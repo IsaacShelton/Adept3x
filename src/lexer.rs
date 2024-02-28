@@ -1,5 +1,5 @@
-use crate::look_ahead::LookAhead;
 use crate::line_column::LineColumn;
+use crate::look_ahead::LookAhead;
 
 pub struct Lexer<I: Iterator<Item = char>> {
     characters: LookAhead<LineColumn<I>>,
@@ -199,8 +199,25 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct TokenInfo {
+    token: Token,
+    friendly_line_number: usize,
+    friendly_column_number: usize,
+}
+
+impl TokenInfo {
+    pub fn new<T: Iterator<Item = char>>(token: Token, line_column: &LineColumn<T>) -> TokenInfo {
+        TokenInfo {
+            token,
+            friendly_line_number: line_column.friendly_line_number(),
+            friendly_column_number: line_column.friendly_column_number(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Error { message: String, friendly_line_number: usize, friendly_column_number: usize },
+    Error(String),
     Newline,
     Identifier(String),
     OpenCurly,
@@ -235,20 +252,16 @@ impl<I> Iterator for Lexer<I>
 where
     I: Iterator<Item = char>,
 {
-    type Item = Token;
+    type Item = TokenInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.feed() {
                 FeedResult::Done => return None,
                 FeedResult::Waiting => (),
-                FeedResult::Has(token) => return Some(token),
+                FeedResult::Has(token) => return Some(TokenInfo::new(token, &self.characters)),
                 FeedResult::Error(message) => {
-                    return Some(Token::Error{
-                        message,
-                        friendly_line_number: self.characters.friendly_line_number(),
-                        friendly_column_number: self.characters.friendly_column_number(),
-                    })
+                    return Some(TokenInfo::new(Token::Error(message), &self.characters));
                 }
             }
         }
