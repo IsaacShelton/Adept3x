@@ -1,0 +1,10 @@
+
+/// This is a doc comment
+func main {
+    // Regular strings
+    println("Hello World")
+
+    // Null terminated strings
+    printf(c"Hello World")
+}
+
