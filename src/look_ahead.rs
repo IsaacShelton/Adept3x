@@ -1,10 +1,14 @@
-use std::{collections::VecDeque, iter::Fuse};
+use derive_more::Deref;
+use std::collections::VecDeque;
 
+#[derive(Deref)]
 pub struct LookAhead<I>
 where
     I: Iterator,
 {
-    iterator: Fuse<I>,
+    #[deref]
+    iterator: I,
+
     buffer: VecDeque<I::Item>,
 }
 
@@ -14,7 +18,7 @@ where
 {
     pub fn new(iterator: I) -> Self {
         Self {
-            iterator: iterator.fuse(),
+            iterator,
             buffer: VecDeque::new(),
         }
     }

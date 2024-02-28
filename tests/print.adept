@@ -6,5 +6,9 @@ func main {
 
     // Null terminated strings
     printf(c"Hello World")
+
+    println(3 * 4 + 5 / 6 % 7 - 2)
+
+    return 10
 }
 

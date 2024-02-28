@@ -1,7 +1,8 @@
 use crate::look_ahead::LookAhead;
+use crate::line_column::LineColumn;
 
 pub struct Lexer<I: Iterator<Item = char>> {
-    characters: LookAhead<I>,
+    characters: LookAhead<LineColumn<I>>,
     state: State,
 }
 
@@ -18,7 +19,7 @@ where
 {
     pub fn new(characters: I) -> Self {
         Self {
-            characters: LookAhead::new(characters),
+            characters: LookAhead::new(LineColumn::new(characters)),
             state: State::Idle,
         }
     }
@@ -85,6 +86,31 @@ where
                         FeedResult::Done
                     }
                 }
+                '.' => FeedResult::Has(Token::Member),
+                '+' => FeedResult::Has(Token::Add),
+                '-' => FeedResult::Has(Token::Subtract),
+                '*' => FeedResult::Has(Token::Multiply),
+                '/' => FeedResult::Has(Token::Divide),
+                '%' => FeedResult::Has(Token::Modulus),
+                '=' if self.characters.peek() == Some(&'=') => {
+                    self.characters.next();
+                    FeedResult::Has(Token::Equals)
+                }
+                '!' if self.characters.peek() == Some(&'=') => {
+                    self.characters.next();
+                    FeedResult::Has(Token::NotEquals)
+                }
+                '<' if self.characters.peek() == Some(&'=') => {
+                    self.characters.next();
+                    FeedResult::Has(Token::LessThanEq)
+                }
+                '>' if self.characters.peek() == Some(&'=') => {
+                    self.characters.next();
+                    FeedResult::Has(Token::GreaterThanEq)
+                }
+                '<' => FeedResult::Has(Token::LessThan),
+                '>' => FeedResult::Has(Token::GreaterThan),
+                '!' => FeedResult::Has(Token::Not),
                 '\"' => {
                     self.state = State::String(StringState {
                         value: String::new(),
@@ -123,12 +149,12 @@ where
             } else {
                 let identifier = std::mem::replace(state, String::default());
                 self.state = State::Idle;
-                FeedResult::Has(Token::Identifier(identifier))
+                FeedResult::Has(Self::new_token_from_identifier(identifier))
             }
         } else {
             let identifier = std::mem::replace(state, String::default());
             self.state = State::Idle;
-            FeedResult::Has(Token::Identifier(identifier))
+            FeedResult::Has(Self::new_token_from_identifier(identifier))
         }
     }
 
@@ -162,11 +188,19 @@ where
             FeedResult::Error("Unclosed string literal".into())
         }
     }
+
+    fn new_token_from_identifier(value: String) -> Token {
+        match value.as_str() {
+            "func" => Token::FuncKeyword,
+            "return" => Token::ReturnKeyword,
+            _ => Token::Identifier(value),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Error(String),
+    Error { message: String, friendly_line_number: usize, friendly_column_number: usize },
     Newline,
     Identifier(String),
     OpenCurly,
@@ -180,6 +214,21 @@ pub enum Token {
         modifier: StringModifier,
     },
     DocComment(String),
+    FuncKeyword,
+    ReturnKeyword,
+    Member,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulus,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanEq,
+    GreaterThanEq,
+    Not,
 }
 
 impl<I> Iterator for Lexer<I>
@@ -194,7 +243,13 @@ where
                 FeedResult::Done => return None,
                 FeedResult::Waiting => (),
                 FeedResult::Has(token) => return Some(token),
-                FeedResult::Error(error) => return Some(Token::Error(error)),
+                FeedResult::Error(message) => {
+                    return Some(Token::Error{
+                        message,
+                        friendly_line_number: self.characters.friendly_line_number(),
+                        friendly_column_number: self.characters.friendly_column_number(),
+                    })
+                }
             }
         }
     }

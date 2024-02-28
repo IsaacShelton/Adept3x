@@ -1,6 +1,7 @@
 
 mod lexer;
 mod look_ahead;
+mod line_column;
 
 use std::io::BufReader;
 use std::process::exit;
