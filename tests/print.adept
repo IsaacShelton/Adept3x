@@ -7,7 +7,15 @@ func main {
     // Null terminated strings
     printf(c"Hello World")
 
-    println(3 * 4 + 5 / 6 % 7 - 2)
+    println(3 * -4 + 5 / -6 % 7 - 2)
+
+
+    f1 := 3.1415
+    f2 := 4.53e7
+    f3 := 4.53E7
+    f4 := -3.1415
+    f5 := -4.53e7
+    f6 := -4.53E7
 
     return 10
 }

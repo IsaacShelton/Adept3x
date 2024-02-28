@@ -1,3 +1,5 @@
+use num_bigint::BigInt;
+
 use crate::line_column::LineColumn;
 use crate::look_ahead::LookAhead;
 
@@ -29,6 +31,7 @@ where
             State::Idle => self.feed_idle(),
             State::Identifier(_) => self.feed_identifier(),
             State::String { .. } => self.feed_string(),
+            State::Number { .. } => self.feed_number(),
         }
     }
 
@@ -85,6 +88,24 @@ where
 
                         FeedResult::Done
                     }
+                }
+                '-' if self
+                    .characters
+                    .peek()
+                    .map_or(false, |next_c| next_c.is_ascii_digit()) =>
+                {
+                    self.state = State::Number(NumberState {
+                        value: String::from(c),
+                        ..Default::default()
+                    });
+                    FeedResult::Waiting
+                }
+                '0'..='9' => {
+                    self.state = State::Number(NumberState {
+                        value: String::from(c),
+                        ..Default::default()
+                    });
+                    FeedResult::Waiting
                 }
                 '.' => FeedResult::Has(Token::Member),
                 '+' => FeedResult::Has(Token::Add),
@@ -189,6 +210,40 @@ where
         }
     }
 
+    fn feed_number(&mut self) -> FeedResult<Token> {
+        let state = self.state.as_mut_number();
+
+        if let Some(c) = self.characters.next() {
+            if c.is_ascii_digit() {
+                state.can_neg = false;
+                state.value.push(c);
+                FeedResult::Waiting
+            } else if c == '.' && state.can_dot {
+                state.can_dot = false;
+                state.value.push(c);
+                FeedResult::Waiting
+            } else if (c == 'e' || c == 'E') && state.can_exp {
+                state.can_exp = false;
+                state.can_neg = true;
+                state.can_dot = false;
+                state.value.push(c);
+                FeedResult::Waiting
+            } else if c == '-' && state.can_neg {
+                state.can_neg = false;
+                state.value.push(c);
+               FeedResult::Waiting
+            } else {
+                let token = state.to_token();
+                self.state = State::Idle;
+                FeedResult::Has(token)
+            }
+        } else {
+            let token = state.to_token();
+            self.state = State::Idle;
+            FeedResult::Has(token)
+        }
+    }
+
     fn new_token_from_identifier(value: String) -> Token {
         match value.as_str() {
             "func" => Token::FuncKeyword,
@@ -229,6 +284,12 @@ pub enum Token {
     String {
         value: String,
         modifier: StringModifier,
+    },
+    Integer {
+        value: BigInt,
+    },
+    Float {
+        value: f64,
     },
     DocComment(String),
     FuncKeyword,
@@ -280,10 +341,45 @@ struct StringState {
     modifier: StringModifier,
 }
 
+struct NumberState {
+    value: String,
+    can_dot: bool,
+    can_exp: bool,
+    can_neg: bool,
+}
+
+impl Default for NumberState {
+    fn default() -> Self {
+        Self {
+            value: String::new(),
+            can_dot: true,
+            can_exp: true,
+            can_neg: false,
+        }
+    }
+}
+
+impl NumberState {
+    pub fn to_token(&self) -> Token {
+        match self.value.parse::<BigInt>() {
+            Ok(value) => return Token::Integer { value },
+            _ => (),
+        }
+
+        match self.value.parse::<f64>() {
+            Ok(value) => return Token::Float { value },
+            _ => (),
+        }
+
+        Token::Error("Invalid number".into())
+    }
+}
+
 enum State {
     Idle,
     Identifier(String),
     String(StringState),
+    Number(NumberState),
 }
 
 impl State {
@@ -297,6 +393,13 @@ impl State {
     pub fn as_mut_string(&mut self) -> &mut StringState {
         match self {
             State::String(state) => state,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_mut_number(&mut self) -> &mut NumberState {
+        match self {
+            State::Number(state) => state,
             _ => panic!(),
         }
     }
