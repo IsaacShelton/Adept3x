@@ -1,0 +1,9 @@
+
+func main {
+    return 0xA
+    return 0xa
+    return 0x123456F
+    return 0xDEADBEEF
+    return 0xabcdef
+}
+

@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 derive_more = "0.99.17"
 num-bigint = "0.4.4"
+num-traits = "0.2.18"
 utf8-chars = "3.0.2"

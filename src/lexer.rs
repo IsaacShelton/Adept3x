@@ -1,4 +1,5 @@
 use num_bigint::BigInt;
+use num_traits::Num;
 
 use crate::line_column::LineColumn;
 use crate::look_ahead::LookAhead;
@@ -32,6 +33,7 @@ where
             State::Identifier(_) => self.feed_identifier(),
             State::String { .. } => self.feed_string(),
             State::Number { .. } => self.feed_number(),
+            State::HexNumber { .. } => self.feed_hex_number(),
         }
     }
 
@@ -89,22 +91,28 @@ where
                         FeedResult::Done
                     }
                 }
-                '-' if self
-                    .characters
-                    .peek()
-                    .map_or(false, |next_c| next_c.is_ascii_digit()) =>
-                {
-                    self.state = State::Number(NumberState {
-                        value: String::from(c),
-                        ..Default::default()
-                    });
-                    FeedResult::Waiting
-                }
                 '0'..='9' => {
-                    self.state = State::Number(NumberState {
-                        value: String::from(c),
-                        ..Default::default()
-                    });
+                    self.state = match self.characters.peek() {
+                        Some('x' | 'X') => {
+                            // Eat 0x
+                            self.characters.next();
+
+                            if let Some(c) = self.characters.next() {
+                                State::HexNumber(HexNumberState {
+                                    value: String::from(c),
+                                })
+                            } else {
+                                return FeedResult::Has(Token::Error(
+                                    "Expected hex number after '0x'".into(),
+                                ));
+                            }
+                        }
+                        _ => State::Number(NumberState {
+                            value: String::from(c),
+                            ..Default::default()
+                        }),
+                    };
+
                     FeedResult::Waiting
                 }
                 '.' => FeedResult::Has(Token::Member),
@@ -231,7 +239,26 @@ where
             } else if c == '-' && state.can_neg {
                 state.can_neg = false;
                 state.value.push(c);
-               FeedResult::Waiting
+                FeedResult::Waiting
+            } else {
+                let token = state.to_token();
+                self.state = State::Idle;
+                FeedResult::Has(token)
+            }
+        } else {
+            let token = state.to_token();
+            self.state = State::Idle;
+            FeedResult::Has(token)
+        }
+    }
+
+    fn feed_hex_number(&mut self) -> FeedResult<Token> {
+        let state = self.state.as_mut_hex_number();
+
+        if let Some(c) = self.characters.peek() {
+            if c.is_ascii_hexdigit() {
+                state.value.push(self.characters.next().unwrap());
+                FeedResult::Waiting
             } else {
                 let token = state.to_token();
                 self.state = State::Idle;
@@ -375,11 +402,25 @@ impl NumberState {
     }
 }
 
+struct HexNumberState {
+    value: String,
+}
+
+impl HexNumberState {
+    pub fn to_token(&self) -> Token {
+        match BigInt::from_str_radix(&self.value, 16) {
+            Ok(value) => Token::Integer { value },
+            Err(_) => Token::Error(format!("Invalid hex number {}", &self.value).into()),
+        }
+    }
+}
+
 enum State {
     Idle,
     Identifier(String),
     String(StringState),
     Number(NumberState),
+    HexNumber(HexNumberState),
 }
 
 impl State {
@@ -400,6 +441,13 @@ impl State {
     pub fn as_mut_number(&mut self) -> &mut NumberState {
         match self {
             State::Number(state) => state,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_mut_hex_number(&mut self) -> &mut HexNumberState {
+        match self {
+            State::HexNumber(state) => state,
             _ => panic!(),
         }
     }
