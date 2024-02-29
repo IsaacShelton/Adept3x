@@ -1,6 +1,9 @@
 mod ast;
+mod error;
+mod ir;
 mod lexer;
 mod line_column;
+mod llvm_backend;
 mod look_ahead;
 mod parser;
 mod token;
@@ -36,7 +39,10 @@ fn main() {
     }
     */
 
-    let ast = parse(Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))), filename.clone());
+    let ast = parse(
+        Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))),
+        filename.clone(),
+    );
     match ast {
         Ok(ast) => println!("{:?}", ast),
         Err(parse_error) => {

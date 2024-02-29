@@ -1,7 +1,5 @@
 use std::fmt::Display;
-
 use colored::Colorize;
-
 use crate::line_column::Location;
 
 #[derive(Clone, Debug)]

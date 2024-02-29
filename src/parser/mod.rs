@@ -4,7 +4,6 @@ use crate::ast::{Ast, Function};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{Token, TokenInfo};
-
 use self::error::{ErrorInfo, ParseError};
 
 struct Parser<I>
