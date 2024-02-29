@@ -54,11 +54,11 @@ where
                 Err(ParseError {
                     message: if let Some(for_reason) = for_reason {
                         format!(
-                            "Expected identifier {}, instead got '{:?}'",
+                            "Expected identifier {}, instead got {}",
                             for_reason, token_info.token
                         )
                     } else {
-                        format!("Expected identifier, instead got '{:?}'", token_info.token)
+                        format!("Expected identifier, instead got {}", token_info.token)
                     },
                     location: token_info.location,
                 })
@@ -83,7 +83,7 @@ where
     pub fn error_unexpected_token(&self, token_info: Option<TokenInfo>) -> ParseError {
         if let Some(token_info) = token_info {
             ParseError {
-                message: format!("Unexpected token '{:?}'", token_info.token),
+                message: format!("Unexpected token {}", token_info.token),
                 location: token_info.location,
             }
         } else {

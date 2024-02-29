@@ -69,12 +69,10 @@ where
     }
 
     #[allow(dead_code)]
-    pub fn next_friendly_line_number(&self) -> usize {
-        self.next_line + 1
-    }
-
-    #[allow(dead_code)]
-    pub fn next_friendly_column_number(&self) -> usize {
-        self.next_column + 1
+    pub fn next_friendly_location(&self) -> Location {
+        Location {
+            line: self.next_line + 1,
+            column: self.next_column + 1,
+        }
     }
 }

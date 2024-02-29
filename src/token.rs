@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use num_bigint::BigInt;
 
 use crate::line_column::Location;
@@ -58,3 +60,40 @@ pub enum Token {
     GreaterThanEq,
     Not,
 }
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Token::*;
+        f.write_str(match self {
+            Error(_) => "'error'",
+            Newline => "'newline'",
+            Identifier(_) => "'identifier'",
+            OpenCurly => "'{'",
+            CloseCurly => "'}'",
+            OpenParen => "'('",
+            CloseParen => "')'",
+            OpenBracket => "']'",
+            CloseBracket => "']'",
+            String { .. } => "'string'",
+            Integer { .. } => "'integer'",
+            Float { .. } => "'float'",
+            DocComment(_) => "'documentation comment'",
+            FuncKeyword => "'func' keyword",
+            ReturnKeyword => "'return' keyword",
+            Member => "'.'",
+            Add => "'+'",
+            Subtract => "'-'",
+            Multiply => "'*'",
+            Divide => "'/'",
+            Modulus => "'%'",
+            Equals => "'='",
+            NotEquals => "'!='",
+            LessThan => "'<'",
+            GreaterThan => "'>'",
+            LessThanEq => "'<='",
+            GreaterThanEq => "'>='",
+            Not => "'!'",
+        })
+    }
+}
+

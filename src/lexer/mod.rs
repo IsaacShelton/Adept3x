@@ -46,9 +46,9 @@ where
         match self.state {
             State::Idle => self.feed_idle(),
             State::Identifier(_) => self.feed_identifier(),
-            State::String { .. } => self.feed_string(),
-            State::Number { .. } => self.feed_number(),
-            State::HexNumber { .. } => self.feed_hex_number(),
+            State::String(_) => self.feed_string(),
+            State::Number(_) => self.feed_number(),
+            State::HexNumber(_) => self.feed_hex_number(),
         }
     }
 
@@ -261,55 +261,59 @@ where
     }
 
     fn feed_number(&mut self) -> FeedResult<TokenInfo> {
+        use FeedResult::*;
+
         let state = self.state.as_mut_number();
 
         if let Some((c, _)) = self.characters.next() {
             if c.is_ascii_digit() {
                 state.can_neg = false;
                 state.value.push(c);
-                FeedResult::Waiting
+                Waiting
             } else if c == '.' && state.can_dot {
                 state.can_dot = false;
                 state.value.push(c);
-                FeedResult::Waiting
+                Waiting
             } else if (c == 'e' || c == 'E') && state.can_exp {
                 state.can_exp = false;
                 state.can_neg = true;
                 state.can_dot = false;
                 state.value.push(c);
-                FeedResult::Waiting
+                Waiting
             } else if c == '-' && state.can_neg {
                 state.can_neg = false;
                 state.value.push(c);
-                FeedResult::Waiting
+                Waiting
             } else {
                 let token = state.to_token_info();
                 self.state = State::Idle;
-                FeedResult::Has(token)
+                Has(token)
             }
         } else {
             let token = state.to_token_info();
             self.state = State::Idle;
-            FeedResult::Has(token)
+            Has(token)
         }
     }
 
     fn feed_hex_number(&mut self) -> FeedResult<TokenInfo> {
+        use FeedResult::*;
+
         let state = self.state.as_mut_hex_number();
 
         if let Some((c, _)) = self.characters.peek() {
             if c.is_ascii_hexdigit() {
                 state.value.push(self.characters.next().unwrap().0);
-                FeedResult::Waiting
+                Waiting
             } else {
                 let token = state.to_token_info();
                 self.state = State::Idle;
-                FeedResult::Has(token)
+                Has(token)
             }
         } else {
             let token = state.to_token_info();
             self.state = State::Idle;
-            FeedResult::Has(token)
+            Has(token)
         }
     }
 }
