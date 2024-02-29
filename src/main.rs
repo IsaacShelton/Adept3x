@@ -1,13 +1,17 @@
-
+mod ast;
 mod lexer;
-mod look_ahead;
 mod line_column;
+mod look_ahead;
+mod parser;
+mod token;
 
+use colored::Colorize;
+use lexer::Lexer;
+use parser::parse;
+use std::fs::File;
 use std::io::BufReader;
 use std::process::exit;
-use std::fs::File;
 use utf8_chars::BufReadCharsExt;
-use lexer::Lexer;
 
 fn main() {
     if std::env::args().len() != 2 {
@@ -27,7 +31,24 @@ fn main() {
 
     let mut reader = BufReader::new(file);
 
+    /*
     for token in Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))) {
         println!("{:?}", token);
     }
+    */
+
+    let ast = parse(Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))));
+    match ast {
+        Ok(ast) => println!("{:?}", ast),
+        Err(parse_error) => {
+            eprintln!(
+                "{}:{}:{}: {}: {}",
+                filename,
+                parse_error.location.line,
+                parse_error.location.column,
+                "error".bright_red().bold(),
+                parse_error.message
+            );
+        }
+    };
 }

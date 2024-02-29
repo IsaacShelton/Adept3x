@@ -1,5 +1,17 @@
 use std::iter::Fuse;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Location {
+    pub line: usize,
+    pub column: usize,
+}
+
+impl Location {
+    pub fn new(line: usize, column: usize) -> Self {
+        Self { line, column }
+    }
+}
+
 pub struct LineColumn<I: Iterator<Item = char>> {
     iterator: Fuse<I>,
     line: usize,
@@ -12,7 +24,7 @@ impl<I> Iterator for LineColumn<I>
 where
     I: Iterator<Item = char>,
 {
-    type Item = I::Item;
+    type Item = (I::Item, Location);
 
     fn next(&mut self) -> Option<Self::Item> {
         let character = self.iterator.next();
@@ -31,7 +43,7 @@ where
             None => (),
         }
 
-        character
+        character.map(|character| (character, self.friendly_location()))
     }
 }
 
@@ -49,12 +61,11 @@ where
         }
     }
 
-    pub fn friendly_line_number(&self) -> usize {
-        self.line + 1
-    }
-
-    pub fn friendly_column_number(&self) -> usize {
-        self.column + 1
+    pub fn friendly_location(&self) -> Location {
+        Location {
+            line: self.line + 1,
+            column: self.column + 1,
+        }
     }
 
     #[allow(dead_code)]
