@@ -5,7 +5,6 @@ mod look_ahead;
 mod parser;
 mod token;
 
-use colored::Colorize;
 use lexer::Lexer;
 use parser::parse;
 use std::fs::File;
@@ -37,18 +36,11 @@ fn main() {
     }
     */
 
-    let ast = parse(Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))));
+    let ast = parse(Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))), filename.clone());
     match ast {
         Ok(ast) => println!("{:?}", ast),
         Err(parse_error) => {
-            eprintln!(
-                "{}:{}:{}: {}: {}",
-                filename,
-                parse_error.location.line,
-                parse_error.location.column,
-                "error".bright_red().bold(),
-                parse_error.message
-            );
+            eprintln!("{}", parse_error);
         }
     };
 }
