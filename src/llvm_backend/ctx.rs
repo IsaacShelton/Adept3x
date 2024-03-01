@@ -21,13 +21,27 @@ pub struct StaticVariable {
     pub ty: LLVMTypeRef,
 }
 
+pub struct FunctionSkeleton {
+    pub skeleton: LLVMValueRef,
+    pub ir_function: Option<ir::FunctionRef>,
+}
+
+impl<'a> FunctionSkeleton {
+    pub fn new(skeleton: LLVMValueRef, ir_function: Option<ir::FunctionRef>) -> Self {
+        Self {
+            skeleton,
+            ir_function
+        }
+    }
+}
+
 pub struct BackendContext<'a> {
     pub backend_module: &'a BackendModule,
     pub ir_module: ir::Module,
     pub builder: Option<Builder>,
     pub value_catalog: Option<ValueCatalog>,
     pub variable_stack: Option<VariableStack>,
-    pub func_skeletons: Vec<LLVMValueRef>,
+    pub func_skeletons: Vec<FunctionSkeleton>,
     pub global_variables: Vec<LLVMValueRef>,
     pub anon_global_variables: Vec<LLVMValueRef>,
     pub target_data: &'a TargetData,

@@ -49,7 +49,7 @@ fn main() {
         filename.clone(),
     );
 
-    let ir_module = match ast {
+    let lower_result = match ast {
         Ok(ast) => {
             println!("{:?}", ast);
             lower(&ast)
@@ -59,6 +59,15 @@ fn main() {
             exit(1);
         }
     };
+
+    let ir_module = match lower_result {
+        Ok(ir_module) => ir_module,
+        Err(error) => {
+            eprintln!("{}", error);
+            exit(1);
+        }
+    };
+    println!("{:?}", ir_module);
 
     match unsafe { llvm_backend(&ir_module) } {
         Err(error) => eprintln!("{}", error),

@@ -29,9 +29,16 @@ pub struct CompilerError {
 }
 
 impl CompilerError {
-    pub fn during_backend(message: String) -> Self {
+    pub fn during_lower(message: impl ToString) -> Self {
         Self {
-            message,
+            message: message.to_string(),
+            kind: CompilerErrorKind::Lower,
+        }
+    }
+
+    pub fn during_backend(message: impl ToString) -> Self {
+        Self {
+            message: message.to_string(),
             kind: CompilerErrorKind::Backend,
         }
     }

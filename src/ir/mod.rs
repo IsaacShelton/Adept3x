@@ -1,4 +1,6 @@
+
 use slotmap::{new_key_type, SlotMap};
+use derive_more::{Deref, DerefMut};
 
 new_key_type! {
     pub struct FunctionRef;
@@ -25,7 +27,7 @@ pub struct Function {
     pub mangled_name: String,
     pub parameters: Vec<Type>,
     pub return_type: Type,
-    pub basicblocks: Vec<BasicBlock>,
+    pub basicblocks: BasicBlocks,
     pub is_cstyle_variadic: bool,
     pub is_foreign: bool,
     pub is_exposed: bool,
@@ -128,7 +130,7 @@ impl BasicBlock {
             .unwrap_or(false)
     }
 
-    pub fn append(&mut self, instruction: Instruction) -> Result<(), ()> {
+    pub fn push(&mut self, instruction: Instruction) -> Result<(), ()> {
         if self.is_terminated() {
             Err(())
         } else {
@@ -137,8 +139,31 @@ impl BasicBlock {
         }
     }
 
-    pub fn iter(&mut self) -> impl Iterator<Item = &Instruction> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = &Instruction> + '_ {
         self.instructions.iter()
+    }
+}
+
+#[derive(Clone, Debug, Deref, DerefMut, Default)]
+pub struct BasicBlocks {
+    #[deref]
+    #[deref_mut]
+    pub blocks: Vec<BasicBlock>,
+}
+
+impl BasicBlocks {
+    pub fn new() -> Self {
+        Self {
+            blocks: vec![],
+        }
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        if let Some(basicblock) = self.blocks.last() {
+            basicblock.is_terminated()
+        } else {
+            false
+        }
     }
 }
 

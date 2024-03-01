@@ -7,22 +7,30 @@ mod target_machine;
 mod value_catalog;
 mod variable_stack;
 
+use self::{
+    builder::Builder,
+    ctx::{BackendContext, FunctionSkeleton},
+    module::BackendModule,
+    target_data::TargetData,
+    target_machine::TargetMachine,
+};
 use crate::{
     error::CompilerError,
-    ir::{self},
+    ir::{self, Instruction},
 };
 use colored::Colorize;
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMCreateEnumAttribute, LLVMDisposeMessage,
-        LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType,
-        LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type,
-        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType,
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAppendBasicBlock, LLVMBuildRet, LLVMConstInt,
+        LLVMConstReal, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
+        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName,
+        LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type,
+        LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
         LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMStructType,
         LLVMVoidType,
     },
-    prelude::{LLVMModuleRef, LLVMTypeRef},
+    prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
         LLVMSetModuleDataLayout, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters,
         LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
@@ -38,15 +46,10 @@ use llvm_sys::{
 use slotmap::SlotMap;
 use std::{
     error::Error,
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, c_double, c_ulonglong, CStr, CString},
     fmt::Display,
     mem::MaybeUninit,
-    ptr::null_mut,
-};
-
-use self::{
-    ctx::BackendContext, module::BackendModule, target_data::TargetData,
-    target_machine::TargetMachine,
+    ptr::{null, null_mut},
 };
 
 pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> {
@@ -130,7 +133,7 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
         )
     };
 
-    for function in ctx.ir_module.functions.values() {
+    for (function_ref, function) in ctx.ir_module.functions.iter() {
         let mut parameters: Vec<LLVMTypeRef> =
             to_backend_types(ctx.backend_module, &function.parameters);
         let return_type = to_backend_type(ctx.backend_module, &function.return_type);
@@ -154,9 +157,101 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
         if !function.is_foreign && !function.is_exposed {
             LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);
         }
+
+        ctx.func_skeletons
+            .push(FunctionSkeleton::new(skeleton, Some(function_ref)));
     }
 
     Ok(())
+}
+
+unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
+    for FunctionSkeleton {
+        skeleton,
+        ir_function,
+    } in ctx.func_skeletons.iter()
+    {
+        if let Some(ir_function) =
+            ir_function.and_then(|function_ref| ctx.ir_module.functions.get(function_ref))
+        {
+            let builder = Builder::new();
+
+            let basicblocks = ir_function
+                .basicblocks
+                .iter()
+                .map(|ir_basicblock| {
+                    (
+                        ir_basicblock,
+                        LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            for (ir_basicblock, llvm_basicblock) in basicblocks.iter() {
+                create_function_block(&builder, ir_basicblock, *llvm_basicblock);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+unsafe fn create_function_block(
+    builder: &Builder,
+    ir_basicblock: &ir::BasicBlock,
+    llvm_basicblock: LLVMBasicBlockRef,
+) {
+    LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
+
+    for instruction in ir_basicblock.iter() {
+        match instruction {
+            Instruction::Return(value) => {
+                let _ = LLVMBuildRet(
+                    builder.get(),
+                    value
+                        .as_ref()
+                        .map_or_else(|| null_mut(), |value| build_value(&builder, value)),
+                );
+            }
+        }
+    }
+}
+
+unsafe fn build_value(builder: &Builder, value: &ir::Value) -> LLVMValueRef {
+    match value {
+        ir::Value::Literal(literal) => match literal {
+            ir::Literal::Boolean(value) => {
+                LLVMConstInt(LLVMInt1Type(), *value as c_ulonglong, false as LLVMBool)
+            }
+            ir::Literal::Signed8(value) => {
+                LLVMConstInt(LLVMInt8Type(), *value as c_ulonglong, true as LLVMBool)
+            }
+            ir::Literal::Signed16(value) => {
+                LLVMConstInt(LLVMInt16Type(), *value as c_ulonglong, true as LLVMBool)
+            }
+            ir::Literal::Signed32(value) => {
+                LLVMConstInt(LLVMInt32Type(), *value as c_ulonglong, true as LLVMBool)
+            }
+            ir::Literal::Signed64(value) => {
+                LLVMConstInt(LLVMInt64Type(), *value as c_ulonglong, true as LLVMBool)
+            }
+            ir::Literal::Unsigned8(value) => {
+                LLVMConstInt(LLVMInt8Type(), *value as c_ulonglong, false as LLVMBool)
+            }
+            ir::Literal::Unsigned16(value) => {
+                LLVMConstInt(LLVMInt16Type(), *value as c_ulonglong, false as LLVMBool)
+            }
+            ir::Literal::Unsigned32(value) => {
+                LLVMConstInt(LLVMInt32Type(), *value as c_ulonglong, false as LLVMBool)
+            }
+            ir::Literal::Unsigned64(value) => {
+                LLVMConstInt(LLVMInt64Type(), *value as c_ulonglong, false as LLVMBool)
+            }
+            ir::Literal::Float32(value) => LLVMConstReal(LLVMFloatType(), *value as c_double),
+            ir::Literal::Float64(value) => LLVMConstReal(LLVMDoubleType(), *value as c_double),
+        },
+        ir::Value::Reference(_) => todo!(),
+    }
 }
 
 unsafe fn to_backend_type(backend_module: &BackendModule, ir_type: &ir::Type) -> LLVMTypeRef {
@@ -205,10 +300,6 @@ unsafe fn to_backend_types(
         .iter()
         .map(|ty| to_backend_type(backend_module, ty))
         .collect()
-}
-
-unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
-    Ok(())
 }
 
 unsafe fn implement_static_init() -> Result<(), CompilerError> {
