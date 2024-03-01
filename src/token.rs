@@ -1,8 +1,7 @@
-use std::fmt::Display;
-
-use num_bigint::BigInt;
-
 use crate::line_column::Location;
+use derive_more::IsVariant;
+use num_bigint::BigInt;
+use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TokenInfo {
@@ -22,7 +21,7 @@ pub enum StringModifier {
     NullTerminated,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, IsVariant)]
 pub enum Token {
     Error(String),
     Newline,
@@ -96,4 +95,3 @@ impl Display for Token {
         })
     }
 }
-

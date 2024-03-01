@@ -1,10 +1,10 @@
-mod error;
-
-use crate::ast::{Ast, Function};
+use self::error::{ErrorInfo, ParseError};
+use crate::ast::{Ast, Expression, Function, Statement};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{Token, TokenInfo};
-use self::error::{ErrorInfo, ParseError};
+
+mod error;
 
 struct Parser<I>
 where
@@ -36,6 +36,22 @@ where
         self.iterator.peek_nth(n)
     }
 
+    pub fn peek_is(&mut self, token: Token) -> bool {
+        if let Some(token_info) = self.iterator.peek() {
+            token_info.token == token
+        } else {
+            false
+        }
+    }
+
+    pub fn peek_is_or_eof(&mut self, token: Token) -> bool {
+        if let Some(token_info) = self.iterator.peek() {
+            token_info.token == token
+        } else {
+            true
+        }
+    }
+
     pub fn next(&mut self) -> Option<TokenInfo> {
         self.iterator.next().map(|token_info| {
             self.previous_location = token_info.location;
@@ -43,7 +59,10 @@ where
         })
     }
 
-    pub fn parse_identifier(&mut self, for_reason: Option<impl ToString>) -> Result<String, ParseError> {
+    pub fn parse_identifier(
+        &mut self,
+        for_reason: Option<impl ToString>,
+    ) -> Result<String, ParseError> {
         if let Some(token_info) = self.next() {
             if let Token::Identifier(identifier) = token_info.token {
                 Ok(identifier)
@@ -76,30 +95,38 @@ where
         token: Token,
         for_reason: Option<impl ToString>,
     ) -> Result<(), ParseError> {
-        if let Some(token_info) = self.next() {
+        let token_info = self.next();
+
+        if let Some(token_info) = &token_info {
             if token_info.token == token {
                 return Ok(());
             }
+        }
 
-            Err(ParseError {
+        Err(self.error_expected_token(token, for_reason, token_info))
+    }
+
+    pub fn error_expected_token(&self, token: Token, for_reason: Option<impl ToString>, token_info: Option<TokenInfo>) -> ParseError {
+        if let Some(token_info) = token_info {
+            ParseError {
                 filename: Some(self.filename.clone()),
                 location: Some(token_info.location),
                 info: ErrorInfo::Expected {
                     expected: format!("{}", token),
                     got: Some(format!("{}", token_info.token)),
                     for_reason: for_reason.map(|reason| reason.to_string()),
-                }
-            })
+                },
+            }
         } else {
-            Err(ParseError {
+            ParseError {
                 filename: Some(self.filename.clone()),
                 location: Some(self.previous_location),
                 info: ErrorInfo::Expected {
                     expected: format!("{}", token),
                     got: None,
                     for_reason: for_reason.map(|reason| reason.to_string()),
-                }
-            })
+                },
+            }
         }
     }
 
@@ -125,15 +152,13 @@ where
                 location: Some(token_info.location),
                 info: ErrorInfo::UnexpectedToken {
                     unexpected: Some(format!("{}", token_info.token)),
-                }
+                },
             }
         } else {
             ParseError {
                 filename: Some(self.filename.clone()),
                 location: Some(self.previous_location),
-                info: ErrorInfo::UnexpectedToken {
-                    unexpected: None,
-                }
+                info: ErrorInfo::UnexpectedToken { unexpected: None },
             }
         }
     }
@@ -143,19 +168,80 @@ where
         //           ^
 
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
+        let mut parameters = vec![];
+        let mut statements = vec![];
+
         self.ignore_newlines();
         self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
         self.ignore_newlines();
-        self.parse_token(Token::CloseCurly, Some("to close function body"))?;
 
-        let parameters = vec![];
-        let statements = vec![];
+        while !self.peek_is_or_eof(Token::CloseCurly) {
+            statements.push(self.parse_statement()?);
+        }
+
+        self.ignore_newlines();
+        self.parse_token(Token::CloseCurly, Some("to close function body"))?;
 
         Ok(Function {
             name,
             parameters,
             statements,
         })
+    }
+
+    fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+        match self.next() {
+            Some(TokenInfo {
+                token: Token::ReturnKeyword,
+                ..
+            }) => self.parse_return(),
+            Some(TokenInfo { token, location }) => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(location),
+                info: ErrorInfo::UnexpectedToken {
+                    unexpected: Some(format!("{}", token)),
+                },
+            }),
+            None => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(self.previous_location),
+                info: ErrorInfo::UnexpectedToken { unexpected: None },
+            }),
+        }
+    }
+
+    fn parse_return(&mut self) -> Result<Statement, ParseError> {
+        // return VALUE
+        //          ^
+
+        if self.peek_is(Token::Newline) {
+            Ok(Statement::Return(None))
+        } else {
+            Ok(Statement::Return(Some(self.parse_expression()?)))
+        }
+    }
+
+    fn parse_expression(&mut self) -> Result<Expression, ParseError> {
+        match self.next() {
+            Some(TokenInfo {
+                token: Token::Integer { value },
+                ..
+            }) => {
+                Ok(Expression::Integer(value))
+            },
+            Some(TokenInfo { token, location }) => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(location),
+                info: ErrorInfo::UnexpectedToken {
+                    unexpected: Some(format!("{}", token)),
+                },
+            }),
+            None => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(self.previous_location),
+                info: ErrorInfo::UnexpectedToken { unexpected: None },
+            }),
+        }
     }
 }
 

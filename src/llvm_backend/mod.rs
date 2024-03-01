@@ -1,3 +1,12 @@
+mod builder;
+mod ctx;
+mod intrinsics;
+mod module;
+mod target_data;
+mod target_machine;
+mod value_catalog;
+mod variable_stack;
+
 use crate::{
     error::CompilerError,
     ir::{self},
@@ -37,15 +46,6 @@ use self::{
     ctx::BackendContext, module::BackendModule, target_data::TargetData,
     target_machine::TargetMachine,
 };
-
-mod builder;
-mod ctx;
-mod intrinsics;
-mod module;
-mod target_data;
-mod target_machine;
-mod value_catalog;
-mod variable_stack;
 
 pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> {
     LLVM_InitializeAllTargetInfos();

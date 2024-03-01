@@ -1,6 +1,5 @@
 use num_bigint::BigInt;
 
-
 #[derive(Clone, Debug)]
 pub struct Ast {
     pub functions: Vec<Function>,
@@ -34,7 +33,7 @@ pub enum Type {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
-    Return(Expression),
+    Return(Option<Expression>),
 }
 
 #[derive(Clone, Debug)]
