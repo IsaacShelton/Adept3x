@@ -26,7 +26,7 @@ pub struct FunctionSkeleton {
     pub ir_function: Option<ir::FunctionRef>,
 }
 
-impl<'a> FunctionSkeleton {
+impl FunctionSkeleton {
     pub fn new(skeleton: LLVMValueRef, ir_function: Option<ir::FunctionRef>) -> Self {
         Self {
             skeleton,
