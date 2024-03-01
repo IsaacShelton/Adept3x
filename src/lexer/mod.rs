@@ -178,7 +178,7 @@ where
                     });
                     Waiting
                 }
-                _ if c.is_alphabetic() => {
+                _ if c.is_alphabetic() || c == '_' => {
                     self.state = State::Identifier(IdentifierState {
                         identifier: String::from(c),
                         start_location: location,

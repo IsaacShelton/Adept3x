@@ -1,10 +1,10 @@
+mod error;
+
 use self::error::{ErrorInfo, ParseError};
 use crate::ast::{Ast, Expression, Function, Statement};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{Token, TokenInfo};
-
-mod error;
 
 struct Parser<I>
 where
@@ -106,7 +106,12 @@ where
         Err(self.error_expected_token(token, for_reason, token_info))
     }
 
-    pub fn error_expected_token(&self, token: Token, for_reason: Option<impl ToString>, token_info: Option<TokenInfo>) -> ParseError {
+    pub fn error_expected_token(
+        &self,
+        token: Token,
+        for_reason: Option<impl ToString>,
+        token_info: Option<TokenInfo>,
+    ) -> ParseError {
         if let Some(token_info) = token_info {
             ParseError {
                 filename: Some(self.filename.clone()),
@@ -226,9 +231,7 @@ where
             Some(TokenInfo {
                 token: Token::Integer { value },
                 ..
-            }) => {
-                Ok(Expression::Integer(value))
-            },
+            }) => Ok(Expression::Integer(value)),
             Some(TokenInfo { token, location }) => Err(ParseError {
                 filename: Some(self.filename.clone()),
                 location: Some(location),

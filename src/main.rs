@@ -7,10 +7,13 @@ mod lexer;
 mod line_column;
 mod llvm_backend;
 mod look_ahead;
+mod lower;
 mod parser;
 mod token;
 
 use lexer::Lexer;
+use llvm_backend::llvm_backend;
+use lower::lower;
 use parser::parse;
 use std::fs::File;
 use std::io::BufReader;
@@ -45,10 +48,20 @@ fn main() {
         Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))),
         filename.clone(),
     );
-    match ast {
-        Ok(ast) => println!("{:?}", ast),
+
+    let ir_module = match ast {
+        Ok(ast) => {
+            println!("{:?}", ast);
+            lower(&ast)
+        }
         Err(parse_error) => {
             eprintln!("{}", parse_error);
+            exit(1);
         }
     };
+
+    match unsafe { llvm_backend(&ir_module) } {
+        Err(error) => eprintln!("{}", error),
+        Ok(()) => (),
+    }
 }

@@ -28,18 +28,20 @@ use llvm_sys::{
         LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
     },
     target_machine::{
-        LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine,
-        LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple,
-        LLVMGetTargetName, LLVMRelocMode, LLVMTarget, LLVMTargetMachineRef, LLVMTargetRef,
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetDataLayout,
+        LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple,
+        LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode, LLVMTarget,
+        LLVMTargetMachineRef, LLVMTargetRef,
     },
     LLVMAttributeFunctionIndex, LLVMCallConv, LLVMLinkage, LLVMModule,
 };
 use slotmap::SlotMap;
 use std::{
     error::Error,
-    ffi::{CStr, CString},
+    ffi::{c_char, CStr, CString},
     fmt::Display,
     mem::MaybeUninit,
+    ptr::null_mut,
 };
 
 use self::{
@@ -79,14 +81,34 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
     create_static_variables()?;
     create_globals()?;
     create_function_heads(&mut ctx)?;
-    create_function_bodies()?;
+    create_function_bodies(&mut ctx)?;
     implement_static_init()?;
     implement_static_deinit()?;
+
+    let mut llvm_emit_error_message: *mut c_char = null_mut();
 
     let module_representation = CStr::from_ptr(LLVMPrintModuleToString(backend_module.get()));
     println!("{}", module_representation.to_string_lossy());
 
-    Ok(())
+    let mut output_object_filename = CString::new("a.o").unwrap();
+
+    llvm_sys::target_machine::LLVMTargetMachineEmitToFile(
+        target_machine.get(),
+        backend_module.get(),
+        output_object_filename.into_raw(),
+        LLVMCodeGenFileType::LLVMObjectFile,
+        &mut llvm_emit_error_message,
+    );
+
+    if !llvm_emit_error_message.is_null() {
+        Err(CompilerError::during_backend(
+            CString::from_raw(llvm_emit_error_message)
+                .to_string_lossy()
+                .into_owned(),
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 unsafe fn create_static_variables() -> Result<(), CompilerError> {
@@ -185,7 +207,7 @@ unsafe fn to_backend_types(
         .collect()
 }
 
-unsafe fn create_function_bodies() -> Result<(), CompilerError> {
+unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
     Ok(())
 }
 
