@@ -21,6 +21,7 @@ use crate::{
 use colored::Colorize;
 use cstr::cstr;
 use llvm_sys::{
+    analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
         LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAppendBasicBlock, LLVMBuildRet, LLVMConstInt,
         LLVMConstReal, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
@@ -94,6 +95,10 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
     println!("{}", module_representation.to_string_lossy());
 
     let mut output_object_filename = CString::new("a.o").unwrap();
+
+    if (LLVMVerifyModule(backend_module.get(), LLVMPrintMessageAction, null_mut()) == 1) {
+        println!("{}", "\n---- WARNING: llvm module verification failed! ----".yellow());
+    }
 
     llvm_sys::target_machine::LLVMTargetMachineEmitToFile(
         target_machine.get(),

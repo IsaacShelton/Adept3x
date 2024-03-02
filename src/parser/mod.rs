@@ -1,7 +1,7 @@
 mod error;
 
 use self::error::{ErrorInfo, ParseError};
-use crate::ast::{Ast, Expression, Function, Statement};
+use crate::ast::{self, Ast, Expression, Function, Statement, Type};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{Token, TokenInfo};
@@ -177,6 +177,9 @@ where
         let mut statements = vec![];
 
         self.ignore_newlines();
+        let return_type = self.parse_type()?;
+
+        self.ignore_newlines();
         self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
         self.ignore_newlines();
 
@@ -190,6 +193,7 @@ where
         Ok(Function {
             name,
             parameters,
+            return_type,
             statements,
         })
     }
@@ -243,6 +247,84 @@ where
                 filename: Some(self.filename.clone()),
                 location: Some(self.previous_location),
                 info: ErrorInfo::UnexpectedToken { unexpected: None },
+            }),
+        }
+    }
+
+    fn parse_type(&mut self) -> Result<Type, ParseError> {
+        match self.next() {
+            Some(TokenInfo {
+                token: Token::Identifier(identifier),
+                location,
+            }) => {
+                use ast::{IntegerBits::*, IntegerSign::*};
+
+                match identifier.as_str() {
+                    "int" => Ok(Type::Integer {
+                        bits: Normal,
+                        sign: Signed,
+                    }),
+                    "uint" => Ok(Type::Integer {
+                        bits: Normal,
+                        sign: Unsigned,
+                    }),
+                    "int8" => Ok(Type::Integer {
+                        bits: Bits8,
+                        sign: Signed,
+                    }),
+                    "uint8" => Ok(Type::Integer {
+                        bits: Bits8,
+                        sign: Unsigned,
+                    }),
+                    "int16" => Ok(Type::Integer {
+                        bits: Bits16,
+                        sign: Signed,
+                    }),
+                    "uint16" => Ok(Type::Integer {
+                        bits: Bits16,
+                        sign: Unsigned,
+                    }),
+                    "int32" => Ok(Type::Integer {
+                        bits: Bits32,
+                        sign: Signed,
+                    }),
+                    "uint32" => Ok(Type::Integer {
+                        bits: Bits32,
+                        sign: Unsigned,
+                    }),
+                    "int64" => Ok(Type::Integer {
+                        bits: Bits64,
+                        sign: Signed,
+                    }),
+                    "uint64" => Ok(Type::Integer {
+                        bits: Bits64,
+                        sign: Unsigned,
+                    }),
+                    "void" => Ok(Type::Void),
+                    _ => Err(ParseError {
+                        filename: Some(self.filename.clone()),
+                        location: Some(location),
+                        info: ErrorInfo::UndeclaredType { name: identifier },
+                    }),
+                }
+            }
+            Some(TokenInfo { location, token }) => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(location),
+                info: ErrorInfo::ExpectedType {
+                    prefix: Some("return ".into()),
+                    for_reason: Some("for function".into()),
+                    got: Some(format!("{}", token)),
+                },
+            }),
+            None => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(self.previous_location),
+                info: ErrorInfo::ExpectedType {
+                    prefix: Some("return ".into()),
+                    for_reason: Some("for function".into()),
+                    got: None,
+                },
             }),
         }
     }

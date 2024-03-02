@@ -1,6 +1,6 @@
-use std::fmt::Display;
-use colored::Colorize;
 use crate::line_column::Location;
+use colored::Colorize;
+use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 pub struct ParseError {
@@ -18,6 +18,14 @@ pub enum ErrorInfo {
         expected: String,
         for_reason: Option<String>,
         got: Option<String>,
+    },
+    ExpectedType {
+        prefix: Option<String>,
+        for_reason: Option<String>,
+        got: Option<String>,
+    },
+    UndeclaredType {
+        name: String,
     },
     Other {
         message: String,
@@ -68,6 +76,28 @@ impl Display for ParseError {
                 } else {
                     write!(f, ", got end-of-file")?;
                 }
+            }
+            ExpectedType { prefix, for_reason, got } => {
+                write!(f, "Expected ")?;
+
+                if let Some(prefix) = prefix {
+                    write!(f, "{}", prefix)?;
+                }
+
+                write!(f, "type")?;
+
+                if let Some(for_reason) = for_reason {
+                    write!(f, " {}", for_reason)?;
+                }
+
+                if let Some(got) = got {
+                    write!(f, ", got {}", got)?;
+                } else {
+                    write!(f, ", got end-of-file")?;
+                }
+            }
+            UndeclaredType { name } => {
+                write!(f, "Undeclared type '{}'", name)?;
             }
             Other { message } => {
                 write!(f, "{}", message)?;

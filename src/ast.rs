@@ -17,6 +17,7 @@ impl Ast {
 pub struct Function {
     pub name: String,
     pub parameters: Vec<Parameter>,
+    pub return_type: Type,
     pub statements: Vec<Statement>,
 }
 
@@ -27,8 +28,24 @@ pub struct Parameter {
 }
 
 #[derive(Clone, Debug)]
+pub enum IntegerBits {
+    Normal,
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
+}
+
+#[derive(Clone, Debug)]
+pub enum IntegerSign {
+    Signed,
+    Unsigned,
+}
+
+#[derive(Clone, Debug)]
 pub enum Type {
-    Integer,
+    Integer { bits: IntegerBits, sign: IntegerSign },
+    Void,
 }
 
 #[derive(Clone, Debug)]
