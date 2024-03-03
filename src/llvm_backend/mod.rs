@@ -46,11 +46,7 @@ use llvm_sys::{
 };
 use slotmap::SlotMap;
 use std::{
-    error::Error,
-    ffi::{c_char, c_double, c_ulonglong, CStr, CString},
-    fmt::Display,
-    mem::MaybeUninit,
-    ptr::{null, null_mut},
+    error::Error, ffi::{c_char, c_double, c_ulonglong, CStr, CString}, fmt::Display, mem::MaybeUninit, process::Command, ptr::{null, null_mut}
 };
 
 pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> {
@@ -109,14 +105,16 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
     );
 
     if !llvm_emit_error_message.is_null() {
-        Err(CompilerError::during_backend(
+        return Err(CompilerError::during_backend(
             CString::from_raw(llvm_emit_error_message)
                 .to_string_lossy()
                 .into_owned(),
         ))
-    } else {
-        Ok(())
     }
+    
+    // Link resulting object file to create executable
+    Command::new("gcc").args(["a.o"]).spawn().expect("Failed to link");
+    Ok(())
 }
 
 unsafe fn create_static_variables() -> Result<(), CompilerError> {

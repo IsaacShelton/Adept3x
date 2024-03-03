@@ -10,8 +10,10 @@ use builder::Builder;
 pub fn lower(ast: &Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
 
-    for function in ast.functions.iter() {
-        lower_function(&mut ir_module, function);
+    for (file_identifier, file) in ast.files.iter() {
+        for function in file.functions.iter() {
+            lower_function(&mut ir_module, function);
+        }
     }
 
     Ok(ir_module)

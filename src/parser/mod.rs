@@ -1,7 +1,7 @@
 mod error;
 
 use self::error::{ErrorInfo, ParseError};
-use crate::ast::{self, Ast, Expression, Function, Statement, Type};
+use crate::ast::{self, Ast, Expression, FileIdentifier, Function, Statement, Type};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{Token, TokenInfo};
@@ -331,14 +331,16 @@ where
 }
 
 pub fn parse(tokens: impl Iterator<Item = TokenInfo>, filename: String) -> Result<Ast, ParseError> {
-    let mut parser = Parser::new(tokens, filename);
-    let mut ast = Ast::new();
+    let mut parser = Parser::new(tokens, filename.clone());
+    let mut ast = Ast::new(filename.clone());
+
+    let mut file = ast.new_file(FileIdentifier::Local(filename));
 
     while let Some(token_info) = parser.peek() {
         match token_info.token {
             Token::FuncKeyword => {
                 parser.next();
-                ast.functions.push(parser.parse_function()?);
+                file.functions.push(parser.parse_function()?);
             }
             Token::Newline => {
                 parser.next();

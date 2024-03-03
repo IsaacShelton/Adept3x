@@ -1,13 +1,51 @@
+use std::collections::HashMap;
+
 use num_bigint::BigInt;
 
 #[derive(Clone, Debug)]
 pub struct Ast {
-    pub functions: Vec<Function>,
+    pub primary_filename: String,
+    pub files: HashMap<FileIdentifier, File>,
 }
 
 impl Ast {
-    pub fn new() -> Ast {
-        Ast {
+    pub fn new(primary_filename: String) -> Self {
+        Self {
+            primary_filename,
+            files: HashMap::new(),
+        }
+    }
+
+    pub fn new_file(&mut self, identifier: FileIdentifier) -> &mut File {
+        self.files.entry(identifier).or_insert_with(|| File::new())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Version {
+    major: i32,
+    minor: i32,
+    patch: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum FileIdentifier {
+    Local(String),
+    Remote {
+        owner: Option<String>,
+        name: String,
+        version: Version,
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct File {
+    pub functions: Vec<Function>,
+}
+
+impl File {
+    pub fn new() -> File {
+        File {
             functions: vec![],
         }
     }
