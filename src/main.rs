@@ -9,12 +9,15 @@ mod llvm_backend;
 mod look_ahead;
 mod lower;
 mod parser;
+mod resolve;
+mod resolved;
 mod token;
 
 use lexer::Lexer;
 use llvm_backend::llvm_backend;
 use lower::lower;
 use parser::parse;
+use resolve::resolve;
 use std::fs::File;
 use std::io::BufReader;
 use std::process::exit;
@@ -29,9 +32,15 @@ fn main() {
     let filename = std::env::args().nth(1).unwrap();
 
     if filename.ends_with(".h") {
-        use lang_c::driver::{Config, parse_preprocessed};
+        use lang_c::driver::{parse_preprocessed, Config};
         let config = Config::default();
-        println!("{:?}", parse_preprocessed(&config, std::fs::read_to_string(filename).expect("Failed to read file")));
+        println!(
+            "{:?}",
+            parse_preprocessed(
+                &config,
+                std::fs::read_to_string(filename).expect("Failed to read file")
+            )
+        );
         return;
     }
 
@@ -51,29 +60,37 @@ fn main() {
     }
     */
 
-    let ast = parse(
+    let ast = match parse(
         Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))),
         filename.clone(),
-    );
-
-    let lower_result = match ast {
-        Ok(ast) => {
-            println!("{:?}", ast);
-            lower(&ast)
-        }
+    ) {
+        Ok(ast) => ast,
         Err(parse_error) => {
             eprintln!("{}", parse_error);
             exit(1);
         }
     };
 
-    let ir_module = match lower_result {
+    println!("{:?}", ast);
+
+    let resolved_ast = match resolve(&ast) {
+        Ok(resolved_ast) => resolved_ast,
+        Err(error) => {
+            eprintln!("{}", error);
+            exit(1);
+        }
+    };
+
+    println!("{:?}", resolved_ast);
+
+    let ir_module = match lower(&resolved_ast) {
         Ok(ir_module) => ir_module,
         Err(error) => {
             eprintln!("{}", error);
             exit(1);
         }
     };
+
     println!("{:?}", ir_module);
 
     match unsafe { llvm_backend(&ir_module) } {

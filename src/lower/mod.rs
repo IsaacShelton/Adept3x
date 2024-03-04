@@ -1,20 +1,18 @@
 mod builder;
 
 use crate::{
-    ast::{self, Ast, Expression, Statement},
+    resolved::{self, Expression, Statement},
     error::CompilerError,
     ir::{self, BasicBlocks, Literal},
 };
 use builder::Builder;
 use std::ffi::CString;
 
-pub fn lower(ast: &Ast) -> Result<ir::Module, CompilerError> {
+pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
 
-    for (file_identifier, file) in ast.files.iter() {
-        for function in file.functions.iter() {
-            lower_function(&mut ir_module, function)?;
-        }
+    for function in ast.functions.values() {
+        lower_function(&mut ir_module, function)?;
     }
 
     Ok(ir_module)
@@ -22,7 +20,7 @@ pub fn lower(ast: &Ast) -> Result<ir::Module, CompilerError> {
 
 fn lower_function(
     ir_module: &mut ir::Module,
-    function: &ast::Function,
+    function: &resolved::Function,
 ) -> Result<(), CompilerError> {
     let basicblocks = if !function.is_foreign {
         let mut builder = Builder::new();
@@ -69,10 +67,11 @@ fn lower_function(
     Ok(())
 }
 
-fn lower_type(ast_type: &ast::Type) -> Result<ir::Type, CompilerError> {
-    use ast::{IntegerBits::*, IntegerSign::*};
-    match ast_type {
-        ast::Type::Integer { bits, sign } => Ok(match (bits, sign) {
+fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError> {
+    use resolved::{IntegerBits::*, IntegerSign::*};
+
+    match resolved_type {
+        resolved::Type::Integer { bits, sign } => Ok(match (bits, sign) {
             (Normal, Signed) => ir::Type::S64,
             (Normal, Unsigned) => ir::Type::U64,
             (Bits8, Signed) => ir::Type::S8,
@@ -84,8 +83,8 @@ fn lower_type(ast_type: &ast::Type) -> Result<ir::Type, CompilerError> {
             (Bits64, Signed) => ir::Type::S64,
             (Bits64, Unsigned) => ir::Type::U64,
         }),
-        ast::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
-        ast::Type::Void => Ok(ir::Type::Void),
+        resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
+        resolved::Type::Void => Ok(ir::Type::Void),
     }
 }
 
@@ -108,34 +107,18 @@ fn lower_expression(
             Literal::NullTerminatedString(value.clone()),
         )),
         Expression::Call(call) => {
-            if let Some(function_ref) = find_function(&ir_module, &call.function_name) {
-                let mut arguments = vec![];
+            let mut arguments = vec![];
 
-                for argument in call.arguments.iter() {
-                    arguments.push(lower_expression(builder, ir_module, argument)?);
-                }
-
-                Ok(builder.push(ir::Instruction::Call(ir::Call {
-                    function: function_ref,
-                    arguments,
-                })))
-            } else {
-                Err(CompilerError::during_lower(format!(
-                    "Failed to find function '{}'",
-                    call.function_name
-                )))
+            for argument in call.arguments.iter() {
+                arguments.push(lower_expression(builder, ir_module, argument)?);
             }
+
+            Ok(builder.push(ir::Instruction::Call(ir::Call {
+                function: call.function,
+                arguments,
+            })))
         }
         Expression::Variable(name) => todo!(),
     }
 }
 
-fn find_function(ir_module: &ir::Module, function_name: &str) -> Option<ir::FunctionRef> {
-    for (function_ref, function) in ir_module.functions.iter() {
-        if function.mangled_name == function_name {
-            return Some(function_ref);
-        }
-    }
-
-    None
-}

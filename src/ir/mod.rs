@@ -2,9 +2,7 @@ use std::ffi::CString;
 use slotmap::{new_key_type, SlotMap};
 use derive_more::{Deref, DerefMut};
 
-new_key_type! {
-    pub struct FunctionRef;
-}
+pub use crate::resolved::FunctionRef;
 
 #[derive(Clone)]
 pub struct Module {
