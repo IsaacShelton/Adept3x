@@ -52,7 +52,7 @@ fn lower_function(
 
     let mut parameters = vec![];
     for parameter in function.parameters.required.iter() {
-        parameters.push(lower_type(&parameter.ast_type)?);
+        parameters.push(lower_type(&parameter.resolved_type)?);
     }
 
     ir_module.functions.insert(

@@ -78,7 +78,7 @@ pub struct Parameter {
     pub ast_type: Type,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IntegerBits {
     Normal,
     Bits8,
@@ -87,7 +87,7 @@ pub enum IntegerBits {
     Bits64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IntegerSign {
     Signed,
     Unsigned,

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    ast::{self, Ast, File, FileIdentifier},
+    ast::{self, Ast, File, FileIdentifier, Type},
     error::CompilerError,
     resolved,
 };
@@ -65,6 +65,11 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
             Job::Regular(file_identifier, function_index, resolved_function_ref) => {
+                let search_context = ctx
+                    .search_contexts
+                    .get(&file_identifier)
+                    .expect("search context to exist for file");
+
                 let ast_file = ast
                     .files
                     .get(&file_identifier)
@@ -75,21 +80,22 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
                     .get(function_index)
                     .expect("function referenced by job to exist");
 
+                let mut resolved_statements = vec![];
+
+                for statement in ast_function.statements.iter() {
+                    resolved_statements.push(resolve_statement(
+                        &mut resolved_ast,
+                        &search_context,
+                        statement,
+                    )?);
+                }
+
                 let resolved_function = resolved_ast
                     .functions
                     .get_mut(resolved_function_ref)
                     .expect("resolved function head to exist");
 
-                let search_context = ctx
-                    .search_contexts
-                    .get(&file_identifier)
-                    .expect("search context to exist for file");
-
-                for statement in ast_function.statements.iter() {
-                    resolved_function
-                        .statements
-                        .push(resolve_statement(&search_context, statement)?);
-                }
+                resolved_function.statements = resolved_statements;
             }
         }
     }
@@ -98,45 +104,92 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
 }
 
 fn resolve_statement(
+    resolved_ast: &mut resolved::Ast,
     search_context: &SearchContext,
     ast_statement: &ast::Statement,
 ) -> Result<resolved::Statement, CompilerError> {
     match ast_statement {
         ast::Statement::Return(value) => {
             Ok(resolved::Statement::Return(if let Some(value) = value {
-                Some(resolve_expression(search_context, value)?)
+                Some(resolve_expression(resolved_ast, search_context, value)?.expression)
             } else {
                 None
             }))
         }
         ast::Statement::Expression(value) => Ok(resolved::Statement::Expression(
-            resolve_expression(search_context, value)?,
+            resolve_expression(resolved_ast, search_context, value)?.expression,
         )),
     }
 }
 
 fn resolve_expression(
+    resolved_ast: &mut resolved::Ast,
     search_context: &SearchContext,
     ast_expression: &ast::Expression,
-) -> Result<resolved::Expression, CompilerError> {
+) -> Result<resolved::TypedExpression, CompilerError> {
+    use resolved::{IntegerBits::*, IntegerSign::*, TypedExpression};
+
     match ast_expression {
         ast::Expression::Variable(_) => todo!(),
-        ast::Expression::Integer(value) => Ok(resolved::Expression::Integer(value.clone())),
-        ast::Expression::NullTerminatedString(value) => {
-            Ok(resolved::Expression::NullTerminatedString(value.clone()))
-        }
+        ast::Expression::Integer(value) => Ok(TypedExpression::new(
+            resolved::Type::Integer {
+                bits: Bits64,
+                sign: Signed,
+            },
+            resolved::Expression::Integer(value.clone()),
+        )),
+        ast::Expression::NullTerminatedString(value) => Ok(TypedExpression::new(
+            resolved::Type::Pointer(Box::new(resolved::Type::Integer {
+                bits: Bits8,
+                sign: Unsigned,
+            })),
+            resolved::Expression::NullTerminatedString(value.clone()),
+        )),
         ast::Expression::Call(call) => {
-            let mut arguments = Vec::with_capacity(call.arguments.len());
-            
-            for argument in call.arguments.iter() {
-                arguments.push(resolve_expression(search_context, argument)?);
+            let function_ref = find_function_or_error(search_context, &call.function_name)?;
+            let function = resolved_ast.functions.get(function_ref).unwrap();
+            let return_type = function.return_type.clone();
+
+            if call.arguments.len() < function.parameters.required.len() {
+                return Err(CompilerError::during_resolve(format!(
+                    "Not enough arguments for call to function '{}'",
+                    &function.name
+                )));
             }
-            
-            Ok(resolved::Expression::Call(resolved::Call {
-                function: find_function_or_error(search_context, &call.function_name)?,
-                arguments,
-            }))
-        },
+
+            if call.arguments.len() > function.parameters.required.len() && !function.parameters.is_cstyle_vararg {
+                return Err(CompilerError::during_resolve(format!(
+                    "Too many arguments for call to function '{}'",
+                    &function.name
+                )));
+            }
+
+            let mut arguments = Vec::with_capacity(call.arguments.len());
+
+            for (i, argument) in call.arguments.iter().enumerate() {
+                let argument = resolve_expression(resolved_ast, search_context, argument)?;
+
+                let function = resolved_ast.functions.get(function_ref).unwrap();
+                if let Some(parameter) = function.parameters.required.get(i) {
+                    if parameter.resolved_type != argument.resolved_type {
+                        return Err(CompilerError::during_resolve(format!(
+                            "Bad type for argument #{} to function '{}'",
+                            i, &function.name
+                        )));
+                    }
+                }
+
+                arguments.push(argument.expression);
+            }
+
+            Ok(TypedExpression::new(
+                return_type,
+                resolved::Expression::Call(resolved::Call {
+                    function: function_ref,
+                    arguments,
+                }),
+            ))
+        }
     }
 }
 
@@ -157,7 +210,7 @@ fn resolve_parameters(parameters: &ast::Parameters) -> Result<resolved::Paramete
     for parameter in parameters.required.iter() {
         required.push(resolved::Parameter {
             name: parameter.name.clone(),
-            ast_type: resolve_type(&parameter.ast_type)?,
+            resolved_type: resolve_type(&parameter.ast_type)?,
         });
     }
 

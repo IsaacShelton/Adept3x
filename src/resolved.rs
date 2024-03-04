@@ -48,12 +48,12 @@ impl Default for Parameters {
 #[derive(Clone, Debug)]
 pub struct Parameter {
     pub name: String,
-    pub ast_type: Type,
+    pub resolved_type: Type,
 }
 
-pub use crate::ast::{IntegerSign, IntegerBits};
+pub use crate::ast::{IntegerBits, IntegerSign};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
     Integer {
         bits: IntegerBits,
@@ -70,6 +70,21 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug)]
+pub struct TypedExpression {
+    pub resolved_type: Type,
+    pub expression: Expression,
+}
+
+impl TypedExpression {
+    pub fn new(resolved_type: Type, expression: Expression) -> Self {
+        Self {
+            resolved_type,
+            expression,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Expression {
     Variable(String),
     Integer(BigInt),
@@ -82,4 +97,3 @@ pub struct Call {
     pub function: FunctionRef,
     pub arguments: Vec<Expression>,
 }
-
