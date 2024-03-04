@@ -61,6 +61,7 @@ pub enum Token {
     Comma,
     Colon,
     Hash,
+    Ellipsis,
 }
 
 impl Display for Token {
@@ -98,6 +99,7 @@ impl Display for Token {
             Comma => "','",
             Colon => "':'",
             Hash => "'#'",
+            Ellipsis => "'...'",
         })
     }
 }

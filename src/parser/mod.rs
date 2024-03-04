@@ -4,7 +4,7 @@ use std::ffi::CString;
 
 use self::error::{ErrorInfo, ParseError};
 use crate::ast::{
-    self, Ast, Call, Expression, FileIdentifier, Function, Parameter, Statement, Type,
+    self, Ast, Call, Expression, FileIdentifier, Function, Parameter, Parameters, Statement, Type,
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
@@ -221,7 +221,7 @@ where
         let parameters = if self.peek_is(Token::OpenParen) {
             self.parse_function_parameters()?
         } else {
-            vec![]
+            Parameters::default()
         };
 
         self.ignore_newlines();
@@ -252,11 +252,12 @@ where
         })
     }
 
-    fn parse_function_parameters(&mut self) -> Result<Vec<Parameter>, ParseError> {
+    fn parse_function_parameters(&mut self) -> Result<Parameters, ParseError> {
         // (arg1 Type1, arg2 Type2, arg3 Type3)
         // ^
 
-        let mut parameters = vec![];
+        let mut required = vec![];
+        let mut is_cstyle_vararg = false;
 
         self.parse_token(Token::OpenParen, Some("to begin function parameters"))?;
         self.ignore_newlines();
@@ -264,21 +265,31 @@ where
         while !self.peek_is_or_eof(Token::CloseParen) {
             // Parse argument
 
-            if !parameters.is_empty() {
+            if !required.is_empty() {
                 self.parse_token(Token::Comma, Some("after parameter"))?;
                 self.ignore_newlines();
+            }
+
+            if self.peek_is(Token::Ellipsis) {
+                is_cstyle_vararg = true;
+                self.next();
+                self.ignore_newlines();
+                break;
             }
 
             let name = self.parse_identifier(Some("for parameter name"))?;
             self.ignore_newlines();
             let ast_type = self.parse_type(None::<&str>, Some("for parameter"))?;
             self.ignore_newlines();
-
-            parameters.push(Parameter { name, ast_type });
+            required.push(Parameter { name, ast_type });
         }
 
         self.parse_token(Token::CloseParen, Some("to end function parameters"))?;
-        Ok(parameters)
+
+        Ok(Parameters {
+            required,
+            is_cstyle_vararg,
+        })
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {

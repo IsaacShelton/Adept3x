@@ -1,6 +1,5 @@
-use std::{collections::HashMap, ffi::CString};
-
 use num_bigint::BigInt;
+use std::{collections::HashMap, ffi::CString, fmt::Debug};
 
 #[derive(Clone, Debug)]
 pub struct Ast {
@@ -35,7 +34,7 @@ pub enum FileIdentifier {
         owner: Option<String>,
         name: String,
         version: Version,
-    }
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -45,19 +44,32 @@ pub struct File {
 
 impl File {
     pub fn new() -> File {
-        File {
-            functions: vec![],
-        }
+        File { functions: vec![] }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Function {
     pub name: String,
-    pub parameters: Vec<Parameter>,
+    pub parameters: Parameters,
     pub return_type: Type,
     pub statements: Vec<Statement>,
     pub is_foreign: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct Parameters {
+    pub required: Vec<Parameter>,
+    pub is_cstyle_vararg: bool,
+}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Self {
+            required: vec![],
+            is_cstyle_vararg: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -83,7 +95,10 @@ pub enum IntegerSign {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    Integer { bits: IntegerBits, sign: IntegerSign },
+    Integer {
+        bits: IntegerBits,
+        sign: IntegerSign,
+    },
     Pointer(Box<Type>),
     Void,
 }
@@ -107,4 +122,3 @@ pub struct Call {
     pub function_name: String,
     pub arguments: Vec<Expression>,
 }
-

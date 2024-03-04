@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::{
     builder::Builder, intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
     value_catalog::ValueCatalog, variable_stack::VariableStack,
@@ -9,6 +7,7 @@ use llvm_sys::{
     prelude::{LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
     LLVMModule,
 };
+use std::collections::HashMap;
 
 pub struct Phi2Relocation {
     pub phi: LLVMValueRef,

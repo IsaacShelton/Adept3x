@@ -1,6 +1,8 @@
+use crate::{
+    line_column::Location,
+    token::{Token, TokenInfo},
+};
 use num_bigint::BigInt;
-
-use crate::{line_column::Location, token::{Token, TokenInfo}};
 
 pub struct NumberState {
     pub value: String,

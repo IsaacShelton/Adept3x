@@ -1,13 +1,12 @@
 mod builder;
 
-use std::ffi::CString;
-
 use crate::{
     ast::{self, Ast, Expression, Statement},
     error::CompilerError,
     ir::{self, BasicBlocks, Literal},
 };
 use builder::Builder;
+use std::ffi::CString;
 
 pub fn lower(ast: &Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
@@ -31,13 +30,12 @@ fn lower_function(
         for statement in function.statements.iter() {
             match statement {
                 Statement::Return(expression) => {
-                    let instruction = ir::Instruction::Return(
-                        if let Some(expression) = expression {
+                    let instruction =
+                        ir::Instruction::Return(if let Some(expression) = expression {
                             Some(lower_expression(&mut builder, ir_module, expression)?)
                         } else {
                             None
-                        },
-                    );
+                        });
 
                     builder.push(instruction);
                 }
@@ -54,7 +52,7 @@ fn lower_function(
     };
 
     let mut parameters = vec![];
-    for parameter in function.parameters.iter() {
+    for parameter in function.parameters.required.iter() {
         parameters.push(lower_type(&parameter.ast_type)?);
     }
 
@@ -63,7 +61,7 @@ fn lower_function(
         basicblocks,
         parameters,
         return_type: lower_type(&function.return_type)?,
-        is_cstyle_variadic: false,
+        is_cstyle_variadic: function.parameters.is_cstyle_vararg,
         is_foreign: true,
         is_exposed: true,
     });
@@ -106,9 +104,9 @@ fn lower_expression(
                 ))
             }
         }
-        Expression::NullTerminatedString(value) => {
-            Ok(ir::Value::Literal(Literal::NullTerminatedString(value.clone())))
-        }
+        Expression::NullTerminatedString(value) => Ok(ir::Value::Literal(
+            Literal::NullTerminatedString(value.clone()),
+        )),
         Expression::Call(call) => {
             if let Some(function_ref) = find_function(&ir_module, &call.function_name) {
                 let mut arguments = vec![];
@@ -122,7 +120,10 @@ fn lower_expression(
                     arguments,
                 })))
             } else {
-                Err(CompilerError::during_lower(format!("Failed to find function '{}'", call.function_name)))
+                Err(CompilerError::during_lower(format!(
+                    "Failed to find function '{}'",
+                    call.function_name
+                )))
             }
         }
         Expression::Variable(name) => todo!(),

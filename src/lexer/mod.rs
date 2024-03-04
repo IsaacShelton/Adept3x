@@ -134,7 +134,15 @@ where
 
                     Waiting
                 }
-                '.' => Has(TokenInfo::new(Token::Member, location)),
+                '.' => {
+                    if self.characters.peek_nth(0).is_character('.') && self.characters.peek_nth(1).is_character('.') {
+                        self.characters.next();
+                        self.characters.next();
+                        Has(TokenInfo::new(Token::Ellipsis, location))
+                    } else {
+                        Has(TokenInfo::new(Token::Member, location))
+                    }
+                },
                 '+' => Has(TokenInfo::new(Token::Add, location)),
                 '-' => Has(TokenInfo::new(Token::Subtract, location)),
                 '*' => Has(TokenInfo::new(Token::Multiply, location)),
@@ -268,23 +276,29 @@ where
 
         let state = self.state.as_mut_number();
 
-        if let Some((c, _)) = self.characters.next() {
+        if let Some((c, _)) = self.characters.peek() {
+            let c = *c;
+
             if c.is_ascii_digit() {
                 state.can_neg = false;
+                self.characters.next();
                 state.value.push(c);
                 Waiting
             } else if c == '.' && state.can_dot {
                 state.can_dot = false;
+                self.characters.next();
                 state.value.push(c);
                 Waiting
             } else if (c == 'e' || c == 'E') && state.can_exp {
                 state.can_exp = false;
                 state.can_neg = true;
                 state.can_dot = false;
+                self.characters.next();
                 state.value.push(c);
                 Waiting
             } else if c == '-' && state.can_neg {
                 state.can_neg = false;
+                self.characters.next();
                 state.value.push(c);
                 Waiting
             } else {
@@ -305,8 +319,11 @@ where
         let state = self.state.as_mut_hex_number();
 
         if let Some((c, _)) = self.characters.peek() {
+            let c = *c;
+
             if c.is_ascii_hexdigit() {
-                state.value.push(self.characters.next().unwrap().0);
+                self.characters.next();
+                state.value.push(c);
                 Waiting
             } else {
                 let token = state.to_token_info();

@@ -1,8 +1,7 @@
-
-use super::hex_number_state::HexNumberState;
-use super::number_state::NumberState;
-use super::string_state::StringState;
-use super::identifier_state::IdentifierState;
+use super::{
+    hex_number_state::HexNumberState, identifier_state::IdentifierState, number_state::NumberState,
+    string_state::StringState,
+};
 
 pub enum State {
     Idle,

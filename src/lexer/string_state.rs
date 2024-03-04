@@ -6,4 +6,3 @@ pub struct StringState {
     pub modifier: StringModifier,
     pub start_location: Location,
 }
-
