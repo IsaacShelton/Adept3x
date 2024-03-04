@@ -24,7 +24,7 @@ impl std::fmt::Debug for Module {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Function {
     pub mangled_name: String,
     pub parameters: Vec<Type>,
@@ -35,24 +35,24 @@ pub struct Function {
     pub is_exposed: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum Instruction {
     Return(Option<Value>),
     Call(Call),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Call {
     pub function: FunctionRef,
     pub arguments: Vec<Value>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Pointer(Box<Type>),
     Boolean,
@@ -72,31 +72,31 @@ pub enum Type {
     UntypedEnum(TypeUntypedEnum),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeComposite {
     pub subtypes: Vec<Type>,
     pub is_packed: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeFunction {
     pub parameters: Vec<Type>,
     pub return_type: Box<Type>,
     pub is_cstyle_variadic: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeUntypedEnum {
     pub member: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Literal(Literal),
     Reference(ValueReference),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum Literal {
     Boolean(bool),
     Signed8(i8),
@@ -112,7 +112,7 @@ pub enum Literal {
     NullTerminatedString(CString),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct ValueReference {
     pub basicblock_id: usize,
     pub instruction_id: usize,

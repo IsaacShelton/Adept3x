@@ -20,7 +20,14 @@ use cstr::cstr;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildCall2, LLVMBuildRet, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
+        LLVMArrayType2, LLVMBuildCall2, LLVMBuildRet, LLVMConstGEP2, LLVMConstInt, LLVMConstReal,
+        LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
+        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName,
+        LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type,
+        LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
+        LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant,
+        LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -149,8 +156,7 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
             LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);
         }
 
-        ctx.func_skeletons
-            .insert(function_ref, skeleton);
+        ctx.func_skeletons.insert(function_ref, skeleton);
     }
 
     Ok(())
@@ -194,9 +200,10 @@ unsafe fn create_function_block(
             Instruction::Return(value) => {
                 let _ = LLVMBuildRet(
                     builder.get(),
-                    value
-                        .as_ref()
-                        .map_or_else(|| null_mut(), |value| build_value(ctx.backend_module, &builder, value)),
+                    value.as_ref().map_or_else(
+                        || null_mut(),
+                        |value| build_value(ctx.backend_module, &builder, value),
+                    ),
                 );
             }
             Instruction::Call(call) => {
@@ -212,6 +219,7 @@ unsafe fn create_function_block(
                     .func_skeletons
                     .get(&call.function)
                     .expect("ir function to exist");
+
                 let mut arguments = call
                     .arguments
                     .iter()
@@ -238,6 +246,7 @@ unsafe fn get_function_type(
     let return_type = to_backend_type(backend_module, &function.return_type);
     let mut parameters = to_backend_types(backend_module, &function.parameters);
     let is_vararg = if function.is_cstyle_variadic { 1 } else { 0 };
+
     LLVMFunctionType(
         return_type,
         parameters.as_mut_ptr(),
@@ -246,7 +255,11 @@ unsafe fn get_function_type(
     )
 }
 
-unsafe fn build_value(backend_module: &BackendModule, builder: &Builder, value: &ir::Value) -> LLVMValueRef {
+unsafe fn build_value(
+    backend_module: &BackendModule,
+    builder: &Builder,
+    value: &ir::Value,
+) -> LLVMValueRef {
     match value {
         ir::Value::Literal(literal) => match literal {
             ir::Literal::Boolean(value) => {
@@ -282,17 +295,26 @@ unsafe fn build_value(backend_module: &BackendModule, builder: &Builder, value: 
                 let length = value.as_bytes_with_nul().len();
                 let storage_type = LLVMArrayType2(LLVMInt8Type(), length.try_into().unwrap());
 
-                let read_only = LLVMAddGlobal(backend_module.get(), storage_type, cstr!("").as_ptr());
+                let read_only =
+                    LLVMAddGlobal(backend_module.get(), storage_type, cstr!("").as_ptr());
                 LLVMSetLinkage(read_only, LLVMLinkage::LLVMInternalLinkage);
                 LLVMSetGlobalConstant(read_only, true as i32);
-                LLVMSetInitializer(read_only, LLVMConstString(value.as_ptr(), length.try_into().unwrap(), true as i32));
+                LLVMSetInitializer(
+                    read_only,
+                    LLVMConstString(value.as_ptr(), length.try_into().unwrap(), true as i32),
+                );
 
                 let mut indicies = [
                     LLVMConstInt(LLVMInt32Type(), 0, true as i32),
                     LLVMConstInt(LLVMInt32Type(), 0, true as i32),
                 ];
 
-                LLVMConstGEP2(storage_type, read_only, indicies.as_mut_ptr(), indicies.len() as _)
+                LLVMConstGEP2(
+                    storage_type,
+                    read_only,
+                    indicies.as_mut_ptr(),
+                    indicies.len() as _,
+                )
             }
         },
         ir::Value::Reference(_) => todo!(),

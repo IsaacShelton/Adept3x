@@ -362,6 +362,7 @@ where
         while !self.peek_is_or_eof(Token::CloseParen) {
             if !arguments.is_empty() {
                 self.parse_token(Token::Comma, Some("to separate arguments"))?;
+                self.ignore_newlines();
             }
 
             arguments.push(self.parse_expression()?);
