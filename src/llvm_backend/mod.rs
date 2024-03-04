@@ -126,16 +126,6 @@ unsafe fn create_globals() -> Result<(), CompilerError> {
 }
 
 unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), CompilerError> {
-    let nounwind = {
-        let name: [i8; 8] = std::mem::transmute(b"nounwind");
-
-        LLVMCreateEnumAttribute(
-            LLVMGetGlobalContext(),
-            LLVMGetEnumAttributeKindForName(name.as_ptr(), name.len()),
-            0,
-        )
-    };
-
     for (function_ref, function) in ctx.ir_module.functions.iter() {
         let mut parameters: Vec<LLVMTypeRef> =
             to_backend_types(ctx.backend_module, &function.parameters);
@@ -152,10 +142,6 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
 
         let skeleton = LLVMAddFunction(ctx.backend_module.get(), name.as_ptr(), function_type);
         LLVMSetFunctionCallConv(skeleton, LLVMCallConv::LLVMCCallConv as u32);
-
-        if function.is_foreign {
-            LLVMAddAttributeAtIndex(skeleton, LLVMAttributeFunctionIndex, nounwind);
-        }
 
         if !function.is_foreign && !function.is_exposed {
             LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);

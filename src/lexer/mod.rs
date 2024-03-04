@@ -159,6 +159,9 @@ where
                 '<' => Has(TokenInfo::new(Token::LessThan, location)),
                 '>' => Has(TokenInfo::new(Token::GreaterThan, location)),
                 '!' => Has(TokenInfo::new(Token::Not, location)),
+                ',' => Has(TokenInfo::new(Token::Comma, location)),
+                ':' => Has(TokenInfo::new(Token::Colon, location)),
+                '#' => Has(TokenInfo::new(Token::Hash, location)),
                 '\"' => {
                     self.state = State::String(StringState {
                         value: String::new(),

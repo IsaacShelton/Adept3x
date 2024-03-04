@@ -27,6 +27,9 @@ pub enum ErrorInfo {
     UndeclaredType {
         name: String,
     },
+    UnrecognizedAnnotation {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -98,6 +101,9 @@ impl Display for ParseError {
             }
             UndeclaredType { name } => {
                 write!(f, "Undeclared type '{}'", name)?;
+            }
+            UnrecognizedAnnotation { name } => {
+                write!(f, "Unrecognized annotation '{}'", name)?;
             }
             Other { message } => {
                 write!(f, "{}", message)?;

@@ -14,4 +14,5 @@ utf8-chars = "3.0.2"
 llvm-sys = { package = "llvm-sys", version = "170" }
 cstr = "0.2.11"
 slotmap = "1.0.7"
+lang-c = "0.15.1"
 

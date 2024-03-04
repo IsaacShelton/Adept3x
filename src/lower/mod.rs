@@ -23,29 +23,39 @@ fn lower_function(
     ir_module: &mut ir::Module,
     function: &ast::Function,
 ) -> Result<(), CompilerError> {
-    let mut builder = Builder::new();
+    let basicblocks = if !function.is_foreign {
+        let mut builder = Builder::new();
 
-    for statement in function.statements.iter() {
-        match statement {
-            Statement::Return(expression) => {
-                let instruction = ir::Instruction::Return(if let Some(expression) = expression {
-                    Some(lower_expression(&mut builder, expression)?)
-                } else {
-                    None
-                });
+        for statement in function.statements.iter() {
+            match statement {
+                Statement::Return(expression) => {
+                    let instruction =
+                        ir::Instruction::Return(if let Some(expression) = expression {
+                            Some(lower_expression(&mut builder, expression)?)
+                        } else {
+                            None
+                        });
 
-                builder.push(instruction);
+                    builder.push(instruction);
+                }
             }
         }
-    }
 
-    builder.terminate();
-    let basicblocks = builder.build();
+        builder.terminate();
+        builder.build()
+    } else {
+        BasicBlocks::default()
+    };
+
+    let mut parameters = vec![];
+    for parameter in function.parameters.iter() {
+        parameters.push(lower_type(&parameter.ast_type)?);
+    }
 
     ir_module.functions.insert(ir::Function {
         mangled_name: function.name.clone(),
         basicblocks,
-        parameters: vec![],
+        parameters, 
         return_type: lower_type(&function.return_type)?,
         is_cstyle_variadic: false,
         is_foreign: true,
@@ -70,6 +80,7 @@ fn lower_type(ast_type: &ast::Type) -> Result<ir::Type, CompilerError> {
             (Bits64, Signed) => ir::Type::S64,
             (Bits64, Unsigned) => ir::Type::U64,
         }),
+        ast::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         ast::Type::Void => Ok(ir::Type::Void),
     }
 }

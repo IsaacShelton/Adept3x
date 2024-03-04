@@ -58,6 +58,9 @@ pub enum Token {
     LessThanEq,
     GreaterThanEq,
     Not,
+    Comma,
+    Colon,
+    Hash,
 }
 
 impl Display for Token {
@@ -92,6 +95,9 @@ impl Display for Token {
             LessThanEq => "'<='",
             GreaterThanEq => "'>='",
             Not => "'!'",
+            Comma => "','",
+            Colon => "':'",
+            Hash => "'#'",
         })
     }
 }

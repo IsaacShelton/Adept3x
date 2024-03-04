@@ -57,6 +57,7 @@ pub struct Function {
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
     pub statements: Vec<Statement>,
+    pub is_foreign: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -83,6 +84,7 @@ pub enum IntegerSign {
 #[derive(Clone, Debug)]
 pub enum Type {
     Integer { bits: IntegerBits, sign: IntegerSign },
+    Pointer(Box<Type>),
     Void,
 }
 

@@ -9,6 +9,7 @@ dependencies = [
  "colored",
  "cstr",
  "derive_more",
+ "lang-c",
  "llvm-sys",
  "num-bigint",
  "num-traits",
@@ -78,6 +79,12 @@ dependencies = [
  "rustc_version",
  "syn",
 ]
+
+[[package]]
+name = "lang-c"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "720e6492b795d1f6838eb2e51879ec3073be745a20e52c32a241b80b3c8ed998"
 
 [[package]]
 name = "lazy_static"

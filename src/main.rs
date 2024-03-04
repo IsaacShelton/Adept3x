@@ -28,6 +28,13 @@ fn main() {
 
     let filename = std::env::args().nth(1).unwrap();
 
+    if filename.ends_with(".h") {
+        use lang_c::driver::{Config, parse_preprocessed};
+        let config = Config::default();
+        println!("{:?}", parse_preprocessed(&config, std::fs::read_to_string(filename).expect("Failed to read file")));
+        return;
+    }
+
     let file = match File::open(&filename) {
         Ok(file) => file,
         Err(_) => {

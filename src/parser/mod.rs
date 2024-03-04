@@ -1,7 +1,7 @@
 mod error;
 
 use self::error::{ErrorInfo, ParseError};
-use crate::ast::{self, Ast, Expression, FileIdentifier, Function, Statement, Type};
+use crate::ast::{self, Ast, Expression, FileIdentifier, Function, Parameter, Statement, Type};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{Token, TokenInfo};
@@ -13,6 +13,10 @@ where
     iterator: LookAhead<I>,
     previous_location: Location,
     filename: String,
+}
+
+enum Annotation {
+    Foreign,
 }
 
 impl<I> Parser<I>
@@ -168,34 +172,109 @@ where
         }
     }
 
-    fn parse_function(&mut self) -> Result<Function, ParseError> {
+    fn parse_annotation(&mut self) -> Result<Annotation, ParseError> {
+        // #[annotation_name]
+        // ^
+
+        self.next();
+
+        self.parse_token(Token::OpenBracket, Some("to begin annotation body"))?;
+
+        let annotation_name = self.parse_identifier(Some("for annotation name"))?;
+        let annotation_name_location = self.previous_location;
+
+        self.parse_token(Token::CloseBracket, Some("to close annotation body"))?;
+
+        match annotation_name.as_str() {
+            "foreign" => Ok(Annotation::Foreign),
+            _ => Err(ParseError {
+                filename: Some(self.filename.clone()),
+                location: Some(annotation_name_location),
+                info: ErrorInfo::UnrecognizedAnnotation {
+                    name: annotation_name,
+                },
+            }),
+        }
+    }
+
+    fn parse_function(&mut self, annotations: Vec<Annotation>) -> Result<Function, ParseError> {
         // func functionName {
-        //           ^
+        //   ^
 
-        let name = self.parse_identifier(Some("after 'func' keyword"))?;
-        let mut parameters = vec![];
-        let mut statements = vec![];
+        let mut is_foreign = false;
 
-        self.ignore_newlines();
-        let return_type = self.parse_type()?;
-
-        self.ignore_newlines();
-        self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
-        self.ignore_newlines();
-
-        while !self.peek_is_or_eof(Token::CloseCurly) {
-            statements.push(self.parse_statement()?);
+        for annotation in annotations {
+            match annotation {
+                Annotation::Foreign => is_foreign = true,
+            }
         }
 
+        self.next();
+
+        let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
-        self.parse_token(Token::CloseCurly, Some("to close function body"))?;
+
+        let parameters = if self.peek_is(Token::OpenParen) {
+            self.parse_function_parameters()?
+        } else {
+            vec![]
+        };
+
+        self.ignore_newlines();
+        let return_type = self.parse_type(Some("return "), Some("for function"))?;
+
+        let mut statements = vec![];
+
+        if !is_foreign {
+            self.ignore_newlines();
+            self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
+            self.ignore_newlines();
+
+
+            while !self.peek_is_or_eof(Token::CloseCurly) {
+                statements.push(self.parse_statement()?);
+            }
+
+            self.ignore_newlines();
+            self.parse_token(Token::CloseCurly, Some("to close function body"))?;
+        }
 
         Ok(Function {
             name,
             parameters,
             return_type,
             statements,
+            is_foreign,
         })
+    }
+
+    fn parse_function_parameters(&mut self) -> Result<Vec<Parameter>, ParseError> {
+        // (arg1 Type1, arg2 Type2, arg3 Type3)
+        // ^
+
+        let mut parameters = vec![];
+
+        self.parse_token(Token::OpenParen, Some("to begin function parameters"))?;
+        self.ignore_newlines();
+
+        while !self.peek_is_or_eof(Token::CloseParen) {
+            // Parse argument
+
+            if !parameters.is_empty() {
+                self.parse_token(Token::Comma, Some("after parameter"))?;
+                self.ignore_newlines();
+            }
+
+            let name = self.parse_identifier(Some("for parameter name"))?;
+            self.ignore_newlines();
+            let ast_type = self.parse_type(None::<&str>, Some("for parameter"))?;
+            self.ignore_newlines();
+
+            parameters.push(Parameter { name, ast_type });
+        }
+
+        self.parse_token(Token::CloseParen, Some("to end function parameters"))?;
+        Ok(parameters)
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
@@ -251,7 +330,11 @@ where
         }
     }
 
-    fn parse_type(&mut self) -> Result<Type, ParseError> {
+    fn parse_type(
+        &mut self,
+        prefix: Option<impl ToString>,
+        for_reason: Option<impl ToString>,
+    ) -> Result<Type, ParseError> {
         match self.next() {
             Some(TokenInfo {
                 token: Token::Identifier(identifier),
@@ -272,7 +355,7 @@ where
                         bits: Bits8,
                         sign: Signed,
                     }),
-                    "uint8" => Ok(Type::Integer {
+                    "uint8" | "byte" => Ok(Type::Integer {
                         bits: Bits8,
                         sign: Unsigned,
                     }),
@@ -301,6 +384,15 @@ where
                         sign: Unsigned,
                     }),
                     "void" => Ok(Type::Void),
+                    "ptr" => {
+                        if self.peek_is(Token::Colon) {
+                            self.parse_token(Token::Colon, None::<&str>)?;
+                            let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                            Ok(Type::Pointer(Box::new(inner)))
+                        } else {
+                            Ok(Type::Pointer(Box::new(Type::Void)))
+                        }
+                    }
                     _ => Err(ParseError {
                         filename: Some(self.filename.clone()),
                         location: Some(location),
@@ -312,8 +404,8 @@ where
                 filename: Some(self.filename.clone()),
                 location: Some(location),
                 info: ErrorInfo::ExpectedType {
-                    prefix: Some("return ".into()),
-                    for_reason: Some("for function".into()),
+                    prefix: prefix.map(|prefix| prefix.to_string()),
+                    for_reason: for_reason.map(|for_reason| for_reason.to_string()),
                     got: Some(format!("{}", token)),
                 },
             }),
@@ -321,8 +413,8 @@ where
                 filename: Some(self.filename.clone()),
                 location: Some(self.previous_location),
                 info: ErrorInfo::ExpectedType {
-                    prefix: Some("return ".into()),
-                    for_reason: Some("for function".into()),
+                    prefix: prefix.map(|prefix| prefix.to_string()),
+                    for_reason: for_reason.map(|for_reason| for_reason.to_string()),
                     got: None,
                 },
             }),
@@ -335,12 +427,17 @@ pub fn parse(tokens: impl Iterator<Item = TokenInfo>, filename: String) -> Resul
     let mut ast = Ast::new(filename.clone());
 
     let mut file = ast.new_file(FileIdentifier::Local(filename));
+    let mut annotations = Vec::new();
 
     while let Some(token_info) = parser.peek() {
         match token_info.token {
             Token::FuncKeyword => {
-                parser.next();
-                file.functions.push(parser.parse_function()?);
+                let function =                     parser
+                        .parse_function(std::mem::replace(&mut annotations, Default::default()))?;
+                file.functions.push(function);
+            }
+            Token::Hash => {
+                annotations.push(parser.parse_annotation()?);
             }
             Token::Newline => {
                 parser.next();
