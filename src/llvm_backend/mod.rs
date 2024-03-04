@@ -156,7 +156,7 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
             LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);
         }
 
-        ctx.func_skeletons.insert(function_ref, skeleton);
+        ctx.func_skeletons.insert(function_ref.clone(), skeleton);
     }
 
     Ok(())
@@ -164,7 +164,7 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
 
 unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
-        if let Some(ir_function) = ctx.ir_module.functions.get(*ir_function_ref) {
+        if let Some(ir_function) = ctx.ir_module.functions.get(ir_function_ref) {
             let builder = Builder::new();
 
             let basicblocks = ir_function
@@ -211,7 +211,7 @@ unsafe fn create_function_block(
                     ctx.backend_module,
                     ctx.ir_module
                         .functions
-                        .get(call.function)
+                        .get(&call.function)
                         .expect("callee to exist"),
                 );
 

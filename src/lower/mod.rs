@@ -1,9 +1,9 @@
 mod builder;
 
 use crate::{
-    resolved::{self, Expression, Statement},
     error::CompilerError,
     ir::{self, BasicBlocks, Literal},
+    resolved::{self, Expression, Statement},
 };
 use builder::Builder;
 use std::ffi::CString;
@@ -11,8 +11,8 @@ use std::ffi::CString;
 pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
 
-    for function in ast.functions.values() {
-        lower_function(&mut ir_module, function)?;
+    for (function_ref, function) in ast.functions.iter() {
+        lower_function(&mut ir_module, function_ref, function)?;
     }
 
     Ok(ir_module)
@@ -20,6 +20,7 @@ pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
 
 fn lower_function(
     ir_module: &mut ir::Module,
+    function_ref: resolved::FunctionRef,
     function: &resolved::Function,
 ) -> Result<(), CompilerError> {
     let basicblocks = if !function.is_foreign {
@@ -54,15 +55,18 @@ fn lower_function(
         parameters.push(lower_type(&parameter.ast_type)?);
     }
 
-    ir_module.functions.insert(ir::Function {
-        mangled_name: function.name.clone(),
-        basicblocks,
-        parameters,
-        return_type: lower_type(&function.return_type)?,
-        is_cstyle_variadic: function.parameters.is_cstyle_vararg,
-        is_foreign: true,
-        is_exposed: true,
-    });
+    ir_module.functions.insert(
+        function_ref,
+        ir::Function {
+            mangled_name: function.name.clone(),
+            basicblocks,
+            parameters,
+            return_type: lower_type(&function.return_type)?,
+            is_cstyle_variadic: function.parameters.is_cstyle_vararg,
+            is_foreign: true,
+            is_exposed: true,
+        },
+    );
 
     Ok(())
 }
@@ -121,4 +125,3 @@ fn lower_expression(
         Expression::Variable(name) => todo!(),
     }
 }
-

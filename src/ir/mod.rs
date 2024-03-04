@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::{collections::HashMap, ffi::CString};
 use slotmap::{new_key_type, SlotMap};
 use derive_more::{Deref, DerefMut};
 
@@ -6,7 +6,7 @@ pub use crate::resolved::FunctionRef;
 
 #[derive(Clone)]
 pub struct Module {
-    pub functions: SlotMap<FunctionRef, Function>,
+    pub functions: HashMap<FunctionRef, Function>,
 }
 
 impl std::fmt::Debug for Module {
@@ -117,7 +117,7 @@ pub struct ValueReference {
 impl Module {
     pub fn new() -> Self {
         Self {
-            functions: SlotMap::with_key(),
+            functions: HashMap::new(),
         }
     }
 }
