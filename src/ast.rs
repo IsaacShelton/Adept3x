@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ffi::CString};
 
 use num_bigint::BigInt;
 
@@ -91,9 +91,20 @@ pub enum Type {
 #[derive(Clone, Debug)]
 pub enum Statement {
     Return(Option<Expression>),
+    Expression(Expression),
 }
 
 #[derive(Clone, Debug)]
 pub enum Expression {
+    Variable(String),
     Integer(BigInt),
+    NullTerminatedString(CString),
+    Call(Call),
 }
+
+#[derive(Clone, Debug)]
+pub struct Call {
+    pub function_name: String,
+    pub arguments: Vec<Expression>,
+}
+

@@ -1,10 +1,14 @@
 mod error;
 
+use std::ffi::CString;
+
 use self::error::{ErrorInfo, ParseError};
-use crate::ast::{self, Ast, Expression, FileIdentifier, Function, Parameter, Statement, Type};
+use crate::ast::{
+    self, Ast, Call, Expression, FileIdentifier, Function, Parameter, Statement, Type,
+};
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
-use crate::token::{Token, TokenInfo};
+use crate::token::{StringModifier, Token, TokenInfo};
 
 struct Parser<I>
 where
@@ -230,9 +234,9 @@ where
             self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
             self.ignore_newlines();
 
-
             while !self.peek_is_or_eof(Token::CloseCurly) {
                 statements.push(self.parse_statement()?);
+                self.ignore_newlines();
             }
 
             self.ignore_newlines();
@@ -278,29 +282,25 @@ where
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
-        match self.next() {
+        match self.peek() {
             Some(TokenInfo {
                 token: Token::ReturnKeyword,
                 ..
             }) => self.parse_return(),
-            Some(TokenInfo { token, location }) => Err(ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(location),
-                info: ErrorInfo::UnexpectedToken {
-                    unexpected: Some(format!("{}", token)),
-                },
-            }),
             None => Err(ParseError {
                 filename: Some(self.filename.clone()),
                 location: Some(self.previous_location),
                 info: ErrorInfo::UnexpectedToken { unexpected: None },
             }),
+            _ => Ok(Statement::Expression(self.parse_expression()?)),
         }
     }
 
     fn parse_return(&mut self) -> Result<Statement, ParseError> {
         // return VALUE
         //          ^
+
+        self.parse_token(Token::ReturnKeyword, Some("for return statement"))?;
 
         if self.peek_is(Token::Newline) {
             Ok(Statement::Return(None))
@@ -315,6 +315,26 @@ where
                 token: Token::Integer { value },
                 ..
             }) => Ok(Expression::Integer(value)),
+            Some(TokenInfo {
+                token:
+                    Token::String {
+                        value,
+                        modifier: StringModifier::NullTerminated,
+                    },
+                ..
+            }) => Ok(Expression::NullTerminatedString(
+                CString::new(value).expect("valid null-terminated string"),
+            )),
+            Some(TokenInfo {
+                token: Token::Identifier(identifier),
+                ..
+            }) => {
+                if self.peek_is(Token::OpenParen) {
+                    self.parse_call(identifier)
+                } else {
+                    Ok(Expression::Variable(identifier))
+                }
+            }
             Some(TokenInfo { token, location }) => Err(ParseError {
                 filename: Some(self.filename.clone()),
                 location: Some(location),
@@ -328,6 +348,32 @@ where
                 info: ErrorInfo::UnexpectedToken { unexpected: None },
             }),
         }
+    }
+
+    fn parse_call(&mut self, function_name: String) -> Result<Expression, ParseError> {
+        // function_name(arg1, arg2, arg3)
+        //              ^
+
+        let mut arguments = vec![];
+
+        self.parse_token(Token::OpenParen, Some("to begin call argument list"))?;
+        self.ignore_newlines();
+
+        while !self.peek_is_or_eof(Token::CloseParen) {
+            if !arguments.is_empty() {
+                self.parse_token(Token::Comma, Some("to separate arguments"))?;
+            }
+
+            arguments.push(self.parse_expression()?);
+            self.ignore_newlines();
+        }
+
+        self.parse_token(Token::CloseParen, Some("to end call argument list"))?;
+
+        Ok(Expression::Call(Call {
+            function_name,
+            arguments,
+        }))
     }
 
     fn parse_type(
@@ -355,7 +401,7 @@ where
                         bits: Bits8,
                         sign: Signed,
                     }),
-                    "uint8" | "byte" => Ok(Type::Integer {
+                    "uint8" => Ok(Type::Integer {
                         bits: Bits8,
                         sign: Unsigned,
                     }),
@@ -432,8 +478,8 @@ pub fn parse(tokens: impl Iterator<Item = TokenInfo>, filename: String) -> Resul
     while let Some(token_info) = parser.peek() {
         match token_info.token {
             Token::FuncKeyword => {
-                let function =                     parser
-                        .parse_function(std::mem::replace(&mut annotations, Default::default()))?;
+                let function = parser
+                    .parse_function(std::mem::replace(&mut annotations, Default::default()))?;
                 file.functions.push(function);
             }
             Token::Hash => {

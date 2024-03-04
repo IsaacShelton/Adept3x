@@ -1,4 +1,6 @@
 
+use std::ffi::CString;
+
 use slotmap::{new_key_type, SlotMap};
 use derive_more::{Deref, DerefMut};
 
@@ -41,6 +43,13 @@ pub struct BasicBlock {
 #[derive(Debug, Clone)]
 pub enum Instruction {
     Return(Option<Value>),
+    Call(Call),
+}
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub function: FunctionRef,
+    pub arguments: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -100,6 +109,7 @@ pub enum Literal {
     Unsigned64(u64),
     Float32(f32),
     Float64(f64),
+    NullTerminatedString(CString),
 }
 
 #[derive(Debug, Clone)]
@@ -171,6 +181,7 @@ impl Instruction {
     pub fn is_terminating(&self) -> bool {
         match self {
             Instruction::Return(_) => true,
+            Instruction::Call(_) => false,
         }
     }
 }

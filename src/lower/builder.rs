@@ -1,4 +1,4 @@
-use crate::ir::{BasicBlock, BasicBlocks, Instruction};
+use crate::ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference};
 
 pub struct Builder {
     pub basicblocks: BasicBlocks,
@@ -25,13 +25,18 @@ impl Builder {
         }
     }
 
-    pub fn push(&mut self, instruction: Instruction) {
+    pub fn push(&mut self, instruction: Instruction) -> ir::Value {
         if let Some(last) = self.basicblocks.last_mut() {
             last.push(instruction);
         } else {
             let mut first_block = BasicBlock::new();
             first_block.push(instruction);
             self.basicblocks.push(first_block);
-        }
+        };
+
+        ir::Value::Reference(ValueReference {
+            basicblock_id: self.basicblocks.len() - 1,
+            instruction_id: self.basicblocks.last().unwrap().instructions.len() - 1,
+        })
     }
 }

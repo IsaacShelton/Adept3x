@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{
     builder::Builder, intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
     value_catalog::ValueCatalog, variable_stack::VariableStack,
@@ -21,27 +23,13 @@ pub struct StaticVariable {
     pub ty: LLVMTypeRef,
 }
 
-pub struct FunctionSkeleton {
-    pub skeleton: LLVMValueRef,
-    pub ir_function: Option<ir::FunctionRef>,
-}
-
-impl FunctionSkeleton {
-    pub fn new(skeleton: LLVMValueRef, ir_function: Option<ir::FunctionRef>) -> Self {
-        Self {
-            skeleton,
-            ir_function
-        }
-    }
-}
-
 pub struct BackendContext<'a> {
     pub backend_module: &'a BackendModule,
     pub ir_module: ir::Module,
     pub builder: Option<Builder>,
     pub value_catalog: Option<ValueCatalog>,
     pub variable_stack: Option<VariableStack>,
-    pub func_skeletons: Vec<FunctionSkeleton>,
+    pub func_skeletons: HashMap<ir::FunctionRef, LLVMValueRef>,
     pub global_variables: Vec<LLVMValueRef>,
     pub anon_global_variables: Vec<LLVMValueRef>,
     pub target_data: &'a TargetData,
@@ -62,7 +50,7 @@ impl<'a> BackendContext<'a> {
             builder: None,
             value_catalog: None,
             variable_stack: None,
-            func_skeletons: Vec::new(),
+            func_skeletons: HashMap::new(),
             global_variables: Vec::new(),
             anon_global_variables: Vec::new(),
             target_data,

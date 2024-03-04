@@ -1,5 +1,7 @@
 mod builder;
 
+use std::ffi::CString;
+
 use crate::{
     ast::{self, Ast, Expression, Statement},
     error::CompilerError,
@@ -12,7 +14,7 @@ pub fn lower(ast: &Ast) -> Result<ir::Module, CompilerError> {
 
     for (file_identifier, file) in ast.files.iter() {
         for function in file.functions.iter() {
-            lower_function(&mut ir_module, function);
+            lower_function(&mut ir_module, function)?;
         }
     }
 
@@ -29,14 +31,18 @@ fn lower_function(
         for statement in function.statements.iter() {
             match statement {
                 Statement::Return(expression) => {
-                    let instruction =
-                        ir::Instruction::Return(if let Some(expression) = expression {
-                            Some(lower_expression(&mut builder, expression)?)
+                    let instruction = ir::Instruction::Return(
+                        if let Some(expression) = expression {
+                            Some(lower_expression(&mut builder, ir_module, expression)?)
                         } else {
                             None
-                        });
+                        },
+                    );
 
                     builder.push(instruction);
+                }
+                Statement::Expression(expression) => {
+                    lower_expression(&mut builder, ir_module, expression)?;
                 }
             }
         }
@@ -55,7 +61,7 @@ fn lower_function(
     ir_module.functions.insert(ir::Function {
         mangled_name: function.name.clone(),
         basicblocks,
-        parameters, 
+        parameters,
         return_type: lower_type(&function.return_type)?,
         is_cstyle_variadic: false,
         is_foreign: true,
@@ -87,6 +93,7 @@ fn lower_type(ast_type: &ast::Type) -> Result<ir::Type, CompilerError> {
 
 fn lower_expression(
     builder: &mut Builder,
+    ir_module: &ir::Module,
     expression: &Expression,
 ) -> Result<ir::Value, CompilerError> {
     match expression {
@@ -99,5 +106,35 @@ fn lower_expression(
                 ))
             }
         }
+        Expression::NullTerminatedString(value) => {
+            Ok(ir::Value::Literal(Literal::NullTerminatedString(value.clone())))
+        }
+        Expression::Call(call) => {
+            if let Some(function_ref) = find_function(&ir_module, &call.function_name) {
+                let mut arguments = vec![];
+
+                for argument in call.arguments.iter() {
+                    arguments.push(lower_expression(builder, ir_module, argument)?);
+                }
+
+                Ok(builder.push(ir::Instruction::Call(ir::Call {
+                    function: function_ref,
+                    arguments,
+                })))
+            } else {
+                Err(CompilerError::during_lower(format!("Failed to find function '{}'", call.function_name)))
+            }
+        }
+        Expression::Variable(name) => todo!(),
     }
+}
+
+fn find_function(ir_module: &ir::Module, function_name: &str) -> Option<ir::FunctionRef> {
+    for (function_ref, function) in ir_module.functions.iter() {
+        if function.mangled_name == function_name {
+            return Some(function_ref);
+        }
+    }
+
+    None
 }

@@ -8,10 +8,7 @@ mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder,
-    ctx::{BackendContext, FunctionSkeleton},
-    module::BackendModule,
-    target_data::TargetData,
+    builder::Builder, ctx::BackendContext, module::BackendModule, target_data::TargetData,
     target_machine::TargetMachine,
 };
 use crate::{
@@ -23,13 +20,7 @@ use cstr::cstr;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAppendBasicBlock, LLVMBuildRet, LLVMConstInt,
-        LLVMConstReal, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
-        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName,
-        LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type,
-        LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
-        LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMStructType,
-        LLVMVoidType,
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildCall2, LLVMBuildRet, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -46,7 +37,12 @@ use llvm_sys::{
 };
 use slotmap::SlotMap;
 use std::{
-    error::Error, ffi::{c_char, c_double, c_ulonglong, CStr, CString}, fmt::Display, mem::MaybeUninit, process::Command, ptr::{null, null_mut}
+    error::Error,
+    ffi::{c_char, c_double, c_ulonglong, CStr, CString},
+    fmt::Display,
+    mem::MaybeUninit,
+    process::Command,
+    ptr::{null, null_mut},
 };
 
 pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> {
@@ -93,7 +89,10 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
     let mut output_object_filename = CString::new("a.o").unwrap();
 
     if (LLVMVerifyModule(backend_module.get(), LLVMPrintMessageAction, null_mut()) == 1) {
-        println!("{}", "\n---- WARNING: llvm module verification failed! ----".yellow());
+        println!(
+            "{}",
+            "\n---- WARNING: llvm module verification failed! ----".yellow()
+        );
     }
 
     llvm_sys::target_machine::LLVMTargetMachineEmitToFile(
@@ -109,11 +108,14 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
             CString::from_raw(llvm_emit_error_message)
                 .to_string_lossy()
                 .into_owned(),
-        ))
+        ));
     }
-    
+
     // Link resulting object file to create executable
-    Command::new("gcc").args(["a.o"]).spawn().expect("Failed to link");
+    Command::new("gcc")
+        .args(["a.o"])
+        .spawn()
+        .expect("Failed to link");
     Ok(())
 }
 
@@ -148,21 +150,15 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
         }
 
         ctx.func_skeletons
-            .push(FunctionSkeleton::new(skeleton, Some(function_ref)));
+            .insert(function_ref, skeleton);
     }
 
     Ok(())
 }
 
 unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
-    for FunctionSkeleton {
-        skeleton,
-        ir_function,
-    } in ctx.func_skeletons.iter()
-    {
-        if let Some(ir_function) =
-            ir_function.and_then(|function_ref| ctx.ir_module.functions.get(function_ref))
-        {
+    for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
+        if let Some(ir_function) = ctx.ir_module.functions.get(*ir_function_ref) {
             let builder = Builder::new();
 
             let basicblocks = ir_function
@@ -177,7 +173,7 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
                 .collect::<Vec<_>>();
 
             for (ir_basicblock, llvm_basicblock) in basicblocks.iter() {
-                create_function_block(&builder, ir_basicblock, *llvm_basicblock);
+                create_function_block(ctx, &builder, ir_basicblock, *llvm_basicblock);
             }
         }
     }
@@ -186,6 +182,7 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
 }
 
 unsafe fn create_function_block(
+    ctx: &BackendContext,
     builder: &Builder,
     ir_basicblock: &ir::BasicBlock,
     llvm_basicblock: LLVMBasicBlockRef,
@@ -199,14 +196,57 @@ unsafe fn create_function_block(
                     builder.get(),
                     value
                         .as_ref()
-                        .map_or_else(|| null_mut(), |value| build_value(&builder, value)),
+                        .map_or_else(|| null_mut(), |value| build_value(ctx.backend_module, &builder, value)),
+                );
+            }
+            Instruction::Call(call) => {
+                let function_type = get_function_type(
+                    ctx.backend_module,
+                    ctx.ir_module
+                        .functions
+                        .get(call.function)
+                        .expect("callee to exist"),
+                );
+
+                let function_value = *ctx
+                    .func_skeletons
+                    .get(&call.function)
+                    .expect("ir function to exist");
+                let mut arguments = call
+                    .arguments
+                    .iter()
+                    .map(|argument| build_value(ctx.backend_module, builder, argument))
+                    .collect::<Vec<_>>();
+
+                let _ = LLVMBuildCall2(
+                    builder.get(),
+                    function_type,
+                    function_value,
+                    arguments.as_mut_ptr(),
+                    arguments.len().try_into().unwrap(),
+                    cstr!("").as_ptr(),
                 );
             }
         }
     }
 }
 
-unsafe fn build_value(builder: &Builder, value: &ir::Value) -> LLVMValueRef {
+unsafe fn get_function_type(
+    backend_module: &BackendModule,
+    function: &ir::Function,
+) -> LLVMTypeRef {
+    let return_type = to_backend_type(backend_module, &function.return_type);
+    let mut parameters = to_backend_types(backend_module, &function.parameters);
+    let is_vararg = if function.is_cstyle_variadic { 1 } else { 0 };
+    LLVMFunctionType(
+        return_type,
+        parameters.as_mut_ptr(),
+        parameters.len().try_into().unwrap(),
+        is_vararg,
+    )
+}
+
+unsafe fn build_value(backend_module: &BackendModule, builder: &Builder, value: &ir::Value) -> LLVMValueRef {
     match value {
         ir::Value::Literal(literal) => match literal {
             ir::Literal::Boolean(value) => {
@@ -238,6 +278,22 @@ unsafe fn build_value(builder: &Builder, value: &ir::Value) -> LLVMValueRef {
             }
             ir::Literal::Float32(value) => LLVMConstReal(LLVMFloatType(), *value as c_double),
             ir::Literal::Float64(value) => LLVMConstReal(LLVMDoubleType(), *value as c_double),
+            ir::Literal::NullTerminatedString(value) => {
+                let length = value.as_bytes_with_nul().len();
+                let storage_type = LLVMArrayType2(LLVMInt8Type(), length.try_into().unwrap());
+
+                let read_only = LLVMAddGlobal(backend_module.get(), storage_type, cstr!("").as_ptr());
+                LLVMSetLinkage(read_only, LLVMLinkage::LLVMInternalLinkage);
+                LLVMSetGlobalConstant(read_only, true as i32);
+                LLVMSetInitializer(read_only, LLVMConstString(value.as_ptr(), length.try_into().unwrap(), true as i32));
+
+                let mut indicies = [
+                    LLVMConstInt(LLVMInt32Type(), 0, true as i32),
+                    LLVMConstInt(LLVMInt32Type(), 0, true as i32),
+                ];
+
+                LLVMConstGEP2(storage_type, read_only, indicies.as_mut_ptr(), indicies.len() as _)
+            }
         },
         ir::Value::Reference(_) => todo!(),
     }
