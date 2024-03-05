@@ -1,9 +1,11 @@
 use std::collections::{HashMap, VecDeque};
 
+use num_bigint::BigInt;
+
 use crate::{
     ast::{self, Ast, File, FileIdentifier, Type},
     error::CompilerError,
-    resolved,
+    resolved::{self, TypedExpression},
 };
 
 enum Job {
@@ -86,6 +88,7 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
                     resolved_statements.push(resolve_statement(
                         &mut resolved_ast,
                         &search_context,
+                        resolved_function_ref,
                         statement,
                     )?);
                 }
@@ -106,19 +109,197 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
 fn resolve_statement(
     resolved_ast: &mut resolved::Ast,
     search_context: &SearchContext,
+    resolved_function_ref: resolved::FunctionRef,
     ast_statement: &ast::Statement,
 ) -> Result<resolved::Statement, CompilerError> {
     match ast_statement {
         ast::Statement::Return(value) => {
             Ok(resolved::Statement::Return(if let Some(value) = value {
-                Some(resolve_expression(resolved_ast, search_context, value)?.expression)
+                let result = resolve_expression(resolved_ast, search_context, value)?;
+
+                let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
+
+                if let Some(result) = conform_expression(&result, &function.return_type) {
+                    Some(result.expression)
+                } else {
+                    return Err(CompilerError::during_resolve(format!(
+                        "Cannot return value of type '{}', expected '{}'",
+                        result.resolved_type, function.return_type,
+                    )));
+                }
             } else {
+                let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
+
+                if function.return_type != resolved::Type::Void {
+                    return Err(CompilerError::during_resolve(
+                        "Cannot return void when function expects return value",
+                    ));
+                }
+
                 None
             }))
         }
         ast::Statement::Expression(value) => Ok(resolved::Statement::Expression(
             resolve_expression(resolved_ast, search_context, value)?.expression,
         )),
+    }
+}
+
+fn conform_expression(
+    expression: &TypedExpression,
+    to_type: &resolved::Type,
+) -> Option<TypedExpression> {
+    if expression.resolved_type == *to_type {
+        return Some(expression.clone());
+    }
+
+    // Integer Literal to Integer Type Conversion
+    match &expression.resolved_type {
+        resolved::Type::IntegerLiteral(value) => {
+            if let Some(conformed) = conform_integer(value, to_type) {
+                return Some(conformed);
+            }
+        }
+        _ => (),
+    }
+
+    None
+}
+
+fn conform_expression_to_default(
+    expression: TypedExpression,
+) -> Result<TypedExpression, CompilerError> {
+    match expression.resolved_type {
+        resolved::Type::IntegerLiteral(value) => {
+            if let Some(conformed) = conform_integer_to_default(&value) {
+                Ok(conformed)
+            } else {
+                Err(CompilerError::during_resolve(format!(
+                    "Failed to lower unrepresentable integer literal {}",
+                    value
+                )))
+            }
+        }
+        _ => Ok(expression),
+    }
+}
+
+fn conform_integer_to_default(value: &BigInt) -> Option<TypedExpression> {
+    use resolved::{IntegerBits::*, IntegerSign::*};
+
+    let possible_types = [
+        resolved::Type::Integer {
+            bits: Bits64,
+            sign: Signed,
+        },
+        resolved::Type::Integer {
+            bits: Bits64,
+            sign: Unsigned,
+        },
+    ];
+
+    for possible_type in possible_types.iter() {
+        if let Some(conformed) = conform_integer(value, possible_type) {
+            return Some(conformed);
+        }
+    }
+
+    return None;
+}
+
+fn conform_integer(value: &BigInt, to_type: &resolved::Type) -> Option<TypedExpression> {
+    match to_type {
+        resolved::Type::Integer { bits, sign } => {
+            use resolved::{IntegerBits::*, IntegerLiteralBits, IntegerSign::*};
+
+            let make_integer = |integer_literal_bits| {
+                Some(TypedExpression::new(
+                    resolved::Type::Integer {
+                        bits: bits.clone(),
+                        sign: sign.clone(),
+                    },
+                    resolved::Expression::Integer {
+                        value: value.clone(),
+                        bits: integer_literal_bits,
+                        sign: sign.clone(),
+                    },
+                ))
+            };
+
+            match (bits, sign) {
+                (Normal, Signed) => {
+                    if TryInto::<i64>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits64)
+                    } else {
+                        None
+                    }
+                }
+                (Normal, Unsigned) => {
+                    if TryInto::<u64>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits64)
+                    } else {
+                        None
+                    }
+                }
+                (Bits8, Signed) => {
+                    if TryInto::<i8>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits8)
+                    } else {
+                        None
+                    }
+                }
+                (Bits8, Unsigned) => {
+                    if TryInto::<u8>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits8)
+                    } else {
+                        None
+                    }
+                }
+                (Bits16, Signed) => {
+                    if TryInto::<i16>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits16)
+                    } else {
+                        None
+                    }
+                }
+                (Bits16, Unsigned) => {
+                    if TryInto::<u16>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits16)
+                    } else {
+                        None
+                    }
+                }
+                (Bits32, Signed) => {
+                    if TryInto::<i32>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits32)
+                    } else {
+                        None
+                    }
+                }
+                (Bits32, Unsigned) => {
+                    if TryInto::<u32>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits32)
+                    } else {
+                        None
+                    }
+                }
+                (Bits64, Signed) => {
+                    if TryInto::<i64>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits64)
+                    } else {
+                        None
+                    }
+                }
+                (Bits64, Unsigned) => {
+                    if TryInto::<u64>::try_into(value).is_ok() {
+                        make_integer(IntegerLiteralBits::Bits64)
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+        _ => None,
     }
 }
 
@@ -132,11 +313,8 @@ fn resolve_expression(
     match ast_expression {
         ast::Expression::Variable(_) => todo!(),
         ast::Expression::Integer(value) => Ok(TypedExpression::new(
-            resolved::Type::Integer {
-                bits: Bits64,
-                sign: Signed,
-            },
-            resolved::Expression::Integer(value.clone()),
+            resolved::Type::IntegerLiteral(value.clone()),
+            resolved::Expression::IntegerLiteral(value.clone()),
         )),
         ast::Expression::NullTerminatedString(value) => Ok(TypedExpression::new(
             resolved::Type::Pointer(Box::new(resolved::Type::Integer {
@@ -157,7 +335,9 @@ fn resolve_expression(
                 )));
             }
 
-            if call.arguments.len() > function.parameters.required.len() && !function.parameters.is_cstyle_vararg {
+            if call.arguments.len() > function.parameters.required.len()
+                && !function.parameters.is_cstyle_vararg
+            {
                 return Err(CompilerError::during_resolve(format!(
                     "Too many arguments for call to function '{}'",
                     &function.name
@@ -167,15 +347,25 @@ fn resolve_expression(
             let mut arguments = Vec::with_capacity(call.arguments.len());
 
             for (i, argument) in call.arguments.iter().enumerate() {
-                let argument = resolve_expression(resolved_ast, search_context, argument)?;
+                let mut argument = resolve_expression(resolved_ast, search_context, argument)?;
 
                 let function = resolved_ast.functions.get(function_ref).unwrap();
+
                 if let Some(parameter) = function.parameters.required.get(i) {
-                    if parameter.resolved_type != argument.resolved_type {
+                    if let Some(conformed_argument) =
+                        conform_expression(&argument, &parameter.resolved_type)
+                    {
+                        argument = conformed_argument;
+                    } else {
                         return Err(CompilerError::during_resolve(format!(
                             "Bad type for argument #{} to function '{}'",
                             i, &function.name
                         )));
+                    }
+                } else {
+                    match conform_expression_to_default(argument) {
+                        Ok(conformed_argument) => argument = conformed_argument,
+                        Err(error) => return Err(error),
                     }
                 }
 

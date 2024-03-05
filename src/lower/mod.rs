@@ -87,6 +87,10 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
             (Bits64, Signed) => ir::Type::S64,
             (Bits64, Unsigned) => ir::Type::U64,
         }),
+        resolved::Type::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
+            "Cannot lower unspecialized integer literal {}",
+            value
+        ))),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         resolved::Type::Void => Ok(ir::Type::Void),
     }
@@ -98,13 +102,53 @@ fn lower_expression(
     expression: &Expression,
 ) -> Result<ir::Value, CompilerError> {
     match expression {
-        Expression::Integer(value) => {
-            if let Ok(value) = value.try_into() {
-                Ok(ir::Value::Literal(Literal::Signed64(value)))
-            } else {
-                Err(CompilerError::during_lower(
-                    "Integer literal does not fit within signed 64-bit integer",
-                ))
+        Expression::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
+            "Cannot lower unspecialized integer literal {}",
+            value
+        ))),
+        Expression::Integer { value, bits, sign } => {
+            use resolved::{IntegerLiteralBits::*, IntegerSign::*};
+            match (bits, sign) {
+                (Bits8, Signed) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Signed8(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into int8", value)))
+                },
+                (Bits8, Unsigned) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Unsigned8(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into uint8", value)))
+                },
+                (Bits16, Signed) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Signed16(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into int16", value)))
+                },
+                (Bits16, Unsigned) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Unsigned16(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into uint16", value)))
+                },
+                (Bits32, Signed) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Signed32(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into int32", value)))
+                },
+                (Bits32, Unsigned) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Unsigned32(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into uint32", value)))
+                },
+                (Bits64, Signed) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Signed64(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into int64", value)))
+                },
+                (Bits64, Unsigned) => if let Ok(value) = value.try_into() {
+                    Ok(ir::Value::Literal(Literal::Unsigned64(value)))
+                } else {
+                    Err(CompilerError::during_lower(format!("Cannot fit {} into uint64", value)))
+                },
             }
         }
         Expression::NullTerminatedString(value) => Ok(ir::Value::Literal(
