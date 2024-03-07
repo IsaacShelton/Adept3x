@@ -29,6 +29,7 @@ pub struct Function {
     pub is_cstyle_variadic: bool,
     pub is_foreign: bool,
     pub is_exposed: bool,
+    pub variables: Vec<Value>,
 }
 
 #[derive(Clone, Debug)]
@@ -40,12 +41,21 @@ pub struct BasicBlock {
 pub enum Instruction {
     Return(Option<Value>),
     Call(Call),
+    Alloca(Type),
+    Store(Store),
+    Load((Value, Type)),
 }
 
 #[derive(Clone, Debug)]
 pub struct Call {
     pub function: FunctionRef,
     pub arguments: Vec<Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Store {
+    pub source: Value,
+    pub destination: Value,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -178,6 +188,9 @@ impl Instruction {
         match self {
             Instruction::Return(_) => true,
             Instruction::Call(_) => false,
+            Instruction::Alloca(_) => false,
+            Instruction::Store(_) => false,
+            Instruction::Load(_) => false,
         }
     }
 }

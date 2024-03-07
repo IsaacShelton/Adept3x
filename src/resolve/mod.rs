@@ -1,12 +1,16 @@
-use std::collections::{HashMap, VecDeque};
-
-use num_bigint::BigInt;
+mod function_search_context;
+mod variable_search_context;
 
 use crate::{
     ast::{self, Ast, File, FileIdentifier, Type},
     error::CompilerError,
-    resolved::{self, TypedExpression},
+    resolved::{self, TypedExpression, VariableStorage, VariableStorageKey},
 };
+use function_search_context::FunctionSearchContext;
+use num_bigint::BigInt;
+use std::collections::{HashMap, VecDeque};
+
+use self::variable_search_context::VariableSearchContext;
 
 enum Job {
     Regular(FileIdentifier, usize, resolved::FunctionRef),
@@ -15,12 +19,7 @@ enum Job {
 #[derive(Default)]
 struct ResolveContext {
     pub jobs: VecDeque<Job>,
-    pub search_contexts: HashMap<FileIdentifier, SearchContext>,
-}
-
-#[derive(Default)]
-struct SearchContext {
-    pub available: HashMap<String, Vec<resolved::FunctionRef>>,
+    pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchContext>,
 }
 
 pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
@@ -34,28 +33,32 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
                 name: function.name.clone(),
                 parameters: resolve_parameters(&function.parameters)?,
                 return_type: resolve_type(&function.return_type)?,
-                statements: Vec::new(),
+                statements: vec![],
                 is_foreign: function.is_foreign,
+                variables: VariableStorage::new(),
             });
 
             ctx.jobs
                 .push_back(Job::Regular(file_identifier.clone(), i, function_ref));
 
-            let search_context = ctx
-                .search_contexts
+            let function_search_context = ctx
+                .function_search_contexts
                 .entry(file_identifier.clone())
-                .or_insert_with(SearchContext::default);
+                .or_insert_with(FunctionSearchContext::default);
 
             // You can blame stable rust for having to do this.
             // There is no way to "get_or_insert_mut" without pre-cloning the key.
-            let function_group = match search_context.available.get_mut(&function.name) {
+            let function_group = match function_search_context.available.get_mut(&function.name) {
                 Some(group) => group,
                 None => {
-                    search_context
+                    function_search_context
                         .available
                         .insert(function.name.clone(), Vec::new());
 
-                    search_context.available.get_mut(&function.name).unwrap()
+                    function_search_context
+                        .available
+                        .get_mut(&function.name)
+                        .unwrap()
                 }
             };
 
@@ -67,8 +70,8 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
             Job::Regular(file_identifier, function_index, resolved_function_ref) => {
-                let search_context = ctx
-                    .search_contexts
+                let function_search_context = ctx
+                    .function_search_contexts
                     .get(&file_identifier)
                     .expect("search context to exist for file");
 
@@ -84,10 +87,21 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
 
                 let mut resolved_statements = vec![];
 
+                let mut variable_search_context = VariableSearchContext::default();
+
+                for (index, parameter) in ast_function.parameters.required.iter().enumerate() {
+                    variable_search_context.put(
+                        parameter.name.clone(),
+                        resolve_type(&parameter.ast_type)?,
+                        VariableStorageKey { index },
+                    );
+                }
+
                 for statement in ast_function.statements.iter() {
                     resolved_statements.push(resolve_statement(
                         &mut resolved_ast,
-                        &search_context,
+                        &function_search_context,
+                        &mut variable_search_context,
                         resolved_function_ref,
                         statement,
                     )?);
@@ -108,14 +122,21 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
 
 fn resolve_statement(
     resolved_ast: &mut resolved::Ast,
-    search_context: &SearchContext,
+    function_search_context: &FunctionSearchContext,
+    variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
     ast_statement: &ast::Statement,
 ) -> Result<resolved::Statement, CompilerError> {
     match ast_statement {
         ast::Statement::Return(value) => {
             Ok(resolved::Statement::Return(if let Some(value) = value {
-                let result = resolve_expression(resolved_ast, search_context, value)?;
+                let result = resolve_expression(
+                    resolved_ast,
+                    function_search_context,
+                    variable_search_context,
+                    resolved_function_ref,
+                    value,
+                )?;
 
                 let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
 
@@ -140,7 +161,14 @@ fn resolve_statement(
             }))
         }
         ast::Statement::Expression(value) => Ok(resolved::Statement::Expression(
-            resolve_expression(resolved_ast, search_context, value)?.expression,
+            resolve_expression(
+                resolved_ast,
+                function_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                value,
+            )?
+            .expression,
         )),
     }
 }
@@ -305,13 +333,22 @@ fn conform_integer(value: &BigInt, to_type: &resolved::Type) -> Option<TypedExpr
 
 fn resolve_expression(
     resolved_ast: &mut resolved::Ast,
-    search_context: &SearchContext,
+    function_search_context: &FunctionSearchContext,
+    variable_search_context: &mut VariableSearchContext,
+    resolved_function_ref: resolved::FunctionRef,
     ast_expression: &ast::Expression,
 ) -> Result<resolved::TypedExpression, CompilerError> {
     use resolved::{IntegerBits::*, IntegerSign::*, TypedExpression};
 
     match ast_expression {
-        ast::Expression::Variable(_) => todo!(),
+        ast::Expression::Variable(name) => {
+            let (resolved_type, key) = variable_search_context.find_variable_or_error(name)?;
+
+            Ok(TypedExpression::new(
+                resolved_type.clone(),
+                resolved::Expression::Variable((*key, resolved_type.clone())),
+            ))
+        }
         ast::Expression::Integer(value) => Ok(TypedExpression::new(
             resolved::Type::IntegerLiteral(value.clone()),
             resolved::Expression::IntegerLiteral(value.clone()),
@@ -324,7 +361,8 @@ fn resolve_expression(
             resolved::Expression::NullTerminatedString(value.clone()),
         )),
         ast::Expression::Call(call) => {
-            let function_ref = find_function_or_error(search_context, &call.function_name)?;
+            let function_ref =
+                function_search_context.find_function_or_error(&call.function_name)?;
             let function = resolved_ast.functions.get(function_ref).unwrap();
             let return_type = function.return_type.clone();
 
@@ -347,7 +385,13 @@ fn resolve_expression(
             let mut arguments = Vec::with_capacity(call.arguments.len());
 
             for (i, argument) in call.arguments.iter().enumerate() {
-                let mut argument = resolve_expression(resolved_ast, search_context, argument)?;
+                let mut argument = resolve_expression(
+                    resolved_ast,
+                    function_search_context,
+                    variable_search_context,
+                    resolved_function_ref,
+                    argument,
+                )?;
 
                 let function = resolved_ast.functions.get(function_ref).unwrap();
 
@@ -381,14 +425,30 @@ fn resolve_expression(
             ))
         }
         ast::Expression::DeclareAssign(declare_assign) => {
-            let value = resolve_expression(resolved_ast, search_context, &declare_assign.value)?;
+            let value = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &declare_assign.value,
+            )?;
+
+            let value = conform_expression_to_default(value)?;
+
+            let function = resolved_ast
+                .functions
+                .get_mut(resolved_function_ref)
+                .unwrap();
+            let key = function.variables.add_variable(value.resolved_type.clone());
+
+            variable_search_context.put(&declare_assign.name, value.resolved_type.clone(), key);
 
             Ok(TypedExpression::new(
                 value.resolved_type,
                 resolved::Expression::DeclareAssign(resolved::DeclareAssign {
-                    name: declare_assign.name.clone(),
+                    key,
                     value: Box::new(value.expression),
-                })
+                }),
             ))
         }
     }
@@ -419,25 +479,4 @@ fn resolve_parameters(parameters: &ast::Parameters) -> Result<resolved::Paramete
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
-}
-
-fn find_function_or_error(
-    search_context: &SearchContext,
-    name: &str,
-) -> Result<resolved::FunctionRef, CompilerError> {
-    match find_function(search_context, name) {
-        Some(function) => Ok(function),
-        None => Err(CompilerError::during_resolve(format!(
-            "Failed to find function '{}'",
-            name
-        ))),
-    }
-}
-
-fn find_function(search_context: &SearchContext, name: &str) -> Option<resolved::FunctionRef> {
-    search_context
-        .available
-        .get(name)
-        .and_then(|list| list.get(0))
-        .copied()
 }

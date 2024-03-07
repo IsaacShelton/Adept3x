@@ -1,3 +1,5 @@
+mod variable_storage;
+
 use num_bigint::BigInt;
 use slotmap::{new_key_type, SlotMap};
 use std::{
@@ -5,6 +7,7 @@ use std::{
     ffi::CString,
     fmt::{Debug, Display},
 };
+pub use variable_storage::VariableStorage;
 
 new_key_type! {
     pub struct FunctionRef;
@@ -32,6 +35,7 @@ pub struct Function {
     pub return_type: Type,
     pub statements: Vec<Statement>,
     pub is_foreign: bool,
+    pub variables: VariableStorage,
 }
 
 #[derive(Clone, Debug)]
@@ -56,6 +60,7 @@ pub struct Parameter {
 }
 
 pub use crate::ast::{IntegerBits, IntegerSign};
+pub use self::variable_storage::VariableStorageKey;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
@@ -130,7 +135,7 @@ pub enum IntegerLiteralBits {
 
 #[derive(Clone, Debug)]
 pub enum Expression {
-    Variable(String),
+    Variable((VariableStorageKey, Type)),
     IntegerLiteral(BigInt),
     Integer {
         value: BigInt,
@@ -150,7 +155,6 @@ pub struct Call {
 
 #[derive(Clone, Debug)]
 pub struct DeclareAssign {
-    pub name: String,
+    pub key: VariableStorageKey,
     pub value: Box<Expression>,
 }
-

@@ -8,8 +8,7 @@ mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder, ctx::BackendContext, module::BackendModule, target_data::TargetData,
-    target_machine::TargetMachine,
+    builder::Builder, ctx::BackendContext, module::BackendModule, target_data::TargetData, target_machine::TargetMachine, value_catalog::ValueCatalog
 };
 use crate::{
     error::CompilerError,
@@ -20,14 +19,7 @@ use cstr::cstr;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
-        LLVMArrayType2, LLVMBuildCall2, LLVMBuildRet, LLVMConstGEP2, LLVMConstInt, LLVMConstReal,
-        LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
-        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName,
-        LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type,
-        LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
-        LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant,
-        LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType,
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildStore, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -166,20 +158,22 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
         if let Some(ir_function) = ctx.ir_module.functions.get(ir_function_ref) {
             let builder = Builder::new();
+            let mut value_catalog = ValueCatalog::new(ir_function.basicblocks.len());
 
             let basicblocks = ir_function
                 .basicblocks
                 .iter()
-                .map(|ir_basicblock| {
+                .enumerate()
+                .map(|(id, ir_basicblock)| {
                     (
+                        id,
                         ir_basicblock,
                         LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
                     )
-                })
-                .collect::<Vec<_>>();
+                });
 
-            for (ir_basicblock, llvm_basicblock) in basicblocks.iter() {
-                create_function_block(ctx, &builder, ir_basicblock, *llvm_basicblock);
+            for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks {
+                create_function_block(ctx, &mut value_catalog, &builder, ir_basicblock_id, ir_basicblock, llvm_basicblock);
             }
         }
     }
@@ -189,22 +183,39 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
 
 unsafe fn create_function_block(
     ctx: &BackendContext,
+    value_catalog: &mut ValueCatalog,
     builder: &Builder,
+    ir_basicblock_id: usize,
     ir_basicblock: &ir::BasicBlock,
     llvm_basicblock: LLVMBasicBlockRef,
 ) {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
 
     for instruction in ir_basicblock.iter() {
-        match instruction {
+        let result = match instruction {
             Instruction::Return(value) => {
                 let _ = LLVMBuildRet(
                     builder.get(),
                     value.as_ref().map_or_else(
                         || null_mut(),
-                        |value| build_value(ctx.backend_module, &builder, value),
+                        |value| build_value(ctx.backend_module, value_catalog, &builder, value),
                     ),
                 );
+                None
+            }
+            Instruction::Alloca(ir_type) => {
+                Some(LLVMBuildAlloca(builder.get(), to_backend_type(ctx.backend_module, ir_type), cstr!("").as_ptr()))
+            }
+            Instruction::Store(store) => {
+                let source = build_value(ctx.backend_module, value_catalog, builder, &store.source);
+                let destination = build_value(ctx.backend_module, value_catalog, builder, &store.destination);
+                let _ = LLVMBuildStore(builder.get(), source, destination);
+                None
+            }
+            Instruction::Load((value, ir_type)) => {
+                let pointer = build_value(ctx.backend_module, value_catalog, builder, value);
+                let llvm_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildLoad2(builder.get(), llvm_type, pointer, cstr!("").as_ptr()))
             }
             Instruction::Call(call) => {
                 let function_type = get_function_type(
@@ -223,19 +234,21 @@ unsafe fn create_function_block(
                 let mut arguments = call
                     .arguments
                     .iter()
-                    .map(|argument| build_value(ctx.backend_module, builder, argument))
+                    .map(|argument| build_value(ctx.backend_module, value_catalog, builder, argument))
                     .collect::<Vec<_>>();
 
-                let _ = LLVMBuildCall2(
+                Some(LLVMBuildCall2(
                     builder.get(),
                     function_type,
                     function_value,
                     arguments.as_mut_ptr(),
                     arguments.len().try_into().unwrap(),
                     cstr!("").as_ptr(),
-                );
+                ))
             }
-        }
+        };
+
+        value_catalog.push(ir_basicblock_id, result);
     }
 }
 
@@ -257,6 +270,7 @@ unsafe fn get_function_type(
 
 unsafe fn build_value(
     backend_module: &BackendModule,
+    value_catalog: &ValueCatalog,
     builder: &Builder,
     value: &ir::Value,
 ) -> LLVMValueRef {
@@ -317,7 +331,7 @@ unsafe fn build_value(
                 )
             }
         },
-        ir::Value::Reference(_) => todo!(),
+        ir::Value::Reference(reference) => value_catalog.get(reference).expect("referenced value exists"),
     }
 }
 

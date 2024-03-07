@@ -2,7 +2,7 @@ mod builder;
 
 use crate::{
     error::CompilerError,
-    ir::{self, BasicBlocks, Literal},
+    ir::{self, BasicBlocks, Literal, Value, ValueReference},
     resolved::{self, Expression, Statement},
 };
 use builder::Builder;
@@ -25,6 +25,11 @@ fn lower_function(
 ) -> Result<(), CompilerError> {
     let basicblocks = if !function.is_foreign {
         let mut builder = Builder::new();
+
+        for variable_type in function.variables.types.iter() {
+            let instruction = ir::Instruction::Alloca(lower_type(variable_type)?);
+            builder.push(instruction);
+        }
 
         for statement in function.statements.iter() {
             match statement {
@@ -65,6 +70,7 @@ fn lower_function(
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
             is_foreign: true,
             is_exposed: true,
+            variables: vec![],
         },
     );
 
@@ -207,7 +213,30 @@ fn lower_expression(
                 arguments,
             })))
         }
-        Expression::Variable(name) => todo!(),
-        Expression::DeclareAssign(declare_assign) => todo!(),
+        Expression::Variable((key, ir_type)) => {
+            let pointer = Value::Reference(ValueReference {
+                basicblock_id: 0,
+                instruction_id: key.index,
+            });
+
+            let resolved_type = lower_type(ir_type)?;
+
+            Ok(builder.push(ir::Instruction::Load((pointer, resolved_type))))
+        },
+        Expression::DeclareAssign(declare_assign) => {
+            let initial_value = lower_expression(builder, ir_module, &declare_assign.value)?;
+
+            let destination = Value::Reference(ValueReference {
+                basicblock_id: 0,
+                instruction_id: declare_assign.key.index,
+            });
+
+            builder.push(ir::Instruction::Store(ir::Store {
+                source: initial_value,
+                destination: destination.clone(),
+            }));
+
+            Ok(destination)
+        }
     }
 }
