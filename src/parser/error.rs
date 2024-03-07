@@ -37,8 +37,6 @@ pub enum ErrorInfo {
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use ErrorInfo::*;
-
         if let Some(filename) = &self.filename {
             write!(f, "{}:", filename)?;
         }
@@ -54,7 +52,7 @@ impl Display for ParseError {
         write!(f, "{}", "error: ".bright_red())?;
 
         match &self.info {
-            UnexpectedToken { unexpected } => {
+            ErrorInfo::UnexpectedToken { unexpected } => {
                 write!(f, "Unexpected token")?;
 
                 if let Some(token) = unexpected {
@@ -63,7 +61,7 @@ impl Display for ParseError {
                     write!(f, " end-of-file")?;
                 }
             }
-            Expected {
+            ErrorInfo::Expected {
                 expected,
                 got,
                 for_reason,
@@ -80,7 +78,7 @@ impl Display for ParseError {
                     write!(f, ", got end-of-file")?;
                 }
             }
-            ExpectedType { prefix, for_reason, got } => {
+            ErrorInfo::ExpectedType { prefix, for_reason, got } => {
                 write!(f, "Expected ")?;
 
                 if let Some(prefix) = prefix {
@@ -99,13 +97,13 @@ impl Display for ParseError {
                     write!(f, ", got end-of-file")?;
                 }
             }
-            UndeclaredType { name } => {
+            ErrorInfo::UndeclaredType { name } => {
                 write!(f, "Undeclared type '{}'", name)?;
             }
-            UnrecognizedAnnotation { name } => {
+            ErrorInfo::UnrecognizedAnnotation { name } => {
                 write!(f, "Unrecognized annotation '{}'", name)?;
             }
-            Other { message } => {
+            ErrorInfo::Other { message } => {
                 write!(f, "{}", message)?;
             }
         }

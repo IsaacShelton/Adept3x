@@ -139,6 +139,7 @@ pub enum Expression {
     },
     NullTerminatedString(CString),
     Call(Call),
+    DeclareAssign(DeclareAssign),
 }
 
 #[derive(Clone, Debug)]
@@ -146,3 +147,10 @@ pub struct Call {
     pub function: FunctionRef,
     pub arguments: Vec<Expression>,
 }
+
+#[derive(Clone, Debug)]
+pub struct DeclareAssign {
+    pub name: String,
+    pub value: Box<Expression>,
+}
+

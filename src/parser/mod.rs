@@ -4,7 +4,7 @@ use std::ffi::CString;
 
 use self::error::{ErrorInfo, ParseError};
 use crate::ast::{
-    self, Ast, Call, Expression, FileIdentifier, Function, Parameter, Parameters, Statement, Type,
+    self, Ast, Call, DeclareAssign, Expression, FileIdentifier, Function, Parameter, Parameters, Statement, Type
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
@@ -342,6 +342,8 @@ where
             }) => {
                 if self.peek_is(Token::OpenParen) {
                     self.parse_call(identifier)
+                } else if self.peek_is(Token::DeclareAssign) {
+                    self.parse_declare_assign(identifier)
                 } else {
                     Ok(Expression::Variable(identifier))
                 }
@@ -385,6 +387,21 @@ where
         Ok(Expression::Call(Call {
             function_name,
             arguments,
+        }))
+    }
+
+    fn parse_declare_assign(&mut self, variable_name: String) -> Result<Expression, ParseError> {
+        // variable_name := value
+        //               ^
+
+        self.parse_token(Token::DeclareAssign, Some("for variable declaration assignment"))?;
+        self.ignore_newlines();
+
+        let value = self.parse_expression()?;
+
+        Ok(Expression::DeclareAssign(DeclareAssign {
+            name: variable_name,
+            value: Box::new(value),
         }))
     }
 

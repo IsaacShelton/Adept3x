@@ -380,6 +380,17 @@ fn resolve_expression(
                 }),
             ))
         }
+        ast::Expression::DeclareAssign(declare_assign) => {
+            let value = resolve_expression(resolved_ast, search_context, &declare_assign.value)?;
+
+            Ok(TypedExpression::new(
+                value.resolved_type,
+                resolved::Expression::DeclareAssign(resolved::DeclareAssign {
+                    name: declare_assign.name.clone(),
+                    value: Box::new(value.expression),
+                })
+            ))
+        }
     }
 }
 

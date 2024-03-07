@@ -168,6 +168,10 @@ where
                 '>' => Has(TokenInfo::new(Token::GreaterThan, location)),
                 '!' => Has(TokenInfo::new(Token::Not, location)),
                 ',' => Has(TokenInfo::new(Token::Comma, location)),
+                ':' if self.characters.peek().is_character('=') => {
+                    self.characters.next();
+                    Has(TokenInfo::new(Token::DeclareAssign, location))
+                },
                 ':' => Has(TokenInfo::new(Token::Colon, location)),
                 '#' => Has(TokenInfo::new(Token::Hash, location)),
                 '\"' => {
