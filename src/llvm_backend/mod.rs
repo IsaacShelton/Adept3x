@@ -19,7 +19,7 @@ use cstr::cstr;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildStore, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildStore, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -173,7 +173,7 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
                 });
 
             for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks {
-                create_function_block(ctx, &mut value_catalog, &builder, ir_basicblock_id, ir_basicblock, llvm_basicblock);
+                create_function_block(ctx, &mut value_catalog, &builder, ir_basicblock_id, ir_basicblock, llvm_basicblock, *skeleton);
             }
         }
     }
@@ -188,6 +188,7 @@ unsafe fn create_function_block(
     ir_basicblock_id: usize,
     ir_basicblock: &ir::BasicBlock,
     llvm_basicblock: LLVMBasicBlockRef,
+    function_skeleton: LLVMValueRef,
 ) {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
 
@@ -205,6 +206,9 @@ unsafe fn create_function_block(
             }
             Instruction::Alloca(ir_type) => {
                 Some(LLVMBuildAlloca(builder.get(), to_backend_type(ctx.backend_module, ir_type), cstr!("").as_ptr()))
+            }
+            Instruction::Parameter(index) => {
+                Some(LLVMGetParam(function_skeleton, *index))
             }
             Instruction::Store(store) => {
                 let source = build_value(ctx.backend_module, value_catalog, builder, &store.source);

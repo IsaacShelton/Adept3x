@@ -135,7 +135,7 @@ pub enum IntegerLiteralBits {
 
 #[derive(Clone, Debug)]
 pub enum Expression {
-    Variable((VariableStorageKey, Type)),
+    Variable(Variable),
     IntegerLiteral(BigInt),
     Integer {
         value: BigInt,
@@ -145,6 +145,12 @@ pub enum Expression {
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
+}
+
+#[derive(Clone, Debug)]
+pub struct Variable {
+    pub key: VariableStorageKey,
+    pub resolved_type: Type,
 }
 
 #[derive(Clone, Debug)]

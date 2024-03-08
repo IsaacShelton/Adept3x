@@ -44,6 +44,7 @@ pub enum Instruction {
     Alloca(Type),
     Store(Store),
     Load((Value, Type)),
+    Parameter(u32),
 }
 
 #[derive(Clone, Debug)]
@@ -191,6 +192,7 @@ impl Instruction {
             Instruction::Alloca(_) => false,
             Instruction::Store(_) => false,
             Instruction::Load(_) => false,
+            Instruction::Parameter(_) => false,
         }
     }
 }

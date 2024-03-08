@@ -225,7 +225,12 @@ where
         };
 
         self.ignore_newlines();
-        let return_type = self.parse_type(Some("return "), Some("for function"))?;
+
+        let return_type = if self.peek_is(Token::OpenCurly) {
+            ast::Type::Void
+        } else {
+            self.parse_type(Some("return "), Some("for function"))?
+        };
 
         let mut statements = vec![];
 

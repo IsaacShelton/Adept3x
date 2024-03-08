@@ -89,12 +89,18 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
 
                 let mut variable_search_context = VariableSearchContext::default();
 
-                for (index, parameter) in ast_function.parameters.required.iter().enumerate() {
-                    variable_search_context.put(
-                        parameter.name.clone(),
-                        resolve_type(&parameter.ast_type)?,
-                        VariableStorageKey { index },
-                    );
+                {
+                    let function = resolved_ast
+                        .functions
+                        .get_mut(resolved_function_ref)
+                        .unwrap();
+
+                    for (index, parameter) in ast_function.parameters.required.iter().enumerate() {
+                        let resolved_type = resolve_type(&parameter.ast_type)?;
+                        let key = function.variables.add_parameter(resolved_type.clone());
+
+                        variable_search_context.put(parameter.name.clone(), resolved_type, key);
+                    }
                 }
 
                 for statement in ast_function.statements.iter() {
@@ -346,7 +352,10 @@ fn resolve_expression(
 
             Ok(TypedExpression::new(
                 resolved_type.clone(),
-                resolved::Expression::Variable((*key, resolved_type.clone())),
+                resolved::Expression::Variable(resolved::Variable {
+                    key: *key,
+                    resolved_type: resolved_type.clone(),
+                }),
             ))
         }
         ast::Expression::Integer(value) => Ok(TypedExpression::new(

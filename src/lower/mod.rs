@@ -26,9 +26,31 @@ fn lower_function(
     let basicblocks = if !function.is_foreign {
         let mut builder = Builder::new();
 
-        for variable_type in function.variables.types.iter() {
-            let instruction = ir::Instruction::Alloca(lower_type(variable_type)?);
-            builder.push(instruction);
+        // Allocate parameters
+        for (i, variable_type) in function
+            .variables
+            .types
+            .iter()
+            .enumerate()
+            .take(function.variables.num_parameters)
+        {
+            let destination = builder.push(ir::Instruction::Alloca(lower_type(variable_type)?));
+            let source = builder.push(ir::Instruction::Parameter(i.try_into().unwrap()));
+
+            builder.push(ir::Instruction::Store(ir::Store {
+                source,
+                destination,
+            }));
+        }
+
+        // Allocate non-parameter stack variables
+        for variable_type in function
+            .variables
+            .types
+            .iter()
+            .skip(function.variables.num_parameters)
+        {
+            builder.push(ir::Instruction::Alloca(lower_type(variable_type)?));
         }
 
         for statement in function.statements.iter() {
@@ -213,16 +235,16 @@ fn lower_expression(
                 arguments,
             })))
         }
-        Expression::Variable((key, ir_type)) => {
+        Expression::Variable(variable) => {
             let pointer = Value::Reference(ValueReference {
                 basicblock_id: 0,
-                instruction_id: key.index,
+                instruction_id: variable.key.index,
             });
 
-            let resolved_type = lower_type(ir_type)?;
+            let ir_type = lower_type(&variable.resolved_type)?;
 
-            Ok(builder.push(ir::Instruction::Load((pointer, resolved_type))))
-        },
+            Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
+        }
         Expression::DeclareAssign(declare_assign) => {
             let initial_value = lower_expression(builder, ir_module, &declare_assign.value)?;
 
