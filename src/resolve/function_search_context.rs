@@ -7,7 +7,10 @@ pub struct FunctionSearchContext {
 }
 
 impl FunctionSearchContext {
-    pub fn find_function_or_error(&self, name: &str) -> Result<resolved::FunctionRef, CompilerError> {
+    pub fn find_function_or_error(
+        &self,
+        name: &str,
+    ) -> Result<resolved::FunctionRef, CompilerError> {
         match self.find_function(name) {
             Some(function) => Ok(function),
             None => Err(CompilerError::during_resolve(format!(
@@ -18,8 +21,7 @@ impl FunctionSearchContext {
     }
 
     pub fn find_function(&self, name: &str) -> Option<resolved::FunctionRef> {
-        self
-            .available
+        self.available
             .get(name)
             .and_then(|list| list.get(0))
             .copied()

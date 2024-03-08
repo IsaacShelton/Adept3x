@@ -8,7 +8,8 @@ mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder, ctx::BackendContext, module::BackendModule, target_data::TargetData, target_machine::TargetMachine, value_catalog::ValueCatalog
+    builder::Builder, ctx::BackendContext, module::BackendModule, target_data::TargetData,
+    target_machine::TargetMachine, value_catalog::ValueCatalog,
 };
 use crate::{
     error::CompilerError,
@@ -19,7 +20,15 @@ use cstr::cstr;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildStore, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
+        LLVMArrayType2, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildRet,
+        LLVMBuildStore, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString,
+        LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType,
+        LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext,
+        LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
+        LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
+        LLVMPrintModuleToString, LLVMSetFunctionCallConv, LLVMSetGlobalConstant,
+        LLVMSetInitializer, LLVMSetLinkage, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -160,20 +169,29 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
             let builder = Builder::new();
             let mut value_catalog = ValueCatalog::new(ir_function.basicblocks.len());
 
-            let basicblocks = ir_function
-                .basicblocks
-                .iter()
-                .enumerate()
-                .map(|(id, ir_basicblock)| {
-                    (
-                        id,
-                        ir_basicblock,
-                        LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
-                    )
-                });
+            let basicblocks =
+                ir_function
+                    .basicblocks
+                    .iter()
+                    .enumerate()
+                    .map(|(id, ir_basicblock)| {
+                        (
+                            id,
+                            ir_basicblock,
+                            LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
+                        )
+                    });
 
             for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks {
-                create_function_block(ctx, &mut value_catalog, &builder, ir_basicblock_id, ir_basicblock, llvm_basicblock, *skeleton);
+                create_function_block(
+                    ctx,
+                    &mut value_catalog,
+                    &builder,
+                    ir_basicblock_id,
+                    ir_basicblock,
+                    llvm_basicblock,
+                    *skeleton,
+                );
             }
         }
     }
@@ -204,22 +222,32 @@ unsafe fn create_function_block(
                 );
                 None
             }
-            Instruction::Alloca(ir_type) => {
-                Some(LLVMBuildAlloca(builder.get(), to_backend_type(ctx.backend_module, ir_type), cstr!("").as_ptr()))
-            }
-            Instruction::Parameter(index) => {
-                Some(LLVMGetParam(function_skeleton, *index))
-            }
+            Instruction::Alloca(ir_type) => Some(LLVMBuildAlloca(
+                builder.get(),
+                to_backend_type(ctx.backend_module, ir_type),
+                cstr!("").as_ptr(),
+            )),
+            Instruction::Parameter(index) => Some(LLVMGetParam(function_skeleton, *index)),
             Instruction::Store(store) => {
                 let source = build_value(ctx.backend_module, value_catalog, builder, &store.source);
-                let destination = build_value(ctx.backend_module, value_catalog, builder, &store.destination);
+                let destination = build_value(
+                    ctx.backend_module,
+                    value_catalog,
+                    builder,
+                    &store.destination,
+                );
                 let _ = LLVMBuildStore(builder.get(), source, destination);
                 None
             }
             Instruction::Load((value, ir_type)) => {
                 let pointer = build_value(ctx.backend_module, value_catalog, builder, value);
                 let llvm_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildLoad2(builder.get(), llvm_type, pointer, cstr!("").as_ptr()))
+                Some(LLVMBuildLoad2(
+                    builder.get(),
+                    llvm_type,
+                    pointer,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::Call(call) => {
                 let function_type = get_function_type(
@@ -238,7 +266,9 @@ unsafe fn create_function_block(
                 let mut arguments = call
                     .arguments
                     .iter()
-                    .map(|argument| build_value(ctx.backend_module, value_catalog, builder, argument))
+                    .map(|argument| {
+                        build_value(ctx.backend_module, value_catalog, builder, argument)
+                    })
                     .collect::<Vec<_>>();
 
                 Some(LLVMBuildCall2(
@@ -335,7 +365,9 @@ unsafe fn build_value(
                 )
             }
         },
-        ir::Value::Reference(reference) => value_catalog.get(reference).expect("referenced value exists"),
+        ir::Value::Reference(reference) => value_catalog
+            .get(reference)
+            .expect("referenced value exists"),
     }
 }
 

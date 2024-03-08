@@ -1,20 +1,18 @@
+mod hex_number_state;
+mod identifier_state;
 mod is_character;
 mod number_state;
 mod state;
 mod string_state;
-mod hex_number_state;
-mod identifier_state;
 
+use self::{
+    hex_number_state::HexNumberState, identifier_state::IdentifierState, number_state::NumberState,
+    string_state::StringState,
+};
 use crate::{
     line_column::LineColumn,
     look_ahead::LookAhead,
     token::{StringModifier, Token, TokenInfo},
-};
-use self::{
-    string_state::StringState,
-    number_state::NumberState,
-    hex_number_state::HexNumberState,
-    identifier_state::IdentifierState,
 };
 use is_character::IsCharacter;
 
@@ -135,14 +133,16 @@ where
                     Waiting
                 }
                 '.' => {
-                    if self.characters.peek_nth(0).is_character('.') && self.characters.peek_nth(1).is_character('.') {
+                    if self.characters.peek_nth(0).is_character('.')
+                        && self.characters.peek_nth(1).is_character('.')
+                    {
                         self.characters.next();
                         self.characters.next();
                         Has(TokenInfo::new(Token::Ellipsis, location))
                     } else {
                         Has(TokenInfo::new(Token::Member, location))
                     }
-                },
+                }
                 '+' => Has(TokenInfo::new(Token::Add, location)),
                 '-' => Has(TokenInfo::new(Token::Subtract, location)),
                 '*' => Has(TokenInfo::new(Token::Multiply, location)),
@@ -171,7 +171,7 @@ where
                 ':' if self.characters.peek().is_character('=') => {
                     self.characters.next();
                     Has(TokenInfo::new(Token::DeclareAssign, location))
-                },
+                }
                 ':' => Has(TokenInfo::new(Token::Colon, location)),
                 '#' => Has(TokenInfo::new(Token::Hash, location)),
                 '\"' => {

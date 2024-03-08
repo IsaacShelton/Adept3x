@@ -59,8 +59,8 @@ pub struct Parameter {
     pub resolved_type: Type,
 }
 
-pub use crate::ast::{IntegerBits, IntegerSign};
 pub use self::variable_storage::VariableStorageKey;
+pub use crate::ast::{IntegerBits, IntegerSign};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {

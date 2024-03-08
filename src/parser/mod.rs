@@ -4,7 +4,8 @@ use std::ffi::CString;
 
 use self::error::{ErrorInfo, ParseError};
 use crate::ast::{
-    self, Ast, Call, DeclareAssign, Expression, FileIdentifier, Function, Parameter, Parameters, Statement, Type
+    self, Ast, Call, DeclareAssign, Expression, FileIdentifier, Function, Parameter, Parameters,
+    Statement, Type,
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
@@ -399,7 +400,10 @@ where
         // variable_name := value
         //               ^
 
-        self.parse_token(Token::DeclareAssign, Some("for variable declaration assignment"))?;
+        self.parse_token(
+            Token::DeclareAssign,
+            Some("for variable declaration assignment"),
+        )?;
         self.ignore_newlines();
 
         let value = self.parse_expression()?;

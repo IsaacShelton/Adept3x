@@ -13,7 +13,10 @@ pub struct VariableStorageKey {
 
 impl VariableStorage {
     pub fn new() -> Self {
-        Self { types: vec![], num_parameters: 0 }
+        Self {
+            types: vec![],
+            num_parameters: 0,
+        }
     }
 
     pub fn add_variable(&mut self, resolved_type: resolved::Type) -> VariableStorageKey {

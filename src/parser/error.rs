@@ -78,7 +78,11 @@ impl Display for ParseError {
                     write!(f, ", got end-of-file")?;
                 }
             }
-            ErrorInfo::ExpectedType { prefix, for_reason, got } => {
+            ErrorInfo::ExpectedType {
+                prefix,
+                for_reason,
+                got,
+            } => {
                 write!(f, "Expected ")?;
 
                 if let Some(prefix) = prefix {

@@ -1,7 +1,10 @@
 use num_bigint::BigInt;
 use num_traits::Num;
 
-use crate::{line_column::Location, token::{Token, TokenInfo}};
+use crate::{
+    line_column::Location,
+    token::{Token, TokenInfo},
+};
 
 pub struct HexNumberState {
     pub value: String,
@@ -19,4 +22,3 @@ impl HexNumberState {
         )
     }
 }
-

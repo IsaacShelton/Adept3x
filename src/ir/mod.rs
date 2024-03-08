@@ -1,6 +1,6 @@
-use std::{collections::HashMap, ffi::CString};
-use slotmap::{new_key_type, SlotMap};
 use derive_more::{Deref, DerefMut};
+use slotmap::{new_key_type, SlotMap};
+use std::{collections::HashMap, ffi::CString};
 
 pub use crate::resolved::FunctionRef;
 
@@ -170,9 +170,7 @@ pub struct BasicBlocks {
 
 impl BasicBlocks {
     pub fn new() -> Self {
-        Self {
-            blocks: vec![],
-        }
+        Self { blocks: vec![] }
     }
 
     pub fn is_terminated(&self) -> bool {

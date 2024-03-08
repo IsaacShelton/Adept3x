@@ -95,7 +95,7 @@ pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
                         .get_mut(resolved_function_ref)
                         .unwrap();
 
-                    for (index, parameter) in ast_function.parameters.required.iter().enumerate() {
+                    for parameter in ast_function.parameters.required.iter() {
                         let resolved_type = resolve_type(&parameter.ast_type)?;
                         let key = function.variables.add_parameter(resolved_type.clone());
 

@@ -1,4 +1,7 @@
-use crate::{line_column::Location, token::{Token, TokenInfo}};
+use crate::{
+    line_column::Location,
+    token::{Token, TokenInfo},
+};
 
 pub struct IdentifierState {
     pub identifier: String,
