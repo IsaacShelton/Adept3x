@@ -21,8 +21,9 @@ use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
         LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
-        LLVMArrayType2, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildRet,
-        LLVMBuildStore, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString,
+        LLVMArrayType2, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2,
+        LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub,
+        LLVMBuildUDiv, LLVMBuildURem, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString,
         LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType,
         LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext,
         LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
@@ -280,6 +281,67 @@ unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
+            Instruction::Add(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildAdd(builder.get(), left, right, cstr!("").as_ptr()))
+            }
+            Instruction::Subtract(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildSub(builder.get(), left, right, cstr!("").as_ptr()))
+            }
+            Instruction::Multiply(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildMul(builder.get(), left, right, cstr!("").as_ptr()))
+            }
+            Instruction::DivideSigned(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildSDiv(
+                    builder.get(),
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::DivideUnsigned(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildUDiv(
+                    builder.get(),
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::ModulusSigned(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildSRem(
+                    builder.get(),
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::ModulusUnsigned(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                Some(LLVMBuildURem(
+                    builder.get(),
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);
@@ -300,6 +362,17 @@ unsafe fn get_function_type(
         parameters.len().try_into().unwrap(),
         is_vararg,
     )
+}
+
+unsafe fn build_binary_operands(
+    backend_module: &BackendModule,
+    value_catalog: &ValueCatalog,
+    builder: &Builder,
+    operands: &ir::BinaryOperands,
+) -> (LLVMValueRef, LLVMValueRef) {
+    let left = build_value(backend_module, value_catalog, builder, &operands.left);
+    let right = build_value(backend_module, value_catalog, builder, &operands.right);
+    (left, right)
 }
 
 unsafe fn build_value(

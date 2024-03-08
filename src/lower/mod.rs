@@ -3,7 +3,7 @@ mod builder;
 use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Literal, Value, ValueReference},
-    resolved::{self, Expression, Statement},
+    resolved::{self, Expression, IntegerSign, Statement},
 };
 use builder::Builder;
 use std::ffi::CString;
@@ -259,6 +259,43 @@ fn lower_expression(
             }));
 
             Ok(destination)
+        }
+        Expression::BinaryOperation(binary_operation) => {
+            let left = lower_expression(builder, ir_module, &binary_operation.left.expression)?;
+            let right = lower_expression(builder, ir_module, &binary_operation.right.expression)?;
+            let operands = ir::BinaryOperands::new(left, right);
+
+            match binary_operation.operator {
+                resolved::BinaryOperator::Add => Ok(builder.push(ir::Instruction::Add(operands))),
+                resolved::BinaryOperator::Subtract => {
+                    Ok(builder.push(ir::Instruction::Subtract(operands)))
+                }
+                resolved::BinaryOperator::Multiply => {
+                    Ok(builder.push(ir::Instruction::Multiply(operands)))
+                }
+                resolved::BinaryOperator::Divide => {
+                    if let Some(sign) = binary_operation.left.resolved_type.sign() {
+                        if let IntegerSign::Signed = sign {
+                            Ok(builder.push(ir::Instruction::DivideSigned(operands)))
+                        } else {
+                            Ok(builder.push(ir::Instruction::DivideUnsigned(operands)))
+                        }
+                    } else {
+                        Err(CompilerError::during_lower("Cannot divide non-integer"))
+                    }
+                }
+                resolved::BinaryOperator::Modulus => {
+                    if let Some(sign) = binary_operation.left.resolved_type.sign() {
+                        if let IntegerSign::Signed = sign {
+                            Ok(builder.push(ir::Instruction::ModulusSigned(operands)))
+                        } else {
+                            Ok(builder.push(ir::Instruction::ModulusUnsigned(operands)))
+                        }
+                    } else {
+                        Err(CompilerError::during_lower("Cannot modulo non-integer"))
+                    }
+                }
+            }
         }
     }
 }

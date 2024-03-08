@@ -32,15 +32,14 @@ fn main() {
     let filename = std::env::args().nth(1).unwrap();
 
     if filename.ends_with(".h") {
-        use lang_c::driver::{parse_preprocessed, Config};
+        use lang_c::driver::{parse, parse_preprocessed, Config};
         let config = Config::default();
-        println!(
-            "{:?}",
-            parse_preprocessed(
-                &config,
-                std::fs::read_to_string(filename).expect("Failed to read file")
-            )
-        );
+
+        match parse(&config, filename) {
+            Ok(translation_unit) => println!("{:?}", translation_unit),
+            Err(error) => println!("{}", error),
+        }
+
         return;
     }
 

@@ -73,6 +73,17 @@ pub enum Type {
     Void,
 }
 
+impl Type {
+    pub fn sign(&self) -> Option<IntegerSign> {
+        match self {
+            Type::Integer { bits, sign } => Some(sign.clone()),
+            Type::IntegerLiteral(value) => Some(IntegerSign::Unsigned),
+            Type::Pointer(_) => None,
+            Type::Void => None,
+        }
+    }
+}
+
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -145,6 +156,16 @@ pub enum Expression {
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
+    BinaryOperation(Box<BinaryOperation>),
+}
+
+pub use crate::ast::BinaryOperator;
+
+#[derive(Clone, Debug)]
+pub struct BinaryOperation {
+    pub operator: BinaryOperator,
+    pub left: TypedExpression,
+    pub right: TypedExpression,
 }
 
 #[derive(Clone, Debug)]

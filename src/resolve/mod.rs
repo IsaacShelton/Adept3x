@@ -460,6 +460,32 @@ fn resolve_expression(
                 }),
             ))
         }
+        ast::Expression::BinaryOperation(binary_operation) => {
+            let left = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &binary_operation.left,
+            )?;
+
+            let right = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &binary_operation.right,
+            )?;
+
+            Ok(TypedExpression::new(
+                left.resolved_type.clone(),
+                resolved::Expression::BinaryOperation(Box::new(resolved::BinaryOperation {
+                    operator: binary_operation.operator.clone(),
+                    left,
+                    right,
+                })),
+            ))
+        }
     }
 }
 

@@ -116,6 +116,23 @@ pub enum Expression {
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
+    BinaryOperation(Box<BinaryOperation>),
+}
+
+#[derive(Clone, Debug)]
+pub struct BinaryOperation {
+    pub operator: BinaryOperator,
+    pub left: Expression,
+    pub right: Expression,
+}
+
+#[derive(Clone, Debug)]
+pub enum BinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulus,
 }
 
 #[derive(Clone, Debug)]

@@ -45,6 +45,25 @@ pub enum Instruction {
     Store(Store),
     Load((Value, Type)),
     Parameter(u32),
+    Add(BinaryOperands),
+    Subtract(BinaryOperands),
+    Multiply(BinaryOperands),
+    DivideSigned(BinaryOperands),
+    DivideUnsigned(BinaryOperands),
+    ModulusSigned(BinaryOperands),
+    ModulusUnsigned(BinaryOperands),
+}
+
+#[derive(Clone, Debug)]
+pub struct BinaryOperands {
+    pub left: Value,
+    pub right: Value,
+}
+
+impl BinaryOperands {
+    pub fn new(left: Value, right: Value) -> Self {
+        Self { left, right }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -191,6 +210,13 @@ impl Instruction {
             Instruction::Store(_) => false,
             Instruction::Load(_) => false,
             Instruction::Parameter(_) => false,
+            Instruction::Add(_) => false,
+            Instruction::Subtract(_) => false,
+            Instruction::Multiply(_) => false,
+            Instruction::DivideSigned(_) => false,
+            Instruction::DivideUnsigned(_) => false,
+            Instruction::ModulusSigned(_) => false,
+            Instruction::ModulusUnsigned(_) => false,
         }
     }
 }
