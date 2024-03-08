@@ -335,6 +335,7 @@ unsafe fn create_function_block(
             Instruction::ModulusUnsigned(operands) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
                 Some(LLVMBuildURem(
                     builder.get(),
                     left,

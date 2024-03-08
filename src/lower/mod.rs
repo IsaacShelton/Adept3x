@@ -274,25 +274,25 @@ fn lower_expression(
                     Ok(builder.push(ir::Instruction::Multiply(operands)))
                 }
                 resolved::BinaryOperator::Divide => {
-                    if let Some(sign) = binary_operation.left.resolved_type.sign() {
-                        if let IntegerSign::Signed = sign {
+                    match binary_operation.left.resolved_type.sign() {
+                        Some(IntegerSign::Signed) => {
                             Ok(builder.push(ir::Instruction::DivideSigned(operands)))
-                        } else {
+                        }
+                        Some(IntegerSign::Unsigned) => {
                             Ok(builder.push(ir::Instruction::DivideUnsigned(operands)))
                         }
-                    } else {
-                        Err(CompilerError::during_lower("Cannot divide non-integer"))
+                        None => Err(CompilerError::during_lower("Cannot divide non-integer")),
                     }
                 }
                 resolved::BinaryOperator::Modulus => {
-                    if let Some(sign) = binary_operation.left.resolved_type.sign() {
-                        if let IntegerSign::Signed = sign {
+                    match binary_operation.left.resolved_type.sign() {
+                        Some(IntegerSign::Signed) => {
                             Ok(builder.push(ir::Instruction::ModulusSigned(operands)))
-                        } else {
+                        }
+                        Some(IntegerSign::Unsigned) => {
                             Ok(builder.push(ir::Instruction::ModulusUnsigned(operands)))
                         }
-                    } else {
-                        Err(CompilerError::during_lower("Cannot modulo non-integer"))
+                        None => Err(CompilerError::during_lower("Cannot modulo non-integer")),
                     }
                 }
             }
