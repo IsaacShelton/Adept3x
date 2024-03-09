@@ -30,6 +30,7 @@ pub enum ErrorInfo {
     UnrecognizedAnnotation {
         name: String,
     },
+    ExpectedTopLevelConstruct,
     Other {
         message: String,
     },
@@ -106,6 +107,9 @@ impl Display for ParseError {
             }
             ErrorInfo::UnrecognizedAnnotation { name } => {
                 write!(f, "Unrecognized annotation '{}'", name)?;
+            }
+            ErrorInfo::ExpectedTopLevelConstruct => {
+                write!(f, "Expected top level construct")?;
             }
             ErrorInfo::Other { message } => {
                 write!(f, "{}", message)?;

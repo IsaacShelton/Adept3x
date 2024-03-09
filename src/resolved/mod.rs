@@ -7,6 +7,8 @@ use std::{
     ffi::CString,
     fmt::{Debug, Display},
 };
+
+pub use crate::ast::BinaryOperator;
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -158,8 +160,6 @@ pub enum Expression {
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
 }
-
-pub use crate::ast::BinaryOperator;
 
 #[derive(Clone, Debug)]
 pub struct BinaryOperation {

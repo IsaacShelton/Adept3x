@@ -1,179 +1,120 @@
+mod annotation;
 mod error;
+mod input;
+mod make_error;
 
-use std::ffi::CString;
-
+use self::annotation::Annotation;
 use self::error::{ErrorInfo, ParseError};
+use self::input::Input;
 use crate::ast::{
-    self, Ast, Call, DeclareAssign, Expression, FileIdentifier, Function, Parameter, Parameters,
-    Statement, Type,
+    self, Ast, Call, DeclareAssign, Expression, File, FileIdentifier, Function, Parameter,
+    Parameters, Statement, Type,
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::token::{StringModifier, Token, TokenInfo};
+use std::ffi::CString;
+use std::fmt::Display;
 
 struct Parser<I>
 where
     I: Iterator<Item = TokenInfo>,
 {
-    iterator: LookAhead<I>,
-    previous_location: Location,
-    filename: String,
-}
-
-enum Annotation {
-    Foreign,
+    input: Input<I>,
 }
 
 impl<I> Parser<I>
 where
     I: Iterator<Item = TokenInfo>,
 {
-    pub fn new(iterator: I, filename: String) -> Self {
-        Self {
-            iterator: LookAhead::new(iterator),
-            previous_location: Location::new(1, 1),
-            filename,
+    pub fn new(input: Input<I>) -> Self {
+        Self { input }
+    }
+
+    fn parse(mut self) -> Result<Ast, ParseError> {
+        let source_filename = self.input.filename();
+        let mut ast = Ast::new(source_filename.into());
+        let ast_file = ast.new_file(FileIdentifier::Local(source_filename.into()));
+
+        while self.input.peek().is_some() {
+            self.parse_top_level(ast_file)?;
         }
+
+        Ok(ast)
     }
 
-    pub fn peek(&mut self) -> Option<&TokenInfo> {
-        self.iterator.peek()
-    }
+    pub fn parse_top_level(&mut self, ast_file: &mut File) -> Result<(), ParseError> {
+        let mut annotations = Vec::new();
 
-    #[allow(dead_code)]
-    pub fn peek_nth(&mut self, n: usize) -> Option<&TokenInfo> {
-        self.iterator.peek_nth(n)
-    }
+        // Ignore preceeding newlines
+        self.ignore_newlines();
 
-    pub fn peek_is(&mut self, token: Token) -> bool {
-        if let Some(token_info) = self.iterator.peek() {
-            token_info.token == token
-        } else {
-            false
+        // Parse annotations
+        while let Some(TokenInfo {
+            token: Token::Hash, ..
+        }) = self.input.peek()
+        {
+            annotations.push(self.parse_annotation()?);
+            self.ignore_newlines();
         }
-    }
 
-    pub fn peek_is_or_eof(&mut self, token: Token) -> bool {
-        if let Some(token_info) = self.iterator.peek() {
-            token_info.token == token
-        } else {
-            true
+        // Ignore newlines after annotations
+        self.ignore_newlines();
+
+        // Parse top-level construct
+        match self.input.peek().map(|info| &info.token) {
+            Some(Token::FuncKeyword) => {
+                ast_file.functions.push(self.parse_function(annotations)?);
+            }
+            None => {
+                if annotations.len() > 0 {
+                    return Err(self.expected_top_level_construct(None));
+                }
+            }
+            _ => {
+                return Err(self.unexpected_token_is_next());
+            }
         }
+
+        Ok(())
     }
 
-    pub fn next(&mut self) -> Option<TokenInfo> {
-        self.iterator.next().map(|token_info| {
-            self.previous_location = token_info.location;
-            token_info
-        })
+    pub fn parse_token(
+        &mut self,
+        expected_token: Token,
+        for_reason: Option<impl ToString>,
+    ) -> Result<(), ParseError> {
+        let token_info = self.input.next();
+
+        if let Some(TokenInfo { token, .. }) = &token_info {
+            if token == &expected_token {
+                return Ok(());
+            }
+        }
+
+        Err(self.expected_token(expected_token, for_reason, token_info))
     }
 
     pub fn parse_identifier(
         &mut self,
         for_reason: Option<impl ToString>,
     ) -> Result<String, ParseError> {
-        if let Some(token_info) = self.next() {
-            if let Token::Identifier(identifier) = token_info.token {
-                Ok(identifier)
-            } else {
-                Err(ParseError {
-                    filename: Some(self.filename.clone()),
-                    location: Some(token_info.location),
-                    info: ErrorInfo::Expected {
-                        expected: format!("identifier"),
-                        for_reason: for_reason.map(|reason| reason.to_string()),
-                        got: Some(format!("{}", token_info.token)),
-                    },
-                })
-            }
+        let token_info = self.input.next();
+
+        if let Some(TokenInfo {
+            token: Token::Identifier(identifier),
+            ..
+        }) = &token_info
+        {
+            Ok(identifier.into())
         } else {
-            Err(ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(self.previous_location),
-                info: ErrorInfo::Expected {
-                    expected: format!("identifier"),
-                    for_reason: for_reason.map(|reason| reason.to_string()),
-                    got: None,
-                },
-            })
-        }
-    }
-
-    pub fn parse_token(
-        &mut self,
-        token: Token,
-        for_reason: Option<impl ToString>,
-    ) -> Result<(), ParseError> {
-        let token_info = self.next();
-
-        if let Some(token_info) = &token_info {
-            if token_info.token == token {
-                return Ok(());
-            }
-        }
-
-        Err(self.error_expected_token(token, for_reason, token_info))
-    }
-
-    pub fn error_expected_token(
-        &self,
-        token: Token,
-        for_reason: Option<impl ToString>,
-        token_info: Option<TokenInfo>,
-    ) -> ParseError {
-        if let Some(token_info) = token_info {
-            ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(token_info.location),
-                info: ErrorInfo::Expected {
-                    expected: format!("{}", token),
-                    got: Some(format!("{}", token_info.token)),
-                    for_reason: for_reason.map(|reason| reason.to_string()),
-                },
-            }
-        } else {
-            ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(self.previous_location),
-                info: ErrorInfo::Expected {
-                    expected: format!("{}", token),
-                    got: None,
-                    for_reason: for_reason.map(|reason| reason.to_string()),
-                },
-            }
+            Err(self.expected_token("identifier", for_reason, token_info))
         }
     }
 
     pub fn ignore_newlines(&mut self) {
-        while let Some(TokenInfo {
-            token: Token::Newline,
-            ..
-        }) = self.peek()
-        {
-            self.next();
-        }
-    }
-
-    pub fn error_unexpected_token_is_next(&mut self) -> ParseError {
-        let token_info = self.next();
-        self.error_unexpected_token(token_info)
-    }
-
-    pub fn error_unexpected_token(&self, token_info: Option<TokenInfo>) -> ParseError {
-        if let Some(token_info) = token_info {
-            ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(token_info.location),
-                info: ErrorInfo::UnexpectedToken {
-                    unexpected: Some(format!("{}", token_info.token)),
-                },
-            }
-        } else {
-            ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(self.previous_location),
-                info: ErrorInfo::UnexpectedToken { unexpected: None },
-            }
+        while let Some(Token::Newline) = self.input.peek().map(|info| &info.token) {
+            self.input.next();
         }
     }
 
@@ -181,19 +122,19 @@ where
         // #[annotation_name]
         // ^
 
-        self.next();
+        self.input.next();
 
         self.parse_token(Token::OpenBracket, Some("to begin annotation body"))?;
 
         let annotation_name = self.parse_identifier(Some("for annotation name"))?;
-        let annotation_name_location = self.previous_location;
+        let annotation_name_location = self.input.previous_location();
 
         self.parse_token(Token::CloseBracket, Some("to close annotation body"))?;
 
         match annotation_name.as_str() {
             "foreign" => Ok(Annotation::Foreign),
             _ => Err(ParseError {
-                filename: Some(self.filename.clone()),
+                filename: Some(self.input.filename().to_string()),
                 location: Some(annotation_name_location),
                 info: ErrorInfo::UnrecognizedAnnotation {
                     name: annotation_name,
@@ -214,12 +155,12 @@ where
             }
         }
 
-        self.next();
+        self.input.next();
 
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
 
-        let parameters = if self.peek_is(Token::OpenParen) {
+        let parameters = if self.input.peek_is(Token::OpenParen) {
             self.parse_function_parameters()?
         } else {
             Parameters::default()
@@ -227,7 +168,7 @@ where
 
         self.ignore_newlines();
 
-        let return_type = if self.peek_is(Token::OpenCurly) {
+        let return_type = if self.input.peek_is(Token::OpenCurly) {
             ast::Type::Void
         } else {
             self.parse_type(Some("return "), Some("for function"))?
@@ -240,7 +181,7 @@ where
             self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
             self.ignore_newlines();
 
-            while !self.peek_is_or_eof(Token::CloseCurly) {
+            while !self.input.peek_is_or_eof(Token::CloseCurly) {
                 statements.push(self.parse_statement()?);
                 self.ignore_newlines();
             }
@@ -268,7 +209,7 @@ where
         self.parse_token(Token::OpenParen, Some("to begin function parameters"))?;
         self.ignore_newlines();
 
-        while !self.peek_is_or_eof(Token::CloseParen) {
+        while !self.input.peek_is_or_eof(Token::CloseParen) {
             // Parse argument
 
             if !required.is_empty() {
@@ -276,9 +217,9 @@ where
                 self.ignore_newlines();
             }
 
-            if self.peek_is(Token::Ellipsis) {
+            if self.input.peek_is(Token::Ellipsis) {
                 is_cstyle_vararg = true;
-                self.next();
+                self.input.next();
                 self.ignore_newlines();
                 break;
             }
@@ -299,14 +240,14 @@ where
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
-        match self.peek() {
+        match self.input.peek() {
             Some(TokenInfo {
                 token: Token::ReturnKeyword,
                 ..
             }) => self.parse_return(),
             None => Err(ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(self.previous_location),
+                filename: Some(self.input.filename().to_string()),
+                location: Some(self.input.previous_location()),
                 info: ErrorInfo::UnexpectedToken { unexpected: None },
             }),
             _ => Ok(Statement::Expression(self.parse_expression()?)),
@@ -319,7 +260,7 @@ where
 
         self.parse_token(Token::ReturnKeyword, Some("for return statement"))?;
 
-        if self.peek_is(Token::Newline) {
+        if self.input.peek_is(Token::Newline) {
             Ok(Statement::Return(None))
         } else {
             Ok(Statement::Return(Some(self.parse_expression()?)))
@@ -327,7 +268,7 @@ where
     }
 
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {
-        match self.next() {
+        match self.input.next() {
             Some(TokenInfo {
                 token: Token::Integer { value },
                 ..
@@ -346,24 +287,24 @@ where
                 token: Token::Identifier(identifier),
                 ..
             }) => {
-                if self.peek_is(Token::OpenParen) {
+                if self.input.peek_is(Token::OpenParen) {
                     self.parse_call(identifier)
-                } else if self.peek_is(Token::DeclareAssign) {
+                } else if self.input.peek_is(Token::DeclareAssign) {
                     self.parse_declare_assign(identifier)
                 } else {
                     Ok(Expression::Variable(identifier))
                 }
             }
             Some(TokenInfo { token, location }) => Err(ParseError {
-                filename: Some(self.filename.clone()),
+                filename: Some(self.input.filename().to_string()),
                 location: Some(location),
                 info: ErrorInfo::UnexpectedToken {
                     unexpected: Some(format!("{}", token)),
                 },
             }),
             None => Err(ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(self.previous_location),
+                filename: Some(self.input.filename().to_string()),
+                location: Some(self.input.previous_location()),
                 info: ErrorInfo::UnexpectedToken { unexpected: None },
             }),
         }
@@ -378,7 +319,7 @@ where
         self.parse_token(Token::OpenParen, Some("to begin call argument list"))?;
         self.ignore_newlines();
 
-        while !self.peek_is_or_eof(Token::CloseParen) {
+        while !self.input.peek_is_or_eof(Token::CloseParen) {
             if !arguments.is_empty() {
                 self.parse_token(Token::Comma, Some("to separate arguments"))?;
                 self.ignore_newlines();
@@ -419,7 +360,7 @@ where
         prefix: Option<impl ToString>,
         for_reason: Option<impl ToString>,
     ) -> Result<Type, ParseError> {
-        match self.next() {
+        match self.input.next() {
             Some(TokenInfo {
                 token: Token::Identifier(identifier),
                 location,
@@ -469,7 +410,7 @@ where
                     }),
                     "void" => Ok(Type::Void),
                     "ptr" => {
-                        if self.peek_is(Token::Colon) {
+                        if self.input.peek_is(Token::Colon) {
                             self.parse_token(Token::Colon, None::<&str>)?;
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
                             Ok(Type::Pointer(Box::new(inner)))
@@ -478,14 +419,14 @@ where
                         }
                     }
                     _ => Err(ParseError {
-                        filename: Some(self.filename.clone()),
+                        filename: Some(self.input.filename().to_string()),
                         location: Some(location),
                         info: ErrorInfo::UndeclaredType { name: identifier },
                     }),
                 }
             }
             Some(TokenInfo { location, token }) => Err(ParseError {
-                filename: Some(self.filename.clone()),
+                filename: Some(self.input.filename().to_string()),
                 location: Some(location),
                 info: ErrorInfo::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),
@@ -494,8 +435,8 @@ where
                 },
             }),
             None => Err(ParseError {
-                filename: Some(self.filename.clone()),
-                location: Some(self.previous_location),
+                filename: Some(self.input.filename().to_string()),
+                location: Some(self.input.previous_location()),
                 info: ErrorInfo::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),
                     for_reason: for_reason.map(|for_reason| for_reason.to_string()),
@@ -507,30 +448,5 @@ where
 }
 
 pub fn parse(tokens: impl Iterator<Item = TokenInfo>, filename: String) -> Result<Ast, ParseError> {
-    let mut parser = Parser::new(tokens, filename.clone());
-    let mut ast = Ast::new(filename.clone());
-
-    let mut file = ast.new_file(FileIdentifier::Local(filename));
-    let mut annotations = Vec::new();
-
-    while let Some(token_info) = parser.peek() {
-        match token_info.token {
-            Token::FuncKeyword => {
-                let function = parser
-                    .parse_function(std::mem::replace(&mut annotations, Default::default()))?;
-                file.functions.push(function);
-            }
-            Token::Hash => {
-                annotations.push(parser.parse_annotation()?);
-            }
-            Token::Newline => {
-                parser.next();
-            }
-            _ => {
-                return Err(parser.error_unexpected_token_is_next());
-            }
-        }
-    }
-
-    Ok(ast)
+    Parser::new(Input::new(tokens, filename.clone())).parse()
 }
