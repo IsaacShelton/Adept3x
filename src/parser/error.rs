@@ -12,17 +12,17 @@ pub struct ParseError {
 #[derive(Clone, Debug)]
 pub enum ErrorInfo {
     UnexpectedToken {
-        unexpected: Option<String>,
+        unexpected: String,
     },
     Expected {
         expected: String,
         for_reason: Option<String>,
-        got: Option<String>,
+        got: String,
     },
     ExpectedType {
         prefix: Option<String>,
         for_reason: Option<String>,
-        got: Option<String>,
+        got: String,
     },
     UndeclaredType {
         name: String,
@@ -54,13 +54,7 @@ impl Display for ParseError {
 
         match &self.info {
             ErrorInfo::UnexpectedToken { unexpected } => {
-                write!(f, "Unexpected token")?;
-
-                if let Some(token) = unexpected {
-                    write!(f, " {}", token)?;
-                } else {
-                    write!(f, " end-of-file")?;
-                }
+                write!(f, "Unexpected token {}", unexpected)?;
             }
             ErrorInfo::Expected {
                 expected,
@@ -73,11 +67,7 @@ impl Display for ParseError {
                     write!(f, " {}", for_reason)?;
                 }
 
-                if let Some(got) = got {
-                    write!(f, ", got {}", got)?;
-                } else {
-                    write!(f, ", got end-of-file")?;
-                }
+                write!(f, ", got {}", got)?;
             }
             ErrorInfo::ExpectedType {
                 prefix,
@@ -96,11 +86,7 @@ impl Display for ParseError {
                     write!(f, " {}", for_reason)?;
                 }
 
-                if let Some(got) = got {
-                    write!(f, ", got {}", got)?;
-                } else {
-                    write!(f, ", got end-of-file")?;
-                }
+                write!(f, ", got {}", got)?;
             }
             ErrorInfo::UndeclaredType { name } => {
                 write!(f, "Undeclared type '{}'", name)?;

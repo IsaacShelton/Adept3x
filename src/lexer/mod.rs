@@ -42,6 +42,7 @@ where
 
     fn feed(&mut self) -> FeedResult<TokenInfo> {
         match self.state {
+            State::EndOfFile => FeedResult::Done,
             State::Idle => self.feed_idle(),
             State::Identifier(_) => self.feed_identifier(),
             State::String(_) => self.feed_string(),
@@ -206,7 +207,12 @@ where
                 )),
             }
         } else {
-            Done
+            self.state = State::EndOfFile;
+
+            Has(TokenInfo::new(
+                Token::EndOfFile,
+                self.characters.friendly_location(),
+            ))
         }
     }
 

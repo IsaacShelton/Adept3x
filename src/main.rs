@@ -9,6 +9,7 @@ mod llvm_backend;
 mod look_ahead;
 mod lower;
 mod parser;
+mod repeating_last;
 mod resolve;
 mod resolved;
 mod token;

@@ -1,17 +1,26 @@
 use crate::line_column::Location;
-use derive_more::IsVariant;
+use derive_more::{IsVariant, Deref};
 use num_bigint::BigInt;
 use std::fmt::Display;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deref)]
 pub struct TokenInfo {
+    #[deref]
     pub token: Token,
+
     pub location: Location,
 }
 
 impl TokenInfo {
     pub fn new(token: Token, location: Location) -> TokenInfo {
         TokenInfo { token, location }
+    }
+
+    pub fn is_end_of_file(&self) -> bool {
+        match self.token {
+            Token::EndOfFile => true,
+            _ => false,
+        }
     }
 }
 
@@ -23,6 +32,7 @@ pub enum StringModifier {
 
 #[derive(Clone, Debug, PartialEq, IsVariant)]
 pub enum Token {
+    EndOfFile,
     Error(String),
     Newline,
     Identifier(String),
@@ -68,6 +78,7 @@ pub enum Token {
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
+            Token::EndOfFile => "end-of-file",
             Token::Error(_) => "'error'",
             Token::Newline => "'newline'",
             Token::Identifier(_) => "'identifier'",

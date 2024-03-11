@@ -23,12 +23,10 @@ where
         }
     }
 
-    #[allow(dead_code)]
     pub fn peek<'a>(&'a mut self) -> Option<&'a I::Item> {
         self.peek_nth(0)
     }
 
-    #[allow(dead_code)]
     pub fn peek_nth<'a>(&'a mut self, index: usize) -> Option<&'a I::Item> {
         while self.buffer.len() <= index {
             if let Some(value) = self.iterator.next() {

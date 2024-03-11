@@ -1,8 +1,13 @@
-use crate::{line_column::Location, look_ahead::LookAhead, token::{Token, TokenInfo}};
+use crate::{
+    line_column::Location,
+    look_ahead::LookAhead,
+    repeating_last::RepeatingLast,
+    token::{Token, TokenInfo},
+};
+use std::borrow::Borrow;
 
 pub struct Input<I: Iterator<Item = TokenInfo>> {
-    iterator: LookAhead<I>,
-    previous_location: Location,
+    iterator: LookAhead<RepeatingLast<I>>,
     filename: String,
 }
 
@@ -12,49 +17,33 @@ where
 {
     pub fn new(iterator: I, filename: String) -> Self {
         Self {
-            iterator: LookAhead::new(iterator),
-            previous_location: Location::new(1, 1),
+            iterator: LookAhead::new(RepeatingLast::new(iterator)),
             filename,
         }
     }
 
-    pub fn peek(&mut self) -> Option<&TokenInfo> {
-        self.iterator.peek()
+    pub fn peek(&mut self) -> &TokenInfo {
+        self.iterator.peek_nth(0).unwrap()
     }
 
-    pub fn peek_nth(&mut self, n: usize) -> Option<&TokenInfo> {
-        self.iterator.peek_nth(n)
+    pub fn peek_nth(&mut self, n: usize) -> &TokenInfo {
+        self.iterator.peek_nth(n).unwrap()
     }
 
-    pub fn peek_is(&mut self, token: Token) -> bool {
-        if let Some(token_info) = self.iterator.peek() {
-            token_info.token == token
-        } else {
-            false
-        }
+    pub fn peek_is(&mut self, token: impl Borrow<Token>) -> bool {
+        self.peek().token == *token.borrow()
     }
 
-    pub fn peek_is_or_eof(&mut self, token: Token) -> bool {
-        if let Some(token_info) = self.iterator.peek() {
-            token_info.token == token
-        } else {
-            true
-        }
+    pub fn peek_is_or_eof(&mut self, token: impl Borrow<Token>) -> bool {
+        let next = &self.peek().token;
+        next == token.borrow() || next.is_end_of_file()
     }
 
-    pub fn next(&mut self) -> Option<TokenInfo> {
-        self.iterator.next().map(|token_info| {
-            self.previous_location = token_info.location;
-            token_info
-        })
-    }
-
-    pub fn previous_location(&self) -> Location {
-        self.previous_location
+    pub fn advance(&mut self) -> TokenInfo {
+        self.iterator.next().unwrap()
     }
 
     pub fn filename(&self) -> &str {
         &self.filename
     }
 }
-
