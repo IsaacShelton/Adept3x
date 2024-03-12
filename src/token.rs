@@ -115,3 +115,27 @@ impl Display for TokenKind {
         })
     }
 }
+
+impl TokenKind {
+    pub fn precedence(&self) -> usize {
+        match self {
+            TokenKind::OpenCurly => 16,
+            TokenKind::OpenBracket => 16,
+            TokenKind::Member => 16,
+            TokenKind::Multiply => 12,
+            TokenKind::Divide => 12,
+            TokenKind::Modulus => 12,
+            TokenKind::Not => 14,
+            TokenKind::Add => 11,
+            TokenKind::Subtract => 11,
+            TokenKind::LessThan => 9,
+            TokenKind::GreaterThan => 9,
+            TokenKind::LessThanEq => 9,
+            TokenKind::GreaterThanEq => 9,
+            TokenKind::Equals => 8,
+            TokenKind::NotEquals => 8,
+            TokenKind::DeclareAssign => 1,
+            _ => 0,
+        }
+    }
+}

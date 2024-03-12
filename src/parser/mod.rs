@@ -7,13 +7,14 @@ use self::annotation::Annotation;
 use self::error::{ParseError, ParseErrorKind};
 use self::input::Input;
 use crate::ast::{
-    self, Ast, Call, DeclareAssign, Expression, ExpressionKind, File, FileIdentifier, Function,
-    Parameter, Parameters, Source, Statement, StatementKind, Type,
+    self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File,
+    FileIdentifier, Function, Parameter, Parameters, Source, Statement, StatementKind, Type,
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
 use crate::source_file_cache::{self, SourceFileCache, SourceFileCacheKey};
 use crate::token::{StringModifier, Token, TokenKind};
+use ast::BinaryOperator;
 use std::borrow::Borrow;
 use std::ffi::CString;
 use std::fmt::Display;
@@ -34,15 +35,28 @@ where
     }
 
     fn parse(mut self) -> Result<Ast<'a>, ParseError> {
-        let source_filename = self.input.filename();
-        let mut ast = Ast::new(source_filename.into(), self.input.source_file_cache());
-        let ast_file = ast.new_file(FileIdentifier::Local(source_filename.into()));
+        // Get primary filename
+        let filename = self.input.filename();
+
+        // Create global ast
+        let mut ast = Ast::new(filename.into(), self.input.source_file_cache());
+
+        // Parse primary file
+        self.parse_into(&mut ast, filename.into())?;
+
+        // Return global ast
+        Ok(ast)
+    }
+
+    fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<(), ParseError> {
+        // Create primary file
+        let ast_file = ast.new_file(FileIdentifier::Local(filename));
 
         while !self.input.peek().is_end_of_file() {
             self.parse_top_level(ast_file)?;
         }
 
-        Ok(ast)
+        Ok(())
     }
 
     pub fn parse_top_level(&mut self, ast_file: &mut File) -> Result<(), ParseError> {
@@ -66,7 +80,7 @@ where
                 ast_file.functions.push(self.parse_function(annotations)?);
             }
             TokenKind::EndOfFile => {
-                // End-of-file is fine only if no preceeding annotations
+                // End-of-file is only okay if no preceeding annotations
                 if annotations.len() > 0 {
                     let token = self.input.advance();
                     return Err(self.expected_top_level_construct(&token));
@@ -261,16 +275,57 @@ where
         let location = self.parse_token(TokenKind::ReturnKeyword, Some("for return statement"))?;
 
         Ok(Statement::new(
-            if self.input.peek_is(TokenKind::Newline) {
-                StatementKind::Return(None)
+            StatementKind::Return(if self.input.peek_is(TokenKind::Newline) {
+                None
             } else {
-                StatementKind::Return(Some(self.parse_expression()?))
-            },
+                Some(self.parse_expression()?)
+            }),
             self.source(location),
         ))
     }
 
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {
+        let primary = self.parse_expression_primary()?;
+        self.parse_operator_expression(0, primary)
+    }
+
+    fn parse_operator_expression(
+        &mut self,
+        precedence: usize,
+        expression: Expression,
+    ) -> Result<Expression, ParseError> {
+        let mut lhs = expression;
+
+        loop {
+            let operator = self.input.peek();
+            let location = operator.location;
+            let next_precedence = operator.kind.precedence();
+
+            if (is_terminating_token(&operator.kind)
+                || (next_precedence + is_right_associative(operator) as usize) < precedence)
+            {
+                return Ok(lhs);
+            }
+
+            let binary_operator = match operator.kind {
+                TokenKind::Add => BinaryOperator::Add,
+                TokenKind::Subtract => BinaryOperator::Subtract,
+                TokenKind::Multiply => BinaryOperator::Multiply,
+                TokenKind::Divide => BinaryOperator::Divide,
+                TokenKind::Modulus => BinaryOperator::Modulus,
+                _ => return Ok(lhs),
+            };
+
+            lhs = self.parse_math(lhs, binary_operator, next_precedence, location)?;
+        }
+    }
+
+    fn parse_expression_primary(&mut self) -> Result<Expression, ParseError> {
+        let expression = self.parse_expression_primary_base()?;
+        self.parse_expression_primary_post(expression)
+    }
+
+    fn parse_expression_primary_base(&mut self) -> Result<Expression, ParseError> {
         match self.input.advance() {
             Token {
                 kind: TokenKind::Integer { value },
@@ -317,6 +372,13 @@ where
         }
     }
 
+    fn parse_expression_primary_post(
+        &mut self,
+        base: Expression,
+    ) -> Result<Expression, ParseError> {
+        Ok(base)
+    }
+
     fn parse_call(
         &mut self,
         function_name: String,
@@ -349,6 +411,41 @@ where
             }),
             source,
         ))
+    }
+
+    fn parse_math(
+        &mut self,
+        lhs: Expression,
+        operator: BinaryOperator,
+        operator_precedence: usize,
+        location: Location,
+    ) -> Result<Expression, ParseError> {
+        let rhs = self.parse_math_rhs(operator_precedence)?;
+
+        Ok(Expression::new(
+            ExpressionKind::BinaryOperation(Box::new(BinaryOperation {
+                operator,
+                left: lhs,
+                right: rhs,
+            })),
+            self.source(location),
+        ))
+    }
+
+    fn parse_math_rhs(&mut self, operator_precedence: usize) -> Result<Expression, ParseError> {
+        // Skip over operator token
+        self.input.advance();
+
+        let rhs = self.parse_expression_primary()?;
+        let next_operator = self.input.peek();
+        let next_precedence = next_operator.kind.precedence();
+
+        if !((next_precedence + is_right_associative(next_operator) as usize) < operator_precedence)
+        {
+            self.parse_operator_expression(operator_precedence + 1, rhs)
+        } else {
+            Ok(rhs)
+        }
     }
 
     fn parse_declare_assign(
@@ -469,4 +566,21 @@ pub fn parse(
     key: SourceFileCacheKey,
 ) -> Result<Ast, ParseError> {
     Parser::new(Input::new(tokens, source_file_cache, key)).parse()
+}
+
+fn is_terminating_token(kind: &TokenKind) -> bool {
+    match kind {
+        TokenKind::Comma => true,
+        TokenKind::CloseParen => true,
+        TokenKind::CloseBracket => true,
+        TokenKind::CloseCurly => true,
+        _ => false,
+    }
+}
+
+fn is_right_associative(kind: &TokenKind) -> bool {
+    match kind {
+        TokenKind::DeclareAssign => true,
+        _ => false,
+    }
 }
