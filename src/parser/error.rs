@@ -101,10 +101,7 @@ impl Display for ParseError {
             ParseErrorKind::ExpectedTopLevelConstruct => {
                 write!(f, "Expected top level construct")?;
             }
-            ParseErrorKind::UnexpectedAnnotation {
-                name,
-                for_reason,
-            } => {
+            ParseErrorKind::UnexpectedAnnotation { name, for_reason } => {
                 write!(f, "Unexpected annotation '{}'", name)?;
 
                 if let Some(for_reason) = for_reason {

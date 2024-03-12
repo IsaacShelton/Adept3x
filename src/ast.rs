@@ -1,7 +1,10 @@
 use num_bigint::BigInt;
 use std::{collections::HashMap, ffi::CString, fmt::Debug};
 
-use crate::{line_column::Location, source_file_cache::{self, SourceFileCache, SourceFileCacheKey}};
+use crate::{
+    line_column::Location,
+    source_file_cache::{self, SourceFileCache, SourceFileCacheKey},
+};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Source {
@@ -61,7 +64,10 @@ pub struct File {
 
 impl File {
     pub fn new() -> File {
-        File { functions: vec![], globals: vec![] }
+        File {
+            functions: vec![],
+            globals: vec![],
+        }
     }
 }
 

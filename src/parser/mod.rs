@@ -7,7 +7,9 @@ use self::annotation::{Annotation, AnnotationKind};
 use self::error::{ParseError, ParseErrorKind};
 use self::input::Input;
 use crate::ast::{
-    self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File, FileIdentifier, Function, Global, Parameter, Parameters, Source, Statement, StatementKind, Type
+    self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File,
+    FileIdentifier, Function, Global, Parameter, Parameters, Source, Statement, StatementKind,
+    Type,
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
@@ -176,7 +178,8 @@ where
             }
         }
 
-        let (name, location) = self.parse_identifier_keep_location(Some("for name of global variable"))?;
+        let (name, location) =
+            self.parse_identifier_keep_location(Some("for name of global variable"))?;
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 
         Ok(Global {
@@ -197,7 +200,13 @@ where
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
-                _ => return Err(self.unexpected_annotation(annotation.kind.to_string(), annotation.location, Some("for function"))),
+                _ => {
+                    return Err(self.unexpected_annotation(
+                        annotation.kind.to_string(),
+                        annotation.location,
+                        Some("for function"),
+                    ))
+                }
             }
         }
 

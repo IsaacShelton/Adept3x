@@ -1,5 +1,5 @@
 use crate::line_column::Location;
-use derive_more::{IsVariant, Deref};
+use derive_more::{Deref, IsVariant};
 use num_bigint::BigInt;
 use std::fmt::Display;
 
@@ -13,7 +13,10 @@ pub struct Token {
 
 impl Token {
     pub fn new(token: TokenKind, location: Location) -> Token {
-        Token { kind: token, location }
+        Token {
+            kind: token,
+            location,
+        }
     }
 
     pub fn is_end_of_file(&self) -> bool {

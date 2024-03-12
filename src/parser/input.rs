@@ -1,5 +1,9 @@
 use crate::{
-    line_column::Location, look_ahead::LookAhead, repeating_last::RepeatingLast, source_file_cache::{self, SourceFileCache, SourceFileCacheKey}, token::{TokenKind, Token}
+    line_column::Location,
+    look_ahead::LookAhead,
+    repeating_last::RepeatingLast,
+    source_file_cache::{self, SourceFileCache, SourceFileCacheKey},
+    token::{Token, TokenKind},
 };
 use std::borrow::Borrow;
 
@@ -13,7 +17,11 @@ impl<'a, I> Input<'a, I>
 where
     I: Iterator<Item = Token>,
 {
-    pub fn new(iterator: I, source_file_cache: &'a SourceFileCache, key: SourceFileCacheKey) -> Self {
+    pub fn new(
+        iterator: I,
+        source_file_cache: &'a SourceFileCache,
+        key: SourceFileCacheKey,
+    ) -> Self {
         Self {
             iterator: LookAhead::new(RepeatingLast::new(iterator)),
             source_file_cache,
@@ -45,7 +53,7 @@ where
     pub fn filename(&self) -> &str {
         self.source_file_cache.get(self.key).filename()
     }
-    
+
     pub fn key(&self) -> SourceFileCacheKey {
         self.key
     }

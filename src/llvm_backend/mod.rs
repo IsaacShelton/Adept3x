@@ -20,7 +20,17 @@ use cstr::cstr;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext, LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
+        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
+        LLVMArrayType2, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2,
+        LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub,
+        LLVMBuildUDiv, LLVMBuildURem, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString,
+        LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType,
+        LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext,
+        LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
+        LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
+        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
+        LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
+        LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -248,7 +258,11 @@ unsafe fn create_function_block(
                 cstr!("").as_ptr(),
             )),
             Instruction::Parameter(index) => Some(LLVMGetParam(function_skeleton, *index)),
-            Instruction::GlobalVariable(global_ref) => Some(*ctx.globals.get(global_ref).expect("referenced global to exist")),
+            Instruction::GlobalVariable(global_ref) => Some(
+                *ctx.globals
+                    .get(global_ref)
+                    .expect("referenced global to exist"),
+            ),
             Instruction::Store(store) => {
                 let source = build_value(ctx.backend_module, value_catalog, builder, &store.source);
                 let destination = build_value(

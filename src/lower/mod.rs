@@ -22,13 +22,20 @@ pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     Ok(ir_module)
 }
 
-fn lower_global(ir_module: &mut ir::Module, global_ref: resolved::GlobalRef, global: &resolved::Global) -> Result<(), CompilerError> {
-    ir_module.globals.insert(global_ref, Global {
-        mangled_name: global.name.to_string(),
-        ir_type: lower_type(&global.resolved_type)?,
-        is_foreign: global.is_foreign,
-        is_thread_local: global.is_thread_local,
-    });
+fn lower_global(
+    ir_module: &mut ir::Module,
+    global_ref: resolved::GlobalRef,
+    global: &resolved::Global,
+) -> Result<(), CompilerError> {
+    ir_module.globals.insert(
+        global_ref,
+        Global {
+            mangled_name: global.name.to_string(),
+            ir_type: lower_type(&global.resolved_type)?,
+            is_foreign: global.is_foreign,
+            is_thread_local: global.is_thread_local,
+        },
+    );
 
     Ok(())
 }
