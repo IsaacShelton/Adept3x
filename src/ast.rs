@@ -38,9 +38,9 @@ impl<'a> Ast<'a> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Version {
-    major: i32,
-    minor: i32,
-    patch: i32,
+    major: u32,
+    minor: u32,
+    patch: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

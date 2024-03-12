@@ -33,9 +33,9 @@ where
         Self { input }
     }
 
-    fn parse(mut self, source_file_cache: &'a SourceFileCache) -> Result<Ast<'a>, ParseError> {
+    fn parse(mut self) -> Result<Ast<'a>, ParseError> {
         let source_filename = self.input.filename();
-        let mut ast = Ast::new(source_filename.into(), source_file_cache);
+        let mut ast = Ast::new(source_filename.into(), self.input.source_file_cache());
         let ast_file = ast.new_file(FileIdentifier::Local(source_filename.into()));
 
         while !self.input.peek().is_end_of_file() {
@@ -66,6 +66,7 @@ where
                 ast_file.functions.push(self.parse_function(annotations)?);
             }
             TokenKind::EndOfFile => {
+                // End-of-file is fine only if no preceeding annotations
                 if annotations.len() > 0 {
                     let token = self.input.advance();
                     return Err(self.expected_top_level_construct(&token));
@@ -467,5 +468,5 @@ pub fn parse(
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
 ) -> Result<Ast, ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse(source_file_cache)
+    Parser::new(Input::new(tokens, source_file_cache, key)).parse()
 }

@@ -1,26 +1,43 @@
-use super::error::{ResolveErrorKind, ResolveError};
+use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
+    ast::Source,
     error::CompilerError,
     resolved::{self, VariableStorageKey},
+    source_file_cache::{self, SourceFileCache},
 };
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct VariableSearchContext<'a> {
+    source_file_cache: &'a SourceFileCache,
     variables: HashMap<String, (resolved::Type, VariableStorageKey)>,
     parent: Option<&'a VariableSearchContext<'a>>,
 }
 
 impl<'a> VariableSearchContext<'a> {
+    pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
+        Self {
+            source_file_cache,
+            variables: Default::default(),
+            parent: None,
+        }
+    }
+
     pub fn find_variable_or_error(
         &self,
         name: &str,
+        source: Source,
     ) -> Result<(&resolved::Type, &VariableStorageKey), ResolveError> {
         match self.find_variable(name) {
             Some(function) => Ok(function),
             None => Err(ResolveError {
-                filename: todo!(),
-                location: todo!(),
+                filename: Some(
+                    self.source_file_cache
+                        .get(source.key)
+                        .filename()
+                        .to_string(),
+                ),
+                location: Some(source.location),
                 kind: ResolveErrorKind::UndeclaredVariable {
                     name: name.to_string(),
                 },

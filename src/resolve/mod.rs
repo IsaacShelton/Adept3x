@@ -19,9 +19,9 @@ enum Job {
 }
 
 #[derive(Default)]
-struct ResolveContext {
+struct ResolveContext<'a> {
     pub jobs: VecDeque<Job>,
-    pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchContext>,
+    pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchContext<'a>>,
 }
 
 pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
@@ -46,7 +46,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             let function_search_context = ctx
                 .function_search_contexts
                 .entry(file_identifier.clone())
-                .or_insert_with(FunctionSearchContext::default);
+                .or_insert_with(|| FunctionSearchContext::new(resolved_ast.source_file_cache));
 
             // You can blame stable rust for having to do this.
             // There is no way to "get_or_insert_mut" without pre-cloning the key.
@@ -89,7 +89,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
                 let mut resolved_statements = vec![];
 
-                let mut variable_search_context = VariableSearchContext::default();
+                let mut variable_search_context = VariableSearchContext::new(resolved_ast.source_file_cache);
 
                 {
                     let function = resolved_ast
@@ -385,7 +385,7 @@ fn resolve_expression(
 
     match &ast_expression.kind {
         ast::ExpressionKind::Variable(name) => {
-            let (resolved_type, key) = variable_search_context.find_variable_or_error(name)?;
+            let (resolved_type, key) = variable_search_context.find_variable_or_error(name, source)?;
 
             Ok(TypedExpression::new(
                 resolved_type.clone(),
@@ -417,7 +417,7 @@ fn resolve_expression(
         )),
         ast::ExpressionKind::Call(call) => {
             let function_ref =
-                function_search_context.find_function_or_error(&call.function_name)?;
+                function_search_context.find_function_or_error(&call.function_name, source)?;
 
             let function = resolved_ast.functions.get(function_ref).unwrap();
             let return_type = function.return_type.clone();

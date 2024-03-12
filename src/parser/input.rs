@@ -4,9 +4,9 @@ use crate::{
 use std::borrow::Borrow;
 
 pub struct Input<'a, I: Iterator<Item = Token>> {
+    source_file_cache: &'a SourceFileCache,
     iterator: LookAhead<RepeatingLast<I>>,
     key: SourceFileCacheKey,
-    source_file_cache: &'a SourceFileCache,
 }
 
 impl<'a, I> Input<'a, I>
@@ -50,7 +50,7 @@ where
         self.key
     }
 
-    pub fn source_file_cache(&self) -> &SourceFileCache {
+    pub fn source_file_cache(&self) -> &'a SourceFileCache {
         self.source_file_cache
     }
 }
