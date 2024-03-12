@@ -27,8 +27,6 @@ use std::io::BufReader;
 use std::process::exit;
 use std::string::ParseError;
 
-struct Test { is_empty: bool}
-
 fn main() {
     if std::env::args().len() != 2 {
         println!("usage: adept FILENAME");
