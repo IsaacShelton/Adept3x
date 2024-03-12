@@ -2,11 +2,12 @@ use derive_more::{Deref, DerefMut};
 use slotmap::{new_key_type, SlotMap};
 use std::{collections::HashMap, ffi::CString};
 
-pub use crate::resolved::FunctionRef;
+pub use crate::resolved::{FunctionRef, GlobalRef};
 
 #[derive(Clone)]
 pub struct Module {
     pub functions: HashMap<FunctionRef, Function>,
+    pub globals: HashMap<GlobalRef, Global>,
 }
 
 impl std::fmt::Debug for Module {
@@ -18,6 +19,14 @@ impl std::fmt::Debug for Module {
         write!(f, "SlotMap }}")?;
         Ok(())
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Global {
+    pub mangled_name: String,
+    pub ir_type: Type,
+    pub is_foreign: bool,
+    pub is_thread_local: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +54,7 @@ pub enum Instruction {
     Store(Store),
     Load((Value, Type)),
     Parameter(u32),
+    GlobalVariable(GlobalRef),
     Add(BinaryOperands),
     Subtract(BinaryOperands),
     Multiply(BinaryOperands),
@@ -148,6 +158,7 @@ impl Module {
     pub fn new() -> Self {
         Self {
             functions: HashMap::new(),
+            globals: HashMap::new(),
         }
     }
 }
@@ -210,6 +221,7 @@ impl Instruction {
             Instruction::Store(_) => false,
             Instruction::Load(_) => false,
             Instruction::Parameter(_) => false,
+            Instruction::GlobalVariable(_) => false,
             Instruction::Add(_) => false,
             Instruction::Subtract(_) => false,
             Instruction::Multiply(_) => false,

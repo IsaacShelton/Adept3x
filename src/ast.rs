@@ -56,12 +56,22 @@ pub enum FileIdentifier {
 #[derive(Clone, Debug)]
 pub struct File {
     pub functions: Vec<Function>,
+    pub globals: Vec<Global>,
 }
 
 impl File {
     pub fn new() -> File {
-        File { functions: vec![] }
+        File { functions: vec![], globals: vec![] }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Global {
+    pub name: String,
+    pub ast_type: Type,
+    pub source: Source,
+    pub is_foreign: bool,
+    pub is_thread_local: bool,
 }
 
 #[derive(Clone, Debug)]

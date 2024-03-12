@@ -2,7 +2,7 @@ use super::{
     error::{ParseErrorKind, ParseError},
     Parser,
 };
-use crate::token::Token;
+use crate::{line_column::Location, token::Token};
 
 impl<I> Parser<'_, I>
 where
@@ -43,6 +43,14 @@ where
             filename: Some(self.input.filename().to_string()),
             location: Some(token.location),
             kind: ParseErrorKind::ExpectedTopLevelConstruct,
+        }
+    }
+
+    pub fn unexpected_annotation(&self, name: String, location: Location, for_reason: Option<impl ToString>) -> ParseError {
+        ParseError {
+            filename: Some(self.input.filename().to_string()),
+            location: Some(location),
+            kind: ParseErrorKind::UnexpectedAnnotation { name, for_reason: for_reason.map(|reason| reason.to_string()) },
         }
     }
 }

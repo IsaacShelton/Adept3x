@@ -2,34 +2,32 @@ use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
     ast::Source,
     error::CompilerError,
-    resolved::{self, VariableStorageKey},
+    resolved::{self, GlobalRef, VariableStorageKey},
     source_file_cache::{self, SourceFileCache},
 };
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct VariableSearchContext<'a> {
+pub struct GlobalSearchContext<'a> {
     source_file_cache: &'a SourceFileCache,
-    variables: HashMap<String, (resolved::Type, VariableStorageKey)>,
-    parent: Option<&'a VariableSearchContext<'a>>,
+    globals: HashMap<String, (resolved::Type, GlobalRef)>,
 }
 
-impl<'a> VariableSearchContext<'a> {
+impl<'a> GlobalSearchContext<'a> {
     pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
         Self {
             source_file_cache,
-            variables: Default::default(),
-            parent: None,
+            globals: Default::default(),
         }
     }
 
-    pub fn find_variable_or_error(
+    pub fn find_global_or_error(
         &self,
         name: &str,
         source: Source,
-    ) -> Result<(&resolved::Type, &VariableStorageKey), ResolveError> {
-        match self.find_variable(name) {
-            Some(variable) => Ok(variable),
+    ) -> Result<(&resolved::Type, &GlobalRef), ResolveError> {
+        match self.find_global(name) {
+            Some(global) => Ok(global),
             None => Err(ResolveError {
                 filename: Some(
                     self.source_file_cache
@@ -45,23 +43,20 @@ impl<'a> VariableSearchContext<'a> {
         }
     }
 
-    pub fn find_variable(&self, name: &str) -> Option<(&resolved::Type, &VariableStorageKey)> {
-        if let Some((resolved_type, key)) = self.variables.get(name) {
+    pub fn find_global(&self, name: &str) -> Option<(&resolved::Type, &GlobalRef)> {
+        if let Some((resolved_type, key)) = self.globals.get(name) {
             return Some((resolved_type, key));
         }
-
-        self.parent
-            .as_ref()
-            .and_then(|parent| parent.find_variable(name))
+        None
     }
 
     pub fn put(
         &mut self,
         name: impl ToString,
         resolved_type: resolved::Type,
-        key: VariableStorageKey,
+        reference: GlobalRef,
     ) {
-        self.variables
-            .insert(name.to_string(), (resolved_type, key));
+        self.globals
+            .insert(name.to_string(), (resolved_type, reference));
     }
 }

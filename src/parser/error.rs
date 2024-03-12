@@ -31,6 +31,10 @@ pub enum ParseErrorKind {
         name: String,
     },
     ExpectedTopLevelConstruct,
+    UnexpectedAnnotation {
+        name: String,
+        for_reason: Option<String>,
+    },
     Other {
         message: String,
     },
@@ -96,6 +100,16 @@ impl Display for ParseError {
             }
             ParseErrorKind::ExpectedTopLevelConstruct => {
                 write!(f, "Expected top level construct")?;
+            }
+            ParseErrorKind::UnexpectedAnnotation {
+                name,
+                for_reason,
+            } => {
+                write!(f, "Unexpected annotation '{}'", name)?;
+
+                if let Some(for_reason) = for_reason {
+                    write!(f, " {}", for_reason)?;
+                }
             }
             ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

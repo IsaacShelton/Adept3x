@@ -1,16 +1,20 @@
 mod error;
 mod function_search_context;
+mod global_search_context;
 mod variable_search_context;
 
 use crate::{
-    ast::{self, Ast, File, FileIdentifier, Source, Type}, resolved::{self, TypedExpression, VariableStorage, VariableStorageKey}, source_file_cache::{self, SourceFileCache}
+    ast::{self, Ast, File, FileIdentifier, Source, Type},
+    resolved::{self, TypedExpression, VariableStorage, VariableStorageKey},
+    source_file_cache::{self, SourceFileCache},
 };
 use function_search_context::FunctionSearchContext;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
 use self::{
-    error::{ResolveErrorKind, ResolveError},
+    error::{ResolveError, ResolveErrorKind},
+    global_search_context::GlobalSearchContext,
     variable_search_context::VariableSearchContext,
 };
 
@@ -22,6 +26,7 @@ enum Job {
 struct ResolveContext<'a> {
     pub jobs: VecDeque<Job>,
     pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchContext<'a>>,
+    pub global_search_contexts: HashMap<FileIdentifier, GlobalSearchContext<'a>>,
 }
 
 pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
@@ -30,6 +35,25 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Create initial jobs
     for (file_identifier, file) in ast.files.iter() {
+        let global_search_context = ctx
+            .global_search_contexts
+            .entry(file_identifier.clone())
+            .or_insert_with(|| GlobalSearchContext::new(resolved_ast.source_file_cache));
+
+        for global in file.globals.iter() {
+            let resolved_type = resolve_type(&global.ast_type)?;
+
+            let global_ref = resolved_ast.globals.insert(resolved::Global {
+                name: global.name.clone(),
+                resolved_type: resolved_type.clone(),
+                source: global.source,
+                is_foreign: global.is_foreign,
+                is_thread_local: global.is_thread_local,
+            });
+
+            global_search_context.put(global.name.to_string(), resolved_type, global_ref);
+        }
+
         for (i, function) in file.functions.iter().enumerate() {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: function.name.clone(),
@@ -75,7 +99,12 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 let function_search_context = ctx
                     .function_search_contexts
                     .get(&file_identifier)
-                    .expect("search context to exist for file");
+                    .expect("function search context to exist for file");
+
+                let global_search_context = ctx
+                    .global_search_contexts
+                    .get(&file_identifier)
+                    .expect("global search context to exist for file");
 
                 let ast_file = ast
                     .files
@@ -89,7 +118,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
                 let mut resolved_statements = vec![];
 
-                let mut variable_search_context = VariableSearchContext::new(resolved_ast.source_file_cache);
+                let mut variable_search_context =
+                    VariableSearchContext::new(resolved_ast.source_file_cache);
 
                 {
                     let function = resolved_ast
@@ -109,6 +139,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     resolved_statements.push(resolve_statement(
                         &mut resolved_ast,
                         &function_search_context,
+                        &global_search_context,
                         &mut variable_search_context,
                         resolved_function_ref,
                         statement,
@@ -131,6 +162,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 fn resolve_statement(
     resolved_ast: &mut resolved::Ast,
     function_search_context: &FunctionSearchContext,
+    global_search_context: &GlobalSearchContext,
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
     ast_statement: &ast::Statement,
@@ -143,6 +175,7 @@ fn resolve_statement(
                 let result = resolve_expression(
                     resolved_ast,
                     function_search_context,
+                    global_search_context,
                     variable_search_context,
                     resolved_function_ref,
                     value,
@@ -154,7 +187,13 @@ fn resolve_statement(
                     Some(result.expression)
                 } else {
                     return Err(ResolveError {
-                        filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(source.key)
+                                .filename()
+                                .to_string(),
+                        ),
                         location: Some(result.expression.source.location),
                         kind: ResolveErrorKind::CannotReturnValueOfType {
                             returning: result.resolved_type.to_string(),
@@ -167,7 +206,13 @@ fn resolve_statement(
 
                 if function.return_type != resolved::Type::Void {
                     return Err(ResolveError {
-                        filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(source.key)
+                                .filename()
+                                .to_string(),
+                        ),
                         location: Some(source.location),
                         kind: ResolveErrorKind::CannotReturnVoid {
                             expected: function.return_type.to_string(),
@@ -188,6 +233,7 @@ fn resolve_statement(
                 resolve_expression(
                     resolved_ast,
                     function_search_context,
+                    global_search_context,
                     variable_search_context,
                     resolved_function_ref,
                     value,
@@ -375,6 +421,7 @@ fn conform_integer(
 fn resolve_expression(
     resolved_ast: &mut resolved::Ast,
     function_search_context: &FunctionSearchContext,
+    global_search_context: &GlobalSearchContext,
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
     ast_expression: &ast::Expression,
@@ -385,18 +432,32 @@ fn resolve_expression(
 
     match &ast_expression.kind {
         ast::ExpressionKind::Variable(name) => {
-            let (resolved_type, key) = variable_search_context.find_variable_or_error(name, source)?;
+            if let Some((resolved_type, key)) = variable_search_context.find_variable(name) {
+                Ok(TypedExpression::new(
+                    resolved_type.clone(),
+                    resolved::Expression::new(
+                        resolved::ExpressionKind::Variable(resolved::Variable {
+                            key: *key,
+                            resolved_type: resolved_type.clone(),
+                        }),
+                        source,
+                    ),
+                ))
+            } else {
+                let (resolved_type, reference) =
+                    global_search_context.find_global_or_error(name, source)?;
 
-            Ok(TypedExpression::new(
-                resolved_type.clone(),
-                resolved::Expression::new(
-                    resolved::ExpressionKind::Variable(resolved::Variable {
-                        key: *key,
-                        resolved_type: resolved_type.clone(),
-                    }),
-                    source,
-                ),
-            ))
+                Ok(TypedExpression::new(
+                    resolved_type.clone(),
+                    resolved::Expression::new(
+                        resolved::ExpressionKind::GlobalVariable(resolved::GlobalVariable {
+                            reference: *reference,
+                            resolved_type: resolved_type.clone(),
+                        }),
+                        source,
+                    ),
+                ))
+            }
         }
         ast::ExpressionKind::Integer(value) => Ok(TypedExpression::new(
             resolved::Type::IntegerLiteral(value.clone()),
@@ -424,7 +485,13 @@ fn resolve_expression(
 
             if call.arguments.len() < function.parameters.required.len() {
                 return Err(ResolveError {
-                    filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                    filename: Some(
+                        resolved_ast
+                            .source_file_cache
+                            .get(source.key)
+                            .filename()
+                            .to_string(),
+                    ),
                     location: Some(source.location),
                     kind: ResolveErrorKind::NotEnoughArgumentsToFunction {
                         name: function.name.to_string(),
@@ -436,7 +503,13 @@ fn resolve_expression(
                 && !function.parameters.is_cstyle_vararg
             {
                 return Err(ResolveError {
-                    filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                    filename: Some(
+                        resolved_ast
+                            .source_file_cache
+                            .get(source.key)
+                            .filename()
+                            .to_string(),
+                    ),
                     location: Some(source.location),
                     kind: ResolveErrorKind::TooManyArgumentsToFunction {
                         name: function.name.to_string(),
@@ -450,6 +523,7 @@ fn resolve_expression(
                 let mut argument = resolve_expression(
                     resolved_ast,
                     function_search_context,
+                    global_search_context,
                     variable_search_context,
                     resolved_function_ref,
                     argument,
@@ -464,7 +538,13 @@ fn resolve_expression(
                         argument = conformed_argument;
                     } else {
                         return Err(ResolveError {
-                            filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                            filename: Some(
+                                resolved_ast
+                                    .source_file_cache
+                                    .get(source.key)
+                                    .filename()
+                                    .to_string(),
+                            ),
                             location: Some(source.location),
                             kind: ResolveErrorKind::BadTypeForArgumentToFunction {
                                 name: function.name.clone(),
@@ -497,6 +577,7 @@ fn resolve_expression(
             let value = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                global_search_context,
                 variable_search_context,
                 resolved_function_ref,
                 &declare_assign.value,
@@ -527,6 +608,7 @@ fn resolve_expression(
             let left = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                global_search_context,
                 variable_search_context,
                 resolved_function_ref,
                 &binary_operation.left,
@@ -535,6 +617,7 @@ fn resolve_expression(
             let right = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                global_search_context,
                 variable_search_context,
                 resolved_function_ref,
                 &binary_operation.right,

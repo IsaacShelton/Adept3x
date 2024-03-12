@@ -3,12 +3,11 @@ mod error;
 mod input;
 mod make_error;
 
-use self::annotation::Annotation;
+use self::annotation::{Annotation, AnnotationKind};
 use self::error::{ParseError, ParseErrorKind};
 use self::input::Input;
 use crate::ast::{
-    self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File,
-    FileIdentifier, Function, Parameter, Parameters, Source, Statement, StatementKind, Type,
+    self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File, FileIdentifier, Function, Global, Parameter, Parameters, Source, Statement, StatementKind, Type
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
@@ -49,7 +48,7 @@ where
     }
 
     fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<(), ParseError> {
-        // Create primary file
+        // Create ast file
         let ast_file = ast.new_file(FileIdentifier::Local(filename));
 
         while !self.input.peek().is_end_of_file() {
@@ -59,7 +58,7 @@ where
         Ok(())
     }
 
-    pub fn parse_top_level(&mut self, ast_file: &mut File) -> Result<(), ParseError> {
+    fn parse_top_level(&mut self, ast_file: &mut File) -> Result<(), ParseError> {
         let mut annotations = Vec::new();
 
         // Ignore preceeding newlines
@@ -79,6 +78,9 @@ where
             TokenKind::FuncKeyword => {
                 ast_file.functions.push(self.parse_function(annotations)?);
             }
+            TokenKind::Identifier(_) => {
+                ast_file.globals.push(self.parse_global(annotations)?);
+            }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
                 if annotations.len() > 0 {
@@ -94,7 +96,7 @@ where
         Ok(())
     }
 
-    pub fn parse_token(
+    fn parse_token(
         &mut self,
         expected_token: impl Borrow<TokenKind>,
         for_reason: Option<impl ToString>,
@@ -109,14 +111,14 @@ where
         Err(self.expected_token(expected_token, for_reason, token))
     }
 
-    pub fn parse_identifier(
+    fn parse_identifier(
         &mut self,
         for_reason: Option<impl ToString>,
     ) -> Result<String, ParseError> {
         Ok(self.parse_identifier_keep_location(for_reason)?.0)
     }
 
-    pub fn parse_identifier_keep_location(
+    fn parse_identifier_keep_location(
         &mut self,
         for_reason: Option<impl ToString>,
     ) -> Result<(String, Location), ParseError> {
@@ -129,7 +131,7 @@ where
         }
     }
 
-    pub fn ignore_newlines(&mut self) {
+    fn ignore_newlines(&mut self) {
         while let TokenKind::Newline = self.input.peek().kind {
             self.input.advance();
         }
@@ -148,7 +150,8 @@ where
         self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
 
         match annotation_name.as_str() {
-            "foreign" => Ok(Annotation::Foreign),
+            "foreign" => Ok(Annotation::new(AnnotationKind::Foreign, location)),
+            "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, location)),
             _ => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),
                 location: Some(location),
@@ -159,6 +162,32 @@ where
         }
     }
 
+    fn parse_global(&mut self, annotations: Vec<Annotation>) -> Result<Global, ParseError> {
+        // my_global_name Type
+        //      ^
+
+        let mut is_foreign = false;
+        let mut is_thread_local = false;
+
+        for annotation in annotations {
+            match annotation.kind {
+                AnnotationKind::Foreign => is_foreign = true,
+                AnnotationKind::ThreadLocal => is_thread_local = true,
+            }
+        }
+
+        let (name, location) = self.parse_identifier_keep_location(Some("for name of global variable"))?;
+        let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
+
+        Ok(Global {
+            name,
+            ast_type,
+            source: self.source(location),
+            is_foreign,
+            is_thread_local,
+        })
+    }
+
     fn parse_function(&mut self, annotations: Vec<Annotation>) -> Result<Function, ParseError> {
         // func functionName {
         //   ^
@@ -166,8 +195,9 @@ where
         let mut is_foreign = false;
 
         for annotation in annotations {
-            match annotation {
-                Annotation::Foreign => is_foreign = true,
+            match annotation.kind {
+                AnnotationKind::Foreign => is_foreign = true,
+                _ => return Err(self.unexpected_annotation(annotation.kind.to_string(), annotation.location, Some("for function"))),
             }
         }
 
@@ -528,8 +558,8 @@ where
                     }),
                     "void" => Ok(Type::Void),
                     "ptr" => {
-                        if self.input.peek_is(TokenKind::Colon) {
-                            self.parse_token(TokenKind::Colon, None::<&str>)?;
+                        if self.input.peek_is(TokenKind::Member) {
+                            self.parse_token(TokenKind::Member, None::<&str>)?;
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
                             Ok(Type::Pointer(Box::new(inner)))
                         } else {
@@ -555,7 +585,7 @@ where
         }
     }
 
-    pub fn source(&self, location: Location) -> Source {
+    fn source(&self, location: Location) -> Source {
         Source::new(self.input.key(), location)
     }
 }

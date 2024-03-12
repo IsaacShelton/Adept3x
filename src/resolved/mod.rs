@@ -14,6 +14,7 @@ pub use variable_storage::VariableStorage;
 
 new_key_type! {
     pub struct FunctionRef;
+    pub struct GlobalRef;
 }
 
 #[derive(Clone, Debug)]
@@ -21,6 +22,7 @@ pub struct Ast<'a> {
     pub source_file_cache: &'a SourceFileCache,
     pub entry_point: Option<FunctionRef>,
     pub functions: SlotMap<FunctionRef, Function>,
+    pub globals: SlotMap<GlobalRef, Global>,
 }
 
 impl<'a> Ast<'a> {
@@ -29,8 +31,18 @@ impl<'a> Ast<'a> {
             source_file_cache,
             entry_point: None,
             functions: SlotMap::with_key(),
+            globals: SlotMap::with_key(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Global {
+    pub name: String,
+    pub resolved_type: Type,
+    pub source: Source,
+    pub is_foreign: bool,
+    pub is_thread_local: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -176,6 +188,7 @@ impl Expression {
 #[derive(Clone, Debug)]
 pub enum ExpressionKind {
     Variable(Variable),
+    GlobalVariable(GlobalVariable),
     IntegerLiteral(BigInt),
     Integer {
         value: BigInt,
@@ -198,6 +211,12 @@ pub struct BinaryOperation {
 #[derive(Clone, Debug)]
 pub struct Variable {
     pub key: VariableStorageKey,
+    pub resolved_type: Type,
+}
+
+#[derive(Clone, Debug)]
+pub struct GlobalVariable {
+    pub reference: GlobalRef,
     pub resolved_type: Type,
 }
 

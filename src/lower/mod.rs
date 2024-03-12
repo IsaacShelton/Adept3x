@@ -2,7 +2,7 @@ mod builder;
 
 use crate::{
     error::CompilerError,
-    ir::{self, BasicBlocks, Literal, Value, ValueReference},
+    ir::{self, BasicBlocks, Global, Literal, Value, ValueReference},
     resolved::{self, Expression, ExpressionKind, IntegerSign, StatementKind},
 };
 use builder::Builder;
@@ -11,11 +11,26 @@ use std::ffi::CString;
 pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
 
+    for (global_ref, global) in ast.globals.iter() {
+        lower_global(&mut ir_module, global_ref, global)?;
+    }
+
     for (function_ref, function) in ast.functions.iter() {
         lower_function(&mut ir_module, function_ref, function)?;
     }
 
     Ok(ir_module)
+}
+
+fn lower_global(ir_module: &mut ir::Module, global_ref: resolved::GlobalRef, global: &resolved::Global) -> Result<(), CompilerError> {
+    ir_module.globals.insert(global_ref, Global {
+        mangled_name: global.name.to_string(),
+        ir_type: lower_type(&global.resolved_type)?,
+        is_foreign: global.is_foreign,
+        is_thread_local: global.is_thread_local,
+    });
+
+    Ok(())
 }
 
 fn lower_function(
@@ -243,6 +258,11 @@ fn lower_expression(
 
             let ir_type = lower_type(&variable.resolved_type)?;
 
+            Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
+        }
+        ExpressionKind::GlobalVariable(global_variable) => {
+            let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
+            let ir_type = lower_type(&global_variable.resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
         ExpressionKind::DeclareAssign(declare_assign) => {
