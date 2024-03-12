@@ -5,11 +5,11 @@ use std::fmt::Display;
 pub struct ResolveError {
     pub filename: Option<String>,
     pub location: Option<Location>,
-    pub info: ErrorInfo,
+    pub kind: ResolveErrorKind,
 }
 
 #[derive(Clone, Debug)]
-pub enum ErrorInfo {
+pub enum ResolveErrorKind {
     CannotReturnValueOfType { returning: String, expected: String },
     CannotReturnVoid { expected: String },
     UnrepresentableInteger { value: String },
@@ -37,8 +37,8 @@ impl Display for ResolveError {
 
         write!(f, "{}", "error: ".bright_red())?;
 
-        match &self.info {
-            ErrorInfo::CannotReturnValueOfType {
+        match &self.kind {
+            ResolveErrorKind::CannotReturnValueOfType {
                 returning,
                 expected,
             } => {
@@ -48,32 +48,32 @@ impl Display for ResolveError {
                     returning, expected
                 )?;
             }
-            ErrorInfo::CannotReturnVoid { expected } => {
+            ResolveErrorKind::CannotReturnVoid { expected } => {
                 write!(f, "Cannot return 'void', expected '{}'", expected,)?;
             }
-            ErrorInfo::UnrepresentableInteger { value } => {
+            ResolveErrorKind::UnrepresentableInteger { value } => {
                 write!(
                     f,
                     "Failed to lower unrepresentable integer literal {}",
                     value
                 )?;
             }
-            ErrorInfo::FailedToFindFunction { name } => {
+            ResolveErrorKind::FailedToFindFunction { name } => {
                 write!(f, "Failed to find function '{}'", name)?;
             }
-            ErrorInfo::UndeclaredVariable { name } => {
+            ResolveErrorKind::UndeclaredVariable { name } => {
                 write!(f, "Undeclared variable '{}'", name)?;
             }
-            ErrorInfo::NotEnoughArgumentsToFunction { name } => {
+            ResolveErrorKind::NotEnoughArgumentsToFunction { name } => {
                 write!(f, "Not enough arguments for call to function '{}'", name)?;
             }
-            ErrorInfo::TooManyArgumentsToFunction { name } => {
+            ResolveErrorKind::TooManyArgumentsToFunction { name } => {
                 write!(f, "Too many arguments for call to function '{}'", name)?;
             }
-            ErrorInfo::BadTypeForArgumentToFunction { name, i } => {
+            ResolveErrorKind::BadTypeForArgumentToFunction { name, i } => {
                 write!(f, "Bad type for argument #{} to function '{}'", i + 1, name)?;
             }
-            ErrorInfo::Other { message } => {
+            ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }
         }

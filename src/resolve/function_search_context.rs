@@ -1,7 +1,7 @@
 use crate::{error::CompilerError, resolved};
 use std::collections::HashMap;
 
-use super::error::{ErrorInfo, ResolveError};
+use super::error::{ResolveErrorKind, ResolveError};
 
 #[derive(Clone, Debug, Default)]
 pub struct FunctionSearchContext {
@@ -18,7 +18,7 @@ impl FunctionSearchContext {
             None => Err(ResolveError {
                 filename: todo!(),
                 location: todo!(),
-                info: ErrorInfo::FailedToFindFunction {
+                kind: ResolveErrorKind::FailedToFindFunction {
                     name: name.to_string(),
                 },
             }),

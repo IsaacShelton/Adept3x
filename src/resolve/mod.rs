@@ -10,7 +10,7 @@ use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
 use self::{
-    error::{ErrorInfo, ResolveError},
+    error::{ResolveErrorKind, ResolveError},
     variable_search_context::VariableSearchContext,
 };
 
@@ -156,7 +156,7 @@ fn resolve_statement(
                     return Err(ResolveError {
                         filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
                         location: Some(result.expression.source.location),
-                        info: ErrorInfo::CannotReturnValueOfType {
+                        kind: ResolveErrorKind::CannotReturnValueOfType {
                             returning: result.resolved_type.to_string(),
                             expected: function.return_type.to_string(),
                         },
@@ -169,7 +169,7 @@ fn resolve_statement(
                     return Err(ResolveError {
                         filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
                         location: Some(source.location),
-                        info: ErrorInfo::CannotReturnVoid {
+                        kind: ResolveErrorKind::CannotReturnVoid {
                             expected: function.return_type.to_string(),
                         },
                     });
@@ -236,7 +236,7 @@ fn conform_expression_to_default(
                 Err(ResolveError {
                     filename: Some(source_file_cache.get(source.key).filename().to_string()),
                     location: Some(source.location),
-                    info: ErrorInfo::UnrepresentableInteger {
+                    kind: ResolveErrorKind::UnrepresentableInteger {
                         value: value.to_string(),
                     },
                 })
@@ -426,7 +426,7 @@ fn resolve_expression(
                 return Err(ResolveError {
                     filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
                     location: Some(source.location),
-                    info: ErrorInfo::NotEnoughArgumentsToFunction {
+                    kind: ResolveErrorKind::NotEnoughArgumentsToFunction {
                         name: function.name.to_string(),
                     },
                 });
@@ -438,7 +438,7 @@ fn resolve_expression(
                 return Err(ResolveError {
                     filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
                     location: Some(source.location),
-                    info: ErrorInfo::TooManyArgumentsToFunction {
+                    kind: ResolveErrorKind::TooManyArgumentsToFunction {
                         name: function.name.to_string(),
                     },
                 });
@@ -466,7 +466,7 @@ fn resolve_expression(
                         return Err(ResolveError {
                             filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
                             location: Some(source.location),
-                            info: ErrorInfo::BadTypeForArgumentToFunction {
+                            kind: ResolveErrorKind::BadTypeForArgumentToFunction {
                                 name: function.name.clone(),
                                 i,
                             },

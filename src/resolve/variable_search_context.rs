@@ -1,4 +1,4 @@
-use super::error::{ErrorInfo, ResolveError};
+use super::error::{ResolveErrorKind, ResolveError};
 use crate::{
     error::CompilerError,
     resolved::{self, VariableStorageKey},
@@ -21,7 +21,7 @@ impl<'a> VariableSearchContext<'a> {
             None => Err(ResolveError {
                 filename: todo!(),
                 location: todo!(),
-                info: ErrorInfo::UndeclaredVariable {
+                kind: ResolveErrorKind::UndeclaredVariable {
                     name: name.to_string(),
                 },
             }),
