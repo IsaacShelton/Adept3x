@@ -1,3 +1,4 @@
+use super::error::{ErrorInfo, ResolveError};
 use crate::{
     error::CompilerError,
     resolved::{self, VariableStorageKey},
@@ -14,13 +15,16 @@ impl<'a> VariableSearchContext<'a> {
     pub fn find_variable_or_error(
         &self,
         name: &str,
-    ) -> Result<(&resolved::Type, &VariableStorageKey), CompilerError> {
+    ) -> Result<(&resolved::Type, &VariableStorageKey), ResolveError> {
         match self.find_variable(name) {
             Some(function) => Ok(function),
-            None => Err(CompilerError::during_resolve(format!(
-                "Undeclared variable '{}'",
-                name
-            ))),
+            None => Err(ResolveError {
+                filename: todo!(),
+                location: todo!(),
+                info: ErrorInfo::UndeclaredVariable {
+                    name: name.to_string(),
+                },
+            }),
         }
     }
 

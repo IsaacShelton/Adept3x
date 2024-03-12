@@ -2,22 +2,22 @@ use std::iter::Fuse;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Location {
-    pub line: usize,
-    pub column: usize,
+    pub line: u32,
+    pub column: u32,
 }
 
 impl Location {
-    pub fn new(line: usize, column: usize) -> Self {
+    pub fn new(line: u32, column: u32) -> Self {
         Self { line, column }
     }
 }
 
 pub struct LineColumn<I: Iterator<Item = char>> {
     iterator: Fuse<I>,
-    line: usize,
-    column: usize,
-    next_line: usize,
-    next_column: usize,
+    line: u32,
+    column: u32,
+    next_line: u32,
+    next_column: u32,
 }
 
 impl<I> Iterator for LineColumn<I>

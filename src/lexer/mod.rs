@@ -12,7 +12,7 @@ use self::{
 use crate::{
     line_column::LineColumn,
     look_ahead::LookAhead,
-    token::{StringModifier, Token, TokenInfo},
+    token::{StringModifier, TokenKind, Token},
 };
 use is_character::IsCharacter;
 
@@ -40,7 +40,7 @@ where
         }
     }
 
-    fn feed(&mut self) -> FeedResult<TokenInfo> {
+    fn feed(&mut self) -> FeedResult<Token> {
         match self.state {
             State::EndOfFile => FeedResult::Done,
             State::Idle => self.feed_idle(),
@@ -51,7 +51,7 @@ where
         }
     }
 
-    fn feed_idle(&mut self) -> FeedResult<TokenInfo> {
+    fn feed_idle(&mut self) -> FeedResult<Token> {
         use FeedResult::*;
 
         // Skip spaces
@@ -61,13 +61,13 @@ where
 
         if let Some((c, location)) = self.characters.next() {
             match c {
-                '\n' => Has(TokenInfo::new(Token::Newline, location)),
-                '{' => Has(TokenInfo::new(Token::OpenCurly, location)),
-                '}' => Has(TokenInfo::new(Token::CloseCurly, location)),
-                '(' => Has(TokenInfo::new(Token::OpenParen, location)),
-                ')' => Has(TokenInfo::new(Token::CloseParen, location)),
-                '[' => Has(TokenInfo::new(Token::OpenBracket, location)),
-                ']' => Has(TokenInfo::new(Token::CloseBracket, location)),
+                '\n' => Has(Token::new(TokenKind::Newline, location)),
+                '{' => Has(Token::new(TokenKind::OpenCurly, location)),
+                '}' => Has(Token::new(TokenKind::CloseCurly, location)),
+                '(' => Has(Token::new(TokenKind::OpenParen, location)),
+                ')' => Has(Token::new(TokenKind::CloseParen, location)),
+                '[' => Has(Token::new(TokenKind::OpenBracket, location)),
+                ']' => Has(Token::new(TokenKind::CloseBracket, location)),
                 '/' if self.characters.peek().is_character('/') => {
                     // Comment
 
@@ -90,19 +90,19 @@ where
 
                         while let Some((c, location)) = self.characters.peek() {
                             if *c == '\n' {
-                                return Has(TokenInfo::new(Token::DocComment(comment), *location));
+                                return Has(Token::new(TokenKind::DocComment(comment), *location));
                             } else {
                                 comment.push(self.characters.next().unwrap().0);
                             }
                         }
 
-                        Has(TokenInfo::new(Token::DocComment(comment), start_location))
+                        Has(Token::new(TokenKind::DocComment(comment), start_location))
                     } else {
                         // Regular line comment
 
                         while let Some((c, _)) = self.characters.next() {
                             if c == '\n' {
-                                return Has(TokenInfo::new(Token::Newline, start_location));
+                                return Has(Token::new(TokenKind::Newline, start_location));
                             }
                         }
 
@@ -122,8 +122,8 @@ where
                                     start_location: location,
                                 })
                             } else {
-                                return Has(TokenInfo::new(
-                                    Token::Error("Expected hex number after '0x'".into()),
+                                return Has(Token::new(
+                                    TokenKind::Error("Expected hex number after '0x'".into()),
                                     hex_location,
                                 ));
                             }
@@ -139,42 +139,42 @@ where
                     {
                         self.characters.next();
                         self.characters.next();
-                        Has(TokenInfo::new(Token::Ellipsis, location))
+                        Has(Token::new(TokenKind::Ellipsis, location))
                     } else {
-                        Has(TokenInfo::new(Token::Member, location))
+                        Has(Token::new(TokenKind::Member, location))
                     }
                 }
-                '+' => Has(TokenInfo::new(Token::Add, location)),
-                '-' => Has(TokenInfo::new(Token::Subtract, location)),
-                '*' => Has(TokenInfo::new(Token::Multiply, location)),
-                '/' => Has(TokenInfo::new(Token::Divide, location)),
-                '%' => Has(TokenInfo::new(Token::Modulus, location)),
+                '+' => Has(Token::new(TokenKind::Add, location)),
+                '-' => Has(Token::new(TokenKind::Subtract, location)),
+                '*' => Has(Token::new(TokenKind::Multiply, location)),
+                '/' => Has(Token::new(TokenKind::Divide, location)),
+                '%' => Has(Token::new(TokenKind::Modulus, location)),
                 '=' if self.characters.peek().is_character('=') => {
                     self.characters.next();
-                    Has(TokenInfo::new(Token::Equals, location))
+                    Has(Token::new(TokenKind::Equals, location))
                 }
                 '!' if self.characters.peek().is_character('=') => {
                     self.characters.next();
-                    Has(TokenInfo::new(Token::NotEquals, location))
+                    Has(Token::new(TokenKind::NotEquals, location))
                 }
                 '<' if self.characters.peek().is_character('=') => {
                     self.characters.next();
-                    Has(TokenInfo::new(Token::LessThanEq, location))
+                    Has(Token::new(TokenKind::LessThanEq, location))
                 }
                 '>' if self.characters.peek().is_character('=') => {
                     self.characters.next();
-                    Has(TokenInfo::new(Token::GreaterThanEq, location))
+                    Has(Token::new(TokenKind::GreaterThanEq, location))
                 }
-                '<' => Has(TokenInfo::new(Token::LessThan, location)),
-                '>' => Has(TokenInfo::new(Token::GreaterThan, location)),
-                '!' => Has(TokenInfo::new(Token::Not, location)),
-                ',' => Has(TokenInfo::new(Token::Comma, location)),
+                '<' => Has(Token::new(TokenKind::LessThan, location)),
+                '>' => Has(Token::new(TokenKind::GreaterThan, location)),
+                '!' => Has(Token::new(TokenKind::Not, location)),
+                ',' => Has(Token::new(TokenKind::Comma, location)),
                 ':' if self.characters.peek().is_character('=') => {
                     self.characters.next();
-                    Has(TokenInfo::new(Token::DeclareAssign, location))
+                    Has(Token::new(TokenKind::DeclareAssign, location))
                 }
-                ':' => Has(TokenInfo::new(Token::Colon, location)),
-                '#' => Has(TokenInfo::new(Token::Hash, location)),
+                ':' => Has(Token::new(TokenKind::Colon, location)),
+                '#' => Has(Token::new(TokenKind::Hash, location)),
                 '\"' => {
                     self.state = State::String(StringState {
                         value: String::new(),
@@ -201,22 +201,22 @@ where
                     });
                     Waiting
                 }
-                _ => Has(TokenInfo::new(
-                    Token::Error(format!("Unexpected character '{}'", c)),
+                _ => Has(Token::new(
+                    TokenKind::Error(format!("Unexpected character '{}'", c)),
                     location,
                 )),
             }
         } else {
             self.state = State::EndOfFile;
 
-            Has(TokenInfo::new(
-                Token::EndOfFile,
+            Has(Token::new(
+                TokenKind::EndOfFile,
                 self.characters.friendly_location(),
             ))
         }
     }
 
-    fn feed_identifier(&mut self) -> FeedResult<TokenInfo> {
+    fn feed_identifier(&mut self) -> FeedResult<Token> {
         use FeedResult::*;
 
         let state = self.state.as_mut_identifier();
@@ -226,18 +226,18 @@ where
                 state.identifier.push(self.characters.next().unwrap().0);
                 Waiting
             } else {
-                let token = state.to_token_info();
+                let token = state.to_token();
                 self.state = State::Idle;
                 Has(token)
             }
         } else {
-            let token = state.to_token_info();
+            let token = state.to_token();
             self.state = State::Idle;
             Has(token)
         }
     }
 
-    fn feed_string(&mut self) -> FeedResult<TokenInfo> {
+    fn feed_string(&mut self) -> FeedResult<Token> {
         use FeedResult::*;
 
         let state = self.state.as_mut_string();
@@ -249,8 +249,8 @@ where
                 let start_location = state.start_location;
                 self.state = State::Idle;
 
-                Has(TokenInfo::new(
-                    Token::String { value, modifier },
+                Has(Token::new(
+                    TokenKind::String { value, modifier },
                     start_location,
                 ))
             } else if c == '\\' {
@@ -264,8 +264,8 @@ where
 
                     Waiting
                 } else {
-                    Has(TokenInfo::new(
-                        Token::Error("Expected character after string esacpe '\\'".into()),
+                    Has(Token::new(
+                        TokenKind::Error("Expected character after string esacpe '\\'".into()),
                         c_location,
                     ))
                 }
@@ -274,14 +274,14 @@ where
                 Waiting
             }
         } else {
-            Has(TokenInfo::new(
-                Token::Error("Unclosed string literal".into()),
+            Has(Token::new(
+                TokenKind::Error("Unclosed string literal".into()),
                 state.start_location,
             ))
         }
     }
 
-    fn feed_number(&mut self) -> FeedResult<TokenInfo> {
+    fn feed_number(&mut self) -> FeedResult<Token> {
         use FeedResult::*;
 
         let state = self.state.as_mut_number();
@@ -312,18 +312,18 @@ where
                 state.value.push(c);
                 Waiting
             } else {
-                let token = state.to_token_info();
+                let token = state.to_token();
                 self.state = State::Idle;
                 Has(token)
             }
         } else {
-            let token = state.to_token_info();
+            let token = state.to_token();
             self.state = State::Idle;
             Has(token)
         }
     }
 
-    fn feed_hex_number(&mut self) -> FeedResult<TokenInfo> {
+    fn feed_hex_number(&mut self) -> FeedResult<Token> {
         use FeedResult::*;
 
         let state = self.state.as_mut_hex_number();
@@ -336,12 +336,12 @@ where
                 state.value.push(c);
                 Waiting
             } else {
-                let token = state.to_token_info();
+                let token = state.to_token();
                 self.state = State::Idle;
                 Has(token)
             }
         } else {
-            let token = state.to_token_info();
+            let token = state.to_token();
             self.state = State::Idle;
             Has(token)
         }
@@ -352,14 +352,14 @@ impl<I> Iterator for Lexer<I>
 where
     I: Iterator<Item = char>,
 {
-    type Item = TokenInfo;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.feed() {
                 FeedResult::Done => return None,
                 FeedResult::Waiting => (),
-                FeedResult::Has(token_info) => return Some(token_info),
+                FeedResult::Has(token) => return Some(token),
             }
         }
     }

@@ -1,5 +1,6 @@
 mod variable_storage;
 
+use crate::{ast::Source, source_file_cache::SourceFileCache};
 use num_bigint::BigInt;
 use slotmap::{new_key_type, SlotMap};
 use std::{
@@ -16,14 +17,16 @@ new_key_type! {
 }
 
 #[derive(Clone, Debug)]
-pub struct Ast {
+pub struct Ast<'a> {
+    pub source_file_cache: &'a SourceFileCache,
     pub entry_point: Option<FunctionRef>,
     pub functions: SlotMap<FunctionRef, Function>,
 }
 
-impl Default for Ast {
-    fn default() -> Self {
+impl<'a> Ast<'a> {
+    pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
         Self {
+            source_file_cache,
             entry_point: None,
             functions: SlotMap::with_key(),
         }
@@ -118,7 +121,19 @@ impl Display for Type {
 }
 
 #[derive(Clone, Debug)]
-pub enum Statement {
+pub struct Statement {
+    pub kind: StatementKind,
+    pub source: Source,
+}
+
+impl Statement {
+    pub fn new(kind: StatementKind, source: Source) -> Self {
+        Self { kind, source }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum StatementKind {
     Return(Option<Expression>),
     Expression(Expression),
 }
@@ -147,7 +162,19 @@ pub enum IntegerLiteralBits {
 }
 
 #[derive(Clone, Debug)]
-pub enum Expression {
+pub struct Expression {
+    pub kind: ExpressionKind,
+    pub source: Source,
+}
+
+impl Expression {
+    pub fn new(kind: ExpressionKind, source: Source) -> Self {
+        Self { kind, source }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ExpressionKind {
     Variable(Variable),
     IntegerLiteral(BigInt),
     Integer {

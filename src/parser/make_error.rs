@@ -1,23 +1,23 @@
 use super::{
-    error::{ErrorInfo, ParseError},
+    error::{ParseErrorKind, ParseError},
     Parser,
 };
-use crate::token::TokenInfo;
+use crate::token::Token;
 
-impl<I> Parser<I>
+impl<I> Parser<'_, I>
 where
-    I: Iterator<Item = TokenInfo>,
+    I: Iterator<Item = Token>,
 {
     pub fn unexpected_token_is_next(&mut self) -> ParseError {
         let unexpected = self.input.advance();
         self.unexpected_token(&unexpected)
     }
 
-    pub fn unexpected_token(&self, info: &TokenInfo) -> ParseError {
+    pub fn unexpected_token(&self, token: &Token) -> ParseError {
         ParseError {
             filename: Some(self.input.filename().to_string()),
-            location: Some(info.location),
-            info: ErrorInfo::UnexpectedToken { unexpected: info.token.to_string() },
+            location: Some(token.location),
+            kind: ParseErrorKind::UnexpectedToken { unexpected: token.kind.to_string() },
         }
     }
 
@@ -25,24 +25,24 @@ where
         &self,
         expected: impl ToString,
         for_reason: Option<impl ToString>,
-        info: TokenInfo,
+        token: Token,
     ) -> ParseError {
         ParseError {
             filename: Some(self.input.filename().to_string()),
-            location: Some(info.location),
-            info: ErrorInfo::Expected {
+            location: Some(token.location),
+            kind: ParseErrorKind::Expected {
                 expected: expected.to_string(),
                 for_reason: for_reason.map(|reason| reason.to_string()),
-                got: info.token.to_string(),
+                got: token.kind.to_string(),
             },
         }
     }
 
-    pub fn expected_top_level_construct(&self, info: &TokenInfo) -> ParseError {
+    pub fn expected_top_level_construct(&self, token: &Token) -> ParseError {
         ParseError {
             filename: Some(self.input.filename().to_string()),
-            location: Some(info.location),
-            info: ErrorInfo::ExpectedTopLevelConstruct,
+            location: Some(token.location),
+            kind: ParseErrorKind::ExpectedTopLevelConstruct,
         }
     }
 }

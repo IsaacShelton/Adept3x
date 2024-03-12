@@ -1,16 +1,18 @@
+mod error;
 mod function_search_context;
 mod variable_search_context;
 
 use crate::{
-    ast::{self, Ast, File, FileIdentifier, Type},
-    error::CompilerError,
-    resolved::{self, TypedExpression, VariableStorage, VariableStorageKey},
+    ast::{self, Ast, File, FileIdentifier, Source, Type}, resolved::{self, TypedExpression, VariableStorage, VariableStorageKey}, source_file_cache::{self, SourceFileCache}
 };
 use function_search_context::FunctionSearchContext;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
-use self::variable_search_context::VariableSearchContext;
+use self::{
+    error::{ErrorInfo, ResolveError},
+    variable_search_context::VariableSearchContext,
+};
 
 enum Job {
     Regular(FileIdentifier, usize, resolved::FunctionRef),
@@ -22,9 +24,9 @@ struct ResolveContext {
     pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchContext>,
 }
 
-pub fn resolve(ast: &Ast) -> Result<resolved::Ast, CompilerError> {
+pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     let mut ctx = ResolveContext::default();
-    let mut resolved_ast = resolved::Ast::default();
+    let mut resolved_ast = resolved::Ast::new(ast.source_file_cache);
 
     // Create initial jobs
     for (file_identifier, file) in ast.files.iter() {
@@ -132,10 +134,12 @@ fn resolve_statement(
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
     ast_statement: &ast::Statement,
-) -> Result<resolved::Statement, CompilerError> {
-    match ast_statement {
-        ast::Statement::Return(value) => {
-            Ok(resolved::Statement::Return(if let Some(value) = value {
+) -> Result<resolved::Statement, ResolveError> {
+    let source = ast_statement.source;
+
+    match &ast_statement.kind {
+        ast::StatementKind::Return(value) => {
+            let return_value = if let Some(value) = value {
                 let result = resolve_expression(
                     resolved_ast,
                     function_search_context,
@@ -149,32 +153,48 @@ fn resolve_statement(
                 if let Some(result) = conform_expression(&result, &function.return_type) {
                     Some(result.expression)
                 } else {
-                    return Err(CompilerError::during_resolve(format!(
-                        "Cannot return value of type '{}', expected '{}'",
-                        result.resolved_type, function.return_type,
-                    )));
+                    return Err(ResolveError {
+                        filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                        location: Some(result.expression.source.location),
+                        info: ErrorInfo::CannotReturnValueOfType {
+                            returning: result.resolved_type.to_string(),
+                            expected: function.return_type.to_string(),
+                        },
+                    });
                 }
             } else {
                 let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
 
                 if function.return_type != resolved::Type::Void {
-                    return Err(CompilerError::during_resolve(
-                        "Cannot return void when function expects return value",
-                    ));
+                    return Err(ResolveError {
+                        filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                        location: Some(source.location),
+                        info: ErrorInfo::CannotReturnVoid {
+                            expected: function.return_type.to_string(),
+                        },
+                    });
                 }
 
                 None
-            }))
+            };
+
+            Ok(resolved::Statement::new(
+                resolved::StatementKind::Return(return_value),
+                source,
+            ))
         }
-        ast::Statement::Expression(value) => Ok(resolved::Statement::Expression(
-            resolve_expression(
-                resolved_ast,
-                function_search_context,
-                variable_search_context,
-                resolved_function_ref,
-                value,
-            )?
-            .expression,
+        ast::StatementKind::Expression(value) => Ok(resolved::Statement::new(
+            resolved::StatementKind::Expression(
+                resolve_expression(
+                    resolved_ast,
+                    function_search_context,
+                    variable_search_context,
+                    resolved_function_ref,
+                    value,
+                )?
+                .expression,
+            ),
+            source,
         )),
     }
 }
@@ -190,7 +210,7 @@ fn conform_expression(
     // Integer Literal to Integer Type Conversion
     match &expression.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
-            if let Some(conformed) = conform_integer(value, to_type) {
+            if let Some(conformed) = conform_integer(value, expression.expression.source, to_type) {
                 return Some(conformed);
             }
         }
@@ -202,23 +222,31 @@ fn conform_expression(
 
 fn conform_expression_to_default(
     expression: TypedExpression,
-) -> Result<TypedExpression, CompilerError> {
+    source_file_cache: &SourceFileCache,
+) -> Result<TypedExpression, ResolveError> {
+    let source = expression.expression.source;
+
     match expression.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
-            if let Some(conformed) = conform_integer_to_default(&value) {
+            if let Some(conformed) =
+                conform_integer_to_default(&value, expression.expression.source)
+            {
                 Ok(conformed)
             } else {
-                Err(CompilerError::during_resolve(format!(
-                    "Failed to lower unrepresentable integer literal {}",
-                    value
-                )))
+                Err(ResolveError {
+                    filename: Some(source_file_cache.get(source.key).filename().to_string()),
+                    location: Some(source.location),
+                    info: ErrorInfo::UnrepresentableInteger {
+                        value: value.to_string(),
+                    },
+                })
             }
         }
         _ => Ok(expression),
     }
 }
 
-fn conform_integer_to_default(value: &BigInt) -> Option<TypedExpression> {
+fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExpression> {
     use resolved::{IntegerBits::*, IntegerSign::*};
 
     let possible_types = [
@@ -233,7 +261,7 @@ fn conform_integer_to_default(value: &BigInt) -> Option<TypedExpression> {
     ];
 
     for possible_type in possible_types.iter() {
-        if let Some(conformed) = conform_integer(value, possible_type) {
+        if let Some(conformed) = conform_integer(value, source, possible_type) {
             return Some(conformed);
         }
     }
@@ -241,7 +269,11 @@ fn conform_integer_to_default(value: &BigInt) -> Option<TypedExpression> {
     return None;
 }
 
-fn conform_integer(value: &BigInt, to_type: &resolved::Type) -> Option<TypedExpression> {
+fn conform_integer(
+    value: &BigInt,
+    source: Source,
+    to_type: &resolved::Type,
+) -> Option<TypedExpression> {
     match to_type {
         resolved::Type::Integer { bits, sign } => {
             use resolved::{IntegerBits::*, IntegerLiteralBits, IntegerSign::*};
@@ -252,11 +284,14 @@ fn conform_integer(value: &BigInt, to_type: &resolved::Type) -> Option<TypedExpr
                         bits: bits.clone(),
                         sign: sign.clone(),
                     },
-                    resolved::Expression::Integer {
-                        value: value.clone(),
-                        bits: integer_literal_bits,
-                        sign: sign.clone(),
-                    },
+                    resolved::Expression::new(
+                        resolved::ExpressionKind::Integer {
+                            value: value.clone(),
+                            bits: integer_literal_bits,
+                            sign: sign.clone(),
+                        },
+                        source,
+                    ),
                 ))
             };
 
@@ -343,52 +378,70 @@ fn resolve_expression(
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
     ast_expression: &ast::Expression,
-) -> Result<resolved::TypedExpression, CompilerError> {
+) -> Result<resolved::TypedExpression, ResolveError> {
     use resolved::{IntegerBits::*, IntegerSign::*, TypedExpression};
 
-    match ast_expression {
-        ast::Expression::Variable(name) => {
+    let source = ast_expression.source;
+
+    match &ast_expression.kind {
+        ast::ExpressionKind::Variable(name) => {
             let (resolved_type, key) = variable_search_context.find_variable_or_error(name)?;
 
             Ok(TypedExpression::new(
                 resolved_type.clone(),
-                resolved::Expression::Variable(resolved::Variable {
-                    key: *key,
-                    resolved_type: resolved_type.clone(),
-                }),
+                resolved::Expression::new(
+                    resolved::ExpressionKind::Variable(resolved::Variable {
+                        key: *key,
+                        resolved_type: resolved_type.clone(),
+                    }),
+                    source,
+                ),
             ))
         }
-        ast::Expression::Integer(value) => Ok(TypedExpression::new(
+        ast::ExpressionKind::Integer(value) => Ok(TypedExpression::new(
             resolved::Type::IntegerLiteral(value.clone()),
-            resolved::Expression::IntegerLiteral(value.clone()),
+            resolved::Expression::new(
+                resolved::ExpressionKind::IntegerLiteral(value.clone()),
+                source,
+            ),
         )),
-        ast::Expression::NullTerminatedString(value) => Ok(TypedExpression::new(
+        ast::ExpressionKind::NullTerminatedString(value) => Ok(TypedExpression::new(
             resolved::Type::Pointer(Box::new(resolved::Type::Integer {
                 bits: Bits8,
                 sign: Unsigned,
             })),
-            resolved::Expression::NullTerminatedString(value.clone()),
+            resolved::Expression::new(
+                resolved::ExpressionKind::NullTerminatedString(value.clone()),
+                source,
+            ),
         )),
-        ast::Expression::Call(call) => {
+        ast::ExpressionKind::Call(call) => {
             let function_ref =
                 function_search_context.find_function_or_error(&call.function_name)?;
+
             let function = resolved_ast.functions.get(function_ref).unwrap();
             let return_type = function.return_type.clone();
 
             if call.arguments.len() < function.parameters.required.len() {
-                return Err(CompilerError::during_resolve(format!(
-                    "Not enough arguments for call to function '{}'",
-                    &function.name
-                )));
+                return Err(ResolveError {
+                    filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                    location: Some(source.location),
+                    info: ErrorInfo::NotEnoughArgumentsToFunction {
+                        name: function.name.to_string(),
+                    },
+                });
             }
 
             if call.arguments.len() > function.parameters.required.len()
                 && !function.parameters.is_cstyle_vararg
             {
-                return Err(CompilerError::during_resolve(format!(
-                    "Too many arguments for call to function '{}'",
-                    &function.name
-                )));
+                return Err(ResolveError {
+                    filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                    location: Some(source.location),
+                    info: ErrorInfo::TooManyArgumentsToFunction {
+                        name: function.name.to_string(),
+                    },
+                });
             }
 
             let mut arguments = Vec::with_capacity(call.arguments.len());
@@ -410,13 +463,17 @@ fn resolve_expression(
                     {
                         argument = conformed_argument;
                     } else {
-                        return Err(CompilerError::during_resolve(format!(
-                            "Bad type for argument #{} to function '{}'",
-                            i, &function.name
-                        )));
+                        return Err(ResolveError {
+                            filename: Some(resolved_ast.source_file_cache.get(source.key).filename().to_string()),
+                            location: Some(source.location),
+                            info: ErrorInfo::BadTypeForArgumentToFunction {
+                                name: function.name.clone(),
+                                i,
+                            },
+                        });
                     }
                 } else {
-                    match conform_expression_to_default(argument) {
+                    match conform_expression_to_default(argument, resolved_ast.source_file_cache) {
                         Ok(conformed_argument) => argument = conformed_argument,
                         Err(error) => return Err(error),
                     }
@@ -427,13 +484,16 @@ fn resolve_expression(
 
             Ok(TypedExpression::new(
                 return_type,
-                resolved::Expression::Call(resolved::Call {
-                    function: function_ref,
-                    arguments,
-                }),
+                resolved::Expression::new(
+                    resolved::ExpressionKind::Call(resolved::Call {
+                        function: function_ref,
+                        arguments,
+                    }),
+                    source,
+                ),
             ))
         }
-        ast::Expression::DeclareAssign(declare_assign) => {
+        ast::ExpressionKind::DeclareAssign(declare_assign) => {
             let value = resolve_expression(
                 resolved_ast,
                 function_search_context,
@@ -442,7 +502,7 @@ fn resolve_expression(
                 &declare_assign.value,
             )?;
 
-            let value = conform_expression_to_default(value)?;
+            let value = conform_expression_to_default(value, resolved_ast.source_file_cache)?;
 
             let function = resolved_ast
                 .functions
@@ -454,13 +514,16 @@ fn resolve_expression(
 
             Ok(TypedExpression::new(
                 value.resolved_type,
-                resolved::Expression::DeclareAssign(resolved::DeclareAssign {
-                    key,
-                    value: Box::new(value.expression),
-                }),
+                resolved::Expression::new(
+                    resolved::ExpressionKind::DeclareAssign(resolved::DeclareAssign {
+                        key,
+                        value: Box::new(value.expression),
+                    }),
+                    source,
+                ),
             ))
         }
-        ast::Expression::BinaryOperation(binary_operation) => {
+        ast::ExpressionKind::BinaryOperation(binary_operation) => {
             let left = resolve_expression(
                 resolved_ast,
                 function_search_context,
@@ -479,17 +542,22 @@ fn resolve_expression(
 
             Ok(TypedExpression::new(
                 left.resolved_type.clone(),
-                resolved::Expression::BinaryOperation(Box::new(resolved::BinaryOperation {
-                    operator: binary_operation.operator.clone(),
-                    left,
-                    right,
-                })),
+                resolved::Expression::new(
+                    resolved::ExpressionKind::BinaryOperation(Box::new(
+                        resolved::BinaryOperation {
+                            operator: binary_operation.operator.clone(),
+                            left,
+                            right,
+                        },
+                    )),
+                    source,
+                ),
             ))
         }
     }
 }
 
-fn resolve_type(ast_type: &ast::Type) -> Result<resolved::Type, CompilerError> {
+fn resolve_type(ast_type: &ast::Type) -> Result<resolved::Type, ResolveError> {
     match ast_type {
         ast::Type::Integer { bits, sign } => Ok(resolved::Type::Integer {
             bits: bits.clone(),
@@ -500,7 +568,7 @@ fn resolve_type(ast_type: &ast::Type) -> Result<resolved::Type, CompilerError> {
     }
 }
 
-fn resolve_parameters(parameters: &ast::Parameters) -> Result<resolved::Parameters, CompilerError> {
+fn resolve_parameters(parameters: &ast::Parameters) -> Result<resolved::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {

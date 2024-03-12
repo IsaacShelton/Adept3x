@@ -1,6 +1,6 @@
 use crate::{
     line_column::Location,
-    token::{Token, TokenInfo},
+    token::{TokenKind, Token},
 };
 
 pub struct IdentifierState {
@@ -9,14 +9,14 @@ pub struct IdentifierState {
 }
 
 impl IdentifierState {
-    pub fn to_token_info(&mut self) -> TokenInfo {
+    pub fn to_token(&mut self) -> Token {
         let identifier = std::mem::replace(&mut self.identifier, String::default());
 
-        TokenInfo::new(
+        Token::new(
             match identifier.as_str() {
-                "func" => Token::FuncKeyword,
-                "return" => Token::ReturnKeyword,
-                _ => Token::Identifier(identifier),
+                "func" => TokenKind::FuncKeyword,
+                "return" => TokenKind::ReturnKeyword,
+                _ => TokenKind::Identifier(identifier),
             },
             self.start_location,
         )

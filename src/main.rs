@@ -12,8 +12,11 @@ mod parser;
 mod repeating_last;
 mod resolve;
 mod resolved;
+mod source_file_cache;
 mod token;
 
+use crate::source_file_cache::SourceFileCache;
+use ast::Ast;
 use lexer::Lexer;
 use llvm_backend::llvm_backend;
 use lower::lower;
@@ -22,7 +25,7 @@ use resolve::resolve;
 use std::fs::File;
 use std::io::BufReader;
 use std::process::exit;
-use utf8_chars::BufReadCharsExt;
+use std::string::ParseError;
 
 fn main() {
     if std::env::args().len() != 2 {
@@ -32,27 +35,17 @@ fn main() {
 
     let filename = std::env::args().nth(1).unwrap();
 
-    if filename.ends_with(".h") {
-        use lang_c::driver::{parse, parse_preprocessed, Config};
-        let config = Config::default();
+    let source_file_cache = SourceFileCache::new();
 
-        match parse(&config, filename) {
-            Ok(translation_unit) => println!("{:?}", translation_unit),
-            Err(error) => println!("{}", error),
-        }
-
-        return;
-    }
-
-    let file = match File::open(&filename) {
-        Ok(file) => file,
+    let key = match source_file_cache.add(&filename) {
+        Ok(key) => key,
         Err(_) => {
             eprintln!("Failed to open file {}", filename);
             exit(1);
         }
     };
 
-    let mut reader = BufReader::new(file);
+    let content = source_file_cache.get(key).content();
 
     /*
     for token in Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))) {
@@ -60,10 +53,7 @@ fn main() {
     }
     */
 
-    let ast = match parse(
-        Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))),
-        filename.clone(),
-    ) {
+    let ast = match parse(Lexer::new(content.chars()), &source_file_cache, key) {
         Ok(ast) => ast,
         Err(parse_error) => {
             eprintln!("{}", parse_error);
@@ -98,3 +88,4 @@ fn main() {
         Ok(()) => (),
     }
 }
+

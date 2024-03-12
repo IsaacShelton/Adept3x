@@ -4,21 +4,21 @@ use num_bigint::BigInt;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Deref)]
-pub struct TokenInfo {
+pub struct Token {
     #[deref]
-    pub token: Token,
+    pub kind: TokenKind,
 
     pub location: Location,
 }
 
-impl TokenInfo {
-    pub fn new(token: Token, location: Location) -> TokenInfo {
-        TokenInfo { token, location }
+impl Token {
+    pub fn new(token: TokenKind, location: Location) -> Token {
+        Token { kind: token, location }
     }
 
     pub fn is_end_of_file(&self) -> bool {
-        match self.token {
-            Token::EndOfFile => true,
+        match self.kind {
+            TokenKind::EndOfFile => true,
             _ => false,
         }
     }
@@ -31,7 +31,7 @@ pub enum StringModifier {
 }
 
 #[derive(Clone, Debug, PartialEq, IsVariant)]
-pub enum Token {
+pub enum TokenKind {
     EndOfFile,
     Error(String),
     Newline,
@@ -75,43 +75,43 @@ pub enum Token {
     DeclareAssign,
 }
 
-impl Display for Token {
+impl Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Token::EndOfFile => "end-of-file",
-            Token::Error(_) => "'error'",
-            Token::Newline => "'newline'",
-            Token::Identifier(_) => "'identifier'",
-            Token::OpenCurly => "'{'",
-            Token::CloseCurly => "'}'",
-            Token::OpenParen => "'('",
-            Token::CloseParen => "')'",
-            Token::OpenBracket => "']'",
-            Token::CloseBracket => "']'",
-            Token::String { .. } => "'string'",
-            Token::Integer { .. } => "'integer'",
-            Token::Float { .. } => "'float'",
-            Token::DocComment(_) => "'documentation comment'",
-            Token::FuncKeyword => "'func' keyword",
-            Token::ReturnKeyword => "'return' keyword",
-            Token::Member => "'.'",
-            Token::Add => "'+'",
-            Token::Subtract => "'-'",
-            Token::Multiply => "'*'",
-            Token::Divide => "'/'",
-            Token::Modulus => "'%'",
-            Token::Equals => "'='",
-            Token::NotEquals => "'!='",
-            Token::LessThan => "'<'",
-            Token::GreaterThan => "'>'",
-            Token::LessThanEq => "'<='",
-            Token::GreaterThanEq => "'>='",
-            Token::Not => "'!'",
-            Token::Comma => "','",
-            Token::Colon => "':'",
-            Token::Hash => "'#'",
-            Token::Ellipsis => "'...'",
-            Token::DeclareAssign => "':='",
+            TokenKind::EndOfFile => "end-of-file",
+            TokenKind::Error(_) => "'error'",
+            TokenKind::Newline => "'newline'",
+            TokenKind::Identifier(_) => "'identifier'",
+            TokenKind::OpenCurly => "'{'",
+            TokenKind::CloseCurly => "'}'",
+            TokenKind::OpenParen => "'('",
+            TokenKind::CloseParen => "')'",
+            TokenKind::OpenBracket => "']'",
+            TokenKind::CloseBracket => "']'",
+            TokenKind::String { .. } => "'string'",
+            TokenKind::Integer { .. } => "'integer'",
+            TokenKind::Float { .. } => "'float'",
+            TokenKind::DocComment(_) => "'documentation comment'",
+            TokenKind::FuncKeyword => "'func' keyword",
+            TokenKind::ReturnKeyword => "'return' keyword",
+            TokenKind::Member => "'.'",
+            TokenKind::Add => "'+'",
+            TokenKind::Subtract => "'-'",
+            TokenKind::Multiply => "'*'",
+            TokenKind::Divide => "'/'",
+            TokenKind::Modulus => "'%'",
+            TokenKind::Equals => "'='",
+            TokenKind::NotEquals => "'!='",
+            TokenKind::LessThan => "'<'",
+            TokenKind::GreaterThan => "'>'",
+            TokenKind::LessThanEq => "'<='",
+            TokenKind::GreaterThanEq => "'>='",
+            TokenKind::Not => "'!'",
+            TokenKind::Comma => "','",
+            TokenKind::Colon => "':'",
+            TokenKind::Hash => "'#'",
+            TokenKind::Ellipsis => "'...'",
+            TokenKind::DeclareAssign => "':='",
         })
     }
 }

@@ -6,11 +6,11 @@ use std::fmt::Display;
 pub struct ParseError {
     pub filename: Option<String>,
     pub location: Option<Location>,
-    pub info: ErrorInfo,
+    pub kind: ParseErrorKind,
 }
 
 #[derive(Clone, Debug)]
-pub enum ErrorInfo {
+pub enum ParseErrorKind {
     UnexpectedToken {
         unexpected: String,
     },
@@ -52,11 +52,11 @@ impl Display for ParseError {
 
         write!(f, "{}", "error: ".bright_red())?;
 
-        match &self.info {
-            ErrorInfo::UnexpectedToken { unexpected } => {
+        match &self.kind {
+            ParseErrorKind::UnexpectedToken { unexpected } => {
                 write!(f, "Unexpected token {}", unexpected)?;
             }
-            ErrorInfo::Expected {
+            ParseErrorKind::Expected {
                 expected,
                 got,
                 for_reason,
@@ -69,7 +69,7 @@ impl Display for ParseError {
 
                 write!(f, ", got {}", got)?;
             }
-            ErrorInfo::ExpectedType {
+            ParseErrorKind::ExpectedType {
                 prefix,
                 for_reason,
                 got,
@@ -88,16 +88,16 @@ impl Display for ParseError {
 
                 write!(f, ", got {}", got)?;
             }
-            ErrorInfo::UndeclaredType { name } => {
+            ParseErrorKind::UndeclaredType { name } => {
                 write!(f, "Undeclared type '{}'", name)?;
             }
-            ErrorInfo::UnrecognizedAnnotation { name } => {
+            ParseErrorKind::UnrecognizedAnnotation { name } => {
                 write!(f, "Unrecognized annotation '{}'", name)?;
             }
-            ErrorInfo::ExpectedTopLevelConstruct => {
+            ParseErrorKind::ExpectedTopLevelConstruct => {
                 write!(f, "Expected top level construct")?;
             }
-            ErrorInfo::Other { message } => {
+            ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }
         }

@@ -1,17 +1,33 @@
 use num_bigint::BigInt;
 use std::{collections::HashMap, ffi::CString, fmt::Debug};
 
-#[derive(Clone, Debug)]
-pub struct Ast {
-    pub primary_filename: String,
-    pub files: HashMap<FileIdentifier, File>,
+use crate::{line_column::Location, source_file_cache::{self, SourceFileCache, SourceFileCacheKey}};
+
+#[derive(Copy, Clone, Debug)]
+pub struct Source {
+    pub key: SourceFileCacheKey,
+    pub location: Location,
 }
 
-impl Ast {
-    pub fn new(primary_filename: String) -> Self {
+impl Source {
+    pub fn new(key: SourceFileCacheKey, location: Location) -> Self {
+        Self { key, location }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Ast<'a> {
+    pub primary_filename: String,
+    pub files: HashMap<FileIdentifier, File>,
+    pub source_file_cache: &'a SourceFileCache,
+}
+
+impl<'a> Ast<'a> {
+    pub fn new(primary_filename: String, source_file_cache: &'a SourceFileCache) -> Self {
         Self {
             primary_filename,
             files: HashMap::new(),
+            source_file_cache,
         }
     }
 
@@ -104,13 +120,37 @@ pub enum Type {
 }
 
 #[derive(Clone, Debug)]
-pub enum Statement {
+pub struct Statement {
+    pub kind: StatementKind,
+    pub source: Source,
+}
+
+impl Statement {
+    pub fn new(kind: StatementKind, source: Source) -> Self {
+        Self { kind, source }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum StatementKind {
     Return(Option<Expression>),
     Expression(Expression),
 }
 
 #[derive(Clone, Debug)]
-pub enum Expression {
+pub struct Expression {
+    pub kind: ExpressionKind,
+    pub source: Source,
+}
+
+impl Expression {
+    pub fn new(kind: ExpressionKind, source: Source) -> Self {
+        Self { kind, source }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ExpressionKind {
     Variable(String),
     Integer(BigInt),
     NullTerminatedString(CString),

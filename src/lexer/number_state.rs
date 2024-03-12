@@ -1,6 +1,6 @@
 use crate::{
     line_column::Location,
-    token::{Token, TokenInfo},
+    token::{TokenKind, Token},
 };
 use num_bigint::BigInt;
 
@@ -23,17 +23,17 @@ impl NumberState {
         }
     }
 
-    pub fn to_token_info(&self) -> TokenInfo {
+    pub fn to_token(&self) -> Token {
         match self.value.parse::<BigInt>() {
-            Ok(value) => return TokenInfo::new(Token::Integer { value }, self.start_location),
+            Ok(value) => return Token::new(TokenKind::Integer { value }, self.start_location),
             _ => (),
         }
 
         match self.value.parse::<f64>() {
-            Ok(value) => return TokenInfo::new(Token::Float { value }, self.start_location),
+            Ok(value) => return Token::new(TokenKind::Float { value }, self.start_location),
             _ => (),
         }
 
-        TokenInfo::new(Token::Error("Invalid number".into()), self.start_location)
+        Token::new(TokenKind::Error("Invalid number".into()), self.start_location)
     }
 }

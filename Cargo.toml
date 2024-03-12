@@ -10,9 +10,8 @@ colored = "2.1.0"
 derive_more = "0.99.17"
 num-bigint = "0.4.4"
 num-traits = "0.2.18"
-utf8-chars = "3.0.2"
 llvm-sys = { package = "llvm-sys", version = "170" }
 cstr = "0.2.11"
 slotmap = "1.0.7"
-lang-c = "0.15.1"
+append-only-vec = "0.1.3"
 

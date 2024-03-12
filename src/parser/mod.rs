@@ -4,37 +4,38 @@ mod input;
 mod make_error;
 
 use self::annotation::Annotation;
-use self::error::{ErrorInfo, ParseError};
+use self::error::{ParseError, ParseErrorKind};
 use self::input::Input;
 use crate::ast::{
-    self, Ast, Call, DeclareAssign, Expression, File, FileIdentifier, Function, Parameter,
-    Parameters, Statement, Type,
+    self, Ast, Call, DeclareAssign, Expression, ExpressionKind, File, FileIdentifier, Function,
+    Parameter, Parameters, Source, Statement, StatementKind, Type,
 };
 use crate::line_column::Location;
 use crate::look_ahead::LookAhead;
-use crate::token::{StringModifier, Token, TokenInfo};
+use crate::source_file_cache::{self, SourceFileCache, SourceFileCacheKey};
+use crate::token::{StringModifier, Token, TokenKind};
 use std::borrow::Borrow;
 use std::ffi::CString;
 use std::fmt::Display;
 
-struct Parser<I>
+struct Parser<'a, I>
 where
-    I: Iterator<Item = TokenInfo>,
+    I: Iterator<Item = Token>,
 {
-    input: Input<I>,
+    input: Input<'a, I>,
 }
 
-impl<I> Parser<I>
+impl<'a, I> Parser<'a, I>
 where
-    I: Iterator<Item = TokenInfo>,
+    I: Iterator<Item = Token>,
 {
-    pub fn new(input: Input<I>) -> Self {
+    pub fn new(input: Input<'a, I>) -> Self {
         Self { input }
     }
 
-    fn parse(mut self) -> Result<Ast, ParseError> {
+    fn parse(mut self, source_file_cache: &'a SourceFileCache) -> Result<Ast<'a>, ParseError> {
         let source_filename = self.input.filename();
-        let mut ast = Ast::new(source_filename.into());
+        let mut ast = Ast::new(source_filename.into(), source_file_cache);
         let ast_file = ast.new_file(FileIdentifier::Local(source_filename.into()));
 
         while !self.input.peek().is_end_of_file() {
@@ -60,14 +61,14 @@ where
         self.ignore_newlines();
 
         // Parse top-level construct
-        match self.input.peek().token {
-            Token::FuncKeyword => {
+        match self.input.peek().kind {
+            TokenKind::FuncKeyword => {
                 ast_file.functions.push(self.parse_function(annotations)?);
             }
-            Token::EndOfFile => {
+            TokenKind::EndOfFile => {
                 if annotations.len() > 0 {
-                    let info = self.input.advance();
-                    return Err(self.expected_top_level_construct(&info));
+                    let token = self.input.advance();
+                    return Err(self.expected_top_level_construct(&token));
                 }
             }
             _ => {
@@ -80,17 +81,17 @@ where
 
     pub fn parse_token(
         &mut self,
-        expected_token: impl Borrow<Token>,
+        expected_token: impl Borrow<TokenKind>,
         for_reason: Option<impl ToString>,
-    ) -> Result<(), ParseError> {
-        let info = self.input.advance();
+    ) -> Result<Location, ParseError> {
+        let token = self.input.advance();
         let expected_token = expected_token.borrow();
 
-        if info.token == *expected_token {
-            return Ok(());
+        if token.kind == *expected_token {
+            return Ok(token.location);
         }
 
-        Err(self.expected_token(expected_token, for_reason, info))
+        Err(self.expected_token(expected_token, for_reason, token))
     }
 
     pub fn parse_identifier(
@@ -104,17 +105,17 @@ where
         &mut self,
         for_reason: Option<impl ToString>,
     ) -> Result<(String, Location), ParseError> {
-        let info = self.input.advance();
+        let token = self.input.advance();
 
-        if let Token::Identifier(identifier) = &info.token {
-            Ok((identifier.into(), info.location))
+        if let TokenKind::Identifier(identifier) = &token.kind {
+            Ok((identifier.into(), token.location))
         } else {
-            Err(self.expected_token("identifier", for_reason, info))
+            Err(self.expected_token("identifier", for_reason, token))
         }
     }
 
     pub fn ignore_newlines(&mut self) {
-        while let Token::Newline = self.input.peek().token {
+        while let TokenKind::Newline = self.input.peek().kind {
             self.input.advance();
         }
     }
@@ -123,20 +124,20 @@ where
         // #[annotation_name]
         // ^
 
-        self.parse_token(Token::Hash, Some("to begin annotation"))?;
-        self.parse_token(Token::OpenBracket, Some("to begin annotation body"))?;
+        self.parse_token(TokenKind::Hash, Some("to begin annotation"))?;
+        self.parse_token(TokenKind::OpenBracket, Some("to begin annotation body"))?;
 
         let (annotation_name, location) =
             self.parse_identifier_keep_location(Some("for annotation name"))?;
 
-        self.parse_token(Token::CloseBracket, Some("to close annotation body"))?;
+        self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
 
         match annotation_name.as_str() {
             "foreign" => Ok(Annotation::Foreign),
             _ => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),
                 location: Some(location),
-                info: ErrorInfo::UnrecognizedAnnotation {
+                kind: ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,
                 },
             }),
@@ -160,7 +161,7 @@ where
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
 
-        let parameters = if self.input.peek_is(Token::OpenParen) {
+        let parameters = if self.input.peek_is(TokenKind::OpenParen) {
             self.parse_function_parameters()?
         } else {
             Parameters::default()
@@ -168,7 +169,7 @@ where
 
         self.ignore_newlines();
 
-        let return_type = if self.input.peek_is(Token::OpenCurly) {
+        let return_type = if self.input.peek_is(TokenKind::OpenCurly) {
             ast::Type::Void
         } else {
             self.parse_type(Some("return "), Some("for function"))?
@@ -178,16 +179,16 @@ where
 
         if !is_foreign {
             self.ignore_newlines();
-            self.parse_token(Token::OpenCurly, Some("to begin function body"))?;
+            self.parse_token(TokenKind::OpenCurly, Some("to begin function body"))?;
             self.ignore_newlines();
 
-            while !self.input.peek_is_or_eof(Token::CloseCurly) {
+            while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
                 statements.push(self.parse_statement()?);
                 self.ignore_newlines();
             }
 
             self.ignore_newlines();
-            self.parse_token(Token::CloseCurly, Some("to close function body"))?;
+            self.parse_token(TokenKind::CloseCurly, Some("to close function body"))?;
         }
 
         Ok(Function {
@@ -206,18 +207,18 @@ where
         let mut required = vec![];
         let mut is_cstyle_vararg = false;
 
-        self.parse_token(Token::OpenParen, Some("to begin function parameters"))?;
+        self.parse_token(TokenKind::OpenParen, Some("to begin function parameters"))?;
         self.ignore_newlines();
 
-        while !self.input.peek_is_or_eof(Token::CloseParen) {
+        while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
             // Parse argument
 
             if !required.is_empty() {
-                self.parse_token(Token::Comma, Some("after parameter"))?;
+                self.parse_token(TokenKind::Comma, Some("after parameter"))?;
                 self.ignore_newlines();
             }
 
-            if self.input.peek_is(Token::Ellipsis) {
+            if self.input.peek_is(TokenKind::Ellipsis) {
                 is_cstyle_vararg = true;
                 self.input.advance();
                 self.ignore_newlines();
@@ -231,7 +232,7 @@ where
             required.push(Parameter { name, ast_type });
         }
 
-        self.parse_token(Token::CloseParen, Some("to end function parameters"))?;
+        self.parse_token(TokenKind::CloseParen, Some("to end function parameters"))?;
 
         Ok(Parameters {
             required,
@@ -240,10 +241,15 @@ where
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
-        match self.input.peek().token {
-            Token::ReturnKeyword => self.parse_return(),
-            Token::EndOfFile => Err(self.unexpected_token_is_next()),
-            _ => Ok(Statement::Expression(self.parse_expression()?)),
+        let location = self.input.peek().location;
+
+        match self.input.peek().kind {
+            TokenKind::ReturnKeyword => self.parse_return(),
+            TokenKind::EndOfFile => Err(self.unexpected_token_is_next()),
+            _ => Ok(Statement::new(
+                StatementKind::Expression(self.parse_expression()?),
+                self.source(location),
+            )),
         }
     }
 
@@ -251,65 +257,81 @@ where
         // return VALUE
         //          ^
 
-        self.parse_token(Token::ReturnKeyword, Some("for return statement"))?;
+        let location = self.parse_token(TokenKind::ReturnKeyword, Some("for return statement"))?;
 
-        if self.input.peek_is(Token::Newline) {
-            Ok(Statement::Return(None))
-        } else {
-            Ok(Statement::Return(Some(self.parse_expression()?)))
-        }
+        Ok(Statement::new(
+            if self.input.peek_is(TokenKind::Newline) {
+                StatementKind::Return(None)
+            } else {
+                StatementKind::Return(Some(self.parse_expression()?))
+            },
+            self.source(location),
+        ))
     }
 
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {
         match self.input.advance() {
-            TokenInfo {
-                token: Token::Integer { value },
-                ..
-            } => Ok(Expression::Integer(value)),
-            TokenInfo {
-                token:
-                    Token::String {
+            Token {
+                kind: TokenKind::Integer { value },
+                location,
+            } => Ok(Expression::new(
+                ExpressionKind::Integer(value),
+                self.source(location),
+            )),
+            Token {
+                kind:
+                    TokenKind::String {
                         value,
                         modifier: StringModifier::NullTerminated,
                     },
-                ..
-            } => Ok(Expression::NullTerminatedString(
-                CString::new(value).expect("valid null-terminated string"),
+                location,
+            } => Ok(Expression::new(
+                ExpressionKind::NullTerminatedString(
+                    CString::new(value).expect("valid null-terminated string"),
+                ),
+                self.source(location),
             )),
-            TokenInfo {
-                token: Token::Identifier(identifier),
-                ..
+            Token {
+                kind: TokenKind::Identifier(identifier),
+                location,
             } => {
-                if self.input.peek_is(Token::OpenParen) {
-                    self.parse_call(identifier)
-                } else if self.input.peek_is(Token::DeclareAssign) {
-                    self.parse_declare_assign(identifier)
+                if self.input.peek_is(TokenKind::OpenParen) {
+                    self.parse_call(identifier, self.source(location))
+                } else if self.input.peek_is(TokenKind::DeclareAssign) {
+                    self.parse_declare_assign(identifier, self.source(location))
                 } else {
-                    Ok(Expression::Variable(identifier))
+                    Ok(Expression::new(
+                        ExpressionKind::Variable(identifier),
+                        self.source(location),
+                    ))
                 }
             }
             unexpected => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),
                 location: Some(unexpected.location),
-                info: ErrorInfo::UnexpectedToken {
+                kind: ParseErrorKind::UnexpectedToken {
                     unexpected: unexpected.to_string(),
                 },
             }),
         }
     }
 
-    fn parse_call(&mut self, function_name: String) -> Result<Expression, ParseError> {
+    fn parse_call(
+        &mut self,
+        function_name: String,
+        source: Source,
+    ) -> Result<Expression, ParseError> {
         // function_name(arg1, arg2, arg3)
         //              ^
 
         let mut arguments = vec![];
 
-        self.parse_token(Token::OpenParen, Some("to begin call argument list"))?;
+        self.parse_token(TokenKind::OpenParen, Some("to begin call argument list"))?;
         self.ignore_newlines();
 
-        while !self.input.peek_is_or_eof(Token::CloseParen) {
+        while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
             if !arguments.is_empty() {
-                self.parse_token(Token::Comma, Some("to separate arguments"))?;
+                self.parse_token(TokenKind::Comma, Some("to separate arguments"))?;
                 self.ignore_newlines();
             }
 
@@ -317,30 +339,40 @@ where
             self.ignore_newlines();
         }
 
-        self.parse_token(Token::CloseParen, Some("to end call argument list"))?;
+        self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
-        Ok(Expression::Call(Call {
-            function_name,
-            arguments,
-        }))
+        Ok(Expression::new(
+            ExpressionKind::Call(Call {
+                function_name,
+                arguments,
+            }),
+            source,
+        ))
     }
 
-    fn parse_declare_assign(&mut self, variable_name: String) -> Result<Expression, ParseError> {
+    fn parse_declare_assign(
+        &mut self,
+        variable_name: String,
+        source: Source,
+    ) -> Result<Expression, ParseError> {
         // variable_name := value
         //               ^
 
         self.parse_token(
-            Token::DeclareAssign,
+            TokenKind::DeclareAssign,
             Some("for variable declaration assignment"),
         )?;
         self.ignore_newlines();
 
         let value = self.parse_expression()?;
 
-        Ok(Expression::DeclareAssign(DeclareAssign {
-            name: variable_name,
-            value: Box::new(value),
-        }))
+        Ok(Expression::new(
+            ExpressionKind::DeclareAssign(DeclareAssign {
+                name: variable_name,
+                value: Box::new(value),
+            }),
+            source,
+        ))
     }
 
     fn parse_type(
@@ -349,8 +381,8 @@ where
         for_reason: Option<impl ToString>,
     ) -> Result<Type, ParseError> {
         match self.input.advance() {
-            TokenInfo {
-                token: Token::Identifier(identifier),
+            Token {
+                kind: TokenKind::Identifier(identifier),
                 location,
             } => {
                 use ast::{IntegerBits::*, IntegerSign::*};
@@ -398,8 +430,8 @@ where
                     }),
                     "void" => Ok(Type::Void),
                     "ptr" => {
-                        if self.input.peek_is(Token::Colon) {
-                            self.parse_token(Token::Colon, None::<&str>)?;
+                        if self.input.peek_is(TokenKind::Colon) {
+                            self.parse_token(TokenKind::Colon, None::<&str>)?;
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
                             Ok(Type::Pointer(Box::new(inner)))
                         } else {
@@ -409,14 +441,14 @@ where
                     _ => Err(ParseError {
                         filename: Some(self.input.filename().to_string()),
                         location: Some(location),
-                        info: ErrorInfo::UndeclaredType { name: identifier },
+                        kind: ParseErrorKind::UndeclaredType { name: identifier },
                     }),
                 }
             }
             unexpected => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),
                 location: Some(unexpected.location),
-                info: ErrorInfo::ExpectedType {
+                kind: ParseErrorKind::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),
                     for_reason: for_reason.map(|for_reason| for_reason.to_string()),
                     got: unexpected.to_string(),
@@ -424,8 +456,16 @@ where
             }),
         }
     }
+
+    pub fn source(&self, location: Location) -> Source {
+        Source::new(self.input.key(), location)
+    }
 }
 
-pub fn parse(tokens: impl Iterator<Item = TokenInfo>, filename: String) -> Result<Ast, ParseError> {
-    Parser::new(Input::new(tokens, filename.clone())).parse()
+pub fn parse(
+    tokens: impl Iterator<Item = Token>,
+    source_file_cache: &SourceFileCache,
+    key: SourceFileCacheKey,
+) -> Result<Ast, ParseError> {
+    Parser::new(Input::new(tokens, source_file_cache, key)).parse(source_file_cache)
 }

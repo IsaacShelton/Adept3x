@@ -3,7 +3,7 @@ mod builder;
 use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Literal, Value, ValueReference},
-    resolved::{self, Expression, IntegerSign, Statement},
+    resolved::{self, Expression, ExpressionKind, IntegerSign, StatementKind},
 };
 use builder::Builder;
 use std::ffi::CString;
@@ -54,8 +54,8 @@ fn lower_function(
         }
 
         for statement in function.statements.iter() {
-            match statement {
-                Statement::Return(expression) => {
+            match &statement.kind {
+                StatementKind::Return(expression) => {
                     let instruction =
                         ir::Instruction::Return(if let Some(expression) = expression {
                             Some(lower_expression(&mut builder, ir_module, expression)?)
@@ -65,7 +65,7 @@ fn lower_function(
 
                     builder.push(instruction);
                 }
-                Statement::Expression(expression) => {
+                StatementKind::Expression(expression) => {
                     lower_expression(&mut builder, ir_module, expression)?;
                 }
             }
@@ -129,12 +129,12 @@ fn lower_expression(
     ir_module: &ir::Module,
     expression: &Expression,
 ) -> Result<ir::Value, CompilerError> {
-    match expression {
-        Expression::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
+    match &expression.kind {
+        ExpressionKind::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
             "Cannot lower unspecialized integer literal {}",
             value
         ))),
-        Expression::Integer { value, bits, sign } => {
+        ExpressionKind::Integer { value, bits, sign } => {
             use resolved::{IntegerLiteralBits as Bits, IntegerSign as Sign};
 
             match (bits, sign) {
@@ -220,10 +220,10 @@ fn lower_expression(
                 }
             }
         }
-        Expression::NullTerminatedString(value) => Ok(ir::Value::Literal(
+        ExpressionKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),
         )),
-        Expression::Call(call) => {
+        ExpressionKind::Call(call) => {
             let mut arguments = vec![];
 
             for argument in call.arguments.iter() {
@@ -235,7 +235,7 @@ fn lower_expression(
                 arguments,
             })))
         }
-        Expression::Variable(variable) => {
+        ExpressionKind::Variable(variable) => {
             let pointer = Value::Reference(ValueReference {
                 basicblock_id: 0,
                 instruction_id: variable.key.index,
@@ -245,7 +245,7 @@ fn lower_expression(
 
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
-        Expression::DeclareAssign(declare_assign) => {
+        ExpressionKind::DeclareAssign(declare_assign) => {
             let initial_value = lower_expression(builder, ir_module, &declare_assign.value)?;
 
             let destination = Value::Reference(ValueReference {
@@ -260,7 +260,7 @@ fn lower_expression(
 
             Ok(destination)
         }
-        Expression::BinaryOperation(binary_operation) => {
+        ExpressionKind::BinaryOperation(binary_operation) => {
             let left = lower_expression(builder, ir_module, &binary_operation.left.expression)?;
             let right = lower_expression(builder, ir_module, &binary_operation.right.expression)?;
             let operands = ir::BinaryOperands::new(left, right);

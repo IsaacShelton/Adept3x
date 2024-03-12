@@ -6,7 +6,6 @@ pub enum CompilerErrorKind {
     CommandLine,
     Lex,
     Parse,
-    Resolve,
     Lower,
     Backend,
 }
@@ -17,7 +16,6 @@ impl Into<&str> for CompilerErrorKind {
             Self::CommandLine => "cli error",
             Self::Lex => "lex error",
             Self::Parse => "syntax error",
-            Self::Resolve => "semantic error",
             Self::Lower => "lower error",
             Self::Backend => "translation error",
         }
@@ -31,13 +29,6 @@ pub struct CompilerError {
 }
 
 impl CompilerError {
-    pub fn during_resolve(message: impl ToString) -> Self {
-        Self {
-            message: message.to_string(),
-            kind: CompilerErrorKind::Resolve,
-        }
-    }
-
     pub fn during_lower(message: impl ToString) -> Self {
         Self {
             message: message.to_string(),
@@ -63,7 +54,6 @@ impl Display for CompilerError {
             self.message
         )?;
 
-        write!(f, "\n")?;
         Ok(())
     }
 }
