@@ -93,7 +93,17 @@ fn lower_function(
             }
         }
 
-        builder.terminate();
+        if !builder.is_terminated() {
+            if let resolved::Type::Void = function.return_type {
+                builder.terminate();
+            } else {
+                return Err(CompilerError::during_lower(format!(
+                    "Must return a value of type '{}' before exiting function '{}'",
+                    function.return_type, function.name
+                )));
+            }
+        }
+
         builder.build()
     } else {
         BasicBlocks::default()
@@ -285,7 +295,8 @@ fn lower_expression(
                 destination: destination.clone(),
             }));
 
-            Ok(destination)
+            let ir_type = lower_type(&declare_assign.resolved_type)?;
+            Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
         ExpressionKind::BinaryOperation(binary_operation) => {
             let left = lower_expression(builder, ir_module, &binary_operation.left.expression)?;

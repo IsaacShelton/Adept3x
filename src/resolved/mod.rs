@@ -230,4 +230,5 @@ pub struct Call {
 pub struct DeclareAssign {
     pub key: VariableStorageKey,
     pub value: Box<Expression>,
+    pub resolved_type: Type,
 }

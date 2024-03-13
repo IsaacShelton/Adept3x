@@ -594,11 +594,12 @@ fn resolve_expression(
             variable_search_context.put(&declare_assign.name, value.resolved_type.clone(), key);
 
             Ok(TypedExpression::new(
-                value.resolved_type,
+                value.resolved_type.clone(),
                 resolved::Expression::new(
                     resolved::ExpressionKind::DeclareAssign(resolved::DeclareAssign {
                         key,
                         value: Box::new(value.expression),
+                        resolved_type: value.resolved_type,
                     }),
                     source,
                 ),
