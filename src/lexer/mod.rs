@@ -57,6 +57,19 @@ where
         // Skip spaces
         while let Some((' ', _)) = self.characters.peek() {
             self.characters.next();
+
+            // Special case for comparison operators '<' and '<='
+            if let Some(('<', location)) = self.characters.peek() {
+                let location = *location;
+                self.characters.next();
+
+                if let Some(('=', _)) = self.characters.peek() {
+                    self.characters.next();
+                    return Has(Token::new(TokenKind::LessThanEq, location));
+                } else {
+                    return Has(Token::new(TokenKind::LessThan, location));
+                }
+            }
         }
 
         if let Some((c, location)) = self.characters.next() {
@@ -157,16 +170,12 @@ where
                     self.characters.next();
                     Has(Token::new(TokenKind::NotEquals, location))
                 }
-                '<' if self.characters.peek().is_character('=') => {
-                    self.characters.next();
-                    Has(Token::new(TokenKind::LessThanEq, location))
-                }
                 '>' if self.characters.peek().is_character('=') => {
                     self.characters.next();
                     Has(Token::new(TokenKind::GreaterThanEq, location))
                 }
-                '<' => Has(Token::new(TokenKind::LessThan, location)),
                 '>' => Has(Token::new(TokenKind::GreaterThan, location)),
+                '<' => Has(Token::new(TokenKind::OpenAngle, location)),
                 '!' => Has(Token::new(TokenKind::Not, location)),
                 ',' => Has(Token::new(TokenKind::Comma, location)),
                 ':' if self.characters.peek().is_character('=') => {

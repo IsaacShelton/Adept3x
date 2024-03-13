@@ -12,11 +12,8 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(token: TokenKind, location: Location) -> Token {
-        Token {
-            kind: token,
-            location,
-        }
+    pub fn new(kind: TokenKind, location: Location) -> Token {
+        Token { kind, location }
     }
 
     pub fn is_end_of_file(&self) -> bool {
@@ -70,6 +67,7 @@ pub enum TokenKind {
     GreaterThan,
     LessThanEq,
     GreaterThanEq,
+    OpenAngle,
     Not,
     Comma,
     Colon,
@@ -109,6 +107,7 @@ impl Display for TokenKind {
             TokenKind::GreaterThan => "'>'",
             TokenKind::LessThanEq => "'<='",
             TokenKind::GreaterThanEq => "'>='",
+            TokenKind::OpenAngle => "open angle '<'",
             TokenKind::Not => "'!'",
             TokenKind::Comma => "','",
             TokenKind::Colon => "':'",

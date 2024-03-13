@@ -567,9 +567,10 @@ where
                     }),
                     "void" => Ok(Type::Void),
                     "ptr" => {
-                        if self.input.peek_is(TokenKind::Member) {
-                            self.parse_token(TokenKind::Member, None::<&str>)?;
+                        if self.input.peek_is(TokenKind::OpenAngle) {
+                            self.input.advance();
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                            self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"));
                             Ok(Type::Pointer(Box::new(inner)))
                         } else {
                             Ok(Type::Pointer(Box::new(Type::Void)))
