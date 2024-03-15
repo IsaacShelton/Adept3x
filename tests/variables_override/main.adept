@@ -1,0 +1,18 @@
+
+#[foreign]
+func printf(format ptr<uint8>, ...) int32
+
+func main {
+    message := c"Hi, World!"
+    printf(c"%s\n", message)
+
+    message := c"What is your age World?"
+    printf(c"%s\n", message)
+
+    message := 4543000000
+    printf(c"I am %lld years old\n", message)
+
+    message := c"Goodbye, World."
+    printf(c"%s\n", message)
+}
+

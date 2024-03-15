@@ -1,0 +1,12 @@
+
+#[foreign]
+func printf(format ptr<uint8>, ...) int32
+
+func main {
+    nice_number := 69
+    printf(c"nice_number = %lld\n", nice_number)
+
+    hello_world := c"Hello World"
+    printf(c"%s\n", hello_world)
+}
+

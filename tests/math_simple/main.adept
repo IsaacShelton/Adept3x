@@ -1,0 +1,15 @@
+
+#[foreign]
+func printf(format ptr<uint8>, ...) int32
+
+func main {
+    a := 13
+    b := 8
+
+    printf(c"%lld + %lld = %lld\n", a, b, a + b)
+    printf(c"%lld - %lld = %lld\n", a, b, a - b)
+    printf(c"%lld * %lld = %lld\n", a, b, a * b)
+    printf(c"%lld / %lld = %lld\n", a, b, a / b)
+    printf(c"%lld %% %lld = %lld\n", a, b, a % b)
+}
+

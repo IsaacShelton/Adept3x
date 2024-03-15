@@ -1,0 +1,20 @@
+
+#[foreign]
+func printf(format ptr<uint8>, ...) int32
+
+func main {
+    greet(c"John")
+    showNumber(getNumber())
+}
+
+func greet(name ptr<uint8>) {
+    printf(c"Hello, %s!\n", name)
+}
+
+func getNumber() int {
+    return 1234
+}
+
+func showNumber(number int) {
+    printf(c"Your number is %lld\n", number)
+}
