@@ -9,7 +9,6 @@ use std::{
     fmt::{Debug, Display},
 };
 
-pub use crate::ast::BinaryOperator;
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -206,6 +205,21 @@ pub struct BinaryOperation {
     pub operator: BinaryOperator,
     pub left: TypedExpression,
     pub right: TypedExpression,
+}
+
+#[derive(Clone, Debug)]
+pub enum BinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulus,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanEq,
+    GreaterThan,
+    GreaterThanEq,
 }
 
 #[derive(Clone, Debug)]

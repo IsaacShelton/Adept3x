@@ -1,6 +1,7 @@
 #![allow(dead_code, unused, unused_mut)]
 
 mod ast;
+mod cli;
 mod error;
 mod ir;
 mod lexer;
@@ -17,6 +18,7 @@ mod token;
 
 use crate::source_file_cache::SourceFileCache;
 use ast::Ast;
+use cli::{BuildCommand, NewCommand};
 use lexer::Lexer;
 use llvm_backend::llvm_backend;
 use lower::lower;
@@ -26,16 +28,23 @@ use std::fs::File;
 use std::io::BufReader;
 use std::process::exit;
 use std::string::ParseError;
+use indoc::indoc;
 
 fn main() {
-    if std::env::args().len() != 2 {
-        println!("usage: adept FILENAME");
-        exit(0);
-    }
+    let args = match cli::Command::parse_env_args() {
+        Ok(args) => args,
+        Err(()) => exit(1),
+    };
 
-    let filename = std::env::args().nth(1).unwrap();
+    match args.kind {
+        cli::CommandKind::Build(build_command) => build_project(build_command),
+        cli::CommandKind::New(new_command) => new_project(new_command),
+    };
+}
 
+fn build_project(build_command: BuildCommand) {
     let source_file_cache = SourceFileCache::new();
+    let filename = build_command.filename;
 
     let key = match source_file_cache.add(&filename) {
         Ok(key) => key,
@@ -88,3 +97,40 @@ fn main() {
         Ok(()) => (),
     }
 }
+
+fn new_project(new_command: NewCommand) {
+    if let Err(error) =  std::fs::create_dir(&new_command.project_name) {
+        eprintln!("Failed to create project directory '{}'", &new_command.project_name);
+        exit(1);
+    }
+
+    let imports = indoc !{r#"
+        import std::prelude
+    "#};
+
+    let main = indoc! {r#"
+
+        func main {
+            println("Hello World!")
+        }
+    "#};
+
+    let lock = indoc! {r#"
+        std::prelude 1.0 731f4cbc9ba52451245d8f67961b640111e522972a6a4eff97c88f7ff07b0b59
+    "#};
+
+    put_file(&new_command.project_name, "_.imports", imports);
+    put_file(&new_command.project_name, "_.lock", lock);
+    put_file(&new_command.project_name, "main.adept", main);
+    println!("Project created!");
+}
+
+fn put_file(directory_name: &str, filename: &str, content: &str) {
+    let path = std::path::Path::new(directory_name).join(filename);
+
+    if let Err(_) = std::fs::write(&path, content) {
+        eprintln!("Failed to create {} file", filename);
+        exit(1);
+    }
+}
+

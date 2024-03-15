@@ -333,6 +333,7 @@ fn lower_expression(
                         None => Err(CompilerError::during_lower("Cannot modulo non-integer")),
                     }
                 }
+                _ => todo!(),
             }
         }
     }

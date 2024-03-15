@@ -189,6 +189,12 @@ pub enum BinaryOperator {
     Multiply,
     Divide,
     Modulus,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanEq,
+    GreaterThan,
+    GreaterThanEq,
 }
 
 #[derive(Clone, Debug)]

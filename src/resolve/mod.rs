@@ -624,12 +624,23 @@ fn resolve_expression(
                 &binary_operation.right,
             )?;
 
+            // TODO: Conform left and right types
+
+            let operator = match binary_operation.operator {
+                ast::BinaryOperator::Add => resolved::BinaryOperator::Add,
+                ast::BinaryOperator::Subtract => resolved::BinaryOperator::Subtract,
+                ast::BinaryOperator::Multiply => resolved::BinaryOperator::Multiply,
+                ast::BinaryOperator::Divide => resolved::BinaryOperator::Divide,
+                ast::BinaryOperator::Modulus => resolved::BinaryOperator::Modulus,
+                _ => todo!(),
+            };
+
             Ok(TypedExpression::new(
                 left.resolved_type.clone(),
                 resolved::Expression::new(
                     resolved::ExpressionKind::BinaryOperation(Box::new(
                         resolved::BinaryOperation {
-                            operator: binary_operation.operator.clone(),
+                            operator,
                             left,
                             right,
                         },
