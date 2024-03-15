@@ -1,4 +1,5 @@
 /target
-/tests/*.c
 .DS_Store
+a.o
+a.out
 

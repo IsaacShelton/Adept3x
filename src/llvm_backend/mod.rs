@@ -48,21 +48,26 @@ use llvm_sys::{
 use slotmap::SlotMap;
 use std::{
     error::Error,
-    ffi::{c_char, c_double, c_ulonglong, CStr, CString},
+    ffi::{c_char, c_double, c_ulonglong, CStr, CString, OsStr},
     fmt::Display,
     mem::MaybeUninit,
+    path::Path,
     process::Command,
     ptr::{null, null_mut},
 };
 
-pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> {
+pub unsafe fn llvm_backend(
+    ir_module: &ir::Module,
+    output_object_filepath: &Path,
+    output_binary_filepath: &Path,
+) -> Result<(), CompilerError> {
     LLVM_InitializeAllTargetInfos();
     LLVM_InitializeAllTargets();
     LLVM_InitializeAllTargetMCs();
     LLVM_InitializeAllAsmParsers();
     LLVM_InitializeAllAsmPrinters();
 
-    let module_name = CString::new("a.o").unwrap();
+    let module_name = CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
     let triple = get_triple();
     let target = get_target_from_triple(&triple)?;
     let cpu = CString::new("generic").unwrap();
@@ -94,9 +99,11 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
     let mut llvm_emit_error_message: *mut c_char = null_mut();
 
     let module_representation = CStr::from_ptr(LLVMPrintModuleToString(backend_module.get()));
-    println!("{}", module_representation.to_string_lossy());
 
-    let mut output_object_filename = CString::new("a.o").unwrap();
+    // println!("{}", module_representation.to_string_lossy());
+
+    let mut output_object_filename =
+        CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
 
     if (LLVMVerifyModule(backend_module.get(), LLVMPrintMessageAction, null_mut()) == 1) {
         println!(
@@ -123,7 +130,11 @@ pub unsafe fn llvm_backend(ir_module: &ir::Module) -> Result<(), CompilerError> 
 
     // Link resulting object file to create executable
     Command::new("gcc")
-        .args(["a.o"])
+        .args([
+            output_object_filepath.as_os_str(),
+            OsStr::new("-o"),
+            output_binary_filepath.as_os_str(),
+        ])
         .spawn()
         .expect("Failed to link");
     Ok(())

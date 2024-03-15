@@ -624,23 +624,30 @@ fn resolve_expression(
                 &binary_operation.right,
             )?;
 
-            // TODO: Conform left and right types
-
-            let operator = match binary_operation.operator {
-                ast::BinaryOperator::Add => resolved::BinaryOperator::Add,
-                ast::BinaryOperator::Subtract => resolved::BinaryOperator::Subtract,
-                ast::BinaryOperator::Multiply => resolved::BinaryOperator::Multiply,
-                ast::BinaryOperator::Divide => resolved::BinaryOperator::Divide,
-                ast::BinaryOperator::Modulus => resolved::BinaryOperator::Modulus,
-                _ => todo!(),
-            };
+            // TODO: Properly conform left and right types
+            if left.resolved_type != right.resolved_type {
+                return Err(ResolveError {
+                    filename: Some(
+                        resolved_ast
+                            .source_file_cache
+                            .get(source.key)
+                            .filename()
+                            .to_string(),
+                    ),
+                    location: Some(source.location),
+                    kind: ResolveErrorKind::BinaryOperatorMismatch {
+                        left: left.resolved_type.to_string(),
+                        right: right.resolved_type.to_string(),
+                    },
+                });
+            }
 
             Ok(TypedExpression::new(
                 left.resolved_type.clone(),
                 resolved::Expression::new(
                     resolved::ExpressionKind::BinaryOperation(Box::new(
                         resolved::BinaryOperation {
-                            operator,
+                            operator: binary_operation.operator.clone(),
                             left,
                             right,
                         },

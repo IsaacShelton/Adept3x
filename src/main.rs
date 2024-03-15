@@ -26,6 +26,7 @@ use parser::parse;
 use resolve::resolve;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 use std::process::exit;
 use std::string::ParseError;
 use indoc::indoc;
@@ -45,6 +46,19 @@ fn main() {
 fn build_project(build_command: BuildCommand) {
     let source_file_cache = SourceFileCache::new();
     let filename = build_command.filename;
+
+
+    let filepath = Path::new(&filename);
+
+    if !filepath.is_file() {
+        eprintln!("Expected filename to be path to file");
+        exit(1);
+    }
+
+    let project_folder = filepath.parent().unwrap();
+
+    let output_binary_filepath = project_folder.join("a.out");
+    let output_object_filepath = project_folder.join("a.o");
 
     let key = match source_file_cache.add(&filename) {
         Ok(key) => key,
@@ -70,7 +84,7 @@ fn build_project(build_command: BuildCommand) {
         }
     };
 
-    println!("{:?}", ast);
+    // println!("{:?}", ast);
 
     let resolved_ast = match resolve(&ast) {
         Ok(resolved_ast) => resolved_ast,
@@ -80,7 +94,7 @@ fn build_project(build_command: BuildCommand) {
         }
     };
 
-    println!("{:?}", resolved_ast);
+    // println!("{:?}", resolved_ast);
 
     let ir_module = match lower(&resolved_ast) {
         Ok(ir_module) => ir_module,
@@ -90,9 +104,9 @@ fn build_project(build_command: BuildCommand) {
         }
     };
 
-    println!("{:?}", ir_module);
+    // println!("{:?}", ir_module);
 
-    match unsafe { llvm_backend(&ir_module) } {
+    match unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) } {
         Err(error) => eprintln!("{}", error),
         Ok(()) => (),
     }

@@ -18,6 +18,8 @@ pub enum ResolveErrorKind {
     NotEnoughArgumentsToFunction { name: String },
     TooManyArgumentsToFunction { name: String },
     BadTypeForArgumentToFunction { name: String, i: usize },
+    BinaryOperatorMismatch { left: String, right: String },
+    CannotBinaryOperator { left: String, right: String },
     Other { message: String },
 }
 
@@ -72,6 +74,12 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::BadTypeForArgumentToFunction { name, i } => {
                 write!(f, "Bad type for argument #{} to function '{}'", i + 1, name)?;
+            }
+            ResolveErrorKind::BinaryOperatorMismatch  { left, right } => {
+                write!(f, "Mismatching types '{}' and '{}' for binary operator", left, right)?;
+            }
+            ResolveErrorKind::CannotBinaryOperator  { left, right } => {
+                write!(f, "Cannot perform binary operator on types '{}' and '{}'", left, right)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
