@@ -676,7 +676,7 @@ fn resolve_expression(
                         left = conform_expression(&left, &unified_type)
                             .expect("conform left side of binary operator");
                         right = conform_expression(&right, &unified_type)
-                            .expect("conform left side of binary operator");
+                            .expect("conform right side of binary operator");
                         unified_type
                     }
                     None => {
