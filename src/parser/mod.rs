@@ -352,6 +352,12 @@ where
                 TokenKind::Multiply => BinaryOperator::Multiply,
                 TokenKind::Divide => BinaryOperator::Divide,
                 TokenKind::Modulus => BinaryOperator::Modulus,
+                TokenKind::Equals => BinaryOperator::Equals,
+                TokenKind::NotEquals => BinaryOperator::NotEquals,
+                TokenKind::LessThan => BinaryOperator::LessThan,
+                TokenKind::LessThanEq => BinaryOperator::LessThanEq,
+                TokenKind::GreaterThan => BinaryOperator::GreaterThan,
+                TokenKind::GreaterThanEq => BinaryOperator::GreaterThanEq,
                 _ => return Ok(lhs),
             };
 
@@ -525,6 +531,7 @@ where
                 use ast::{IntegerBits::*, IntegerSign::*};
 
                 match identifier.as_str() {
+                    "bool" => Ok(Type::Boolean),
                     "int" => Ok(Type::Integer {
                         bits: Normal,
                         sign: Signed,
@@ -533,7 +540,6 @@ where
                         bits: Normal,
                         sign: Unsigned,
                     }),
-                    "bool" => Ok(Type::Boolean),
                     "i8" => Ok(Type::Integer {
                         bits: Bits8,
                         sign: Signed,
@@ -571,7 +577,10 @@ where
                         if self.input.peek_is(TokenKind::OpenAngle) {
                             self.input.advance();
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                            self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"));
+                            self.parse_token(
+                                TokenKind::GreaterThan,
+                                Some("to close type parameters"),
+                            );
                             Ok(Type::Pointer(Box::new(inner)))
                         } else {
                             Ok(Type::Pointer(Box::new(Type::Void)))

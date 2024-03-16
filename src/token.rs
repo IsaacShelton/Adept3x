@@ -101,7 +101,7 @@ impl Display for TokenKind {
             TokenKind::Multiply => "'*'",
             TokenKind::Divide => "'/'",
             TokenKind::Modulus => "'%'",
-            TokenKind::Equals => "'='",
+            TokenKind::Equals => "'=='",
             TokenKind::NotEquals => "'!='",
             TokenKind::LessThan => "'<'",
             TokenKind::GreaterThan => "'>'",
@@ -137,7 +137,26 @@ impl TokenKind {
             TokenKind::Equals => 8,
             TokenKind::NotEquals => 8,
             TokenKind::DeclareAssign => 1,
-            _ => 0,
+
+            TokenKind::EndOfFile
+            | TokenKind::Error(_)
+            | TokenKind::Newline
+            | TokenKind::Identifier(_)
+            | TokenKind::CloseCurly
+            | TokenKind::OpenParen
+            | TokenKind::CloseParen
+            | TokenKind::CloseBracket
+            | TokenKind::String { .. }
+            | TokenKind::Integer { .. }
+            | TokenKind::Float { .. }
+            | TokenKind::DocComment(_)
+            | TokenKind::FuncKeyword
+            | TokenKind::ReturnKeyword
+            | TokenKind::OpenAngle
+            | TokenKind::Comma
+            | TokenKind::Colon
+            | TokenKind::Hash
+            | TokenKind::Ellipsis => 0,
         }
     }
 }

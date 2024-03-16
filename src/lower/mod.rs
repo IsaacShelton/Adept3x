@@ -49,21 +49,16 @@ fn lower_function(
         let mut builder = Builder::new();
 
         // Allocate parameters
-        for (i, variable_type) in function
+        let mut parameter_variables = function
             .variables
             .types
             .iter()
             .enumerate()
             .take(function.variables.num_parameters)
-        {
-            let destination = builder.push(ir::Instruction::Alloca(lower_type(variable_type)?));
-            let source = builder.push(ir::Instruction::Parameter(i.try_into().unwrap()));
-
-            builder.push(ir::Instruction::Store(ir::Store {
-                source,
-                destination,
-            }));
-        }
+            .map(|(i, variable_type)| {
+                Ok(builder.push(ir::Instruction::Alloca(lower_type(variable_type)?)))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         // Allocate non-parameter stack variables
         for variable_type in function
@@ -73,6 +68,15 @@ fn lower_function(
             .skip(function.variables.num_parameters)
         {
             builder.push(ir::Instruction::Alloca(lower_type(variable_type)?));
+        }
+
+        for (i, destination) in parameter_variables.into_iter().enumerate() {
+            let source = builder.push(ir::Instruction::Parameter(i.try_into().unwrap()));
+
+            builder.push(ir::Instruction::Store(ir::Store {
+                source,
+                destination,
+            }));
         }
 
         for statement in function.statements.iter() {
@@ -314,27 +318,50 @@ fn lower_expression(
                 }
                 resolved::BinaryOperator::Divide => {
                     match binary_operation.left.resolved_type.sign() {
-                        Some(IntegerSign::Signed) => {
-                            Ok(builder.push(ir::Instruction::DivideSigned(operands)))
-                        }
-                        Some(IntegerSign::Unsigned) => {
-                            Ok(builder.push(ir::Instruction::DivideUnsigned(operands)))
-                        }
+                        Some(sign) => Ok(builder.push(ir::Instruction::Divide(operands, sign))),
                         None => Err(CompilerError::during_lower("Cannot divide non-integer")),
                     }
                 }
                 resolved::BinaryOperator::Modulus => {
                     match binary_operation.left.resolved_type.sign() {
-                        Some(IntegerSign::Signed) => {
-                            Ok(builder.push(ir::Instruction::ModulusSigned(operands)))
-                        }
-                        Some(IntegerSign::Unsigned) => {
-                            Ok(builder.push(ir::Instruction::ModulusUnsigned(operands)))
-                        }
+                        Some(sign) => Ok(builder.push(ir::Instruction::Modulus(operands, sign))),
                         None => Err(CompilerError::during_lower("Cannot modulo non-integer")),
                     }
                 }
-                _ => todo!(),
+                resolved::BinaryOperator::Equals => {
+                    Ok(builder.push(ir::Instruction::Equals(operands)))
+                }
+                resolved::BinaryOperator::NotEquals => {
+                    Ok(builder.push(ir::Instruction::NotEquals(operands)))
+                }
+                resolved::BinaryOperator::LessThan => {
+                    match binary_operation.left.resolved_type.sign() {
+                        Some(sign) => Ok(builder.push(ir::Instruction::LessThan(operands, sign))),
+                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
+                    }
+                }
+                resolved::BinaryOperator::LessThanEq => {
+                    match binary_operation.left.resolved_type.sign() {
+                        Some(sign) => Ok(builder.push(ir::Instruction::LessThanEq(operands, sign))),
+                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
+                    }
+                }
+                resolved::BinaryOperator::GreaterThan => {
+                    match binary_operation.left.resolved_type.sign() {
+                        Some(sign) => {
+                            Ok(builder.push(ir::Instruction::GreaterThan(operands, sign)))
+                        }
+                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
+                    }
+                }
+                resolved::BinaryOperator::GreaterThanEq => {
+                    match binary_operation.left.resolved_type.sign() {
+                        Some(sign) => {
+                            Ok(builder.push(ir::Instruction::GreaterThanEq(operands, sign)))
+                        }
+                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
+                    }
+                }
             }
         }
     }

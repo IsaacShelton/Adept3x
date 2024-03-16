@@ -3,9 +3,16 @@
 func printf(format ptr<u8>, ...) i32
 
 func main {
-    a := 8
-    b := 13
+    test(8, 13)
+    test(42, 42)
+}
 
-    // printf(c"%lld < %lld = %lld\n", a, b, a < b)
+func test(a int, b int) {
+    printf(c"%lld == %lld = %lld\n", a, b, a == b)
+    printf(c"%lld != %lld = %lld\n", a, b, a != b)
+    printf(c"%lld < %lld = %lld\n", a, b, a < b)
+    printf(c"%lld <= %lld = %lld\n", a, b, a <= b)
+    printf(c"%lld > %lld = %lld\n", a, b, a > b)
+    printf(c"%lld >= %lld = %lld\n", a, b, a >= b)
 }
 

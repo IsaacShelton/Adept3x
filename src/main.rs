@@ -70,11 +70,7 @@ fn build_project(build_command: BuildCommand) {
 
     let content = source_file_cache.get(key).content();
 
-    /*
-    for token in Lexer::new(reader.chars().map(|c| c.expect("valid utf8"))) {
-        println!("{:?}", token);
-    }
-    */
+    // println!("{:?}", Lexer::new(content.chars()).collect::<Vec<_>>());
 
     let ast = match parse(Lexer::new(content.chars()), &source_file_cache, key) {
         Ok(ast) => ast,

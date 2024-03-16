@@ -46,6 +46,14 @@ pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
 }
 
+pub use crate::resolved::IntegerSign;
+
+#[derive(Clone, Debug)]
+pub enum FloatOrSign {
+    Integer(IntegerSign),
+    Float,
+}
+
 #[derive(Clone, Debug)]
 pub enum Instruction {
     Return(Option<Value>),
@@ -58,10 +66,14 @@ pub enum Instruction {
     Add(BinaryOperands),
     Subtract(BinaryOperands),
     Multiply(BinaryOperands),
-    DivideSigned(BinaryOperands),
-    DivideUnsigned(BinaryOperands),
-    ModulusSigned(BinaryOperands),
-    ModulusUnsigned(BinaryOperands),
+    Divide(BinaryOperands, IntegerSign),
+    Modulus(BinaryOperands, IntegerSign),
+    Equals(BinaryOperands),
+    NotEquals(BinaryOperands),
+    LessThan(BinaryOperands, IntegerSign),
+    LessThanEq(BinaryOperands, IntegerSign),
+    GreaterThan(BinaryOperands, IntegerSign),
+    GreaterThanEq(BinaryOperands, IntegerSign),
 }
 
 #[derive(Clone, Debug)]
@@ -215,20 +227,24 @@ impl BasicBlocks {
 impl Instruction {
     pub fn is_terminating(&self) -> bool {
         match self {
-            Instruction::Return(_) => true,
-            Instruction::Call(_) => false,
-            Instruction::Alloca(_) => false,
-            Instruction::Store(_) => false,
-            Instruction::Load(_) => false,
-            Instruction::Parameter(_) => false,
-            Instruction::GlobalVariable(_) => false,
-            Instruction::Add(_) => false,
-            Instruction::Subtract(_) => false,
-            Instruction::Multiply(_) => false,
-            Instruction::DivideSigned(_) => false,
-            Instruction::DivideUnsigned(_) => false,
-            Instruction::ModulusSigned(_) => false,
-            Instruction::ModulusUnsigned(_) => false,
+            Instruction::Return(..) => true,
+            Instruction::Call(..) => false,
+            Instruction::Alloca(..) => false,
+            Instruction::Store(..) => false,
+            Instruction::Load(..) => false,
+            Instruction::Parameter(..) => false,
+            Instruction::GlobalVariable(..) => false,
+            Instruction::Add(..) => false,
+            Instruction::Subtract(..) => false,
+            Instruction::Multiply(..) => false,
+            Instruction::Divide(..) => false,
+            Instruction::Modulus(..) => false,
+            Instruction::Equals(..) => false,
+            Instruction::NotEquals(..) => false,
+            Instruction::LessThan(..) => false,
+            Instruction::LessThanEq(..) => false,
+            Instruction::GreaterThan(..) => false,
+            Instruction::GreaterThanEq(..) => false,
         }
     }
 }

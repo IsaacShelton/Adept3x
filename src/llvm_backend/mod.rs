@@ -17,20 +17,22 @@ use crate::{
 };
 use colored::Colorize;
 use cstr::cstr;
+use ir::IntegerSign;
+use llvm_sys::LLVMIntPredicate::*;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
         LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
-        LLVMArrayType2, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2,
-        LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub,
-        LLVMBuildUDiv, LLVMBuildURem, LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString,
-        LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule, LLVMDoubleType,
-        LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalContext,
-        LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
-        LLVMModuleCreateWithName, LLVMPointerType, LLVMPositionBuilderAtEnd,
-        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
-        LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
-        LLVMStructType, LLVMVoidType,
+        LLVMArrayType2, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildICmp,
+        LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore,
+        LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMConstGEP2, LLVMConstInt, LLVMConstReal,
+        LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
+        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName,
+        LLVMGetGlobalContext, LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type,
+        LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType,
+        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
+        LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage,
+        LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -43,7 +45,7 @@ use llvm_sys::{
         LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode, LLVMTarget,
         LLVMTargetMachineRef, LLVMTargetRef,
     },
-    LLVMAttributeFunctionIndex, LLVMCallConv, LLVMLinkage, LLVMModule,
+    LLVMAttributeFunctionIndex, LLVMCallConv, LLVMIntPredicate, LLVMLinkage, LLVMModule,
 };
 use slotmap::SlotMap;
 use std::{
@@ -344,45 +346,111 @@ unsafe fn create_function_block(
 
                 Some(LLVMBuildMul(builder.get(), left, right, cstr!("").as_ptr()))
             }
-            Instruction::DivideSigned(operands) => {
+            Instruction::Divide(operands, sign) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                Some(LLVMBuildSDiv(
+                Some(match sign {
+                    IntegerSign::Signed => {
+                        LLVMBuildSDiv(builder.get(), left, right, cstr!("").as_ptr())
+                    }
+                    IntegerSign::Unsigned => {
+                        LLVMBuildUDiv(builder.get(), left, right, cstr!("").as_ptr())
+                    }
+                })
+            }
+            Instruction::Modulus(operands, sign) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(match sign {
+                    IntegerSign::Signed => {
+                        LLVMBuildSRem(builder.get(), left, right, cstr!("").as_ptr())
+                    }
+                    IntegerSign::Unsigned => {
+                        LLVMBuildURem(builder.get(), left, right, cstr!("").as_ptr())
+                    }
+                })
+            }
+            Instruction::Equals(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildICmp(
                     builder.get(),
+                    LLVMIntEQ,
                     left,
                     right,
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::DivideUnsigned(operands) => {
+            Instruction::NotEquals(operands) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                Some(LLVMBuildUDiv(
+                Some(LLVMBuildICmp(
                     builder.get(),
+                    LLVMIntNE,
                     left,
                     right,
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::ModulusSigned(operands) => {
+            Instruction::LessThan(operands, sign) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                Some(LLVMBuildSRem(
+                Some(LLVMBuildICmp(
                     builder.get(),
+                    match sign {
+                        IntegerSign::Signed => LLVMIntSLT,
+                        IntegerSign::Unsigned => LLVMIntULT,
+                    },
                     left,
                     right,
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::ModulusUnsigned(operands) => {
+            Instruction::LessThanEq(operands, sign) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                Some(LLVMBuildURem(
+                Some(LLVMBuildICmp(
                     builder.get(),
+                    match sign {
+                        IntegerSign::Signed => LLVMIntSLE,
+                        IntegerSign::Unsigned => LLVMIntULE,
+                    },
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::GreaterThan(operands, sign) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildICmp(
+                    builder.get(),
+                    match sign {
+                        IntegerSign::Signed => LLVMIntSGT,
+                        IntegerSign::Unsigned => LLVMIntUGT,
+                    },
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::GreaterThanEq(operands, sign) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildICmp(
+                    builder.get(),
+                    match sign {
+                        IntegerSign::Signed => LLVMIntSGE,
+                        IntegerSign::Unsigned => LLVMIntUGE,
+                    },
                     left,
                     right,
                     cstr!("").as_ptr(),
