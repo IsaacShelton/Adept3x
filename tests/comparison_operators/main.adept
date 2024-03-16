@@ -5,5 +5,7 @@ func printf(format ptr<u8>, ...) i32
 func main {
     a := 8
     b := 13
+
+    // printf(c"%lld < %lld = %lld\n", a, b, a < b)
 }
 

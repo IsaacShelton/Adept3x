@@ -533,6 +533,7 @@ where
                         bits: Normal,
                         sign: Unsigned,
                     }),
+                    "bool" => Ok(Type::Boolean),
                     "i8" => Ok(Type::Integer {
                         bits: Bits8,
                         sign: Signed,

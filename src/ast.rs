@@ -127,6 +127,7 @@ pub enum IntegerSign {
 
 #[derive(Clone, Debug)]
 pub enum Type {
+    Boolean,
     Integer {
         bits: IntegerBits,
         sign: IntegerSign,

@@ -661,6 +661,7 @@ fn resolve_expression(
 
 fn resolve_type(ast_type: &ast::Type) -> Result<resolved::Type, ResolveError> {
     match ast_type {
+        ast::Type::Boolean => Ok(resolved::Type::Boolean),
         ast::Type::Integer { bits, sign } => Ok(resolved::Type::Integer {
             bits: bits.clone(),
             sign: sign.clone(),

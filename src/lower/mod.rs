@@ -135,6 +135,7 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
     use resolved::{IntegerBits as Bits, IntegerSign as Sign};
 
     match resolved_type {
+        resolved::Type::Boolean => Ok(ir::Type::Boolean),
         resolved::Type::Integer { bits, sign } => Ok(match (bits, sign) {
             (Bits::Normal, Sign::Signed) => ir::Type::S64,
             (Bits::Normal, Sign::Unsigned) => ir::Type::U64,

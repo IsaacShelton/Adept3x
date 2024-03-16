@@ -81,6 +81,7 @@ pub use crate::ast::{IntegerBits, IntegerSign};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
+    Boolean,
     Integer {
         bits: IntegerBits,
         sign: IntegerSign,
@@ -93,6 +94,7 @@ pub enum Type {
 impl Type {
     pub fn sign(&self) -> Option<IntegerSign> {
         match self {
+            Type::Boolean => None,
             Type::Integer { bits, sign } => Some(sign.clone()),
             Type::IntegerLiteral(value) => Some(IntegerSign::Unsigned),
             Type::Pointer(_) => None,
@@ -104,26 +106,28 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Type::Boolean => {
+                write!(f, "bool")?;
+            }
             Type::Integer { bits, sign } => {
                 f.write_str(match (bits, sign) {
                     (IntegerBits::Normal, IntegerSign::Signed) => "int",
                     (IntegerBits::Normal, IntegerSign::Unsigned) => "uint",
-                    (IntegerBits::Bits8, IntegerSign::Signed) => "int8",
-                    (IntegerBits::Bits8, IntegerSign::Unsigned) => "uint8",
-                    (IntegerBits::Bits16, IntegerSign::Signed) => "int16",
-                    (IntegerBits::Bits16, IntegerSign::Unsigned) => "uint16",
-                    (IntegerBits::Bits32, IntegerSign::Signed) => "int32",
-                    (IntegerBits::Bits32, IntegerSign::Unsigned) => "uint32",
-                    (IntegerBits::Bits64, IntegerSign::Signed) => "int64",
-                    (IntegerBits::Bits64, IntegerSign::Unsigned) => "uint64",
+                    (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
+                    (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
+                    (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
+                    (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
+                    (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
+                    (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
+                    (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
+                    (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
                 })?;
             }
             Type::IntegerLiteral(value) => {
                 write!(f, "literal integer {}", value)?;
             }
             Type::Pointer(inner) => {
-                f.write_str("ptr:")?;
-                write!(f, "{}", inner)?;
+                write!(f, "ptr<{}>", inner)?;
             }
             Type::Void => f.write_str("void")?,
         }
