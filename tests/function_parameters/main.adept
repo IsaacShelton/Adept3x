@@ -1,19 +1,21 @@
 
 #[foreign]
-func printf(format ptr<uint8>, ...) int32
+func printf(format ptr<u8>, ...) i32
 
 func main {
     greet(c"John")
     showNumber(getNumber())
 }
 
-func greet(name ptr<uint8>) {
+func greet(name ptr<u8>) {
     printf(c"Hello, %s!\n", name)
 }
 
 func getNumber() int {
     return 1234
 }
+
+struct Person (name String, age int)
 
 func showNumber(number int) {
     printf(c"Your number is %lld\n", number)

@@ -1,5 +1,9 @@
 
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
 func main {
-    
+    a := 8
+    b := 13
 }
 

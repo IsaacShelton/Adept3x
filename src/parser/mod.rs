@@ -533,35 +533,35 @@ where
                         bits: Normal,
                         sign: Unsigned,
                     }),
-                    "int8" => Ok(Type::Integer {
+                    "i8" => Ok(Type::Integer {
                         bits: Bits8,
                         sign: Signed,
                     }),
-                    "uint8" => Ok(Type::Integer {
+                    "u8" => Ok(Type::Integer {
                         bits: Bits8,
                         sign: Unsigned,
                     }),
-                    "int16" => Ok(Type::Integer {
+                    "i16" => Ok(Type::Integer {
                         bits: Bits16,
                         sign: Signed,
                     }),
-                    "uint16" => Ok(Type::Integer {
+                    "u16" => Ok(Type::Integer {
                         bits: Bits16,
                         sign: Unsigned,
                     }),
-                    "int32" => Ok(Type::Integer {
+                    "i32" => Ok(Type::Integer {
                         bits: Bits32,
                         sign: Signed,
                     }),
-                    "uint32" => Ok(Type::Integer {
+                    "u32" => Ok(Type::Integer {
                         bits: Bits32,
                         sign: Unsigned,
                     }),
-                    "int64" => Ok(Type::Integer {
+                    "i64" => Ok(Type::Integer {
                         bits: Bits64,
                         sign: Signed,
                     }),
-                    "uint64" => Ok(Type::Integer {
+                    "u64" => Ok(Type::Integer {
                         bits: Bits64,
                         sign: Unsigned,
                     }),
