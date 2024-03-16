@@ -644,16 +644,10 @@ fn resolve_expression(
                 let maybe_unified_type = match (&left.resolved_type, &right.resolved_type) {
                     (resolved::Type::IntegerLiteral(_), resolved::Type::IntegerLiteral(_)) => {
                         // TODO: We can be smarter than this
-                        let unified_type = resolved::Type::Integer {
-                            bits: resolved::IntegerBits::Bits64,
+                        Some(resolved::Type::Integer {
+                            bits: resolved::IntegerBits::Normal,
                             sign: resolved::IntegerSign::Signed,
-                        };
-
-                        left = conform_expression(&left, &unified_type)
-                            .expect("conform left side of binary operator");
-                        right = conform_expression(&right, &unified_type)
-                            .expect("conform left side of binary operator");
-                        Some(unified_type)
+                        })
                     }
                     (a @ resolved::Type::Integer { .. }, resolved::Type::IntegerLiteral(_)) => {
                         Some(a.clone())
