@@ -1,9 +1,6 @@
-use crate::{
-    ast::Source, error::CompilerError, resolved, source_file_cache::{self, SourceFileCache}
-};
-use std::collections::HashMap;
-
 use super::error::{ResolveError, ResolveErrorKind};
+use crate::{ast::Source, resolved, source_file_cache::SourceFileCache};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FunctionSearchContext<'a> {
@@ -28,7 +25,12 @@ impl<'a> FunctionSearchContext<'a> {
         match self.find_function(name) {
             Some(function) => Ok(function),
             None => Err(ResolveError {
-                filename: Some(self.source_file_cache.get(source.key).filename().to_string()),
+                filename: Some(
+                    self.source_file_cache
+                        .get(source.key)
+                        .filename()
+                        .to_string(),
+                ),
                 location: Some(source.location),
                 kind: ResolveErrorKind::FailedToFindFunction {
                     name: name.to_string(),

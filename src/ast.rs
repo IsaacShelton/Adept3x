@@ -3,7 +3,7 @@ use std::{collections::HashMap, ffi::CString, fmt::Debug};
 
 use crate::{
     line_column::Location,
-    source_file_cache::{self, SourceFileCache, SourceFileCacheKey},
+    source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
 
 #[derive(Copy, Clone, Debug)]

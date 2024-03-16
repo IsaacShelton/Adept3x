@@ -22,40 +22,33 @@ use llvm_sys::LLVMIntPredicate::*;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock,
-        LLVMArrayType2, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildICmp,
-        LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore,
-        LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMConstGEP2, LLVMConstInt, LLVMConstReal,
-        LLVMConstString, LLVMCreateEnumAttribute, LLVMDisposeMessage, LLVMDisposeModule,
-        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetEnumAttributeKindForName,
-        LLVMGetGlobalContext, LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type,
-        LLVMInt64Type, LLVMInt8Type, LLVMModuleCreateWithName, LLVMPointerType,
-        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
-        LLVMSetFunctionCallConv, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage,
-        LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
+        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAdd,
+        LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet,
+        LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
+        LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMDisposeMessage,
+        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMInt16Type, LLVMInt1Type,
+        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd,
+        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
+        LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
+        LLVMStructType, LLVMVoidType,
     },
-    prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
+    prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
         LLVMSetModuleDataLayout, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters,
         LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
     },
     target_machine::{
-        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetDataLayout,
-        LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple,
-        LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode, LLVMTarget,
-        LLVMTargetMachineRef, LLVMTargetRef,
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMGetDefaultTargetTriple,
+        LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetRef,
     },
-    LLVMAttributeFunctionIndex, LLVMCallConv, LLVMIntPredicate, LLVMLinkage, LLVMModule,
+    LLVMCallConv, LLVMLinkage,
 };
-use slotmap::SlotMap;
 use std::{
-    error::Error,
     ffi::{c_char, c_double, c_ulonglong, CStr, CString, OsStr},
-    fmt::Display,
     mem::MaybeUninit,
     path::Path,
     process::Command,
-    ptr::{null, null_mut},
+    ptr::null_mut,
 };
 
 pub unsafe fn llvm_backend(
@@ -100,14 +93,15 @@ pub unsafe fn llvm_backend(
 
     let mut llvm_emit_error_message: *mut c_char = null_mut();
 
+    #[allow(unused_variables)]
     let module_representation = CStr::from_ptr(LLVMPrintModuleToString(backend_module.get()));
 
     // println!("{}", module_representation.to_string_lossy());
 
-    let mut output_object_filename =
+    let output_object_filename =
         CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
 
-    if (LLVMVerifyModule(backend_module.get(), LLVMPrintMessageAction, null_mut()) == 1) {
+    if LLVMVerifyModule(backend_module.get(), LLVMPrintMessageAction, null_mut()) == 1 {
         println!(
             "{}",
             "\n---- WARNING: llvm module verification failed! ----".yellow()
@@ -492,7 +486,7 @@ unsafe fn build_binary_operands(
 unsafe fn build_value(
     backend_module: &BackendModule,
     value_catalog: &ValueCatalog,
-    builder: &Builder,
+    _builder: &Builder,
     value: &ir::Value,
 ) -> LLVMValueRef {
     match value {

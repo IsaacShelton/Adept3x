@@ -1,8 +1,7 @@
 use crate::{
-    line_column::Location,
     look_ahead::LookAhead,
     repeating_last::RepeatingLast,
-    source_file_cache::{self, SourceFileCache, SourceFileCacheKey},
+    source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{Token, TokenKind},
 };
 use std::borrow::Borrow;

@@ -1,5 +1,4 @@
 use derive_more::Deref;
-use std::collections::VecDeque;
 
 #[derive(Deref)]
 pub struct RepeatingLast<I>

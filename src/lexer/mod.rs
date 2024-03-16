@@ -12,7 +12,7 @@ use self::{
 use crate::{
     line_column::LineColumn,
     look_ahead::LookAhead,
-    token::{StringModifier, TokenKind, Token},
+    token::{StringModifier, Token, TokenKind},
 };
 use is_character::IsCharacter;
 

@@ -4,13 +4,12 @@ use crate::{ast::Source, source_file_cache::SourceFileCache};
 use num_bigint::BigInt;
 use slotmap::{new_key_type, SlotMap};
 use std::{
-    collections::HashMap,
     ffi::CString,
     fmt::{Debug, Display},
 };
 
-pub use variable_storage::VariableStorage;
 pub use crate::ast::BinaryOperator;
+pub use variable_storage::VariableStorage;
 
 new_key_type! {
     pub struct FunctionRef;
@@ -95,8 +94,8 @@ impl Type {
     pub fn sign(&self) -> Option<IntegerSign> {
         match self {
             Type::Boolean => None,
-            Type::Integer { bits, sign } => Some(sign.clone()),
-            Type::IntegerLiteral(value) => Some(IntegerSign::Unsigned),
+            Type::Integer { sign, ..} => Some(sign.clone()),
+            Type::IntegerLiteral(_) => Some(IntegerSign::Unsigned),
             Type::Pointer(_) => None,
             Type::Void => None,
         }

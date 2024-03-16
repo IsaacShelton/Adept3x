@@ -1,12 +1,8 @@
 use super::{
     builder::Builder, intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
-    value_catalog::ValueCatalog, variable_stack::VariableStack,
 };
 use crate::ir;
-use llvm_sys::{
-    prelude::{LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
-    LLVMModule,
-};
+use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use std::collections::HashMap;
 
 pub struct Phi2Relocation {

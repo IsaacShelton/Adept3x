@@ -4,9 +4,9 @@ mod global_search_context;
 mod variable_search_context;
 
 use crate::{
-    ast::{self, Ast, File, FileIdentifier, Source, Type},
-    resolved::{self, TypedExpression, VariableStorage, VariableStorageKey},
-    source_file_cache::{self, SourceFileCache},
+    ast::{self, Ast, FileIdentifier, Source},
+    resolved::{self, TypedExpression, VariableStorage},
+    source_file_cache::SourceFileCache,
 };
 use function_search_context::FunctionSearchContext;
 use num_bigint::BigInt;
@@ -426,7 +426,7 @@ fn resolve_expression(
     resolved_function_ref: resolved::FunctionRef,
     ast_expression: &ast::Expression,
 ) -> Result<resolved::TypedExpression, ResolveError> {
-    use resolved::{IntegerBits::*, IntegerSign::*, TypedExpression};
+    use resolved::{IntegerBits::*, IntegerSign::*};
 
     let source = ast_expression.source;
 

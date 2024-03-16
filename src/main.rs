@@ -1,4 +1,4 @@
-#![allow(dead_code, unused, unused_mut)]
+#![allow(dead_code)]
 
 mod ast;
 mod cli;
@@ -17,19 +17,15 @@ mod source_file_cache;
 mod token;
 
 use crate::source_file_cache::SourceFileCache;
-use ast::Ast;
 use cli::{BuildCommand, NewCommand};
+use indoc::indoc;
 use lexer::Lexer;
 use llvm_backend::llvm_backend;
 use lower::lower;
 use parser::parse;
 use resolve::resolve;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 use std::process::exit;
-use std::string::ParseError;
-use indoc::indoc;
 
 fn main() {
     let args = match cli::Command::parse_env_args() {
@@ -46,7 +42,6 @@ fn main() {
 fn build_project(build_command: BuildCommand) {
     let source_file_cache = SourceFileCache::new();
     let filename = build_command.filename;
-
 
     let filepath = Path::new(&filename);
 
@@ -109,12 +104,15 @@ fn build_project(build_command: BuildCommand) {
 }
 
 fn new_project(new_command: NewCommand) {
-    if let Err(error) =  std::fs::create_dir(&new_command.project_name) {
-        eprintln!("Failed to create project directory '{}'", &new_command.project_name);
+    if let Err(_) = std::fs::create_dir(&new_command.project_name) {
+        eprintln!(
+            "Failed to create project directory '{}'",
+            &new_command.project_name
+        );
         exit(1);
     }
 
-    let imports = indoc !{r#"
+    let imports = indoc! {r#"
         import std::prelude
     "#};
 
@@ -143,4 +141,3 @@ fn put_file(directory_name: &str, filename: &str, content: &str) {
         exit(1);
     }
 }
-

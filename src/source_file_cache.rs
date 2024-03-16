@@ -1,5 +1,5 @@
 use append_only_vec::AppendOnlyVec;
-use std::{cell::RefCell, fs::read_to_string, pin::Pin};
+use std::fs::read_to_string;
 
 #[derive(Debug)]
 pub struct SourceFileCache {

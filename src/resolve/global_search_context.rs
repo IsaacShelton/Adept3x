@@ -1,9 +1,8 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
     ast::Source,
-    error::CompilerError,
-    resolved::{self, GlobalRef, VariableStorageKey},
-    source_file_cache::{self, SourceFileCache},
+    resolved::{self, GlobalRef},
+    source_file_cache::SourceFileCache,
 };
 use std::collections::HashMap;
 

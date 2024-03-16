@@ -1,6 +1,6 @@
 use llvm_sys::{
     core::{LLVMCreateBuilder, LLVMDisposeBuilder},
-    prelude::{LLVMBuilderRef, LLVMValueRef},
+    prelude::LLVMBuilderRef,
 };
 
 pub struct Builder {

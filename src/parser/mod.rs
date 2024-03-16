@@ -3,22 +3,23 @@ mod error;
 mod input;
 mod make_error;
 
-use self::annotation::{Annotation, AnnotationKind};
-use self::error::{ParseError, ParseErrorKind};
-use self::input::Input;
-use crate::ast::{
-    self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File,
-    FileIdentifier, Function, Global, Parameter, Parameters, Source, Statement, StatementKind,
-    Type,
+use self::{
+    annotation::{Annotation, AnnotationKind},
+    error::{ParseError, ParseErrorKind},
+    input::Input,
 };
-use crate::line_column::Location;
-use crate::look_ahead::LookAhead;
-use crate::source_file_cache::{self, SourceFileCache, SourceFileCacheKey};
-use crate::token::{StringModifier, Token, TokenKind};
+use crate::{
+    ast::{
+        self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File,
+        FileIdentifier, Function, Global, Parameter, Parameters, Source, Statement, StatementKind,
+        Type,
+    },
+    line_column::Location,
+    source_file_cache::{SourceFileCache, SourceFileCacheKey},
+    token::{StringModifier, Token, TokenKind},
+};
 use ast::BinaryOperator;
-use std::borrow::Borrow;
-use std::ffi::CString;
-use std::fmt::Display;
+use std::{borrow::Borrow, ffi::CString};
 
 struct Parser<'a, I>
 where
@@ -340,8 +341,8 @@ where
             let location = operator.location;
             let next_precedence = operator.kind.precedence();
 
-            if (is_terminating_token(&operator.kind)
-                || (next_precedence + is_right_associative(operator) as usize) < precedence)
+            if is_terminating_token(&operator.kind)
+                || (next_precedence + is_right_associative(operator) as usize) < precedence
             {
                 return Ok(lhs);
             }
@@ -580,7 +581,7 @@ where
                             self.parse_token(
                                 TokenKind::GreaterThan,
                                 Some("to close type parameters"),
-                            );
+                            )?;
                             Ok(Type::Pointer(Box::new(inner)))
                         } else {
                             Ok(Type::Pointer(Box::new(Type::Void)))

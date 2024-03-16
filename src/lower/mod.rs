@@ -3,10 +3,9 @@ mod builder;
 use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Global, Literal, Value, ValueReference},
-    resolved::{self, Expression, ExpressionKind, IntegerSign, StatementKind},
+    resolved::{self, Expression, ExpressionKind, StatementKind},
 };
 use builder::Builder;
-use std::ffi::CString;
 
 pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
@@ -49,13 +48,12 @@ fn lower_function(
         let mut builder = Builder::new();
 
         // Allocate parameters
-        let mut parameter_variables = function
+        let parameter_variables = function
             .variables
             .types
             .iter()
-            .enumerate()
             .take(function.variables.num_parameters)
-            .map(|(i, variable_type)| {
+            .map(|variable_type| {
                 Ok(builder.push(ir::Instruction::Alloca(lower_type(variable_type)?)))
             })
             .collect::<Result<Vec<_>, _>>()?;

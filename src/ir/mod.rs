@@ -1,5 +1,4 @@
 use derive_more::{Deref, DerefMut};
-use slotmap::{new_key_type, SlotMap};
 use std::{collections::HashMap, ffi::CString};
 
 pub use crate::resolved::{FunctionRef, GlobalRef};
@@ -189,12 +188,11 @@ impl BasicBlock {
             .unwrap_or(false)
     }
 
-    pub fn push(&mut self, instruction: Instruction) -> Result<(), ()> {
+    pub fn push(&mut self, instruction: Instruction) {
         if self.is_terminated() {
-            Err(())
+            panic!("Cannot push instruction onto basicblock when basicblock is already terminated");
         } else {
             self.instructions.push(instruction);
-            Ok(())
         }
     }
 

@@ -1,6 +1,5 @@
-use llvm_sys::prelude::LLVMValueRef;
-
 use crate::ir::ValueReference;
+use llvm_sys::prelude::LLVMValueRef;
 
 #[derive(Clone, Debug)]
 pub struct ValueCatalog {

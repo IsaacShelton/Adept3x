@@ -1,5 +1,5 @@
 use colored::Colorize;
-use std::{error::Error, fmt::Display, path::Path};
+use std::{error::Error, fmt::Display};
 
 #[derive(Copy, Clone, Debug)]
 pub enum CompilerErrorKind {
