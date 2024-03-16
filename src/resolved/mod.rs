@@ -94,7 +94,7 @@ impl Type {
     pub fn sign(&self) -> Option<IntegerSign> {
         match self {
             Type::Boolean => None,
-            Type::Integer { sign, ..} => Some(sign.clone()),
+            Type::Integer { sign, ..} => Some(*sign),
             Type::IntegerLiteral(_) => Some(IntegerSign::Unsigned),
             Type::Pointer(_) => None,
             Type::Void => None,
@@ -123,7 +123,7 @@ impl Display for Type {
                 })?;
             }
             Type::IntegerLiteral(value) => {
-                write!(f, "literal integer {}", value)?;
+                write!(f, "integer {}", value)?;
             }
             Type::Pointer(inner) => {
                 write!(f, "ptr<{}>", inner)?;

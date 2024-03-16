@@ -110,16 +110,28 @@ pub struct Parameter {
     pub ast_type: Type,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IntegerBits {
-    Normal,
     Bits8,
     Bits16,
     Bits32,
     Bits64,
+    Normal,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+impl IntegerBits {
+    pub fn successor(&self) -> Option<IntegerBits> {
+        match self {
+            Self::Normal => Some(Self::Normal),
+            Self::Bits8 => Some(Self::Bits16),
+            Self::Bits16 => Some(Self::Bits32),
+            Self::Bits32 => Some(Self::Bits64),
+            Self::Bits64 => None,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IntegerSign {
     Signed,
     Unsigned,

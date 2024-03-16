@@ -256,8 +256,23 @@ fn conform_expression(
     // Integer Literal to Integer Type Conversion
     match &expression.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
-            if let Some(conformed) = conform_integer(value, expression.expression.source, to_type) {
+            // Integer literals -> Integer
+            if let Some(conformed) =
+                conform_integer_literal(value, expression.expression.source, to_type)
+            {
                 return Some(conformed);
+            }
+        }
+        resolved::Type::Integer { .. } => {
+            // Integer -> Integer
+            match to_type {
+                resolved::Type::Integer {
+                    bits: _new_bits,
+                    sign: _new_sign,
+                } => {
+                    todo!();
+                }
+                _ => (),
             }
         }
         _ => (),
@@ -307,7 +322,7 @@ fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExp
     ];
 
     for possible_type in possible_types.iter() {
-        if let Some(conformed) = conform_integer(value, source, possible_type) {
+        if let Some(conformed) = conform_integer_literal(value, source, possible_type) {
             return Some(conformed);
         }
     }
@@ -315,7 +330,7 @@ fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExp
     return None;
 }
 
-fn conform_integer(
+fn conform_integer_literal(
     value: &BigInt,
     source: Source,
     to_type: &resolved::Type,
@@ -327,14 +342,14 @@ fn conform_integer(
             let make_integer = |integer_literal_bits| {
                 Some(TypedExpression::new(
                     resolved::Type::Integer {
-                        bits: bits.clone(),
-                        sign: sign.clone(),
+                        bits: *bits,
+                        sign: *sign,
                     },
                     resolved::Expression::new(
                         resolved::ExpressionKind::Integer {
                             value: value.clone(),
                             bits: integer_literal_bits,
-                            sign: sign.clone(),
+                            sign: *sign,
                         },
                         source,
                     ),
@@ -606,7 +621,7 @@ fn resolve_expression(
             ))
         }
         ast::ExpressionKind::BinaryOperation(binary_operation) => {
-            let left = resolve_expression(
+            let mut left = resolve_expression(
                 resolved_ast,
                 function_search_context,
                 global_search_context,
@@ -615,7 +630,7 @@ fn resolve_expression(
                 &binary_operation.left,
             )?;
 
-            let right = resolve_expression(
+            let mut right = resolve_expression(
                 resolved_ast,
                 function_search_context,
                 global_search_context,
@@ -625,27 +640,76 @@ fn resolve_expression(
             )?;
 
             // TODO: Properly conform left and right types
-            if left.resolved_type != right.resolved_type {
-                return Err(ResolveError {
-                    filename: Some(
-                        resolved_ast
-                            .source_file_cache
-                            .get(source.key)
-                            .filename()
-                            .to_string(),
-                    ),
-                    location: Some(source.location),
-                    kind: ResolveErrorKind::BinaryOperatorMismatch {
-                        left: left.resolved_type.to_string(),
-                        right: right.resolved_type.to_string(),
-                    },
-                });
-            }
+            let unified_type = if left.resolved_type != right.resolved_type {
+                let maybe_unified_type = match (&left.resolved_type, &right.resolved_type) {
+                    (resolved::Type::IntegerLiteral(_), resolved::Type::IntegerLiteral(_)) => {
+                        // TODO: We can be smarter than this
+                        let unified_type = resolved::Type::Integer {
+                            bits: resolved::IntegerBits::Bits64,
+                            sign: resolved::IntegerSign::Signed,
+                        };
+
+                        left = conform_expression(&left, &unified_type)
+                            .expect("conform left side of binary operator");
+                        right = conform_expression(&right, &unified_type)
+                            .expect("conform left side of binary operator");
+                        Some(unified_type)
+                    }
+                    (a @ resolved::Type::Integer { .. }, resolved::Type::IntegerLiteral(_)) => {
+                        Some(a.clone())
+                    }
+                    (resolved::Type::IntegerLiteral(_), b @ resolved::Type::Integer { .. }) => {
+                        Some(b.clone())
+                    }
+                    (
+                        resolved::Type::Integer {
+                            bits: a_bits,
+                            sign: a_sign,
+                        },
+                        resolved::Type::Integer {
+                            bits: b_bits,
+                            sign: b_sign,
+                        },
+                    ) if a_sign == b_sign => Some(resolved::Type::Integer {
+                        bits: (*a_bits).max(*b_bits),
+                        sign: *a_sign,
+                    }),
+                    _ => None,
+                };
+
+                match maybe_unified_type {
+                    Some(unified_type) => {
+                        left = conform_expression(&left, &unified_type)
+                            .expect("conform left side of binary operator");
+                        right = conform_expression(&right, &unified_type)
+                            .expect("conform left side of binary operator");
+                        unified_type
+                    }
+                    None => {
+                        return Err(ResolveError {
+                            filename: Some(
+                                resolved_ast
+                                    .source_file_cache
+                                    .get(source.key)
+                                    .filename()
+                                    .to_string(),
+                            ),
+                            location: Some(source.location),
+                            kind: ResolveErrorKind::BinaryOperatorMismatch {
+                                left: left.resolved_type.to_string(),
+                                right: right.resolved_type.to_string(),
+                            },
+                        })
+                    }
+                }
+            } else {
+                left.resolved_type.clone()
+            };
 
             let result_type = if binary_operation.operator.returns_boolean() {
                 resolved::Type::Boolean
             } else {
-                left.resolved_type.clone()
+                unified_type
             };
 
             Ok(TypedExpression::new(
@@ -669,8 +733,8 @@ fn resolve_type(ast_type: &ast::Type) -> Result<resolved::Type, ResolveError> {
     match ast_type {
         ast::Type::Boolean => Ok(resolved::Type::Boolean),
         ast::Type::Integer { bits, sign } => Ok(resolved::Type::Integer {
-            bits: bits.clone(),
-            sign: sign.clone(),
+            bits: *bits,
+            sign: *sign,
         }),
         ast::Type::Pointer(inner) => Ok(resolved::Type::Pointer(Box::new(resolve_type(inner)?))),
         ast::Type::Void => Ok(resolved::Type::Void),

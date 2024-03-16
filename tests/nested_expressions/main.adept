@@ -1,0 +1,8 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    printf(c"Result is %lld\n", (1 + 2) * (3 + 4))
+}
+

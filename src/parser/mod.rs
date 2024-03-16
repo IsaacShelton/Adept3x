@@ -372,45 +372,40 @@ where
     }
 
     fn parse_expression_primary_base(&mut self) -> Result<Expression, ParseError> {
-        match self.input.advance() {
-            Token {
-                kind: TokenKind::Integer { value },
-                location,
-            } => Ok(Expression::new(
+        let Token { kind, location } = self.input.advance();
+
+        match kind {
+            TokenKind::Integer { value } => Ok(Expression::new(
                 ExpressionKind::Integer(value),
                 self.source(location),
             )),
-            Token {
-                kind:
-                    TokenKind::String {
-                        value,
-                        modifier: StringModifier::NullTerminated,
-                    },
-                location,
+            TokenKind::String {
+                value,
+                modifier: StringModifier::NullTerminated,
             } => Ok(Expression::new(
                 ExpressionKind::NullTerminatedString(
                     CString::new(value).expect("valid null-terminated string"),
                 ),
                 self.source(location),
             )),
-            Token {
-                kind: TokenKind::Identifier(identifier),
-                location,
-            } => {
-                if self.input.peek_is(TokenKind::OpenParen) {
-                    self.parse_call(identifier, self.source(location))
-                } else if self.input.peek_is(TokenKind::DeclareAssign) {
-                    self.parse_declare_assign(identifier, self.source(location))
-                } else {
-                    Ok(Expression::new(
-                        ExpressionKind::Variable(identifier),
-                        self.source(location),
-                    ))
-                }
+            TokenKind::OpenParen => {
+                let inner = self.parse_expression()?;
+                self.parse_token(TokenKind::CloseParen, Some("to close nested expression"))?;
+                Ok(inner)
             }
+            TokenKind::Identifier(identifier) => match self.input.peek().kind {
+                TokenKind::OpenParen => self.parse_call(identifier, self.source(location)),
+                TokenKind::DeclareAssign => {
+                    self.parse_declare_assign(identifier, self.source(location))
+                }
+                _ => Ok(Expression::new(
+                    ExpressionKind::Variable(identifier),
+                    self.source(location),
+                )),
+            },
             unexpected => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),
-                location: Some(unexpected.location),
+                location: Some(location),
                 kind: ParseErrorKind::UnexpectedToken {
                     unexpected: unexpected.to_string(),
                 },
