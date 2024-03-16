@@ -642,8 +642,14 @@ fn resolve_expression(
                 });
             }
 
+            let result_type = if binary_operation.operator.returns_boolean() {
+                resolved::Type::Boolean
+            } else {
+                left.resolved_type.clone()
+            };
+
             Ok(TypedExpression::new(
-                left.resolved_type.clone(),
+                result_type,
                 resolved::Expression::new(
                     resolved::ExpressionKind::BinaryOperation(Box::new(
                         resolved::BinaryOperation {

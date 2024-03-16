@@ -198,6 +198,24 @@ pub enum BinaryOperator {
     GreaterThanEq,
 }
 
+impl BinaryOperator {
+    pub fn returns_boolean(&self) -> bool {
+        match self {
+            BinaryOperator::Add => false,
+            BinaryOperator::Subtract => false,
+            BinaryOperator::Multiply => false,
+            BinaryOperator::Divide => false,
+            BinaryOperator::Modulus => false,
+            BinaryOperator::Equals => true,
+            BinaryOperator::NotEquals => true,
+            BinaryOperator::LessThan => true,
+            BinaryOperator::LessThanEq => true,
+            BinaryOperator::GreaterThan => true,
+            BinaryOperator::GreaterThanEq => true,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Call {
     pub function_name: String,
