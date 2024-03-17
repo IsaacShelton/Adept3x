@@ -300,7 +300,7 @@ where
 
         match self.input.peek().kind {
             TokenKind::Identifier(_) => {
-                if TokenKind::OpenParen == self.input.peek_nth(1).kind {
+                if let TokenKind::OpenParen | TokenKind::DeclareAssign = self.input.peek_nth(1).kind {
                     Ok(Statement::new(
                         StatementKind::Expression(self.parse_expression()?),
                         self.source(location),
