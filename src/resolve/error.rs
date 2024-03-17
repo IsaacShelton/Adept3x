@@ -21,6 +21,7 @@ pub enum ResolveErrorKind {
     BinaryOperatorMismatch { left: String, right: String },
     CannotBinaryOperator { left: String, right: String },
     TypeMismatch { left: String, right: String },
+    CannotAssignValueOfType { from: String, to: String },
     CannotMutate,
     Other { message: String },
 }
@@ -93,6 +94,9 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::TypeMismatch { left, right } => {
                 write!(f, "Mismatching types '{}' and '{}'", left, right)?;
+            }
+            ResolveErrorKind::CannotAssignValueOfType { from, to } => {
+                write!(f, "Cannot assign value of type '{}' to '{}'", from, to)?;
             }
             ResolveErrorKind::CannotMutate => {
                 write!(f, "Cannot mutate value")?;

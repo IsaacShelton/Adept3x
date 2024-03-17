@@ -1,3 +1,4 @@
+use num_traits::Zero;
 mod variable_storage;
 
 use crate::{ast::Source, source_file_cache::SourceFileCache};
@@ -95,7 +96,11 @@ impl Type {
         match self {
             Type::Boolean => None,
             Type::Integer { sign, .. } => Some(*sign),
-            Type::IntegerLiteral(_) => Some(IntegerSign::Unsigned),
+            Type::IntegerLiteral(value) => Some(if value >= &BigInt::zero() {
+                IntegerSign::Unsigned
+            } else {
+                IntegerSign::Signed
+            }),
             Type::Pointer(_) => None,
             Type::Void => None,
         }
@@ -216,6 +221,7 @@ pub enum ExpressionKind {
     Call(Call),
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
+    IntegerExtend(Box<Expression>, Type),
 }
 
 #[derive(Clone, Debug)]

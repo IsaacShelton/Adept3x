@@ -13,6 +13,8 @@ compile c_printf
 compile comparison_operators
 compile function_parameters
 compile function_simple
+compile integer_literal_conforming
+compile integer_value_conforming
 compile math_simple
 compile return
 compile return_message

@@ -409,5 +409,19 @@ fn lower_expression(
                 }
             }
         }
+        ExpressionKind::IntegerExtend(value, resolved_type) => {
+            let value = lower_expression(builder, ir_module, value)?;
+            let ir_type = lower_type(resolved_type)?;
+
+            Ok(builder.push(
+                match resolved_type
+                    .sign()
+                    .expect("integer extend result type to be an integer type")
+                {
+                    resolved::IntegerSign::Signed => ir::Instruction::SignExtend(value, ir_type),
+                    resolved::IntegerSign::Unsigned => ir::Instruction::ZeroExtend(value, ir_type),
+                },
+            ))
+        }
     }
 }

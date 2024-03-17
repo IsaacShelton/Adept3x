@@ -348,14 +348,12 @@ where
     }
 
     fn parse_assignment(&mut self, destination: Expression) -> Result<Statement, ParseError> {
-        let source = destination.source;
-        self.parse_token(TokenKind::Assign, Some("for assignment"))?;
-
+        let location = self.parse_token(TokenKind::Assign, Some("for assignment"))?;
         let value = self.parse_expression()?;
 
         Ok(Statement::new(
             StatementKind::Assignment(Assignment { destination, value }),
-            source,
+            self.source(location),
         ))
     }
 

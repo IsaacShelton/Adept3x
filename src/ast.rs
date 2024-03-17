@@ -110,7 +110,7 @@ pub struct Parameter {
     pub ast_type: Type,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
 pub enum IntegerBits {
     Bits8,
     Bits16,
@@ -128,6 +128,22 @@ impl IntegerBits {
             Self::Bits32 => Some(Self::Bits64),
             Self::Bits64 => None,
         }
+    }
+
+    pub fn bits(&self) -> u8 {
+        match self {
+            IntegerBits::Bits8 => 8,
+            IntegerBits::Bits16 => 16,
+            IntegerBits::Bits32 => 32,
+            IntegerBits::Bits64 => 64,
+            IntegerBits::Normal => 64,
+        }
+    }
+}
+
+impl PartialOrd for IntegerBits {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.bits().partial_cmp(&other.bits())
     }
 }
 

@@ -1,0 +1,50 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    printf(c"Signed: ---------------------\n")
+
+    value i8 = 0
+    value = value + 1
+    printf(c"value = %hhd\n", value)
+
+    value i16 = 0
+    value = value + 1
+    printf(c"value = %hd\n", value)
+
+    value i32 = 0
+    value = value + 1
+    printf(c"value = %d\n", value)
+
+    value i64 = 0
+    value = value + 1
+    printf(c"value = %lld\n", value)
+
+    value int = 0
+    value = value + 1
+    printf(c"value = %lld\n", value)
+
+    printf(c"Unsigned: -------------------\n")
+
+    value u8 = 0
+    value = value + 1
+    printf(c"value = %hhu\n", value)
+
+    value u16 = 0
+    value = value + 1
+    printf(c"value = %hu\n", value)
+
+    value u32 = 0
+    value = value + 1
+    printf(c"value = %u\n", value)
+
+    value u64 = 0
+    value = value + 1
+    printf(c"value = %llu\n", value)
+
+    value uint = 0
+    value = value + 1
+    printf(c"value = %llu\n", value)
+}
+

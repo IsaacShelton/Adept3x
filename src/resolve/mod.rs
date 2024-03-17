@@ -8,6 +8,7 @@ use crate::{
     resolved::{self, Destination, TypedExpression, VariableStorage},
     source_file_cache::SourceFileCache,
 };
+use ast::{IntegerBits, IntegerSign};
 use function_search_context::FunctionSearchContext;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
@@ -278,9 +279,9 @@ fn resolve_statement(
                                 .to_string(),
                         ),
                         location: Some(source.location),
-                        kind: ResolveErrorKind::TypeMismatch {
-                            left: resolved_type.to_string(),
-                            right: value.resolved_type.to_string(),
+                        kind: ResolveErrorKind::CannotAssignValueOfType {
+                            from: value.resolved_type.to_string(),
+                            to: resolved_type.to_string(),
                         },
                     }),
                 })
@@ -347,9 +348,9 @@ fn resolve_statement(
                             .to_string(),
                     ),
                     location: Some(source.location),
-                    kind: ResolveErrorKind::TypeMismatch {
-                        left: destination.resolved_type.to_string(),
-                        right: value.resolved_type.to_string(),
+                    kind: ResolveErrorKind::CannotAssignValueOfType {
+                        from: value.resolved_type.to_string(),
+                        to: destination.resolved_type.to_string(),
                     },
                 }),
             }
@@ -369,28 +370,59 @@ fn conform_expression(
     match &expression.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
             // Integer literals -> Integer
-            if let Some(conformed) =
-                conform_integer_literal(value, expression.expression.source, to_type)
-            {
-                return Some(conformed);
-            }
+            conform_integer_literal(value, expression.expression.source, to_type)
         }
-        resolved::Type::Integer { .. } => {
+        resolved::Type::Integer {
+            bits: from_bits,
+            sign: from_sign,
+        } => {
             // Integer -> Integer
             match to_type {
-                resolved::Type::Integer {
-                    bits: _new_bits,
-                    sign: _new_sign,
-                } => {
-                    todo!();
-                }
-                _ => (),
+                resolved::Type::Integer { bits, sign } => conform_integer_value(
+                    &expression.expression,
+                    *from_bits,
+                    *from_sign,
+                    *bits,
+                    *sign,
+                ),
+                _ => None,
             }
         }
-        _ => (),
+        _ => None,
+    }
+}
+
+fn conform_integer_value(
+    expression: &resolved::Expression,
+    from_bits: IntegerBits,
+    from_sign: IntegerSign,
+    to_bits: IntegerBits,
+    to_sign: IntegerSign,
+) -> Option<TypedExpression> {
+    if from_sign != to_sign {
+        return None;
     }
 
-    None
+    if to_bits < from_bits {
+        return None;
+    }
+
+    let result_type = resolved::Type::Integer {
+        bits: to_bits,
+        sign: to_sign,
+    };
+
+    if from_sign == to_sign && to_bits == from_bits {
+        return Some(TypedExpression::new(result_type, expression.clone()));
+    }
+
+    Some(TypedExpression::new(
+        result_type.clone(),
+        resolved::Expression {
+            kind: resolved::ExpressionKind::IntegerExtend(Box::new(expression.clone()), result_type),
+            source: expression.source,
+        },
+    ))
 }
 
 fn conform_expression_to_default(
