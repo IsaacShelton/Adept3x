@@ -73,6 +73,12 @@ pub enum Instruction {
     LessThanEq(BinaryOperands, IntegerSign),
     GreaterThan(BinaryOperands, IntegerSign),
     GreaterThanEq(BinaryOperands, IntegerSign),
+    Bitcast(Value, Type),
+    ZeroExtend(Value, Type),
+    SignExtend(Value, Type),
+    FloatExtend(Value, Type),
+    Truncate(Value, Type),
+    TruncateFloat(Value, Type),
 }
 
 #[derive(Clone, Debug)]
@@ -243,6 +249,12 @@ impl Instruction {
             Instruction::LessThanEq(..) => false,
             Instruction::GreaterThan(..) => false,
             Instruction::GreaterThanEq(..) => false,
+            Instruction::Bitcast(..) => false,
+            Instruction::ZeroExtend(..) => false,
+            Instruction::SignExtend(..) => false,
+            Instruction::FloatExtend(..) => false,
+            Instruction::Truncate(..) => false,
+            Instruction::TruncateFloat(..) => false,
         }
     }
 }

@@ -5,7 +5,7 @@ mod variable_search_context;
 
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
-    resolved::{self, TypedExpression, VariableStorage},
+    resolved::{self, Destination, TypedExpression, VariableStorage},
     source_file_cache::SourceFileCache,
 };
 use function_search_context::FunctionSearchContext;
@@ -242,6 +242,118 @@ fn resolve_statement(
             ),
             source,
         )),
+        ast::StatementKind::Declaration(declaration) => {
+            let function = resolved_ast
+                .functions
+                .get_mut(resolved_function_ref)
+                .unwrap();
+
+            let resolved_type = resolve_type(&declaration.ast_type)?;
+            let key = function.variables.add_variable(resolved_type.clone());
+            variable_search_context.put(&declaration.name, resolved_type.clone(), key);
+
+            let value = declaration
+                .value
+                .as_ref()
+                .map(|value| {
+                    resolve_expression(
+                        resolved_ast,
+                        function_search_context,
+                        global_search_context,
+                        variable_search_context,
+                        resolved_function_ref,
+                        value,
+                    )
+                })
+                .transpose()?
+                .as_ref()
+                .map(|value| match conform_expression(value, &resolved_type) {
+                    Some(value) => Ok(value.expression),
+                    None => Err(ResolveError {
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(source.key)
+                                .filename()
+                                .to_string(),
+                        ),
+                        location: Some(source.location),
+                        kind: ResolveErrorKind::TypeMismatch {
+                            left: resolved_type.to_string(),
+                            right: value.resolved_type.to_string(),
+                        },
+                    }),
+                })
+                .transpose()?;
+
+            Ok(resolved::Statement::new(
+                resolved::StatementKind::Declaration(resolved::Declaration { key, value }),
+                source,
+            ))
+        }
+        ast::StatementKind::Assignment(assignment) => {
+            let destination = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &assignment.destination,
+            )?;
+
+            let value = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &assignment.value,
+            )?;
+
+            match conform_expression(&value, &destination.resolved_type) {
+                Some(value) => {
+                    let destination = match TryInto::<Destination>::try_into(destination.expression)
+                    {
+                        Ok(destination) => destination,
+                        Err(_) => {
+                            return Err(ResolveError {
+                                filename: Some(
+                                    resolved_ast
+                                        .source_file_cache
+                                        .get(source.key)
+                                        .filename()
+                                        .to_string(),
+                                ),
+                                location: Some(source.location),
+                                kind: ResolveErrorKind::CannotMutate,
+                            })
+                        }
+                    };
+
+                    Ok(resolved::Statement::new(
+                        resolved::StatementKind::Assignment(resolved::Assignment {
+                            destination,
+                            value: value.expression,
+                        }),
+                        source,
+                    ))
+                }
+                None => Err(ResolveError {
+                    filename: Some(
+                        resolved_ast
+                            .source_file_cache
+                            .get(source.key)
+                            .filename()
+                            .to_string(),
+                    ),
+                    location: Some(source.location),
+                    kind: ResolveErrorKind::TypeMismatch {
+                        left: destination.resolved_type.to_string(),
+                        right: value.resolved_type.to_string(),
+                    },
+                }),
+            }
+        }
     }
 }
 

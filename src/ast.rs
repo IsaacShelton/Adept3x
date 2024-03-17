@@ -164,6 +164,21 @@ impl Statement {
 pub enum StatementKind {
     Return(Option<Expression>),
     Expression(Expression),
+    Declaration(Declaration),
+    Assignment(Assignment),
+}
+
+#[derive(Clone, Debug)]
+pub struct Declaration {
+    pub name: String,
+    pub ast_type: Type,
+    pub value: Option<Expression>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Assignment {
+    pub destination: Expression,
+    pub value: Expression,
 }
 
 #[derive(Clone, Debug)]

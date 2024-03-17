@@ -10,9 +10,9 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Ast, BinaryOperation, Call, DeclareAssign, Expression, ExpressionKind, File,
-        FileIdentifier, Function, Global, Parameter, Parameters, Source, Statement, StatementKind,
-        Type,
+        self, Assignment, Ast, BinaryOperation, Call, Declaration, DeclareAssign, Expression,
+        ExpressionKind, File, FileIdentifier, Function, Global, Parameter, Parameters, Source,
+        Statement, StatementKind, Type,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -299,6 +299,16 @@ where
         let location = self.input.peek().location;
 
         match self.input.peek().kind {
+            TokenKind::Identifier(_) => {
+                if TokenKind::OpenParen == self.input.peek_nth(1).kind {
+                    Ok(Statement::new(
+                        StatementKind::Expression(self.parse_expression()?),
+                        self.source(location),
+                    ))
+                } else {
+                    self.parse_declaration()
+                }
+            }
             TokenKind::ReturnKeyword => self.parse_return(),
             TokenKind::EndOfFile => Err(self.unexpected_token_is_next()),
             _ => Ok(Statement::new(
@@ -306,6 +316,47 @@ where
                 self.source(location),
             )),
         }
+    }
+
+    fn parse_declaration(&mut self) -> Result<Statement, ParseError> {
+        let (name, location) = self.parse_identifier_keep_location(Some("for variable name"))?;
+
+        if self.input.peek_is(TokenKind::Assign) {
+            let variable = Expression::new(ExpressionKind::Variable(name), self.source(location));
+            self.parse_assignment(variable)
+        } else {
+            let ast_type = self.parse_type(None::<&str>, Some("for variable type"))?;
+
+            let value = if self.input.peek_is(TokenKind::Assign) {
+                self.input.advance();
+                Some(self.parse_expression()?)
+            } else {
+                None
+            };
+
+            self.ignore_newlines();
+
+            Ok(Statement::new(
+                StatementKind::Declaration(Declaration {
+                    name,
+                    ast_type,
+                    value,
+                }),
+                self.source(location),
+            ))
+        }
+    }
+
+    fn parse_assignment(&mut self, destination: Expression) -> Result<Statement, ParseError> {
+        let source = destination.source;
+        self.parse_token(TokenKind::Assign, Some("for assignment"))?;
+
+        let value = self.parse_expression()?;
+
+        Ok(Statement::new(
+            StatementKind::Assignment(Assignment { destination, value }),
+            source,
+        ))
     }
 
     fn parse_return(&mut self) -> Result<Statement, ParseError> {

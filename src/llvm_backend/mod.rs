@@ -18,7 +18,7 @@ use crate::{
 use colored::Colorize;
 use cstr::cstr;
 use ir::IntegerSign;
-use llvm_sys::LLVMIntPredicate::*;
+use llvm_sys::{core::{LLVMBuildBitCast, LLVMBuildFPExt, LLVMBuildFPTrunc, LLVMBuildSExt, LLVMBuildTrunc, LLVMBuildZExt}, LLVMIntPredicate::*};
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
@@ -449,6 +449,36 @@ unsafe fn create_function_block(
                     right,
                     cstr!("").as_ptr(),
                 ))
+            }
+            Instruction::Bitcast(value, ir_type) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildBitCast(builder.get(), value, backend_type, cstr!("").as_ptr()))
+            }
+            Instruction::ZeroExtend(value, ir_type) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildZExt(builder.get(), value, backend_type, cstr!("").as_ptr()))
+            }
+            Instruction::SignExtend(value, ir_type) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildSExt(builder.get(), value, backend_type, cstr!("").as_ptr()))
+            }
+            Instruction::FloatExtend(value, ir_type) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildFPExt(builder.get(), value, backend_type, cstr!("").as_ptr()))
+            }
+            Instruction::Truncate(value, ir_type) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildTrunc(builder.get(), value, backend_type, cstr!("").as_ptr()))
+            }
+            Instruction::TruncateFloat(value, ir_type) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                Some(LLVMBuildFPTrunc(builder.get(), value, backend_type, cstr!("").as_ptr()))
             }
         };
 

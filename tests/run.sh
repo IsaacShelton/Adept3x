@@ -18,5 +18,6 @@ compile return
 compile return_message
 compile variables
 compile variables_override
+compile variables_typed
 popd > /dev/null
 

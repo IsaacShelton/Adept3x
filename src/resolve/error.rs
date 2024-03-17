@@ -20,6 +20,8 @@ pub enum ResolveErrorKind {
     BadTypeForArgumentToFunction { name: String, i: usize },
     BinaryOperatorMismatch { left: String, right: String },
     CannotBinaryOperator { left: String, right: String },
+    TypeMismatch { left: String, right: String },
+    CannotMutate,
     Other { message: String },
 }
 
@@ -75,11 +77,25 @@ impl Display for ResolveError {
             ResolveErrorKind::BadTypeForArgumentToFunction { name, i } => {
                 write!(f, "Bad type for argument #{} to function '{}'", i + 1, name)?;
             }
-            ResolveErrorKind::BinaryOperatorMismatch  { left, right } => {
-                write!(f, "Mismatching types '{}' and '{}' for binary operator", left, right)?;
+            ResolveErrorKind::BinaryOperatorMismatch { left, right } => {
+                write!(
+                    f,
+                    "Mismatching types '{}' and '{}' for binary operator",
+                    left, right
+                )?;
             }
-            ResolveErrorKind::CannotBinaryOperator  { left, right } => {
-                write!(f, "Cannot perform binary operator on types '{}' and '{}'", left, right)?;
+            ResolveErrorKind::CannotBinaryOperator { left, right } => {
+                write!(
+                    f,
+                    "Cannot perform binary operator on types '{}' and '{}'",
+                    left, right
+                )?;
+            }
+            ResolveErrorKind::TypeMismatch { left, right } => {
+                write!(f, "Mismatching types '{}' and '{}'", left, right)?;
+            }
+            ResolveErrorKind::CannotMutate => {
+                write!(f, "Cannot mutate value")?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

@@ -94,7 +94,7 @@ impl Type {
     pub fn sign(&self) -> Option<IntegerSign> {
         match self {
             Type::Boolean => None,
-            Type::Integer { sign, ..} => Some(*sign),
+            Type::Integer { sign, .. } => Some(*sign),
             Type::IntegerLiteral(_) => Some(IntegerSign::Unsigned),
             Type::Pointer(_) => None,
             Type::Void => None,
@@ -151,6 +151,20 @@ impl Statement {
 pub enum StatementKind {
     Return(Option<Expression>),
     Expression(Expression),
+    Declaration(Declaration),
+    Assignment(Assignment),
+}
+
+#[derive(Clone, Debug)]
+pub struct Declaration {
+    pub key: VariableStorageKey,
+    pub value: Option<Expression>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Assignment {
+    pub destination: Destination,
+    pub value: Expression,
 }
 
 #[derive(Clone, Debug)]
@@ -202,6 +216,41 @@ pub enum ExpressionKind {
     Call(Call),
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
+}
+
+#[derive(Clone, Debug)]
+pub struct Destination {
+    pub kind: DestinationKind,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum DestinationKind {
+    Variable(Variable),
+    GlobalVariable(GlobalVariable),
+}
+
+impl TryFrom<Expression> for Destination {
+    type Error = ();
+
+    fn try_from(value: Expression) -> Result<Self, Self::Error> {
+        value.kind.try_into().map(|kind| Destination {
+            kind,
+            source: value.source,
+        })
+    }
+}
+
+impl TryFrom<ExpressionKind> for DestinationKind {
+    type Error = ();
+
+    fn try_from(value: ExpressionKind) -> Result<Self, Self::Error> {
+        match value {
+            ExpressionKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
+            ExpressionKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

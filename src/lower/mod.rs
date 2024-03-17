@@ -3,7 +3,7 @@ mod builder;
 use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Global, Literal, Value, ValueReference},
-    resolved::{self, Expression, ExpressionKind, StatementKind},
+    resolved::{self, Destination, DestinationKind, Expression, ExpressionKind, StatementKind},
 };
 use builder::Builder;
 
@@ -92,6 +92,32 @@ fn lower_function(
                 StatementKind::Expression(expression) => {
                     lower_expression(&mut builder, ir_module, expression)?;
                 }
+                StatementKind::Declaration(declaration) => {
+                    let destination = Value::Reference(ValueReference {
+                        basicblock_id: 0,
+                        instruction_id: declaration.key.index,
+                    });
+
+                    if let Some(value) = &declaration.value {
+                        let source = lower_expression(&mut builder, ir_module, value)?;
+
+                        builder.push(ir::Instruction::Store(ir::Store {
+                            source,
+                            destination,
+                        }));
+                    }
+                }
+                StatementKind::Assignment(assignment) => {
+                    let destination =
+                        lower_destination(&mut builder, ir_module, &assignment.destination)?;
+
+                    let source = lower_expression(&mut builder, ir_module, &assignment.value)?;
+
+                    builder.push(ir::Instruction::Store(ir::Store {
+                        source,
+                        destination,
+                    }));
+                }
             }
         }
 
@@ -156,6 +182,27 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
         ))),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         resolved::Type::Void => Ok(ir::Type::Void),
+    }
+}
+
+fn lower_destination(
+    builder: &mut Builder,
+    _ir_module: &ir::Module,
+    destination: &Destination,
+) -> Result<ir::Value, CompilerError> {
+    match &destination.kind {
+        DestinationKind::Variable(variable) => {
+            let pointer = Value::Reference(ValueReference {
+                basicblock_id: 0,
+                instruction_id: variable.key.index,
+            });
+
+            Ok(pointer)
+        }
+        DestinationKind::GlobalVariable(global_variable) => {
+            let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
+            Ok(pointer)
+        }
     }
 }
 

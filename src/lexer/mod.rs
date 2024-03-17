@@ -166,6 +166,9 @@ where
                     self.characters.next();
                     Has(Token::new(TokenKind::Equals, location))
                 }
+                '=' => {
+                    Has(Token::new(TokenKind::Assign, location))
+                }
                 '!' if self.characters.peek().is_character('=') => {
                     self.characters.next();
                     Has(Token::new(TokenKind::NotEquals, location))

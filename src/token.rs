@@ -74,6 +74,7 @@ pub enum TokenKind {
     Hash,
     Ellipsis,
     DeclareAssign,
+    Assign,
 }
 
 impl Display for TokenKind {
@@ -114,6 +115,7 @@ impl Display for TokenKind {
             TokenKind::Hash => "'#'",
             TokenKind::Ellipsis => "'...'",
             TokenKind::DeclareAssign => "':='",
+            TokenKind::Assign => "'='",
         })
     }
 }
@@ -137,6 +139,7 @@ impl TokenKind {
             TokenKind::Equals => 8,
             TokenKind::NotEquals => 8,
             TokenKind::DeclareAssign => 1,
+            TokenKind::Assign => 1,
 
             TokenKind::EndOfFile
             | TokenKind::Error(_)
