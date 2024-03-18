@@ -54,6 +54,21 @@ pub enum FloatOrSign {
     Float,
 }
 
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum OverflowOperator {
+    Add,
+    Subtract,
+    Multiply,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct OverflowOperation {
+    pub operator: OverflowOperator,
+    pub sign: IntegerSign,
+    pub bits: IntegerBits,
+}
+
 #[derive(Clone, Debug)]
 pub enum Instruction {
     Return(Option<Value>),
@@ -64,7 +79,7 @@ pub enum Instruction {
     Parameter(u32),
     GlobalVariable(GlobalRef),
     Add(BinaryOperands),
-    CheckedAdd(BinaryOperands, IntegerBits, IntegerSign),
+    Checked(OverflowOperation, BinaryOperands),
     Subtract(BinaryOperands),
     Multiply(BinaryOperands),
     Divide(BinaryOperands, IntegerSign),
@@ -241,7 +256,7 @@ impl Instruction {
             Instruction::Parameter(..) => false,
             Instruction::GlobalVariable(..) => false,
             Instruction::Add(..) => false,
-            Instruction::CheckedAdd(..) => false,
+            Instruction::Checked(..) => false,
             Instruction::Subtract(..) => false,
             Instruction::Multiply(..) => false,
             Instruction::Divide(..) => false,

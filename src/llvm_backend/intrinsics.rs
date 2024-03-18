@@ -1,3 +1,10 @@
+use super::{
+    builder::Builder, module::BackendModule, null_terminated_string::build_literal_cstring,
+};
+use crate::{
+    ir::{OverflowOperation, OverflowOperator},
+    resolved::{IntegerBits, IntegerSign},
+};
 use cstr::cstr;
 use llvm_sys::{
     core::{
@@ -8,13 +15,10 @@ use llvm_sys::{
     },
     prelude::{LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
 };
+use memo_map::MemoMap;
 use std::{
     cell::OnceCell,
     ffi::{c_uint, CStr, CString},
-};
-
-use super::{
-    builder::Builder, module::BackendModule, null_terminated_string::build_literal_cstring,
 };
 
 pub struct Intrinsics {
@@ -26,14 +30,7 @@ pub struct Intrinsics {
     va_start: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
     va_end: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
     va_copy: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    signed_add_with_overflow_i8: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    signed_add_with_overflow_i16: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    signed_add_with_overflow_i32: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    signed_add_with_overflow_i64: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    unsigned_add_with_overflow_i8: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    unsigned_add_with_overflow_i16: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    unsigned_add_with_overflow_i32: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
-    unsigned_add_with_overflow_i64: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
+    overflow_operations: MemoMap<OverflowOperation, (LLVMValueRef, LLVMTypeRef)>,
     expect_i1: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
     on_overflow: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
     printf: OnceCell<(LLVMValueRef, LLVMTypeRef)>,
@@ -51,14 +48,7 @@ impl Intrinsics {
             va_start: OnceCell::new(),
             va_end: OnceCell::new(),
             va_copy: OnceCell::new(),
-            signed_add_with_overflow_i8: OnceCell::new(),
-            signed_add_with_overflow_i16: OnceCell::new(),
-            signed_add_with_overflow_i32: OnceCell::new(),
-            signed_add_with_overflow_i64: OnceCell::new(),
-            unsigned_add_with_overflow_i8: OnceCell::new(),
-            unsigned_add_with_overflow_i16: OnceCell::new(),
-            unsigned_add_with_overflow_i32: OnceCell::new(),
-            unsigned_add_with_overflow_i64: OnceCell::new(),
+            overflow_operations: MemoMap::new(),
             expect_i1: OnceCell::new(),
             on_overflow: OnceCell::new(),
             printf: OnceCell::new(),
@@ -95,69 +85,142 @@ impl Intrinsics {
         })
     }
 
-    pub unsafe fn signed_add_with_overflow_i8(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.signed_add_with_overflow_i8.get_or_init(|| {
-            self.create_intrinsic_with_overflow(LLVMInt8Type(), cstr!("llvm.sadd.with.overflow.i8"))
-        })
-    }
+    pub unsafe fn overflow_operation(
+        &self,
+        operation: &OverflowOperation,
+    ) -> (LLVMValueRef, LLVMTypeRef) {
+        *self.overflow_operations.get_or_insert(&operation, || {
+            let backend_type = match operation.bits {
+                IntegerBits::Bits8 => LLVMInt8Type(),
+                IntegerBits::Bits16 => LLVMInt16Type(),
+                IntegerBits::Bits32 => LLVMInt32Type(),
+                IntegerBits::Bits64 | IntegerBits::Normal => LLVMInt64Type(),
+            };
 
-    pub unsafe fn signed_add_with_overflow_i16(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.signed_add_with_overflow_i16.get_or_init(|| {
-            self.create_intrinsic_with_overflow(
-                LLVMInt16Type(),
-                cstr!("llvm.sadd.with.overflow.i16"),
-            )
-        })
-    }
+            let name = match operation {
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Signed,
+                } => "llvm.sadd.with.overflow.i8",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits16,
+                    sign: IntegerSign::Signed,
+                } => "llvm.sadd.with.overflow.i16",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits32,
+                    sign: IntegerSign::Signed,
+                } => "llvm.sadd.with.overflow.i32",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    sign: IntegerSign::Signed,
+                } => "llvm.sadd.with.overflow.i64",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.uadd.with.overflow.i8",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits16,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.uadd.with.overflow.i16",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits32,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.uadd.with.overflow.i32",
+                OverflowOperation {
+                    operator: OverflowOperator::Add,
+                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.uadd.with.overflow.i64",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Signed,
+                } => "llvm.ssub.with.overflow.i8",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits16,
+                    sign: IntegerSign::Signed,
+                } => "llvm.ssub.with.overflow.i16",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits32,
+                    sign: IntegerSign::Signed,
+                } => "llvm.ssub.with.overflow.i32",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    sign: IntegerSign::Signed,
+                } => "llvm.ssub.with.overflow.i64",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.usub.with.overflow.i8",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits16,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.usub.with.overflow.i16",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits32,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.usub.with.overflow.i32",
+                OverflowOperation {
+                    operator: OverflowOperator::Subtract,
+                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.usub.with.overflow.i64",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Signed,
+                } => "llvm.smul.with.overflow.i8",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits16,
+                    sign: IntegerSign::Signed,
+                } => "llvm.smul.with.overflow.i16",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits32,
+                    sign: IntegerSign::Signed,
+                } => "llvm.smul.with.overflow.i32",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    sign: IntegerSign::Signed,
+                } => "llvm.smul.with.overflow.i64",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.umul.with.overflow.i8",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits16,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.umul.with.overflow.i16",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits32,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.umul.with.overflow.i32",
+                OverflowOperation {
+                    operator: OverflowOperator::Multiply,
+                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    sign: IntegerSign::Unsigned,
+                } => "llvm.umul.with.overflow.i64",
+            };
 
-    pub unsafe fn signed_add_with_overflow_i32(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.signed_add_with_overflow_i32.get_or_init(|| {
-            self.create_intrinsic_with_overflow(
-                LLVMInt32Type(),
-                cstr!("llvm.sadd.with.overflow.i32"),
-            )
-        })
-    }
-
-    pub unsafe fn signed_add_with_overflow_i64(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.signed_add_with_overflow_i64.get_or_init(|| {
-            self.create_intrinsic_with_overflow(
-                LLVMInt64Type(),
-                cstr!("llvm.sadd.with.overflow.i64"),
-            )
-        })
-    }
-
-    pub unsafe fn unsigned_add_with_overflow_i8(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.unsigned_add_with_overflow_i8.get_or_init(|| {
-            self.create_intrinsic_with_overflow(LLVMInt8Type(), cstr!("llvm.uadd.with.overflow.i8"))
-        })
-    }
-
-    pub unsafe fn unsigned_add_with_overflow_i16(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.unsigned_add_with_overflow_i16.get_or_init(|| {
-            self.create_intrinsic_with_overflow(
-                LLVMInt16Type(),
-                cstr!("llvm.uadd.with.overflow.i16"),
-            )
-        })
-    }
-
-    pub unsafe fn unsigned_add_with_overflow_i32(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.unsigned_add_with_overflow_i32.get_or_init(|| {
-            self.create_intrinsic_with_overflow(
-                LLVMInt32Type(),
-                cstr!("llvm.uadd.with.overflow.i32"),
-            )
-        })
-    }
-
-    pub unsafe fn unsigned_add_with_overflow_i64(&self) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.unsigned_add_with_overflow_i64.get_or_init(|| {
-            self.create_intrinsic_with_overflow(
-                LLVMInt64Type(),
-                cstr!("llvm.uadd.with.overflow.i64"),
-            )
+            self.create_intrinsic_with_overflow(backend_type, &CString::new(name).unwrap())
         })
     }
 

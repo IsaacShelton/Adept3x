@@ -9,14 +9,17 @@ mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder, ctx::BackendContext, module::BackendModule,
-    null_terminated_string::build_literal_cstring, target_data::TargetData,
-    target_machine::TargetMachine, value_catalog::ValueCatalog,
+    builder::Builder,
+    ctx::BackendContext,
+    module::BackendModule,
+    null_terminated_string::build_literal_cstring,
+    target_data::TargetData,
+    target_machine::TargetMachine,
+    value_catalog::ValueCatalog,
 };
 use crate::{
     error::CompilerError,
     ir::{self, Instruction},
-    resolved::IntegerBits,
 };
 use colored::Colorize;
 use cstr::cstr;
@@ -341,43 +344,16 @@ unsafe fn create_function_block(
 
                 Some(LLVMBuildAdd(builder.get(), left, right, cstr!("").as_ptr()))
             }
-            Instruction::CheckedAdd(operands, bits, sign) => {
+            Instruction::Checked(operation, operands) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                let (expect_i1_fn_value, expect_i1_fn_type) = ctx.intrinsics.expect_i1();
+                let (expect_i1_fn, expect_i1_fn_type) = ctx.intrinsics.expect_i1();
                 let (overflow_panic_fn, overflow_panic_fn_type) = ctx.intrinsics.on_overflow();
 
                 let mut arguments = [left, right];
 
-                let (fn_value, fn_type) = match (bits, sign) {
-                    (IntegerBits::Bits8, IntegerSign::Signed) => {
-                        ctx.intrinsics.signed_add_with_overflow_i8()
-                    }
-                    (IntegerBits::Bits8, IntegerSign::Unsigned) => {
-                        ctx.intrinsics.unsigned_add_with_overflow_i8()
-                    }
-                    (IntegerBits::Bits16, IntegerSign::Signed) => {
-                        ctx.intrinsics.signed_add_with_overflow_i16()
-                    }
-                    (IntegerBits::Bits16, IntegerSign::Unsigned) => {
-                        ctx.intrinsics.unsigned_add_with_overflow_i16()
-                    }
-                    (IntegerBits::Bits32, IntegerSign::Signed) => {
-                        ctx.intrinsics.signed_add_with_overflow_i32()
-                    }
-                    (IntegerBits::Bits32, IntegerSign::Unsigned) => {
-                        ctx.intrinsics.unsigned_add_with_overflow_i32()
-                    }
-                    (IntegerBits::Bits64, IntegerSign::Signed)
-                    | (IntegerBits::Normal, IntegerSign::Signed) => {
-                        ctx.intrinsics.signed_add_with_overflow_i64()
-                    }
-                    (IntegerBits::Bits64, IntegerSign::Unsigned)
-                    | (IntegerBits::Normal, IntegerSign::Unsigned) => {
-                        ctx.intrinsics.unsigned_add_with_overflow_i64()
-                    }
-                };
+                let (fn_value, fn_type) = ctx.intrinsics.overflow_operation(&operation);
 
                 let info = LLVMBuildCall2(
                     builder.get(),
@@ -401,7 +377,7 @@ unsafe fn create_function_block(
                 LLVMBuildCall2(
                     builder.get(),
                     expect_i1_fn_type,
-                    expect_i1_fn_value,
+                    expect_i1_fn,
                     arguments.as_mut_ptr(),
                     arguments.len().try_into().unwrap(),
                     cstr!("").as_ptr(),

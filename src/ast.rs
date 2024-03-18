@@ -110,7 +110,7 @@ pub struct Parameter {
     pub ast_type: Type,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, Hash)]
 pub enum IntegerBits {
     Bits8,
     Bits16,
@@ -147,7 +147,7 @@ impl PartialOrd for IntegerBits {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IntegerSign {
     Signed,
     Unsigned,

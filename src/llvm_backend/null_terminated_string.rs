@@ -9,11 +9,7 @@ use llvm_sys::{
 };
 use std::ffi::CString;
 
-
-pub unsafe fn build_literal_cstring(
-    llvm_module: LLVMModuleRef,
-    value: &CString,
-) -> LLVMValueRef {
+pub unsafe fn build_literal_cstring(llvm_module: LLVMModuleRef, value: &CString) -> LLVMValueRef {
     let length = value.as_bytes_with_nul().len();
     let storage_type = LLVMArrayType2(LLVMInt8Type(), length.try_into().unwrap());
 

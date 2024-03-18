@@ -2,7 +2,7 @@ mod builder;
 
 use crate::{
     error::CompilerError,
-    ir::{self, BasicBlocks, Global, Literal, Value, ValueReference},
+    ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expression, ExpressionKind, IntegerBits, StatementKind,
     },
@@ -361,15 +361,48 @@ fn lower_expression(
                         resolved::Type::Integer {
                             bits: IntegerBits::Normal,
                             sign,
-                        } => ir::Instruction::CheckedAdd(operands, IntegerBits::Normal, *sign),
+                        } => ir::Instruction::Checked(
+                            ir::OverflowOperation {
+                                operator: OverflowOperator::Add,
+                                sign: *sign,
+                                bits: IntegerBits::Normal,
+                            },
+                            operands,
+                        ),
                         _ => ir::Instruction::Add(operands),
                     }))
                 }
                 resolved::BinaryOperator::Subtract => {
-                    Ok(builder.push(ir::Instruction::Subtract(operands)))
+                    Ok(builder.push(match &binary_operation.left.resolved_type {
+                        resolved::Type::Integer {
+                            bits: IntegerBits::Normal,
+                            sign,
+                        } => ir::Instruction::Checked(
+                            ir::OverflowOperation {
+                                operator: OverflowOperator::Subtract,
+                                sign: *sign,
+                                bits: IntegerBits::Normal,
+                            },
+                            operands,
+                        ),
+                        _ => ir::Instruction::Subtract(operands),
+                    }))
                 }
                 resolved::BinaryOperator::Multiply => {
-                    Ok(builder.push(ir::Instruction::Multiply(operands)))
+                    Ok(builder.push(match &binary_operation.left.resolved_type {
+                        resolved::Type::Integer {
+                            bits: IntegerBits::Normal,
+                            sign,
+                        } => ir::Instruction::Checked(
+                            ir::OverflowOperation {
+                                operator: OverflowOperator::Multiply,
+                                sign: *sign,
+                                bits: IntegerBits::Normal,
+                            },
+                            operands,
+                        ),
+                        _ => ir::Instruction::Multiply(operands),
+                    }))
                 }
                 resolved::BinaryOperator::Divide => {
                     match binary_operation.left.resolved_type.sign() {
