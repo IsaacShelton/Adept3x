@@ -55,6 +55,7 @@ pub enum TokenKind {
     DocComment(String),
     FuncKeyword,
     ReturnKeyword,
+    StructKeyword,
     Member,
     Add,
     Subtract,
@@ -96,6 +97,7 @@ impl Display for TokenKind {
             TokenKind::DocComment(_) => "'documentation comment'",
             TokenKind::FuncKeyword => "'func' keyword",
             TokenKind::ReturnKeyword => "'return' keyword",
+            TokenKind::StructKeyword => "'struct' keyword",
             TokenKind::Member => "'.'",
             TokenKind::Add => "'+'",
             TokenKind::Subtract => "'-'",
@@ -155,6 +157,7 @@ impl TokenKind {
             | TokenKind::DocComment(_)
             | TokenKind::FuncKeyword
             | TokenKind::ReturnKeyword
+            | TokenKind::StructKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

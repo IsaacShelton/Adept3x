@@ -20,6 +20,7 @@ compile integer_value_conforming
 compile math_simple
 compile return
 compile return_message
+compile structure_definitions
 compile variables
 compile variables_override
 compile variables_typed

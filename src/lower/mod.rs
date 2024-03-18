@@ -12,6 +12,10 @@ use builder::Builder;
 pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
 
+    for (structure_ref, structure) in ast.structures.iter() {
+        lower_structure(&mut ir_module, structure_ref, structure)?;
+    }
+
     for (global_ref, global) in ast.globals.iter() {
         lower_global(&mut ir_module, global_ref, global)?;
     }
@@ -21,6 +25,28 @@ pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     }
 
     Ok(ir_module)
+}
+
+fn lower_structure(
+    ir_module: &mut ir::Module,
+    structure_ref: resolved::StructureRef,
+    structure: &resolved::Structure,
+) -> Result<(), CompilerError> {
+    let mut fields = Vec::with_capacity(structure.fields.len());
+
+    for field in structure.fields.values() {
+        fields.push(lower_type(&field.resolved_type)?);
+    }
+
+    ir_module.structures.insert(
+        structure_ref,
+        ir::Structure {
+            fields,
+            is_packed: structure.is_packed,
+        }
+    );
+
+    Ok(())
 }
 
 fn lower_global(
@@ -184,6 +210,7 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
         ))),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         resolved::Type::Void => Ok(ir::Type::Void),
+        resolved::Type::Structure(structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
     }
 }
 

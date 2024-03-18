@@ -11,15 +11,15 @@ use self::{
 use crate::{
     ast::{
         self, Assignment, Ast, BinaryOperation, Call, Declaration, DeclareAssign, Expression,
-        ExpressionKind, File, FileIdentifier, Function, Global, Parameter, Parameters, Source,
-        Statement, StatementKind, Type,
+        ExpressionKind, Field, File, FileIdentifier, Function, Global, Parameter, Parameters,
+        Source, Statement, StatementKind, Structure, Type, TypeKind,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{StringModifier, Token, TokenKind},
 };
 use ast::BinaryOperator;
-use std::{borrow::Borrow, ffi::CString};
+use std::{borrow::Borrow, collections::HashMap, ffi::CString};
 
 struct Parser<'a, I>
 where
@@ -83,6 +83,9 @@ where
             }
             TokenKind::Identifier(_) => {
                 ast_file.globals.push(self.parse_global(annotations)?);
+            }
+            TokenKind::StructKeyword => {
+                ast_file.structures.push(self.parse_structure(annotations)?)
             }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
@@ -155,6 +158,7 @@ where
         match annotation_name.as_str() {
             "foreign" => Ok(Annotation::new(AnnotationKind::Foreign, location)),
             "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, location)),
+            "packed" => Ok(Annotation::new(AnnotationKind::Packed, location)),
             _ => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),
                 location: Some(location),
@@ -176,6 +180,13 @@ where
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::ThreadLocal => is_thread_local = true,
+                _ => {
+                    return Err(self.unexpected_annotation(
+                        annotation.kind.to_string(),
+                        annotation.location,
+                        Some("for global variable"),
+                    ))
+                }
             }
         }
 
@@ -189,6 +200,61 @@ where
             source: self.source(location),
             is_foreign,
             is_thread_local,
+        })
+    }
+
+    fn parse_structure(&mut self, annotations: Vec<Annotation>) -> Result<Structure, ParseError> {
+        self.input.advance();
+
+        let name = self.parse_identifier(Some("for struct name after 'struct' keyword"))?;
+        self.ignore_newlines();
+
+        let mut is_packed = false;
+
+        for annotation in annotations {
+            match annotation.kind {
+                AnnotationKind::Packed => is_packed = true,
+                _ => {
+                    return Err(self.unexpected_annotation(
+                        annotation.kind.to_string(),
+                        annotation.location,
+                        Some("for structure"),
+                    ))
+                }
+            }
+        }
+
+        let mut fields = HashMap::new();
+
+        self.ignore_newlines();
+        self.parse_token(TokenKind::OpenParen, Some("to begin struct fields"))?;
+
+        while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
+            if fields.len() != 0 {
+                self.parse_token(TokenKind::Comma, Some("to separate struct fields"))?;
+                self.ignore_newlines();
+            }
+
+            let field_name = self.parse_identifier(Some("for field name"))?;
+            self.ignore_newlines();
+            let field_type = self.parse_type(None::<&str>, Some("for field type"))?;
+            self.ignore_newlines();
+
+            fields.insert(
+                field_name,
+                Field {
+                    ast_type: field_type,
+                    privacy: Default::default(),
+                },
+            );
+        }
+
+        self.parse_token(TokenKind::CloseParen, Some("to end struct fields"))?;
+
+        Ok(Structure {
+            name,
+            fields,
+            is_packed,
         })
     }
 
@@ -225,7 +291,8 @@ where
         self.ignore_newlines();
 
         let return_type = if self.input.peek_is(TokenKind::OpenCurly) {
-            ast::Type::Void
+            let location = self.input.peek().location;
+            ast::Type::new(ast::TypeKind::Void, self.source(location))
         } else {
             self.parse_type(Some("return "), Some("for function"))?
         };
@@ -300,7 +367,8 @@ where
 
         match self.input.peek().kind {
             TokenKind::Identifier(_) => {
-                if let TokenKind::OpenParen | TokenKind::DeclareAssign = self.input.peek_nth(1).kind {
+                if let TokenKind::OpenParen | TokenKind::DeclareAssign = self.input.peek_nth(1).kind
+                {
                     Ok(Statement::new(
                         StatementKind::Expression(self.parse_expression()?),
                         self.source(location),
@@ -568,56 +636,59 @@ where
         prefix: Option<impl ToString>,
         for_reason: Option<impl ToString>,
     ) -> Result<Type, ParseError> {
+        let location = self.input.peek().location;
+        let source = self.source(location);
+
         match self.input.advance() {
             Token {
                 kind: TokenKind::Identifier(identifier),
-                location,
+                ..
             } => {
                 use ast::{IntegerBits::*, IntegerSign::*};
 
-                match identifier.as_str() {
-                    "bool" => Ok(Type::Boolean),
-                    "int" => Ok(Type::Integer {
+                let type_kind = match identifier.as_str() {
+                    "bool" => Ok(TypeKind::Boolean),
+                    "int" => Ok(TypeKind::Integer {
                         bits: Normal,
                         sign: Signed,
                     }),
-                    "uint" => Ok(Type::Integer {
+                    "uint" => Ok(TypeKind::Integer {
                         bits: Normal,
                         sign: Unsigned,
                     }),
-                    "i8" => Ok(Type::Integer {
+                    "i8" => Ok(TypeKind::Integer {
                         bits: Bits8,
                         sign: Signed,
                     }),
-                    "u8" => Ok(Type::Integer {
+                    "u8" => Ok(TypeKind::Integer {
                         bits: Bits8,
                         sign: Unsigned,
                     }),
-                    "i16" => Ok(Type::Integer {
+                    "i16" => Ok(TypeKind::Integer {
                         bits: Bits16,
                         sign: Signed,
                     }),
-                    "u16" => Ok(Type::Integer {
+                    "u16" => Ok(TypeKind::Integer {
                         bits: Bits16,
                         sign: Unsigned,
                     }),
-                    "i32" => Ok(Type::Integer {
+                    "i32" => Ok(TypeKind::Integer {
                         bits: Bits32,
                         sign: Signed,
                     }),
-                    "u32" => Ok(Type::Integer {
+                    "u32" => Ok(TypeKind::Integer {
                         bits: Bits32,
                         sign: Unsigned,
                     }),
-                    "i64" => Ok(Type::Integer {
+                    "i64" => Ok(TypeKind::Integer {
                         bits: Bits64,
                         sign: Signed,
                     }),
-                    "u64" => Ok(Type::Integer {
+                    "u64" => Ok(TypeKind::Integer {
                         bits: Bits64,
                         sign: Unsigned,
                     }),
-                    "void" => Ok(Type::Void),
+                    "void" => Ok(TypeKind::Void),
                     "ptr" => {
                         if self.input.peek_is(TokenKind::OpenAngle) {
                             self.input.advance();
@@ -626,17 +697,18 @@ where
                                 TokenKind::GreaterThan,
                                 Some("to close type parameters"),
                             )?;
-                            Ok(Type::Pointer(Box::new(inner)))
+                            Ok(TypeKind::Pointer(Box::new(inner)))
                         } else {
-                            Ok(Type::Pointer(Box::new(Type::Void)))
+                            Ok(TypeKind::Pointer(Box::new(Type::new(
+                                TypeKind::Void,
+                                source,
+                            ))))
                         }
                     }
-                    _ => Err(ParseError {
-                        filename: Some(self.input.filename().to_string()),
-                        location: Some(location),
-                        kind: ParseErrorKind::UndeclaredType { name: identifier },
-                    }),
-                }
+                    identifier => Ok(TypeKind::Named(identifier.into())),
+                }?;
+
+                Ok(Type::new(type_kind, source))
             }
             unexpected => Err(ParseError {
                 filename: Some(self.input.filename().to_string()),

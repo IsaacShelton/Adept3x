@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use num_traits::Zero;
 mod variable_storage;
 
@@ -15,6 +16,7 @@ pub use variable_storage::VariableStorage;
 new_key_type! {
     pub struct FunctionRef;
     pub struct GlobalRef;
+    pub struct StructureRef;
 }
 
 #[derive(Clone, Debug)]
@@ -22,6 +24,7 @@ pub struct Ast<'a> {
     pub source_file_cache: &'a SourceFileCache,
     pub entry_point: Option<FunctionRef>,
     pub functions: SlotMap<FunctionRef, Function>,
+    pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalRef, Global>,
 }
 
@@ -31,6 +34,7 @@ impl<'a> Ast<'a> {
             source_file_cache,
             entry_point: None,
             functions: SlotMap::with_key(),
+            structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
         }
     }
@@ -79,6 +83,21 @@ pub struct Parameter {
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{IntegerBits, IntegerSign};
 
+#[derive(Clone, Debug)]
+pub struct Structure {
+    pub name: String,
+    pub fields: IndexMap<String, Field>,
+    pub is_packed: bool,
+}
+
+pub use crate::ast::Privacy;
+
+#[derive(Clone, Debug)]
+pub struct Field {
+    pub resolved_type: Type,
+    pub privacy: Privacy,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
     Boolean,
@@ -89,6 +108,7 @@ pub enum Type {
     IntegerLiteral(BigInt),
     Pointer(Box<Type>),
     Void,
+    Structure(StructureRef),
 }
 
 impl Type {
@@ -103,6 +123,7 @@ impl Type {
             }),
             Type::Pointer(_) => None,
             Type::Void => None,
+            Type::Structure(_) => None,
         }
     }
 }
@@ -134,6 +155,7 @@ impl Display for Type {
                 write!(f, "ptr<{}>", inner)?;
             }
             Type::Void => f.write_str("void")?,
+            Type::Structure(_) => f.write_str("<structure>")?,
         }
 
         Ok(())

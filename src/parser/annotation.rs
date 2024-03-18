@@ -3,6 +3,7 @@ use crate::line_column::Location;
 pub enum AnnotationKind {
     Foreign,
     ThreadLocal,
+    Packed,
 }
 
 pub struct Annotation {
@@ -21,6 +22,7 @@ impl ToString for AnnotationKind {
         match self {
             AnnotationKind::Foreign => "foreign",
             AnnotationKind::ThreadLocal => "thread_local",
+            AnnotationKind::Packed => "packed",
         }
         .into()
     }

@@ -16,6 +16,7 @@ impl IdentifierState {
             match identifier.as_str() {
                 "func" => TokenKind::FuncKeyword,
                 "return" => TokenKind::ReturnKeyword,
+                "struct" => TokenKind::StructKeyword,
                 _ => TokenKind::Identifier(identifier),
             },
             self.start_location,

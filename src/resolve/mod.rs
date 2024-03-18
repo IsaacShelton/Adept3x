@@ -1,6 +1,7 @@
 mod error;
 mod function_search_context;
 mod global_search_context;
+mod type_search_context;
 mod variable_search_context;
 
 use crate::{
@@ -10,12 +11,14 @@ use crate::{
 };
 use ast::{IntegerBits, IntegerSign};
 use function_search_context::FunctionSearchContext;
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
 use self::{
     error::{ResolveError, ResolveErrorKind},
     global_search_context::GlobalSearchContext,
+    type_search_context::TypeSearchContext,
     variable_search_context::VariableSearchContext,
 };
 
@@ -26,6 +29,7 @@ enum Job {
 #[derive(Default)]
 struct ResolveContext<'a> {
     pub jobs: VecDeque<Job>,
+    pub type_search_contexts: HashMap<FileIdentifier, TypeSearchContext<'a>>,
     pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchContext<'a>>,
     pub global_search_contexts: HashMap<FileIdentifier, GlobalSearchContext<'a>>,
 }
@@ -36,13 +40,41 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Create initial jobs
     for (file_identifier, file) in ast.files.iter() {
+        let type_search_context = ctx
+            .type_search_contexts
+            .entry(file_identifier.clone())
+            .or_insert_with(|| TypeSearchContext::new(resolved_ast.source_file_cache));
+
+        for structure in file.structures.iter() {
+            let mut fields = IndexMap::new();
+
+            for (field_name, field) in structure.fields.iter() {
+                fields.insert(
+                    field_name.into(),
+                    resolved::Field {
+                        resolved_type: resolve_type(type_search_context, &field.ast_type)?,
+                        privacy: field.privacy,
+                    },
+                );
+            }
+
+            let structure_key = resolved_ast.structures.insert(resolved::Structure {
+                name: structure.name.clone(),
+                fields,
+                is_packed: structure.is_packed,
+            });
+
+            let resolved_type = resolved::Type::Structure(structure_key);
+            type_search_context.put(structure.name.clone(), resolved_type);
+        }
+
         let global_search_context = ctx
             .global_search_contexts
             .entry(file_identifier.clone())
             .or_insert_with(|| GlobalSearchContext::new(resolved_ast.source_file_cache));
 
         for global in file.globals.iter() {
-            let resolved_type = resolve_type(&global.ast_type)?;
+            let resolved_type = resolve_type(type_search_context, &global.ast_type)?;
 
             let global_ref = resolved_ast.globals.insert(resolved::Global {
                 name: global.name.clone(),
@@ -52,14 +84,14 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_thread_local: global.is_thread_local,
             });
 
-            global_search_context.put(global.name.to_string(), resolved_type, global_ref);
+            global_search_context.put(global.name.clone(), resolved_type, global_ref);
         }
 
         for (i, function) in file.functions.iter().enumerate() {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: function.name.clone(),
-                parameters: resolve_parameters(&function.parameters)?,
-                return_type: resolve_type(&function.return_type)?,
+                parameters: resolve_parameters(type_search_context, &function.parameters)?,
+                return_type: resolve_type(type_search_context, &function.return_type)?,
                 statements: vec![],
                 is_foreign: function.is_foreign,
                 variables: VariableStorage::new(),
@@ -102,6 +134,11 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     .get(&file_identifier)
                     .expect("function search context to exist for file");
 
+                let type_search_context = ctx
+                    .type_search_contexts
+                    .get(&file_identifier)
+                    .expect("type search context to exist for file");
+
                 let global_search_context = ctx
                     .global_search_contexts
                     .get(&file_identifier)
@@ -129,7 +166,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                         .unwrap();
 
                     for parameter in ast_function.parameters.required.iter() {
-                        let resolved_type = resolve_type(&parameter.ast_type)?;
+                        let resolved_type = resolve_type(type_search_context, &parameter.ast_type)?;
                         let key = function.variables.add_parameter(resolved_type.clone());
 
                         variable_search_context.put(parameter.name.clone(), resolved_type, key);
@@ -140,6 +177,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     resolved_statements.push(resolve_statement(
                         &mut resolved_ast,
                         &function_search_context,
+                        &type_search_context,
                         &global_search_context,
                         &mut variable_search_context,
                         resolved_function_ref,
@@ -163,6 +201,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 fn resolve_statement(
     resolved_ast: &mut resolved::Ast,
     function_search_context: &FunctionSearchContext,
+    type_search_context: &TypeSearchContext,
     global_search_context: &GlobalSearchContext,
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
@@ -249,7 +288,7 @@ fn resolve_statement(
                 .get_mut(resolved_function_ref)
                 .unwrap();
 
-            let resolved_type = resolve_type(&declaration.ast_type)?;
+            let resolved_type = resolve_type(type_search_context, &declaration.ast_type)?;
             let key = function.variables.add_variable(resolved_type.clone());
             variable_search_context.put(&declaration.name, resolved_type.clone(), key);
 
@@ -419,7 +458,10 @@ fn conform_integer_value(
     Some(TypedExpression::new(
         result_type.clone(),
         resolved::Expression {
-            kind: resolved::ExpressionKind::IntegerExtend(Box::new(expression.clone()), result_type),
+            kind: resolved::ExpressionKind::IntegerExtend(
+                Box::new(expression.clone()),
+                result_type,
+            ),
             source: expression.source,
         },
     ))
@@ -867,25 +909,37 @@ fn resolve_expression(
     }
 }
 
-fn resolve_type(ast_type: &ast::Type) -> Result<resolved::Type, ResolveError> {
-    match ast_type {
-        ast::Type::Boolean => Ok(resolved::Type::Boolean),
-        ast::Type::Integer { bits, sign } => Ok(resolved::Type::Integer {
+fn resolve_type(
+    type_search_context: &TypeSearchContext<'_>,
+    ast_type: &ast::Type,
+) -> Result<resolved::Type, ResolveError> {
+    match &ast_type.kind {
+        ast::TypeKind::Boolean => Ok(resolved::Type::Boolean),
+        ast::TypeKind::Integer { bits, sign } => Ok(resolved::Type::Integer {
             bits: *bits,
             sign: *sign,
         }),
-        ast::Type::Pointer(inner) => Ok(resolved::Type::Pointer(Box::new(resolve_type(inner)?))),
-        ast::Type::Void => Ok(resolved::Type::Void),
+        ast::TypeKind::Pointer(inner) => Ok(resolved::Type::Pointer(Box::new(resolve_type(
+            type_search_context,
+            &inner,
+        )?))),
+        ast::TypeKind::Void => Ok(resolved::Type::Void),
+        ast::TypeKind::Named(name) => {
+            type_search_context.find_type_or_error(&name, ast_type.source).cloned()
+        }
     }
 }
 
-fn resolve_parameters(parameters: &ast::Parameters) -> Result<resolved::Parameters, ResolveError> {
+fn resolve_parameters(
+    type_search_context: &TypeSearchContext<'_>,
+    parameters: &ast::Parameters,
+) -> Result<resolved::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {
         required.push(resolved::Parameter {
             name: parameter.name.clone(),
-            resolved_type: resolve_type(&parameter.ast_type)?,
+            resolved_type: resolve_type(type_search_context, &parameter.ast_type)?,
         });
     }
 

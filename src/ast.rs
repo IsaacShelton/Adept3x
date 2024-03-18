@@ -59,6 +59,7 @@ pub enum FileIdentifier {
 #[derive(Clone, Debug)]
 pub struct File {
     pub functions: Vec<Function>,
+    pub structures: Vec<Structure>,
     pub globals: Vec<Global>,
 }
 
@@ -66,6 +67,7 @@ impl File {
     pub fn new() -> File {
         File {
             functions: vec![],
+            structures: vec![],
             globals: vec![],
         }
     }
@@ -108,6 +110,26 @@ impl Default for Parameters {
 pub struct Parameter {
     pub name: String,
     pub ast_type: Type,
+}
+
+#[derive(Clone, Debug)]
+pub struct Structure {
+    pub name: String,
+    pub fields: HashMap<String, Field>,
+    pub is_packed: bool,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub enum Privacy {
+    #[default]
+    Public,
+    Private,
+}
+
+#[derive(Clone, Debug)]
+pub struct Field {
+    pub ast_type: Type,
+    pub privacy: Privacy,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, Hash)]
@@ -154,7 +176,19 @@ pub enum IntegerSign {
 }
 
 #[derive(Clone, Debug)]
-pub enum Type {
+pub struct Type {
+    pub kind: TypeKind,
+    pub source: Source,
+}
+
+impl Type {
+    pub fn new(kind: TypeKind, source: Source) -> Self {
+        Self { kind, source }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeKind {
     Boolean,
     Integer {
         bits: IntegerBits,
@@ -162,6 +196,7 @@ pub enum Type {
     },
     Pointer(Box<Type>),
     Void,
+    Named(String),
 }
 
 #[derive(Clone, Debug)]

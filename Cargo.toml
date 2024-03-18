@@ -16,4 +16,5 @@ slotmap = "1.0.7"
 append-only-vec = "0.1.3"
 indoc = "2"
 memo-map = "0.3.2"
+indexmap = "2.2.5"
 

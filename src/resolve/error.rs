@@ -15,6 +15,7 @@ pub enum ResolveErrorKind {
     UnrepresentableInteger { value: String },
     FailedToFindFunction { name: String },
     UndeclaredVariable { name: String },
+    UndeclaredType { name: String },
     NotEnoughArgumentsToFunction { name: String },
     TooManyArgumentsToFunction { name: String },
     BadTypeForArgumentToFunction { name: String, i: usize },
@@ -68,6 +69,9 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::UndeclaredVariable { name } => {
                 write!(f, "Undeclared variable '{}'", name)?;
+            }
+            ResolveErrorKind::UndeclaredType { name } => {
+                write!(f, "Undeclared type '{}'", name)?;
             }
             ResolveErrorKind::NotEnoughArgumentsToFunction { name } => {
                 write!(f, "Not enough arguments for call to function '{}'", name)?;

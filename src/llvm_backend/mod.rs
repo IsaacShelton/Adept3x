@@ -9,13 +9,9 @@ mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder,
-    ctx::BackendContext,
-    module::BackendModule,
-    null_terminated_string::build_literal_cstring,
-    target_data::TargetData,
-    target_machine::TargetMachine,
-    value_catalog::ValueCatalog,
+    builder::Builder, ctx::BackendContext, module::BackendModule,
+    null_terminated_string::build_literal_cstring, target_data::TargetData,
+    target_machine::TargetMachine, value_catalog::ValueCatalog,
 };
 use crate::{
     error::CompilerError,
@@ -96,6 +92,7 @@ pub unsafe fn llvm_backend(
 
     let mut ctx = BackendContext::new(ir_module, &backend_module, &target_data);
 
+    create_structures(&mut ctx);
     create_static_variables()?;
     create_globals(&mut ctx)?;
     create_function_heads(&mut ctx)?;
@@ -148,13 +145,28 @@ pub unsafe fn llvm_backend(
     Ok(())
 }
 
+unsafe fn create_structures(ctx: &mut BackendContext) {
+    for (structure_key, ir_structure) in ctx.ir_module.structures.iter() {
+        let mut subtypes = to_backend_types(ctx, &ir_structure.fields);
+
+        let struct_type = LLVMStructType(
+            subtypes.as_mut_ptr(),
+            subtypes.len().try_into().unwrap(),
+            ir_structure.is_packed.into(),
+        );
+
+        ctx.structure_cache
+            .insert(structure_key.clone(), struct_type);
+    }
+}
+
 unsafe fn create_static_variables() -> Result<(), CompilerError> {
     Ok(())
 }
 
 unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), CompilerError> {
     for (global_ref, global) in ctx.ir_module.globals.iter() {
-        let backend_type = to_backend_type(ctx.backend_module, &global.ir_type);
+        let backend_type = to_backend_type(ctx, &global.ir_type);
 
         let name = CString::new(global.mangled_name.as_bytes()).unwrap();
         let backend_global = LLVMAddGlobal(ctx.backend_module.get(), backend_type, name.as_ptr());
@@ -186,9 +198,8 @@ unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), CompilerError> 
 
 unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), CompilerError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
-        let mut parameters: Vec<LLVMTypeRef> =
-            to_backend_types(ctx.backend_module, &function.parameters);
-        let return_type = to_backend_type(ctx.backend_module, &function.return_type);
+        let mut parameters: Vec<LLVMTypeRef> = to_backend_types(ctx, &function.parameters);
+        let return_type = to_backend_type(ctx, &function.return_type);
 
         let name = CString::new(function.mangled_name.as_bytes()).unwrap();
 
@@ -277,7 +288,7 @@ unsafe fn create_function_block(
             }
             Instruction::Alloca(ir_type) => Some(LLVMBuildAlloca(
                 builder.get(),
-                to_backend_type(ctx.backend_module, ir_type),
+                to_backend_type(ctx, ir_type),
                 cstr!("").as_ptr(),
             )),
             Instruction::Parameter(index) => Some(LLVMGetParam(function_skeleton, *index)),
@@ -299,7 +310,7 @@ unsafe fn create_function_block(
             }
             Instruction::Load((value, ir_type)) => {
                 let pointer = build_value(ctx.backend_module, value_catalog, builder, value);
-                let llvm_type = to_backend_type(ctx.backend_module, ir_type);
+                let llvm_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildLoad2(
                     builder.get(),
                     llvm_type,
@@ -309,7 +320,7 @@ unsafe fn create_function_block(
             }
             Instruction::Call(call) => {
                 let function_type = get_function_type(
-                    ctx.backend_module,
+                    ctx,
                     ctx.ir_module
                         .functions
                         .get(&call.function)
@@ -540,7 +551,7 @@ unsafe fn create_function_block(
             }
             Instruction::Bitcast(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildBitCast(
                     builder.get(),
                     value,
@@ -550,7 +561,7 @@ unsafe fn create_function_block(
             }
             Instruction::ZeroExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildZExt(
                     builder.get(),
                     value,
@@ -560,7 +571,7 @@ unsafe fn create_function_block(
             }
             Instruction::SignExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildSExt(
                     builder.get(),
                     value,
@@ -570,7 +581,7 @@ unsafe fn create_function_block(
             }
             Instruction::FloatExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildFPExt(
                     builder.get(),
                     value,
@@ -580,7 +591,7 @@ unsafe fn create_function_block(
             }
             Instruction::Truncate(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildTrunc(
                     builder.get(),
                     value,
@@ -590,7 +601,7 @@ unsafe fn create_function_block(
             }
             Instruction::TruncateFloat(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx.backend_module, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type);
                 Some(LLVMBuildFPTrunc(
                     builder.get(),
                     value,
@@ -605,11 +616,11 @@ unsafe fn create_function_block(
 }
 
 unsafe fn get_function_type(
-    backend_module: &BackendModule,
+    ctx: &BackendContext<'_>,
     function: &ir::Function,
 ) -> LLVMTypeRef {
-    let return_type = to_backend_type(backend_module, &function.return_type);
-    let mut parameters = to_backend_types(backend_module, &function.parameters);
+    let return_type = to_backend_type(ctx, &function.return_type);
+    let mut parameters = to_backend_types(ctx, &function.parameters);
     let is_vararg = if function.is_cstyle_variadic { 1 } else { 0 };
 
     LLVMFunctionType(
@@ -678,7 +689,7 @@ unsafe fn build_value(
     }
 }
 
-unsafe fn to_backend_type(backend_module: &BackendModule, ir_type: &ir::Type) -> LLVMTypeRef {
+unsafe fn to_backend_type(ctx: &BackendContext<'_>, ir_type: &ir::Type) -> LLVMTypeRef {
     match ir_type {
         ir::Type::Void => LLVMVoidType(),
         ir::Type::Boolean => LLVMInt1Type(),
@@ -688,10 +699,10 @@ unsafe fn to_backend_type(backend_module: &BackendModule, ir_type: &ir::Type) ->
         ir::Type::S64 | ir::Type::U64 => LLVMInt64Type(),
         ir::Type::F32 => LLVMFloatType(),
         ir::Type::F64 => LLVMDoubleType(),
-        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(backend_module, to), 0),
+        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to), 0),
         ir::Type::UntypedEnum(_) => panic!("Cannot convert untyped enum to backend type"),
-        ir::Type::Composite(composite) => {
-            let mut subtypes = to_backend_types(backend_module, &composite.subtypes);
+        ir::Type::AnonymousComposite(composite) => {
+            let mut subtypes = to_backend_types(ctx, &composite.subtypes);
 
             LLVMStructType(
                 subtypes.as_mut_ptr(),
@@ -699,9 +710,14 @@ unsafe fn to_backend_type(backend_module: &BackendModule, ir_type: &ir::Type) ->
                 composite.is_packed.into(),
             )
         }
+        ir::Type::Structure(structure_ref) => ctx
+            .structure_cache
+            .get(structure_ref)
+            .expect("referenced structure to exist")
+            .clone(),
         ir::Type::Function(function) => {
-            let return_type = to_backend_type(backend_module, &function.return_type);
-            let mut params = to_backend_types(backend_module, &function.parameters);
+            let return_type = to_backend_type(ctx, &function.return_type);
+            let mut params = to_backend_types(ctx, &function.parameters);
 
             LLVMPointerType(
                 LLVMFunctionType(
@@ -716,14 +732,8 @@ unsafe fn to_backend_type(backend_module: &BackendModule, ir_type: &ir::Type) ->
     }
 }
 
-unsafe fn to_backend_types(
-    backend_module: &BackendModule,
-    ir_types: &[ir::Type],
-) -> Vec<LLVMTypeRef> {
-    ir_types
-        .iter()
-        .map(|ty| to_backend_type(backend_module, ty))
-        .collect()
+unsafe fn to_backend_types(ctx: &BackendContext<'_>, ir_types: &[ir::Type]) -> Vec<LLVMTypeRef> {
+    ir_types.iter().map(|ty| to_backend_type(ctx, ty)).collect()
 }
 
 unsafe fn implement_static_init() -> Result<(), CompilerError> {

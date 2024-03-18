@@ -1,12 +1,13 @@
 use derive_more::{Deref, DerefMut};
 use std::{collections::HashMap, ffi::CString};
 
-use crate::resolved::IntegerBits;
+use crate::resolved::{IntegerBits, StructureRef};
 pub use crate::resolved::{FunctionRef, GlobalRef};
 
 #[derive(Clone)]
 pub struct Module {
     pub functions: HashMap<FunctionRef, Function>,
+    pub structures: HashMap<StructureRef, Structure>,
     pub globals: HashMap<GlobalRef, Global>,
 }
 
@@ -39,6 +40,12 @@ pub struct Function {
     pub is_foreign: bool,
     pub is_exposed: bool,
     pub variables: Vec<Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Structure {
+    pub fields: Vec<Type>,
+    pub is_packed: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -137,7 +144,8 @@ pub enum Type {
     F32,
     F64,
     Void,
-    Composite(TypeComposite),
+    Structure(StructureRef),
+    AnonymousComposite(TypeComposite),
     Function(TypeFunction),
     UntypedEnum(TypeUntypedEnum),
 }
@@ -147,7 +155,6 @@ pub struct TypeComposite {
     pub subtypes: Vec<Type>,
     pub is_packed: bool,
 }
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeFunction {
     pub parameters: Vec<Type>,
@@ -192,6 +199,7 @@ impl Module {
     pub fn new() -> Self {
         Self {
             functions: HashMap::new(),
+            structures: HashMap::new(),
             globals: HashMap::new(),
         }
     }

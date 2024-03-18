@@ -1,7 +1,7 @@
 use super::{
     builder::Builder, intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
 };
-use crate::ir;
+use crate::{ir, resolved::StructureRef};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use std::collections::HashMap;
 
@@ -29,6 +29,7 @@ pub struct BackendContext<'a> {
     pub intrinsics: Intrinsics,
     pub relocations: Vec<Phi2Relocation>,
     pub static_variables: Vec<StaticVariable>,
+    pub structure_cache: HashMap<StructureRef, LLVMTypeRef>,
 }
 
 impl<'a> BackendContext<'a> {
@@ -48,6 +49,7 @@ impl<'a> BackendContext<'a> {
             intrinsics: Intrinsics::new(&backend_module),
             relocations: Vec::new(),
             static_variables: Vec::new(),
+            structure_cache: Default::default(),
         }
     }
 }
