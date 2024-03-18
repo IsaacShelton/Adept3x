@@ -1,6 +1,7 @@
 use derive_more::{Deref, DerefMut};
 use std::{collections::HashMap, ffi::CString};
 
+use crate::resolved::IntegerBits;
 pub use crate::resolved::{FunctionRef, GlobalRef};
 
 #[derive(Clone)]
@@ -63,6 +64,7 @@ pub enum Instruction {
     Parameter(u32),
     GlobalVariable(GlobalRef),
     Add(BinaryOperands),
+    CheckedAdd(BinaryOperands, IntegerBits, IntegerSign),
     Subtract(BinaryOperands),
     Multiply(BinaryOperands),
     Divide(BinaryOperands, IntegerSign),
@@ -239,6 +241,7 @@ impl Instruction {
             Instruction::Parameter(..) => false,
             Instruction::GlobalVariable(..) => false,
             Instruction::Add(..) => false,
+            Instruction::CheckedAdd(..) => false,
             Instruction::Subtract(..) => false,
             Instruction::Multiply(..) => false,
             Instruction::Divide(..) => false,

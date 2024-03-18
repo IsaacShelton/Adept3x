@@ -2,35 +2,36 @@ mod builder;
 mod ctx;
 mod intrinsics;
 mod module;
+mod null_terminated_string;
 mod target_data;
 mod target_machine;
 mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder, ctx::BackendContext, module::BackendModule, target_data::TargetData,
+    builder::Builder, ctx::BackendContext, module::BackendModule,
+    null_terminated_string::build_literal_cstring, target_data::TargetData,
     target_machine::TargetMachine, value_catalog::ValueCatalog,
 };
 use crate::{
     error::CompilerError,
     ir::{self, Instruction},
+    resolved::IntegerBits,
 };
 use colored::Colorize;
 use cstr::cstr;
 use ir::IntegerSign;
-use llvm_sys::{core::{LLVMBuildBitCast, LLVMBuildFPExt, LLVMBuildFPTrunc, LLVMBuildSExt, LLVMBuildTrunc, LLVMBuildZExt}, LLVMIntPredicate::*};
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMArrayType2, LLVMBuildAdd,
-        LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet,
-        LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
-        LLVMConstGEP2, LLVMConstInt, LLVMConstReal, LLVMConstString, LLVMDisposeMessage,
-        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMInt16Type, LLVMInt1Type,
-        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd,
-        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
-        LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
-        LLVMStructType, LLVMVoidType,
+        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAdd, LLVMBuildAlloca,
+        LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildICmp, LLVMBuildLoad2,
+        LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub,
+        LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMConstInt, LLVMConstReal,
+        LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam,
+        LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
+        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
+        LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -43,7 +44,15 @@ use llvm_sys::{
     },
     LLVMCallConv, LLVMLinkage,
 };
+use llvm_sys::{
+    core::{
+        LLVMBuildBitCast, LLVMBuildFPExt, LLVMBuildFPTrunc, LLVMBuildSExt, LLVMBuildTrunc,
+        LLVMBuildZExt,
+    },
+    LLVMIntPredicate::*,
+};
 use std::{
+    cell::OnceCell,
     ffi::{c_char, c_double, c_ulonglong, CStr, CString, OsStr},
     mem::MaybeUninit,
     path::Path,
@@ -219,10 +228,13 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
                         )
                     });
 
+            let overflow_basicblock: OnceCell<LLVMBasicBlockRef> = OnceCell::new();
+
             for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks {
                 create_function_block(
                     ctx,
                     &mut value_catalog,
+                    &overflow_basicblock,
                     &builder,
                     ir_basicblock_id,
                     ir_basicblock,
@@ -239,10 +251,11 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
 unsafe fn create_function_block(
     ctx: &BackendContext,
     value_catalog: &mut ValueCatalog,
+    overflow_basicblock: &OnceCell<LLVMBasicBlockRef>,
     builder: &Builder,
     ir_basicblock_id: usize,
     ir_basicblock: &ir::BasicBlock,
-    llvm_basicblock: LLVMBasicBlockRef,
+    mut llvm_basicblock: LLVMBasicBlockRef,
     function_skeleton: LLVMValueRef,
 ) {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
@@ -327,6 +340,105 @@ unsafe fn create_function_block(
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
                 Some(LLVMBuildAdd(builder.get(), left, right, cstr!("").as_ptr()))
+            }
+            Instruction::CheckedAdd(operands, bits, sign) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                let (expect_i1_fn_value, expect_i1_fn_type) = ctx.intrinsics.expect_i1();
+                let (overflow_panic_fn, overflow_panic_fn_type) = ctx.intrinsics.on_overflow();
+
+                let mut arguments = [left, right];
+
+                let (fn_value, fn_type) = match (bits, sign) {
+                    (IntegerBits::Bits8, IntegerSign::Signed) => {
+                        ctx.intrinsics.signed_add_with_overflow_i8()
+                    }
+                    (IntegerBits::Bits8, IntegerSign::Unsigned) => {
+                        ctx.intrinsics.unsigned_add_with_overflow_i8()
+                    }
+                    (IntegerBits::Bits16, IntegerSign::Signed) => {
+                        ctx.intrinsics.signed_add_with_overflow_i16()
+                    }
+                    (IntegerBits::Bits16, IntegerSign::Unsigned) => {
+                        ctx.intrinsics.unsigned_add_with_overflow_i16()
+                    }
+                    (IntegerBits::Bits32, IntegerSign::Signed) => {
+                        ctx.intrinsics.signed_add_with_overflow_i32()
+                    }
+                    (IntegerBits::Bits32, IntegerSign::Unsigned) => {
+                        ctx.intrinsics.unsigned_add_with_overflow_i32()
+                    }
+                    (IntegerBits::Bits64, IntegerSign::Signed)
+                    | (IntegerBits::Normal, IntegerSign::Signed) => {
+                        ctx.intrinsics.signed_add_with_overflow_i64()
+                    }
+                    (IntegerBits::Bits64, IntegerSign::Unsigned)
+                    | (IntegerBits::Normal, IntegerSign::Unsigned) => {
+                        ctx.intrinsics.unsigned_add_with_overflow_i64()
+                    }
+                };
+
+                let info = LLVMBuildCall2(
+                    builder.get(),
+                    fn_type,
+                    fn_value,
+                    arguments.as_mut_ptr(),
+                    arguments.len().try_into().unwrap(),
+                    cstr!("").as_ptr(),
+                );
+
+                // `result = info.0`
+                // `overflow = info.1`
+                let result = LLVMBuildExtractValue(builder.get(), info, 0, cstr!("").as_ptr());
+                let overflowed = LLVMBuildExtractValue(builder.get(), info, 1, cstr!("").as_ptr());
+
+                // `llvm.expect.i1(overflowed, false)`
+                let mut arguments = [
+                    overflowed,
+                    LLVMConstInt(LLVMInt1Type(), false.into(), false.into()),
+                ];
+                LLVMBuildCall2(
+                    builder.get(),
+                    expect_i1_fn_type,
+                    expect_i1_fn_value,
+                    arguments.as_mut_ptr(),
+                    arguments.len().try_into().unwrap(),
+                    cstr!("").as_ptr(),
+                );
+
+                let overflow_basicblock = *overflow_basicblock.get_or_init(|| {
+                    let overflow_basicblock =
+                        LLVMAppendBasicBlock(function_skeleton, cstr!("").as_ptr());
+                    let mut args = [];
+
+                    LLVMPositionBuilderAtEnd(builder.get(), overflow_basicblock);
+                    LLVMBuildCall2(
+                        builder.get(),
+                        overflow_panic_fn_type,
+                        overflow_panic_fn,
+                        args.as_mut_ptr(),
+                        args.len().try_into().unwrap(),
+                        cstr!("").as_ptr(),
+                    );
+                    LLVMBuildUnreachable(builder.get());
+                    LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
+                    overflow_basicblock
+                });
+
+                // Break to either "ok" basicblock or "overflow occurred" basicblock
+                let ok_basicblock = LLVMAppendBasicBlock(function_skeleton, cstr!("").as_ptr());
+                LLVMBuildCondBr(
+                    builder.get(),
+                    overflowed,
+                    overflow_basicblock,
+                    ok_basicblock,
+                );
+
+                // Switch over to new continuation basicblock
+                llvm_basicblock = ok_basicblock;
+                LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
+                Some(result)
             }
             Instruction::Subtract(operands) => {
                 let (left, right) =
@@ -453,32 +565,62 @@ unsafe fn create_function_block(
             Instruction::Bitcast(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildBitCast(builder.get(), value, backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildBitCast(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::ZeroExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildZExt(builder.get(), value, backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildZExt(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::SignExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildSExt(builder.get(), value, backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildSExt(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::FloatExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildFPExt(builder.get(), value, backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildFPExt(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::Truncate(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildTrunc(builder.get(), value, backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildTrunc(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::TruncateFloat(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx.backend_module, ir_type);
-                Some(LLVMBuildFPTrunc(builder.get(), value, backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildFPTrunc(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
         };
 
@@ -551,29 +693,7 @@ unsafe fn build_value(
             ir::Literal::Float32(value) => LLVMConstReal(LLVMFloatType(), *value as c_double),
             ir::Literal::Float64(value) => LLVMConstReal(LLVMDoubleType(), *value as c_double),
             ir::Literal::NullTerminatedString(value) => {
-                let length = value.as_bytes_with_nul().len();
-                let storage_type = LLVMArrayType2(LLVMInt8Type(), length.try_into().unwrap());
-
-                let read_only =
-                    LLVMAddGlobal(backend_module.get(), storage_type, cstr!("").as_ptr());
-                LLVMSetLinkage(read_only, LLVMLinkage::LLVMInternalLinkage);
-                LLVMSetGlobalConstant(read_only, true as i32);
-                LLVMSetInitializer(
-                    read_only,
-                    LLVMConstString(value.as_ptr(), length.try_into().unwrap(), true as i32),
-                );
-
-                let mut indicies = [
-                    LLVMConstInt(LLVMInt32Type(), 0, true as i32),
-                    LLVMConstInt(LLVMInt32Type(), 0, true as i32),
-                ];
-
-                LLVMConstGEP2(
-                    storage_type,
-                    read_only,
-                    indicies.as_mut_ptr(),
-                    indicies.len() as _,
-                )
+                build_literal_cstring(backend_module.get(), value)
             }
         },
         ir::Value::Reference(reference) => value_catalog

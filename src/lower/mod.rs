@@ -3,7 +3,9 @@ mod builder;
 use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Global, Literal, Value, ValueReference},
-    resolved::{self, Destination, DestinationKind, Expression, ExpressionKind, StatementKind},
+    resolved::{
+        self, Destination, DestinationKind, Expression, ExpressionKind, IntegerBits, StatementKind,
+    },
 };
 use builder::Builder;
 
@@ -354,7 +356,15 @@ fn lower_expression(
             let operands = ir::BinaryOperands::new(left, right);
 
             match binary_operation.operator {
-                resolved::BinaryOperator::Add => Ok(builder.push(ir::Instruction::Add(operands))),
+                resolved::BinaryOperator::Add => {
+                    Ok(builder.push(match &binary_operation.left.resolved_type {
+                        resolved::Type::Integer {
+                            bits: IntegerBits::Normal,
+                            sign,
+                        } => ir::Instruction::CheckedAdd(operands, IntegerBits::Normal, *sign),
+                        _ => ir::Instruction::Add(operands),
+                    }))
+                }
                 resolved::BinaryOperator::Subtract => {
                     Ok(builder.push(ir::Instruction::Subtract(operands)))
                 }

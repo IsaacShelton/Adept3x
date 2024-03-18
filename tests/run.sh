@@ -14,6 +14,8 @@ compile comparison_operators
 compile function_parameters
 compile function_simple
 compile integer_literal_conforming
+compile integer_signed_overflow
+compile integer_unsigned_overflow
 compile integer_value_conforming
 compile math_simple
 compile return
