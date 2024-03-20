@@ -39,10 +39,7 @@ impl<'a> TypeSearchContext<'a> {
     }
 
     pub fn find_type(&self, name: &str) -> Option<&resolved::Type> {
-        if let Some(resolved_type) = self.types.get(name) {
-            return Some(resolved_type);
-        }
-        None
+        self.types.get(name)
     }
 
     pub fn put(&mut self, name: impl ToString, resolved_type: resolved::Type) {

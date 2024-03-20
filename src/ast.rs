@@ -1,5 +1,9 @@
 use num_bigint::BigInt;
-use std::{collections::HashMap, ffi::CString, fmt::Debug};
+use std::{
+    collections::HashMap,
+    ffi::CString,
+    fmt::{Debug, Display},
+};
 
 use crate::{
     line_column::Location,
@@ -195,8 +199,54 @@ pub enum TypeKind {
         sign: IntegerSign,
     },
     Pointer(Box<Type>),
+    PlainOldData(Box<Type>),
     Void,
     Named(String),
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.kind)?;
+        Ok(())
+    }
+}
+
+impl Display for &TypeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeKind::Boolean => {
+                write!(f, "bool")?;
+            }
+            TypeKind::Integer { bits, sign } => {
+                f.write_str(match (bits, sign) {
+                    (IntegerBits::Normal, IntegerSign::Signed) => "int",
+                    (IntegerBits::Normal, IntegerSign::Unsigned) => "uint",
+                    (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
+                    (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
+                    (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
+                    (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
+                    (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
+                    (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
+                    (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
+                    (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
+                })?;
+            }
+            TypeKind::Pointer(inner) => {
+                write!(f, "ptr<{}>", inner)?;
+            }
+            TypeKind::PlainOldData(inner) => {
+                write!(f, "pod<{}>", inner)?;
+            }
+            TypeKind::Void => {
+                write!(f, "void")?;
+            }
+            TypeKind::Named(name) => {
+                write!(f, "{}", name)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -252,6 +302,7 @@ pub enum ExpressionKind {
     Call(Call),
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
+    Member(Box<Expression>, String),
 }
 
 #[derive(Clone, Debug)]

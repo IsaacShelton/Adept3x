@@ -107,8 +107,9 @@ pub enum Type {
     },
     IntegerLiteral(BigInt),
     Pointer(Box<Type>),
+    PlainOldData(String, StructureRef),
     Void,
-    Structure(StructureRef),
+    Structure(String, StructureRef),
 }
 
 impl Type {
@@ -122,8 +123,9 @@ impl Type {
                 IntegerSign::Signed
             }),
             Type::Pointer(_) => None,
+            Type::PlainOldData(_, _) => None,
             Type::Void => None,
-            Type::Structure(_) => None,
+            Type::Structure(_, _) => None,
         }
     }
 }
@@ -154,8 +156,11 @@ impl Display for Type {
             Type::Pointer(inner) => {
                 write!(f, "ptr<{}>", inner)?;
             }
+            Type::PlainOldData(name, _) => {
+                write!(f, "pod<{}>", name)?;
+            }
             Type::Void => f.write_str("void")?,
-            Type::Structure(_) => f.write_str("<structure>")?,
+            Type::Structure(name, _) => f.write_str(name)?,
         }
 
         Ok(())
@@ -244,6 +249,7 @@ pub enum ExpressionKind {
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
     IntegerExtend(Box<Expression>, Type),
+    Member(Destination, StructureRef, usize, Type),
 }
 
 #[derive(Clone, Debug)]
@@ -256,6 +262,7 @@ pub struct Destination {
 pub enum DestinationKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),
+    Member(Box<Destination>, StructureRef, usize, Type),
 }
 
 impl TryFrom<Expression> for Destination {
@@ -276,6 +283,9 @@ impl TryFrom<ExpressionKind> for DestinationKind {
         match value {
             ExpressionKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
             ExpressionKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
+            ExpressionKind::Member(destination, structure_ref, index, ir_type) => {
+                Ok(DestinationKind::Member(Box::new(destination), structure_ref, index, ir_type))
+            }
             _ => Err(()),
         }
     }

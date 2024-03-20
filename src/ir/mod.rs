@@ -103,6 +103,7 @@ pub enum Instruction {
     FloatExtend(Value, Type),
     Truncate(Value, Type),
     TruncateFloat(Value, Type),
+    Member(Value, StructureRef, usize),
 }
 
 #[derive(Clone, Debug)]
@@ -281,6 +282,7 @@ impl Instruction {
             Instruction::FloatExtend(..) => false,
             Instruction::Truncate(..) => false,
             Instruction::TruncateFloat(..) => false,
+            Instruction::Member(..) => false,
         }
     }
 }

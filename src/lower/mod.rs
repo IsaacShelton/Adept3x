@@ -43,7 +43,7 @@ fn lower_structure(
         ir::Structure {
             fields,
             is_packed: structure.is_packed,
-        }
+        },
     );
 
     Ok(())
@@ -210,13 +210,14 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
         ))),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         resolved::Type::Void => Ok(ir::Type::Void),
-        resolved::Type::Structure(structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
+        resolved::Type::Structure(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
+        resolved::Type::PlainOldData(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
     }
 }
 
 fn lower_destination(
     builder: &mut Builder,
-    _ir_module: &ir::Module,
+    ir_module: &ir::Module,
     destination: &Destination,
 ) -> Result<ir::Value, CompilerError> {
     match &destination.kind {
@@ -231,6 +232,14 @@ fn lower_destination(
         DestinationKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
             Ok(pointer)
+        }
+        DestinationKind::Member(destination, structure_ref, index, _) => {
+            let subject_pointer = lower_destination(builder, ir_module, destination)?;
+            Ok(builder.push(ir::Instruction::Member(
+                subject_pointer,
+                *structure_ref,
+                *index,
+            )))
         }
     }
 }
@@ -492,6 +501,16 @@ fn lower_expression(
                     resolved::IntegerSign::Unsigned => ir::Instruction::ZeroExtend(value, ir_type),
                 },
             ))
+        }
+        ExpressionKind::Member(subject_destination, structure_ref, index, resolved_type) => {
+            let subject_pointer = lower_destination(builder, ir_module, subject_destination)?;
+            let member = builder.push(ir::Instruction::Member(
+                subject_pointer,
+                *structure_ref,
+                *index,
+            ));
+            let ir_type = lower_type(resolved_type)?;
+            Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
     }
 }

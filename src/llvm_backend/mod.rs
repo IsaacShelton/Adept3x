@@ -24,13 +24,14 @@ use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
         LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAdd, LLVMBuildAlloca,
-        LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildICmp, LLVMBuildLoad2,
-        LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub,
-        LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMConstInt, LLVMConstReal,
-        LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam,
-        LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
-        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
-        LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
+        LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildGEP2, LLVMBuildICmp,
+        LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore,
+        LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMConstInt,
+        LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType,
+        LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
+        LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString,
+        LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal,
+        LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -198,7 +199,7 @@ unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), CompilerError> 
 
 unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), CompilerError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
-        let mut parameters: Vec<LLVMTypeRef> = to_backend_types(ctx, &function.parameters);
+        let mut parameters = to_backend_types(ctx, &function.parameters);
         let return_type = to_backend_type(ctx, &function.return_type);
 
         let name = CString::new(function.mangled_name.as_bytes()).unwrap();
@@ -609,16 +610,34 @@ unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
+            Instruction::Member(pointer_value, structure_ref, index) => {
+                let pointer = build_value(ctx.backend_module, value_catalog, builder, pointer_value);
+                let backend_type = *ctx
+                    .structure_cache
+                    .get(structure_ref)
+                    .expect("referenced structure to exist");
+
+                let mut indices = [
+                    LLVMConstInt(LLVMInt32Type(), 0, true.into()),
+                    LLVMConstInt(LLVMInt32Type(), (*index).try_into().unwrap(), true.into()),
+                ];
+
+                Some(LLVMBuildGEP2(
+                    builder.get(),
+                    backend_type,
+                    pointer,
+                    indices.as_mut_ptr(),
+                    indices.len().try_into().unwrap(),
+                    cstr!("").as_ptr(),
+                ))
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);
     }
 }
 
-unsafe fn get_function_type(
-    ctx: &BackendContext<'_>,
-    function: &ir::Function,
-) -> LLVMTypeRef {
+unsafe fn get_function_type(ctx: &BackendContext, function: &ir::Function) -> LLVMTypeRef {
     let return_type = to_backend_type(ctx, &function.return_type);
     let mut parameters = to_backend_types(ctx, &function.parameters);
     let is_vararg = if function.is_cstyle_variadic { 1 } else { 0 };
@@ -689,7 +708,7 @@ unsafe fn build_value(
     }
 }
 
-unsafe fn to_backend_type(ctx: &BackendContext<'_>, ir_type: &ir::Type) -> LLVMTypeRef {
+unsafe fn to_backend_type(ctx: &BackendContext, ir_type: &ir::Type) -> LLVMTypeRef {
     match ir_type {
         ir::Type::Void => LLVMVoidType(),
         ir::Type::Boolean => LLVMInt1Type(),
@@ -732,7 +751,7 @@ unsafe fn to_backend_type(ctx: &BackendContext<'_>, ir_type: &ir::Type) -> LLVMT
     }
 }
 
-unsafe fn to_backend_types(ctx: &BackendContext<'_>, ir_types: &[ir::Type]) -> Vec<LLVMTypeRef> {
+unsafe fn to_backend_types(ctx: &BackendContext, ir_types: &[ir::Type]) -> Vec<LLVMTypeRef> {
     ir_types.iter().map(|ty| to_backend_type(ctx, ty)).collect()
 }
 

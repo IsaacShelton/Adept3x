@@ -367,14 +367,19 @@ where
 
         match self.input.peek().kind {
             TokenKind::Identifier(_) => {
-                if let TokenKind::OpenParen | TokenKind::DeclareAssign = self.input.peek_nth(1).kind
-                {
-                    Ok(Statement::new(
-                        StatementKind::Expression(self.parse_expression()?),
-                        self.source(location),
-                    ))
-                } else {
+                if let TokenKind::Identifier(..) = self.input.peek_nth(1).kind {
                     self.parse_declaration()
+                } else {
+                    let left = self.parse_expression()?;
+
+                    if self.input.peek_is(TokenKind::Assign) {
+                        self.parse_assignment(left)
+                    } else {
+                        Ok(Statement::new(
+                            StatementKind::Expression(left),
+                            self.source(location),
+                        ))
+                    }
                 }
             }
             TokenKind::ReturnKeyword => self.parse_return(),
@@ -532,9 +537,31 @@ where
 
     fn parse_expression_primary_post(
         &mut self,
-        base: Expression,
+        mut base: Expression,
     ) -> Result<Expression, ParseError> {
+        loop {
+            self.ignore_newlines();
+
+            match self.input.peek().kind {
+                TokenKind::Member => base = self.parse_member(base)?,
+                _ => break,
+            }
+        }
+
         Ok(base)
+    }
+
+    fn parse_member(&mut self, subject: Expression) -> Result<Expression, ParseError> {
+        // subject.field_name
+        //        ^
+
+        let location = self.parse_token(TokenKind::Member, Some("for member expression"))?;
+        let field_name = self.parse_identifier(Some("for field name"))?;
+
+        Ok(Expression::new(
+            ExpressionKind::Member(Box::new(subject), field_name),
+            self.source(location),
+        ))
     }
 
     fn parse_call(
@@ -700,6 +727,22 @@ where
                             Ok(TypeKind::Pointer(Box::new(inner)))
                         } else {
                             Ok(TypeKind::Pointer(Box::new(Type::new(
+                                TypeKind::Void,
+                                source,
+                            ))))
+                        }
+                    }
+                    "pod" => {
+                        if self.input.peek_is(TokenKind::OpenAngle) {
+                            self.input.advance();
+                            let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                            self.parse_token(
+                                TokenKind::GreaterThan,
+                                Some("to close type parameters"),
+                            )?;
+                            Ok(TypeKind::PlainOldData(Box::new(inner)))
+                        } else {
+                            Ok(TypeKind::PlainOldData(Box::new(Type::new(
                                 TypeKind::Void,
                                 source,
                             ))))

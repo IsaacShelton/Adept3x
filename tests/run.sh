@@ -18,9 +18,11 @@ compile integer_signed_overflow
 compile integer_unsigned_overflow
 compile integer_value_conforming
 compile math_simple
+compile member_pod
 compile return
 compile return_message
 compile structure_definitions
+compile structure_pod
 compile variables
 compile variables_override
 compile variables_typed

@@ -52,7 +52,11 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 fields.insert(
                     field_name.into(),
                     resolved::Field {
-                        resolved_type: resolve_type(type_search_context, &field.ast_type)?,
+                        resolved_type: resolve_type(
+                            type_search_context,
+                            resolved_ast.source_file_cache,
+                            &field.ast_type,
+                        )?,
                         privacy: field.privacy,
                     },
                 );
@@ -64,7 +68,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_packed: structure.is_packed,
             });
 
-            let resolved_type = resolved::Type::Structure(structure_key);
+            let resolved_type = resolved::Type::Structure(structure.name.clone(), structure_key);
             type_search_context.put(structure.name.clone(), resolved_type);
         }
 
@@ -74,7 +78,11 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             .or_insert_with(|| GlobalSearchContext::new(resolved_ast.source_file_cache));
 
         for global in file.globals.iter() {
-            let resolved_type = resolve_type(type_search_context, &global.ast_type)?;
+            let resolved_type = resolve_type(
+                type_search_context,
+                resolved_ast.source_file_cache,
+                &global.ast_type,
+            )?;
 
             let global_ref = resolved_ast.globals.insert(resolved::Global {
                 name: global.name.clone(),
@@ -90,8 +98,16 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
         for (i, function) in file.functions.iter().enumerate() {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: function.name.clone(),
-                parameters: resolve_parameters(type_search_context, &function.parameters)?,
-                return_type: resolve_type(type_search_context, &function.return_type)?,
+                parameters: resolve_parameters(
+                    type_search_context,
+                    resolved_ast.source_file_cache,
+                    &function.parameters,
+                )?,
+                return_type: resolve_type(
+                    type_search_context,
+                    resolved_ast.source_file_cache,
+                    &function.return_type,
+                )?,
                 statements: vec![],
                 is_foreign: function.is_foreign,
                 variables: VariableStorage::new(),
@@ -166,7 +182,11 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                         .unwrap();
 
                     for parameter in ast_function.parameters.required.iter() {
-                        let resolved_type = resolve_type(type_search_context, &parameter.ast_type)?;
+                        let resolved_type = resolve_type(
+                            type_search_context,
+                            resolved_ast.source_file_cache,
+                            &parameter.ast_type,
+                        )?;
                         let key = function.variables.add_parameter(resolved_type.clone());
 
                         variable_search_context.put(parameter.name.clone(), resolved_type, key);
@@ -288,7 +308,11 @@ fn resolve_statement(
                 .get_mut(resolved_function_ref)
                 .unwrap();
 
-            let resolved_type = resolve_type(type_search_context, &declaration.ast_type)?;
+            let resolved_type = resolve_type(
+                type_search_context,
+                resolved_ast.source_file_cache,
+                &declaration.ast_type,
+            )?;
             let key = function.variables.add_variable(resolved_type.clone());
             variable_search_context.put(&declaration.name, resolved_type.clone(), key);
 
@@ -332,7 +356,7 @@ fn resolve_statement(
             ))
         }
         ast::StatementKind::Assignment(assignment) => {
-            let destination = resolve_expression(
+            let destination_expression = resolve_expression(
                 resolved_ast,
                 function_search_context,
                 global_search_context,
@@ -350,25 +374,12 @@ fn resolve_statement(
                 &assignment.value,
             )?;
 
-            match conform_expression(&value, &destination.resolved_type) {
+            match conform_expression(&value, &destination_expression.resolved_type) {
                 Some(value) => {
-                    let destination = match TryInto::<Destination>::try_into(destination.expression)
-                    {
-                        Ok(destination) => destination,
-                        Err(_) => {
-                            return Err(ResolveError {
-                                filename: Some(
-                                    resolved_ast
-                                        .source_file_cache
-                                        .get(source.key)
-                                        .filename()
-                                        .to_string(),
-                                ),
-                                location: Some(source.location),
-                                kind: ResolveErrorKind::CannotMutate,
-                            })
-                        }
-                    };
+                    let destination = resolve_expression_to_destination(
+                        resolved_ast.source_file_cache,
+                        destination_expression.expression,
+                    )?;
 
                     Ok(resolved::Statement::new(
                         resolved::StatementKind::Assignment(resolved::Assignment {
@@ -389,7 +400,7 @@ fn resolve_statement(
                     location: Some(source.location),
                     kind: ResolveErrorKind::CannotAssignValueOfType {
                         from: value.resolved_type.to_string(),
-                        to: destination.resolved_type.to_string(),
+                        to: destination_expression.resolved_type.to_string(),
                     },
                 }),
             }
@@ -906,11 +917,97 @@ fn resolve_expression(
                 ),
             ))
         }
+        ast::ExpressionKind::Member(subject, field_name) => {
+            let resolved_subject = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                subject,
+            )?;
+
+            let structure_ref = match resolved_subject.resolved_type {
+                resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
+                _ => {
+                    return Err(ResolveError {
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(subject.source.key)
+                                .filename()
+                                .to_string(),
+                        ),
+                        location: Some(subject.source.location),
+                        kind: ResolveErrorKind::PlainOldDataExpectedStructType {
+                            bad_type: resolved_subject.resolved_type.to_string(),
+                        },
+                    })
+                }
+            };
+
+            let structure = resolved_ast
+                .structures
+                .get(structure_ref)
+                .expect("referenced struct to exist");
+
+            let (index, _key, found_field) = match structure.fields.get_full(field_name) {
+                Some(found) => found,
+                None => {
+                    return Err(ResolveError {
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(subject.source.key)
+                                .filename()
+                                .to_string(),
+                        ),
+                        location: Some(subject.source.location),
+                        kind: ResolveErrorKind::FieldDoesNotExist {
+                            field_name: field_name.to_string(),
+                        },
+                    })
+                }
+            };
+
+            match found_field.privacy {
+                resolved::Privacy::Public => (),
+                resolved::Privacy::Private => {
+                    return Err(ResolveError {
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(subject.source.key)
+                                .filename()
+                                .to_string(),
+                        ),
+                        location: Some(subject.source.location),
+                        kind: ResolveErrorKind::FieldIsPrivate {
+                            field_name: field_name.to_string(),
+                        },
+                    })
+                }
+            }
+
+            let subject_destination = resolve_expression_to_destination(
+                resolved_ast.source_file_cache,
+                resolved_subject.expression,
+            )?;
+
+            Ok(TypedExpression::new(
+                found_field.resolved_type.clone(),
+                resolved::Expression::new(
+                    resolved::ExpressionKind::Member(subject_destination, structure_ref, index, found_field.resolved_type.clone()),
+                    ast_expression.source,
+                ),
+            ))
+        }
     }
 }
 
 fn resolve_type(
     type_search_context: &TypeSearchContext<'_>,
+    source_file_cache: &SourceFileCache,
     ast_type: &ast::Type,
 ) -> Result<resolved::Type, ResolveError> {
     match &ast_type.kind {
@@ -921,17 +1018,60 @@ fn resolve_type(
         }),
         ast::TypeKind::Pointer(inner) => Ok(resolved::Type::Pointer(Box::new(resolve_type(
             type_search_context,
+            source_file_cache,
             &inner,
         )?))),
         ast::TypeKind::Void => Ok(resolved::Type::Void),
-        ast::TypeKind::Named(name) => {
-            type_search_context.find_type_or_error(&name, ast_type.source).cloned()
-        }
+        ast::TypeKind::Named(name) => type_search_context
+            .find_type_or_error(&name, ast_type.source)
+            .cloned(),
+        ast::TypeKind::PlainOldData(inner) => match &inner.kind {
+            ast::TypeKind::Named(name) => {
+                let resolved_inner_type = type_search_context
+                    .find_type_or_error(&name, ast_type.source)
+                    .cloned()?;
+
+                let structure_ref = match resolved_inner_type {
+                    resolved::Type::Structure(_, structure_ref) => structure_ref,
+                    _ => {
+                        return Err(ResolveError {
+                            filename: Some(
+                                source_file_cache
+                                    .get(inner.source.key)
+                                    .filename()
+                                    .to_string(),
+                            ),
+                            location: Some(inner.source.location),
+                            kind: ResolveErrorKind::PlainOldDataExpectedStructType {
+                                bad_type: inner.to_string(),
+                            },
+                        })
+                    }
+                };
+
+                Ok(resolved::Type::PlainOldData(name.clone(), structure_ref))
+            }
+            _ => {
+                return Err(ResolveError {
+                    filename: Some(
+                        source_file_cache
+                            .get(inner.source.key)
+                            .filename()
+                            .to_string(),
+                    ),
+                    location: Some(inner.source.location),
+                    kind: ResolveErrorKind::PlainOldDataExpectedStructType {
+                        bad_type: inner.to_string(),
+                    },
+                })
+            }
+        },
     }
 }
 
 fn resolve_parameters(
     type_search_context: &TypeSearchContext<'_>,
+    source_file_cache: &SourceFileCache,
     parameters: &ast::Parameters,
 ) -> Result<resolved::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
@@ -939,7 +1079,11 @@ fn resolve_parameters(
     for parameter in parameters.required.iter() {
         required.push(resolved::Parameter {
             name: parameter.name.clone(),
-            resolved_type: resolve_type(type_search_context, &parameter.ast_type)?,
+            resolved_type: resolve_type(
+                type_search_context,
+                source_file_cache,
+                &parameter.ast_type,
+            )?,
         });
     }
 
@@ -947,4 +1091,22 @@ fn resolve_parameters(
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
+}
+
+pub fn resolve_expression_to_destination(
+    source_file_cache: &SourceFileCache,
+    expression: resolved::Expression,
+) -> Result<Destination, ResolveError> {
+    let source = expression.source;
+
+    match TryInto::<Destination>::try_into(expression) {
+        Ok(destination) => Ok(destination),
+        Err(_) => {
+            return Err(ResolveError {
+                filename: Some(source_file_cache.get(source.key).filename().to_string()),
+                location: Some(source.location),
+                kind: ResolveErrorKind::CannotMutate,
+            })
+        }
+    }
 }
