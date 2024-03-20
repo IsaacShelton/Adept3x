@@ -939,7 +939,7 @@ fn resolve_expression(
                                 .to_string(),
                         ),
                         location: Some(subject.source.location),
-                        kind: ResolveErrorKind::PlainOldDataExpectedStructType {
+                        kind: ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
                             bad_type: resolved_subject.resolved_type.to_string(),
                         },
                     })
@@ -1042,7 +1042,7 @@ fn resolve_type(
                                     .to_string(),
                             ),
                             location: Some(inner.source.location),
-                            kind: ResolveErrorKind::PlainOldDataExpectedStructType {
+                            kind: ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
                                 bad_type: inner.to_string(),
                             },
                         })
@@ -1060,7 +1060,7 @@ fn resolve_type(
                             .to_string(),
                     ),
                     location: Some(inner.source.location),
-                    kind: ResolveErrorKind::PlainOldDataExpectedStructType {
+                    kind: ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
                         bad_type: inner.to_string(),
                     },
                 })

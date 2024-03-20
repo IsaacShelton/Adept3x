@@ -24,7 +24,7 @@ pub enum ResolveErrorKind {
     TypeMismatch { left: String, right: String },
     CannotAssignValueOfType { from: String, to: String },
     CannotMutate,
-    PlainOldDataExpectedStructType { bad_type: String },
+    CannotGetFieldOfNonPlainOldDataType { bad_type: String },
     FieldIsPrivate { field_name: String },
     FieldDoesNotExist { field_name: String },
     Other { message: String },
@@ -108,10 +108,10 @@ impl Display for ResolveError {
             ResolveErrorKind::CannotMutate => {
                 write!(f, "Cannot mutate value")?;
             }
-            ResolveErrorKind::PlainOldDataExpectedStructType { bad_type } => {
+            ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType { bad_type } => {
                 write!(
                     f,
-                    "Expected struct type for inner type of pod<...>, got '{}'",
+                    "Cannot get field of non-plain-old-data type '{}'",
                     bad_type
                 )?;
             }
