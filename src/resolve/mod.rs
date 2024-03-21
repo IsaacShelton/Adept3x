@@ -240,6 +240,7 @@ fn resolve_statement(
                     variable_search_context,
                     resolved_function_ref,
                     value,
+                    Initialized::Require,
                 )?;
 
                 let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
@@ -299,24 +300,18 @@ fn resolve_statement(
                     variable_search_context,
                     resolved_function_ref,
                     value,
+                    Initialized::Require,
                 )?
                 .expression,
             ),
             source,
         )),
         ast::StatementKind::Declaration(declaration) => {
-            let function = resolved_ast
-                .functions
-                .get_mut(resolved_function_ref)
-                .unwrap();
-
             let resolved_type = resolve_type(
                 type_search_context,
                 resolved_ast.source_file_cache,
                 &declaration.ast_type,
             )?;
-            let key = function.variables.add_variable(resolved_type.clone());
-            variable_search_context.put(&declaration.name, resolved_type.clone(), key);
 
             let value = declaration
                 .value
@@ -330,6 +325,7 @@ fn resolve_statement(
                         variable_search_context,
                         resolved_function_ref,
                         value,
+                        Initialized::Require,
                     )
                 })
                 .transpose()?
@@ -353,6 +349,16 @@ fn resolve_statement(
                 })
                 .transpose()?;
 
+            let function = resolved_ast
+                .functions
+                .get_mut(resolved_function_ref)
+                .unwrap();
+
+            let key = function
+                .variables
+                .add_variable(resolved_type.clone(), value.is_some());
+            variable_search_context.put(&declaration.name, resolved_type.clone(), key);
+
             Ok(resolved::Statement::new(
                 resolved::StatementKind::Declaration(resolved::Declaration { key, value }),
                 source,
@@ -367,6 +373,7 @@ fn resolve_statement(
                 variable_search_context,
                 resolved_function_ref,
                 &assignment.destination,
+                Initialized::AllowUninitialized,
             )?;
 
             let value = resolve_expression(
@@ -377,6 +384,7 @@ fn resolve_statement(
                 variable_search_context,
                 resolved_function_ref,
                 &assignment.value,
+                Initialized::Require,
             )?;
 
             match conform_expression(&value, &destination_expression.resolved_type) {
@@ -385,6 +393,24 @@ fn resolve_statement(
                         resolved_ast.source_file_cache,
                         destination_expression.expression,
                     )?;
+
+                    // Mark destination as initialized
+                    match &destination.kind {
+                        resolved::DestinationKind::Variable(variable) => {
+                            let function = resolved_ast
+                                .functions
+                                .get_mut(resolved_function_ref)
+                                .unwrap();
+
+                            function
+                                .variables
+                                .get(variable.key)
+                                .expect("variable being assigned to exists")
+                                .set_initialized();
+                        }
+                        resolved::DestinationKind::GlobalVariable(..) => (),
+                        resolved::DestinationKind::Member(..) => (),
+                    }
 
                     Ok(resolved::Statement::new(
                         resolved::StatementKind::Assignment(resolved::Assignment {
@@ -635,6 +661,11 @@ fn conform_integer_literal(
     }
 }
 
+enum Initialized {
+    Require,
+    AllowUninitialized,
+}
+
 fn resolve_expression(
     resolved_ast: &mut resolved::Ast,
     function_search_context: &FunctionSearchContext,
@@ -643,15 +674,27 @@ fn resolve_expression(
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
     ast_expression: &ast::Expression,
+    initialized: Initialized,
 ) -> Result<resolved::TypedExpression, ResolveError> {
     use resolved::{IntegerBits::*, IntegerSign::*};
 
     let source = ast_expression.source;
 
-    match &ast_expression.kind {
+    let resolved_expression = match &ast_expression.kind {
         ast::ExpressionKind::Variable(name) => {
             if let Some((resolved_type, key)) = variable_search_context.find_variable(name) {
-                Ok(TypedExpression::new(
+                let function = resolved_ast
+                    .functions
+                    .get_mut(resolved_function_ref)
+                    .unwrap();
+
+                let is_initialized = function
+                    .variables
+                    .get(*key)
+                    .expect("found variable to exist")
+                    .is_initialized();
+
+                Ok(TypedExpression::new_maybe_initialized(
                     resolved_type.clone(),
                     resolved::Expression::new(
                         resolved::ExpressionKind::Variable(resolved::Variable {
@@ -660,6 +703,7 @@ fn resolve_expression(
                         }),
                         source,
                     ),
+                    is_initialized,
                 ))
             } else {
                 let (resolved_type, reference) =
@@ -746,6 +790,7 @@ fn resolve_expression(
                     variable_search_context,
                     resolved_function_ref,
                     argument,
+                    Initialized::Require,
                 )?;
 
                 let function = resolved_ast.functions.get(function_ref).unwrap();
@@ -801,6 +846,7 @@ fn resolve_expression(
                 variable_search_context,
                 resolved_function_ref,
                 &declare_assign.value,
+                Initialized::Require,
             )?;
 
             let value = conform_expression_to_default(value, resolved_ast.source_file_cache)?;
@@ -809,8 +855,10 @@ fn resolve_expression(
                 .functions
                 .get_mut(resolved_function_ref)
                 .unwrap();
-            let key = function.variables.add_variable(value.resolved_type.clone());
 
+            let key = function
+                .variables
+                .add_variable(value.resolved_type.clone(), true);
             variable_search_context.put(&declare_assign.name, value.resolved_type.clone(), key);
 
             Ok(TypedExpression::new(
@@ -834,6 +882,7 @@ fn resolve_expression(
                 variable_search_context,
                 resolved_function_ref,
                 &binary_operation.left,
+                Initialized::Require,
             )?;
 
             let mut right = resolve_expression(
@@ -844,6 +893,7 @@ fn resolve_expression(
                 variable_search_context,
                 resolved_function_ref,
                 &binary_operation.right,
+                Initialized::Require,
             )?;
 
             // TODO: Properly conform left and right types
@@ -936,7 +986,10 @@ fn resolve_expression(
                 variable_search_context,
                 resolved_function_ref,
                 subject,
+                Initialized::Require,
             )?;
+
+            ensure_initialized(resolved_ast.source_file_cache, subject, &resolved_subject)?;
 
             let structure_ref = match resolved_subject.resolved_type {
                 resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
@@ -1055,6 +1108,7 @@ fn resolve_expression(
                     variable_search_context,
                     resolved_function_ref,
                     value,
+                    Initialized::Require,
                 )?;
 
                 let structure = resolved_ast
@@ -1140,7 +1194,19 @@ fn resolve_expression(
                 ),
             ))
         }
-    }
+    };
+
+    resolved_expression.and_then(|resolved_expression| match initialized {
+        Initialized::Require => {
+            ensure_initialized(
+                resolved_ast.source_file_cache,
+                ast_expression,
+                &resolved_expression,
+            )?;
+            Ok(resolved_expression)
+        }
+        Initialized::AllowUninitialized => Ok(resolved_expression),
+    })
 }
 
 fn resolve_type(
@@ -1246,5 +1312,35 @@ pub fn resolve_expression_to_destination(
                 kind: ResolveErrorKind::CannotMutate,
             })
         }
+    }
+}
+
+fn ensure_initialized(
+    source_file_cache: &SourceFileCache,
+    subject: &ast::Expression,
+    resolved_subject: &TypedExpression,
+) -> Result<(), ResolveError> {
+    if resolved_subject.is_initialized {
+        Ok(())
+    } else {
+        let resolve_error_kind = match &subject.kind {
+            ast::ExpressionKind::Variable(variable_name) => {
+                ResolveErrorKind::CannotUseUninitializedVariable {
+                    variable_name: variable_name.clone(),
+                }
+            }
+            _ => ResolveErrorKind::CannotUseUninitializedValue,
+        };
+
+        return Err(ResolveError {
+            filename: Some(
+                source_file_cache
+                    .get(subject.source.key)
+                    .filename()
+                    .to_string(),
+            ),
+            location: Some(subject.source.location),
+            kind: resolve_error_kind,
+        });
     }
 }

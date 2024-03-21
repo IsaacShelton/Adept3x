@@ -31,6 +31,8 @@ pub enum ResolveErrorKind {
     FieldDoesNotExist { field_name: String },
     CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type: String },
     MissingFields { fields: Vec<String> },
+    CannotUseUninitializedValue,
+    CannotUseUninitializedVariable { variable_name: String },
     Other { message: String },
 }
 
@@ -154,6 +156,12 @@ impl Display for ResolveError {
                     _ => write!(f, "Missing fields - {}, ...", first_missing_field_names)?,
                 }
             }
+            ResolveErrorKind::CannotUseUninitializedValue => {
+                write!(f, "Cannot use uninitialized value")?;
+            },
+            ResolveErrorKind::CannotUseUninitializedVariable { variable_name } => {
+                write!(f, "Cannot use uninitialized variable '{}'", variable_name)?;
+            },
         }
 
         Ok(())

@@ -5,7 +5,8 @@ func printf(format ptr<u8>, ...) i32
 struct Vector3i (x int, y int, z int)
 
 func main {
-    vector pod<Vector3i>
+    vector pod<Vector3i> = pod<Vector3i> { x: 0, y: 0, z: 0 }
+
     vector.x = 123
     vector.y = 456
     vector.z = 789

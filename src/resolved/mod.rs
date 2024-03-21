@@ -203,6 +203,7 @@ pub struct Assignment {
 pub struct TypedExpression {
     pub resolved_type: Type,
     pub expression: Expression,
+    pub is_initialized: bool,
 }
 
 impl TypedExpression {
@@ -210,6 +211,19 @@ impl TypedExpression {
         Self {
             resolved_type,
             expression,
+            is_initialized: true,
+        }
+    }
+
+    pub fn new_maybe_initialized(
+        resolved_type: Type,
+        expression: Expression,
+        is_initialized: bool,
+    ) -> Self {
+        Self {
+            resolved_type,
+            expression,
+            is_initialized,
         }
     }
 }

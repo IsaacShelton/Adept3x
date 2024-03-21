@@ -7,6 +7,11 @@ function compile() {
     ../target/debug/adept $1/main.adept
 }
 
+function expect_fail_compile() {
+    echo "[-] Expecting failure to compile '$1'"
+    ../target/debug/adept $1/main.adept
+}
+
 pushd "$self" > /dev/null
 cargo build
 compile c_printf
@@ -17,6 +22,7 @@ compile integer_literal_conforming
 compile integer_signed_overflow
 compile integer_unsigned_overflow
 compile integer_value_conforming
+compile late_initialization
 compile math_simple
 compile member_pod
 compile return
@@ -27,5 +33,8 @@ compile structure_pod
 compile variables
 compile variables_override
 compile variables_typed
+expect_fail_compile _should_fail/partial_initialization
+expect_fail_compile _should_fail/uninitialized_member
+expect_fail_compile _should_fail/uninitialized_simple
 popd > /dev/null
 

@@ -1,0 +1,13 @@
+
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+struct Vector3i (x int, y int, z int)
+
+func main {
+    vector pod<Vector3i>
+
+    printf(c"x = %lld\n", vector.x)
+}
+

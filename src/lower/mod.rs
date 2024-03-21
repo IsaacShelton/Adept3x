@@ -78,22 +78,26 @@ fn lower_function(
         // Allocate parameters
         let parameter_variables = function
             .variables
-            .types
+            .instances
             .iter()
             .take(function.variables.num_parameters)
-            .map(|variable_type| {
-                Ok(builder.push(ir::Instruction::Alloca(lower_type(variable_type)?)))
+            .map(|instance| {
+                Ok(builder.push(ir::Instruction::Alloca(lower_type(
+                    &instance.resolved_type,
+                )?)))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
         // Allocate non-parameter stack variables
-        for variable_type in function
+        for variable_instance in function
             .variables
-            .types
+            .instances
             .iter()
             .skip(function.variables.num_parameters)
         {
-            builder.push(ir::Instruction::Alloca(lower_type(variable_type)?));
+            builder.push(ir::Instruction::Alloca(lower_type(
+                &variable_instance.resolved_type,
+            )?));
         }
 
         for (i, destination) in parameter_variables.into_iter().enumerate() {
