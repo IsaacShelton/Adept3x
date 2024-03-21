@@ -989,8 +989,6 @@ fn resolve_expression(
                 Initialized::Require,
             )?;
 
-            ensure_initialized(resolved_ast.source_file_cache, subject, &resolved_subject)?;
-
             let structure_ref = match resolved_subject.resolved_type {
                 resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
                 _ => {

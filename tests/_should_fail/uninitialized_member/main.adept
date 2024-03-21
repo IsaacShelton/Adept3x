@@ -1,5 +1,4 @@
 
-
 #[foreign]
 func printf(format ptr<u8>, ...) i32
 
