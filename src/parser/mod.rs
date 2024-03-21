@@ -20,7 +20,7 @@ use crate::{
 };
 use ast::BinaryOperator;
 use indexmap::IndexMap;
-use std::{borrow::Borrow, collections::HashMap, ffi::CString};
+use std::{borrow::Borrow, ffi::CString};
 
 struct Parser<'a, I>
 where
@@ -225,7 +225,7 @@ where
             }
         }
 
-        let mut fields = HashMap::new();
+        let mut fields = IndexMap::new();
 
         self.ignore_newlines();
         self.parse_token(TokenKind::OpenParen, Some("to begin struct fields"))?;
@@ -499,12 +499,10 @@ where
         let location = *location;
 
         match kind {
-            TokenKind::Integer(..) => {
-                let source = self.source(location);
-                let value = self.input.advance().kind.unwrap_integer();
-
-                Ok(Expression::new(ExpressionKind::Integer(value), source))
-            }
+            TokenKind::Integer(..) => Ok(Expression::new(
+                ExpressionKind::Integer(self.input.advance().kind.unwrap_integer()),
+                self.source(location),
+            )),
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::NullTerminated,
                 ..
@@ -516,7 +514,7 @@ where
                 self.source(location),
             )),
             TokenKind::OpenParen => {
-                self.input.advance();
+                self.input.advance().kind.unwrap_open_paren();
                 let inner = self.parse_expression()?;
                 self.parse_token(TokenKind::CloseParen, Some("to close nested expression"))?;
                 Ok(inner)
@@ -588,6 +586,7 @@ where
             self.ignore_newlines();
 
             self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
+            self.ignore_newlines();
 
             let field_value = self.parse_expression()?;
             self.ignore_newlines();

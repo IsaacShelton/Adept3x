@@ -613,6 +613,7 @@ unsafe fn create_function_block(
             Instruction::Member(pointer_value, structure_ref, index) => {
                 let pointer =
                     build_value(ctx.backend_module, value_catalog, builder, pointer_value);
+
                 let backend_type = *ctx
                     .structure_cache
                     .get(structure_ref)

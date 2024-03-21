@@ -1180,7 +1180,7 @@ fn resolve_type(
                                     .to_string(),
                             ),
                             location: Some(inner.source.location),
-                            kind: ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
+                            kind: ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
                                 bad_type: inner.to_string(),
                             },
                         })
@@ -1198,7 +1198,7 @@ fn resolve_type(
                             .to_string(),
                     ),
                     location: Some(inner.source.location),
-                    kind: ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
+                    kind: ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
                         bad_type: inner.to_string(),
                     },
                 })

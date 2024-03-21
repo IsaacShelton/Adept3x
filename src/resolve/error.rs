@@ -26,6 +26,7 @@ pub enum ResolveErrorKind {
     CannotAssignValueOfType { from: String, to: String },
     CannotMutate,
     CannotGetFieldOfNonPlainOldDataType { bad_type: String },
+    CannotCreatePlainOldDataOfNonStructure { bad_type: String },
     FieldIsPrivate { field_name: String },
     FieldDoesNotExist { field_name: String },
     CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type: String },
@@ -118,6 +119,13 @@ impl Display for ResolveError {
                     bad_type
                 )?;
             }
+            ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure { bad_type } => {
+                write!(
+                    f,
+                    "Cannot create plain-old-data type of non-struct type '{}'",
+                    bad_type
+                )?;
+            }
             ResolveErrorKind::FieldIsPrivate { field_name } => {
                 write!(f, "Field '{}' is private", field_name)?;
             }
@@ -142,8 +150,8 @@ impl Display for ResolveError {
                     .join(", ");
 
                 match fields.len() {
-                    0..=4 => write!(f, "Missing fields {}", first_missing_field_names)?,
-                    _ => write!(f, "Missing fields {}, ...", first_missing_field_names)?,
+                    0..=4 => write!(f, "Missing fields - {}", first_missing_field_names)?,
+                    _ => write!(f, "Missing fields - {}, ...", first_missing_field_names)?,
                 }
             }
         }

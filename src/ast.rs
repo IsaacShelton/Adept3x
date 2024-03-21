@@ -120,7 +120,7 @@ pub struct Parameter {
 #[derive(Clone, Debug)]
 pub struct Structure {
     pub name: String,
-    pub fields: HashMap<String, Field>,
+    pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
 }
 

@@ -517,7 +517,7 @@ fn lower_expression(
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
-            for (_name, (expression, index)) in fields.iter() {
+            for (expression, index) in fields.values() {
                 let value = lower_expression(builder, ir_module, expression)?;
                 values.push((index, value));
             }
