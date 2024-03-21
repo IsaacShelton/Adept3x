@@ -115,6 +115,8 @@ fn lower_function(
                     let instruction =
                         ir::Instruction::Return(if let Some(expression) = expression {
                             Some(lower_expression(&mut builder, ir_module, expression)?)
+                        } else if function.name == "main" {
+                            Some(ir::Value::Literal(Literal::Signed32(0)))
                         } else {
                             None
                         });
@@ -155,7 +157,13 @@ fn lower_function(
 
         if !builder.is_terminated() {
             if let resolved::Type::Void = function.return_type {
-                builder.terminate();
+                if function.name == "main" && !builder.is_terminated() {
+                    builder.push(ir::Instruction::Return(Some(ir::Value::Literal(
+                        Literal::Signed32(0),
+                    ))));
+                } else {
+                    builder.terminate();
+                }
             } else {
                 return Err(CompilerError::during_lower(format!(
                     "Must return a value of type '{}' before exiting function '{}'",
@@ -174,13 +182,21 @@ fn lower_function(
         parameters.push(lower_type(&parameter.resolved_type)?);
     }
 
+    let mut return_type = lower_type(&function.return_type)?;
+
+    if function.name == "main" {
+        if let ir::Type::Void = return_type {
+            return_type = ir::Type::S32;
+        }
+    }
+
     ir_module.functions.insert(
         function_ref,
         ir::Function {
             mangled_name: function.name.clone(),
             basicblocks,
             parameters,
-            return_type: lower_type(&function.return_type)?,
+            return_type,
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
             is_foreign: true,
             is_exposed: true,
