@@ -17,4 +17,5 @@ append-only-vec = "0.1.3"
 indoc = "2"
 memo-map = "0.3.2"
 indexmap = "2.2.5"
+itertools = "0.12.1"
 

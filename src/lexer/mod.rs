@@ -12,7 +12,7 @@ use self::{
 use crate::{
     line_column::LineColumn,
     look_ahead::LookAhead,
-    token::{StringModifier, Token, TokenKind},
+    token::{StringLiteral, StringModifier, Token, TokenKind},
 };
 use is_character::IsCharacter;
 
@@ -166,9 +166,7 @@ where
                     self.characters.next();
                     Has(Token::new(TokenKind::Equals, location))
                 }
-                '=' => {
-                    Has(Token::new(TokenKind::Assign, location))
-                }
+                '=' => Has(Token::new(TokenKind::Assign, location)),
                 '!' if self.characters.peek().is_character('=') => {
                     self.characters.next();
                     Has(Token::new(TokenKind::NotEquals, location))
@@ -262,7 +260,7 @@ where
                 self.state = State::Idle;
 
                 Has(Token::new(
-                    TokenKind::String { value, modifier },
+                    TokenKind::String(StringLiteral { value, modifier }),
                     start_location,
                 ))
             } else if c == '\\' {

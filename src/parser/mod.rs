@@ -16,9 +16,10 @@ use crate::{
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
-    token::{StringModifier, Token, TokenKind},
+    token::{StringLiteral, StringModifier, Token, TokenKind},
 };
 use ast::BinaryOperator;
+use indexmap::IndexMap;
 use std::{borrow::Borrow, collections::HashMap, ffi::CString};
 
 struct Parser<'a, I>
@@ -494,44 +495,49 @@ where
     }
 
     fn parse_expression_primary_base(&mut self) -> Result<Expression, ParseError> {
-        let Token { kind, location } = self.input.advance();
+        let Token { kind, location } = self.input.peek();
+        let location = *location;
 
         match kind {
-            TokenKind::Integer { value } => Ok(Expression::new(
-                ExpressionKind::Integer(value),
-                self.source(location),
-            )),
-            TokenKind::String {
-                value,
+            TokenKind::Integer(..) => {
+                let source = self.source(location);
+                let value = self.input.advance().kind.unwrap_integer();
+
+                Ok(Expression::new(ExpressionKind::Integer(value), source))
+            }
+            TokenKind::String(StringLiteral {
                 modifier: StringModifier::NullTerminated,
-            } => Ok(Expression::new(
+                ..
+            }) => Ok(Expression::new(
                 ExpressionKind::NullTerminatedString(
-                    CString::new(value).expect("valid null-terminated string"),
+                    CString::new(self.input.advance().kind.unwrap_string().value)
+                        .expect("valid null-terminated string"),
                 ),
                 self.source(location),
             )),
             TokenKind::OpenParen => {
+                self.input.advance();
                 let inner = self.parse_expression()?;
                 self.parse_token(TokenKind::CloseParen, Some("to close nested expression"))?;
                 Ok(inner)
             }
-            TokenKind::Identifier(identifier) => match self.input.peek().kind {
-                TokenKind::OpenParen => self.parse_call(identifier, self.source(location)),
-                TokenKind::DeclareAssign => {
-                    self.parse_declare_assign(identifier, self.source(location))
-                }
+            TokenKind::Identifier(_) => match self.input.peek_nth(1).kind {
+                TokenKind::OpenAngle | TokenKind::OpenCurly => self.parse_structure_literal(),
+                TokenKind::OpenParen => self.parse_call(),
+                TokenKind::DeclareAssign => self.parse_declare_assign(),
                 _ => Ok(Expression::new(
-                    ExpressionKind::Variable(identifier),
+                    ExpressionKind::Variable(self.input.advance().kind.unwrap_identifier()),
                     self.source(location),
                 )),
             },
-            unexpected => Err(ParseError {
-                filename: Some(self.input.filename().to_string()),
-                location: Some(location),
-                kind: ParseErrorKind::UnexpectedToken {
-                    unexpected: unexpected.to_string(),
-                },
-            }),
+            unexpected => {
+                let unexpected = unexpected.to_string();
+                Err(ParseError {
+                    filename: Some(self.input.filename().to_string()),
+                    location: Some(location),
+                    kind: ParseErrorKind::UnexpectedToken { unexpected },
+                })
+            }
         }
     }
 
@@ -564,14 +570,59 @@ where
         ))
     }
 
-    fn parse_call(
-        &mut self,
-        function_name: String,
-        source: Source,
-    ) -> Result<Expression, ParseError> {
+    fn parse_structure_literal(&mut self) -> Result<Expression, ParseError> {
+        // Type { x: VALUE, b: VALUE, c: VALUE }
+        //  ^
+
+        let ast_type = self.parse_type(None::<&str>, Some("for type of struct literal"))?;
+        let source = ast_type.source;
+
+        self.parse_token(TokenKind::OpenCurly, Some("to begin struct literal"))?;
+        self.ignore_newlines();
+
+        let mut fields = IndexMap::new();
+
+        while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+            let (field_name, field_location) =
+                self.parse_identifier_keep_location(Some("for field name in struct literal"))?;
+            self.ignore_newlines();
+
+            self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
+
+            let field_value = self.parse_expression()?;
+            self.ignore_newlines();
+
+            if fields.get(&field_name).is_some() {
+                return Err(ParseError {
+                    filename: Some(self.input.filename().to_string()),
+                    location: Some(field_location),
+                    kind: ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name },
+                });
+            }
+
+            fields.insert(field_name, field_value);
+
+            self.ignore_newlines();
+            if !self.input.peek_is(TokenKind::CloseCurly) {
+                self.parse_token(TokenKind::Comma, Some("after field in struct literal"))?;
+                self.ignore_newlines();
+            }
+        }
+
+        self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
+        Ok(Expression::new(
+            ExpressionKind::StructureLiteral(ast_type, fields),
+            source,
+        ))
+    }
+
+    fn parse_call(&mut self) -> Result<Expression, ParseError> {
         // function_name(arg1, arg2, arg3)
         //              ^
 
+        let (function_name, location) =
+            self.parse_identifier_keep_location(Some("for function call"))?;
+        let source = self.source(location);
         let mut arguments = vec![];
 
         self.parse_token(TokenKind::OpenParen, Some("to begin call argument list"))?;
@@ -633,13 +684,13 @@ where
         }
     }
 
-    fn parse_declare_assign(
-        &mut self,
-        variable_name: String,
-        source: Source,
-    ) -> Result<Expression, ParseError> {
+    fn parse_declare_assign(&mut self) -> Result<Expression, ParseError> {
         // variable_name := value
         //               ^
+
+        let (variable_name, location) =
+            self.parse_identifier_keep_location(Some("for function call"))?;
+        let source = self.source(location);
 
         self.parse_token(
             TokenKind::DeclareAssign,

@@ -35,6 +35,9 @@ pub enum ParseErrorKind {
         name: String,
         for_reason: Option<String>,
     },
+    FieldSpecifiedMoreThanOnce {
+        field_name: String,
+    },
     Other {
         message: String,
     },
@@ -107,6 +110,9 @@ impl Display for ParseError {
                 if let Some(for_reason) = for_reason {
                     write!(f, " {}", for_reason)?;
                 }
+            }
+            ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name } => {
+                write!(f, "Field '{}' specified more than more", field_name)?;
             }
             ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

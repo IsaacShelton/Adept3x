@@ -25,13 +25,13 @@ use llvm_sys::{
     core::{
         LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAdd, LLVMBuildAlloca,
         LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildGEP2, LLVMBuildICmp,
-        LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildStore,
-        LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMConstInt,
-        LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType,
-        LLVMGetParam, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
-        LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString,
-        LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal,
-        LLVMStructType, LLVMVoidType,
+        LLVMBuildInsertValue, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv,
+        LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
+        LLVMBuildUnreachable, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType,
+        LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type,
+        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd,
+        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
+        LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -611,7 +611,8 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::Member(pointer_value, structure_ref, index) => {
-                let pointer = build_value(ctx.backend_module, value_catalog, builder, pointer_value);
+                let pointer =
+                    build_value(ctx.backend_module, value_catalog, builder, pointer_value);
                 let backend_type = *ctx
                     .structure_cache
                     .get(structure_ref)
@@ -630,6 +631,25 @@ unsafe fn create_function_block(
                     indices.len().try_into().unwrap(),
                     cstr!("").as_ptr(),
                 ))
+            }
+            Instruction::StructureLiteral(ir_type, values) => {
+                let backend_type = to_backend_type(ctx, ir_type);
+                let mut literal = LLVMGetUndef(backend_type);
+
+                for (index, value) in values.iter().enumerate() {
+                    let backend_value =
+                        build_value(ctx.backend_module, value_catalog, builder, value);
+
+                    literal = LLVMBuildInsertValue(
+                        builder.get(),
+                        literal,
+                        backend_value,
+                        index.try_into().unwrap(),
+                        cstr!("").as_ptr(),
+                    );
+                }
+
+                Some(literal)
             }
         };
 

@@ -1,0 +1,16 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+struct Vector3i (x int, y int, z int)
+
+func main {
+    vector := pod<Vector3i> {
+        x: 123,
+        y: 456,
+        z: 789,
+    }
+
+    printf(c"x: %lld, y: %lld, z: %lld\n", vector.x, vector.y, vector.z)
+}
+

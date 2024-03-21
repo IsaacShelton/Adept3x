@@ -250,6 +250,7 @@ pub enum ExpressionKind {
     BinaryOperation(Box<BinaryOperation>),
     IntegerExtend(Box<Expression>, Type),
     Member(Destination, StructureRef, usize, Type),
+    StructureLiteral(Type, IndexMap<String, (Expression, usize)>),
 }
 
 #[derive(Clone, Debug)]
@@ -283,9 +284,9 @@ impl TryFrom<ExpressionKind> for DestinationKind {
         match value {
             ExpressionKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
             ExpressionKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
-            ExpressionKind::Member(destination, structure_ref, index, ir_type) => {
-                Ok(DestinationKind::Member(Box::new(destination), structure_ref, index, ir_type))
-            }
+            ExpressionKind::Member(destination, structure_ref, index, ir_type) => Ok(
+                DestinationKind::Member(Box::new(destination), structure_ref, index, ir_type),
+            ),
             _ => Err(()),
         }
     }

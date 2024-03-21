@@ -22,6 +22,7 @@ compile member_pod
 compile return
 compile return_message
 compile structure_definitions
+compile structure_literals
 compile structure_pod
 compile variables
 compile variables_override

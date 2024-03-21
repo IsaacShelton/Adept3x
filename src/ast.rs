@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 use std::{
     collections::HashMap,
@@ -303,6 +304,7 @@ pub enum ExpressionKind {
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
     Member(Box<Expression>, String),
+    StructureLiteral(Type, IndexMap<String, Expression>),
 }
 
 #[derive(Clone, Debug)]

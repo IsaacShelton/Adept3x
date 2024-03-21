@@ -512,5 +512,23 @@ fn lower_expression(
             let ir_type = lower_type(resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
+        ExpressionKind::StructureLiteral(resolved_type, fields) => {
+            let ir_type = lower_type(resolved_type)?;
+            let mut values = Vec::with_capacity(fields.len());
+
+            // Evaluate field values in the order specified by the struct literal
+            for (_name, (expression, index)) in fields.iter() {
+                let value = lower_expression(builder, ir_module, expression)?;
+                values.push((index, value));
+            }
+
+            // Sort resulting values by index
+            values.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+            // Drop the index part of the values
+            let values = values.drain(..).map(|(_, value)| value).collect();
+
+            Ok(builder.push(ir::Instruction::StructureLiteral(ir_type, values)))
+        }
     }
 }

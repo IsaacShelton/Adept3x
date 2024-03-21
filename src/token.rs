@@ -1,5 +1,5 @@
 use crate::line_column::Location;
-use derive_more::{Deref, IsVariant};
+use derive_more::{Deref, IsVariant, Unwrap};
 use num_bigint::BigInt;
 use std::fmt::Display;
 
@@ -30,7 +30,13 @@ pub enum StringModifier {
     NullTerminated,
 }
 
-#[derive(Clone, Debug, PartialEq, IsVariant)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct StringLiteral {
+    pub value: String,
+    pub modifier: StringModifier,
+}
+
+#[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum TokenKind {
     EndOfFile,
     Error(String),
@@ -42,16 +48,9 @@ pub enum TokenKind {
     CloseParen,
     OpenBracket,
     CloseBracket,
-    String {
-        value: String,
-        modifier: StringModifier,
-    },
-    Integer {
-        value: BigInt,
-    },
-    Float {
-        value: f64,
-    },
+    String(StringLiteral),
+    Integer(BigInt),
+    Float(f64),
     DocComment(String),
     FuncKeyword,
     ReturnKeyword,

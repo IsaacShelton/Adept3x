@@ -235,6 +235,7 @@ fn resolve_statement(
                 let result = resolve_expression(
                     resolved_ast,
                     function_search_context,
+                    type_search_context,
                     global_search_context,
                     variable_search_context,
                     resolved_function_ref,
@@ -293,6 +294,7 @@ fn resolve_statement(
                 resolve_expression(
                     resolved_ast,
                     function_search_context,
+                    type_search_context,
                     global_search_context,
                     variable_search_context,
                     resolved_function_ref,
@@ -323,6 +325,7 @@ fn resolve_statement(
                     resolve_expression(
                         resolved_ast,
                         function_search_context,
+                        type_search_context,
                         global_search_context,
                         variable_search_context,
                         resolved_function_ref,
@@ -359,6 +362,7 @@ fn resolve_statement(
             let destination_expression = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                type_search_context,
                 global_search_context,
                 variable_search_context,
                 resolved_function_ref,
@@ -368,6 +372,7 @@ fn resolve_statement(
             let value = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                type_search_context,
                 global_search_context,
                 variable_search_context,
                 resolved_function_ref,
@@ -633,6 +638,7 @@ fn conform_integer_literal(
 fn resolve_expression(
     resolved_ast: &mut resolved::Ast,
     function_search_context: &FunctionSearchContext,
+    type_search_context: &TypeSearchContext,
     global_search_context: &GlobalSearchContext,
     variable_search_context: &mut VariableSearchContext,
     resolved_function_ref: resolved::FunctionRef,
@@ -735,6 +741,7 @@ fn resolve_expression(
                 let mut argument = resolve_expression(
                     resolved_ast,
                     function_search_context,
+                    type_search_context,
                     global_search_context,
                     variable_search_context,
                     resolved_function_ref,
@@ -789,6 +796,7 @@ fn resolve_expression(
             let value = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                type_search_context,
                 global_search_context,
                 variable_search_context,
                 resolved_function_ref,
@@ -821,6 +829,7 @@ fn resolve_expression(
             let mut left = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                type_search_context,
                 global_search_context,
                 variable_search_context,
                 resolved_function_ref,
@@ -830,6 +839,7 @@ fn resolve_expression(
             let mut right = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                type_search_context,
                 global_search_context,
                 variable_search_context,
                 resolved_function_ref,
@@ -921,6 +931,7 @@ fn resolve_expression(
             let resolved_subject = resolve_expression(
                 resolved_ast,
                 function_search_context,
+                type_search_context,
                 global_search_context,
                 variable_search_context,
                 resolved_function_ref,
@@ -997,8 +1008,135 @@ fn resolve_expression(
             Ok(TypedExpression::new(
                 found_field.resolved_type.clone(),
                 resolved::Expression::new(
-                    resolved::ExpressionKind::Member(subject_destination, structure_ref, index, found_field.resolved_type.clone()),
+                    resolved::ExpressionKind::Member(
+                        subject_destination,
+                        structure_ref,
+                        index,
+                        found_field.resolved_type.clone(),
+                    ),
                     ast_expression.source,
+                ),
+            ))
+        }
+        ast::ExpressionKind::StructureLiteral(ast_type, fields) => {
+            let resolved_type = resolve_type(
+                type_search_context,
+                resolved_ast.source_file_cache,
+                ast_type,
+            )?;
+
+            let structure_ref =
+                match resolved_type {
+                    resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
+                    _ => return Err(ResolveError {
+                        filename: Some(
+                            resolved_ast
+                                .source_file_cache
+                                .get(ast_type.source.key)
+                                .filename()
+                                .to_string(),
+                        ),
+                        location: Some(ast_type.source.location),
+                        kind:
+                            ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure {
+                                bad_type: ast_type.to_string(),
+                            },
+                    }),
+                };
+
+            let mut resolved_fields = IndexMap::new();
+
+            for (name, value) in fields.iter() {
+                let resolved_expression = resolve_expression(
+                    resolved_ast,
+                    function_search_context,
+                    type_search_context,
+                    global_search_context,
+                    variable_search_context,
+                    resolved_function_ref,
+                    value,
+                )?;
+
+                let structure = resolved_ast
+                    .structures
+                    .get(structure_ref)
+                    .expect("referenced structure to exist");
+
+                let (index, _, field) = match structure.fields.get_full::<str>(&name) {
+                    Some(field) => field,
+                    None => {
+                        return Err(ResolveError {
+                            filename: Some(
+                                resolved_ast
+                                    .source_file_cache
+                                    .get(ast_type.source.key)
+                                    .filename()
+                                    .to_string(),
+                            ),
+                            location: Some(ast_type.source.location),
+                            kind: ResolveErrorKind::FieldDoesNotExist {
+                                field_name: name.to_string(),
+                            },
+                        })
+                    }
+                };
+
+                let resolved_expression =
+                    match conform_expression(&resolved_expression, &field.resolved_type) {
+                        Some(resolved_expression) => resolved_expression,
+                        None => {
+                            return Err(ResolveError {
+                                filename: Some(
+                                    resolved_ast
+                                        .source_file_cache
+                                        .get(ast_type.source.key)
+                                        .filename()
+                                        .to_string(),
+                                ),
+                                location: Some(ast_type.source.location),
+                                kind: ResolveErrorKind::FieldDoesNotExist {
+                                    field_name: name.to_string(),
+                                },
+                            })
+                        }
+                    };
+
+                resolved_fields.insert(name.to_string(), (resolved_expression.expression, index));
+            }
+
+            let structure = resolved_ast
+                .structures
+                .get(structure_ref)
+                .expect("referenced structure to exist");
+
+            if resolved_fields.len() != structure.fields.len() {
+                let missing = structure
+                    .fields
+                    .keys()
+                    .flat_map(|field_name| match resolved_fields.get(field_name) {
+                        None => Some(field_name.clone()),
+                        Some(_) => None,
+                    })
+                    .collect();
+
+                return Err(ResolveError {
+                    filename: Some(
+                        resolved_ast
+                            .source_file_cache
+                            .get(ast_type.source.key)
+                            .filename()
+                            .to_string(),
+                    ),
+                    location: Some(ast_type.source.location),
+                    kind: ResolveErrorKind::MissingFields { fields: missing },
+                });
+            }
+
+            Ok(TypedExpression::new(
+                resolved_type.clone(),
+                resolved::Expression::new(
+                    resolved::ExpressionKind::StructureLiteral(resolved_type, resolved_fields),
+                    ast_type.source,
                 ),
             ))
         }

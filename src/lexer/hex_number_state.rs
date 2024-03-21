@@ -15,7 +15,7 @@ impl HexNumberState {
     pub fn to_token(&self) -> Token {
         Token::new(
             match BigInt::from_str_radix(&self.value, 16) {
-                Ok(value) => TokenKind::Integer { value },
+                Ok(value) => TokenKind::Integer(value),
                 Err(_) => TokenKind::Error(format!("Invalid hex number {}", &self.value)),
             },
             self.start_location,

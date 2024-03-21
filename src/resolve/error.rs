@@ -1,5 +1,6 @@
 use crate::line_column::Location;
 use colored::Colorize;
+use itertools::Itertools;
 use std::fmt::Display;
 
 pub struct ResolveError {
@@ -27,6 +28,8 @@ pub enum ResolveErrorKind {
     CannotGetFieldOfNonPlainOldDataType { bad_type: String },
     FieldIsPrivate { field_name: String },
     FieldDoesNotExist { field_name: String },
+    CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type: String },
+    MissingFields { fields: Vec<String> },
     Other { message: String },
 }
 
@@ -123,6 +126,25 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
+            }
+            ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type } => {
+                write!(
+                    f,
+                    "Cannot create struct literal for non-plain-old-data structure '{}'",
+                    bad_type
+                )?;
+            }
+            ResolveErrorKind::MissingFields { fields } => {
+                let first_missing_field_names = fields
+                    .iter()
+                    .take(5)
+                    .map(|field_name| format!("'{}'", field_name))
+                    .join(", ");
+
+                match fields.len() {
+                    0..=4 => write!(f, "Missing fields {}", first_missing_field_names)?,
+                    _ => write!(f, "Missing fields {}, ...", first_missing_field_names)?,
+                }
             }
         }
 

@@ -1,8 +1,8 @@
 use derive_more::{Deref, DerefMut};
 use std::{collections::HashMap, ffi::CString};
 
-use crate::resolved::{IntegerBits, StructureRef};
 pub use crate::resolved::{FunctionRef, GlobalRef};
+use crate::resolved::{IntegerBits, StructureRef};
 
 #[derive(Clone)]
 pub struct Module {
@@ -61,7 +61,6 @@ pub enum FloatOrSign {
     Float,
 }
 
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum OverflowOperator {
     Add,
@@ -104,6 +103,7 @@ pub enum Instruction {
     Truncate(Value, Type),
     TruncateFloat(Value, Type),
     Member(Value, StructureRef, usize),
+    StructureLiteral(Type, Vec<Value>),
 }
 
 #[derive(Clone, Debug)]
@@ -283,6 +283,7 @@ impl Instruction {
             Instruction::Truncate(..) => false,
             Instruction::TruncateFloat(..) => false,
             Instruction::Member(..) => false,
+            Instruction::StructureLiteral(..) => false,
         }
     }
 }
