@@ -1,11 +1,13 @@
 use crate::line_column::Location;
 
+#[derive(Clone, Debug)]
 pub enum AnnotationKind {
     Foreign,
     ThreadLocal,
     Packed,
 }
 
+#[derive(Clone, Debug)]
 pub struct Annotation {
     pub kind: AnnotationKind,
     pub location: Location,

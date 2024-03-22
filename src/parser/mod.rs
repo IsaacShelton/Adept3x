@@ -56,14 +56,14 @@ where
         let ast_file = ast.new_file(FileIdentifier::Local(filename));
 
         while !self.input.peek().is_end_of_file() {
-            self.parse_top_level(ast_file)?;
+            self.parse_top_level(ast_file, vec![])?;
         }
 
         Ok(())
     }
 
-    fn parse_top_level(&mut self, ast_file: &mut File) -> Result<(), ParseError> {
-        let mut annotations = Vec::new();
+    fn parse_top_level(&mut self, ast_file: &mut File, parent_annotations: Vec<Annotation>) -> Result<(), ParseError> {
+        let mut annotations = parent_annotations;
 
         // Ignore preceeding newlines
         self.ignore_newlines();
@@ -79,6 +79,17 @@ where
 
         // Parse top-level construct
         match self.input.peek().kind {
+            TokenKind::OpenCurly => {
+                self.input.advance().kind.unwrap_open_curly();
+                self.ignore_newlines();
+
+                while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+                    self.parse_top_level(ast_file, annotations.clone())?;
+                    self.ignore_newlines();
+                }
+
+                self.parse_token(TokenKind::CloseCurly, Some("to close annotation group"))?;
+            }
             TokenKind::FuncKeyword => {
                 ast_file.functions.push(self.parse_function(annotations)?);
             }

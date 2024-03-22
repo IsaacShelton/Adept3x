@@ -1,0 +1,18 @@
+
+#[foreign]
+{
+    // NOTE: This is only macOS (also type is incorrect but it's a pointer so doesn't matter)
+    __stdinp ptr<u8>
+
+    func printf(format ptr<u8>, ...) i32
+    func fgets(string ptr<u8>, length i32, stream ptr<u8>) void
+    func malloc(size uint) ptr<u8>
+    func free(pointer ptr<u8>) void
+    func strcmp(a ptr<u8>, b ptr<u8>) i32
+    func atoi(string ptr<u8>) i32
+}
+
+func main {
+    printf(c"Hi World!\n")
+}
+
