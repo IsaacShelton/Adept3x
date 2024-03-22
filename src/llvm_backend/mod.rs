@@ -23,7 +23,7 @@ use ir::IntegerSign;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFNeg, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
+        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFNeg, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -181,6 +181,7 @@ unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), CompilerError> 
             // In order to prevent aggressive optimizations from removing necessary internal global
             // variables, we'll mark them as externally-initialized
             LLVMSetExternallyInitialized(backend_global, true.into());
+            LLVMSetInitializer(backend_global, LLVMGetUndef(backend_type));
         }
 
         ctx.globals.insert(global_ref.clone(), backend_global);

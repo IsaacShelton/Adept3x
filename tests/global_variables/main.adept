@@ -1,0 +1,11 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+x int
+
+func main {
+    x = 100
+    printf(c"x = %lld\n", x)
+}
+

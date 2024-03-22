@@ -572,11 +572,11 @@ fn lower_expression(
         ExpressionKind::UnaryOperator(unary_operation) => {
             let inner = lower_expression(builder, ir_module, &unary_operation.inner.expression)?;
 
-            match unary_operation.operator {
-                resolved::UnaryOperator::Not => Ok(builder.push(ir::Instruction::IsZero(inner))),
-                resolved::UnaryOperator::BitComplement => Ok(builder.push(ir::Instruction::BitComplement(inner))),
-                resolved::UnaryOperator::Negate => Ok(builder.push(ir::Instruction::Negate(inner))),
-            }
-        },
+            Ok(builder.push(match unary_operation.operator {
+                resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
+                resolved::UnaryOperator::BitComplement => ir::Instruction::BitComplement(inner),
+                resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
+            }))
+        }
     }
 }
