@@ -23,15 +23,7 @@ use ir::IntegerSign;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAdd, LLVMBuildAlloca,
-        LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildGEP2, LLVMBuildICmp,
-        LLVMBuildInsertValue, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildSDiv,
-        LLVMBuildSRem, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
-        LLVMBuildUnreachable, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType,
-        LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type,
-        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd,
-        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
-        LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
+        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -550,6 +542,42 @@ unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
+            Instruction::And(operands) | Instruction::BitwiseAnd(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildAnd(builder.get(), left, right, cstr!("").as_ptr()))
+            }
+            Instruction::Or(operands) | Instruction::BitwiseOr(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildOr(builder.get(), left, right, cstr!("").as_ptr()))
+            }
+            Instruction::BitwiseXor(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildXor(builder.get(), left, right, cstr!("").as_ptr()))
+            },
+            Instruction::LeftShift(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildShl(builder.get(), left, right, cstr!("").as_ptr()))
+            },
+            Instruction::RightShift(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildAShr(builder.get(), left, right, cstr!("").as_ptr()))
+            },
+            Instruction::LogicalRightShift(operands) => {
+                let (left, right) =
+                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+
+                Some(LLVMBuildLShr(builder.get(), left, right, cstr!("").as_ptr()))
+            },
             Instruction::Bitcast(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx, ir_type);

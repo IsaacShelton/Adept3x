@@ -506,6 +506,25 @@ fn lower_expression(
                         None => Err(CompilerError::during_lower("Cannot compare non-integers")),
                     }
                 }
+                resolved::BinaryOperator::BitwiseAnd => {
+                    Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))
+                }
+                resolved::BinaryOperator::BitwiseOr => {
+                    Ok(builder.push(ir::Instruction::BitwiseOr(operands)))
+                }
+                resolved::BinaryOperator::BitwiseXor => {
+                    Ok(builder.push(ir::Instruction::BitwiseXor(operands)))
+                }
+                resolved::BinaryOperator::LogicalLeftShift
+                | resolved::BinaryOperator::LeftShift => {
+                    Ok(builder.push(ir::Instruction::LeftShift(operands)))
+                }
+                resolved::BinaryOperator::RightShift => {
+                    Ok(builder.push(ir::Instruction::RightShift(operands)))
+                }
+                resolved::BinaryOperator::LogicalRightShift => {
+                    Ok(builder.push(ir::Instruction::LogicalRightShift(operands)))
+                }
             }
         }
         ExpressionKind::IntegerExtend(value, resolved_type) => {

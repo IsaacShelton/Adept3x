@@ -75,6 +75,15 @@ pub enum TokenKind {
     Ellipsis,
     DeclareAssign,
     Assign,
+    And,
+    Or,
+    Ampersand,
+    Pipe,
+    Caret,
+    LeftShift,
+    RightShift,
+    LogicalLeftShift,
+    LogicalRightShift,
 }
 
 impl Display for TokenKind {
@@ -117,6 +126,15 @@ impl Display for TokenKind {
             TokenKind::Ellipsis => "'...'",
             TokenKind::DeclareAssign => "':='",
             TokenKind::Assign => "'='",
+            TokenKind::And => "'&&'",
+            TokenKind::Or => "'||'",
+            TokenKind::Ampersand => "'&'",
+            TokenKind::Pipe => "'|'",
+            TokenKind::Caret => "'^'",
+            TokenKind::LeftShift => "'<<'",
+            TokenKind::RightShift => "'>>'",
+            TokenKind::LogicalLeftShift => "'<<<'",
+            TokenKind::LogicalRightShift => "'>>>'",
         })
     }
 }
@@ -133,12 +151,21 @@ impl TokenKind {
             TokenKind::Not => 14,
             TokenKind::Add => 11,
             TokenKind::Subtract => 11,
+            TokenKind::LeftShift => 10,
+            TokenKind::RightShift => 10,
+            TokenKind::LogicalLeftShift => 10,
+            TokenKind::LogicalRightShift => 10,
             TokenKind::LessThan => 9,
             TokenKind::GreaterThan => 9,
             TokenKind::LessThanEq => 9,
             TokenKind::GreaterThanEq => 9,
             TokenKind::Equals => 8,
             TokenKind::NotEquals => 8,
+            TokenKind::Ampersand => 7,
+            TokenKind::Caret => 6,
+            TokenKind::Pipe => 5,
+            TokenKind::And => 4,
+            TokenKind::Or => 3,
             TokenKind::DeclareAssign => 1,
             TokenKind::Assign => 1,
 

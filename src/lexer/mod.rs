@@ -66,6 +66,15 @@ where
                 if let Some(('=', _)) = self.characters.peek() {
                     self.characters.next();
                     return Has(Token::new(TokenKind::LessThanEq, location));
+                } else if let Some(('<', _)) = self.characters.peek() {
+                    self.characters.next();
+
+                    if let Some(('<', _)) = self.characters.peek() {
+                        self.characters.next();
+                        return Has(Token::new(TokenKind::LogicalLeftShift, location));
+                    } else {
+                        return Has(Token::new(TokenKind::LeftShift, location));
+                    }
                 } else {
                     return Has(Token::new(TokenKind::LessThan, location));
                 }
@@ -175,9 +184,21 @@ where
                     self.characters.next();
                     Has(Token::new(TokenKind::GreaterThanEq, location))
                 }
+                '>' if self.characters.peek().is_character('>') && self.characters.peek_nth(1).is_character('>') => {
+                    self.characters.next();
+                    self.characters.next();
+                    Has(Token::new(TokenKind::LogicalRightShift, location))
+                }
+                '>' if self.characters.peek().is_character('>') => {
+                    self.characters.next();
+                    Has(Token::new(TokenKind::RightShift, location))
+                }
                 '>' => Has(Token::new(TokenKind::GreaterThan, location)),
                 '<' => Has(Token::new(TokenKind::OpenAngle, location)),
                 '!' => Has(Token::new(TokenKind::Not, location)),
+                '&' => Has(Token::new(TokenKind::Ampersand, location)),
+                '|' => Has(Token::new(TokenKind::Pipe, location)),
+                '^' => Has(Token::new(TokenKind::Caret, location)),
                 ',' => Has(Token::new(TokenKind::Comma, location)),
                 ':' if self.characters.peek().is_character('=') => {
                     self.characters.next();

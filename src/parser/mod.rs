@@ -482,6 +482,13 @@ where
                 TokenKind::LessThanEq => BinaryOperator::LessThanEq,
                 TokenKind::GreaterThan => BinaryOperator::GreaterThan,
                 TokenKind::GreaterThanEq => BinaryOperator::GreaterThanEq,
+                TokenKind::Ampersand => BinaryOperator::BitwiseAnd,
+                TokenKind::Pipe => BinaryOperator::BitwiseOr,
+                TokenKind::Caret => BinaryOperator::BitwiseXor,
+                TokenKind::LeftShift => BinaryOperator::LeftShift,
+                TokenKind::LogicalLeftShift => BinaryOperator::LogicalLeftShift,
+                TokenKind::RightShift => BinaryOperator::RightShift,
+                TokenKind::LogicalRightShift => BinaryOperator::LogicalRightShift,
                 _ => return Ok(lhs),
             };
 

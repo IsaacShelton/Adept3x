@@ -327,6 +327,13 @@ pub enum BinaryOperator {
     LessThanEq,
     GreaterThan,
     GreaterThanEq,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
+    LogicalLeftShift,
+    LogicalRightShift,
 }
 
 impl BinaryOperator {
@@ -343,6 +350,13 @@ impl BinaryOperator {
             BinaryOperator::LessThanEq => true,
             BinaryOperator::GreaterThan => true,
             BinaryOperator::GreaterThanEq => true,
+            BinaryOperator::BitwiseAnd => false,
+            BinaryOperator::BitwiseOr => false,
+            BinaryOperator::BitwiseXor => false,
+            BinaryOperator::LeftShift => false,
+            BinaryOperator::RightShift => false,
+            BinaryOperator::LogicalLeftShift => false,
+            BinaryOperator::LogicalRightShift => false,
         }
     }
 }
