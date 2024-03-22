@@ -1,4 +1,4 @@
-use crate::line_column::Location;
+use crate::{ast::Source, line_column::Location, source_file_cache::SourceFileCache};
 use colored::Colorize;
 use itertools::Itertools;
 use std::fmt::Display;
@@ -7,6 +7,20 @@ pub struct ResolveError {
     pub filename: Option<String>,
     pub location: Option<Location>,
     pub kind: ResolveErrorKind,
+}
+
+impl ResolveError {
+    pub fn new(
+        source_file_cache: &SourceFileCache,
+        source: Source,
+        kind: ResolveErrorKind,
+    ) -> Self {
+        Self {
+            filename: Some(source_file_cache.get(source.key).filename().to_string()),
+            location: Some(source.location),
+            kind,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -33,6 +47,7 @@ pub enum ResolveErrorKind {
     MissingFields { fields: Vec<String> },
     CannotUseUninitializedValue,
     CannotUseUninitializedVariable { variable_name: String },
+    CannotPerformUnaryOperationForType { operator: String, bad_type: String },
     Other { message: String },
 }
 
@@ -158,10 +173,13 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::CannotUseUninitializedValue => {
                 write!(f, "Cannot use uninitialized value")?;
-            },
+            }
             ResolveErrorKind::CannotUseUninitializedVariable { variable_name } => {
                 write!(f, "Cannot use uninitialized variable '{}'", variable_name)?;
-            },
+            }
+            ResolveErrorKind::CannotPerformUnaryOperationForType { operator, bad_type } => {
+                write!(f, "Cannot perform '{}' on '{}'", operator, bad_type)?;
+            }
         }
 
         Ok(())

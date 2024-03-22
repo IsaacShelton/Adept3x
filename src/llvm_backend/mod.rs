@@ -23,7 +23,7 @@ use ir::IntegerSign;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
+        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFNeg, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -680,6 +680,26 @@ unsafe fn create_function_block(
 
                 Some(literal)
             }
+            Instruction::IsZero(inner) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                Some(LLVMBuildIsNull(builder.get(), value, cstr!("").as_ptr()))
+            },
+            Instruction::IsNotZero(inner) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                Some(LLVMBuildIsNotNull(builder.get(), value, cstr!("").as_ptr()))
+            },
+            Instruction::Negate(inner) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                Some(LLVMBuildNeg(builder.get(), value, cstr!("").as_ptr()))
+            },
+            Instruction::NegateFloat(inner) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                Some(LLVMBuildFNeg(builder.get(), value, cstr!("").as_ptr()))
+            },
+            Instruction::BitComplement(inner) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                Some(LLVMBuildNot(builder.get(), value, cstr!("").as_ptr()))
+            },
         };
 
         value_catalog.push(ir_basicblock_id, result);

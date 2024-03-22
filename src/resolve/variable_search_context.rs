@@ -29,18 +29,13 @@ impl<'a> VariableSearchContext<'a> {
     ) -> Result<(&resolved::Type, &VariableStorageKey), ResolveError> {
         match self.find_variable(name) {
             Some(variable) => Ok(variable),
-            None => Err(ResolveError {
-                filename: Some(
-                    self.source_file_cache
-                        .get(source.key)
-                        .filename()
-                        .to_string(),
-                ),
-                location: Some(source.location),
-                kind: ResolveErrorKind::UndeclaredVariable {
+            None => Err(ResolveError::new(
+                self.source_file_cache,
+                source,
+                ResolveErrorKind::UndeclaredVariable {
                     name: name.to_string(),
                 },
-            }),
+            )),
         }
     }
 

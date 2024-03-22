@@ -12,7 +12,7 @@ use crate::{
     ast::{
         self, Assignment, Ast, BinaryOperation, Call, Declaration, DeclareAssign, Expression,
         ExpressionKind, Field, File, FileIdentifier, Function, Global, Parameter, Parameters,
-        Source, Statement, StatementKind, Structure, Type, TypeKind,
+        Source, Statement, StatementKind, Structure, Type, TypeKind, UnaryOperation, UnaryOperator,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -535,6 +535,22 @@ where
                     self.source(location),
                 )),
             },
+            TokenKind::Not | TokenKind::BitComplement | TokenKind::Subtract => {
+                let operator = match kind {
+                    TokenKind::Not => UnaryOperator::Not,
+                    TokenKind::BitComplement => UnaryOperator::BitComplement,
+                    TokenKind::Subtract => UnaryOperator::Negate,
+                    _ => unreachable!(),
+                };
+
+                let location = self.input.advance().location;
+                let inner = self.parse_expression()?;
+
+                Ok(Expression::new(
+                    ExpressionKind::UnaryOperator(Box::new(UnaryOperation { operator, inner })),
+                    self.source(location),
+                ))
+            }
             unexpected => {
                 let unexpected = unexpected.to_string();
                 Err(ParseError {

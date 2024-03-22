@@ -569,5 +569,14 @@ fn lower_expression(
 
             Ok(builder.push(ir::Instruction::StructureLiteral(ir_type, values)))
         }
+        ExpressionKind::UnaryOperator(unary_operation) => {
+            let inner = lower_expression(builder, ir_module, &unary_operation.inner.expression)?;
+
+            match unary_operation.operator {
+                resolved::UnaryOperator::Not => Ok(builder.push(ir::Instruction::IsZero(inner))),
+                resolved::UnaryOperator::BitComplement => Ok(builder.push(ir::Instruction::BitComplement(inner))),
+                resolved::UnaryOperator::Negate => Ok(builder.push(ir::Instruction::Negate(inner))),
+            }
+        },
     }
 }

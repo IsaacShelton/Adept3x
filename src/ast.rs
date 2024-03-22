@@ -305,6 +305,7 @@ pub enum ExpressionKind {
     BinaryOperation(Box<BinaryOperation>),
     Member(Box<Expression>, String),
     StructureLiteral(Type, IndexMap<String, Expression>),
+    UnaryOperator(Box<UnaryOperation>),
 }
 
 #[derive(Clone, Debug)]
@@ -334,6 +335,30 @@ pub enum BinaryOperator {
     RightShift,
     LogicalLeftShift,
     LogicalRightShift,
+}
+
+#[derive(Clone, Debug)]
+pub struct UnaryOperation {
+    pub operator: UnaryOperator,
+    pub inner: Expression,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnaryOperator {
+    Not,
+    BitComplement,
+    Negate,
+}
+
+impl ToString for UnaryOperator {
+    fn to_string(&self) -> String {
+        match self {
+            UnaryOperator::Not => "!",
+            UnaryOperator::BitComplement => "~",
+            UnaryOperator::Negate => "-",
+        }
+        .into()
+    }
 }
 
 impl BinaryOperator {

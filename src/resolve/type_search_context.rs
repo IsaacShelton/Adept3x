@@ -23,18 +23,13 @@ impl<'a> TypeSearchContext<'a> {
     ) -> Result<&resolved::Type, ResolveError> {
         match self.find_type(name) {
             Some(info) => Ok(info),
-            None => Err(ResolveError {
-                filename: Some(
-                    self.source_file_cache
-                        .get(source.key)
-                        .filename()
-                        .to_string(),
-                ),
-                location: Some(source.location),
-                kind: ResolveErrorKind::UndeclaredType {
+            None => Err(ResolveError::new(
+                self.source_file_cache,
+                source,
+                ResolveErrorKind::UndeclaredType {
                     name: name.to_string(),
                 },
-            }),
+            )),
         }
     }
 

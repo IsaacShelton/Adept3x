@@ -10,7 +10,7 @@ use std::{
     fmt::{Debug, Display},
 };
 
-pub use crate::ast::BinaryOperator;
+pub use crate::ast::{BinaryOperator, UnaryOperator};
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -265,6 +265,7 @@ pub enum ExpressionKind {
     IntegerExtend(Box<Expression>, Type),
     Member(Destination, StructureRef, usize, Type),
     StructureLiteral(Type, IndexMap<String, (Expression, usize)>),
+    UnaryOperator(Box<UnaryOperation>),
 }
 
 #[derive(Clone, Debug)]
@@ -311,6 +312,12 @@ pub struct BinaryOperation {
     pub operator: BinaryOperator,
     pub left: TypedExpression,
     pub right: TypedExpression,
+}
+
+#[derive(Clone, Debug)]
+pub struct UnaryOperation {
+    pub operator: UnaryOperator,
+    pub inner: TypedExpression,
 }
 
 #[derive(Clone, Debug)]

@@ -112,6 +112,11 @@ pub enum Instruction {
     TruncateFloat(Value, Type),
     Member(Value, StructureRef, usize),
     StructureLiteral(Type, Vec<Value>),
+    IsZero(Value),
+    IsNotZero(Value),
+    Negate(Value),
+    NegateFloat(Value),
+    BitComplement(Value),
 }
 
 #[derive(Clone, Debug)]
@@ -300,6 +305,11 @@ impl Instruction {
             Instruction::TruncateFloat(..) => false,
             Instruction::Member(..) => false,
             Instruction::StructureLiteral(..) => false,
+            Instruction::IsZero(..) => false,
+            Instruction::IsNotZero(..) => false,
+            Instruction::Negate(..) => false,
+            Instruction::NegateFloat(..) => false,
+            Instruction::BitComplement(..) => false,
         }
     }
 }

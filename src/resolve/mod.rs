@@ -248,38 +248,26 @@ fn resolve_statement(
                 if let Some(result) = conform_expression(&result, &function.return_type) {
                     Some(result.expression)
                 } else {
-                    return Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(result.expression.source.location),
-                        kind: ResolveErrorKind::CannotReturnValueOfType {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::CannotReturnValueOfType {
                             returning: result.resolved_type.to_string(),
                             expected: function.return_type.to_string(),
                         },
-                    });
+                    ));
                 }
             } else {
                 let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
 
                 if function.return_type != resolved::Type::Void {
-                    return Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(source.location),
-                        kind: ResolveErrorKind::CannotReturnVoid {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::CannotReturnVoid {
                             expected: function.return_type.to_string(),
                         },
-                    });
+                    ));
                 }
 
                 None
@@ -332,20 +320,14 @@ fn resolve_statement(
                 .as_ref()
                 .map(|value| match conform_expression(value, &resolved_type) {
                     Some(value) => Ok(value.expression),
-                    None => Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(source.location),
-                        kind: ResolveErrorKind::CannotAssignValueOfType {
+                    None => Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::CannotAssignValueOfType {
                             from: value.resolved_type.to_string(),
                             to: resolved_type.to_string(),
                         },
-                    }),
+                    )),
                 })
                 .transpose()?;
 
@@ -357,6 +339,7 @@ fn resolve_statement(
             let key = function
                 .variables
                 .add_variable(resolved_type.clone(), value.is_some());
+
             variable_search_context.put(&declaration.name, resolved_type.clone(), key);
 
             Ok(resolved::Statement::new(
@@ -420,20 +403,14 @@ fn resolve_statement(
                         source,
                     ))
                 }
-                None => Err(ResolveError {
-                    filename: Some(
-                        resolved_ast
-                            .source_file_cache
-                            .get(source.key)
-                            .filename()
-                            .to_string(),
-                    ),
-                    location: Some(source.location),
-                    kind: ResolveErrorKind::CannotAssignValueOfType {
+                None => Err(ResolveError::new(
+                    resolved_ast.source_file_cache,
+                    source,
+                    ResolveErrorKind::CannotAssignValueOfType {
                         from: value.resolved_type.to_string(),
                         to: destination_expression.resolved_type.to_string(),
                     },
-                }),
+                )),
             }
         }
     }
@@ -513,25 +490,30 @@ fn conform_expression_to_default(
     expression: TypedExpression,
     source_file_cache: &SourceFileCache,
 ) -> Result<TypedExpression, ResolveError> {
-    let source = expression.expression.source;
-
     match expression.resolved_type {
-        resolved::Type::IntegerLiteral(value) => {
-            if let Some(conformed) =
-                conform_integer_to_default(&value, expression.expression.source)
-            {
-                Ok(conformed)
-            } else {
-                Err(ResolveError {
-                    filename: Some(source_file_cache.get(source.key).filename().to_string()),
-                    location: Some(source.location),
-                    kind: ResolveErrorKind::UnrepresentableInteger {
-                        value: value.to_string(),
-                    },
-                })
-            }
-        }
+        resolved::Type::IntegerLiteral(value) => conform_integer_to_default_or_error(
+            source_file_cache,
+            &value,
+            expression.expression.source,
+        ),
         _ => Ok(expression),
+    }
+}
+
+fn conform_integer_to_default_or_error(
+    source_file_cache: &SourceFileCache,
+    value: &BigInt,
+    source: Source,
+) -> Result<TypedExpression, ResolveError> {
+    match conform_integer_to_default(&value, source) {
+        Some(resolved) => Ok(resolved),
+        None => Err(ResolveError::new(
+            source_file_cache,
+            source,
+            ResolveErrorKind::UnrepresentableInteger {
+                value: value.to_string(),
+            },
+        )),
     }
 }
 
@@ -746,37 +728,25 @@ fn resolve_expression(
             let return_type = function.return_type.clone();
 
             if call.arguments.len() < function.parameters.required.len() {
-                return Err(ResolveError {
-                    filename: Some(
-                        resolved_ast
-                            .source_file_cache
-                            .get(source.key)
-                            .filename()
-                            .to_string(),
-                    ),
-                    location: Some(source.location),
-                    kind: ResolveErrorKind::NotEnoughArgumentsToFunction {
+                return Err(ResolveError::new(
+                    resolved_ast.source_file_cache,
+                    source,
+                    ResolveErrorKind::NotEnoughArgumentsToFunction {
                         name: function.name.to_string(),
                     },
-                });
+                ));
             }
 
             if call.arguments.len() > function.parameters.required.len()
                 && !function.parameters.is_cstyle_vararg
             {
-                return Err(ResolveError {
-                    filename: Some(
-                        resolved_ast
-                            .source_file_cache
-                            .get(source.key)
-                            .filename()
-                            .to_string(),
-                    ),
-                    location: Some(source.location),
-                    kind: ResolveErrorKind::TooManyArgumentsToFunction {
+                return Err(ResolveError::new(
+                    resolved_ast.source_file_cache,
+                    source,
+                    ResolveErrorKind::TooManyArgumentsToFunction {
                         name: function.name.to_string(),
                     },
-                });
+                ));
             }
 
             let mut arguments = Vec::with_capacity(call.arguments.len());
@@ -801,20 +771,14 @@ fn resolve_expression(
                     {
                         argument = conformed_argument;
                     } else {
-                        return Err(ResolveError {
-                            filename: Some(
-                                resolved_ast
-                                    .source_file_cache
-                                    .get(source.key)
-                                    .filename()
-                                    .to_string(),
-                            ),
-                            location: Some(source.location),
-                            kind: ResolveErrorKind::BadTypeForArgumentToFunction {
+                        return Err(ResolveError::new(
+                            resolved_ast.source_file_cache,
+                            source,
+                            ResolveErrorKind::BadTypeForArgumentToFunction {
                                 name: function.name.clone(),
                                 i,
                             },
-                        });
+                        ));
                     }
                 } else {
                     match conform_expression_to_default(argument, resolved_ast.source_file_cache) {
@@ -937,20 +901,14 @@ fn resolve_expression(
                         unified_type
                     }
                     None => {
-                        return Err(ResolveError {
-                            filename: Some(
-                                resolved_ast
-                                    .source_file_cache
-                                    .get(source.key)
-                                    .filename()
-                                    .to_string(),
-                            ),
-                            location: Some(source.location),
-                            kind: ResolveErrorKind::BinaryOperatorMismatch {
+                        return Err(ResolveError::new(
+                            resolved_ast.source_file_cache,
+                            source,
+                            ResolveErrorKind::BinaryOperatorMismatch {
                                 left: left.resolved_type.to_string(),
                                 right: right.resolved_type.to_string(),
                             },
-                        })
+                        ))
                     }
                 }
             } else {
@@ -992,19 +950,13 @@ fn resolve_expression(
             let structure_ref = match resolved_subject.resolved_type {
                 resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
                 _ => {
-                    return Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(subject.source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(subject.source.location),
-                        kind: ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        subject.source,
+                        ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
                             bad_type: resolved_subject.resolved_type.to_string(),
                         },
-                    })
+                    ))
                 }
             };
 
@@ -1016,38 +968,26 @@ fn resolve_expression(
             let (index, _key, found_field) = match structure.fields.get_full(field_name) {
                 Some(found) => found,
                 None => {
-                    return Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(subject.source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(subject.source.location),
-                        kind: ResolveErrorKind::FieldDoesNotExist {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        subject.source,
+                        ResolveErrorKind::FieldDoesNotExist {
                             field_name: field_name.to_string(),
                         },
-                    })
+                    ))
                 }
             };
 
             match found_field.privacy {
                 resolved::Privacy::Public => (),
                 resolved::Privacy::Private => {
-                    return Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(subject.source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(subject.source.location),
-                        kind: ResolveErrorKind::FieldIsPrivate {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        subject.source,
+                        ResolveErrorKind::FieldIsPrivate {
                             field_name: field_name.to_string(),
                         },
-                    })
+                    ))
                 }
             }
 
@@ -1079,20 +1019,13 @@ fn resolve_expression(
             let structure_ref =
                 match resolved_type {
                     resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
-                    _ => return Err(ResolveError {
-                        filename: Some(
-                            resolved_ast
-                                .source_file_cache
-                                .get(ast_type.source.key)
-                                .filename()
-                                .to_string(),
-                        ),
-                        location: Some(ast_type.source.location),
-                        kind:
-                            ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure {
-                                bad_type: ast_type.to_string(),
-                            },
-                    }),
+                    _ => return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        ast_type.source,
+                        ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure {
+                            bad_type: ast_type.to_string(),
+                        },
+                    )),
                 };
 
             let mut resolved_fields = IndexMap::new();
@@ -1117,19 +1050,13 @@ fn resolve_expression(
                 let (index, _, field) = match structure.fields.get_full::<str>(&name) {
                     Some(field) => field,
                     None => {
-                        return Err(ResolveError {
-                            filename: Some(
-                                resolved_ast
-                                    .source_file_cache
-                                    .get(ast_type.source.key)
-                                    .filename()
-                                    .to_string(),
-                            ),
-                            location: Some(ast_type.source.location),
-                            kind: ResolveErrorKind::FieldDoesNotExist {
+                        return Err(ResolveError::new(
+                            resolved_ast.source_file_cache,
+                            source,
+                            ResolveErrorKind::FieldDoesNotExist {
                                 field_name: name.to_string(),
                             },
-                        })
+                        ))
                     }
                 };
 
@@ -1137,19 +1064,13 @@ fn resolve_expression(
                     match conform_expression(&resolved_expression, &field.resolved_type) {
                         Some(resolved_expression) => resolved_expression,
                         None => {
-                            return Err(ResolveError {
-                                filename: Some(
-                                    resolved_ast
-                                        .source_file_cache
-                                        .get(ast_type.source.key)
-                                        .filename()
-                                        .to_string(),
-                                ),
-                                location: Some(ast_type.source.location),
-                                kind: ResolveErrorKind::FieldDoesNotExist {
+                            return Err(ResolveError::new(
+                                resolved_ast.source_file_cache,
+                                ast_type.source,
+                                ResolveErrorKind::FieldDoesNotExist {
                                     field_name: name.to_string(),
                                 },
-                            })
+                            ))
                         }
                     };
 
@@ -1171,17 +1092,11 @@ fn resolve_expression(
                     })
                     .collect();
 
-                return Err(ResolveError {
-                    filename: Some(
-                        resolved_ast
-                            .source_file_cache
-                            .get(ast_type.source.key)
-                            .filename()
-                            .to_string(),
-                    ),
-                    location: Some(ast_type.source.location),
-                    kind: ResolveErrorKind::MissingFields { fields: missing },
-                });
+                return Err(ResolveError::new(
+                    resolved_ast.source_file_cache,
+                    source,
+                    ResolveErrorKind::MissingFields { fields: missing },
+                ));
             }
 
             Ok(TypedExpression::new(
@@ -1191,6 +1106,54 @@ fn resolve_expression(
                     ast_type.source,
                 ),
             ))
+        }
+        ast::ExpressionKind::UnaryOperator(unary_operation) => {
+            let resolved_expression = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                type_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &unary_operation.inner,
+                Initialized::Require,
+            )?;
+
+            let resolved_expression = match resolved_expression.resolved_type {
+                resolved::Type::Boolean => resolved_expression,
+                resolved::Type::Integer { .. } => resolved_expression,
+                resolved::Type::IntegerLiteral(value) => conform_integer_to_default_or_error(
+                    resolved_ast.source_file_cache,
+                    &value,
+                    resolved_expression.expression.source,
+                )?,
+                _ => {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::CannotPerformUnaryOperationForType {
+                            operator: unary_operation.operator.to_string(),
+                            bad_type: resolved_expression.resolved_type.to_string(),
+                        },
+                    ));
+                }
+            };
+
+            let result_type = match unary_operation.operator {
+                resolved::UnaryOperator::Not => resolved::Type::Boolean,
+                resolved::UnaryOperator::BitComplement => resolved_expression.resolved_type.clone(),
+                resolved::UnaryOperator::Negate => resolved_expression.resolved_type.clone(),
+            };
+
+            let expression = resolved::Expression::new(
+                resolved::ExpressionKind::UnaryOperator(Box::new(resolved::UnaryOperation {
+                    operator: unary_operation.operator.clone(),
+                    inner: resolved_expression,
+                })),
+                source,
+            );
+
+            Ok(TypedExpression::new(result_type, expression))
         }
     };
 
@@ -1236,36 +1199,26 @@ fn resolve_type(
                 let structure_ref = match resolved_inner_type {
                     resolved::Type::Structure(_, structure_ref) => structure_ref,
                     _ => {
-                        return Err(ResolveError {
-                            filename: Some(
-                                source_file_cache
-                                    .get(inner.source.key)
-                                    .filename()
-                                    .to_string(),
-                            ),
-                            location: Some(inner.source.location),
-                            kind: ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
+                        return Err(ResolveError::new(
+                            source_file_cache,
+                            inner.source,
+                            ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
                                 bad_type: inner.to_string(),
                             },
-                        })
+                        ));
                     }
                 };
 
                 Ok(resolved::Type::PlainOldData(name.clone(), structure_ref))
             }
             _ => {
-                return Err(ResolveError {
-                    filename: Some(
-                        source_file_cache
-                            .get(inner.source.key)
-                            .filename()
-                            .to_string(),
-                    ),
-                    location: Some(inner.source.location),
-                    kind: ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
+                return Err(ResolveError::new(
+                    source_file_cache,
+                    inner.source,
+                    ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
                         bad_type: inner.to_string(),
                     },
-                })
+                ));
             }
         },
     }
@@ -1303,13 +1256,11 @@ pub fn resolve_expression_to_destination(
 
     match TryInto::<Destination>::try_into(expression) {
         Ok(destination) => Ok(destination),
-        Err(_) => {
-            return Err(ResolveError {
-                filename: Some(source_file_cache.get(source.key).filename().to_string()),
-                location: Some(source.location),
-                kind: ResolveErrorKind::CannotMutate,
-            })
-        }
+        Err(_) => Err(ResolveError::new(
+            source_file_cache,
+            source,
+            ResolveErrorKind::CannotMutate,
+        )),
     }
 }
 
@@ -1321,24 +1272,17 @@ fn ensure_initialized(
     if resolved_subject.is_initialized {
         Ok(())
     } else {
-        let resolve_error_kind = match &subject.kind {
-            ast::ExpressionKind::Variable(variable_name) => {
-                ResolveErrorKind::CannotUseUninitializedVariable {
-                    variable_name: variable_name.clone(),
+        Err(ResolveError::new(
+            source_file_cache,
+            subject.source,
+            match &subject.kind {
+                ast::ExpressionKind::Variable(variable_name) => {
+                    ResolveErrorKind::CannotUseUninitializedVariable {
+                        variable_name: variable_name.clone(),
+                    }
                 }
-            }
-            _ => ResolveErrorKind::CannotUseUninitializedValue,
-        };
-
-        return Err(ResolveError {
-            filename: Some(
-                source_file_cache
-                    .get(subject.source.key)
-                    .filename()
-                    .to_string(),
-            ),
-            location: Some(subject.source.location),
-            kind: resolve_error_kind,
-        });
+                _ => ResolveErrorKind::CannotUseUninitializedValue,
+            },
+        ))
     }
 }

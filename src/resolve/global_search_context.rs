@@ -27,18 +27,13 @@ impl<'a> GlobalSearchContext<'a> {
     ) -> Result<(&resolved::Type, &GlobalRef), ResolveError> {
         match self.find_global(name) {
             Some(global) => Ok(global),
-            None => Err(ResolveError {
-                filename: Some(
-                    self.source_file_cache
-                        .get(source.key)
-                        .filename()
-                        .to_string(),
-                ),
-                location: Some(source.location),
-                kind: ResolveErrorKind::UndeclaredVariable {
+            None => Err(ResolveError::new(
+                self.source_file_cache,
+                source,
+                ResolveErrorKind::UndeclaredVariable {
                     name: name.to_string(),
                 },
-            }),
+            )),
         }
     }
 

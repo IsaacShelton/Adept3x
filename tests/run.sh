@@ -31,6 +31,7 @@ compile return_message
 compile structure_definitions
 compile structure_literals
 compile structure_pod
+compile unary_operators
 compile variables
 compile variables_override
 compile variables_typed

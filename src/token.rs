@@ -69,6 +69,7 @@ pub enum TokenKind {
     GreaterThanEq,
     OpenAngle,
     Not,
+    BitComplement,
     Comma,
     Colon,
     Hash,
@@ -84,6 +85,8 @@ pub enum TokenKind {
     RightShift,
     LogicalLeftShift,
     LogicalRightShift,
+    Increment,
+    Decrement,
 }
 
 impl Display for TokenKind {
@@ -120,6 +123,7 @@ impl Display for TokenKind {
             TokenKind::GreaterThanEq => "'>='",
             TokenKind::OpenAngle => "open angle '<'",
             TokenKind::Not => "'!'",
+            TokenKind::BitComplement => "'~'",
             TokenKind::Comma => "','",
             TokenKind::Colon => "':'",
             TokenKind::Hash => "'#'",
@@ -135,6 +139,8 @@ impl Display for TokenKind {
             TokenKind::RightShift => "'>>'",
             TokenKind::LogicalLeftShift => "'<<<'",
             TokenKind::LogicalRightShift => "'>>>'",
+            TokenKind::Increment => "'++'",
+            TokenKind::Decrement => "'--'",
         })
     }
 }
@@ -145,10 +151,13 @@ impl TokenKind {
             TokenKind::OpenCurly => 16,
             TokenKind::OpenBracket => 16,
             TokenKind::Member => 16,
+            TokenKind::Increment => 15,
+            TokenKind::Decrement => 15,
+            TokenKind::Not => 14,
+            TokenKind::BitComplement => 14,
             TokenKind::Multiply => 12,
             TokenKind::Divide => 12,
             TokenKind::Modulus => 12,
-            TokenKind::Not => 14,
             TokenKind::Add => 11,
             TokenKind::Subtract => 11,
             TokenKind::LeftShift => 10,

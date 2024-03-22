@@ -24,18 +24,13 @@ impl<'a> FunctionSearchContext<'a> {
     ) -> Result<resolved::FunctionRef, ResolveError> {
         match self.find_function(name) {
             Some(function) => Ok(function),
-            None => Err(ResolveError {
-                filename: Some(
-                    self.source_file_cache
-                        .get(source.key)
-                        .filename()
-                        .to_string(),
-                ),
-                location: Some(source.location),
-                kind: ResolveErrorKind::FailedToFindFunction {
+            None => Err(ResolveError::new(
+                self.source_file_cache,
+                source,
+                ResolveErrorKind::FailedToFindFunction {
                     name: name.to_string(),
                 },
-            }),
+            )),
         }
     }
 

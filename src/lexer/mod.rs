@@ -196,6 +196,7 @@ where
                 '>' => Has(Token::new(TokenKind::GreaterThan, location)),
                 '<' => Has(Token::new(TokenKind::OpenAngle, location)),
                 '!' => Has(Token::new(TokenKind::Not, location)),
+                '~' => Has(Token::new(TokenKind::BitComplement, location)),
                 '&' => Has(Token::new(TokenKind::Ampersand, location)),
                 '|' => Has(Token::new(TokenKind::Pipe, location)),
                 '^' => Has(Token::new(TokenKind::Caret, location)),
