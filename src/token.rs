@@ -55,6 +55,9 @@ pub enum TokenKind {
     FuncKeyword,
     ReturnKeyword,
     StructKeyword,
+    IfKeyword,
+    ElseKeyword,
+    ElifKeyword,
     Member,
     Add,
     Subtract,
@@ -109,6 +112,9 @@ impl Display for TokenKind {
             TokenKind::FuncKeyword => "'func' keyword",
             TokenKind::ReturnKeyword => "'return' keyword",
             TokenKind::StructKeyword => "'struct' keyword",
+            TokenKind::IfKeyword => "'if' keyword",
+            TokenKind::ElseKeyword => "'else' keyword",
+            TokenKind::ElifKeyword => "'elif' keyword",
             TokenKind::Member => "'.'",
             TokenKind::Add => "'+'",
             TokenKind::Subtract => "'-'",
@@ -193,6 +199,9 @@ impl TokenKind {
             | TokenKind::FuncKeyword
             | TokenKind::ReturnKeyword
             | TokenKind::StructKeyword
+            | TokenKind::IfKeyword
+            | TokenKind::ElseKeyword
+            | TokenKind::ElifKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

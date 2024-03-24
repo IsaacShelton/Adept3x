@@ -5,13 +5,14 @@ mod type_search_context;
 mod variable_search_context;
 
 use crate::{
-    ast::{self, Ast, FileIdentifier, Source},
+    ast::{self, Ast, Conditional, FileIdentifier, Source},
     resolved::{self, Destination, TypedExpression, VariableStorage},
     source_file_cache::SourceFileCache,
 };
 use ast::{IntegerBits, IntegerSign};
 use function_search_context::FunctionSearchContext;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
@@ -170,8 +171,6 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     .get(function_index)
                     .expect("function referenced by job to exist");
 
-                let mut resolved_statements = vec![];
-
                 let mut variable_search_context =
                     VariableSearchContext::new(resolved_ast.source_file_cache);
 
@@ -193,17 +192,15 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     }
                 }
 
-                for statement in ast_function.statements.iter() {
-                    resolved_statements.push(resolve_statement(
-                        &mut resolved_ast,
-                        &function_search_context,
-                        &type_search_context,
-                        &global_search_context,
-                        &mut variable_search_context,
-                        resolved_function_ref,
-                        statement,
-                    )?);
-                }
+                let mut resolved_statements = resolve_statements(
+                    &mut resolved_ast,
+                    &function_search_context,
+                    &type_search_context,
+                    &global_search_context,
+                    &mut variable_search_context,
+                    resolved_function_ref,
+                    &ast_function.statements,
+                )?;
 
                 let resolved_function = resolved_ast
                     .functions
@@ -216,6 +213,32 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     }
 
     Ok(resolved_ast)
+}
+
+fn resolve_statements(
+    resolved_ast: &mut resolved::Ast,
+    function_search_context: &FunctionSearchContext,
+    type_search_context: &TypeSearchContext,
+    global_search_context: &GlobalSearchContext,
+    variable_search_context: &mut VariableSearchContext,
+    resolved_function_ref: resolved::FunctionRef,
+    statements: &[ast::Statement],
+) -> Result<Vec<resolved::Statement>, ResolveError> {
+    let mut resolved_statements = vec![];
+
+    for statement in statements.iter() {
+        resolved_statements.push(resolve_statement(
+            resolved_ast,
+            &function_search_context,
+            &type_search_context,
+            &global_search_context,
+            variable_search_context,
+            resolved_function_ref,
+            statement,
+        )?);
+    }
+
+    Ok(resolved_statements)
 }
 
 fn resolve_statement(
@@ -1152,6 +1175,81 @@ fn resolve_expression(
                 })),
                 source,
             );
+
+            Ok(TypedExpression::new(result_type, expression))
+        }
+        ast::ExpressionKind::Conditional(ast::Conditional {
+            conditions,
+            otherwise,
+        }) => {
+            let otherwise = otherwise
+                .as_ref()
+                .map(|otherwise| {
+                    resolve_statements(
+                        resolved_ast,
+                        function_search_context,
+                        type_search_context,
+                        global_search_context,
+                        variable_search_context,
+                        resolved_function_ref,
+                        &otherwise.statements,
+                    )
+                    .map(|statements| resolved::Block::new(statements))
+                })
+                .transpose()?;
+
+            let conditions = conditions
+                .iter()
+                .map(|(expression, block)| {
+                    let condition = resolve_expression(
+                        resolved_ast,
+                        function_search_context,
+                        type_search_context,
+                        global_search_context,
+                        variable_search_context,
+                        resolved_function_ref,
+                        expression,
+                        Initialized::Require,
+                    )?;
+
+                    let statements = resolve_statements(
+                        resolved_ast,
+                        function_search_context,
+                        type_search_context,
+                        global_search_context,
+                        variable_search_context,
+                        resolved_function_ref,
+                        &block.statements,
+                    )?;
+
+                    let condition = if let Some(condition) =
+                        conform_expression(&condition, &resolved::Type::Boolean)
+                    {
+                        Ok(condition.expression)
+                    } else {
+                        Err(ResolveError::new(
+                            resolved_ast.source_file_cache,
+                            condition.expression.source,
+                            ResolveErrorKind::TypeMismatch {
+                                left: condition.resolved_type.to_string(),
+                                right: resolved::Type::Boolean.to_string(),
+                            },
+                        ))
+                    }?;
+
+                    Ok((condition, resolved::Block::new(statements)))
+                })
+                .collect::<Result<Vec<(resolved::Expression, resolved::Block)>, ResolveError>>()?;
+
+            let expression = resolved::Expression::new(
+                resolved::ExpressionKind::Conditional(resolved::Conditional {
+                    conditions,
+                    otherwise,
+                }),
+                source,
+            );
+
+            let result_type = todo!();
 
             Ok(TypedExpression::new(result_type, expression))
         }
