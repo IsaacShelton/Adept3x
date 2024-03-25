@@ -320,6 +320,12 @@ pub struct Block {
     pub statements: Vec<Statement>
 }
 
+impl Block {
+    pub fn new(statements: Vec<Statement>) -> Self {
+        Self { statements }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct BinaryOperation {
     pub operator: BinaryOperator,

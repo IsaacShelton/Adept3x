@@ -5,14 +5,13 @@ mod type_search_context;
 mod variable_search_context;
 
 use crate::{
-    ast::{self, Ast, Conditional, FileIdentifier, Source},
+    ast::{self, Ast, FileIdentifier, Source},
     resolved::{self, Destination, TypedExpression, VariableStorage},
     source_file_cache::SourceFileCache,
 };
 use ast::{IntegerBits, IntegerSign};
 use function_search_context::FunctionSearchContext;
 use indexmap::IndexMap;
-use itertools::Itertools;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
@@ -192,7 +191,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     }
                 }
 
-                let mut resolved_statements = resolve_statements(
+                let resolved_statements = resolve_statements(
                     &mut resolved_ast,
                     &function_search_context,
                     &type_search_context,
@@ -224,7 +223,7 @@ fn resolve_statements(
     resolved_function_ref: resolved::FunctionRef,
     statements: &[ast::Statement],
 ) -> Result<Vec<resolved::Statement>, ResolveError> {
-    let mut resolved_statements = vec![];
+    let mut resolved_statements = Vec::with_capacity(statements.len());
 
     for statement in statements.iter() {
         resolved_statements.push(resolve_statement(
@@ -302,19 +301,16 @@ fn resolve_statement(
             ))
         }
         ast::StatementKind::Expression(value) => Ok(resolved::Statement::new(
-            resolved::StatementKind::Expression(
-                resolve_expression(
-                    resolved_ast,
-                    function_search_context,
-                    type_search_context,
-                    global_search_context,
-                    variable_search_context,
-                    resolved_function_ref,
-                    value,
-                    Initialized::Require,
-                )?
-                .expression,
-            ),
+            resolved::StatementKind::Expression(resolve_expression(
+                resolved_ast,
+                function_search_context,
+                type_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                value,
+                Initialized::Require,
+            )?),
             source,
         )),
         ast::StatementKind::Declaration(declaration) => {
@@ -1241,6 +1237,44 @@ fn resolve_expression(
                 })
                 .collect::<Result<Vec<(resolved::Expression, resolved::Block)>, ResolveError>>()?;
 
+            let result_types = conditions
+                .iter()
+                .map(|(_, block)| block)
+                .chain(otherwise.iter())
+                .map(|block| {
+                    block
+                        .statements
+                        .last()
+                        .and_then(|statement| match &statement.kind {
+                            resolved::StatementKind::Return(_) => None,
+                            resolved::StatementKind::Expression(expression) => {
+                                Some(expression.resolved_type.clone())
+                            }
+                            resolved::StatementKind::Declaration(_) => None,
+                            resolved::StatementKind::Assignment(_) => None,
+                        })
+                        .unwrap_or(resolved::Type::Void)
+                })
+                .try_fold(None, |acc: Option<resolved::Type>, item| {
+                    if let Some(existing) = acc {
+                        if existing == item {
+                            Ok(Some(existing))
+                        } else {
+                            Err(ResolveError::new(
+                                resolved_ast.source_file_cache,
+                                source,
+                                ResolveErrorKind::Other {
+                                    message: "hi".into(),
+                                },
+                            ))
+                        }
+                    } else {
+                        Ok(Some(item))
+                    }
+                })?;
+
+            let result_type = result_types.expect("at least one result type");
+
             let expression = resolved::Expression::new(
                 resolved::ExpressionKind::Conditional(resolved::Conditional {
                     conditions,
@@ -1248,8 +1282,6 @@ fn resolve_expression(
                 }),
                 source,
             );
-
-            let result_type = todo!();
 
             Ok(TypedExpression::new(result_type, expression))
         }

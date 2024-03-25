@@ -182,7 +182,7 @@ impl Statement {
 #[derive(Clone, Debug)]
 pub enum StatementKind {
     Return(Option<Expression>),
-    Expression(Expression),
+    Expression(TypedExpression),
     Declaration(Declaration),
     Assignment(Assignment),
 }

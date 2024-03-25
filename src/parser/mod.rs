@@ -10,9 +10,10 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Assignment, Ast, BinaryOperation, Call, Declaration, DeclareAssign, Expression,
-        ExpressionKind, Field, File, FileIdentifier, Function, Global, Parameter, Parameters,
-        Source, Statement, StatementKind, Structure, Type, TypeKind, UnaryOperation, UnaryOperator,
+        self, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
+        DeclareAssign, Expression, ExpressionKind, Field, File, FileIdentifier, Function, Global,
+        Parameter, Parameters, Source, Statement, StatementKind, Structure, Type, TypeKind,
+        UnaryOperation, UnaryOperator,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -62,7 +63,11 @@ where
         Ok(())
     }
 
-    fn parse_top_level(&mut self, ast_file: &mut File, parent_annotations: Vec<Annotation>) -> Result<(), ParseError> {
+    fn parse_top_level(
+        &mut self,
+        ast_file: &mut File,
+        parent_annotations: Vec<Annotation>,
+    ) -> Result<(), ParseError> {
         let mut annotations = parent_annotations;
 
         // Ignore preceeding newlines
@@ -559,6 +564,82 @@ where
 
                 Ok(Expression::new(
                     ExpressionKind::UnaryOperator(Box::new(UnaryOperation { operator, inner })),
+                    self.source(location),
+                ))
+            }
+            TokenKind::IfKeyword => {
+                self.input.advance().kind.unwrap_if_keyword();
+                self.ignore_newlines();
+
+                let condition = self.parse_expression()?;
+                self.ignore_newlines();
+                self.parse_token(TokenKind::OpenCurly, Some("to begin 'if' block"))?;
+                self.ignore_newlines();
+
+                let mut statements = Vec::new();
+
+                while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+                    statements.push(self.parse_statement()?);
+                    self.ignore_newlines();
+                }
+
+                self.ignore_newlines();
+                self.parse_token(TokenKind::CloseCurly, Some("to end 'if' block"))?;
+                self.ignore_newlines();
+
+                let mut conditions = Vec::new();
+                conditions.push((condition, Block::new(statements)));
+
+                while self.input.peek_is(TokenKind::ElifKeyword) {
+                    self.input.advance().kind.unwrap_elif_keyword();
+                    self.ignore_newlines();
+
+                    let condition = self.parse_expression()?;
+                    self.ignore_newlines();
+                    self.parse_token(TokenKind::OpenCurly, Some("to begin 'elif' block"))?;
+                    self.ignore_newlines();
+
+                    let mut statements = Vec::new();
+
+                    while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+                        statements.push(self.parse_statement()?);
+                        self.ignore_newlines();
+                    }
+
+                    self.ignore_newlines();
+                    self.parse_token(TokenKind::CloseCurly, Some("to end 'elif' block"))?;
+                    self.ignore_newlines();
+
+                    conditions.push((condition, Block::new(statements)));
+                }
+
+                let otherwise = if self.input.peek_is(TokenKind::ElseKeyword) {
+                    self.input.advance().kind.unwrap_else_keyword();
+                    self.ignore_newlines();
+
+                    let mut statements = Vec::new();
+
+                    while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+                        statements.push(self.parse_statement()?);
+                        self.ignore_newlines();
+                    }
+
+                    self.ignore_newlines();
+                    self.parse_token(TokenKind::CloseCurly, Some("to end 'else' block"))?;
+                    self.ignore_newlines();
+
+                    Some(Block::new(statements))
+                } else {
+                    None
+                };
+
+                let conditional = Conditional {
+                    conditions,
+                    otherwise,
+                };
+
+                Ok(Expression::new(
+                    ExpressionKind::Conditional(conditional),
                     self.source(location),
                 ))
             }

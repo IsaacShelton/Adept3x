@@ -124,7 +124,7 @@ fn lower_function(
                     builder.push(instruction);
                 }
                 StatementKind::Expression(expression) => {
-                    lower_expression(&mut builder, ir_module, expression)?;
+                    lower_expression(&mut builder, ir_module, &expression.expression)?;
                 }
                 StatementKind::Declaration(declaration) => {
                     let destination = Value::Reference(ValueReference {
@@ -578,5 +578,6 @@ fn lower_expression(
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
             }))
         }
+        ExpressionKind::Conditional(_) => todo!("conditional"),
     }
 }
