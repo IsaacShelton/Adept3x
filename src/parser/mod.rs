@@ -21,6 +21,7 @@ use crate::{
 };
 use ast::BinaryOperator;
 use indexmap::IndexMap;
+use lazy_format::lazy_format;
 use std::{borrow::Borrow, ffi::CString};
 
 struct Parser<'a, I>
@@ -314,21 +315,10 @@ where
             self.parse_type(Some("return "), Some("for function"))?
         };
 
-        let mut statements = vec![];
-
-        if !is_foreign {
-            self.ignore_newlines();
-            self.parse_token(TokenKind::OpenCurly, Some("to begin function body"))?;
-            self.ignore_newlines();
-
-            while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-                statements.push(self.parse_statement()?);
-                self.ignore_newlines();
-            }
-
-            self.ignore_newlines();
-            self.parse_token(TokenKind::CloseCurly, Some("to close function body"))?;
-        }
+        let statements = (!is_foreign)
+            .then(|| self.parse_block("function"))
+            .transpose()?
+            .unwrap_or_default();
 
         Ok(Function {
             name,
@@ -337,6 +327,31 @@ where
             statements,
             is_foreign,
         })
+    }
+
+    fn parse_block(&mut self, to_begin_what_block: &str) -> Result<Vec<Statement>, ParseError> {
+        self.ignore_newlines();
+
+        self.parse_token(
+            TokenKind::OpenCurly,
+            Some(lazy_format!("to begin {} block", to_begin_what_block)),
+        )?;
+
+        let mut statements = Vec::new();
+        self.ignore_newlines();
+
+        while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+            statements.push(self.parse_statement()?);
+            self.ignore_newlines();
+        }
+
+        self.ignore_newlines();
+        self.parse_token(
+            TokenKind::CloseCurly,
+            Some(lazy_format!("to close {} block", to_begin_what_block)),
+        )?;
+
+        Ok(statements)
     }
 
     fn parse_function_parameters(&mut self) -> Result<Parameters, ParseError> {
@@ -572,66 +587,24 @@ where
                 self.ignore_newlines();
 
                 let condition = self.parse_expression()?;
-                self.ignore_newlines();
-                self.parse_token(TokenKind::OpenCurly, Some("to begin 'if' block"))?;
-                self.ignore_newlines();
-
-                let mut statements = Vec::new();
-
-                while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-                    statements.push(self.parse_statement()?);
-                    self.ignore_newlines();
-                }
-
-                self.ignore_newlines();
-                self.parse_token(TokenKind::CloseCurly, Some("to end 'if' block"))?;
-                self.ignore_newlines();
-
-                let mut conditions = Vec::new();
-                conditions.push((condition, Block::new(statements)));
+                let statements = self.parse_block("'if'")?;
+                let mut conditions = vec![(condition, Block::new(statements))];
 
                 while self.input.peek_is(TokenKind::ElifKeyword) {
                     self.input.advance().kind.unwrap_elif_keyword();
                     self.ignore_newlines();
 
                     let condition = self.parse_expression()?;
-                    self.ignore_newlines();
-                    self.parse_token(TokenKind::OpenCurly, Some("to begin 'elif' block"))?;
-                    self.ignore_newlines();
-
-                    let mut statements = Vec::new();
-
-                    while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-                        statements.push(self.parse_statement()?);
-                        self.ignore_newlines();
-                    }
-
-                    self.ignore_newlines();
-                    self.parse_token(TokenKind::CloseCurly, Some("to end 'elif' block"))?;
-                    self.ignore_newlines();
-
-                    conditions.push((condition, Block::new(statements)));
+                    conditions.push((condition, Block::new(self.parse_block("'elif'")?)));
                 }
 
-                let otherwise = if self.input.peek_is(TokenKind::ElseKeyword) {
-                    self.input.advance().kind.unwrap_else_keyword();
-                    self.ignore_newlines();
-
-                    let mut statements = Vec::new();
-
-                    while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-                        statements.push(self.parse_statement()?);
-                        self.ignore_newlines();
-                    }
-
-                    self.ignore_newlines();
-                    self.parse_token(TokenKind::CloseCurly, Some("to end 'else' block"))?;
-                    self.ignore_newlines();
-
-                    Some(Block::new(statements))
-                } else {
-                    None
-                };
+                let otherwise = self
+                    .input
+                    .peek_is(TokenKind::ElseKeyword)
+                    .then(|| {
+                        self.input.advance().kind.unwrap_else_keyword();
+                        Ok(Block::new(self.parse_block("'else'")?))
+                    }).transpose()?;
 
                 let conditional = Conditional {
                     conditions,
