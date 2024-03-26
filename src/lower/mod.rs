@@ -578,6 +578,8 @@ fn lower_expression(
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
             }))
         }
-        ExpressionKind::Conditional(_) => todo!("conditional"),
+        ExpressionKind::Conditional(_conditional) => {
+            todo!("conditional")
+        }
     }
 }

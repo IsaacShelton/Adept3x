@@ -23,7 +23,18 @@ use ir::IntegerSign;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFNeg, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
+        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd,
+        LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildBr, LLVMBuildCall2, LLVMBuildCondBr,
+        LLVMBuildExtractValue, LLVMBuildFNeg, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue,
+        LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul,
+        LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem,
+        LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
+        LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage,
+        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type,
+        LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
+        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
+        LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
+        LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -223,31 +234,32 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
             let builder = Builder::new();
             let mut value_catalog = ValueCatalog::new(ir_function.basicblocks.len());
 
-            let basicblocks =
-                ir_function
-                    .basicblocks
-                    .iter()
-                    .enumerate()
-                    .map(|(id, ir_basicblock)| {
-                        (
-                            id,
-                            ir_basicblock,
-                            LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
-                        )
-                    });
+            let basicblocks = ir_function
+                .basicblocks
+                .iter()
+                .enumerate()
+                .map(|(id, ir_basicblock)| {
+                    (
+                        id,
+                        ir_basicblock,
+                        LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
+                    )
+                })
+                .collect::<Vec<_>>();
 
             let overflow_basicblock: OnceCell<LLVMBasicBlockRef> = OnceCell::new();
 
-            for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks {
+            for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks.iter() {
                 create_function_block(
                     ctx,
                     &mut value_catalog,
                     &overflow_basicblock,
                     &builder,
-                    ir_basicblock_id,
+                    *ir_basicblock_id,
                     ir_basicblock,
-                    llvm_basicblock,
+                    *llvm_basicblock,
                     *skeleton,
+                    &basicblocks,
                 );
             }
         }
@@ -265,6 +277,7 @@ unsafe fn create_function_block(
     ir_basicblock: &ir::BasicBlock,
     mut llvm_basicblock: LLVMBasicBlockRef,
     function_skeleton: LLVMValueRef,
+    basicblocks: &[(usize, &ir::BasicBlock, LLVMBasicBlockRef)],
 ) {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
 
@@ -560,25 +573,35 @@ unsafe fn create_function_block(
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
                 Some(LLVMBuildXor(builder.get(), left, right, cstr!("").as_ptr()))
-            },
+            }
             Instruction::LeftShift(operands) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
                 Some(LLVMBuildShl(builder.get(), left, right, cstr!("").as_ptr()))
-            },
+            }
             Instruction::RightShift(operands) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                Some(LLVMBuildAShr(builder.get(), left, right, cstr!("").as_ptr()))
-            },
+                Some(LLVMBuildAShr(
+                    builder.get(),
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
             Instruction::LogicalRightShift(operands) => {
                 let (left, right) =
                     build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
 
-                Some(LLVMBuildLShr(builder.get(), left, right, cstr!("").as_ptr()))
-            },
+                Some(LLVMBuildLShr(
+                    builder.get(),
+                    left,
+                    right,
+                    cstr!("").as_ptr(),
+                ))
+            }
             Instruction::Bitcast(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
                 let backend_type = to_backend_type(ctx, ir_type);
@@ -684,23 +707,47 @@ unsafe fn create_function_block(
             Instruction::IsZero(inner) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, inner);
                 Some(LLVMBuildIsNull(builder.get(), value, cstr!("").as_ptr()))
-            },
+            }
             Instruction::IsNotZero(inner) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, inner);
                 Some(LLVMBuildIsNotNull(builder.get(), value, cstr!("").as_ptr()))
-            },
+            }
             Instruction::Negate(inner) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, inner);
                 Some(LLVMBuildNeg(builder.get(), value, cstr!("").as_ptr()))
-            },
+            }
             Instruction::NegateFloat(inner) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, inner);
                 Some(LLVMBuildFNeg(builder.get(), value, cstr!("").as_ptr()))
-            },
+            }
             Instruction::BitComplement(inner) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, inner);
                 Some(LLVMBuildNot(builder.get(), value, cstr!("").as_ptr()))
-            },
+            }
+            Instruction::Break(break_info) => {
+                let (_, _, backend_block) = basicblocks
+                    .get(break_info.true_basicblock_id)
+                    .expect("referenced basicblock to exist");
+                Some(LLVMBuildBr(builder.get(), *backend_block))
+            }
+            Instruction::ConditionalBreak(condition, break_info) => {
+                let value = build_value(ctx.backend_module, value_catalog, builder, condition);
+
+                let (_, _, true_backend_block) = basicblocks
+                    .get(break_info.true_basicblock_id)
+                    .expect("referenced basicblock to exist");
+
+                let (_, _, false_backend_block) = basicblocks
+                    .get(break_info.false_basicblock_id)
+                    .expect("referenced basicblock to exist");
+
+                Some(LLVMBuildCondBr(
+                    builder.get(),
+                    value,
+                    *true_backend_block,
+                    *false_backend_block,
+                ))
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);

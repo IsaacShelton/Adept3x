@@ -117,6 +117,19 @@ pub enum Instruction {
     Negate(Value),
     NegateFloat(Value),
     BitComplement(Value),
+    Break(Break),
+    ConditionalBreak(Value, ConditionalBreak),
+}
+
+#[derive(Clone, Debug)]
+pub struct Break {
+    pub true_basicblock_id: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct ConditionalBreak {
+    pub true_basicblock_id: usize,
+    pub false_basicblock_id: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -310,6 +323,8 @@ impl Instruction {
             Instruction::Negate(..) => false,
             Instruction::NegateFloat(..) => false,
             Instruction::BitComplement(..) => false,
+            Instruction::Break(..) => true,
+            Instruction::ConditionalBreak(..) => true,
         }
     }
 }
