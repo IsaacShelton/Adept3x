@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use builder::Builder;
+use colored::Colorize;
 
 pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
@@ -109,55 +110,11 @@ fn lower_function(
             }));
         }
 
-        for statement in function.statements.iter() {
-            match &statement.kind {
-                StatementKind::Return(expression) => {
-                    let instruction =
-                        ir::Instruction::Return(if let Some(expression) = expression {
-                            Some(lower_expression(&mut builder, ir_module, expression)?)
-                        } else if function.name == "main" {
-                            Some(ir::Value::Literal(Literal::Signed32(0)))
-                        } else {
-                            None
-                        });
+        lower_statements(&mut builder, ir_module, &function.statements, function)?;
 
-                    builder.push(instruction);
-                }
-                StatementKind::Expression(expression) => {
-                    lower_expression(&mut builder, ir_module, &expression.expression)?;
-                }
-                StatementKind::Declaration(declaration) => {
-                    let destination = Value::Reference(ValueReference {
-                        basicblock_id: 0,
-                        instruction_id: declaration.key.index,
-                    });
-
-                    if let Some(value) = &declaration.value {
-                        let source = lower_expression(&mut builder, ir_module, value)?;
-
-                        builder.push(ir::Instruction::Store(ir::Store {
-                            source,
-                            destination,
-                        }));
-                    }
-                }
-                StatementKind::Assignment(assignment) => {
-                    let destination =
-                        lower_destination(&mut builder, ir_module, &assignment.destination)?;
-
-                    let source = lower_expression(&mut builder, ir_module, &assignment.value)?;
-
-                    builder.push(ir::Instruction::Store(ir::Store {
-                        source,
-                        destination,
-                    }));
-                }
-            }
-        }
-
-        if !builder.is_terminated() {
+        if !builder.is_block_terminated() {
             if let resolved::Type::Void = function.return_type {
-                if function.name == "main" && !builder.is_terminated() {
+                if function.name == "main" && !builder.is_block_terminated() {
                     builder.push(ir::Instruction::Return(Some(ir::Value::Literal(
                         Literal::Signed32(0),
                     ))));
@@ -203,6 +160,58 @@ fn lower_function(
             variables: vec![],
         },
     );
+
+    Ok(())
+}
+
+fn lower_statements(
+    builder: &mut Builder,
+    ir_module: &ir::Module,
+    statements: &[resolved::Statement],
+    function: &resolved::Function,
+) -> Result<(), CompilerError> {
+    for statement in statements.iter() {
+        match &statement.kind {
+            StatementKind::Return(expression) => {
+                let instruction = ir::Instruction::Return(if let Some(expression) = expression {
+                    Some(lower_expression(builder, ir_module, expression, function)?)
+                } else if function.name == "main" {
+                    Some(ir::Value::Literal(Literal::Signed32(0)))
+                } else {
+                    None
+                });
+
+                builder.push(instruction);
+            }
+            StatementKind::Expression(expression) => {
+                lower_expression(builder, ir_module, &expression.expression, function)?;
+            }
+            StatementKind::Declaration(declaration) => {
+                let destination = Value::Reference(ValueReference {
+                    basicblock_id: 0,
+                    instruction_id: declaration.key.index,
+                });
+
+                if let Some(value) = &declaration.value {
+                    let source = lower_expression(builder, ir_module, value, function)?;
+
+                    builder.push(ir::Instruction::Store(ir::Store {
+                        source,
+                        destination,
+                    }));
+                }
+            }
+            StatementKind::Assignment(assignment) => {
+                let destination = lower_destination(builder, ir_module, &assignment.destination)?;
+                let source = lower_expression(builder, ir_module, &assignment.value, function)?;
+
+                builder.push(ir::Instruction::Store(ir::Store {
+                    source,
+                    destination,
+                }));
+            }
+        }
+    }
 
     Ok(())
 }
@@ -268,6 +277,7 @@ fn lower_expression(
     builder: &mut Builder,
     ir_module: &ir::Module,
     expression: &Expression,
+    function: &resolved::Function,
 ) -> Result<ir::Value, CompilerError> {
     match &expression.kind {
         ExpressionKind::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
@@ -367,7 +377,7 @@ fn lower_expression(
             let mut arguments = vec![];
 
             for argument in call.arguments.iter() {
-                arguments.push(lower_expression(builder, ir_module, argument)?);
+                arguments.push(lower_expression(builder, ir_module, argument, function)?);
             }
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
@@ -391,7 +401,8 @@ fn lower_expression(
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
         ExpressionKind::DeclareAssign(declare_assign) => {
-            let initial_value = lower_expression(builder, ir_module, &declare_assign.value)?;
+            let initial_value =
+                lower_expression(builder, ir_module, &declare_assign.value, function)?;
 
             let destination = Value::Reference(ValueReference {
                 basicblock_id: 0,
@@ -407,8 +418,18 @@ fn lower_expression(
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
         ExpressionKind::BinaryOperation(binary_operation) => {
-            let left = lower_expression(builder, ir_module, &binary_operation.left.expression)?;
-            let right = lower_expression(builder, ir_module, &binary_operation.right.expression)?;
+            let left = lower_expression(
+                builder,
+                ir_module,
+                &binary_operation.left.expression,
+                function,
+            )?;
+            let right = lower_expression(
+                builder,
+                ir_module,
+                &binary_operation.right.expression,
+                function,
+            )?;
             let operands = ir::BinaryOperands::new(left, right);
 
             match binary_operation.operator {
@@ -528,7 +549,7 @@ fn lower_expression(
             }
         }
         ExpressionKind::IntegerExtend(value, resolved_type) => {
-            let value = lower_expression(builder, ir_module, value)?;
+            let value = lower_expression(builder, ir_module, value, function)?;
             let ir_type = lower_type(resolved_type)?;
 
             Ok(builder.push(
@@ -557,7 +578,7 @@ fn lower_expression(
 
             // Evaluate field values in the order specified by the struct literal
             for (expression, index) in fields.values() {
-                let value = lower_expression(builder, ir_module, expression)?;
+                let value = lower_expression(builder, ir_module, expression, function)?;
                 values.push((index, value));
             }
 
@@ -570,7 +591,12 @@ fn lower_expression(
             Ok(builder.push(ir::Instruction::StructureLiteral(ir_type, values)))
         }
         ExpressionKind::UnaryOperator(unary_operation) => {
-            let inner = lower_expression(builder, ir_module, &unary_operation.inner.expression)?;
+            let inner = lower_expression(
+                builder,
+                ir_module,
+                &unary_operation.inner.expression,
+                function,
+            )?;
 
             Ok(builder.push(match unary_operation.operator {
                 resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
@@ -578,8 +604,44 @@ fn lower_expression(
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
             }))
         }
-        ExpressionKind::Conditional(_conditional) => {
-            todo!("conditional")
+        ExpressionKind::Conditional(conditional) => {
+            let resume_basicblock_id = builder.new_block();
+
+            for (expression, block) in conditional.conditions.iter() {
+                let condition = lower_expression(builder, ir_module, expression, function)?;
+
+                let true_basicblock_id = builder.new_block();
+                let false_basicblock_id = builder.new_block();
+
+                builder.push(ir::Instruction::ConditionalBreak(
+                    condition,
+                    ir::ConditionalBreak {
+                        true_basicblock_id,
+                        false_basicblock_id,
+                    },
+                ));
+
+                builder.use_block(true_basicblock_id);
+                lower_statements(builder, ir_module, &block.statements, function)?;
+                builder.continues_to(resume_basicblock_id);
+
+                builder.use_block(false_basicblock_id);
+            }
+
+            if let Some(block) = &conditional.otherwise {
+                lower_statements(builder, ir_module, &block.statements, function)?;
+            }
+
+            builder.continues_to(resume_basicblock_id);
+            builder.use_block(resume_basicblock_id);
+
+            println!(
+                "{} results from conditionals have not been implemented yet",
+                "warning:".yellow()
+            );
+
+            // TODO: Give back proper result value
+            Ok(Value::Literal(Literal::Boolean(false)))
         }
     }
 }

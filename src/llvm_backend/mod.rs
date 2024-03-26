@@ -726,7 +726,7 @@ unsafe fn create_function_block(
             }
             Instruction::Break(break_info) => {
                 let (_, _, backend_block) = basicblocks
-                    .get(break_info.true_basicblock_id)
+                    .get(break_info.basicblock_id)
                     .expect("referenced basicblock to exist");
                 Some(LLVMBuildBr(builder.get(), *backend_block))
             }

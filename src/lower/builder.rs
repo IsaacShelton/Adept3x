@@ -1,13 +1,15 @@
 use crate::ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference};
 
 pub struct Builder {
-    pub basicblocks: BasicBlocks,
+    basicblocks: BasicBlocks,
+    current_basicblock_id: usize,
 }
 
 impl Builder {
     pub fn new() -> Self {
         Self {
             basicblocks: BasicBlocks::new(),
+            current_basicblock_id: 0,
         }
     }
 
@@ -15,28 +17,52 @@ impl Builder {
         self.basicblocks
     }
 
-    pub fn is_terminated(&self) -> bool {
-        self.basicblocks.is_terminated()
+    pub fn is_block_terminated(&self) -> bool {
+        self.basicblocks.blocks[self.current_basicblock_id].is_terminated()
+    }
+
+    pub fn continues_to(&mut self, basicblock_id: usize) {
+        if !self.is_block_terminated() {
+            self.push(ir::Instruction::Break(ir::Break { basicblock_id }));
+        }
     }
 
     pub fn terminate(&mut self) {
-        if !self.is_terminated() {
+        if !self.is_block_terminated() {
             self.push(Instruction::Return(None));
         }
     }
 
+    pub fn new_block(&mut self) -> usize {
+        let block = BasicBlock::new();
+        let id = self.basicblocks.len();
+        self.basicblocks.push(block);
+        id
+    }
+
+    pub fn use_block(&mut self, id: usize) {
+        if id >= self.basicblocks.len() {
+            panic!("attempt to build with basicblock that doesn't exist");
+        }
+
+        self.current_basicblock_id = id;
+    }
+
     pub fn push(&mut self, instruction: Instruction) -> ir::Value {
-        if let Some(last) = self.basicblocks.last_mut() {
-            last.push(instruction);
-        } else {
-            let mut first_block = BasicBlock::new();
-            first_block.push(instruction);
-            self.basicblocks.push(first_block);
-        };
+        let current_block =
+            if let Some(current_block) = self.basicblocks.get_mut(self.current_basicblock_id) {
+                current_block.push(instruction);
+                &*current_block
+            } else {
+                let mut first_block = BasicBlock::new();
+                first_block.push(instruction);
+                self.basicblocks.push(first_block);
+                self.basicblocks.last().unwrap()
+            };
 
         ir::Value::Reference(ValueReference {
-            basicblock_id: self.basicblocks.len() - 1,
-            instruction_id: self.basicblocks.last().unwrap().instructions.len() - 1,
+            basicblock_id: self.current_basicblock_id,
+            instruction_id: current_block.instructions.len() - 1,
         })
     }
 }

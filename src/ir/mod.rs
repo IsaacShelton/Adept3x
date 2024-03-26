@@ -123,7 +123,7 @@ pub enum Instruction {
 
 #[derive(Clone, Debug)]
 pub struct Break {
-    pub true_basicblock_id: usize,
+    pub basicblock_id: usize,
 }
 
 #[derive(Clone, Debug)]
