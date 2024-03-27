@@ -22,6 +22,7 @@ compile function_parameters
 compile function_simple
 compile global_variables
 compile if
+compile if_eval
 compile integer_literal_conforming
 compile integer_signed_overflow
 compile integer_unsigned_overflow

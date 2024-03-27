@@ -27,6 +27,19 @@ where
         self.peek_nth(0)
     }
 
+    pub fn peek_n<'a>(&'a mut self, count: usize) -> &'a [I::Item] {
+        while self.buffer.len() <= count {
+            if let Some(value) = self.iterator.next() {
+                self.buffer.push_back(value);
+            } else {
+                break;
+            }
+        }
+
+        // TODO: Find better solution
+        &self.buffer.make_contiguous()[0..count]
+    }
+
     pub fn peek_nth<'a>(&'a mut self, index: usize) -> Option<&'a I::Item> {
         while self.buffer.len() <= index {
             if let Some(value) = self.iterator.next() {

@@ -58,6 +58,8 @@ pub enum TokenKind {
     IfKeyword,
     ElseKeyword,
     ElifKeyword,
+    TrueKeyword,
+    FalseKeyword,
     Member,
     Add,
     Subtract,
@@ -115,6 +117,8 @@ impl Display for TokenKind {
             TokenKind::IfKeyword => "'if' keyword",
             TokenKind::ElseKeyword => "'else' keyword",
             TokenKind::ElifKeyword => "'elif' keyword",
+            TokenKind::TrueKeyword => "'true'",
+            TokenKind::FalseKeyword => "'false'",
             TokenKind::Member => "'.'",
             TokenKind::Add => "'+'",
             TokenKind::Subtract => "'-'",
@@ -202,6 +206,8 @@ impl TokenKind {
             | TokenKind::IfKeyword
             | TokenKind::ElseKeyword
             | TokenKind::ElifKeyword
+            | TokenKind::TrueKeyword
+            | TokenKind::FalseKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

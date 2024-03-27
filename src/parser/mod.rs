@@ -21,6 +21,7 @@ use crate::{
 };
 use ast::BinaryOperator;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use lazy_format::lazy_format;
 use std::{borrow::Borrow, ffi::CString};
 
@@ -537,6 +538,20 @@ where
         let location = *location;
 
         match kind {
+            TokenKind::TrueKeyword => {
+                self.input.advance().kind.unwrap_true_keyword();
+                Ok(Expression::new(
+                    ExpressionKind::Boolean(true),
+                    self.source(location),
+                ))
+            }
+            TokenKind::FalseKeyword => {
+                self.input.advance().kind.unwrap_false_keyword();
+                Ok(Expression::new(
+                    ExpressionKind::Boolean(false),
+                    self.source(location),
+                ))
+            }
             TokenKind::Integer(..) => Ok(Expression::new(
                 ExpressionKind::Integer(self.input.advance().kind.unwrap_integer()),
                 self.source(location),
@@ -558,7 +573,26 @@ where
                 Ok(inner)
             }
             TokenKind::Identifier(_) => match self.input.peek_nth(1).kind {
-                TokenKind::OpenAngle | TokenKind::OpenCurly => self.parse_structure_literal(),
+                TokenKind::OpenAngle => self.parse_structure_literal(),
+                TokenKind::OpenCurly => {
+                    let next_three = self
+                        .input
+                        .peek_n(3)
+                        .iter()
+                        .map(|token| &token.kind)
+                        .collect_vec();
+
+                    match &next_three[..] {
+                        [TokenKind::Identifier(_), TokenKind::Colon, ..]
+                        | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
+                            self.parse_structure_literal()
+                        }
+                        _ => Ok(Expression::new(
+                            ExpressionKind::Variable(self.input.advance().kind.unwrap_identifier()),
+                            self.source(location),
+                        )),
+                    }
+                }
                 TokenKind::OpenParen => self.parse_call(),
                 TokenKind::DeclareAssign => self.parse_declare_assign(),
                 _ => Ok(Expression::new(
@@ -604,7 +638,8 @@ where
                     .then(|| {
                         self.input.advance().kind.unwrap_else_keyword();
                         Ok(Block::new(self.parse_block("'else'")?))
-                    }).transpose()?;
+                    })
+                    .transpose()?;
 
                 let conditional = Conditional {
                     conditions,

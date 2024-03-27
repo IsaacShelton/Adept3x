@@ -20,6 +20,8 @@ impl IdentifierState {
                 "if" => TokenKind::IfKeyword,
                 "else" => TokenKind::ElseKeyword,
                 "elif" => TokenKind::ElifKeyword,
+                "true" => TokenKind::TrueKeyword,
+                "false" => TokenKind::FalseKeyword,
                 _ => TokenKind::Identifier(identifier),
             },
             self.start_location,

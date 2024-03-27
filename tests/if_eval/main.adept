@@ -1,0 +1,14 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    use_firstname := true
+
+    printf(c"Welcome, %s\n", if use_firstname {
+        c"Isaac"
+    } else {
+        c"Shelton"
+    })
+}
+

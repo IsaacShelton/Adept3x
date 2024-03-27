@@ -252,6 +252,7 @@ impl Expression {
 pub enum ExpressionKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),
+    BooleanLiteral(bool),
     IntegerLiteral(BigInt),
     Integer {
         value: BigInt,
@@ -271,6 +272,7 @@ pub enum ExpressionKind {
 
 #[derive(Clone, Debug)]
 pub struct Conditional {
+    pub result_type: Type,
     pub conditions: Vec<(Expression, Block)>,
     pub otherwise: Option<Block>,
 }

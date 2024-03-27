@@ -119,6 +119,19 @@ pub enum Instruction {
     BitComplement(Value),
     Break(Break),
     ConditionalBreak(Value, ConditionalBreak),
+    Phi(Phi),
+}
+
+#[derive(Clone, Debug)]
+pub struct Phi {
+    pub ir_type: Type,
+    pub incoming: Vec<PhiIncoming>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PhiIncoming {
+    pub basicblock_id: usize,
+    pub value: Value,
 }
 
 #[derive(Clone, Debug)]
@@ -202,6 +215,7 @@ pub enum Value {
 
 #[derive(Clone, Debug)]
 pub enum Literal {
+    Void,
     Boolean(bool),
     Signed8(i8),
     Signed16(i16),
@@ -325,6 +339,7 @@ impl Instruction {
             Instruction::BitComplement(..) => false,
             Instruction::Break(..) => true,
             Instruction::ConditionalBreak(..) => true,
+            Instruction::Phi(..) => false,
         }
     }
 }

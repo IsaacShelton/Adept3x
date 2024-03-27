@@ -23,12 +23,12 @@ use ir::IntegerSign;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd,
-        LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildBr, LLVMBuildCall2, LLVMBuildCondBr,
+        LLVMAddFunction, LLVMAddGlobal, LLVMAddIncoming, LLVMAppendBasicBlock, LLVMBuildAShr,
+        LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildBr, LLVMBuildCall2, LLVMBuildCondBr,
         LLVMBuildExtractValue, LLVMBuildFNeg, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue,
         LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMul,
-        LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem,
-        LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
+        LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildPhi, LLVMBuildRet, LLVMBuildSDiv,
+        LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
         LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage,
         LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type,
         LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
@@ -748,6 +748,26 @@ unsafe fn create_function_block(
                     *false_backend_block,
                 ))
             }
+            Instruction::Phi(phi) => {
+                let backend_type = to_backend_type(ctx, &phi.ir_type);
+
+                let node = LLVMBuildPhi(builder.get(), backend_type, cstr!("").as_ptr());
+
+                for incoming in phi.incoming.iter() {
+                    let (_, _, backend_block) = basicblocks
+                        .get(incoming.basicblock_id)
+                        .expect("backend basicblock referenced by phi node to exist");
+
+                    let mut backend_block = *backend_block;
+
+                    let mut value =
+                        build_value(ctx.backend_module, value_catalog, builder, &incoming.value);
+
+                    LLVMAddIncoming(node, &mut value, &mut backend_block, 1);
+                }
+
+                Some(node)
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);
@@ -818,6 +838,7 @@ unsafe fn build_value(
             ir::Literal::NullTerminatedString(value) => {
                 build_literal_cstring(backend_module.get(), value)
             }
+            ir::Literal::Void => LLVMGetUndef(LLVMVoidType()),
         },
         ir::Value::Reference(reference) => value_catalog
             .get(reference)

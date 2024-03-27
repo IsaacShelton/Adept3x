@@ -8,7 +8,6 @@ use crate::{
     },
 };
 use builder::Builder;
-use colored::Colorize;
 
 pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
     let mut ir_module = ir::Module::new();
@@ -169,9 +168,11 @@ fn lower_statements(
     ir_module: &ir::Module,
     statements: &[resolved::Statement],
     function: &resolved::Function,
-) -> Result<(), CompilerError> {
+) -> Result<Value, CompilerError> {
+    let mut result = Value::Literal(Literal::Void);
+
     for statement in statements.iter() {
-        match &statement.kind {
+        result = match &statement.kind {
             StatementKind::Return(expression) => {
                 let instruction = ir::Instruction::Return(if let Some(expression) = expression {
                     Some(lower_expression(builder, ir_module, expression, function)?)
@@ -182,9 +183,10 @@ fn lower_statements(
                 });
 
                 builder.push(instruction);
+                Value::Literal(Literal::Void)
             }
             StatementKind::Expression(expression) => {
-                lower_expression(builder, ir_module, &expression.expression, function)?;
+                lower_expression(builder, ir_module, &expression.expression, function)?
             }
             StatementKind::Declaration(declaration) => {
                 let destination = Value::Reference(ValueReference {
@@ -200,6 +202,8 @@ fn lower_statements(
                         destination,
                     }));
                 }
+
+                Value::Literal(Literal::Void)
             }
             StatementKind::Assignment(assignment) => {
                 let destination = lower_destination(builder, ir_module, &assignment.destination)?;
@@ -209,11 +213,13 @@ fn lower_statements(
                     source,
                     destination,
                 }));
+
+                Value::Literal(Literal::Void)
             }
         }
     }
 
-    Ok(())
+    Ok(result)
 }
 
 fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError> {
@@ -607,6 +613,8 @@ fn lower_expression(
         ExpressionKind::Conditional(conditional) => {
             let resume_basicblock_id = builder.new_block();
 
+            let mut incoming = vec![];
+
             for (expression, block) in conditional.conditions.iter() {
                 let condition = lower_expression(builder, ir_module, expression, function)?;
 
@@ -622,26 +630,35 @@ fn lower_expression(
                 ));
 
                 builder.use_block(true_basicblock_id);
-                lower_statements(builder, ir_module, &block.statements, function)?;
+                let value = lower_statements(builder, ir_module, &block.statements, function)?;
+
+                incoming.push(ir::PhiIncoming {
+                    basicblock_id: builder.current_block_id(),
+                    value,
+                });
                 builder.continues_to(resume_basicblock_id);
 
                 builder.use_block(false_basicblock_id);
             }
 
             if let Some(block) = &conditional.otherwise {
-                lower_statements(builder, ir_module, &block.statements, function)?;
+                let value = lower_statements(builder, ir_module, &block.statements, function)?;
+                incoming.push(ir::PhiIncoming {
+                    basicblock_id: builder.current_block_id(),
+                    value,
+                });
             }
 
             builder.continues_to(resume_basicblock_id);
             builder.use_block(resume_basicblock_id);
 
-            println!(
-                "{} results from conditionals have not been implemented yet",
-                "warning:".yellow()
-            );
-
-            // TODO: Give back proper result value
-            Ok(Value::Literal(Literal::Boolean(false)))
+            if conditional.otherwise.is_some() {
+                let ir_type = lower_type(&conditional.result_type)?;
+                Ok(builder.push(ir::Instruction::Phi(ir::Phi { ir_type, incoming })))
+            } else {
+                Ok(Value::Literal(Literal::Void))
+            }
         }
+        ExpressionKind::BooleanLiteral(value) => Ok(Value::Literal(Literal::Boolean(*value))),
     }
 }

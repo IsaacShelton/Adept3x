@@ -48,6 +48,13 @@ impl Builder {
         self.current_basicblock_id = id;
     }
 
+    pub fn current_block_id(&mut self) -> usize {
+        if self.basicblocks.len() == 0 {
+            panic!("attempt to get current block id of empty ir builder");
+        }
+        self.current_basicblock_id
+    }
+
     pub fn push(&mut self, instruction: Instruction) -> ir::Value {
         let current_block =
             if let Some(current_block) = self.basicblocks.get_mut(self.current_basicblock_id) {

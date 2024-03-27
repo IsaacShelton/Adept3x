@@ -36,6 +36,10 @@ where
         self.iterator.peek_nth(n).unwrap()
     }
 
+    pub fn peek_n(&mut self, n: usize) -> &[Token] {
+        self.iterator.peek_n(n)
+    }
+
     pub fn peek_is(&mut self, token: impl Borrow<TokenKind>) -> bool {
         self.peek().kind == *token.borrow()
     }

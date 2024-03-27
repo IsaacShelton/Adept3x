@@ -1277,6 +1277,7 @@ fn resolve_expression(
 
             let expression = resolved::Expression::new(
                 resolved::ExpressionKind::Conditional(resolved::Conditional {
+                    result_type: result_type.clone(),
                     conditions,
                     otherwise,
                 }),
@@ -1285,6 +1286,10 @@ fn resolve_expression(
 
             Ok(TypedExpression::new(result_type, expression))
         }
+        ast::ExpressionKind::Boolean(value) => Ok(TypedExpression::new(
+            resolved::Type::Boolean,
+            resolved::Expression::new(resolved::ExpressionKind::BooleanLiteral(*value), source),
+        )),
     };
 
     resolved_expression.and_then(|resolved_expression| match initialized {

@@ -298,6 +298,7 @@ impl Expression {
 #[derive(Clone, Debug)]
 pub enum ExpressionKind {
     Variable(String),
+    Boolean(bool),
     Integer(BigInt),
     NullTerminatedString(CString),
     Call(Call),
