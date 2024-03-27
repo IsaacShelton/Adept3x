@@ -9,7 +9,7 @@ mod value_catalog;
 mod variable_stack;
 
 use self::{
-    builder::Builder, ctx::BackendContext, module::BackendModule,
+    builder::{Builder, PhiRelocation}, ctx::BackendContext, module::BackendModule,
     null_terminated_string::build_literal_cstring, target_data::TargetData,
     target_machine::TargetMachine, value_catalog::ValueCatalog,
 };
@@ -231,7 +231,7 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
 unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
         if let Some(ir_function) = ctx.ir_module.functions.get(ir_function_ref) {
-            let builder = Builder::new();
+            let mut builder = Builder::new();
             let mut value_catalog = ValueCatalog::new(ir_function.basicblocks.len());
 
             let basicblocks = ir_function
@@ -261,6 +261,21 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
                     *skeleton,
                     &basicblocks,
                 );
+            }
+            
+            for relocation in builder.take_phi_relocations().iter() {
+                for incoming in relocation.incoming.iter() {
+                    let (_, _, backend_block) = basicblocks
+                        .get(incoming.basicblock_id)
+                        .expect("backend basicblock referenced by phi node to exist");
+
+                    let mut backend_block = *backend_block;
+
+                    let mut value =
+                        build_value(ctx.backend_module, &value_catalog, &builder, &incoming.value);
+
+                    LLVMAddIncoming(relocation.phi_node, &mut value, &mut backend_block, 1);
+                }
             }
         }
     }
@@ -750,23 +765,14 @@ unsafe fn create_function_block(
             }
             Instruction::Phi(phi) => {
                 let backend_type = to_backend_type(ctx, &phi.ir_type);
+                let phi_node = LLVMBuildPhi(builder.get(), backend_type, cstr!("").as_ptr());
 
-                let node = LLVMBuildPhi(builder.get(), backend_type, cstr!("").as_ptr());
+                builder.add_phi_relocation(PhiRelocation {
+                    phi_node,
+                    incoming: phi.incoming.clone(),
+                });
 
-                for incoming in phi.incoming.iter() {
-                    let (_, _, backend_block) = basicblocks
-                        .get(incoming.basicblock_id)
-                        .expect("backend basicblock referenced by phi node to exist");
-
-                    let mut backend_block = *backend_block;
-
-                    let mut value =
-                        build_value(ctx.backend_module, value_catalog, builder, &incoming.value);
-
-                    LLVMAddIncoming(node, &mut value, &mut backend_block, 1);
-                }
-
-                Some(node)
+                Some(phi_node)
             }
         };
 

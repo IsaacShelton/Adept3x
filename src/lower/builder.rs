@@ -18,7 +18,8 @@ impl Builder {
     }
 
     pub fn is_block_terminated(&self) -> bool {
-        self.basicblocks.blocks[self.current_basicblock_id].is_terminated()
+        self.basicblocks.len() > 0
+            && self.basicblocks.blocks[self.current_basicblock_id].is_terminated()
     }
 
     pub fn continues_to(&mut self, basicblock_id: usize) {
