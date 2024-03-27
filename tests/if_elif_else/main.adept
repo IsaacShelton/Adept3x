@@ -1,0 +1,32 @@
+
+#[foreign]
+{
+    // NOTE: This is only macOS (also type is incorrect but it's a pointer so doesn't matter)
+    __stdinp ptr<u8>
+
+    func printf(format ptr<u8>, ...) i32
+    func fgets(string ptr<u8>, length i32, stream ptr<u8>) void
+    func malloc(size uint) ptr<u8>
+    func free(pointer ptr<u8>) void
+    func strcmp(a ptr<u8>, b ptr<u8>) i32
+    func atoi(string ptr<u8>) i32
+}
+
+func main {
+    printf(c"Enter the name of a number: ")
+
+    number ptr<u8> = malloc(1024)
+    fgets(number, 1024, __stdinp)
+
+    printf(c"Your number is: %s\n", if strcmp(number, c"one\n") == 0 {
+        c"1"
+    } elif strcmp(number, c"two\n") == 0 {
+        c"2"
+    } elif strcmp(number, c"three\n") == 0 {
+        c"3"
+    } else {
+        c"I'm not sure"
+    })
+
+    free(number)
+}
