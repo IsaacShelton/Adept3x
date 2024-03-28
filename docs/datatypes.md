@@ -13,7 +13,7 @@
 - `i32` wrapping 32-bit signed integer
 - `i64` wrapping 64-bit signed integer
 - `u8` wrapping 8-bit unsigned integer
-- `u16` wrapping 16-bit ununsigned integer
+- `u16` wrapping 16-bit unsigned integer
 - `u32` wrapping 32-bit unsigned integer
 - `u64` wrapping 64-bit unsigned integer
 - `f32` 32-bit float
