@@ -308,12 +308,19 @@ pub enum ExpressionKind {
     StructureLiteral(Type, IndexMap<String, Expression>),
     UnaryOperator(Box<UnaryOperation>),
     Conditional(Conditional),
+    While(While),
 }
 
 #[derive(Clone, Debug)]
 pub struct Conditional {
     pub conditions: Vec<(Expression, Block)>,
     pub otherwise: Option<Block>
+}
+
+#[derive(Clone, Debug)]
+pub struct While {
+    pub condition: Box<Expression>,
+    pub block: Block,
 }
 
 #[derive(Clone, Debug)]

@@ -435,6 +435,25 @@ fn resolve_statement(
     }
 }
 
+fn conform_expression_or_error(
+    source_file_cache: &SourceFileCache,
+    expression: &TypedExpression,
+    target_type: &resolved::Type,
+) -> Result<TypedExpression, ResolveError> {
+    if let Some(expression) = conform_expression(expression, target_type) {
+        Ok(expression)
+    } else {
+        Err(ResolveError::new(
+            source_file_cache,
+            expression.expression.source,
+            ResolveErrorKind::TypeMismatch {
+                left: expression.resolved_type.to_string(),
+                right: target_type.to_string(),
+            },
+        ))
+    }
+}
+
 fn conform_expression(
     expression: &TypedExpression,
     to_type: &resolved::Type,
@@ -1218,21 +1237,12 @@ fn resolve_expression(
                         &block.statements,
                     )?;
 
-                    let condition = if let Some(condition) =
-                        conform_expression(&condition, &resolved::Type::Boolean)
-                    {
-                        Ok(condition.expression)
-                    } else {
-                        Err(ResolveError::new(
-                            resolved_ast.source_file_cache,
-                            condition.expression.source,
-                            ResolveErrorKind::TypeMismatch {
-                                left: condition.resolved_type.to_string(),
-                                right: resolved::Type::Boolean.to_string(),
-                            },
-                        ))
-                    }?;
-
+                    let condition = conform_expression_or_error(
+                        resolved_ast.source_file_cache,
+                        &condition,
+                        &resolved::Type::Boolean,
+                    )?
+                    .expression;
                     Ok((condition, resolved::Block::new(statements)))
                 })
                 .collect::<Result<Vec<(resolved::Expression, resolved::Block)>, ResolveError>>()?;
@@ -1280,6 +1290,47 @@ fn resolve_expression(
                     result_type: result_type.clone(),
                     conditions,
                     otherwise,
+                }),
+                source,
+            );
+
+            Ok(TypedExpression::new(result_type, expression))
+        }
+        ast::ExpressionKind::While(while_loop) => {
+            let result_type = resolved::Type::Void;
+
+            let condition = resolve_expression(
+                resolved_ast,
+                function_search_context,
+                type_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &while_loop.condition,
+                Initialized::Require,
+            )?;
+
+            let condition = conform_expression_or_error(
+                resolved_ast.source_file_cache,
+                &condition,
+                &resolved::Type::Boolean,
+            )?
+            .expression;
+
+            let block = resolved::Block::new(resolve_statements(
+                resolved_ast,
+                function_search_context,
+                type_search_context,
+                global_search_context,
+                variable_search_context,
+                resolved_function_ref,
+                &while_loop.block.statements,
+            )?);
+
+            let expression = resolved::Expression::new(
+                resolved::ExpressionKind::While(resolved::While {
+                    condition: Box::new(condition),
+                    block,
                 }),
                 source,
             );

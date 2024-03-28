@@ -13,7 +13,7 @@ use crate::{
         self, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
         DeclareAssign, Expression, ExpressionKind, Field, File, FileIdentifier, Function, Global,
         Parameter, Parameters, Source, Statement, StatementKind, Structure, Type, TypeKind,
-        UnaryOperation, UnaryOperator,
+        UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -648,6 +648,21 @@ where
 
                 Ok(Expression::new(
                     ExpressionKind::Conditional(conditional),
+                    self.source(location),
+                ))
+            }
+            TokenKind::WhileKeyword => {
+                self.input.advance().kind.unwrap_while_keyword();
+                self.ignore_newlines();
+
+                let condition = self.parse_expression()?;
+                let statements = self.parse_block("'while'")?;
+
+                Ok(Expression::new(
+                    ExpressionKind::While(While {
+                        condition: Box::new(condition),
+                        block: Block::new(statements),
+                    }),
                     self.source(location),
                 ))
             }

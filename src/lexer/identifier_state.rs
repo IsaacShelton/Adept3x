@@ -20,6 +20,7 @@ impl IdentifierState {
                 "if" => TokenKind::IfKeyword,
                 "else" => TokenKind::ElseKeyword,
                 "elif" => TokenKind::ElifKeyword,
+                "while" => TokenKind::WhileKeyword,
                 "true" => TokenKind::TrueKeyword,
                 "false" => TokenKind::FalseKeyword,
                 _ => TokenKind::Identifier(identifier),

@@ -660,5 +660,30 @@ fn lower_expression(
             }
         }
         ExpressionKind::BooleanLiteral(value) => Ok(Value::Literal(Literal::Boolean(*value))),
+        ExpressionKind::While(while_loop) => {
+            let evaluate_basicblock_id = builder.new_block();
+            let true_basicblock_id = builder.new_block();
+            let false_basicblock_id = builder.new_block();
+
+            builder.continues_to(evaluate_basicblock_id);
+            builder.use_block(evaluate_basicblock_id);
+
+            let condition = lower_expression(builder, ir_module, &while_loop.condition, function)?;
+
+            builder.push(ir::Instruction::ConditionalBreak(
+                condition,
+                ir::ConditionalBreak {
+                    true_basicblock_id,
+                    false_basicblock_id,
+                },
+            ));
+
+            builder.use_block(true_basicblock_id);
+            lower_statements(builder, ir_module, &while_loop.block.statements, function)?;
+            builder.continues_to(evaluate_basicblock_id);
+
+            builder.use_block(false_basicblock_id);
+            Ok(Value::Literal(Literal::Void))
+        }
     }
 }

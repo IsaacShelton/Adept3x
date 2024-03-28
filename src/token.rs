@@ -58,6 +58,7 @@ pub enum TokenKind {
     IfKeyword,
     ElseKeyword,
     ElifKeyword,
+    WhileKeyword,
     TrueKeyword,
     FalseKeyword,
     Member,
@@ -117,6 +118,7 @@ impl Display for TokenKind {
             TokenKind::IfKeyword => "'if' keyword",
             TokenKind::ElseKeyword => "'else' keyword",
             TokenKind::ElifKeyword => "'elif' keyword",
+            TokenKind::WhileKeyword => "'while' keyword",
             TokenKind::TrueKeyword => "'true'",
             TokenKind::FalseKeyword => "'false'",
             TokenKind::Member => "'.'",
@@ -206,6 +208,7 @@ impl TokenKind {
             | TokenKind::IfKeyword
             | TokenKind::ElseKeyword
             | TokenKind::ElifKeyword
+            | TokenKind::WhileKeyword
             | TokenKind::TrueKeyword
             | TokenKind::FalseKeyword
             | TokenKind::OpenAngle

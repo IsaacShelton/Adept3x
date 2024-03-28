@@ -40,6 +40,7 @@ compile unary_operators
 compile variables
 compile variables_override
 compile variables_typed
+compile while
 expect_fail_compile _should_fail/partial_initialization
 expect_fail_compile _should_fail/uninitialized_member
 expect_fail_compile _should_fail/uninitialized_simple
