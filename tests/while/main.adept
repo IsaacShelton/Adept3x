@@ -14,7 +14,6 @@
 
 func main {
     printf(c"Enter a number: ")
-    
     number ptr<u8> = malloc(1024)
     fgets(number, 1024, __stdinp)
     i := atoi(number)
