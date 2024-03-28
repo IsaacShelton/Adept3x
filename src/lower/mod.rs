@@ -223,7 +223,7 @@ fn lower_statements(
 }
 
 fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError> {
-    use resolved::{IntegerBits as Bits, IntegerSign as Sign};
+    use resolved::{FloatSize, IntegerBits as Bits, IntegerSign as Sign};
 
     match resolved_type {
         resolved::Type::Boolean => Ok(ir::Type::Boolean),
@@ -243,6 +243,11 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
             "Cannot lower unspecialized integer literal {}",
             value
         ))),
+        resolved::Type::Float(size) => Ok(match size {
+            FloatSize::Normal => ir::Type::F64,
+            FloatSize::Bits32 => ir::Type::F32,
+            FloatSize::Bits64 => ir::Type::F64,
+        }),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         resolved::Type::Void => Ok(ir::Type::Void),
         resolved::Type::Structure(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
@@ -376,6 +381,7 @@ fn lower_expression(
                 }
             }
         }
+        ExpressionKind::Float(value) => Ok(Value::Literal(Literal::Float64(*value))),
         ExpressionKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),
         )),

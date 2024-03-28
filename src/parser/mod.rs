@@ -556,6 +556,10 @@ where
                 ExpressionKind::Integer(self.input.advance().kind.unwrap_integer()),
                 self.source(location),
             )),
+            TokenKind::Float(..) => Ok(Expression::new(
+                ExpressionKind::Float(self.input.advance().kind.unwrap_float()),
+                self.source(location),
+            )),
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::NullTerminated,
                 ..

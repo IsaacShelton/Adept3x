@@ -9,7 +9,7 @@ use crate::{
     resolved::{self, Destination, TypedExpression, VariableStorage},
     source_file_cache::SourceFileCache,
 };
-use ast::{IntegerBits, IntegerSign};
+use ast::{FloatSize, IntegerBits, IntegerSign};
 use function_search_context::FunctionSearchContext;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -748,6 +748,10 @@ fn resolve_expression(
                 source,
             ),
         )),
+        ast::ExpressionKind::Float(value) => Ok(TypedExpression::new(
+            resolved::Type::Float(FloatSize::Bits64),
+            resolved::Expression::new(resolved::ExpressionKind::Float(*value), source),
+        )),
         ast::ExpressionKind::NullTerminatedString(value) => Ok(TypedExpression::new(
             resolved::Type::Pointer(Box::new(resolved::Type::Integer {
                 bits: Bits8,
@@ -1407,6 +1411,7 @@ fn resolve_type(
                 ));
             }
         },
+        ast::TypeKind::Float(size) => Ok(resolved::Type::Float(*size)),
     }
 }
 

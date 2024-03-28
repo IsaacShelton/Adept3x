@@ -1,0 +1,9 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    value := 3.14159
+    printf(c"pi = %f\n", value)
+}
+

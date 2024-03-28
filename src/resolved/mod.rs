@@ -10,7 +10,9 @@ use std::{
     fmt::{Debug, Display},
 };
 
+pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{BinaryOperator, UnaryOperator};
+pub use crate::ast::{FloatSize, IntegerBits, IntegerSign};
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -80,9 +82,6 @@ pub struct Parameter {
     pub resolved_type: Type,
 }
 
-pub use self::variable_storage::VariableStorageKey;
-pub use crate::ast::{IntegerBits, IntegerSign};
-
 #[derive(Clone, Debug)]
 pub struct Structure {
     pub name: String,
@@ -98,9 +97,10 @@ pub struct Field {
     pub privacy: Privacy,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Boolean,
+    Float(FloatSize),
     Integer {
         bits: IntegerBits,
         sign: IntegerSign,
@@ -126,6 +126,7 @@ impl Type {
             Type::PlainOldData(_, _) => None,
             Type::Void => None,
             Type::Structure(_, _) => None,
+            Type::Float(_) => None,
         }
     }
 }
@@ -161,6 +162,11 @@ impl Display for Type {
             }
             Type::Void => f.write_str("void")?,
             Type::Structure(name, _) => f.write_str(name)?,
+            Type::Float(size) => match size {
+                FloatSize::Normal => f.write_str("float")?,
+                FloatSize::Bits32 => f.write_str("f32")?,
+                FloatSize::Bits64 => f.write_str("f64")?,
+            },
         }
 
         Ok(())
@@ -259,6 +265,7 @@ pub enum ExpressionKind {
         bits: IntegerLiteralBits,
         sign: IntegerSign,
     },
+    Float(f64),
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),

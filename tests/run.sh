@@ -18,6 +18,7 @@ compile annotation_groups
 compile bitwise_operators
 compile c_printf
 compile comparison_operators
+compile float_literal
 compile function_parameters
 compile function_simple
 compile global_variables

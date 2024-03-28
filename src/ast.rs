@@ -137,6 +137,13 @@ pub struct Field {
     pub privacy: Privacy,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Hash)]
+pub enum FloatSize {
+    Normal,
+    Bits32,
+    Bits64,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, Hash)]
 pub enum IntegerBits {
     Bits8,
@@ -199,6 +206,7 @@ pub enum TypeKind {
         bits: IntegerBits,
         sign: IntegerSign,
     },
+    Float(FloatSize),
     Pointer(Box<Type>),
     PlainOldData(Box<Type>),
     Void,
@@ -244,7 +252,12 @@ impl Display for &TypeKind {
             TypeKind::Named(name) => {
                 write!(f, "{}", name)?;
             }
-        }
+            TypeKind::Float(size) => f.write_str(match size {
+                FloatSize::Normal => "float",
+                FloatSize::Bits32 => "f32",
+                FloatSize::Bits64 => "f64",
+            })?,
+       }
 
         Ok(())
     }
@@ -300,6 +313,7 @@ pub enum ExpressionKind {
     Variable(String),
     Boolean(bool),
     Integer(BigInt),
+    Float(f64),
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
@@ -314,7 +328,7 @@ pub enum ExpressionKind {
 #[derive(Clone, Debug)]
 pub struct Conditional {
     pub conditions: Vec<(Expression, Block)>,
-    pub otherwise: Option<Block>
+    pub otherwise: Option<Block>,
 }
 
 #[derive(Clone, Debug)]
@@ -325,7 +339,7 @@ pub struct While {
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub statements: Vec<Statement>
+    pub statements: Vec<Statement>,
 }
 
 impl Block {
