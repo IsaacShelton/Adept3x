@@ -1033,30 +1033,34 @@ fn resolve_expression(
                 left.resolved_type.clone()
             };
 
-            let result_type = if binary_operation.operator.returns_boolean() {
-                resolved::Type::Boolean
-            } else {
-                unified_type
-            };
-
-            fn float_or_integer_from_type(result_type: &resolved::Type) -> Option<FloatOrInteger> {
-                match result_type {
+            fn float_or_integer_from_type(
+                unified_type: &resolved::Type,
+                allow_on_bools: bool,
+            ) -> Option<FloatOrInteger> {
+                match unified_type {
+                    resolved::Type::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
                     resolved::Type::Integer { .. } => Some(FloatOrInteger::Integer),
                     resolved::Type::Float(_) => Some(FloatOrInteger::Float),
                     _ => None,
                 }
             }
 
-            fn float_or_sign_from_type(result_type: &resolved::Type) -> Option<FloatOrSign> {
-                match result_type {
+            fn float_or_sign_from_type(
+                unified_type: &resolved::Type,
+                allow_on_bools: bool,
+            ) -> Option<FloatOrSign> {
+                match unified_type {
+                    resolved::Type::Boolean if allow_on_bools => {
+                        Some(FloatOrSign::Integer(IntegerSign::Unsigned))
+                    }
                     resolved::Type::Integer { sign, .. } => Some(FloatOrSign::Integer(*sign)),
                     resolved::Type::Float(_) => Some(FloatOrSign::Float),
                     _ => None,
                 }
             }
 
-            fn numeric_mode_from_type(result_type: &resolved::Type) -> Option<NumericMode> {
-                match result_type {
+            fn numeric_mode_from_type(unified_type: &resolved::Type) -> Option<NumericMode> {
+                match unified_type {
                     resolved::Type::Integer { sign, bits } => Some(match bits {
                         IntegerBits::Normal => NumericMode::CheckOverflow(*sign),
                         _ => NumericMode::Integer(*sign),
@@ -1066,73 +1070,70 @@ fn resolve_expression(
                 }
             }
 
-            let operator =
-                match binary_operation.operator {
-                    ast::BinaryOperator::Add => {
-                        numeric_mode_from_type(&result_type).map(resolved::BinaryOperator::Add)
-                    }
-                    ast::BinaryOperator::Subtract => {
-                        numeric_mode_from_type(&result_type).map(resolved::BinaryOperator::Subtract)
-                    }
-                    ast::BinaryOperator::Multiply => {
-                        numeric_mode_from_type(&result_type).map(resolved::BinaryOperator::Multiply)
-                    }
-                    ast::BinaryOperator::Divide => {
-                        float_or_sign_from_type(&result_type).map(resolved::BinaryOperator::Divide)
-                    }
-                    ast::BinaryOperator::Modulus => {
-                        float_or_sign_from_type(&result_type).map(resolved::BinaryOperator::Modulus)
-                    }
-                    ast::BinaryOperator::Equals => float_or_integer_from_type(&result_type)
-                        .map(resolved::BinaryOperator::Equals),
-                    ast::BinaryOperator::NotEquals => float_or_integer_from_type(&result_type)
-                        .map(resolved::BinaryOperator::NotEquals),
-                    ast::BinaryOperator::LessThan => float_or_sign_from_type(&result_type)
-                        .map(resolved::BinaryOperator::LessThan),
-                    ast::BinaryOperator::LessThanEq => float_or_sign_from_type(&result_type)
-                        .map(resolved::BinaryOperator::LessThanEq),
-                    ast::BinaryOperator::GreaterThan => float_or_sign_from_type(&result_type)
-                        .map(resolved::BinaryOperator::GreaterThan),
-                    ast::BinaryOperator::GreaterThanEq => float_or_sign_from_type(&result_type)
-                        .map(resolved::BinaryOperator::GreaterThanEq),
-                    ast::BinaryOperator::BitwiseAnd => matches!(
-                        result_type,
-                        resolved::Type::Integer { .. } | resolved::Type::Boolean
-                    )
-                    .then_some(resolved::BinaryOperator::BitwiseAnd),
-                    ast::BinaryOperator::BitwiseOr => matches!(
-                        result_type,
-                        resolved::Type::Integer { .. } | resolved::Type::Boolean
-                    )
-                    .then_some(resolved::BinaryOperator::BitwiseOr),
-                    ast::BinaryOperator::BitwiseXor => matches!(
-                        result_type,
-                        resolved::Type::Integer { .. } | resolved::Type::Boolean
-                    )
-                    .then_some(resolved::BinaryOperator::BitwiseXor),
-                    ast::BinaryOperator::LeftShift => match result_type {
-                        resolved::Type::Integer { sign, .. } => Some(match sign {
-                            Signed => resolved::BinaryOperator::LeftShift,
-                            Unsigned => resolved::BinaryOperator::LogicalLeftShift,
-                        }),
-                        _ => None,
-                    },
-                    ast::BinaryOperator::RightShift => match result_type {
-                        resolved::Type::Integer { sign, .. } => Some(match sign {
-                            Signed => resolved::BinaryOperator::RightShift,
-                            Unsigned => resolved::BinaryOperator::LogicalRightShift,
-                        }),
-                        _ => None,
-                    },
-                    ast::BinaryOperator::LogicalLeftShift => {
-                        matches!(result_type, resolved::Type::Integer { .. })
-                            .then_some(resolved::BinaryOperator::BitwiseXor)
-                    }
-                    ast::BinaryOperator::LogicalRightShift => {
-                        matches!(result_type, resolved::Type::Integer { .. })
-                            .then_some(resolved::BinaryOperator::BitwiseXor)
-                    }
-                };
+            let operator = match binary_operation.operator {
+                ast::BinaryOperator::Add => {
+                    numeric_mode_from_type(&unified_type).map(resolved::BinaryOperator::Add)
+                }
+                ast::BinaryOperator::Subtract => {
+                    numeric_mode_from_type(&unified_type).map(resolved::BinaryOperator::Subtract)
+                }
+                ast::BinaryOperator::Multiply => {
+                    numeric_mode_from_type(&unified_type).map(resolved::BinaryOperator::Multiply)
+                }
+                ast::BinaryOperator::Divide => float_or_sign_from_type(&unified_type, false)
+                    .map(resolved::BinaryOperator::Divide),
+                ast::BinaryOperator::Modulus => float_or_sign_from_type(&unified_type, false)
+                    .map(resolved::BinaryOperator::Modulus),
+                ast::BinaryOperator::Equals => float_or_integer_from_type(&unified_type, true)
+                    .map(resolved::BinaryOperator::Equals),
+                ast::BinaryOperator::NotEquals => float_or_integer_from_type(&unified_type, true)
+                    .map(resolved::BinaryOperator::NotEquals),
+                ast::BinaryOperator::LessThan => float_or_sign_from_type(&unified_type, false)
+                    .map(resolved::BinaryOperator::LessThan),
+                ast::BinaryOperator::LessThanEq => float_or_sign_from_type(&unified_type, false)
+                    .map(resolved::BinaryOperator::LessThanEq),
+                ast::BinaryOperator::GreaterThan => float_or_sign_from_type(&unified_type, false)
+                    .map(resolved::BinaryOperator::GreaterThan),
+                ast::BinaryOperator::GreaterThanEq => float_or_sign_from_type(&unified_type, false)
+                    .map(resolved::BinaryOperator::GreaterThanEq),
+                ast::BinaryOperator::BitwiseAnd => matches!(
+                    unified_type,
+                    resolved::Type::Integer { .. } | resolved::Type::Boolean
+                )
+                .then_some(resolved::BinaryOperator::BitwiseAnd),
+                ast::BinaryOperator::BitwiseOr => matches!(
+                    unified_type,
+                    resolved::Type::Integer { .. } | resolved::Type::Boolean
+                )
+                .then_some(resolved::BinaryOperator::BitwiseOr),
+                ast::BinaryOperator::BitwiseXor => matches!(
+                    unified_type,
+                    resolved::Type::Integer { .. } | resolved::Type::Boolean
+                )
+                .then_some(resolved::BinaryOperator::BitwiseXor),
+                ast::BinaryOperator::LeftShift => match unified_type {
+                    resolved::Type::Integer { sign, .. } => Some(match sign {
+                        Signed => resolved::BinaryOperator::LeftShift,
+                        Unsigned => resolved::BinaryOperator::LogicalLeftShift,
+                    }),
+                    _ => None,
+                },
+                ast::BinaryOperator::RightShift => match unified_type {
+                    resolved::Type::Integer { sign, .. } => Some(match sign {
+                        Signed => resolved::BinaryOperator::RightShift,
+                        Unsigned => resolved::BinaryOperator::LogicalRightShift,
+                    }),
+                    _ => None,
+                },
+                ast::BinaryOperator::LogicalLeftShift => {
+                    matches!(unified_type, resolved::Type::Integer { .. })
+                        .then_some(resolved::BinaryOperator::BitwiseXor)
+                }
+                ast::BinaryOperator::LogicalRightShift => {
+                    matches!(unified_type, resolved::Type::Integer { .. })
+                        .then_some(resolved::BinaryOperator::BitwiseXor)
+                }
+            };
 
             let operator = match operator {
                 Some(operator) => operator,
@@ -1142,10 +1143,16 @@ fn resolve_expression(
                         source,
                         ResolveErrorKind::CannotPerformBinaryOperationForType {
                             operator: binary_operation.operator.to_string(),
-                            bad_type: result_type.to_string(),
+                            bad_type: unified_type.to_string(),
                         },
                     ))
                 }
+            };
+
+            let result_type = if binary_operation.operator.returns_boolean() {
+                resolved::Type::Boolean
+            } else {
+                unified_type
             };
 
             Ok(TypedExpression::new(
