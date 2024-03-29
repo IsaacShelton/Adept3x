@@ -5,5 +5,10 @@ func printf(format ptr<u8>, ...) i32
 func main {
     value := 3.14159
     printf(c"pi = %f\n", value)
+
+    ones float = 1.11
+    twos f64 = 2.22
+
+    printf(c"ones = %f, twos = %f\n", ones, twos)
 }
 

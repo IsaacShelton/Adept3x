@@ -4,7 +4,8 @@ use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
-        self, Destination, DestinationKind, Expression, ExpressionKind, IntegerBits, StatementKind,
+        self, Destination, DestinationKind, Expression, ExpressionKind, FloatOrInteger, FloatSize,
+        IntegerBits, NumericMode, StatementKind,
     },
 };
 use builder::Builder;
@@ -223,7 +224,7 @@ fn lower_statements(
 }
 
 fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError> {
-    use resolved::{FloatSize, IntegerBits as Bits, IntegerSign as Sign};
+    use resolved::{IntegerBits as Bits, IntegerSign as Sign};
 
     match resolved_type {
         resolved::Type::Boolean => Ok(ir::Type::Boolean),
@@ -241,6 +242,10 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
         }),
         resolved::Type::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
             "Cannot lower unspecialized integer literal {}",
+            value
+        ))),
+        resolved::Type::FloatLiteral(value) => Err(CompilerError::during_lower(format!(
+            "Cannot lower unspecialized float literal {}",
             value
         ))),
         resolved::Type::Float(size) => Ok(match size {
@@ -381,7 +386,10 @@ fn lower_expression(
                 }
             }
         }
-        ExpressionKind::Float(value) => Ok(Value::Literal(Literal::Float64(*value))),
+        ExpressionKind::Float(size, value) => Ok(Value::Literal(match size {
+            FloatSize::Bits32 => Literal::Float32(*value as f32),
+            FloatSize::Bits64 | FloatSize::Normal => Literal::Float64(*value),
+        })),
         ExpressionKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),
         )),
@@ -444,100 +452,76 @@ fn lower_expression(
             )?;
             let operands = ir::BinaryOperands::new(left, right);
 
-            match binary_operation.operator {
-                resolved::BinaryOperator::Add => {
-                    Ok(builder.push(match &binary_operation.left.resolved_type {
-                        resolved::Type::Integer {
+            match &binary_operation.operator {
+                resolved::BinaryOperator::Add(mode) => Ok(builder.push(match mode {
+                    NumericMode::Integer(_) => {
+                        ir::Instruction::Add(operands, FloatOrInteger::Integer)
+                    }
+                    NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
+                    NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
+                        ir::OverflowOperation {
+                            operator: OverflowOperator::Add,
                             bits: IntegerBits::Normal,
-                            sign,
-                        } => ir::Instruction::Checked(
-                            ir::OverflowOperation {
-                                operator: OverflowOperator::Add,
-                                sign: *sign,
-                                bits: IntegerBits::Normal,
-                            },
-                            operands,
-                        ),
-                        _ => ir::Instruction::Add(operands),
-                    }))
-                }
-                resolved::BinaryOperator::Subtract => {
-                    Ok(builder.push(match &binary_operation.left.resolved_type {
-                        resolved::Type::Integer {
+                            sign: *sign,
+                        },
+                        operands,
+                    ),
+                })),
+                resolved::BinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
+                    NumericMode::Integer(_) => {
+                        ir::Instruction::Subtract(operands, FloatOrInteger::Integer)
+                    }
+                    NumericMode::Float => {
+                        ir::Instruction::Subtract(operands, FloatOrInteger::Float)
+                    }
+                    NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
+                        ir::OverflowOperation {
+                            operator: OverflowOperator::Subtract,
                             bits: IntegerBits::Normal,
-                            sign,
-                        } => ir::Instruction::Checked(
-                            ir::OverflowOperation {
-                                operator: OverflowOperator::Subtract,
-                                sign: *sign,
-                                bits: IntegerBits::Normal,
-                            },
-                            operands,
-                        ),
-                        _ => ir::Instruction::Subtract(operands),
-                    }))
-                }
-                resolved::BinaryOperator::Multiply => {
-                    Ok(builder.push(match &binary_operation.left.resolved_type {
-                        resolved::Type::Integer {
+                            sign: *sign,
+                        },
+                        operands,
+                    ),
+                })),
+                resolved::BinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
+                    NumericMode::Integer(_) => {
+                        ir::Instruction::Multiply(operands, FloatOrInteger::Integer)
+                    }
+                    NumericMode::Float => {
+                        ir::Instruction::Multiply(operands, FloatOrInteger::Float)
+                    }
+                    NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
+                        ir::OverflowOperation {
+                            operator: OverflowOperator::Multiply,
                             bits: IntegerBits::Normal,
-                            sign,
-                        } => ir::Instruction::Checked(
-                            ir::OverflowOperation {
-                                operator: OverflowOperator::Multiply,
-                                sign: *sign,
-                                bits: IntegerBits::Normal,
-                            },
-                            operands,
-                        ),
-                        _ => ir::Instruction::Multiply(operands),
-                    }))
+                            sign: *sign,
+                        },
+                        operands,
+                    ),
+                })),
+                resolved::BinaryOperator::Divide(mode) => {
+                    Ok(builder.push(ir::Instruction::Divide(operands, *mode)))
                 }
-                resolved::BinaryOperator::Divide => {
-                    match binary_operation.left.resolved_type.sign() {
-                        Some(sign) => Ok(builder.push(ir::Instruction::Divide(operands, sign))),
-                        None => Err(CompilerError::during_lower("Cannot divide non-integer")),
-                    }
+                resolved::BinaryOperator::Modulus(mode) => {
+                    Ok(builder.push(ir::Instruction::Modulus(operands, *mode)))
                 }
-                resolved::BinaryOperator::Modulus => {
-                    match binary_operation.left.resolved_type.sign() {
-                        Some(sign) => Ok(builder.push(ir::Instruction::Modulus(operands, sign))),
-                        None => Err(CompilerError::during_lower("Cannot modulo non-integer")),
-                    }
+                resolved::BinaryOperator::Equals(mode) => {
+                    Ok(builder.push(ir::Instruction::Equals(operands, *mode)))
                 }
-                resolved::BinaryOperator::Equals => {
-                    Ok(builder.push(ir::Instruction::Equals(operands)))
+                resolved::BinaryOperator::NotEquals(mode) => {
+                    Ok(builder.push(ir::Instruction::NotEquals(operands, *mode)))
                 }
-                resolved::BinaryOperator::NotEquals => {
-                    Ok(builder.push(ir::Instruction::NotEquals(operands)))
+                resolved::BinaryOperator::LessThan(mode) => {
+                    Ok(builder.push(ir::Instruction::LessThan(operands, *mode)))
                 }
-                resolved::BinaryOperator::LessThan => {
-                    match binary_operation.left.resolved_type.sign() {
-                        Some(sign) => Ok(builder.push(ir::Instruction::LessThan(operands, sign))),
-                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
-                    }
+                resolved::BinaryOperator::LessThanEq(mode) => {
+                    Ok(builder.push(ir::Instruction::LessThanEq(operands, *mode)))
                 }
-                resolved::BinaryOperator::LessThanEq => {
-                    match binary_operation.left.resolved_type.sign() {
-                        Some(sign) => Ok(builder.push(ir::Instruction::LessThanEq(operands, sign))),
-                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
-                    }
+                resolved::BinaryOperator::GreaterThan(mode) => {
+                    Ok(builder.push(ir::Instruction::GreaterThan(operands, *mode)))
                 }
-                resolved::BinaryOperator::GreaterThan => {
-                    match binary_operation.left.resolved_type.sign() {
-                        Some(sign) => {
-                            Ok(builder.push(ir::Instruction::GreaterThan(operands, sign)))
-                        }
-                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
-                    }
-                }
-                resolved::BinaryOperator::GreaterThanEq => {
-                    match binary_operation.left.resolved_type.sign() {
-                        Some(sign) => {
-                            Ok(builder.push(ir::Instruction::GreaterThanEq(operands, sign)))
-                        }
-                        None => Err(CompilerError::during_lower("Cannot compare non-integers")),
-                    }
+                resolved::BinaryOperator::GreaterThanEq(mode) => {
+                    Ok(builder.push(ir::Instruction::GreaterThanEq(operands, *mode)))
                 }
                 resolved::BinaryOperator::BitwiseAnd => {
                     Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))
@@ -573,6 +557,11 @@ fn lower_expression(
                     resolved::IntegerSign::Unsigned => ir::Instruction::ZeroExtend(value, ir_type),
                 },
             ))
+        }
+        ExpressionKind::FloatExtend(value, resolved_type) => {
+            let value = lower_expression(builder, ir_module, value, function)?;
+            let ir_type = lower_type(resolved_type)?;
+            Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
         ExpressionKind::Member(subject_destination, structure_ref, index, resolved_type) => {
             let subject_pointer = lower_destination(builder, ir_module, subject_destination)?;

@@ -1,0 +1,15 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    a := 13.14
+    b := 8.76543
+
+    printf(c"%f + %f = %f\n", a, b, a + b)
+    printf(c"%f - %f = %f\n", a, b, a - b)
+    printf(c"%f * %f = %f\n", a, b, a * b)
+    printf(c"%f / %f = %f\n", a, b, a / b)
+    printf(c"%f %% %f = %f\n", a, b, a % b)
+}
+

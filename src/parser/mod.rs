@@ -19,7 +19,7 @@ use crate::{
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
-use ast::BinaryOperator;
+use ast::{BinaryOperator, FloatSize};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lazy_format::lazy_format;
@@ -907,6 +907,9 @@ where
                         bits: Bits64,
                         sign: Unsigned,
                     }),
+                    "float" => Ok(TypeKind::Float(FloatSize::Normal)),
+                    "f32" => Ok(TypeKind::Float(FloatSize::Bits32)),
+                    "f64" => Ok(TypeKind::Float(FloatSize::Bits64)),
                     "void" => Ok(TypeKind::Void),
                     "ptr" => {
                         if self.input.peek_is(TokenKind::OpenAngle) {

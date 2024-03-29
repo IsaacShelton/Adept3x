@@ -30,6 +30,7 @@ compile integer_signed_overflow
 compile integer_unsigned_overflow
 compile integer_value_conforming
 compile late_initialization
+compile math_floats
 compile math_simple
 compile member_pod
 compile return

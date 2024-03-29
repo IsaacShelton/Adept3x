@@ -144,6 +144,15 @@ pub enum FloatSize {
     Bits64,
 }
 
+impl FloatSize {
+    pub fn bits(&self) -> u8 {
+        match self {
+            Self::Bits32 => 32,
+            Self::Bits64 | Self::Normal => 64,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, Hash)]
 pub enum IntegerBits {
     Bits8,
@@ -257,7 +266,7 @@ impl Display for &TypeKind {
                 FloatSize::Bits32 => "f32",
                 FloatSize::Bits64 => "f64",
             })?,
-       }
+        }
 
         Ok(())
     }
@@ -377,6 +386,31 @@ pub enum BinaryOperator {
     LogicalRightShift,
 }
 
+impl Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Multiply => "*",
+            Self::Divide => "/",
+            Self::Modulus => "%",
+            Self::Equals => "==",
+            Self::NotEquals => "!=",
+            Self::LessThan => "<",
+            Self::LessThanEq => "<=",
+            Self::GreaterThan => ">",
+            Self::GreaterThanEq => ">=",
+            Self::BitwiseAnd => "&",
+            Self::BitwiseOr => "|",
+            Self::BitwiseXor => "^",
+            Self::LeftShift => "<<",
+            Self::RightShift => ">>",
+            Self::LogicalLeftShift => "<<<",
+            Self::LogicalRightShift => ">>>",
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct UnaryOperation {
     pub operator: UnaryOperator,
@@ -390,14 +424,13 @@ pub enum UnaryOperator {
     Negate,
 }
 
-impl ToString for UnaryOperator {
-    fn to_string(&self) -> String {
-        match self {
-            UnaryOperator::Not => "!",
-            UnaryOperator::BitComplement => "~",
-            UnaryOperator::Negate => "-",
-        }
-        .into()
+impl Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Not => "!",
+            Self::BitComplement => "~",
+            Self::Negate => "-",
+        })
     }
 }
 

@@ -1,8 +1,9 @@
+use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
 use derive_more::{Deref, DerefMut};
 use std::{collections::HashMap, ffi::CString};
 
+pub use crate::resolved::{IntegerSign, FloatOrSign};
 pub use crate::resolved::{FunctionRef, GlobalRef};
-use crate::resolved::{IntegerBits, StructureRef};
 
 #[derive(Clone)]
 pub struct Module {
@@ -53,14 +54,6 @@ pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
 }
 
-pub use crate::resolved::IntegerSign;
-
-#[derive(Clone, Debug)]
-pub enum FloatOrSign {
-    Integer(IntegerSign),
-    Float,
-}
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum OverflowOperator {
     Add,
@@ -84,18 +77,18 @@ pub enum Instruction {
     Load((Value, Type)),
     Parameter(u32),
     GlobalVariable(GlobalRef),
-    Add(BinaryOperands),
+    Add(BinaryOperands, FloatOrInteger),
     Checked(OverflowOperation, BinaryOperands),
-    Subtract(BinaryOperands),
-    Multiply(BinaryOperands),
-    Divide(BinaryOperands, IntegerSign),
-    Modulus(BinaryOperands, IntegerSign),
-    Equals(BinaryOperands),
-    NotEquals(BinaryOperands),
-    LessThan(BinaryOperands, IntegerSign),
-    LessThanEq(BinaryOperands, IntegerSign),
-    GreaterThan(BinaryOperands, IntegerSign),
-    GreaterThanEq(BinaryOperands, IntegerSign),
+    Subtract(BinaryOperands, FloatOrInteger),
+    Multiply(BinaryOperands, FloatOrInteger),
+    Divide(BinaryOperands, FloatOrSign),
+    Modulus(BinaryOperands, FloatOrSign),
+    Equals(BinaryOperands, FloatOrInteger),
+    NotEquals(BinaryOperands, FloatOrInteger),
+    LessThan(BinaryOperands, FloatOrSign),
+    LessThanEq(BinaryOperands, FloatOrSign),
+    GreaterThan(BinaryOperands, FloatOrSign),
+    GreaterThanEq(BinaryOperands, FloatOrSign),
     And(BinaryOperands),
     Or(BinaryOperands),
     BitwiseAnd(BinaryOperands),

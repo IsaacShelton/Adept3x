@@ -6,7 +6,10 @@ mod variable_search_context;
 
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
-    resolved::{self, Destination, TypedExpression, VariableStorage},
+    resolved::{
+        self, Destination, FloatOrInteger, FloatOrSign, NumericMode, TypedExpression,
+        VariableStorage,
+    },
     source_file_cache::SourceFileCache,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
@@ -484,8 +487,60 @@ fn conform_expression(
                 _ => None,
             }
         }
+        resolved::Type::FloatLiteral(value) => {
+            // Float literals -> Float
+            match to_type {
+                resolved::Type::Float(size) => Some(TypedExpression::new(
+                    resolved::Type::Float(*size),
+                    resolved::Expression::new(
+                        resolved::ExpressionKind::Float(*size, *value),
+                        expression.expression.source,
+                    ),
+                )),
+                _ => None,
+            }
+        }
+        resolved::Type::Float(from_size) => {
+            // Float -> Float
+            match to_type {
+                resolved::Type::Float(size) => {
+                    conform_float_value(&expression.expression, *from_size, *size)
+                }
+                _ => None,
+            }
+        }
         _ => None,
     }
+}
+
+fn conform_float_value(
+    expression: &resolved::Expression,
+    from_size: FloatSize,
+    to_size: FloatSize,
+) -> Option<TypedExpression> {
+    let result_type = resolved::Type::Float(to_size);
+
+    let from_bits = from_size.bits();
+    let to_bits = to_size.bits();
+
+    if from_bits == to_bits {
+        return Some(TypedExpression::new(result_type, expression.clone()));
+    }
+
+    if from_bits < to_bits {
+        return Some(TypedExpression::new(
+            result_type.clone(),
+            resolved::Expression {
+                kind: resolved::ExpressionKind::FloatExtend(
+                    Box::new(expression.clone()),
+                    result_type,
+                ),
+                source: expression.source,
+            },
+        ));
+    }
+
+    None
 }
 
 fn conform_integer_value(
@@ -534,8 +589,22 @@ fn conform_expression_to_default(
             &value,
             expression.expression.source,
         ),
+        resolved::Type::FloatLiteral(value) => Ok(conform_float_to_default(
+            value,
+            expression.expression.source,
+        )),
         _ => Ok(expression),
     }
+}
+
+fn conform_float_to_default(value: f64, source: Source) -> TypedExpression {
+    TypedExpression::new(
+        resolved::Type::Float(FloatSize::Normal),
+        resolved::Expression::new(
+            resolved::ExpressionKind::Float(FloatSize::Normal, value),
+            source,
+        ),
+    )
 }
 
 fn conform_integer_to_default_or_error(
@@ -749,8 +818,11 @@ fn resolve_expression(
             ),
         )),
         ast::ExpressionKind::Float(value) => Ok(TypedExpression::new(
-            resolved::Type::Float(FloatSize::Bits64),
-            resolved::Expression::new(resolved::ExpressionKind::Float(*value), source),
+            resolved::Type::FloatLiteral(*value),
+            resolved::Expression::new(
+                resolved::ExpressionKind::Float(FloatSize::Normal, *value),
+                source,
+            ),
         )),
         ast::ExpressionKind::NullTerminatedString(value) => Ok(TypedExpression::new(
             resolved::Type::Pointer(Box::new(resolved::Type::Integer {
@@ -912,6 +984,10 @@ fn resolve_expression(
                             sign: resolved::IntegerSign::Signed,
                         })
                     }
+                    (resolved::Type::FloatLiteral(_), resolved::Type::FloatLiteral(_)) => {
+                        // TODO: We can be smarter than this
+                        Some(resolved::Type::Float(FloatSize::Normal))
+                    }
                     (a @ resolved::Type::Integer { .. }, resolved::Type::IntegerLiteral(_)) => {
                         Some(a.clone())
                     }
@@ -963,12 +1039,121 @@ fn resolve_expression(
                 unified_type
             };
 
+            fn float_or_integer_from_type(result_type: &resolved::Type) -> Option<FloatOrInteger> {
+                match result_type {
+                    resolved::Type::Integer { .. } => Some(FloatOrInteger::Integer),
+                    resolved::Type::Float(_) => Some(FloatOrInteger::Float),
+                    _ => None,
+                }
+            }
+
+            fn float_or_sign_from_type(result_type: &resolved::Type) -> Option<FloatOrSign> {
+                match result_type {
+                    resolved::Type::Integer { sign, .. } => Some(FloatOrSign::Integer(*sign)),
+                    resolved::Type::Float(_) => Some(FloatOrSign::Float),
+                    _ => None,
+                }
+            }
+
+            fn numeric_mode_from_type(result_type: &resolved::Type) -> Option<NumericMode> {
+                match result_type {
+                    resolved::Type::Integer { sign, bits } => Some(match bits {
+                        IntegerBits::Normal => NumericMode::CheckOverflow(*sign),
+                        _ => NumericMode::Integer(*sign),
+                    }),
+                    resolved::Type::Float(_) => Some(NumericMode::Float),
+                    _ => None,
+                }
+            }
+
+            let operator =
+                match binary_operation.operator {
+                    ast::BinaryOperator::Add => {
+                        numeric_mode_from_type(&result_type).map(resolved::BinaryOperator::Add)
+                    }
+                    ast::BinaryOperator::Subtract => {
+                        numeric_mode_from_type(&result_type).map(resolved::BinaryOperator::Subtract)
+                    }
+                    ast::BinaryOperator::Multiply => {
+                        numeric_mode_from_type(&result_type).map(resolved::BinaryOperator::Multiply)
+                    }
+                    ast::BinaryOperator::Divide => {
+                        float_or_sign_from_type(&result_type).map(resolved::BinaryOperator::Divide)
+                    }
+                    ast::BinaryOperator::Modulus => {
+                        float_or_sign_from_type(&result_type).map(resolved::BinaryOperator::Modulus)
+                    }
+                    ast::BinaryOperator::Equals => float_or_integer_from_type(&result_type)
+                        .map(resolved::BinaryOperator::Equals),
+                    ast::BinaryOperator::NotEquals => float_or_integer_from_type(&result_type)
+                        .map(resolved::BinaryOperator::NotEquals),
+                    ast::BinaryOperator::LessThan => float_or_sign_from_type(&result_type)
+                        .map(resolved::BinaryOperator::LessThan),
+                    ast::BinaryOperator::LessThanEq => float_or_sign_from_type(&result_type)
+                        .map(resolved::BinaryOperator::LessThanEq),
+                    ast::BinaryOperator::GreaterThan => float_or_sign_from_type(&result_type)
+                        .map(resolved::BinaryOperator::GreaterThan),
+                    ast::BinaryOperator::GreaterThanEq => float_or_sign_from_type(&result_type)
+                        .map(resolved::BinaryOperator::GreaterThanEq),
+                    ast::BinaryOperator::BitwiseAnd => matches!(
+                        result_type,
+                        resolved::Type::Integer { .. } | resolved::Type::Boolean
+                    )
+                    .then_some(resolved::BinaryOperator::BitwiseAnd),
+                    ast::BinaryOperator::BitwiseOr => matches!(
+                        result_type,
+                        resolved::Type::Integer { .. } | resolved::Type::Boolean
+                    )
+                    .then_some(resolved::BinaryOperator::BitwiseOr),
+                    ast::BinaryOperator::BitwiseXor => matches!(
+                        result_type,
+                        resolved::Type::Integer { .. } | resolved::Type::Boolean
+                    )
+                    .then_some(resolved::BinaryOperator::BitwiseXor),
+                    ast::BinaryOperator::LeftShift => match result_type {
+                        resolved::Type::Integer { sign, .. } => Some(match sign {
+                            Signed => resolved::BinaryOperator::LeftShift,
+                            Unsigned => resolved::BinaryOperator::LogicalLeftShift,
+                        }),
+                        _ => None,
+                    },
+                    ast::BinaryOperator::RightShift => match result_type {
+                        resolved::Type::Integer { sign, .. } => Some(match sign {
+                            Signed => resolved::BinaryOperator::RightShift,
+                            Unsigned => resolved::BinaryOperator::LogicalRightShift,
+                        }),
+                        _ => None,
+                    },
+                    ast::BinaryOperator::LogicalLeftShift => {
+                        matches!(result_type, resolved::Type::Integer { .. })
+                            .then_some(resolved::BinaryOperator::BitwiseXor)
+                    }
+                    ast::BinaryOperator::LogicalRightShift => {
+                        matches!(result_type, resolved::Type::Integer { .. })
+                            .then_some(resolved::BinaryOperator::BitwiseXor)
+                    }
+                };
+
+            let operator = match operator {
+                Some(operator) => operator,
+                _ => {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::CannotPerformBinaryOperationForType {
+                            operator: binary_operation.operator.to_string(),
+                            bad_type: result_type.to_string(),
+                        },
+                    ))
+                }
+            };
+
             Ok(TypedExpression::new(
                 result_type,
                 resolved::Expression::new(
                     resolved::ExpressionKind::BinaryOperation(Box::new(
                         resolved::BinaryOperation {
-                            operator: binary_operation.operator.clone(),
+                            operator,
                             left,
                             right,
                         },

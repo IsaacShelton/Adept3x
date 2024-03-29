@@ -95,7 +95,7 @@ fn build_project(build_command: BuildCommand) {
         }
     };
 
-    // println!("{:?}", ir_module);
+    println!("{:?}", ir_module);
 
     match unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) } {
         Err(error) => eprintln!("{}", error),

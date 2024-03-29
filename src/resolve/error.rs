@@ -48,6 +48,7 @@ pub enum ResolveErrorKind {
     CannotUseUninitializedValue,
     CannotUseUninitializedVariable { variable_name: String },
     CannotPerformUnaryOperationForType { operator: String, bad_type: String },
+    CannotPerformBinaryOperationForType { operator: String, bad_type: String },
     Other { message: String },
 }
 
@@ -178,6 +179,9 @@ impl Display for ResolveError {
                 write!(f, "Cannot use uninitialized variable '{}'", variable_name)?;
             }
             ResolveErrorKind::CannotPerformUnaryOperationForType { operator, bad_type } => {
+                write!(f, "Cannot perform '{}' on '{}'", operator, bad_type)?;
+            }
+            ResolveErrorKind::CannotPerformBinaryOperationForType { operator, bad_type } => {
                 write!(f, "Cannot perform '{}' on '{}'", operator, bad_type)?;
             }
         }

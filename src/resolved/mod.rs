@@ -11,7 +11,7 @@ use std::{
 };
 
 pub use self::variable_storage::VariableStorageKey;
-pub use crate::ast::{BinaryOperator, UnaryOperator};
+pub use crate::ast::UnaryOperator;
 pub use crate::ast::{FloatSize, IntegerBits, IntegerSign};
 pub use variable_storage::VariableStorage;
 
@@ -100,12 +100,13 @@ pub struct Field {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Boolean,
-    Float(FloatSize),
     Integer {
         bits: IntegerBits,
         sign: IntegerSign,
     },
     IntegerLiteral(BigInt),
+    FloatLiteral(f64),
+    Float(FloatSize),
     Pointer(Box<Type>),
     PlainOldData(String, StructureRef),
     Void,
@@ -122,11 +123,12 @@ impl Type {
             } else {
                 IntegerSign::Signed
             }),
+            Type::Float(_) => None,
+            Type::FloatLiteral(_) => None,
             Type::Pointer(_) => None,
             Type::PlainOldData(_, _) => None,
             Type::Void => None,
             Type::Structure(_, _) => None,
-            Type::Float(_) => None,
         }
     }
 }
@@ -154,6 +156,12 @@ impl Display for Type {
             Type::IntegerLiteral(value) => {
                 write!(f, "integer {}", value)?;
             }
+            Type::Float(size) => match size {
+                FloatSize::Normal => f.write_str("float")?,
+                FloatSize::Bits32 => f.write_str("f32")?,
+                FloatSize::Bits64 => f.write_str("f64")?,
+            },
+            Type::FloatLiteral(value) => write!(f, "float {}", value)?,
             Type::Pointer(inner) => {
                 write!(f, "ptr<{}>", inner)?;
             }
@@ -162,11 +170,6 @@ impl Display for Type {
             }
             Type::Void => f.write_str("void")?,
             Type::Structure(name, _) => f.write_str(name)?,
-            Type::Float(size) => match size {
-                FloatSize::Normal => f.write_str("float")?,
-                FloatSize::Bits32 => f.write_str("f32")?,
-                FloatSize::Bits64 => f.write_str("f64")?,
-            },
         }
 
         Ok(())
@@ -265,12 +268,13 @@ pub enum ExpressionKind {
         bits: IntegerLiteralBits,
         sign: IntegerSign,
     },
-    Float(f64),
+    Float(FloatSize, f64),
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
     IntegerExtend(Box<Expression>, Type),
+    FloatExtend(Box<Expression>, Type),
     Member(Destination, StructureRef, usize, Type),
     StructureLiteral(Type, IndexMap<String, (Expression, usize)>),
     UnaryOperator(Box<UnaryOperation>),
@@ -339,6 +343,56 @@ impl TryFrom<ExpressionKind> for DestinationKind {
             _ => Err(()),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FloatOrSign {
+    Integer(IntegerSign),
+    Float,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FloatOrInteger {
+    Integer,
+    Float,
+}
+
+impl From<FloatOrSign> for FloatOrInteger {
+    fn from(value: FloatOrSign) -> Self {
+        match value {
+            FloatOrSign::Integer(_) => Self::Integer,
+            FloatOrSign::Float => Self::Float,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum NumericMode {
+    Integer(IntegerSign),
+    CheckOverflow(IntegerSign),
+    Float,
+}
+
+#[derive(Clone, Debug)]
+pub enum BinaryOperator {
+    Add(NumericMode),
+    Subtract(NumericMode),
+    Multiply(NumericMode),
+    Divide(FloatOrSign),
+    Modulus(FloatOrSign),
+    Equals(FloatOrInteger),
+    NotEquals(FloatOrInteger),
+    LessThan(FloatOrSign),
+    LessThanEq(FloatOrSign),
+    GreaterThan(FloatOrSign),
+    GreaterThanEq(FloatOrSign),
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
+    LogicalLeftShift,
+    LogicalRightShift,
 }
 
 #[derive(Clone, Debug)]
