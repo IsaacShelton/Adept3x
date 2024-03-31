@@ -25,31 +25,89 @@ impl ResolveError {
 
 #[derive(Clone, Debug)]
 pub enum ResolveErrorKind {
-    CannotReturnValueOfType { returning: String, expected: String },
-    CannotReturnVoid { expected: String },
-    UnrepresentableInteger { value: String },
-    FailedToFindFunction { name: String },
-    UndeclaredVariable { name: String },
-    UndeclaredType { name: String },
-    NotEnoughArgumentsToFunction { name: String },
-    TooManyArgumentsToFunction { name: String },
-    BadTypeForArgumentToFunction { name: String, i: usize },
-    BinaryOperatorMismatch { left: String, right: String },
-    CannotBinaryOperator { left: String, right: String },
-    TypeMismatch { left: String, right: String },
-    CannotAssignValueOfType { from: String, to: String },
+    CannotReturnValueOfType {
+        returning: String,
+        expected: String,
+    },
+    CannotReturnVoid {
+        expected: String,
+    },
+    UnrepresentableInteger {
+        value: String,
+    },
+    FailedToFindFunction {
+        name: String,
+    },
+    UndeclaredVariable {
+        name: String,
+    },
+    UndeclaredType {
+        name: String,
+    },
+    NotEnoughArgumentsToFunction {
+        name: String,
+    },
+    TooManyArgumentsToFunction {
+        name: String,
+    },
+    BadTypeForArgumentToFunction {
+        name: String,
+        i: usize,
+    },
+    IncompatibleTypesForBinaryOperator {
+        operator: String,
+        left: String,
+        right: String,
+    },
+    CannotBinaryOperator {
+        left: String,
+        right: String,
+    },
+    TypeMismatch {
+        left: String,
+        right: String,
+    },
+    CannotAssignValueOfType {
+        from: String,
+        to: String,
+    },
     CannotMutate,
-    CannotGetFieldOfNonPlainOldDataType { bad_type: String },
-    CannotCreatePlainOldDataOfNonStructure { bad_type: String },
-    FieldIsPrivate { field_name: String },
-    FieldDoesNotExist { field_name: String },
-    CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type: String },
-    MissingFields { fields: Vec<String> },
+    CannotGetFieldOfNonPlainOldDataType {
+        bad_type: String,
+    },
+    CannotCreatePlainOldDataOfNonStructure {
+        bad_type: String,
+    },
+    FieldIsPrivate {
+        field_name: String,
+    },
+    FieldDoesNotExist {
+        field_name: String,
+    },
+    CannotCreateStructLiteralForNonPlainOldDataStructure {
+        bad_type: String,
+    },
+    MissingFields {
+        fields: Vec<String>,
+    },
     CannotUseUninitializedValue,
-    CannotUseUninitializedVariable { variable_name: String },
-    CannotPerformUnaryOperationForType { operator: String, bad_type: String },
-    CannotPerformBinaryOperationForType { operator: String, bad_type: String },
-    Other { message: String },
+    CannotUseUninitializedVariable {
+        variable_name: String,
+    },
+    CannotPerformUnaryOperationForType {
+        operator: String,
+        bad_type: String,
+    },
+    CannotPerformBinaryOperationForType {
+        operator: String,
+        bad_type: String,
+    },
+    MismatchingYieldedTypes {
+        got: Vec<String>,
+    },
+    Other {
+        message: String,
+    },
 }
 
 impl Display for ResolveError {
@@ -107,11 +165,15 @@ impl Display for ResolveError {
             ResolveErrorKind::BadTypeForArgumentToFunction { name, i } => {
                 write!(f, "Bad type for argument #{} to function '{}'", i + 1, name)?;
             }
-            ResolveErrorKind::BinaryOperatorMismatch { left, right } => {
+            ResolveErrorKind::IncompatibleTypesForBinaryOperator {
+                operator,
+                left,
+                right,
+            } => {
                 write!(
                     f,
-                    "Mismatching types '{}' and '{}' for binary operator",
-                    left, right
+                    "Incompatible types '{}' and '{}' for '{}'",
+                    left, right, operator
                 )?;
             }
             ResolveErrorKind::CannotBinaryOperator { left, right } => {
@@ -183,6 +245,19 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::CannotPerformBinaryOperationForType { operator, bad_type } => {
                 write!(f, "Cannot perform '{}' on '{}'", operator, bad_type)?;
+            }
+            ResolveErrorKind::MismatchingYieldedTypes { got } => {
+                let got = got
+                    .iter()
+                    .unique()
+                    .take(5)
+                    .map(|type_name| format!("'{}'", type_name))
+                    .join(", ");
+
+                match got.len() {
+                    0..=4 => write!(f, "Mismatching yielded types - {}", got)?,
+                    _ => write!(f, "Mismatching yielded types - {}, ...", got)?,
+                }
             }
         }
 

@@ -7,7 +7,7 @@ mod variable_search_context;
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
     resolved::{
-        self, Destination, FloatOrInteger, FloatOrSign, NumericMode, TypedExpression,
+        self, Branch, Destination, FloatOrInteger, FloatOrSign, NumericMode, TypedExpression,
         VariableStorage,
     },
     source_file_cache::SourceFileCache,
@@ -15,6 +15,7 @@ use crate::{
 use ast::{FloatSize, IntegerBits, IntegerSign};
 use function_search_context::FunctionSearchContext;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use num_bigint::BigInt;
 use std::collections::{HashMap, VecDeque};
 
@@ -974,64 +975,18 @@ fn resolve_expression(
                 Initialized::Require,
             )?;
 
-            // TODO: Properly conform left and right types
-            let unified_type = if left.resolved_type != right.resolved_type {
-                let maybe_unified_type = match (&left.resolved_type, &right.resolved_type) {
-                    (resolved::Type::IntegerLiteral(_), resolved::Type::IntegerLiteral(_)) => {
-                        // TODO: We can be smarter than this
-                        Some(resolved::Type::Integer {
-                            bits: resolved::IntegerBits::Normal,
-                            sign: resolved::IntegerSign::Signed,
-                        })
-                    }
-                    (resolved::Type::FloatLiteral(_), resolved::Type::FloatLiteral(_)) => {
-                        // TODO: We can be smarter than this
-                        Some(resolved::Type::Float(FloatSize::Normal))
-                    }
-                    (a @ resolved::Type::Integer { .. }, resolved::Type::IntegerLiteral(_)) => {
-                        Some(a.clone())
-                    }
-                    (resolved::Type::IntegerLiteral(_), b @ resolved::Type::Integer { .. }) => {
-                        Some(b.clone())
-                    }
-                    (
-                        resolved::Type::Integer {
-                            bits: a_bits,
-                            sign: a_sign,
-                        },
-                        resolved::Type::Integer {
-                            bits: b_bits,
-                            sign: b_sign,
-                        },
-                    ) if a_sign == b_sign => Some(resolved::Type::Integer {
-                        bits: (*a_bits).max(*b_bits),
-                        sign: *a_sign,
-                    }),
-                    _ => None,
-                };
-
-                match maybe_unified_type {
-                    Some(unified_type) => {
-                        left = conform_expression(&left, &unified_type)
-                            .expect("conform left side of binary operator");
-                        right = conform_expression(&right, &unified_type)
-                            .expect("conform right side of binary operator");
-                        unified_type
-                    }
-                    None => {
-                        return Err(ResolveError::new(
-                            resolved_ast.source_file_cache,
-                            source,
-                            ResolveErrorKind::BinaryOperatorMismatch {
-                                left: left.resolved_type.to_string(),
-                                right: right.resolved_type.to_string(),
-                            },
-                        ))
-                    }
-                }
-            } else {
-                left.resolved_type.clone()
-            };
+            let unified_type = match unify_types(&[&mut left, &mut right]) {
+                Some(value) => Ok(value),
+                None => Err(ResolveError::new(
+                    resolved_ast.source_file_cache,
+                    source,
+                    ResolveErrorKind::IncompatibleTypesForBinaryOperator {
+                        operator: binary_operation.operator.to_string(),
+                        left: left.resolved_type.to_string(),
+                        right: right.resolved_type.to_string(),
+                    },
+                )),
+            }?;
 
             fn float_or_integer_from_type(
                 unified_type: &resolved::Type,
@@ -1409,82 +1364,115 @@ fn resolve_expression(
                 })
                 .transpose()?;
 
-            let conditions = conditions
-                .iter()
-                .map(|(expression, block)| {
-                    let condition = resolve_expression(
-                        resolved_ast,
-                        function_search_context,
-                        type_search_context,
-                        global_search_context,
-                        variable_search_context,
-                        resolved_function_ref,
-                        expression,
-                        Initialized::Require,
-                    )?;
+            let mut branches = Vec::with_capacity(conditions.len());
+            let mut block_results = Vec::with_capacity(conditions.len());
 
-                    let statements = resolve_statements(
-                        resolved_ast,
-                        function_search_context,
-                        type_search_context,
-                        global_search_context,
-                        variable_search_context,
-                        resolved_function_ref,
-                        &block.statements,
-                    )?;
+            for (expression, block) in conditions.iter() {
+                let condition = resolve_expression(
+                    resolved_ast,
+                    function_search_context,
+                    type_search_context,
+                    global_search_context,
+                    variable_search_context,
+                    resolved_function_ref,
+                    expression,
+                    Initialized::Require,
+                )?;
 
-                    let condition = conform_expression_or_error(
-                        resolved_ast.source_file_cache,
-                        &condition,
-                        &resolved::Type::Boolean,
-                    )?
-                    .expression;
-                    Ok((condition, resolved::Block::new(statements)))
-                })
-                .collect::<Result<Vec<(resolved::Expression, resolved::Block)>, ResolveError>>()?;
+                let statements = resolve_statements(
+                    resolved_ast,
+                    function_search_context,
+                    type_search_context,
+                    global_search_context,
+                    variable_search_context,
+                    resolved_function_ref,
+                    &block.statements,
+                )?;
 
-            let result_types = conditions
-                .iter()
-                .map(|(_, block)| block)
-                .chain(otherwise.iter())
-                .map(|block| {
-                    block
-                        .statements
-                        .last()
-                        .and_then(|statement| match &statement.kind {
-                            resolved::StatementKind::Return(_) => None,
-                            resolved::StatementKind::Expression(expression) => {
-                                Some(expression.resolved_type.clone())
-                            }
-                            resolved::StatementKind::Declaration(_) => None,
-                            resolved::StatementKind::Assignment(_) => None,
-                        })
-                        .unwrap_or(resolved::Type::Void)
-                })
-                .try_fold(None, |acc: Option<resolved::Type>, item| {
-                    if let Some(existing) = acc {
-                        if existing == item {
-                            Ok(Some(existing))
-                        } else {
-                            Err(ResolveError::new(
-                                resolved_ast.source_file_cache,
-                                source,
-                                ResolveErrorKind::Other {
-                                    message: "hi".into(),
-                                },
-                            ))
+                let condition = conform_expression_or_error(
+                    resolved_ast.source_file_cache,
+                    &condition,
+                    &resolved::Type::Boolean,
+                )?;
+
+                let block = resolved::Block::new(statements);
+
+                let block_result = if let Some(statement) = block.statements.last() {
+                    match &statement.kind {
+                        resolved::StatementKind::Return(_) => None,
+                        resolved::StatementKind::Expression(expression) => {
+                            Some(expression.resolved_type.clone())
                         }
-                    } else {
-                        Ok(Some(item))
+                        resolved::StatementKind::Declaration(_) => None,
+                        resolved::StatementKind::Assignment(_) => None,
                     }
-                })?;
+                } else {
+                    None
+                }
+                .unwrap_or(resolved::Type::Void);
 
-            let result_type = result_types.expect("at least one result type");
+                branches.push(Branch { condition, block });
+                block_results.push(block_result);
+            }
+
+            let result_type = if block_results
+                .iter()
+                .any(|result| result == &resolved::Type::Void)
+            {
+                if block_results.iter().all_equal() {
+                    resolved::Type::Void
+                } else {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::MismatchingYieldedTypes {
+                            got: block_results
+                                .iter()
+                                .map(|resolved_type| resolved_type.to_string())
+                                .collect_vec(),
+                        },
+                    ));
+                }
+            } else {
+                let last_expressions = branches
+                    .chunks_exact_mut(1)
+                    .map(|chunk| {
+                        match &mut chunk[0]
+                            .block
+                            .statements
+                            .last_mut()
+                            .expect("last statement to exist")
+                            .kind
+                        {
+                            resolved::StatementKind::Expression(expression) => expression,
+                            resolved::StatementKind::Return(_)
+                            | resolved::StatementKind::Declaration(_)
+                            | resolved::StatementKind::Assignment(_) => unreachable!(),
+                        }
+                    })
+                    .collect_vec();
+
+                match unify_types(&last_expressions[..]) {
+                    Some(result_type) => result_type,
+                    None => {
+                        return Err(ResolveError::new(
+                            resolved_ast.source_file_cache,
+                            source,
+                            ResolveErrorKind::MismatchingYieldedTypes {
+                                got: block_results
+                                    .iter()
+                                    .map(|resolved_type| resolved_type.to_string())
+                                    .collect_vec(),
+                            },
+                        ))
+                    }
+                }
+            };
 
             let expression = resolved::Expression::new(
                 resolved::ExpressionKind::Conditional(resolved::Conditional {
                     result_type: result_type.clone(),
-                    conditions,
+                    branches,
                     otherwise,
                 }),
                 source,
@@ -1668,4 +1656,76 @@ fn ensure_initialized(
             },
         ))
     }
+}
+
+fn unify_types(expressions: &[&mut TypedExpression]) -> Option<resolved::Type> {
+    // If it's possible to combine
+
+    if expressions
+        .iter()
+        .map(|expression| &expression.resolved_type)
+        .all_equal()
+    {
+        return Some(
+            expressions
+                .first()
+                .map(|expression| expression.resolved_type.clone())
+                .unwrap_or_else(|| resolved::Type::Void),
+        );
+    }
+
+    // If all integer literals
+    // TODO
+
+    // If all (integer/float) literals
+    // TODO
+
+    // If combinations of integers and integer literals
+    // TODO
+
+    // If combinations of floats and (integer/float) literals
+    // TODO
+
+    /*
+    let maybe_unified_type = match (&a.resolved_type, &b.resolved_type) {
+        (resolved::Type::IntegerLiteral(_), resolved::Type::IntegerLiteral(_)) => {
+            // TODO: We can be smarter than this
+            Some(resolved::Type::Integer {
+                bits: resolved::IntegerBits::Normal,
+                sign: resolved::IntegerSign::Signed,
+            })
+        }
+        (resolved::Type::FloatLiteral(_), resolved::Type::FloatLiteral(_)) => {
+            // TODO: We can be smarter than this
+            Some(resolved::Type::Float(FloatSize::Normal))
+        }
+        (a @ resolved::Type::Integer { .. }, resolved::Type::IntegerLiteral(_)) => Some(a.clone()),
+        (resolved::Type::IntegerLiteral(_), b @ resolved::Type::Integer { .. }) => Some(b.clone()),
+        (
+            resolved::Type::Integer {
+                bits: a_bits,
+                sign: a_sign,
+            },
+            resolved::Type::Integer {
+                bits: b_bits,
+                sign: b_sign,
+            },
+        ) if a_sign == b_sign => Some(resolved::Type::Integer {
+            bits: (*a_bits).max(*b_bits),
+            sign: *a_sign,
+        }),
+        _ => None,
+    };
+
+    match maybe_unified_type {
+        Some(unified_type) => {
+            let new_a = conform_expression(&a, &unified_type).expect("can conform to unified type");
+            let new_b = conform_expression(&b, &unified_type).expect("can conform to unified type");
+            Some((new_a, new_b, unified_type))
+        }
+        None => None,
+    }
+    */
+
+    None
 }

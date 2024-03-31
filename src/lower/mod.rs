@@ -610,7 +610,8 @@ fn lower_expression(
 
             let mut incoming = vec![];
 
-            for (expression, block) in conditional.conditions.iter() {
+            for resolved::Branch { condition, block } in conditional.branches.iter() {
+                let expression = &condition.expression;
                 let condition = lower_expression(builder, ir_module, expression, function)?;
 
                 let true_basicblock_id = builder.new_block();
