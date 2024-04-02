@@ -163,6 +163,20 @@ pub enum IntegerBits {
 }
 
 impl IntegerBits {
+    pub fn new(bits: u64) -> Option<Self> {
+        if bits <= 8 {
+            Some(Self::Bits8)
+        } else if bits <= 16 {
+            Some(Self::Bits16)
+        } else if bits <= 32 {
+            Some(Self::Bits32)
+        } else if bits <= 64 {
+            Some(Self::Bits64)
+        } else {
+            None
+        }
+    }
+
     pub fn successor(&self) -> Option<IntegerBits> {
         match self {
             Self::Normal => Some(Self::Normal),

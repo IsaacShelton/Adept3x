@@ -1,0 +1,15 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    a i32 = 10
+    b u32 = 4
+
+    // This variable will be an i64, since i64 is the smallest type
+    // that can safely represent the result of (i32 + u32)
+    c := a + b
+
+    printf(c"result is %lld\n", c)
+}
+

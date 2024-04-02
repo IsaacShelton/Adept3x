@@ -17,7 +17,11 @@ use function_search_context::FunctionSearchContext;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::collections::{HashMap, VecDeque};
+use num_traits::{ToPrimitive, Zero};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, VecDeque},
+};
 
 use self::{
     error::{ResolveError, ResolveErrorKind},
@@ -469,7 +473,7 @@ fn conform_expression(
     // Integer Literal to Integer Type Conversion
     match &expression.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
-            // Integer literals -> Integer
+            // Integer literals -> Integer/Float
             conform_integer_literal(value, expression.expression.source, to_type)
         }
         resolved::Type::Integer {
@@ -551,7 +555,7 @@ fn conform_integer_value(
     to_bits: IntegerBits,
     to_sign: IntegerSign,
 ) -> Option<TypedExpression> {
-    if from_sign != to_sign {
+    if from_sign != to_sign && !(to_bits > from_bits) {
         return None;
     }
 
@@ -654,6 +658,12 @@ fn conform_integer_literal(
     to_type: &resolved::Type,
 ) -> Option<TypedExpression> {
     match to_type {
+        resolved::Type::Float(size) => value.to_f64().map(|literal| {
+            TypedExpression::new(
+                resolved::Type::Float(*size),
+                resolved::Expression::new(resolved::ExpressionKind::Float(*size, literal), source),
+            )
+        }),
         resolved::Type::Integer { bits, sign } => {
             use resolved::{IntegerBits::*, IntegerLiteralBits, IntegerSign::*};
 
@@ -975,7 +985,7 @@ fn resolve_expression(
                 Initialized::Require,
             )?;
 
-            let unified_type = match unify_types(&[&mut left, &mut right]) {
+            let unified_type = match unify_types(&mut [&mut left, &mut right]) {
                 Some(value) => Ok(value),
                 None => Err(ResolveError::new(
                     resolved_ast.source_file_cache,
@@ -1348,7 +1358,7 @@ fn resolve_expression(
             conditions,
             otherwise,
         }) => {
-            let otherwise = otherwise
+            let mut otherwise = otherwise
                 .as_ref()
                 .map(|otherwise| {
                     resolve_statements(
@@ -1364,8 +1374,7 @@ fn resolve_expression(
                 })
                 .transpose()?;
 
-            let mut branches = Vec::with_capacity(conditions.len());
-            let mut block_results = Vec::with_capacity(conditions.len());
+            let mut branches_without_else = Vec::with_capacity(conditions.len());
 
             for (expression, block) in conditions.iter() {
                 let condition = resolve_expression(
@@ -1396,24 +1405,15 @@ fn resolve_expression(
                 )?;
 
                 let block = resolved::Block::new(statements);
-
-                let block_result = if let Some(statement) = block.statements.last() {
-                    match &statement.kind {
-                        resolved::StatementKind::Return(_) => None,
-                        resolved::StatementKind::Expression(expression) => {
-                            Some(expression.resolved_type.clone())
-                        }
-                        resolved::StatementKind::Declaration(_) => None,
-                        resolved::StatementKind::Assignment(_) => None,
-                    }
-                } else {
-                    None
-                }
-                .unwrap_or(resolved::Type::Void);
-
-                branches.push(Branch { condition, block });
-                block_results.push(block_result);
+                branches_without_else.push(Branch { condition, block });
             }
+
+            let block_results = branches_without_else
+                .iter()
+                .map(|branch| &branch.block)
+                .chain(otherwise.iter())
+                .map(|block| block.get_result_type())
+                .collect_vec();
 
             let result_type = if block_results
                 .iter()
@@ -1434,11 +1434,12 @@ fn resolve_expression(
                     ));
                 }
             } else {
-                let last_expressions = branches
+                let mut last_expressions = branches_without_else
                     .chunks_exact_mut(1)
-                    .map(|chunk| {
-                        match &mut chunk[0]
-                            .block
+                    .map(|branch| &mut branch[0].block)
+                    .chain(otherwise.iter_mut())
+                    .map(|block| {
+                        match &mut block
                             .statements
                             .last_mut()
                             .expect("last statement to exist")
@@ -1452,7 +1453,7 @@ fn resolve_expression(
                     })
                     .collect_vec();
 
-                match unify_types(&last_expressions[..]) {
+                match unify_types(&mut last_expressions[..]) {
                     Some(result_type) => result_type,
                     None => {
                         return Err(ResolveError::new(
@@ -1472,7 +1473,7 @@ fn resolve_expression(
             let expression = resolved::Expression::new(
                 resolved::ExpressionKind::Conditional(resolved::Conditional {
                     result_type: result_type.clone(),
-                    branches,
+                    branches: branches_without_else,
                     otherwise,
                 }),
                 source,
@@ -1658,74 +1659,160 @@ fn ensure_initialized(
     }
 }
 
-fn unify_types(expressions: &[&mut TypedExpression]) -> Option<resolved::Type> {
-    // If it's possible to combine
+fn unify_integer_properties(
+    required_bits: Option<IntegerBits>,
+    required_sign: Option<IntegerSign>,
+    ty: &resolved::Type,
+) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
+    let (new_bits, new_sign) = match ty {
+        resolved::Type::Integer { bits, sign } => (
+            match required_sign {
+                Some(IntegerSign::Unsigned) if *sign == IntegerSign::Signed => {
+                    // Compensate for situations like i32 + u32
+                    bits.bits() as u64 + 1
+                }
+                _ => bits.bits() as u64,
+            },
+            Some(*sign),
+        ),
+        resolved::Type::IntegerLiteral(value) => {
+            let unsigned_bits = value.bits();
 
-    if expressions
+            let (bits, sign) = if *value < BigInt::zero() {
+                (unsigned_bits + 1, Some(IntegerSign::Signed))
+            } else {
+                (unsigned_bits, None)
+            };
+
+            (bits, sign)
+        }
+        _ => return None,
+    };
+
+    let check_overflow = match ty {
+        resolved::Type::Integer {
+            bits: IntegerBits::Normal,
+            ..
+        } => true,
+        _ => required_bits == Some(IntegerBits::Normal),
+    };
+
+    let old_bits = match (required_sign, new_sign) {
+        (Some(IntegerSign::Signed), Some(IntegerSign::Unsigned)) => {
+            required_bits.map(|bits| bits.bits() + 1).unwrap_or(0)
+        }
+        _ => required_bits.map(|bits| bits.bits()).unwrap_or(0),
+    };
+    let old_sign = required_sign;
+
+    let sign_kind = match (old_sign, new_sign) {
+        (Some(old_sign), Some(new_sign)) => {
+            if old_sign == IntegerSign::Signed || new_sign == IntegerSign::Signed {
+                Some(IntegerSign::Signed)
+            } else {
+                Some(IntegerSign::Unsigned)
+            }
+        }
+        (Some(old_sign), None) => Some(old_sign),
+        (None, Some(new_sign)) => Some(new_sign),
+        (None, None) => None,
+    };
+
+    let bits_kind = IntegerBits::new(new_bits.max(old_bits.into())).map(|bits| match bits {
+        IntegerBits::Bits64 => {
+            if check_overflow {
+                IntegerBits::Normal
+            } else {
+                bits
+            }
+        }
+        _ => bits,
+    });
+
+    bits_kind.map(|bits_kind| ((Some(bits_kind), sign_kind)))
+}
+
+fn bits_and_sign_for<'a>(
+    types: &[&resolved::Type],
+) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
+    types.iter().fold(Some((None, None)), |acc, ty| match acc {
+        Some((maybe_bits, maybe_sign)) => unify_integer_properties(maybe_bits, maybe_sign, ty),
+        None => None,
+    })
+}
+
+fn unifying_type_for(expressions: &[impl Borrow<TypedExpression>]) -> Option<resolved::Type> {
+    let types = expressions
         .iter()
-        .map(|expression| &expression.resolved_type)
-        .all_equal()
-    {
+        .map(|expression| &expression.borrow().resolved_type)
+        .collect_vec();
+
+    if types.iter().all_equal() {
         return Some(
             expressions
                 .first()
-                .map(|expression| expression.resolved_type.clone())
+                .map(|expression| expression.borrow().resolved_type.clone())
                 .unwrap_or_else(|| resolved::Type::Void),
         );
     }
 
     // If all integer literals
-    // TODO
+    if types
+        .iter()
+        .all(|resolved_type| matches!(resolved_type, resolved::Type::IntegerLiteral(..)))
+    {
+        // TODO: We can be smarter than this
+        return Some(resolved::Type::Integer {
+            bits: IntegerBits::Normal,
+            sign: IntegerSign::Signed,
+        });
+    }
 
     // If all (integer/float) literals
-    // TODO
-
-    // If combinations of integers and integer literals
-    // TODO
-
-    // If combinations of floats and (integer/float) literals
-    // TODO
-
-    /*
-    let maybe_unified_type = match (&a.resolved_type, &b.resolved_type) {
-        (resolved::Type::IntegerLiteral(_), resolved::Type::IntegerLiteral(_)) => {
-            // TODO: We can be smarter than this
-            Some(resolved::Type::Integer {
-                bits: resolved::IntegerBits::Normal,
-                sign: resolved::IntegerSign::Signed,
-            })
-        }
-        (resolved::Type::FloatLiteral(_), resolved::Type::FloatLiteral(_)) => {
-            // TODO: We can be smarter than this
-            Some(resolved::Type::Float(FloatSize::Normal))
-        }
-        (a @ resolved::Type::Integer { .. }, resolved::Type::IntegerLiteral(_)) => Some(a.clone()),
-        (resolved::Type::IntegerLiteral(_), b @ resolved::Type::Integer { .. }) => Some(b.clone()),
-        (
-            resolved::Type::Integer {
-                bits: a_bits,
-                sign: a_sign,
-            },
-            resolved::Type::Integer {
-                bits: b_bits,
-                sign: b_sign,
-            },
-        ) if a_sign == b_sign => Some(resolved::Type::Integer {
-            bits: (*a_bits).max(*b_bits),
-            sign: *a_sign,
-        }),
-        _ => None,
-    };
-
-    match maybe_unified_type {
-        Some(unified_type) => {
-            let new_a = conform_expression(&a, &unified_type).expect("can conform to unified type");
-            let new_b = conform_expression(&b, &unified_type).expect("can conform to unified type");
-            Some((new_a, new_b, unified_type))
-        }
-        None => None,
+    if types.iter().all(|resolved_type| {
+        matches!(
+            resolved_type,
+            resolved::Type::IntegerLiteral(..) | resolved::Type::FloatLiteral(..)
+        )
+    }) {
+        return Some(resolved::Type::Float(FloatSize::Normal));
     }
-    */
+
+    // If all integers and integer literals
+    if types.iter().all(|resolved_type| {
+        matches!(
+            resolved_type,
+            resolved::Type::IntegerLiteral(..) | resolved::Type::Integer { .. }
+        )
+    }) {
+        let (bits, sign) = bits_and_sign_for(&types[..])?;
+
+        let bits = bits.unwrap_or(IntegerBits::Normal);
+        let sign = sign.unwrap_or(IntegerSign::Signed);
+
+        return Some(resolved::Type::Integer { bits, sign });
+    }
 
     None
+}
+
+fn unify_types(expressions: &mut [&mut TypedExpression]) -> Option<resolved::Type> {
+    let unified_type = unifying_type_for(expressions);
+
+    if let Some(unified_type) = &unified_type {
+        for expression in expressions.iter_mut() {
+            **expression = match conform_expression(&**expression, unified_type) {
+                Some(conformed) => conformed,
+                None => {
+                    panic!(
+                        "cannot conform to unified type {} for value of type {}",
+                        unified_type.to_string(),
+                        expression.resolved_type.to_string(),
+                    );
+                }
+            }
+        }
+    }
+
+    unified_type
 }

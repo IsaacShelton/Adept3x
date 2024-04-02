@@ -311,6 +311,20 @@ impl Block {
     pub fn new(statements: Vec<Statement>) -> Self {
         Self { statements }
     }
+
+    pub fn get_result_type(&self) -> Type {
+        if let Some(statement) = self.statements.last() {
+            match &statement.kind {
+                StatementKind::Return(_) => None,
+                StatementKind::Expression(expression) => Some(expression.resolved_type.clone()),
+                StatementKind::Declaration(_) => None,
+                StatementKind::Assignment(_) => None,
+            }
+        } else {
+            None
+        }
+        .unwrap_or(Type::Void)
+    }
 }
 
 #[derive(Clone, Debug)]
