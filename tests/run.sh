@@ -25,6 +25,7 @@ compile global_variables
 compile if
 compile if_elif_else
 compile if_eval
+compile integer_and_float_literals_combining
 compile integer_literal_conforming
 compile integer_signed_overflow
 compile integer_unsigned_overflow
@@ -35,6 +36,7 @@ compile math_simple
 compile member_pod
 compile return
 compile return_message
+compile signed_unsigned_promotion
 compile structure_definitions
 compile structure_literals
 compile structure_pod
@@ -43,6 +45,7 @@ compile variables
 compile variables_override
 compile variables_typed
 compile while
+expect_fail_compile _should_fail/mismatching_yielded_types
 expect_fail_compile _should_fail/partial_initialization
 expect_fail_compile _should_fail/uninitialized_member
 expect_fail_compile _should_fail/uninitialized_simple

@@ -1,9 +1,10 @@
-use indexmap::IndexMap;
-use num_traits::Zero;
 mod variable_storage;
 
 use crate::{ast::Source, source_file_cache::SourceFileCache};
+use derive_more::Unwrap;
+use indexmap::IndexMap;
 use num_bigint::BigInt;
+use num_traits::Zero;
 use slotmap::{new_key_type, SlotMap};
 use std::{
     ffi::CString,
@@ -188,7 +189,7 @@ impl Statement {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Unwrap)]
 pub enum StatementKind {
     Return(Option<Expression>),
     Expression(TypedExpression),
@@ -283,9 +284,15 @@ pub enum ExpressionKind {
 }
 
 #[derive(Clone, Debug)]
+pub struct Branch {
+    pub condition: TypedExpression,
+    pub block: Block,
+}
+
+#[derive(Clone, Debug)]
 pub struct Conditional {
     pub result_type: Type,
-    pub conditions: Vec<(Expression, Block)>,
+    pub branches: Vec<Branch>,
     pub otherwise: Option<Block>,
 }
 
@@ -303,6 +310,20 @@ pub struct Block {
 impl Block {
     pub fn new(statements: Vec<Statement>) -> Self {
         Self { statements }
+    }
+
+    pub fn get_result_type(&self) -> Type {
+        if let Some(statement) = self.statements.last() {
+            match &statement.kind {
+                StatementKind::Return(_) => None,
+                StatementKind::Expression(expression) => Some(expression.resolved_type.clone()),
+                StatementKind::Declaration(_) => None,
+                StatementKind::Assignment(_) => None,
+            }
+        } else {
+            None
+        }
+        .unwrap_or(Type::Void)
     }
 }
 

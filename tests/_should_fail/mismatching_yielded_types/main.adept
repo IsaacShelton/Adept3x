@@ -1,0 +1,17 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    condition := true
+
+    printf(c"Result is %f\n", if condition {
+        x i32 = 123
+        x
+    } elif !condition {
+        53
+    } else {
+        3.1415
+    })
+}
+
