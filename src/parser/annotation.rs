@@ -22,9 +22,9 @@ impl Annotation {
 impl ToString for AnnotationKind {
     fn to_string(&self) -> String {
         match self {
-            AnnotationKind::Foreign => "foreign",
-            AnnotationKind::ThreadLocal => "thread_local",
-            AnnotationKind::Packed => "packed",
+            Self::Foreign => "foreign",
+            Self::ThreadLocal => "thread_local",
+            Self::Packed => "packed",
         }
         .into()
     }

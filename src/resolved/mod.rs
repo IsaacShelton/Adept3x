@@ -270,6 +270,7 @@ pub enum ExpressionKind {
         sign: IntegerSign,
     },
     Float(FloatSize, f64),
+    String(String),
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),

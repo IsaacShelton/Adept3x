@@ -105,6 +105,7 @@ pub enum ResolveErrorKind {
     MismatchingYieldedTypes {
         got: Vec<String>,
     },
+    StringTypeNotDefined,
     Other {
         message: String,
     },
@@ -138,7 +139,7 @@ impl Display for ResolveError {
                 )?;
             }
             ResolveErrorKind::CannotReturnVoid { expected } => {
-                write!(f, "Cannot return 'void', expected '{}'", expected,)?;
+                write!(f, "Cannot return 'void', expected '{}'", expected)?;
             }
             ResolveErrorKind::UnrepresentableInteger { value } => {
                 write!(
@@ -212,9 +213,6 @@ impl Display for ResolveError {
             ResolveErrorKind::FieldDoesNotExist { field_name } => {
                 write!(f, "Field '{}' does not exist", field_name)?;
             }
-            ResolveErrorKind::Other { message } => {
-                write!(f, "{}", message)?;
-            }
             ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type } => {
                 write!(
                     f,
@@ -258,6 +256,12 @@ impl Display for ResolveError {
                     0..=4 => write!(f, "Mismatching yielded types - {}", got)?,
                     _ => write!(f, "Mismatching yielded types - {}, ...", got)?,
                 }
+            }
+            ResolveErrorKind::StringTypeNotDefined => {
+                write!(f, "String type not defined")?;
+            }
+            ResolveErrorKind::Other { message } => {
+                write!(f, "{}", message)?;
             }
         }
 

@@ -337,6 +337,7 @@ pub enum ExpressionKind {
     Boolean(bool),
     Integer(BigInt),
     Float(f64),
+    String(String),
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),

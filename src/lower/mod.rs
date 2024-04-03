@@ -393,6 +393,11 @@ fn lower_expression(
         ExpressionKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),
         )),
+        ExpressionKind::String(_value) => {
+            unimplemented!(
+                "String literals are not fully implemented yet, still need ability to lower"
+            )
+        }
         ExpressionKind::Call(call) => {
             let mut arguments = vec![];
 

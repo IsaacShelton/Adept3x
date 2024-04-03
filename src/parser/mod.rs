@@ -570,6 +570,13 @@ where
                 ),
                 self.source(location),
             )),
+            TokenKind::String(StringLiteral {
+                modifier: StringModifier::Normal,
+                ..
+            }) => Ok(Expression::new(
+                ExpressionKind::String(self.input.advance().kind.unwrap_string().value),
+                self.source(location),
+            )),
             TokenKind::OpenParen => {
                 self.input.advance().kind.unwrap_open_paren();
                 let inner = self.parse_expression()?;

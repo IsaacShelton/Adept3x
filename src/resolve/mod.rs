@@ -845,6 +845,25 @@ fn resolve_expression(
                 source,
             ),
         )),
+        ast::ExpressionKind::String(value) => {
+            let resolved_type = type_search_context.find_type_or_error("String", source)?;
+
+            let structure_ref = match resolved_type {
+                resolved::Type::Structure(_, structure_ref) => structure_ref,
+                _ => {
+                    return Err(ResolveError::new(
+                        resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::StringTypeNotDefined,
+                    ))
+                }
+            };
+
+            Ok(TypedExpression::new(
+                resolved::Type::Structure("String".into(), *structure_ref),
+                resolved::Expression::new(resolved::ExpressionKind::String(value.clone()), source),
+            ))
+        }
         ast::ExpressionKind::Call(call) => {
             let function_ref =
                 function_search_context.find_function_or_error(&call.function_name, source)?;
