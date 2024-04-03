@@ -588,8 +588,9 @@ where
                 TokenKind::OpenCurly => {
                     let next_three = self
                         .input
-                        .peek_n(3)
+                        .peek_n(5)
                         .iter()
+                        .skip(2)
                         .map(|token| &token.kind)
                         .collect_vec();
 

@@ -1285,8 +1285,10 @@ fn resolve_expression(
                             return Err(ResolveError::new(
                                 resolved_ast.source_file_cache,
                                 ast_type.source,
-                                ResolveErrorKind::FieldDoesNotExist {
+                                ResolveErrorKind::ExpectedTypeForField {
+                                    structure: ast_type.to_string(),
                                     field_name: name.to_string(),
+                                    expected: field.resolved_type.to_string(),
                                 },
                             ))
                         }

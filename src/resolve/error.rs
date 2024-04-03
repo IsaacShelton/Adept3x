@@ -106,6 +106,11 @@ pub enum ResolveErrorKind {
         got: Vec<String>,
     },
     StringTypeNotDefined,
+    ExpectedTypeForField {
+        structure: String,
+        field_name: String,
+        expected: String,
+    },
     Other {
         message: String,
     },
@@ -259,6 +264,13 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::StringTypeNotDefined => {
                 write!(f, "String type not defined")?;
+            }
+            ResolveErrorKind::ExpectedTypeForField {
+                structure,
+                field_name,
+                expected,
+            } => {
+                write!(f, "Expected value of type '{}' for field '{}' of '{}'", expected, field_name, structure)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
