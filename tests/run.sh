@@ -34,6 +34,8 @@ compile late_initialization
 compile math_floats
 compile math_simple
 compile member_pod
+compile nested_expressions
+compile reference_counted
 compile return
 compile return_message
 compile signed_unsigned_promotion

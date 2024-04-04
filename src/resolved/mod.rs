@@ -111,7 +111,7 @@ pub enum Type {
     Pointer(Box<Type>),
     PlainOldData(String, StructureRef),
     Void,
-    Structure(String, StructureRef),
+    ManagedStructure(String, StructureRef),
 }
 
 impl Type {
@@ -129,7 +129,7 @@ impl Type {
             Type::Pointer(_) => None,
             Type::PlainOldData(_, _) => None,
             Type::Void => None,
-            Type::Structure(_, _) => None,
+            Type::ManagedStructure(_, _) => None,
         }
     }
 }
@@ -170,7 +170,7 @@ impl Display for Type {
                 write!(f, "pod<{}>", name)?;
             }
             Type::Void => f.write_str("void")?,
-            Type::Structure(name, _) => f.write_str(name)?,
+            Type::ManagedStructure(name, _) => f.write_str(name)?,
         }
 
         Ok(())
@@ -259,6 +259,12 @@ impl Expression {
 }
 
 #[derive(Clone, Debug)]
+pub enum MemoryManagement {
+    None,
+    ReferenceCounted,
+}
+
+#[derive(Clone, Debug)]
 pub enum ExpressionKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),
@@ -277,8 +283,12 @@ pub enum ExpressionKind {
     BinaryOperation(Box<BinaryOperation>),
     IntegerExtend(Box<Expression>, Type),
     FloatExtend(Box<Expression>, Type),
-    Member(Destination, StructureRef, usize, Type),
-    StructureLiteral(Type, IndexMap<String, (Expression, usize)>),
+    Member(Destination, StructureRef, usize, Type, MemoryManagement),
+    StructureLiteral {
+        structure_type: Type,
+        fields: IndexMap<String, (Expression, usize)>,
+        memory_management: MemoryManagement,
+    },
     UnaryOperator(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
@@ -338,7 +348,13 @@ pub struct Destination {
 pub enum DestinationKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),
-    Member(Box<Destination>, StructureRef, usize, Type),
+    Member(
+        Box<Destination>,
+        StructureRef,
+        usize,
+        Type,
+        MemoryManagement,
+    ),
 }
 
 impl TryFrom<Expression> for Destination {
@@ -359,9 +375,19 @@ impl TryFrom<ExpressionKind> for DestinationKind {
         match value {
             ExpressionKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
             ExpressionKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
-            ExpressionKind::Member(destination, structure_ref, index, ir_type) => Ok(
-                DestinationKind::Member(Box::new(destination), structure_ref, index, ir_type),
-            ),
+            ExpressionKind::Member(
+                destination,
+                structure_ref,
+                index,
+                ir_type,
+                memory_management,
+            ) => Ok(DestinationKind::Member(
+                Box::new(destination),
+                structure_ref,
+                index,
+                ir_type,
+                memory_management,
+            )),
             _ => Err(()),
         }
     }

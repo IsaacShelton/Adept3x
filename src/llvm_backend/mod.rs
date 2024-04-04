@@ -28,11 +28,25 @@ use ir::{FloatOrSign, IntegerSign};
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAddIncoming, LLVMAppendBasicBlock, LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildArrayMalloc, LLVMBuildBr, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFAdd, LLVMBuildFCmp, LLVMBuildFDiv, LLVMBuildFMul, LLVMBuildFNeg, LLVMBuildFRem, LLVMBuildFSub, LLVMBuildFree, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMalloc, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildPhi, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType
+        LLVMAddFunction, LLVMAddGlobal, LLVMAddIncoming, LLVMAppendBasicBlock, LLVMBuildAShr,
+        LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildArrayMalloc, LLVMBuildBr,
+        LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFAdd, LLVMBuildFCmp,
+        LLVMBuildFDiv, LLVMBuildFMul, LLVMBuildFNeg, LLVMBuildFRem, LLVMBuildFSub, LLVMBuildFree,
+        LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull,
+        LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMalloc, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot,
+        LLVMBuildOr, LLVMBuildPhi, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl,
+        LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable,
+        LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType,
+        LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type,
+        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd,
+        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
+        LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
-        LLVMABISizeOfType, LLVMSetModuleDataLayout, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets
+        LLVMABISizeOfType, LLVMSetModuleDataLayout, LLVM_InitializeAllAsmParsers,
+        LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs,
+        LLVM_InitializeAllTargets,
     },
     target_machine::{
         LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMGetDefaultTargetTriple,
@@ -254,7 +268,7 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Compile
                     *llvm_basicblock,
                     *skeleton,
                     &basicblocks,
-                );
+                )?;
             }
 
             for relocation in builder.take_phi_relocations().iter() {
@@ -291,7 +305,7 @@ unsafe fn create_function_block(
     mut llvm_basicblock: LLVMBasicBlockRef,
     function_skeleton: LLVMValueRef,
     basicblocks: &[(usize, &ir::BasicBlock, LLVMBasicBlockRef)],
-) {
+) -> Result<(), CompilerError> {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
 
     for instruction in ir_basicblock.iter() {
@@ -313,12 +327,21 @@ unsafe fn create_function_block(
             )),
             Instruction::Malloc(ir_type) => {
                 let backend_type = to_backend_type(ctx, ir_type);
-                Some(LLVMBuildMalloc(builder.get(), backend_type, cstr!("").as_ptr()))
+                Some(LLVMBuildMalloc(
+                    builder.get(),
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::MallocArray(ir_type, count) => {
                 let backend_type = to_backend_type(ctx, ir_type);
                 let count = build_value(ctx.backend_module, value_catalog, builder, count);
-                Some(LLVMBuildArrayMalloc(builder.get(), backend_type, count, cstr!("").as_ptr()))
+                Some(LLVMBuildArrayMalloc(
+                    builder.get(),
+                    backend_type,
+                    count,
+                    cstr!("").as_ptr(),
+                ))
             }
             Instruction::Free(value) => {
                 let backend_value = build_value(ctx.backend_module, value_catalog, builder, value);
@@ -742,14 +765,20 @@ unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::Member(pointer_value, structure_ref, index) => {
+            Instruction::Member(pointer_value, ir_type, index) => {
                 let pointer =
                     build_value(ctx.backend_module, value_catalog, builder, pointer_value);
 
-                let backend_type = *ctx
-                    .structure_cache
-                    .get(structure_ref)
-                    .expect("referenced structure to exist");
+                let backend_type = match ir_type {
+                    ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
+                        to_backend_type(ctx, ir_type)
+                    }
+                    _ => {
+                        return Err(CompilerError::during_backend(
+                            "cannot use member instruction on non-structure",
+                        ))
+                    }
+                };
 
                 let mut indices = [
                     LLVMConstInt(LLVMInt32Type(), 0, true.into()),
@@ -843,6 +872,8 @@ unsafe fn create_function_block(
 
         value_catalog.push(ir_basicblock_id, result);
     }
+
+    Ok(())
 }
 
 unsafe fn get_function_type(ctx: &BackendContext, function: &ir::Function) -> LLVMTypeRef {

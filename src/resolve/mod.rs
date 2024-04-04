@@ -7,8 +7,8 @@ mod variable_search_context;
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
     resolved::{
-        self, Branch, Destination, FloatOrInteger, FloatOrSign, NumericMode, TypedExpression,
-        VariableStorage,
+        self, Branch, Destination, FloatOrInteger, FloatOrSign, MemoryManagement, NumericMode,
+        TypedExpression, VariableStorage,
     },
     source_file_cache::SourceFileCache,
 };
@@ -76,7 +76,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_packed: structure.is_packed,
             });
 
-            let resolved_type = resolved::Type::Structure(structure.name.clone(), structure_key);
+            let resolved_type =
+                resolved::Type::ManagedStructure(structure.name.clone(), structure_key);
             type_search_context.put(structure.name.clone(), resolved_type);
         }
 
@@ -849,7 +850,7 @@ fn resolve_expression(
             let resolved_type = type_search_context.find_type_or_error("String", source)?;
 
             let structure_ref = match resolved_type {
-                resolved::Type::Structure(_, structure_ref) => structure_ref,
+                resolved::Type::ManagedStructure(_, structure_ref) => structure_ref,
                 _ => {
                     return Err(ResolveError::new(
                         resolved_ast.source_file_cache,
@@ -860,7 +861,7 @@ fn resolve_expression(
             };
 
             Ok(TypedExpression::new(
-                resolved::Type::Structure("String".into(), *structure_ref),
+                resolved::Type::ManagedStructure("String".into(), *structure_ref),
                 resolved::Expression::new(resolved::ExpressionKind::String(value.clone()), source),
             ))
         }
@@ -1165,8 +1166,13 @@ fn resolve_expression(
                 Initialized::Require,
             )?;
 
-            let structure_ref = match resolved_subject.resolved_type {
-                resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
+            let (structure_ref, memory_management) = match resolved_subject.resolved_type {
+                resolved::Type::PlainOldData(_, structure_ref) => {
+                    (structure_ref, MemoryManagement::None)
+                }
+                resolved::Type::ManagedStructure(_, structure_ref) => {
+                    (structure_ref, MemoryManagement::ReferenceCounted)
+                }
                 _ => {
                     return Err(ResolveError::new(
                         resolved_ast.source_file_cache,
@@ -1222,6 +1228,7 @@ fn resolve_expression(
                         structure_ref,
                         index,
                         found_field.resolved_type.clone(),
+                        memory_management,
                     ),
                     ast_expression.source,
                 ),
@@ -1234,9 +1241,16 @@ fn resolve_expression(
                 ast_type,
             )?;
 
-            let structure_ref =
-                match resolved_type {
-                    resolved::Type::PlainOldData(_, structure_ref) => structure_ref,
+            let (name, structure_ref, memory_management) =
+                match &resolved_type {
+                    resolved::Type::PlainOldData(name, structure_ref) => {
+                        (name, *structure_ref, resolved::MemoryManagement::None)
+                    }
+                    resolved::Type::ManagedStructure(name, structure_ref) => (
+                        name,
+                        *structure_ref,
+                        resolved::MemoryManagement::ReferenceCounted,
+                    ),
                     _ => return Err(ResolveError::new(
                         resolved_ast.source_file_cache,
                         ast_type.source,
@@ -1246,6 +1260,7 @@ fn resolve_expression(
                     )),
                 };
 
+            let structure_type = resolved::Type::PlainOldData(name.clone(), structure_ref);
             let mut resolved_fields = IndexMap::new();
 
             for (name, value) in fields.iter() {
@@ -1322,7 +1337,11 @@ fn resolve_expression(
             Ok(TypedExpression::new(
                 resolved_type.clone(),
                 resolved::Expression::new(
-                    resolved::ExpressionKind::StructureLiteral(resolved_type, resolved_fields),
+                    resolved::ExpressionKind::StructureLiteral {
+                        structure_type,
+                        fields: resolved_fields,
+                        memory_management,
+                    },
                     ast_type.source,
                 ),
             ))
@@ -1589,7 +1608,7 @@ fn resolve_type(
                     .cloned()?;
 
                 let structure_ref = match resolved_inner_type {
-                    resolved::Type::Structure(_, structure_ref) => structure_ref,
+                    resolved::Type::ManagedStructure(_, structure_ref) => structure_ref,
                     _ => {
                         return Err(ResolveError::new(
                             source_file_cache,

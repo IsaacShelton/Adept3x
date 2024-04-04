@@ -255,7 +255,9 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
         }),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
         resolved::Type::Void => Ok(ir::Type::Void),
-        resolved::Type::Structure(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
+        resolved::Type::ManagedStructure(_, structure_ref) => {
+            Ok(ir::Type::Structure(*structure_ref).reference_counted_pointer())
+        }
         resolved::Type::PlainOldData(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
     }
 }
@@ -278,11 +280,29 @@ fn lower_destination(
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
             Ok(pointer)
         }
-        DestinationKind::Member(destination, structure_ref, index, _) => {
+        DestinationKind::Member(destination, structure_ref, index, _, memory_management) => {
             let subject_pointer = lower_destination(builder, ir_module, destination)?;
+
+            let subject_pointer = match memory_management {
+                resolved::MemoryManagement::None => subject_pointer,
+                resolved::MemoryManagement::ReferenceCounted => {
+                    // Load pointer from pointed object
+
+                    let container =
+                        ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
+
+                    let subject_pointer = builder.push(ir::Instruction::Load((
+                        subject_pointer,
+                        container.pointer(),
+                    )));
+
+                    builder.push(ir::Instruction::Member(subject_pointer, container, 1))
+                }
+            };
+
             Ok(builder.push(ir::Instruction::Member(
                 subject_pointer,
-                *structure_ref,
+                ir::Type::Structure(*structure_ref),
                 *index,
             )))
         }
@@ -568,24 +588,53 @@ fn lower_expression(
             let ir_type = lower_type(resolved_type)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
-        ExpressionKind::Member(subject_destination, structure_ref, index, resolved_type) => {
+        ExpressionKind::Member(
+            subject_destination,
+            structure_ref,
+            index,
+            resolved_type,
+            memory_management,
+        ) => {
             let subject_pointer = lower_destination(builder, ir_module, subject_destination)?;
+
+            let subject_pointer = match memory_management {
+                resolved::MemoryManagement::None => subject_pointer,
+                resolved::MemoryManagement::ReferenceCounted => {
+                    // Load pointer from pointed object
+
+                    let container =
+                        ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
+
+                    let subject_pointer = builder.push(ir::Instruction::Load((
+                        subject_pointer,
+                        container.pointer(),
+                    )));
+
+                    builder.push(ir::Instruction::Member(subject_pointer, container, 1))
+                }
+            };
+
             let member = builder.push(ir::Instruction::Member(
                 subject_pointer,
-                *structure_ref,
+                ir::Type::Structure(*structure_ref),
                 *index,
             ));
+
             let ir_type = lower_type(resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
-        ExpressionKind::StructureLiteral(resolved_type, fields) => {
-            let ir_type = lower_type(resolved_type)?;
+        ExpressionKind::StructureLiteral {
+            structure_type,
+            fields,
+            memory_management,
+        } => {
+            let ir_type = lower_type(structure_type)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
             for (expression, index) in fields.values() {
-                let value = lower_expression(builder, ir_module, expression, function)?;
-                values.push((index, value));
+                let ir_value = lower_expression(builder, ir_module, expression, function)?;
+                values.push((index, ir_value));
             }
 
             // Sort resulting values by index
@@ -594,7 +643,44 @@ fn lower_expression(
             // Drop the index part of the values
             let values = values.drain(..).map(|(_, value)| value).collect();
 
-            Ok(builder.push(ir::Instruction::StructureLiteral(ir_type, values)))
+            match memory_management {
+                resolved::MemoryManagement::None => {
+                    Ok(builder.push(ir::Instruction::StructureLiteral(ir_type, values)))
+                }
+                resolved::MemoryManagement::ReferenceCounted => {
+                    let flat =
+                        builder.push(ir::Instruction::StructureLiteral(ir_type.clone(), values));
+
+                    let container = ir_type.reference_counted_no_pointer();
+                    let heap_memory = builder.push(ir::Instruction::Malloc(container.clone()));
+
+                    // TODO: Assert that malloc didn't return NULL
+
+                    let at_reference_count = builder.push(ir::Instruction::Member(
+                        heap_memory.clone(),
+                        container.clone(),
+                        0,
+                    ));
+
+                    let at_value = builder.push(ir::Instruction::Member(
+                        heap_memory.clone(),
+                        container.clone(),
+                        1,
+                    ));
+
+                    builder.push(ir::Instruction::Store(ir::Store {
+                        source: flat.clone(),
+                        destination: at_reference_count,
+                    }));
+
+                    builder.push(ir::Instruction::Store(ir::Store {
+                        source: flat,
+                        destination: at_value,
+                    }));
+
+                    Ok(heap_memory)
+                }
+            }
         }
         ExpressionKind::UnaryOperator(unary_operation) => {
             let inner = lower_expression(

@@ -1,5 +1,5 @@
 use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
-use derive_more::{Deref, DerefMut};
+use derive_more::{Deref, DerefMut, IsVariant};
 use std::{collections::HashMap, ffi::CString};
 
 pub use crate::resolved::{FloatOrSign, IntegerSign};
@@ -107,7 +107,7 @@ pub enum Instruction {
     FloatExtend(Value, Type),
     Truncate(Value, Type),
     TruncateFloat(Value, Type),
-    Member(Value, StructureRef, usize),
+    Member(Value, Type, usize),
     StructureLiteral(Type, Vec<Value>),
     IsZero(Value),
     IsNotZero(Value),
@@ -166,7 +166,7 @@ pub struct Store {
     pub destination: Value,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, IsVariant)]
 pub enum Type {
     Pointer(Box<Type>),
     Boolean,
@@ -187,11 +187,40 @@ pub enum Type {
     UntypedEnum(TypeUntypedEnum),
 }
 
+impl Type {
+    pub fn pointer(&self) -> Self {
+        Type::Pointer(Box::new(self.clone()))
+    }
+
+    pub fn reference_counted_pointer(&self) -> Self {
+        // Don't allow wrapping pointer values with reference counting
+        // This will catch us if we accidently nest more than once
+        assert!(!self.is_pointer());
+
+        Type::Pointer(Box::new(self.reference_counted_no_pointer()))
+    }
+
+    pub fn reference_counted_no_pointer(&self) -> Self {
+        let subtypes = vec![
+            // Reference count
+            Type::U64,
+            // Value
+            self.clone(),
+        ];
+
+        Type::AnonymousComposite(TypeComposite {
+            subtypes,
+            is_packed: false,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeComposite {
     pub subtypes: Vec<Type>,
     pub is_packed: bool,
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeFunction {
     pub parameters: Vec<Type>,
