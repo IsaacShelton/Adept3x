@@ -66,17 +66,21 @@ where
                 let location = *location;
                 self.characters.next();
 
-                return Has(Token::new(
-                    match self.characters.peek_n(3) {
-                        [('<', _), ('<', _), ('=', _), ..] => TokenKind::LogicalLeftShiftAssign,
-                        [('<', _), ('<', _), ..] => TokenKind::LogicalLeftShift,
-                        [('<', _), ('=', _), ..] => TokenKind::LeftShiftAssign,
-                        [('<', _), ..] => TokenKind::LeftShift,
-                        [('=', _), ..] => TokenKind::LessThanEq,
-                        _ => TokenKind::LessThan,
-                    },
-                    location,
-                ));
+                // TODO: CLEANUP: This could be better
+                let (token_kind, num_extra_chars) = match self.characters.peek_n(3) {
+                    [('<', _), ('<', _), ('=', _), ..] => (TokenKind::LogicalLeftShiftAssign, 3),
+                    [('<', _), ('<', _), ..] => (TokenKind::LogicalLeftShift, 2),
+                    [('<', _), ('=', _), ..] => (TokenKind::LeftShiftAssign, 2),
+                    [('<', _), ..] => (TokenKind::LeftShift, 1),
+                    [('=', _), ..] => (TokenKind::LessThanEq, 1),
+                    _ => (TokenKind::LessThan, 0),
+                };
+
+                for _ in 0..num_extra_chars {
+                    self.characters.next();
+                }
+
+                return Has(Token::new(token_kind, location));
             }
         }
 
