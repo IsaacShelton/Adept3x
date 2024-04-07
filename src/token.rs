@@ -82,6 +82,18 @@ pub enum TokenKind {
     Ellipsis,
     DeclareAssign,
     Assign,
+    AddAssign,
+    SubtractAssign,
+    MultiplyAssign,
+    DivideAssign,
+    ModulusAssign,
+    AmpersandAssign,
+    PipeAssign,
+    CaretAssign,
+    LeftShiftAssign,
+    RightShiftAssign,
+    LogicalLeftShiftAssign,
+    LogicalRightShiftAssign,
     And,
     Or,
     Ampersand,
@@ -142,6 +154,18 @@ impl Display for TokenKind {
             TokenKind::Ellipsis => "'...'",
             TokenKind::DeclareAssign => "':='",
             TokenKind::Assign => "'='",
+            TokenKind::AddAssign => "'+='",
+            TokenKind::SubtractAssign => "'-='",
+            TokenKind::MultiplyAssign => "'*='",
+            TokenKind::DivideAssign => "'/='",
+            TokenKind::ModulusAssign => "'%='",
+            TokenKind::AmpersandAssign => "'&='",
+            TokenKind::PipeAssign => "'|='",
+            TokenKind::CaretAssign => "'^='",
+            TokenKind::LeftShiftAssign => "'<<='",
+            TokenKind::RightShiftAssign => "'>>='",
+            TokenKind::LogicalLeftShiftAssign => "'<<<='",
+            TokenKind::LogicalRightShiftAssign => "'>>>='",
             TokenKind::And => "'&&'",
             TokenKind::Or => "'||'",
             TokenKind::Ampersand => "'&'",
@@ -187,8 +211,20 @@ impl TokenKind {
             TokenKind::Pipe => 5,
             TokenKind::And => 4,
             TokenKind::Or => 3,
-            TokenKind::DeclareAssign => 1,
-            TokenKind::Assign => 1,
+            TokenKind::DeclareAssign
+            | TokenKind::AddAssign
+            | TokenKind::SubtractAssign
+            | TokenKind::MultiplyAssign
+            | TokenKind::DivideAssign
+            | TokenKind::ModulusAssign
+            | TokenKind::AmpersandAssign
+            | TokenKind::PipeAssign
+            | TokenKind::CaretAssign
+            | TokenKind::LeftShiftAssign
+            | TokenKind::RightShiftAssign
+            | TokenKind::LogicalLeftShiftAssign
+            | TokenKind::LogicalRightShiftAssign
+            | TokenKind::Assign => 1,
 
             TokenKind::EndOfFile
             | TokenKind::Error(_)

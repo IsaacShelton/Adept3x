@@ -36,8 +36,9 @@ where
             }
         }
 
-        // TODO: Find better solution
-        &self.buffer.make_contiguous()[0..count]
+        // TODO: CLEANUP: Find better solution
+        let contiguous = self.buffer.make_contiguous();
+        &contiguous[..contiguous.len().max(count)]
     }
 
     pub fn peek_nth<'a>(&'a mut self, index: usize) -> Option<&'a I::Item> {

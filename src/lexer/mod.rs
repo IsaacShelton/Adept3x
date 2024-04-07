@@ -58,26 +58,25 @@ where
         while let Some((' ', _)) = self.characters.peek() {
             self.characters.next();
 
-            // Special case for comparison operators '<' and '<='
+            // Special case for operators '<', '<=', etc.
+            // These require a preceeding space right now, but might be made more permissive later.
+            // (at the very least '<' needs a preceeding space to disambiguate between less-than and left-angle)
+            // (this seems to be the best syntax trade off as everybody uses a preceeding space anyway)
             if let Some(('<', location)) = self.characters.peek() {
                 let location = *location;
                 self.characters.next();
 
-                if let Some(('=', _)) = self.characters.peek() {
-                    self.characters.next();
-                    return Has(Token::new(TokenKind::LessThanEq, location));
-                } else if let Some(('<', _)) = self.characters.peek() {
-                    self.characters.next();
-
-                    if let Some(('<', _)) = self.characters.peek() {
-                        self.characters.next();
-                        return Has(Token::new(TokenKind::LogicalLeftShift, location));
-                    } else {
-                        return Has(Token::new(TokenKind::LeftShift, location));
-                    }
-                } else {
-                    return Has(Token::new(TokenKind::LessThan, location));
-                }
+                return Has(Token::new(
+                    match self.characters.peek_n(3) {
+                        [('<', _), ('<', _), ('=', _), ..] => TokenKind::LogicalLeftShiftAssign,
+                        [('<', _), ('<', _), ..] => TokenKind::LogicalLeftShift,
+                        [('<', _), ('=', _), ..] => TokenKind::LeftShiftAssign,
+                        [('<', _), ..] => TokenKind::LeftShift,
+                        [('=', _), ..] => TokenKind::LessThanEq,
+                        _ => TokenKind::LessThan,
+                    },
+                    location,
+                ));
             }
         }
 
@@ -166,11 +165,46 @@ where
                         Has(Token::new(TokenKind::Member, location))
                     }
                 }
-                '+' => Has(Token::new(TokenKind::Add, location)),
-                '-' => Has(Token::new(TokenKind::Subtract, location)),
-                '*' => Has(Token::new(TokenKind::Multiply, location)),
-                '/' => Has(Token::new(TokenKind::Divide, location)),
-                '%' => Has(Token::new(TokenKind::Modulus, location)),
+                '+' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::AddAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Add, location))
+                    }
+                }
+                '-' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::SubtractAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Subtract, location))
+                    }
+                }
+                '*' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::MultiplyAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Multiply, location))
+                    }
+                }
+                '/' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::DivideAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Divide, location))
+                    }
+                }
+                '%' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::ModulusAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Modulus, location))
+                    }
+                }
                 '=' if self.characters.peek().is_character('=') => {
                     self.characters.next();
                     Has(Token::new(TokenKind::Equals, location))
@@ -184,10 +218,28 @@ where
                     self.characters.next();
                     Has(Token::new(TokenKind::GreaterThanEq, location))
                 }
-                '>' if self.characters.peek().is_character('>') && self.characters.peek_nth(1).is_character('>') => {
+                '>' if self.characters.peek().is_character('>')
+                    && self.characters.peek_nth(1).is_character('>')
+                    && self.characters.peek_nth(2).is_character('=') =>
+                {
+                    self.characters.next();
+                    self.characters.next();
+                    self.characters.next();
+                    Has(Token::new(TokenKind::LogicalRightShiftAssign, location))
+                }
+                '>' if self.characters.peek().is_character('>')
+                    && self.characters.peek_nth(1).is_character('>') =>
+                {
                     self.characters.next();
                     self.characters.next();
                     Has(Token::new(TokenKind::LogicalRightShift, location))
+                }
+                '>' if self.characters.peek().is_character('>')
+                    && self.characters.peek_nth(1).is_character('=') =>
+                {
+                    self.characters.next();
+                    self.characters.next();
+                    Has(Token::new(TokenKind::RightShiftAssign, location))
                 }
                 '>' if self.characters.peek().is_character('>') => {
                     self.characters.next();
@@ -197,9 +249,30 @@ where
                 '<' => Has(Token::new(TokenKind::OpenAngle, location)),
                 '!' => Has(Token::new(TokenKind::Not, location)),
                 '~' => Has(Token::new(TokenKind::BitComplement, location)),
-                '&' => Has(Token::new(TokenKind::Ampersand, location)),
-                '|' => Has(Token::new(TokenKind::Pipe, location)),
-                '^' => Has(Token::new(TokenKind::Caret, location)),
+                '&' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::AmpersandAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Ampersand, location))
+                    }
+                }
+                '|' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::PipeAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Pipe, location))
+                    }
+                }
+                '^' => {
+                    if self.characters.peek().is_character('=') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::CaretAssign, location))
+                    } else {
+                        Has(Token::new(TokenKind::Caret, location))
+                    }
+                }
                 ',' => Has(Token::new(TokenKind::Comma, location)),
                 ':' if self.characters.peek().is_character('=') => {
                     self.characters.next();
