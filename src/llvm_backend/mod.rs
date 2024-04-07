@@ -765,13 +765,13 @@ unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::Member(pointer_value, ir_type, index) => {
+            Instruction::Member(pointer_value, structure_ir_type, index) => {
                 let pointer =
                     build_value(ctx.backend_module, value_catalog, builder, pointer_value);
 
-                let backend_type = match ir_type {
+                let backend_type = match structure_ir_type {
                     ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
-                        to_backend_type(ctx, ir_type)
+                        to_backend_type(ctx, structure_ir_type)
                     }
                     _ => {
                         return Err(CompilerError::during_backend(

@@ -194,7 +194,7 @@ impl Type {
 
     pub fn reference_counted_pointer(&self) -> Self {
         // Don't allow wrapping pointer values with reference counting
-        // This will catch us if we accidently nest more than once
+        // This will catch us if we accidentally nest more than once
         assert!(!self.is_pointer());
 
         Type::Pointer(Box::new(self.reference_counted_no_pointer()))

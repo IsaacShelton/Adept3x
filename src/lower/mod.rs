@@ -628,7 +628,7 @@ fn lower_expression(
             fields,
             memory_management,
         } => {
-            let ir_type = lower_type(structure_type)?;
+            let result_ir_type = lower_type(structure_type)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
@@ -645,13 +645,15 @@ fn lower_expression(
 
             match memory_management {
                 resolved::MemoryManagement::None => {
-                    Ok(builder.push(ir::Instruction::StructureLiteral(ir_type, values)))
+                    Ok(builder.push(ir::Instruction::StructureLiteral(result_ir_type, values)))
                 }
                 resolved::MemoryManagement::ReferenceCounted => {
-                    let flat =
-                        builder.push(ir::Instruction::StructureLiteral(ir_type.clone(), values));
+                    let flat = builder.push(ir::Instruction::StructureLiteral(
+                        result_ir_type.clone(),
+                        values,
+                    ));
 
-                    let container = ir_type.reference_counted_no_pointer();
+                    let container = result_ir_type.reference_counted_no_pointer();
                     let heap_memory = builder.push(ir::Instruction::Malloc(container.clone()));
 
                     // TODO: Assert that malloc didn't return NULL
