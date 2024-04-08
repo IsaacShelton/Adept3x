@@ -26,6 +26,7 @@ compile if
 compile if_elif_else
 compile if_eval
 compile integer_and_float_literals_combining
+compile integer_hex_literals
 compile integer_literal_conforming
 compile integer_signed_overflow
 compile integer_unsigned_overflow
