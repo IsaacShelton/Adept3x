@@ -24,6 +24,7 @@ use llvm_backend::llvm_backend;
 use lower::lower;
 use parser::parse;
 use resolve::resolve;
+use std::fs::metadata;
 use std::path::Path;
 use std::process::exit;
 
@@ -45,12 +46,19 @@ fn build_project(build_command: BuildCommand) {
 
     let filepath = Path::new(&filename);
 
-    if !filepath.is_file() {
-        eprintln!("Expected filename to be path to file");
-        exit(1);
-    }
+    let project_folder = match metadata(filepath) {
+        Ok(metadata) if metadata.is_dir() => {
+            unimplemented!("compiling folder");
+        }
+        _ => {
+            if !filepath.is_file() {
+                eprintln!("Expected filename to be path to file");
+                exit(1);
+            }
 
-    let project_folder = filepath.parent().unwrap();
+            filepath.parent().unwrap()
+        }
+    };
 
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");

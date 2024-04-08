@@ -10,7 +10,7 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
+        self, ArrayAccess, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
         DeclareAssign, Expression, ExpressionKind, Field, File, FileIdentifier, Function, Global,
         Parameter, Parameters, Source, Statement, StatementKind, Structure, Type, TypeKind,
         UnaryOperation, UnaryOperator, While,
@@ -698,6 +698,7 @@ where
 
             match self.input.peek().kind {
                 TokenKind::Member => base = self.parse_member(base)?,
+                TokenKind::OpenBracket => base = self.parse_array_access(base)?,
                 _ => break,
             }
         }
@@ -714,6 +715,24 @@ where
 
         Ok(Expression::new(
             ExpressionKind::Member(Box::new(subject), field_name),
+            self.source(location),
+        ))
+    }
+
+    fn parse_array_access(&mut self, subject: Expression) -> Result<Expression, ParseError> {
+        // subject[index]
+        //        ^
+
+        let location = self.parse_token(TokenKind::OpenBracket, Some("for array access"))?;
+
+        self.ignore_newlines();
+        let index = self.parse_expression()?;
+        self.ignore_newlines();
+
+        self.parse_token(TokenKind::CloseBracket, Some("to close array access"))?;
+
+        Ok(Expression::new(
+            ExpressionKind::ArrayAccess(Box::new(ArrayAccess { subject, index })),
             self.source(location),
         ))
     }

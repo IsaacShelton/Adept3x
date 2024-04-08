@@ -343,10 +343,17 @@ pub enum ExpressionKind {
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
     Member(Box<Expression>, String),
+    ArrayAccess(Box<ArrayAccess>),
     StructureLiteral(Type, IndexMap<String, Expression>),
     UnaryOperator(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
+}
+
+#[derive(Clone, Debug)]
+pub struct ArrayAccess {
+    pub subject: Expression,
+    pub index: Expression,
 }
 
 #[derive(Clone, Debug)]

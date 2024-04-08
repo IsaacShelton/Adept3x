@@ -118,7 +118,7 @@ impl Display for TokenKind {
             TokenKind::CloseCurly => "'}'",
             TokenKind::OpenParen => "'('",
             TokenKind::CloseParen => "')'",
-            TokenKind::OpenBracket => "']'",
+            TokenKind::OpenBracket => "'['",
             TokenKind::CloseBracket => "']'",
             TokenKind::String { .. } => "'string'",
             TokenKind::Integer { .. } => "'integer'",

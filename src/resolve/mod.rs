@@ -7,8 +7,7 @@ mod variable_search_context;
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
     resolved::{
-        self, Branch, Destination, FloatOrInteger, FloatOrSign, MemoryManagement, NumericMode,
-        TypedExpression, VariableStorage,
+        self, Branch, Destination, FloatOrInteger, FloatOrSign, MemoryManagement, NumericMode, TypedExpression, VariableStorage
     },
     source_file_cache::SourceFileCache,
 };
@@ -76,8 +75,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_packed: structure.is_packed,
             });
 
-            let resolved_type =
-                resolved::Type::ManagedStructure(structure.name.clone(), structure_key);
+            let resolved_type = resolved::Type::ManagedStructure(structure.name.clone(), structure_key);
             type_search_context.put(structure.name.clone(), resolved_type);
         }
 
@@ -1167,12 +1165,10 @@ fn resolve_expression(
             )?;
 
             let (structure_ref, memory_management) = match resolved_subject.resolved_type {
-                resolved::Type::PlainOldData(_, structure_ref) => {
-                    (structure_ref, MemoryManagement::None)
-                }
+                resolved::Type::PlainOldData(_, structure_ref) => (structure_ref, MemoryManagement::None),
                 resolved::Type::ManagedStructure(_, structure_ref) => {
                     (structure_ref, MemoryManagement::ReferenceCounted)
-                }
+                },
                 _ => {
                     return Err(ResolveError::new(
                         resolved_ast.source_file_cache,
@@ -1234,6 +1230,9 @@ fn resolve_expression(
                 ),
             ))
         }
+        ast::ExpressionKind::ArrayAccess(_array_access) => {
+            unimplemented!("array access resolution not implemented yet!");
+        }
         ast::ExpressionKind::StructureLiteral(ast_type, fields) => {
             let resolved_type = resolve_type(
                 type_search_context,
@@ -1246,11 +1245,9 @@ fn resolve_expression(
                     resolved::Type::PlainOldData(name, structure_ref) => {
                         (name, *structure_ref, resolved::MemoryManagement::None)
                     }
-                    resolved::Type::ManagedStructure(name, structure_ref) => (
-                        name,
-                        *structure_ref,
-                        resolved::MemoryManagement::ReferenceCounted,
-                    ),
+                    resolved::Type::ManagedStructure(name, structure_ref) => {
+                        (name, *structure_ref, resolved::MemoryManagement::ReferenceCounted)
+                    }
                     _ => return Err(ResolveError::new(
                         resolved_ast.source_file_cache,
                         ast_type.source,
