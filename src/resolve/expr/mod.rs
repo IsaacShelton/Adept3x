@@ -1,24 +1,29 @@
-use ast::{FloatSize, IntegerBits, IntegerSign};
-use indexmap::IndexMap;
-use itertools::Itertools;
-
-use crate::{
-    ast::{self, Source},
-    resolve::{
-        conform_expression, conform_expression_or_error, conform_expression_to_default,
-        conform_integer_to_default_or_error, ensure_initialized, error::ResolveErrorKind,
-        resolve_expression_to_destination, resolve_statements, resolve_type, unify_types,
-    },
-    resolved::{
-        self, Branch, FloatOrInteger, FloatOrSign, MemoryManagement, NumericMode, TypedExpression,
-    },
-};
+mod binary_operation;
+mod call;
+mod variable;
 
 use super::{
     error::ResolveError, function_search_ctx::FunctionSearchCtx,
     global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx,
     variable_search_ctx::VariableSearchCtx, Initialized,
 };
+use crate::{
+    ast::{self},
+    resolve::{
+        conform_expression, conform_expression_or_error, conform_expression_to_default,
+        conform_integer_to_default_or_error, ensure_initialized,
+        error::ResolveErrorKind,
+        expr::{
+            binary_operation::resolve_binary_operation_expression, call::resolve_call_expression,
+            variable::resolve_variable_expression,
+        },
+        resolve_expression_to_destination, resolve_statements, resolve_type, unify_types,
+    },
+    resolved::{self, Branch, MemoryManagement, TypedExpression},
+};
+use ast::FloatSize;
+use indexmap::IndexMap;
+use itertools::Itertools;
 
 pub struct ResolveExpressionCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
@@ -481,289 +486,4 @@ pub fn resolve_expression<'a>(
         }
         Initialized::AllowUninitialized => Ok(resolved_expression),
     })
-}
-
-fn resolve_variable_expression(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
-    name: &str,
-    source: Source,
-) -> Result<TypedExpression, ResolveError> {
-    if let Some((resolved_type, key)) = ctx.variable_search_ctx.find_variable(name) {
-        let function = ctx
-            .resolved_ast
-            .functions
-            .get_mut(ctx.resolved_function_ref)
-            .unwrap();
-
-        let is_initialized = function
-            .variables
-            .get(*key)
-            .expect("found variable to exist")
-            .is_initialized();
-
-        Ok(TypedExpression::new_maybe_initialized(
-            resolved_type.clone(),
-            resolved::Expression::new(
-                resolved::ExpressionKind::Variable(resolved::Variable {
-                    key: *key,
-                    resolved_type: resolved_type.clone(),
-                }),
-                source,
-            ),
-            is_initialized,
-        ))
-    } else {
-        let (resolved_type, reference) =
-            ctx.global_search_ctx.find_global_or_error(name, source)?;
-
-        Ok(TypedExpression::new(
-            resolved_type.clone(),
-            resolved::Expression::new(
-                resolved::ExpressionKind::GlobalVariable(resolved::GlobalVariable {
-                    reference: *reference,
-                    resolved_type: resolved_type.clone(),
-                }),
-                source,
-            ),
-        ))
-    }
-}
-
-fn resolve_call_expression(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
-    call: &ast::Call,
-    source: Source,
-) -> Result<TypedExpression, ResolveError> {
-    let function_ref = ctx
-        .function_search_ctx
-        .find_function_or_error(&call.function_name, source)?;
-
-    let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
-    let return_type = function.return_type.clone();
-
-    if call.arguments.len() < function.parameters.required.len() {
-        return Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::NotEnoughArgumentsToFunction {
-                name: function.name.to_string(),
-            },
-        ));
-    }
-
-    if call.arguments.len() > function.parameters.required.len()
-        && !function.parameters.is_cstyle_vararg
-    {
-        return Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::TooManyArgumentsToFunction {
-                name: function.name.to_string(),
-            },
-        ));
-    }
-
-    let mut arguments = Vec::with_capacity(call.arguments.len());
-
-    for (i, argument) in call.arguments.iter().enumerate() {
-        let mut argument = resolve_expression(ctx, argument, Initialized::Require)?;
-
-        let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
-
-        if let Some(parameter) = function.parameters.required.get(i) {
-            if let Some(conformed_argument) =
-                conform_expression(&argument, &parameter.resolved_type)
-            {
-                argument = conformed_argument;
-            } else {
-                return Err(ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    source,
-                    ResolveErrorKind::BadTypeForArgumentToFunction {
-                        expected: parameter.resolved_type.to_string(),
-                        got: argument.resolved_type.to_string(),
-                        name: function.name.clone(),
-                        i,
-                    },
-                ));
-            }
-        } else {
-            match conform_expression_to_default(argument, ctx.resolved_ast.source_file_cache) {
-                Ok(conformed_argument) => argument = conformed_argument,
-                Err(error) => return Err(error),
-            }
-        }
-
-        arguments.push(argument.expression);
-    }
-
-    Ok(TypedExpression::new(
-        return_type,
-        resolved::Expression::new(
-            resolved::ExpressionKind::Call(resolved::Call {
-                function: function_ref,
-                arguments,
-            }),
-            source,
-        ),
-    ))
-}
-
-fn float_or_integer_from_type(
-    unified_type: &resolved::Type,
-    allow_on_bools: bool,
-) -> Option<FloatOrInteger> {
-    match unified_type {
-        resolved::Type::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
-        resolved::Type::Integer { .. } => Some(FloatOrInteger::Integer),
-        resolved::Type::Float(_) => Some(FloatOrInteger::Float),
-        _ => None,
-    }
-}
-
-fn float_or_sign_from_type(
-    unified_type: &resolved::Type,
-    allow_on_bools: bool,
-) -> Option<FloatOrSign> {
-    match unified_type {
-        resolved::Type::Boolean if allow_on_bools => {
-            Some(FloatOrSign::Integer(IntegerSign::Unsigned))
-        }
-        resolved::Type::Integer { sign, .. } => Some(FloatOrSign::Integer(*sign)),
-        resolved::Type::Float(_) => Some(FloatOrSign::Float),
-        _ => None,
-    }
-}
-
-fn numeric_mode_from_type(unified_type: &resolved::Type) -> Option<NumericMode> {
-    match unified_type {
-        resolved::Type::Integer { sign, bits } => Some(match bits {
-            IntegerBits::Normal => NumericMode::CheckOverflow(*sign),
-            _ => NumericMode::Integer(*sign),
-        }),
-        resolved::Type::Float(_) => Some(NumericMode::Float),
-        _ => None,
-    }
-}
-
-fn resolve_binary_operation_expression(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
-    binary_operation: &ast::BinaryOperation,
-    source: Source,
-) -> Result<TypedExpression, ResolveError> {
-    let mut left = resolve_expression(ctx, &binary_operation.left, Initialized::Require)?;
-    let mut right = resolve_expression(ctx, &binary_operation.right, Initialized::Require)?;
-
-    let unified_type = match unify_types(&mut [&mut left, &mut right]) {
-        Some(value) => Ok(value),
-        None => Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::IncompatibleTypesForBinaryOperator {
-                operator: binary_operation.operator.to_string(),
-                left: left.resolved_type.to_string(),
-                right: right.resolved_type.to_string(),
-            },
-        )),
-    }?;
-
-    let operator =
-        match binary_operation.operator {
-            ast::BinaryOperator::Add => {
-                numeric_mode_from_type(&unified_type).map(resolved::BinaryOperator::Add)
-            }
-            ast::BinaryOperator::Subtract => {
-                numeric_mode_from_type(&unified_type).map(resolved::BinaryOperator::Subtract)
-            }
-            ast::BinaryOperator::Multiply => {
-                numeric_mode_from_type(&unified_type).map(resolved::BinaryOperator::Multiply)
-            }
-            ast::BinaryOperator::Divide => {
-                float_or_sign_from_type(&unified_type, false).map(resolved::BinaryOperator::Divide)
-            }
-            ast::BinaryOperator::Modulus => {
-                float_or_sign_from_type(&unified_type, false).map(resolved::BinaryOperator::Modulus)
-            }
-            ast::BinaryOperator::Equals => float_or_integer_from_type(&unified_type, true)
-                .map(resolved::BinaryOperator::Equals),
-            ast::BinaryOperator::NotEquals => float_or_integer_from_type(&unified_type, true)
-                .map(resolved::BinaryOperator::NotEquals),
-            ast::BinaryOperator::LessThan => float_or_sign_from_type(&unified_type, false)
-                .map(resolved::BinaryOperator::LessThan),
-            ast::BinaryOperator::LessThanEq => float_or_sign_from_type(&unified_type, false)
-                .map(resolved::BinaryOperator::LessThanEq),
-            ast::BinaryOperator::GreaterThan => float_or_sign_from_type(&unified_type, false)
-                .map(resolved::BinaryOperator::GreaterThan),
-            ast::BinaryOperator::GreaterThanEq => float_or_sign_from_type(&unified_type, false)
-                .map(resolved::BinaryOperator::GreaterThanEq),
-            ast::BinaryOperator::BitwiseAnd => matches!(
-                unified_type,
-                resolved::Type::Integer { .. } | resolved::Type::Boolean
-            )
-            .then_some(resolved::BinaryOperator::BitwiseAnd),
-            ast::BinaryOperator::BitwiseOr => matches!(
-                unified_type,
-                resolved::Type::Integer { .. } | resolved::Type::Boolean
-            )
-            .then_some(resolved::BinaryOperator::BitwiseOr),
-            ast::BinaryOperator::BitwiseXor => matches!(
-                unified_type,
-                resolved::Type::Integer { .. } | resolved::Type::Boolean
-            )
-            .then_some(resolved::BinaryOperator::BitwiseXor),
-            ast::BinaryOperator::LeftShift => match unified_type {
-                resolved::Type::Integer { sign, .. } => Some(match sign {
-                    IntegerSign::Signed => resolved::BinaryOperator::LeftShift,
-                    IntegerSign::Unsigned => resolved::BinaryOperator::LogicalLeftShift,
-                }),
-                _ => None,
-            },
-            ast::BinaryOperator::RightShift => match unified_type {
-                resolved::Type::Integer { sign, .. } => Some(match sign {
-                    IntegerSign::Signed => resolved::BinaryOperator::RightShift,
-                    IntegerSign::Unsigned => resolved::BinaryOperator::LogicalRightShift,
-                }),
-                _ => None,
-            },
-            ast::BinaryOperator::LogicalLeftShift => {
-                matches!(unified_type, resolved::Type::Integer { .. })
-                    .then_some(resolved::BinaryOperator::BitwiseXor)
-            }
-            ast::BinaryOperator::LogicalRightShift => {
-                matches!(unified_type, resolved::Type::Integer { .. })
-                    .then_some(resolved::BinaryOperator::BitwiseXor)
-            }
-        };
-
-    let operator = match operator {
-        Some(operator) => operator,
-        _ => {
-            return Err(ResolveError::new(
-                ctx.resolved_ast.source_file_cache,
-                source,
-                ResolveErrorKind::CannotPerformBinaryOperationForType {
-                    operator: binary_operation.operator.to_string(),
-                    bad_type: unified_type.to_string(),
-                },
-            ))
-        }
-    };
-
-    let result_type = binary_operation
-        .operator
-        .returns_boolean()
-        .then_some(resolved::Type::Boolean)
-        .unwrap_or(unified_type);
-
-    Ok(TypedExpression::new(
-        result_type,
-        resolved::Expression::new(
-            resolved::ExpressionKind::BinaryOperation(Box::new(resolved::BinaryOperation {
-                operator,
-                left,
-                right,
-            })),
-            source,
-        ),
-    ))
 }

@@ -22,7 +22,11 @@ use std::{
 };
 
 use self::{
-    error::{ResolveError, ResolveErrorKind}, expr::{resolve_expression, ResolveExpressionCtx}, global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx, variable_search_ctx::VariableSearchCtx
+    error::{ResolveError, ResolveErrorKind},
+    expr::{resolve_expression, ResolveExpressionCtx},
+    global_search_ctx::GlobalSearchCtx,
+    type_search_ctx::TypeSearchCtx,
+    variable_search_ctx::VariableSearchCtx,
 };
 
 enum Job {
