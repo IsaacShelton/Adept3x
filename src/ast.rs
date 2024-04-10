@@ -92,7 +92,7 @@ pub struct Function {
     pub name: String,
     pub parameters: Parameters,
     pub return_type: Type,
-    pub statements: Vec<Statement>,
+    pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
 }
 
@@ -287,21 +287,21 @@ impl Display for &TypeKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct Statement {
-    pub kind: StatementKind,
+pub struct Stmt {
+    pub kind: StmtKind,
     pub source: Source,
 }
 
-impl Statement {
-    pub fn new(kind: StatementKind, source: Source) -> Self {
+impl Stmt {
+    pub fn new(kind: StmtKind, source: Source) -> Self {
         Self { kind, source }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum StatementKind {
-    Return(Option<Expression>),
-    Expression(Expression),
+pub enum StmtKind {
+    Return(Option<Expr>),
+    Expr(Expr),
     Declaration(Declaration),
     Assignment(Assignment),
 }
@@ -310,29 +310,29 @@ pub enum StatementKind {
 pub struct Declaration {
     pub name: String,
     pub ast_type: Type,
-    pub value: Option<Expression>,
+    pub value: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Assignment {
-    pub destination: Expression,
-    pub value: Expression,
+    pub destination: Expr,
+    pub value: Expr,
 }
 
 #[derive(Clone, Debug)]
-pub struct Expression {
-    pub kind: ExpressionKind,
+pub struct Expr {
+    pub kind: ExprKind,
     pub source: Source,
 }
 
-impl Expression {
-    pub fn new(kind: ExpressionKind, source: Source) -> Self {
+impl Expr {
+    pub fn new(kind: ExprKind, source: Source) -> Self {
         Self { kind, source }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum ExpressionKind {
+pub enum ExprKind {
     Variable(String),
     Boolean(bool),
     Integer(BigInt),
@@ -342,48 +342,48 @@ pub enum ExpressionKind {
     Call(Call),
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
-    Member(Box<Expression>, String),
+    Member(Box<Expr>, String),
     ArrayAccess(Box<ArrayAccess>),
-    StructureLiteral(Type, IndexMap<String, Expression>),
-    UnaryOperator(Box<UnaryOperation>),
+    StructureLiteral(Type, IndexMap<String, Expr>),
+    UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
 }
 
 #[derive(Clone, Debug)]
 pub struct ArrayAccess {
-    pub subject: Expression,
-    pub index: Expression,
+    pub subject: Expr,
+    pub index: Expr,
 }
 
 #[derive(Clone, Debug)]
 pub struct Conditional {
-    pub conditions: Vec<(Expression, Block)>,
+    pub conditions: Vec<(Expr, Block)>,
     pub otherwise: Option<Block>,
 }
 
 #[derive(Clone, Debug)]
 pub struct While {
-    pub condition: Box<Expression>,
+    pub condition: Box<Expr>,
     pub block: Block,
 }
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub statements: Vec<Statement>,
+    pub stmts: Vec<Stmt>,
 }
 
 impl Block {
-    pub fn new(statements: Vec<Statement>) -> Self {
-        Self { statements }
+    pub fn new(stmts: Vec<Stmt>) -> Self {
+        Self { stmts }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct BinaryOperation {
     pub operator: BinaryOperator,
-    pub left: Expression,
-    pub right: Expression,
+    pub left: Expr,
+    pub right: Expr,
 }
 
 #[derive(Clone, Debug)]
@@ -436,7 +436,7 @@ impl Display for BinaryOperator {
 #[derive(Clone, Debug)]
 pub struct UnaryOperation {
     pub operator: UnaryOperator,
-    pub inner: Expression,
+    pub inner: Expr,
 }
 
 #[derive(Clone, Debug)]
@@ -484,11 +484,11 @@ impl BinaryOperator {
 #[derive(Clone, Debug)]
 pub struct Call {
     pub function_name: String,
-    pub arguments: Vec<Expression>,
+    pub arguments: Vec<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub struct DeclareAssign {
     pub name: String,
-    pub value: Box<Expression>,
+    pub value: Box<Expr>,
 }

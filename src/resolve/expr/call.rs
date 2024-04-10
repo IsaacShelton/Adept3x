@@ -1,19 +1,19 @@
-use super::{resolve_expression, ResolveExpressionCtx};
+use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
-        conform_expression, conform_expression_to_default,
+        conform_expr, conform_expr_to_default,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, TypedExpression},
+    resolved::{self, TypedExpr},
 };
 
-pub fn resolve_call_expression(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
+pub fn resolve_call_expr(
+    ctx: &mut ResolveExprCtx<'_, '_>,
     call: &ast::Call,
     source: Source,
-) -> Result<TypedExpression, ResolveError> {
+) -> Result<TypedExpr, ResolveError> {
     let function_ref = ctx
         .function_search_ctx
         .find_function_or_error(&call.function_name, source)?;
@@ -46,13 +46,13 @@ pub fn resolve_call_expression(
     let mut arguments = Vec::with_capacity(call.arguments.len());
 
     for (i, argument) in call.arguments.iter().enumerate() {
-        let mut argument = resolve_expression(ctx, argument, Initialized::Require)?;
+        let mut argument = resolve_expr(ctx, argument, Initialized::Require)?;
 
         let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
 
         if let Some(parameter) = function.parameters.required.get(i) {
             if let Some(conformed_argument) =
-                conform_expression(&argument, &parameter.resolved_type)
+                conform_expr(&argument, &parameter.resolved_type)
             {
                 argument = conformed_argument;
             } else {
@@ -68,19 +68,19 @@ pub fn resolve_call_expression(
                 ));
             }
         } else {
-            match conform_expression_to_default(argument, ctx.resolved_ast.source_file_cache) {
+            match conform_expr_to_default(argument, ctx.resolved_ast.source_file_cache) {
                 Ok(conformed_argument) => argument = conformed_argument,
                 Err(error) => return Err(error),
             }
         }
 
-        arguments.push(argument.expression);
+        arguments.push(argument.expr);
     }
 
-    Ok(TypedExpression::new(
+    Ok(TypedExpr::new(
         return_type,
-        resolved::Expression::new(
-            resolved::ExpressionKind::Call(resolved::Call {
+        resolved::Expr::new(
+            resolved::ExprKind::Call(resolved::Call {
                 function: function_ref,
                 arguments,
             }),

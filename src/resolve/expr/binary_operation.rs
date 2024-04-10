@@ -1,25 +1,24 @@
-use super::{resolve_expression, ResolveExpressionCtx};
+use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         unify_types, Initialized,
     },
-    resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpression},
+    resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpr},
 };
 use ast::{IntegerBits, IntegerSign};
 
-pub fn resolve_binary_operation_expression(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
+pub fn resolve_binary_operation_expr(
+    ctx: &mut ResolveExprCtx<'_, '_>,
     binary_operation: &ast::BinaryOperation,
     source: Source,
-) -> Result<TypedExpression, ResolveError> {
-    let mut left = resolve_expression(ctx, &binary_operation.left, Initialized::Require)?;
-    let mut right = resolve_expression(ctx, &binary_operation.right, Initialized::Require)?;
+) -> Result<TypedExpr, ResolveError> {
+    let mut left = resolve_expr(ctx, &binary_operation.left, Initialized::Require)?;
+    let mut right = resolve_expr(ctx, &binary_operation.right, Initialized::Require)?;
 
-    let unified_type = match unify_types(&mut [&mut left, &mut right]) {
-        Some(value) => Ok(value),
-        None => Err(ResolveError::new(
+    let unified_type = unify_types(&mut [&mut left, &mut right]).ok_or_else(|| {
+        ResolveError::new(
             ctx.resolved_ast.source_file_cache,
             source,
             ResolveErrorKind::IncompatibleTypesForBinaryOperator {
@@ -27,8 +26,8 @@ pub fn resolve_binary_operation_expression(
                 left: left.resolved_type.to_string(),
                 right: right.resolved_type.to_string(),
             },
-        )),
-    }?;
+        )
+    })?;
 
     let operator =
         match binary_operation.operator {
@@ -98,19 +97,16 @@ pub fn resolve_binary_operation_expression(
             }
         };
 
-    let operator = match operator {
-        Some(operator) => operator,
-        _ => {
-            return Err(ResolveError::new(
-                ctx.resolved_ast.source_file_cache,
-                source,
-                ResolveErrorKind::CannotPerformBinaryOperationForType {
-                    operator: binary_operation.operator.to_string(),
-                    bad_type: unified_type.to_string(),
-                },
-            ))
-        }
-    };
+    let operator = operator.ok_or_else(|| {
+        ResolveError::new(
+            ctx.resolved_ast.source_file_cache,
+            source,
+            ResolveErrorKind::CannotPerformBinaryOperationForType {
+                operator: binary_operation.operator.to_string(),
+                bad_type: unified_type.to_string(),
+            },
+        )
+    })?;
 
     let result_type = binary_operation
         .operator
@@ -118,10 +114,10 @@ pub fn resolve_binary_operation_expression(
         .then_some(resolved::Type::Boolean)
         .unwrap_or(unified_type);
 
-    Ok(TypedExpression::new(
+    Ok(TypedExpr::new(
         result_type,
-        resolved::Expression::new(
-            resolved::ExpressionKind::BinaryOperation(Box::new(resolved::BinaryOperation {
+        resolved::Expr::new(
+            resolved::ExprKind::BinaryOperation(Box::new(resolved::BinaryOperation {
                 operator,
                 left,
                 right,

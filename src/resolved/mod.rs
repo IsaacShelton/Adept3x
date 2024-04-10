@@ -57,7 +57,7 @@ pub struct Function {
     pub name: String,
     pub parameters: Parameters,
     pub return_type: Type,
-    pub statements: Vec<Statement>,
+    pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
     pub variables: VariableStorage,
 }
@@ -178,21 +178,21 @@ impl Display for Type {
 }
 
 #[derive(Clone, Debug)]
-pub struct Statement {
-    pub kind: StatementKind,
+pub struct Stmt {
+    pub kind: StmtKind,
     pub source: Source,
 }
 
-impl Statement {
-    pub fn new(kind: StatementKind, source: Source) -> Self {
+impl Stmt {
+    pub fn new(kind: StmtKind, source: Source) -> Self {
         Self { kind, source }
     }
 }
 
 #[derive(Clone, Debug, Unwrap)]
-pub enum StatementKind {
-    Return(Option<Expression>),
-    Expression(TypedExpression),
+pub enum StmtKind {
+    Return(Option<Expr>),
+    Expr(TypedExpr),
     Declaration(Declaration),
     Assignment(Assignment),
 }
@@ -200,39 +200,39 @@ pub enum StatementKind {
 #[derive(Clone, Debug)]
 pub struct Declaration {
     pub key: VariableStorageKey,
-    pub value: Option<Expression>,
+    pub value: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Assignment {
     pub destination: Destination,
-    pub value: Expression,
+    pub value: Expr,
 }
 
 #[derive(Clone, Debug)]
-pub struct TypedExpression {
+pub struct TypedExpr {
     pub resolved_type: Type,
-    pub expression: Expression,
+    pub expr: Expr,
     pub is_initialized: bool,
 }
 
-impl TypedExpression {
-    pub fn new(resolved_type: Type, expression: Expression) -> Self {
+impl TypedExpr {
+    pub fn new(resolved_type: Type, expr: Expr) -> Self {
         Self {
             resolved_type,
-            expression,
+            expr,
             is_initialized: true,
         }
     }
 
     pub fn new_maybe_initialized(
         resolved_type: Type,
-        expression: Expression,
+        expr: Expr,
         is_initialized: bool,
     ) -> Self {
         Self {
             resolved_type,
-            expression,
+            expr,
             is_initialized,
         }
     }
@@ -247,13 +247,13 @@ pub enum IntegerLiteralBits {
 }
 
 #[derive(Clone, Debug)]
-pub struct Expression {
-    pub kind: ExpressionKind,
+pub struct Expr {
+    pub kind: ExprKind,
     pub source: Source,
 }
 
-impl Expression {
-    pub fn new(kind: ExpressionKind, source: Source) -> Self {
+impl Expr {
+    pub fn new(kind: ExprKind, source: Source) -> Self {
         Self { kind, source }
     }
 }
@@ -265,7 +265,7 @@ pub enum MemoryManagement {
 }
 
 #[derive(Clone, Debug)]
-pub enum ExpressionKind {
+pub enum ExprKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),
     BooleanLiteral(bool),
@@ -281,22 +281,22 @@ pub enum ExpressionKind {
     Call(Call),
     DeclareAssign(DeclareAssign),
     BinaryOperation(Box<BinaryOperation>),
-    IntegerExtend(Box<Expression>, Type),
-    FloatExtend(Box<Expression>, Type),
+    IntegerExtend(Box<Expr>, Type),
+    FloatExtend(Box<Expr>, Type),
     Member(Destination, StructureRef, usize, Type, MemoryManagement),
     StructureLiteral {
         structure_type: Type,
-        fields: IndexMap<String, (Expression, usize)>,
+        fields: IndexMap<String, (Expr, usize)>,
         memory_management: MemoryManagement,
     },
-    UnaryOperator(Box<UnaryOperation>),
+    UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
 }
 
 #[derive(Clone, Debug)]
 pub struct Branch {
-    pub condition: TypedExpression,
+    pub condition: TypedExpr,
     pub block: Block,
 }
 
@@ -309,27 +309,27 @@ pub struct Conditional {
 
 #[derive(Clone, Debug)]
 pub struct While {
-    pub condition: Box<Expression>,
+    pub condition: Box<Expr>,
     pub block: Block,
 }
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub statements: Vec<Statement>,
+    pub stmts: Vec<Stmt>,
 }
 
 impl Block {
-    pub fn new(statements: Vec<Statement>) -> Self {
-        Self { statements }
+    pub fn new(stmts: Vec<Stmt>) -> Self {
+        Self { stmts }
     }
 
     pub fn get_result_type(&self) -> Type {
-        if let Some(statement) = self.statements.last() {
-            match &statement.kind {
-                StatementKind::Return(_) => None,
-                StatementKind::Expression(expression) => Some(expression.resolved_type.clone()),
-                StatementKind::Declaration(_) => None,
-                StatementKind::Assignment(_) => None,
+        if let Some(stmt) = self.stmts.last() {
+            match &stmt.kind {
+                StmtKind::Return(_) => None,
+                StmtKind::Expr(expr) => Some(expr.resolved_type.clone()),
+                StmtKind::Declaration(_) => None,
+                StmtKind::Assignment(_) => None,
             }
         } else {
             None
@@ -357,10 +357,10 @@ pub enum DestinationKind {
     ),
 }
 
-impl TryFrom<Expression> for Destination {
+impl TryFrom<Expr> for Destination {
     type Error = ();
 
-    fn try_from(value: Expression) -> Result<Self, Self::Error> {
+    fn try_from(value: Expr) -> Result<Self, Self::Error> {
         value.kind.try_into().map(|kind| Destination {
             kind,
             source: value.source,
@@ -368,14 +368,14 @@ impl TryFrom<Expression> for Destination {
     }
 }
 
-impl TryFrom<ExpressionKind> for DestinationKind {
+impl TryFrom<ExprKind> for DestinationKind {
     type Error = ();
 
-    fn try_from(value: ExpressionKind) -> Result<Self, Self::Error> {
+    fn try_from(value: ExprKind) -> Result<Self, Self::Error> {
         match value {
-            ExpressionKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
-            ExpressionKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
-            ExpressionKind::Member(
+            ExprKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
+            ExprKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
+            ExprKind::Member(
                 destination,
                 structure_ref,
                 index,
@@ -446,14 +446,14 @@ pub enum BinaryOperator {
 #[derive(Clone, Debug)]
 pub struct BinaryOperation {
     pub operator: BinaryOperator,
-    pub left: TypedExpression,
-    pub right: TypedExpression,
+    pub left: TypedExpr,
+    pub right: TypedExpr,
 }
 
 #[derive(Clone, Debug)]
 pub struct UnaryOperation {
     pub operator: UnaryOperator,
-    pub inner: TypedExpression,
+    pub inner: TypedExpr,
 }
 
 #[derive(Clone, Debug)]
@@ -471,12 +471,12 @@ pub struct GlobalVariable {
 #[derive(Clone, Debug)]
 pub struct Call {
     pub function: FunctionRef,
-    pub arguments: Vec<Expression>,
+    pub arguments: Vec<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub struct DeclareAssign {
     pub key: VariableStorageKey,
-    pub value: Box<Expression>,
+    pub value: Box<Expr>,
     pub resolved_type: Type,
 }

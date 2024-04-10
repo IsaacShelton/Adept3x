@@ -7,7 +7,7 @@ mod variable_search_ctx;
 
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
-    resolved::{self, Destination, TypedExpression, VariableStorage},
+    resolved::{self, Destination, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
@@ -23,7 +23,7 @@ use std::{
 
 use self::{
     error::{ResolveError, ResolveErrorKind},
-    expr::{resolve_expression, ResolveExpressionCtx},
+    expr::{resolve_expr, ResolveExprCtx},
     global_search_ctx::GlobalSearchCtx,
     type_search_ctx::TypeSearchCtx,
     variable_search_ctx::VariableSearchCtx,
@@ -115,7 +115,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     source_file_cache,
                     &function.return_type,
                 )?,
-                statements: vec![],
+                stmts: vec![],
                 is_foreign: function.is_foreign,
                 variables: VariableStorage::new(),
             });
@@ -194,8 +194,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     }
                 }
 
-                let resolved_statements = {
-                    let mut ctx = ResolveExpressionCtx {
+                let resolved_stmts = {
+                    let mut ctx = ResolveExprCtx {
                         resolved_ast: &mut resolved_ast,
                         function_search_ctx,
                         type_search_ctx,
@@ -204,7 +204,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                         resolved_function_ref,
                     };
 
-                    resolve_statements(&mut ctx, &ast_function.statements)?
+                    resolve_stmts(&mut ctx, &ast_function.stmts)?
                 };
 
                 let resolved_function = resolved_ast
@@ -212,7 +212,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     .get_mut(resolved_function_ref)
                     .expect("resolved function head to exist");
 
-                resolved_function.statements = resolved_statements;
+                resolved_function.stmts = resolved_stmts;
             }
         }
     }
@@ -220,29 +220,29 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     Ok(resolved_ast)
 }
 
-fn resolve_statements(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
-    statements: &[ast::Statement],
-) -> Result<Vec<resolved::Statement>, ResolveError> {
-    let mut resolved_statements = Vec::with_capacity(statements.len());
+fn resolve_stmts(
+    ctx: &mut ResolveExprCtx<'_, '_>,
+    stmts: &[ast::Stmt],
+) -> Result<Vec<resolved::Stmt>, ResolveError> {
+    let mut resolved_stmts = Vec::with_capacity(stmts.len());
 
-    for statement in statements.iter() {
-        resolved_statements.push(resolve_statement(ctx, statement)?);
+    for stmt in stmts.iter() {
+        resolved_stmts.push(resolve_stmt(ctx, stmt)?);
     }
 
-    Ok(resolved_statements)
+    Ok(resolved_stmts)
 }
 
-fn resolve_statement<'a>(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
-    ast_statement: &ast::Statement,
-) -> Result<resolved::Statement, ResolveError> {
-    let source = ast_statement.source;
+fn resolve_stmt<'a>(
+    ctx: &mut ResolveExprCtx<'_, '_>,
+    ast_stmt: &ast::Stmt,
+) -> Result<resolved::Stmt, ResolveError> {
+    let source = ast_stmt.source;
 
-    match &ast_statement.kind {
-        ast::StatementKind::Return(value) => {
+    match &ast_stmt.kind {
+        ast::StmtKind::Return(value) => {
             let return_value = if let Some(value) = value {
-                let result = resolve_expression(ctx, value, Initialized::Require)?;
+                let result = resolve_expr(ctx, value, Initialized::Require)?;
 
                 let function = ctx
                     .resolved_ast
@@ -250,8 +250,8 @@ fn resolve_statement<'a>(
                     .get(ctx.resolved_function_ref)
                     .unwrap();
 
-                if let Some(result) = conform_expression(&result, &function.return_type) {
-                    Some(result.expression)
+                if let Some(result) = conform_expr(&result, &function.return_type) {
+                    Some(result.expr)
                 } else {
                     return Err(ResolveError::new(
                         ctx.resolved_ast.source_file_cache,
@@ -282,20 +282,16 @@ fn resolve_statement<'a>(
                 None
             };
 
-            Ok(resolved::Statement::new(
-                resolved::StatementKind::Return(return_value),
+            Ok(resolved::Stmt::new(
+                resolved::StmtKind::Return(return_value),
                 source,
             ))
         }
-        ast::StatementKind::Expression(value) => Ok(resolved::Statement::new(
-            resolved::StatementKind::Expression(resolve_expression(
-                ctx,
-                value,
-                Initialized::Require,
-            )?),
+        ast::StmtKind::Expr(value) => Ok(resolved::Stmt::new(
+            resolved::StmtKind::Expr(resolve_expr(ctx, value, Initialized::Require)?),
             source,
         )),
-        ast::StatementKind::Declaration(declaration) => {
+        ast::StmtKind::Declaration(declaration) => {
             let resolved_type = resolve_type(
                 ctx.type_search_ctx,
                 ctx.resolved_ast.source_file_cache,
@@ -305,11 +301,11 @@ fn resolve_statement<'a>(
             let value = declaration
                 .value
                 .as_ref()
-                .map(|value| resolve_expression(ctx, value, Initialized::Require))
+                .map(|value| resolve_expr(ctx, value, Initialized::Require))
                 .transpose()?
                 .as_ref()
-                .map(|value| match conform_expression(value, &resolved_type) {
-                    Some(value) => Ok(value.expression),
+                .map(|value| match conform_expr(value, &resolved_type) {
+                    Some(value) => Ok(value.expr),
                     None => Err(ResolveError::new(
                         ctx.resolved_ast.source_file_cache,
                         source,
@@ -334,25 +330,25 @@ fn resolve_statement<'a>(
             ctx.variable_search_ctx
                 .put(&declaration.name, resolved_type.clone(), key);
 
-            Ok(resolved::Statement::new(
-                resolved::StatementKind::Declaration(resolved::Declaration { key, value }),
+            Ok(resolved::Stmt::new(
+                resolved::StmtKind::Declaration(resolved::Declaration { key, value }),
                 source,
             ))
         }
-        ast::StatementKind::Assignment(assignment) => {
-            let destination_expression = resolve_expression(
+        ast::StmtKind::Assignment(assignment) => {
+            let destination_expr = resolve_expr(
                 ctx,
                 &assignment.destination,
                 Initialized::AllowUninitialized,
             )?;
 
-            let value = resolve_expression(ctx, &assignment.value, Initialized::Require)?;
+            let value = resolve_expr(ctx, &assignment.value, Initialized::Require)?;
 
-            match conform_expression(&value, &destination_expression.resolved_type) {
+            match conform_expr(&value, &destination_expr.resolved_type) {
                 Some(value) => {
-                    let destination = resolve_expression_to_destination(
+                    let destination = resolve_expr_to_destination(
                         ctx.resolved_ast.source_file_cache,
-                        destination_expression.expression,
+                        destination_expr.expr,
                     )?;
 
                     // Mark destination as initialized
@@ -374,10 +370,10 @@ fn resolve_statement<'a>(
                         resolved::DestinationKind::Member(..) => (),
                     }
 
-                    Ok(resolved::Statement::new(
-                        resolved::StatementKind::Assignment(resolved::Assignment {
+                    Ok(resolved::Stmt::new(
+                        resolved::StmtKind::Assignment(resolved::Assignment {
                             destination,
-                            value: value.expression,
+                            value: value.expr,
                         }),
                         source,
                     ))
@@ -387,7 +383,7 @@ fn resolve_statement<'a>(
                     source,
                     ResolveErrorKind::CannotAssignValueOfType {
                         from: value.resolved_type.to_string(),
-                        to: destination_expression.resolved_type.to_string(),
+                        to: destination_expr.resolved_type.to_string(),
                     },
                 )),
             }
@@ -395,38 +391,35 @@ fn resolve_statement<'a>(
     }
 }
 
-fn conform_expression_or_error(
+fn conform_expr_or_error(
     source_file_cache: &SourceFileCache,
-    expression: &TypedExpression,
+    expr: &TypedExpr,
     target_type: &resolved::Type,
-) -> Result<TypedExpression, ResolveError> {
-    if let Some(expression) = conform_expression(expression, target_type) {
-        Ok(expression)
+) -> Result<TypedExpr, ResolveError> {
+    if let Some(expr) = conform_expr(expr, target_type) {
+        Ok(expr)
     } else {
         Err(ResolveError::new(
             source_file_cache,
-            expression.expression.source,
+            expr.expr.source,
             ResolveErrorKind::TypeMismatch {
-                left: expression.resolved_type.to_string(),
+                left: expr.resolved_type.to_string(),
                 right: target_type.to_string(),
             },
         ))
     }
 }
 
-fn conform_expression(
-    expression: &TypedExpression,
-    to_type: &resolved::Type,
-) -> Option<TypedExpression> {
-    if expression.resolved_type == *to_type {
-        return Some(expression.clone());
+fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr> {
+    if expr.resolved_type == *to_type {
+        return Some(expr.clone());
     }
 
     // Integer Literal to Integer Type Conversion
-    match &expression.resolved_type {
+    match &expr.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
             // Integer literals -> Integer/Float
-            conform_integer_literal(value, expression.expression.source, to_type)
+            conform_integer_literal(value, expr.expr.source, to_type)
         }
         resolved::Type::Integer {
             bits: from_bits,
@@ -434,24 +427,20 @@ fn conform_expression(
         } => {
             // Integer -> Integer
             match to_type {
-                resolved::Type::Integer { bits, sign } => conform_integer_value(
-                    &expression.expression,
-                    *from_bits,
-                    *from_sign,
-                    *bits,
-                    *sign,
-                ),
+                resolved::Type::Integer { bits, sign } => {
+                    conform_integer_value(&expr.expr, *from_bits, *from_sign, *bits, *sign)
+                }
                 _ => None,
             }
         }
         resolved::Type::FloatLiteral(value) => {
             // Float literals -> Float
             match to_type {
-                resolved::Type::Float(size) => Some(TypedExpression::new(
+                resolved::Type::Float(size) => Some(TypedExpr::new(
                     resolved::Type::Float(*size),
-                    resolved::Expression::new(
-                        resolved::ExpressionKind::Float(*size, *value),
-                        expression.expression.source,
+                    resolved::Expr::new(
+                        resolved::ExprKind::Float(*size, *value),
+                        expr.expr.source,
                     ),
                 )),
                 _ => None,
@@ -461,7 +450,7 @@ fn conform_expression(
             // Float -> Float
             match to_type {
                 resolved::Type::Float(size) => {
-                    conform_float_value(&expression.expression, *from_size, *size)
+                    conform_float_value(&expr.expr, *from_size, *size)
                 }
                 _ => None,
             }
@@ -471,28 +460,25 @@ fn conform_expression(
 }
 
 fn conform_float_value(
-    expression: &resolved::Expression,
+    expr: &resolved::Expr,
     from_size: FloatSize,
     to_size: FloatSize,
-) -> Option<TypedExpression> {
+) -> Option<TypedExpr> {
     let result_type = resolved::Type::Float(to_size);
 
     let from_bits = from_size.bits();
     let to_bits = to_size.bits();
 
     if from_bits == to_bits {
-        return Some(TypedExpression::new(result_type, expression.clone()));
+        return Some(TypedExpr::new(result_type, expr.clone()));
     }
 
     if from_bits < to_bits {
-        return Some(TypedExpression::new(
+        return Some(TypedExpr::new(
             result_type.clone(),
-            resolved::Expression {
-                kind: resolved::ExpressionKind::FloatExtend(
-                    Box::new(expression.clone()),
-                    result_type,
-                ),
-                source: expression.source,
+            resolved::Expr {
+                kind: resolved::ExprKind::FloatExtend(Box::new(expr.clone()), result_type),
+                source: expr.source,
             },
         ));
     }
@@ -501,12 +487,12 @@ fn conform_float_value(
 }
 
 fn conform_integer_value(
-    expression: &resolved::Expression,
+    expr: &resolved::Expr,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
     to_bits: IntegerBits,
     to_sign: IntegerSign,
-) -> Option<TypedExpression> {
+) -> Option<TypedExpr> {
     if from_sign != to_sign && !(to_bits > from_bits) {
         return None;
     }
@@ -521,46 +507,37 @@ fn conform_integer_value(
     };
 
     if from_sign == to_sign && to_bits == from_bits {
-        return Some(TypedExpression::new(result_type, expression.clone()));
+        return Some(TypedExpr::new(result_type, expr.clone()));
     }
 
-    Some(TypedExpression::new(
+    Some(TypedExpr::new(
         result_type.clone(),
-        resolved::Expression {
-            kind: resolved::ExpressionKind::IntegerExtend(
-                Box::new(expression.clone()),
-                result_type,
-            ),
-            source: expression.source,
+        resolved::Expr {
+            kind: resolved::ExprKind::IntegerExtend(Box::new(expr.clone()), result_type),
+            source: expr.source,
         },
     ))
 }
 
-fn conform_expression_to_default(
-    expression: TypedExpression,
+fn conform_expr_to_default(
+    expr: TypedExpr,
     source_file_cache: &SourceFileCache,
-) -> Result<TypedExpression, ResolveError> {
-    match expression.resolved_type {
-        resolved::Type::IntegerLiteral(value) => conform_integer_to_default_or_error(
-            source_file_cache,
-            &value,
-            expression.expression.source,
-        ),
-        resolved::Type::FloatLiteral(value) => Ok(conform_float_to_default(
-            value,
-            expression.expression.source,
-        )),
-        _ => Ok(expression),
+) -> Result<TypedExpr, ResolveError> {
+    match expr.resolved_type {
+        resolved::Type::IntegerLiteral(value) => {
+            conform_integer_to_default_or_error(source_file_cache, &value, expr.expr.source)
+        }
+        resolved::Type::FloatLiteral(value) => {
+            Ok(conform_float_to_default(value, expr.expr.source))
+        }
+        _ => Ok(expr),
     }
 }
 
-fn conform_float_to_default(value: f64, source: Source) -> TypedExpression {
-    TypedExpression::new(
+fn conform_float_to_default(value: f64, source: Source) -> TypedExpr {
+    TypedExpr::new(
         resolved::Type::Float(FloatSize::Normal),
-        resolved::Expression::new(
-            resolved::ExpressionKind::Float(FloatSize::Normal, value),
-            source,
-        ),
+        resolved::Expr::new(resolved::ExprKind::Float(FloatSize::Normal, value), source),
     )
 }
 
@@ -568,7 +545,7 @@ fn conform_integer_to_default_or_error(
     source_file_cache: &SourceFileCache,
     value: &BigInt,
     source: Source,
-) -> Result<TypedExpression, ResolveError> {
+) -> Result<TypedExpr, ResolveError> {
     match conform_integer_to_default(&value, source) {
         Some(resolved) => Ok(resolved),
         None => Err(ResolveError::new(
@@ -581,7 +558,7 @@ fn conform_integer_to_default_or_error(
     }
 }
 
-fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExpression> {
+fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExpr> {
     use resolved::{IntegerBits::*, IntegerSign::*};
 
     let possible_types = [
@@ -608,25 +585,25 @@ fn conform_integer_literal(
     value: &BigInt,
     source: Source,
     to_type: &resolved::Type,
-) -> Option<TypedExpression> {
+) -> Option<TypedExpr> {
     match to_type {
         resolved::Type::Float(size) => value.to_f64().map(|literal| {
-            TypedExpression::new(
+            TypedExpr::new(
                 resolved::Type::Float(*size),
-                resolved::Expression::new(resolved::ExpressionKind::Float(*size, literal), source),
+                resolved::Expr::new(resolved::ExprKind::Float(*size, literal), source),
             )
         }),
         resolved::Type::Integer { bits, sign } => {
             use resolved::{IntegerBits::*, IntegerLiteralBits, IntegerSign::*};
 
             let make_integer = |integer_literal_bits| {
-                Some(TypedExpression::new(
+                Some(TypedExpr::new(
                     resolved::Type::Integer {
                         bits: *bits,
                         sign: *sign,
                     },
-                    resolved::Expression::new(
-                        resolved::ExpressionKind::Integer {
+                    resolved::Expr::new(
+                        resolved::ExprKind::Integer {
                             value: value.clone(),
                             bits: integer_literal_bits,
                             sign: *sign,
@@ -797,13 +774,13 @@ fn resolve_parameters(
     })
 }
 
-pub fn resolve_expression_to_destination(
+pub fn resolve_expr_to_destination(
     source_file_cache: &SourceFileCache,
-    expression: resolved::Expression,
+    expr: resolved::Expr,
 ) -> Result<Destination, ResolveError> {
-    let source = expression.source;
+    let source = expr.source;
 
-    match TryInto::<Destination>::try_into(expression) {
+    match TryInto::<Destination>::try_into(expr) {
         Ok(destination) => Ok(destination),
         Err(_) => Err(ResolveError::new(
             source_file_cache,
@@ -815,8 +792,8 @@ pub fn resolve_expression_to_destination(
 
 fn ensure_initialized(
     source_file_cache: &SourceFileCache,
-    subject: &ast::Expression,
-    resolved_subject: &TypedExpression,
+    subject: &ast::Expr,
+    resolved_subject: &TypedExpr,
 ) -> Result<(), ResolveError> {
     if resolved_subject.is_initialized {
         Ok(())
@@ -825,7 +802,7 @@ fn ensure_initialized(
             source_file_cache,
             subject.source,
             match &subject.kind {
-                ast::ExpressionKind::Variable(variable_name) => {
+                ast::ExprKind::Variable(variable_name) => {
                     ResolveErrorKind::CannotUseUninitializedVariable {
                         variable_name: variable_name.clone(),
                     }
@@ -918,17 +895,17 @@ fn bits_and_sign_for<'a>(
     })
 }
 
-fn unifying_type_for(expressions: &[impl Borrow<TypedExpression>]) -> Option<resolved::Type> {
-    let types = expressions
+fn unifying_type_for(exprs: &[impl Borrow<TypedExpr>]) -> Option<resolved::Type> {
+    let types = exprs
         .iter()
-        .map(|expression| &expression.borrow().resolved_type)
+        .map(|expr| &expr.borrow().resolved_type)
         .collect_vec();
 
     if types.iter().all_equal() {
         return Some(
-            expressions
+            exprs
                 .first()
-                .map(|expression| expression.borrow().resolved_type.clone())
+                .map(|expr| expr.borrow().resolved_type.clone())
                 .unwrap_or_else(|| resolved::Type::Void),
         );
     }
@@ -973,18 +950,18 @@ fn unifying_type_for(expressions: &[impl Borrow<TypedExpression>]) -> Option<res
     None
 }
 
-fn unify_types(expressions: &mut [&mut TypedExpression]) -> Option<resolved::Type> {
-    let unified_type = unifying_type_for(expressions);
+fn unify_types(exprs: &mut [&mut TypedExpr]) -> Option<resolved::Type> {
+    let unified_type = unifying_type_for(exprs);
 
     if let Some(unified_type) = &unified_type {
-        for expression in expressions.iter_mut() {
-            **expression = match conform_expression(&**expression, unified_type) {
+        for expr in exprs.iter_mut() {
+            **expr = match conform_expr(&**expr, unified_type) {
                 Some(conformed) => conformed,
                 None => {
                     panic!(
                         "cannot conform to unified type {} for value of type {}",
                         unified_type.to_string(),
-                        expression.resolved_type.to_string(),
+                        expr.resolved_type.to_string(),
                     );
                 }
             }

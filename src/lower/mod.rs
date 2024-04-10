@@ -4,8 +4,8 @@ use crate::{
     error::CompilerError,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
-        self, Destination, DestinationKind, Expression, ExpressionKind, FloatOrInteger, FloatSize,
-        IntegerBits, NumericMode, StatementKind,
+        self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
+        NumericMode, StmtKind,
     },
 };
 use builder::Builder;
@@ -110,7 +110,7 @@ fn lower_function(
             }));
         }
 
-        lower_statements(&mut builder, ir_module, &function.statements, function)?;
+        lower_stmts(&mut builder, ir_module, &function.stmts, function)?;
 
         if !builder.is_block_terminated() {
             if let resolved::Type::Void = function.return_type {
@@ -164,19 +164,19 @@ fn lower_function(
     Ok(())
 }
 
-fn lower_statements(
+fn lower_stmts(
     builder: &mut Builder,
     ir_module: &ir::Module,
-    statements: &[resolved::Statement],
+    stmts: &[resolved::Stmt],
     function: &resolved::Function,
 ) -> Result<Value, CompilerError> {
     let mut result = Value::Literal(Literal::Void);
 
-    for statement in statements.iter() {
-        result = match &statement.kind {
-            StatementKind::Return(expression) => {
-                let instruction = ir::Instruction::Return(if let Some(expression) = expression {
-                    Some(lower_expression(builder, ir_module, expression, function)?)
+    for stmt in stmts.iter() {
+        result = match &stmt.kind {
+            StmtKind::Return(expr) => {
+                let instruction = ir::Instruction::Return(if let Some(expr) = expr {
+                    Some(lower_expr(builder, ir_module, expr, function)?)
                 } else if function.name == "main" {
                     Some(ir::Value::Literal(Literal::Signed32(0)))
                 } else {
@@ -186,17 +186,15 @@ fn lower_statements(
                 builder.push(instruction);
                 Value::Literal(Literal::Void)
             }
-            StatementKind::Expression(expression) => {
-                lower_expression(builder, ir_module, &expression.expression, function)?
-            }
-            StatementKind::Declaration(declaration) => {
+            StmtKind::Expr(expr) => lower_expr(builder, ir_module, &expr.expr, function)?,
+            StmtKind::Declaration(declaration) => {
                 let destination = Value::Reference(ValueReference {
                     basicblock_id: 0,
                     instruction_id: declaration.key.index,
                 });
 
                 if let Some(value) = &declaration.value {
-                    let source = lower_expression(builder, ir_module, value, function)?;
+                    let source = lower_expr(builder, ir_module, value, function)?;
 
                     builder.push(ir::Instruction::Store(ir::Store {
                         source,
@@ -206,9 +204,9 @@ fn lower_statements(
 
                 Value::Literal(Literal::Void)
             }
-            StatementKind::Assignment(assignment) => {
+            StmtKind::Assignment(assignment) => {
                 let destination = lower_destination(builder, ir_module, &assignment.destination)?;
-                let source = lower_expression(builder, ir_module, &assignment.value, function)?;
+                let source = lower_expr(builder, ir_module, &assignment.value, function)?;
 
                 builder.push(ir::Instruction::Store(ir::Store {
                     source,
@@ -309,18 +307,18 @@ fn lower_destination(
     }
 }
 
-fn lower_expression(
+fn lower_expr(
     builder: &mut Builder,
     ir_module: &ir::Module,
-    expression: &Expression,
+    expr: &Expr,
     function: &resolved::Function,
 ) -> Result<ir::Value, CompilerError> {
-    match &expression.kind {
-        ExpressionKind::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
+    match &expr.kind {
+        ExprKind::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
             "Cannot lower unspecialized integer literal {}",
             value
         ))),
-        ExpressionKind::Integer { value, bits, sign } => {
+        ExprKind::Integer { value, bits, sign } => {
             use resolved::{IntegerLiteralBits as Bits, IntegerSign as Sign};
 
             match (bits, sign) {
@@ -406,23 +404,23 @@ fn lower_expression(
                 }
             }
         }
-        ExpressionKind::Float(size, value) => Ok(Value::Literal(match size {
+        ExprKind::Float(size, value) => Ok(Value::Literal(match size {
             FloatSize::Bits32 => Literal::Float32(*value as f32),
             FloatSize::Bits64 | FloatSize::Normal => Literal::Float64(*value),
         })),
-        ExpressionKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
+        ExprKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),
         )),
-        ExpressionKind::String(_value) => {
+        ExprKind::String(_value) => {
             unimplemented!(
                 "String literals are not fully implemented yet, still need ability to lower"
             )
         }
-        ExpressionKind::Call(call) => {
+        ExprKind::Call(call) => {
             let mut arguments = vec![];
 
             for argument in call.arguments.iter() {
-                arguments.push(lower_expression(builder, ir_module, argument, function)?);
+                arguments.push(lower_expr(builder, ir_module, argument, function)?);
             }
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
@@ -430,7 +428,7 @@ fn lower_expression(
                 arguments,
             })))
         }
-        ExpressionKind::Variable(variable) => {
+        ExprKind::Variable(variable) => {
             let pointer = Value::Reference(ValueReference {
                 basicblock_id: 0,
                 instruction_id: variable.key.index,
@@ -440,14 +438,13 @@ fn lower_expression(
 
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
-        ExpressionKind::GlobalVariable(global_variable) => {
+        ExprKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
             let ir_type = lower_type(&global_variable.resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
-        ExpressionKind::DeclareAssign(declare_assign) => {
-            let initial_value =
-                lower_expression(builder, ir_module, &declare_assign.value, function)?;
+        ExprKind::DeclareAssign(declare_assign) => {
+            let initial_value = lower_expr(builder, ir_module, &declare_assign.value, function)?;
 
             let destination = Value::Reference(ValueReference {
                 basicblock_id: 0,
@@ -462,19 +459,9 @@ fn lower_expression(
             let ir_type = lower_type(&declare_assign.resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
-        ExpressionKind::BinaryOperation(binary_operation) => {
-            let left = lower_expression(
-                builder,
-                ir_module,
-                &binary_operation.left.expression,
-                function,
-            )?;
-            let right = lower_expression(
-                builder,
-                ir_module,
-                &binary_operation.right.expression,
-                function,
-            )?;
+        ExprKind::BinaryOperation(binary_operation) => {
+            let left = lower_expr(builder, ir_module, &binary_operation.left.expr, function)?;
+            let right = lower_expr(builder, ir_module, &binary_operation.right.expr, function)?;
             let operands = ir::BinaryOperands::new(left, right);
 
             match &binary_operation.operator {
@@ -569,8 +556,8 @@ fn lower_expression(
                 }
             }
         }
-        ExpressionKind::IntegerExtend(value, resolved_type) => {
-            let value = lower_expression(builder, ir_module, value, function)?;
+        ExprKind::IntegerExtend(value, resolved_type) => {
+            let value = lower_expr(builder, ir_module, value, function)?;
             let ir_type = lower_type(resolved_type)?;
 
             Ok(builder.push(
@@ -583,12 +570,12 @@ fn lower_expression(
                 },
             ))
         }
-        ExpressionKind::FloatExtend(value, resolved_type) => {
-            let value = lower_expression(builder, ir_module, value, function)?;
+        ExprKind::FloatExtend(value, resolved_type) => {
+            let value = lower_expr(builder, ir_module, value, function)?;
             let ir_type = lower_type(resolved_type)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
-        ExpressionKind::Member(
+        ExprKind::Member(
             subject_destination,
             structure_ref,
             index,
@@ -623,7 +610,7 @@ fn lower_expression(
             let ir_type = lower_type(resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
-        ExpressionKind::StructureLiteral {
+        ExprKind::StructureLiteral {
             structure_type,
             fields,
             memory_management,
@@ -632,8 +619,8 @@ fn lower_expression(
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
-            for (expression, index) in fields.values() {
-                let ir_value = lower_expression(builder, ir_module, expression, function)?;
+            for (expr, index) in fields.values() {
+                let ir_value = lower_expr(builder, ir_module, expr, function)?;
                 values.push((index, ir_value));
             }
 
@@ -684,13 +671,8 @@ fn lower_expression(
                 }
             }
         }
-        ExpressionKind::UnaryOperator(unary_operation) => {
-            let inner = lower_expression(
-                builder,
-                ir_module,
-                &unary_operation.inner.expression,
-                function,
-            )?;
+        ExprKind::UnaryOperation(unary_operation) => {
+            let inner = lower_expr(builder, ir_module, &unary_operation.inner.expr, function)?;
 
             Ok(builder.push(match unary_operation.operator {
                 resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
@@ -698,14 +680,13 @@ fn lower_expression(
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
             }))
         }
-        ExpressionKind::Conditional(conditional) => {
+        ExprKind::Conditional(conditional) => {
             let resume_basicblock_id = builder.new_block();
 
             let mut incoming = vec![];
 
             for resolved::Branch { condition, block } in conditional.branches.iter() {
-                let expression = &condition.expression;
-                let condition = lower_expression(builder, ir_module, expression, function)?;
+                let condition = lower_expr(builder, ir_module, &condition.expr, function)?;
 
                 let true_basicblock_id = builder.new_block();
                 let false_basicblock_id = builder.new_block();
@@ -719,7 +700,7 @@ fn lower_expression(
                 ));
 
                 builder.use_block(true_basicblock_id);
-                let value = lower_statements(builder, ir_module, &block.statements, function)?;
+                let value = lower_stmts(builder, ir_module, &block.stmts, function)?;
 
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
@@ -731,7 +712,7 @@ fn lower_expression(
             }
 
             if let Some(block) = &conditional.otherwise {
-                let value = lower_statements(builder, ir_module, &block.statements, function)?;
+                let value = lower_stmts(builder, ir_module, &block.stmts, function)?;
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
                     value,
@@ -748,8 +729,8 @@ fn lower_expression(
                 Ok(Value::Literal(Literal::Void))
             }
         }
-        ExpressionKind::BooleanLiteral(value) => Ok(Value::Literal(Literal::Boolean(*value))),
-        ExpressionKind::While(while_loop) => {
+        ExprKind::BooleanLiteral(value) => Ok(Value::Literal(Literal::Boolean(*value))),
+        ExprKind::While(while_loop) => {
             let evaluate_basicblock_id = builder.new_block();
             let true_basicblock_id = builder.new_block();
             let false_basicblock_id = builder.new_block();
@@ -757,7 +738,7 @@ fn lower_expression(
             builder.continues_to(evaluate_basicblock_id);
             builder.use_block(evaluate_basicblock_id);
 
-            let condition = lower_expression(builder, ir_module, &while_loop.condition, function)?;
+            let condition = lower_expr(builder, ir_module, &while_loop.condition, function)?;
 
             builder.push(ir::Instruction::ConditionalBreak(
                 condition,
@@ -768,7 +749,7 @@ fn lower_expression(
             ));
 
             builder.use_block(true_basicblock_id);
-            lower_statements(builder, ir_module, &while_loop.block.statements, function)?;
+            lower_stmts(builder, ir_module, &while_loop.block.stmts, function)?;
             builder.continues_to(evaluate_basicblock_id);
 
             builder.use_block(false_basicblock_id);

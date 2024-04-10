@@ -1,15 +1,15 @@
-use super::ResolveExpressionCtx;
+use super::ResolveExprCtx;
 use crate::{
     ast::Source,
     resolve::error::ResolveError,
-    resolved::{self, TypedExpression},
+    resolved::{self, TypedExpr},
 };
 
-pub fn resolve_variable_expression(
-    ctx: &mut ResolveExpressionCtx<'_, '_>,
+pub fn resolve_variable_expr(
+    ctx: &mut ResolveExprCtx<'_, '_>,
     name: &str,
     source: Source,
-) -> Result<TypedExpression, ResolveError> {
+) -> Result<TypedExpr, ResolveError> {
     if let Some((resolved_type, key)) = ctx.variable_search_ctx.find_variable(name) {
         let function = ctx
             .resolved_ast
@@ -23,10 +23,10 @@ pub fn resolve_variable_expression(
             .expect("found variable to exist")
             .is_initialized();
 
-        Ok(TypedExpression::new_maybe_initialized(
+        Ok(TypedExpr::new_maybe_initialized(
             resolved_type.clone(),
-            resolved::Expression::new(
-                resolved::ExpressionKind::Variable(resolved::Variable {
+            resolved::Expr::new(
+                resolved::ExprKind::Variable(resolved::Variable {
                     key: *key,
                     resolved_type: resolved_type.clone(),
                 }),
@@ -38,10 +38,10 @@ pub fn resolve_variable_expression(
         let (resolved_type, reference) =
             ctx.global_search_ctx.find_global_or_error(name, source)?;
 
-        Ok(TypedExpression::new(
+        Ok(TypedExpr::new(
             resolved_type.clone(),
-            resolved::Expression::new(
-                resolved::ExpressionKind::GlobalVariable(resolved::GlobalVariable {
+            resolved::Expr::new(
+                resolved::ExprKind::GlobalVariable(resolved::GlobalVariable {
                     reference: *reference,
                     resolved_type: resolved_type.clone(),
                 }),

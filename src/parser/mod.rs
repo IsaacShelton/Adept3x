@@ -11,8 +11,8 @@ use self::{
 use crate::{
     ast::{
         self, ArrayAccess, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
-        DeclareAssign, Expression, ExpressionKind, Field, File, FileIdentifier, Function, Global,
-        Parameter, Parameters, Source, Statement, StatementKind, Structure, Type, TypeKind,
+        DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier, Function, Global,
+        Parameter, Parameters, Source, Stmt, StmtKind, Structure, Type, TypeKind,
         UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
@@ -316,7 +316,7 @@ where
             self.parse_type(Some("return "), Some("for function"))?
         };
 
-        let statements = (!is_foreign)
+        let stmts = (!is_foreign)
             .then(|| self.parse_block("function"))
             .transpose()?
             .unwrap_or_default();
@@ -325,12 +325,12 @@ where
             name,
             parameters,
             return_type,
-            statements,
+            stmts,
             is_foreign,
         })
     }
 
-    fn parse_block(&mut self, to_begin_what_block: &str) -> Result<Vec<Statement>, ParseError> {
+    fn parse_block(&mut self, to_begin_what_block: &str) -> Result<Vec<Stmt>, ParseError> {
         self.ignore_newlines();
 
         self.parse_token(
@@ -338,11 +338,11 @@ where
             Some(lazy_format!("to begin {} block", to_begin_what_block)),
         )?;
 
-        let mut statements = Vec::new();
+        let mut stmts = Vec::new();
         self.ignore_newlines();
 
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-            statements.push(self.parse_statement()?);
+            stmts.push(self.parse_stmt()?);
             self.ignore_newlines();
         }
 
@@ -352,7 +352,7 @@ where
             Some(lazy_format!("to close {} block", to_begin_what_block)),
         )?;
 
-        Ok(statements)
+        Ok(stmts)
     }
 
     fn parse_function_parameters(&mut self) -> Result<Parameters, ParseError> {
@@ -395,7 +395,7 @@ where
         })
     }
 
-    fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+    fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
         let location = self.input.peek().location;
 
         match self.input.peek().kind {
@@ -403,13 +403,13 @@ where
                 if let TokenKind::Identifier(..) = self.input.peek_nth(1).kind {
                     self.parse_declaration()
                 } else {
-                    let left = self.parse_expression()?;
+                    let left = self.parse_expr()?;
 
                     if self.input.peek_is(TokenKind::Assign) {
                         self.parse_assignment(left)
                     } else {
-                        Ok(Statement::new(
-                            StatementKind::Expression(left),
+                        Ok(Stmt::new(
+                            StmtKind::Expr(left),
                             self.source(location),
                         ))
                     }
@@ -417,33 +417,33 @@ where
             }
             TokenKind::ReturnKeyword => self.parse_return(),
             TokenKind::EndOfFile => Err(self.unexpected_token_is_next()),
-            _ => Ok(Statement::new(
-                StatementKind::Expression(self.parse_expression()?),
+            _ => Ok(Stmt::new(
+                StmtKind::Expr(self.parse_expr()?),
                 self.source(location),
             )),
         }
     }
 
-    fn parse_declaration(&mut self) -> Result<Statement, ParseError> {
+    fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
         let (name, location) = self.parse_identifier_keep_location(Some("for variable name"))?;
 
         if self.input.peek_is(TokenKind::Assign) {
-            let variable = Expression::new(ExpressionKind::Variable(name), self.source(location));
+            let variable = Expr::new(ExprKind::Variable(name), self.source(location));
             self.parse_assignment(variable)
         } else {
             let ast_type = self.parse_type(None::<&str>, Some("for variable type"))?;
 
             let value = if self.input.peek_is(TokenKind::Assign) {
                 self.input.advance();
-                Some(self.parse_expression()?)
+                Some(self.parse_expr()?)
             } else {
                 None
             };
 
             self.ignore_newlines();
 
-            Ok(Statement::new(
-                StatementKind::Declaration(Declaration {
+            Ok(Stmt::new(
+                StmtKind::Declaration(Declaration {
                     name,
                     ast_type,
                     value,
@@ -453,43 +453,43 @@ where
         }
     }
 
-    fn parse_assignment(&mut self, destination: Expression) -> Result<Statement, ParseError> {
+    fn parse_assignment(&mut self, destination: Expr) -> Result<Stmt, ParseError> {
         let location = self.parse_token(TokenKind::Assign, Some("for assignment"))?;
-        let value = self.parse_expression()?;
+        let value = self.parse_expr()?;
 
-        Ok(Statement::new(
-            StatementKind::Assignment(Assignment { destination, value }),
+        Ok(Stmt::new(
+            StmtKind::Assignment(Assignment { destination, value }),
             self.source(location),
         ))
     }
 
-    fn parse_return(&mut self) -> Result<Statement, ParseError> {
+    fn parse_return(&mut self) -> Result<Stmt, ParseError> {
         // return VALUE
         //          ^
 
         let location = self.parse_token(TokenKind::ReturnKeyword, Some("for return statement"))?;
 
-        Ok(Statement::new(
-            StatementKind::Return(if self.input.peek_is(TokenKind::Newline) {
+        Ok(Stmt::new(
+            StmtKind::Return(if self.input.peek_is(TokenKind::Newline) {
                 None
             } else {
-                Some(self.parse_expression()?)
+                Some(self.parse_expr()?)
             }),
             self.source(location),
         ))
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, ParseError> {
-        let primary = self.parse_expression_primary()?;
-        self.parse_operator_expression(0, primary)
+    fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        let primary = self.parse_expr_primary()?;
+        self.parse_operator_expr(0, primary)
     }
 
-    fn parse_operator_expression(
+    fn parse_operator_expr(
         &mut self,
         precedence: usize,
-        expression: Expression,
-    ) -> Result<Expression, ParseError> {
-        let mut lhs = expression;
+        expr: Expr,
+    ) -> Result<Expr, ParseError> {
+        let mut lhs = expr;
 
         loop {
             let operator = self.input.peek();
@@ -528,43 +528,43 @@ where
         }
     }
 
-    fn parse_expression_primary(&mut self) -> Result<Expression, ParseError> {
-        let expression = self.parse_expression_primary_base()?;
-        self.parse_expression_primary_post(expression)
+    fn parse_expr_primary(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.parse_expr_primary_base()?;
+        self.parse_expr_primary_post(expr)
     }
 
-    fn parse_expression_primary_base(&mut self) -> Result<Expression, ParseError> {
+    fn parse_expr_primary_base(&mut self) -> Result<Expr, ParseError> {
         let Token { kind, location } = self.input.peek();
         let location = *location;
 
         match kind {
             TokenKind::TrueKeyword => {
                 self.input.advance().kind.unwrap_true_keyword();
-                Ok(Expression::new(
-                    ExpressionKind::Boolean(true),
+                Ok(Expr::new(
+                    ExprKind::Boolean(true),
                     self.source(location),
                 ))
             }
             TokenKind::FalseKeyword => {
                 self.input.advance().kind.unwrap_false_keyword();
-                Ok(Expression::new(
-                    ExpressionKind::Boolean(false),
+                Ok(Expr::new(
+                    ExprKind::Boolean(false),
                     self.source(location),
                 ))
             }
-            TokenKind::Integer(..) => Ok(Expression::new(
-                ExpressionKind::Integer(self.input.advance().kind.unwrap_integer()),
+            TokenKind::Integer(..) => Ok(Expr::new(
+                ExprKind::Integer(self.input.advance().kind.unwrap_integer()),
                 self.source(location),
             )),
-            TokenKind::Float(..) => Ok(Expression::new(
-                ExpressionKind::Float(self.input.advance().kind.unwrap_float()),
+            TokenKind::Float(..) => Ok(Expr::new(
+                ExprKind::Float(self.input.advance().kind.unwrap_float()),
                 self.source(location),
             )),
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::NullTerminated,
                 ..
-            }) => Ok(Expression::new(
-                ExpressionKind::NullTerminatedString(
+            }) => Ok(Expr::new(
+                ExprKind::NullTerminatedString(
                     CString::new(self.input.advance().kind.unwrap_string().value)
                         .expect("valid null-terminated string"),
                 ),
@@ -573,13 +573,13 @@ where
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::Normal,
                 ..
-            }) => Ok(Expression::new(
-                ExpressionKind::String(self.input.advance().kind.unwrap_string().value),
+            }) => Ok(Expr::new(
+                ExprKind::String(self.input.advance().kind.unwrap_string().value),
                 self.source(location),
             )),
             TokenKind::OpenParen => {
                 self.input.advance().kind.unwrap_open_paren();
-                let inner = self.parse_expression()?;
+                let inner = self.parse_expr()?;
                 self.parse_token(TokenKind::CloseParen, Some("to close nested expression"))?;
                 Ok(inner)
             }
@@ -599,16 +599,16 @@ where
                         | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
                             self.parse_structure_literal()
                         }
-                        _ => Ok(Expression::new(
-                            ExpressionKind::Variable(self.input.advance().kind.unwrap_identifier()),
+                        _ => Ok(Expr::new(
+                            ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
                             self.source(location),
                         )),
                     }
                 }
                 TokenKind::OpenParen => self.parse_call(),
                 TokenKind::DeclareAssign => self.parse_declare_assign(),
-                _ => Ok(Expression::new(
-                    ExpressionKind::Variable(self.input.advance().kind.unwrap_identifier()),
+                _ => Ok(Expr::new(
+                    ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
                     self.source(location),
                 )),
             },
@@ -621,10 +621,10 @@ where
                 };
 
                 let location = self.input.advance().location;
-                let inner = self.parse_expression()?;
+                let inner = self.parse_expr()?;
 
-                Ok(Expression::new(
-                    ExpressionKind::UnaryOperator(Box::new(UnaryOperation { operator, inner })),
+                Ok(Expr::new(
+                    ExprKind::UnaryOperation(Box::new(UnaryOperation { operator, inner })),
                     self.source(location),
                 ))
             }
@@ -632,15 +632,15 @@ where
                 self.input.advance().kind.unwrap_if_keyword();
                 self.ignore_newlines();
 
-                let condition = self.parse_expression()?;
-                let statements = self.parse_block("'if'")?;
-                let mut conditions = vec![(condition, Block::new(statements))];
+                let condition = self.parse_expr()?;
+                let stmts = self.parse_block("'if'")?;
+                let mut conditions = vec![(condition, Block::new(stmts))];
 
                 while self.input.peek_is(TokenKind::ElifKeyword) {
                     self.input.advance().kind.unwrap_elif_keyword();
                     self.ignore_newlines();
 
-                    let condition = self.parse_expression()?;
+                    let condition = self.parse_expr()?;
                     conditions.push((condition, Block::new(self.parse_block("'elif'")?)));
                 }
 
@@ -658,8 +658,8 @@ where
                     otherwise,
                 };
 
-                Ok(Expression::new(
-                    ExpressionKind::Conditional(conditional),
+                Ok(Expr::new(
+                    ExprKind::Conditional(conditional),
                     self.source(location),
                 ))
             }
@@ -667,13 +667,13 @@ where
                 self.input.advance().kind.unwrap_while_keyword();
                 self.ignore_newlines();
 
-                let condition = self.parse_expression()?;
-                let statements = self.parse_block("'while'")?;
+                let condition = self.parse_expr()?;
+                let stmts = self.parse_block("'while'")?;
 
-                Ok(Expression::new(
-                    ExpressionKind::While(While {
+                Ok(Expr::new(
+                    ExprKind::While(While {
                         condition: Box::new(condition),
-                        block: Block::new(statements),
+                        block: Block::new(stmts),
                     }),
                     self.source(location),
                 ))
@@ -689,10 +689,10 @@ where
         }
     }
 
-    fn parse_expression_primary_post(
+    fn parse_expr_primary_post(
         &mut self,
-        mut base: Expression,
-    ) -> Result<Expression, ParseError> {
+        mut base: Expr,
+    ) -> Result<Expr, ParseError> {
         loop {
             self.ignore_newlines();
 
@@ -706,38 +706,38 @@ where
         Ok(base)
     }
 
-    fn parse_member(&mut self, subject: Expression) -> Result<Expression, ParseError> {
+    fn parse_member(&mut self, subject: Expr) -> Result<Expr, ParseError> {
         // subject.field_name
         //        ^
 
         let location = self.parse_token(TokenKind::Member, Some("for member expression"))?;
         let field_name = self.parse_identifier(Some("for field name"))?;
 
-        Ok(Expression::new(
-            ExpressionKind::Member(Box::new(subject), field_name),
+        Ok(Expr::new(
+            ExprKind::Member(Box::new(subject), field_name),
             self.source(location),
         ))
     }
 
-    fn parse_array_access(&mut self, subject: Expression) -> Result<Expression, ParseError> {
+    fn parse_array_access(&mut self, subject: Expr) -> Result<Expr, ParseError> {
         // subject[index]
         //        ^
 
         let location = self.parse_token(TokenKind::OpenBracket, Some("for array access"))?;
 
         self.ignore_newlines();
-        let index = self.parse_expression()?;
+        let index = self.parse_expr()?;
         self.ignore_newlines();
 
         self.parse_token(TokenKind::CloseBracket, Some("to close array access"))?;
 
-        Ok(Expression::new(
-            ExpressionKind::ArrayAccess(Box::new(ArrayAccess { subject, index })),
+        Ok(Expr::new(
+            ExprKind::ArrayAccess(Box::new(ArrayAccess { subject, index })),
             self.source(location),
         ))
     }
 
-    fn parse_structure_literal(&mut self) -> Result<Expression, ParseError> {
+    fn parse_structure_literal(&mut self) -> Result<Expr, ParseError> {
         // Type { x: VALUE, b: VALUE, c: VALUE }
         //  ^
 
@@ -757,7 +757,7 @@ where
             self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
             self.ignore_newlines();
 
-            let field_value = self.parse_expression()?;
+            let field_value = self.parse_expr()?;
             self.ignore_newlines();
 
             if fields.get(&field_name).is_some() {
@@ -778,13 +778,13 @@ where
         }
 
         self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
-        Ok(Expression::new(
-            ExpressionKind::StructureLiteral(ast_type, fields),
+        Ok(Expr::new(
+            ExprKind::StructureLiteral(ast_type, fields),
             source,
         ))
     }
 
-    fn parse_call(&mut self) -> Result<Expression, ParseError> {
+    fn parse_call(&mut self) -> Result<Expr, ParseError> {
         // function_name(arg1, arg2, arg3)
         //              ^
 
@@ -802,14 +802,14 @@ where
                 self.ignore_newlines();
             }
 
-            arguments.push(self.parse_expression()?);
+            arguments.push(self.parse_expr()?);
             self.ignore_newlines();
         }
 
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
-        Ok(Expression::new(
-            ExpressionKind::Call(Call {
+        Ok(Expr::new(
+            ExprKind::Call(Call {
                 function_name,
                 arguments,
             }),
@@ -819,15 +819,15 @@ where
 
     fn parse_math(
         &mut self,
-        lhs: Expression,
+        lhs: Expr,
         operator: BinaryOperator,
         operator_precedence: usize,
         location: Location,
-    ) -> Result<Expression, ParseError> {
+    ) -> Result<Expr, ParseError> {
         let rhs = self.parse_math_rhs(operator_precedence)?;
 
-        Ok(Expression::new(
-            ExpressionKind::BinaryOperation(Box::new(BinaryOperation {
+        Ok(Expr::new(
+            ExprKind::BinaryOperation(Box::new(BinaryOperation {
                 operator,
                 left: lhs,
                 right: rhs,
@@ -836,23 +836,23 @@ where
         ))
     }
 
-    fn parse_math_rhs(&mut self, operator_precedence: usize) -> Result<Expression, ParseError> {
+    fn parse_math_rhs(&mut self, operator_precedence: usize) -> Result<Expr, ParseError> {
         // Skip over operator token
         self.input.advance();
 
-        let rhs = self.parse_expression_primary()?;
+        let rhs = self.parse_expr_primary()?;
         let next_operator = self.input.peek();
         let next_precedence = next_operator.kind.precedence();
 
         if !((next_precedence + is_right_associative(next_operator) as usize) < operator_precedence)
         {
-            self.parse_operator_expression(operator_precedence + 1, rhs)
+            self.parse_operator_expr(operator_precedence + 1, rhs)
         } else {
             Ok(rhs)
         }
     }
 
-    fn parse_declare_assign(&mut self) -> Result<Expression, ParseError> {
+    fn parse_declare_assign(&mut self) -> Result<Expr, ParseError> {
         // variable_name := value
         //               ^
 
@@ -866,10 +866,10 @@ where
         )?;
         self.ignore_newlines();
 
-        let value = self.parse_expression()?;
+        let value = self.parse_expr()?;
 
-        Ok(Expression::new(
-            ExpressionKind::DeclareAssign(DeclareAssign {
+        Ok(Expr::new(
+            ExprKind::DeclareAssign(DeclareAssign {
                 name: variable_name,
                 value: Box::new(value),
             }),
