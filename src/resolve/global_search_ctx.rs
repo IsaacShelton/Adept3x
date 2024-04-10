@@ -7,12 +7,12 @@ use crate::{
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct GlobalSearchContext<'a> {
+pub struct GlobalSearchCtx<'a> {
     source_file_cache: &'a SourceFileCache,
     globals: HashMap<String, (resolved::Type, GlobalRef)>,
 }
 
-impl<'a> GlobalSearchContext<'a> {
+impl<'a> GlobalSearchCtx<'a> {
     pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
         Self {
             source_file_cache,

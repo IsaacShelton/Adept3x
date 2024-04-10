@@ -7,13 +7,13 @@ use crate::{
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct VariableSearchContext<'a> {
+pub struct VariableSearchCtx<'a> {
     source_file_cache: &'a SourceFileCache,
     variables: HashMap<String, (resolved::Type, VariableStorageKey)>,
-    parent: Option<&'a VariableSearchContext<'a>>,
+    parent: Option<&'a VariableSearchCtx<'a>>,
 }
 
-impl<'a> VariableSearchContext<'a> {
+impl<'a> VariableSearchCtx<'a> {
     pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
         Self {
             source_file_cache,

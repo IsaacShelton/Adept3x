@@ -53,6 +53,8 @@ pub enum ResolveErrorKind {
     BadTypeForArgumentToFunction {
         name: String,
         i: usize,
+        expected: String,
+        got: String,
     },
     IncompatibleTypesForBinaryOperator {
         operator: String,
@@ -168,8 +170,8 @@ impl Display for ResolveError {
             ResolveErrorKind::TooManyArgumentsToFunction { name } => {
                 write!(f, "Too many arguments for call to function '{}'", name)?;
             }
-            ResolveErrorKind::BadTypeForArgumentToFunction { name, i } => {
-                write!(f, "Bad type for argument #{} to function '{}'", i + 1, name)?;
+            ResolveErrorKind::BadTypeForArgumentToFunction { name, i, expected, got } => {
+                write!(f, "Bad type for argument #{} to function '{}' (expected '{}' but got '{}')", i + 1, name, expected, got)?;
             }
             ResolveErrorKind::IncompatibleTypesForBinaryOperator {
                 operator,
