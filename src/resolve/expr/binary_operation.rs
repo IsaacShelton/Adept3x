@@ -3,7 +3,7 @@ use crate::{
     ast::{self, Source},
     resolve::{
         error::{ResolveError, ResolveErrorKind},
-        unify_types, Initialized,
+        unify_types::unify_types, Initialized,
     },
     resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpr},
 };

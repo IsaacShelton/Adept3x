@@ -4,7 +4,9 @@ use crate::{
     resolve::{
         conform_expr_or_error,
         error::{ResolveError, ResolveErrorKind},
-        resolve_stmts, unify_types, Initialized,
+        resolve_stmts,
+        unify_types::unify_types,
+        Initialized,
     },
     resolved::{self, Branch, TypedExpr},
 };

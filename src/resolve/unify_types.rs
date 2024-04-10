@@ -1,0 +1,164 @@
+use super::conform_expr;
+use crate::resolved::{self, FloatSize, IntegerBits, IntegerSign, TypedExpr};
+use itertools::Itertools;
+use num_bigint::BigInt;
+use num_traits::Zero;
+use std::borrow::Borrow;
+
+pub fn unify_types(exprs: &mut [&mut TypedExpr]) -> Option<resolved::Type> {
+    let unified_type = unifying_type_for(exprs);
+
+    if let Some(unified_type) = &unified_type {
+        for expr in exprs.iter_mut() {
+            **expr = match conform_expr(&**expr, unified_type) {
+                Some(conformed) => conformed,
+                None => {
+                    panic!(
+                        "cannot conform to unified type {} for value of type {}",
+                        unified_type.to_string(),
+                        expr.resolved_type.to_string(),
+                    );
+                }
+            }
+        }
+    }
+
+    unified_type
+}
+
+fn unify_integer_properties(
+    required_bits: Option<IntegerBits>,
+    required_sign: Option<IntegerSign>,
+    ty: &resolved::Type,
+) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
+    let (new_bits, new_sign) = match ty {
+        resolved::Type::Integer { bits, sign } => (
+            match required_sign {
+                Some(IntegerSign::Unsigned) if *sign == IntegerSign::Signed => {
+                    // Compensate for situations like i32 + u32
+                    bits.bits() as u64 + 1
+                }
+                _ => bits.bits() as u64,
+            },
+            Some(*sign),
+        ),
+        resolved::Type::IntegerLiteral(value) => {
+            let unsigned_bits = value.bits();
+
+            let (bits, sign) = if *value < BigInt::zero() {
+                (unsigned_bits + 1, Some(IntegerSign::Signed))
+            } else {
+                (unsigned_bits, None)
+            };
+
+            (bits, sign)
+        }
+        _ => return None,
+    };
+
+    let check_overflow = match ty {
+        resolved::Type::Integer {
+            bits: IntegerBits::Normal,
+            ..
+        } => true,
+        _ => required_bits == Some(IntegerBits::Normal),
+    };
+
+    let old_bits = match (required_sign, new_sign) {
+        (Some(IntegerSign::Signed), Some(IntegerSign::Unsigned)) => {
+            required_bits.map(|bits| bits.bits() + 1).unwrap_or(0)
+        }
+        _ => required_bits.map(|bits| bits.bits()).unwrap_or(0),
+    };
+    let old_sign = required_sign;
+
+    let sign_kind = match (old_sign, new_sign) {
+        (Some(old_sign), Some(new_sign)) => {
+            if old_sign == IntegerSign::Signed || new_sign == IntegerSign::Signed {
+                Some(IntegerSign::Signed)
+            } else {
+                Some(IntegerSign::Unsigned)
+            }
+        }
+        (Some(old_sign), None) => Some(old_sign),
+        (None, Some(new_sign)) => Some(new_sign),
+        (None, None) => None,
+    };
+
+    let bits_kind = IntegerBits::new(new_bits.max(old_bits.into())).map(|bits| match bits {
+        IntegerBits::Bits64 => {
+            if check_overflow {
+                IntegerBits::Normal
+            } else {
+                bits
+            }
+        }
+        _ => bits,
+    });
+
+    bits_kind.map(|bits_kind| ((Some(bits_kind), sign_kind)))
+}
+
+fn bits_and_sign_for<'a>(
+    types: &[&resolved::Type],
+) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
+    types.iter().fold(Some((None, None)), |acc, ty| match acc {
+        Some((maybe_bits, maybe_sign)) => unify_integer_properties(maybe_bits, maybe_sign, ty),
+        None => None,
+    })
+}
+
+fn unifying_type_for(exprs: &[impl Borrow<TypedExpr>]) -> Option<resolved::Type> {
+    let types = exprs
+        .iter()
+        .map(|expr| &expr.borrow().resolved_type)
+        .collect_vec();
+
+    if types.iter().all_equal() {
+        return Some(
+            exprs
+                .first()
+                .map(|expr| expr.borrow().resolved_type.clone())
+                .unwrap_or_else(|| resolved::Type::Void),
+        );
+    }
+
+    // If all integer literals
+    if types
+        .iter()
+        .all(|resolved_type| matches!(resolved_type, resolved::Type::IntegerLiteral(..)))
+    {
+        // TODO: We can be smarter than this
+        return Some(resolved::Type::Integer {
+            bits: IntegerBits::Normal,
+            sign: IntegerSign::Signed,
+        });
+    }
+
+    // If all (integer/float) literals
+    if types.iter().all(|resolved_type| {
+        matches!(
+            resolved_type,
+            resolved::Type::IntegerLiteral(..) | resolved::Type::FloatLiteral(..)
+        )
+    }) {
+        return Some(resolved::Type::Float(FloatSize::Normal));
+    }
+
+    // If all integers and integer literals
+    if types.iter().all(|resolved_type| {
+        matches!(
+            resolved_type,
+            resolved::Type::IntegerLiteral(..) | resolved::Type::Integer { .. }
+        )
+    }) {
+        let (bits, sign) = bits_and_sign_for(&types[..])?;
+
+        let bits = bits.unwrap_or(IntegerBits::Normal);
+        let sign = sign.unwrap_or(IntegerSign::Signed);
+
+        return Some(resolved::Type::Integer { bits, sign });
+    }
+
+    None
+}

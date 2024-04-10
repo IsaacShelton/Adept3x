@@ -2,7 +2,9 @@ mod error;
 mod expr;
 mod function_search_ctx;
 mod global_search_ctx;
+mod stmt;
 mod type_search_ctx;
+mod unify_types;
 mod variable_search_ctx;
 
 use crate::{
@@ -13,20 +15,12 @@ use crate::{
 use ast::{FloatSize, IntegerBits, IntegerSign};
 use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
-use itertools::Itertools;
 use num_bigint::BigInt;
-use num_traits::{ToPrimitive, Zero};
-use std::{
-    borrow::Borrow,
-    collections::{HashMap, VecDeque},
-};
+use num_traits::ToPrimitive;
+use std::collections::{HashMap, VecDeque};
 
 use self::{
-    error::{ResolveError, ResolveErrorKind},
-    expr::{resolve_expr, ResolveExprCtx},
-    global_search_ctx::GlobalSearchCtx,
-    type_search_ctx::TypeSearchCtx,
-    variable_search_ctx::VariableSearchCtx,
+    error::{ResolveError, ResolveErrorKind}, expr::ResolveExprCtx, global_search_ctx::GlobalSearchCtx, stmt::resolve_stmts, type_search_ctx::TypeSearchCtx, variable_search_ctx::VariableSearchCtx
 };
 
 enum Job {
@@ -220,177 +214,6 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     Ok(resolved_ast)
 }
 
-fn resolve_stmts(
-    ctx: &mut ResolveExprCtx<'_, '_>,
-    stmts: &[ast::Stmt],
-) -> Result<Vec<resolved::Stmt>, ResolveError> {
-    let mut resolved_stmts = Vec::with_capacity(stmts.len());
-
-    for stmt in stmts.iter() {
-        resolved_stmts.push(resolve_stmt(ctx, stmt)?);
-    }
-
-    Ok(resolved_stmts)
-}
-
-fn resolve_stmt<'a>(
-    ctx: &mut ResolveExprCtx<'_, '_>,
-    ast_stmt: &ast::Stmt,
-) -> Result<resolved::Stmt, ResolveError> {
-    let source = ast_stmt.source;
-
-    match &ast_stmt.kind {
-        ast::StmtKind::Return(value) => {
-            let return_value = if let Some(value) = value {
-                let result = resolve_expr(ctx, value, Initialized::Require)?;
-
-                let function = ctx
-                    .resolved_ast
-                    .functions
-                    .get(ctx.resolved_function_ref)
-                    .unwrap();
-
-                if let Some(result) = conform_expr(&result, &function.return_type) {
-                    Some(result.expr)
-                } else {
-                    return Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotReturnValueOfType {
-                            returning: result.resolved_type.to_string(),
-                            expected: function.return_type.to_string(),
-                        },
-                    ));
-                }
-            } else {
-                let function = ctx
-                    .resolved_ast
-                    .functions
-                    .get(ctx.resolved_function_ref)
-                    .unwrap();
-
-                if function.return_type != resolved::Type::Void {
-                    return Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotReturnVoid {
-                            expected: function.return_type.to_string(),
-                        },
-                    ));
-                }
-
-                None
-            };
-
-            Ok(resolved::Stmt::new(
-                resolved::StmtKind::Return(return_value),
-                source,
-            ))
-        }
-        ast::StmtKind::Expr(value) => Ok(resolved::Stmt::new(
-            resolved::StmtKind::Expr(resolve_expr(ctx, value, Initialized::Require)?),
-            source,
-        )),
-        ast::StmtKind::Declaration(declaration) => {
-            let resolved_type = resolve_type(
-                ctx.type_search_ctx,
-                ctx.resolved_ast.source_file_cache,
-                &declaration.ast_type,
-            )?;
-
-            let value = declaration
-                .value
-                .as_ref()
-                .map(|value| resolve_expr(ctx, value, Initialized::Require))
-                .transpose()?
-                .as_ref()
-                .map(|value| match conform_expr(value, &resolved_type) {
-                    Some(value) => Ok(value.expr),
-                    None => Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotAssignValueOfType {
-                            from: value.resolved_type.to_string(),
-                            to: resolved_type.to_string(),
-                        },
-                    )),
-                })
-                .transpose()?;
-
-            let function = ctx
-                .resolved_ast
-                .functions
-                .get_mut(ctx.resolved_function_ref)
-                .unwrap();
-
-            let key = function
-                .variables
-                .add_variable(resolved_type.clone(), value.is_some());
-
-            ctx.variable_search_ctx
-                .put(&declaration.name, resolved_type.clone(), key);
-
-            Ok(resolved::Stmt::new(
-                resolved::StmtKind::Declaration(resolved::Declaration { key, value }),
-                source,
-            ))
-        }
-        ast::StmtKind::Assignment(assignment) => {
-            let destination_expr = resolve_expr(
-                ctx,
-                &assignment.destination,
-                Initialized::AllowUninitialized,
-            )?;
-
-            let value = resolve_expr(ctx, &assignment.value, Initialized::Require)?;
-
-            match conform_expr(&value, &destination_expr.resolved_type) {
-                Some(value) => {
-                    let destination = resolve_expr_to_destination(
-                        ctx.resolved_ast.source_file_cache,
-                        destination_expr.expr,
-                    )?;
-
-                    // Mark destination as initialized
-                    match &destination.kind {
-                        resolved::DestinationKind::Variable(variable) => {
-                            let function = ctx
-                                .resolved_ast
-                                .functions
-                                .get_mut(ctx.resolved_function_ref)
-                                .unwrap();
-
-                            function
-                                .variables
-                                .get(variable.key)
-                                .expect("variable being assigned to exists")
-                                .set_initialized();
-                        }
-                        resolved::DestinationKind::GlobalVariable(..) => (),
-                        resolved::DestinationKind::Member(..) => (),
-                    }
-
-                    Ok(resolved::Stmt::new(
-                        resolved::StmtKind::Assignment(resolved::Assignment {
-                            destination,
-                            value: value.expr,
-                        }),
-                        source,
-                    ))
-                }
-                None => Err(ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    source,
-                    ResolveErrorKind::CannotAssignValueOfType {
-                        from: value.resolved_type.to_string(),
-                        to: destination_expr.resolved_type.to_string(),
-                    },
-                )),
-            }
-        }
-    }
-}
-
 fn conform_expr_or_error(
     source_file_cache: &SourceFileCache,
     expr: &TypedExpr,
@@ -438,10 +261,7 @@ fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr>
             match to_type {
                 resolved::Type::Float(size) => Some(TypedExpr::new(
                     resolved::Type::Float(*size),
-                    resolved::Expr::new(
-                        resolved::ExprKind::Float(*size, *value),
-                        expr.expr.source,
-                    ),
+                    resolved::Expr::new(resolved::ExprKind::Float(*size, *value), expr.expr.source),
                 )),
                 _ => None,
             }
@@ -449,9 +269,7 @@ fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr>
         resolved::Type::Float(from_size) => {
             // Float -> Float
             match to_type {
-                resolved::Type::Float(size) => {
-                    conform_float_value(&expr.expr, *from_size, *size)
-                }
+                resolved::Type::Float(size) => conform_float_value(&expr.expr, *from_size, *size),
                 _ => None,
             }
         }
@@ -811,162 +629,4 @@ fn ensure_initialized(
             },
         ))
     }
-}
-
-fn unify_integer_properties(
-    required_bits: Option<IntegerBits>,
-    required_sign: Option<IntegerSign>,
-    ty: &resolved::Type,
-) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
-    let (new_bits, new_sign) = match ty {
-        resolved::Type::Integer { bits, sign } => (
-            match required_sign {
-                Some(IntegerSign::Unsigned) if *sign == IntegerSign::Signed => {
-                    // Compensate for situations like i32 + u32
-                    bits.bits() as u64 + 1
-                }
-                _ => bits.bits() as u64,
-            },
-            Some(*sign),
-        ),
-        resolved::Type::IntegerLiteral(value) => {
-            let unsigned_bits = value.bits();
-
-            let (bits, sign) = if *value < BigInt::zero() {
-                (unsigned_bits + 1, Some(IntegerSign::Signed))
-            } else {
-                (unsigned_bits, None)
-            };
-
-            (bits, sign)
-        }
-        _ => return None,
-    };
-
-    let check_overflow = match ty {
-        resolved::Type::Integer {
-            bits: IntegerBits::Normal,
-            ..
-        } => true,
-        _ => required_bits == Some(IntegerBits::Normal),
-    };
-
-    let old_bits = match (required_sign, new_sign) {
-        (Some(IntegerSign::Signed), Some(IntegerSign::Unsigned)) => {
-            required_bits.map(|bits| bits.bits() + 1).unwrap_or(0)
-        }
-        _ => required_bits.map(|bits| bits.bits()).unwrap_or(0),
-    };
-    let old_sign = required_sign;
-
-    let sign_kind = match (old_sign, new_sign) {
-        (Some(old_sign), Some(new_sign)) => {
-            if old_sign == IntegerSign::Signed || new_sign == IntegerSign::Signed {
-                Some(IntegerSign::Signed)
-            } else {
-                Some(IntegerSign::Unsigned)
-            }
-        }
-        (Some(old_sign), None) => Some(old_sign),
-        (None, Some(new_sign)) => Some(new_sign),
-        (None, None) => None,
-    };
-
-    let bits_kind = IntegerBits::new(new_bits.max(old_bits.into())).map(|bits| match bits {
-        IntegerBits::Bits64 => {
-            if check_overflow {
-                IntegerBits::Normal
-            } else {
-                bits
-            }
-        }
-        _ => bits,
-    });
-
-    bits_kind.map(|bits_kind| ((Some(bits_kind), sign_kind)))
-}
-
-fn bits_and_sign_for<'a>(
-    types: &[&resolved::Type],
-) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
-    types.iter().fold(Some((None, None)), |acc, ty| match acc {
-        Some((maybe_bits, maybe_sign)) => unify_integer_properties(maybe_bits, maybe_sign, ty),
-        None => None,
-    })
-}
-
-fn unifying_type_for(exprs: &[impl Borrow<TypedExpr>]) -> Option<resolved::Type> {
-    let types = exprs
-        .iter()
-        .map(|expr| &expr.borrow().resolved_type)
-        .collect_vec();
-
-    if types.iter().all_equal() {
-        return Some(
-            exprs
-                .first()
-                .map(|expr| expr.borrow().resolved_type.clone())
-                .unwrap_or_else(|| resolved::Type::Void),
-        );
-    }
-
-    // If all integer literals
-    if types
-        .iter()
-        .all(|resolved_type| matches!(resolved_type, resolved::Type::IntegerLiteral(..)))
-    {
-        // TODO: We can be smarter than this
-        return Some(resolved::Type::Integer {
-            bits: IntegerBits::Normal,
-            sign: IntegerSign::Signed,
-        });
-    }
-
-    // If all (integer/float) literals
-    if types.iter().all(|resolved_type| {
-        matches!(
-            resolved_type,
-            resolved::Type::IntegerLiteral(..) | resolved::Type::FloatLiteral(..)
-        )
-    }) {
-        return Some(resolved::Type::Float(FloatSize::Normal));
-    }
-
-    // If all integers and integer literals
-    if types.iter().all(|resolved_type| {
-        matches!(
-            resolved_type,
-            resolved::Type::IntegerLiteral(..) | resolved::Type::Integer { .. }
-        )
-    }) {
-        let (bits, sign) = bits_and_sign_for(&types[..])?;
-
-        let bits = bits.unwrap_or(IntegerBits::Normal);
-        let sign = sign.unwrap_or(IntegerSign::Signed);
-
-        return Some(resolved::Type::Integer { bits, sign });
-    }
-
-    None
-}
-
-fn unify_types(exprs: &mut [&mut TypedExpr]) -> Option<resolved::Type> {
-    let unified_type = unifying_type_for(exprs);
-
-    if let Some(unified_type) = &unified_type {
-        for expr in exprs.iter_mut() {
-            **expr = match conform_expr(&**expr, unified_type) {
-                Some(conformed) => conformed,
-                None => {
-                    panic!(
-                        "cannot conform to unified type {} for value of type {}",
-                        unified_type.to_string(),
-                        expr.resolved_type.to_string(),
-                    );
-                }
-            }
-        }
-    }
-
-    unified_type
 }
