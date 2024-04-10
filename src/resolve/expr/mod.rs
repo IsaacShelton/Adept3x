@@ -131,13 +131,14 @@ pub fn resolve_expr(
             resolved::Type::Boolean,
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
-    };
+    }?;
 
-    resolved_expr.and_then(|resolved_expr| match initialized {
+    match initialized {
         Initialized::Require => {
             ensure_initialized(ctx.resolved_ast.source_file_cache, ast_expr, &resolved_expr)?;
-            Ok(resolved_expr)
         }
-        Initialized::AllowUninitialized => Ok(resolved_expr),
-    })
+        Initialized::AllowUninitialized => (),
+    }
+
+    Ok(resolved_expr)
 }
