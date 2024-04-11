@@ -1,9 +1,10 @@
-use super::{resolve_expr, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
         error::{ResolveError, ResolveErrorKind},
-        unify_types::unify_types, Initialized,
+        unify_types::unify_types,
+        Initialized,
     },
     resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpr},
 };
@@ -12,12 +13,28 @@ use ast::{IntegerBits, IntegerSign};
 pub fn resolve_binary_operation_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     binary_operation: &ast::BinaryOperation,
+    preferred_type: Option<PreferredType>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let mut left = resolve_expr(ctx, &binary_operation.left, Initialized::Require)?;
-    let mut right = resolve_expr(ctx, &binary_operation.right, Initialized::Require)?;
+    let mut left = resolve_expr(
+        ctx,
+        &binary_operation.left,
+        preferred_type,
+        Initialized::Require,
+    )?;
 
-    let unified_type = unify_types(&mut [&mut left, &mut right]).ok_or_else(|| {
+    let mut right = resolve_expr(
+        ctx,
+        &binary_operation.right,
+        preferred_type,
+        Initialized::Require,
+    )?;
+
+    let unified_type = unify_types(
+        preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
+        &mut [&mut left, &mut right],
+    )
+    .ok_or_else(|| {
         ResolveError::new(
             ctx.resolved_ast.source_file_cache,
             source,

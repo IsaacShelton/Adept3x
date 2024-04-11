@@ -14,7 +14,7 @@ pub fn resolve_member_expr(
     field_name: &str,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_subject = resolve_expr(ctx, subject, Initialized::Require)?;
+    let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
     let (structure_ref, memory_management) = match resolved_subject.resolved_type {
         resolved::Type::PlainOldData(_, structure_ref) => (structure_ref, MemoryManagement::None),

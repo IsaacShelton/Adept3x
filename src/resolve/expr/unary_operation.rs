@@ -1,12 +1,13 @@
 use crate::{ast::{self, Source}, resolve::{conform_integer_to_default_or_error, error::{ResolveError, ResolveErrorKind}, Initialized}, resolved::{self, TypedExpr}};
-use super::{resolve_expr, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx};
 
 pub fn resolve_unary_operation_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     unary_operation: &ast::UnaryOperation,
+    preferred_type: Option<PreferredType>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_expr = resolve_expr(ctx, &unary_operation.inner, Initialized::Require)?;
+    let resolved_expr = resolve_expr(ctx, &unary_operation.inner, preferred_type, Initialized::Require)?;
 
     let resolved_expr = match resolved_expr.resolved_type {
         resolved::Type::Boolean => resolved_expr,

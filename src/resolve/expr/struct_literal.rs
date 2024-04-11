@@ -1,4 +1,4 @@
-use super::{resolve_expr, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Expr, Source},
     resolve::{
@@ -46,31 +46,46 @@ pub fn resolve_struct_literal_expr(
     let mut resolved_fields = IndexMap::new();
 
     for (name, value) in fields.iter() {
-        let resolved_expr = resolve_expr(ctx, value, Initialized::Require)?;
+        // Ensure field exists on structure
+        {
+            let structure = ctx
+                .resolved_ast
+                .structures
+                .get(structure_ref)
+                .expect("referenced structure to exist");
 
-        let structure = ctx
-            .resolved_ast
-            .structures
-            .get(structure_ref)
-            .expect("referenced structure to exist");
-
-        let (index, _, field) = match structure.fields.get_full::<str>(&name) {
-            Some(field) => field,
-            None => {
+            if !structure.fields.contains_key::<str>(&name) {
                 return Err(ResolveError::new(
                     ctx.resolved_ast.source_file_cache,
                     source,
                     ResolveErrorKind::FieldDoesNotExist {
                         field_name: name.to_string(),
                     },
-                ))
+                ));
             }
-        };
+        }
 
-        let resolved_expr = match conform_expr(&resolved_expr, &field.resolved_type) {
-            Some(resolved_expr) => resolved_expr,
-            None => {
-                return Err(ResolveError::new(
+        // Resolve expression value given for this field
+        let resolved_expr = resolve_expr(
+            ctx,
+            value,
+            Some(PreferredType::FieldType(structure_ref, &name)),
+            Initialized::Require,
+        )?;
+
+        // Lookup additional details required for resolution
+        let (index, _, field) = ctx
+            .resolved_ast
+            .structures
+            .get(structure_ref)
+            .expect("referenced structure to exist")
+            .fields
+            .get_full::<str>(&name)
+            .expect("referenced struct field to exist");
+
+        let resolved_expr =
+            conform_expr(&resolved_expr, &field.resolved_type).ok_or_else(|| {
+                ResolveError::new(
                     ctx.resolved_ast.source_file_cache,
                     ast_type.source,
                     ResolveErrorKind::ExpectedTypeForField {
@@ -78,9 +93,8 @@ pub fn resolve_struct_literal_expr(
                         field_name: name.to_string(),
                         expected: field.resolved_type.to_string(),
                     },
-                ))
-            }
-        };
+                )
+            })?;
 
         resolved_fields.insert(name.to_string(), (resolved_expr.expr, index));
     }

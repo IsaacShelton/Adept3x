@@ -5,8 +5,11 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use std::borrow::Borrow;
 
-pub fn unify_types(exprs: &mut [&mut TypedExpr]) -> Option<resolved::Type> {
-    let unified_type = unifying_type_for(exprs);
+pub fn unify_types(
+    preferred_type: Option<&resolved::Type>,
+    exprs: &mut [&mut TypedExpr],
+) -> Option<resolved::Type> {
+    let unified_type = unifying_type_for(preferred_type, exprs);
 
     if let Some(unified_type) = &unified_type {
         for expr in exprs.iter_mut() {
@@ -108,7 +111,38 @@ fn bits_and_sign_for<'a>(
     })
 }
 
-fn unifying_type_for(exprs: &[impl Borrow<TypedExpr>]) -> Option<resolved::Type> {
+fn do_integer_literal_types_fit_in_integer(
+    preferred_bits: IntegerBits,
+    preferred_sign: IntegerSign,
+    types: &[&resolved::Type],
+) -> bool {
+    types
+        .iter()
+        .map(|resolved_type| match resolved_type {
+            resolved::Type::IntegerLiteral(value) => value,
+            _ => panic!("expected integer literal type"),
+        })
+        .all(|value| {
+            let sign = if *value < BigInt::zero() {
+                IntegerSign::Signed
+            } else {
+                IntegerSign::Unsigned
+            };
+
+            let bits = match sign {
+                IntegerSign::Unsigned => value.bits(),
+                IntegerSign::Signed => value.bits() + 1,
+            };
+
+            bits <= preferred_bits.bits().into()
+                && (preferred_sign != IntegerSign::Unsigned || sign == IntegerSign::Unsigned)
+        })
+}
+
+fn unifying_type_for(
+    preferred_type: Option<&resolved::Type>,
+    exprs: &[impl Borrow<TypedExpr>],
+) -> Option<resolved::Type> {
     let types = exprs
         .iter()
         .map(|expr| &expr.borrow().resolved_type)
@@ -128,10 +162,24 @@ fn unifying_type_for(exprs: &[impl Borrow<TypedExpr>]) -> Option<resolved::Type>
         .iter()
         .all(|resolved_type| matches!(resolved_type, resolved::Type::IntegerLiteral(..)))
     {
-        // TODO: We can be smarter than this
-        return Some(resolved::Type::Integer {
-            bits: IntegerBits::Normal,
-            sign: IntegerSign::Signed,
+        return Some(match preferred_type {
+            Some(
+                preferred_type @ resolved::Type::Integer {
+                    bits: preferred_bits,
+                    sign: preferred_sign,
+                },
+            ) if do_integer_literal_types_fit_in_integer(
+                *preferred_bits,
+                *preferred_sign,
+                &types[..],
+            ) =>
+            {
+                preferred_type.clone()
+            }
+            _ => resolved::Type::Integer {
+                bits: IntegerBits::Normal,
+                sign: IntegerSign::Signed,
+            },
         });
     }
 

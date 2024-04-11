@@ -1,7 +1,7 @@
 use super::{
     conform_expr,
     error::{ResolveError, ResolveErrorKind},
-    expr::{resolve_expr, ResolveExprCtx},
+    expr::{resolve_expr, PreferredType, ResolveExprCtx},
     resolve_expr_to_destination, resolve_type, Initialized,
 };
 use crate::{ast, resolved};
@@ -28,15 +28,21 @@ pub fn resolve_stmt<'a>(
     match &ast_stmt.kind {
         ast::StmtKind::Return(value) => {
             let return_value = if let Some(value) = value {
-                let result = resolve_expr(ctx, value, Initialized::Require)?;
+                let result = resolve_expr(
+                    ctx,
+                    value,
+                    Some(PreferredType::ReturnType(ctx.resolved_function_ref)),
+                    Initialized::Require,
+                )?;
 
-                let function = ctx
+                let return_type = &ctx
                     .resolved_ast
                     .functions
                     .get(ctx.resolved_function_ref)
-                    .unwrap();
+                    .unwrap()
+                    .return_type;
 
-                if let Some(result) = conform_expr(&result, &function.return_type) {
+                if let Some(result) = conform_expr(&result, &return_type) {
                     Some(result.expr)
                 } else {
                     return Err(ResolveError::new(
@@ -44,7 +50,7 @@ pub fn resolve_stmt<'a>(
                         source,
                         ResolveErrorKind::CannotReturnValueOfType {
                             returning: result.resolved_type.to_string(),
-                            expected: function.return_type.to_string(),
+                            expected: return_type.to_string(),
                         },
                     ));
                 }
@@ -74,7 +80,7 @@ pub fn resolve_stmt<'a>(
             ))
         }
         ast::StmtKind::Expr(value) => Ok(resolved::Stmt::new(
-            resolved::StmtKind::Expr(resolve_expr(ctx, value, Initialized::Require)?),
+            resolved::StmtKind::Expr(resolve_expr(ctx, value, None, Initialized::Require)?),
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
@@ -87,7 +93,14 @@ pub fn resolve_stmt<'a>(
             let value = declaration
                 .value
                 .as_ref()
-                .map(|value| resolve_expr(ctx, value, Initialized::Require))
+                .map(|value| {
+                    resolve_expr(
+                        ctx,
+                        value,
+                        Some(PreferredType::of(&resolved_type)),
+                        Initialized::Require,
+                    )
+                })
                 .transpose()?
                 .as_ref()
                 .map(|value| match conform_expr(value, &resolved_type) {
@@ -125,10 +138,16 @@ pub fn resolve_stmt<'a>(
             let destination_expr = resolve_expr(
                 ctx,
                 &assignment.destination,
+                None,
                 Initialized::AllowUninitialized,
             )?;
 
-            let value = resolve_expr(ctx, &assignment.value, Initialized::Require)?;
+            let value = resolve_expr(
+                ctx,
+                &assignment.value,
+                Some(PreferredType::of(&destination_expr.resolved_type)),
+                Initialized::Require,
+            )?;
 
             let value = conform_expr(&value, &destination_expr.resolved_type).ok_or_else(|| {
                 ResolveError::new(

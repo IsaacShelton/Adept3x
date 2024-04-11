@@ -25,7 +25,7 @@ use crate::{
         },
         resolve_stmts,
     },
-    resolved::{self, TypedExpr},
+    resolved::{self, FunctionRef, StructureRef, TypedExpr},
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
 
@@ -38,9 +38,63 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_function_ref: resolved::FunctionRef,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum PreferredType<'a> {
+    Reference(&'a resolved::Type),
+    ParameterType(FunctionRef, usize),
+    ReturnType(FunctionRef),
+    FieldType(StructureRef, &'a str),
+}
+
+impl<'a> PreferredType<'a> {
+    pub fn of(reference: &'a resolved::Type) -> Self {
+        Self::Reference(reference)
+    }
+
+    pub fn of_parameter(function_ref: FunctionRef, index: usize) -> Self {
+        Self::ParameterType(function_ref, index)
+    }
+
+    pub fn view(&self, resolved_ast: &'a resolved::Ast) -> &'a resolved::Type {
+        match self {
+            PreferredType::Reference(reference) => reference,
+            PreferredType::ParameterType(function_ref, index) => {
+                &resolved_ast
+                    .functions
+                    .get(*function_ref)
+                    .unwrap()
+                    .parameters
+                    .required
+                    .get(*index)
+                    .unwrap()
+                    .resolved_type
+            }
+            PreferredType::ReturnType(function_ref) => {
+                &resolved_ast
+                    .functions
+                    .get(*function_ref)
+                    .unwrap()
+                    .return_type
+            }
+            PreferredType::FieldType(structure_ref, field_name) => {
+                let (_, _, field) = resolved_ast
+                    .structures
+                    .get(*structure_ref)
+                    .expect("referenced structure to exist")
+                    .fields
+                    .get_full::<str>(field_name)
+                    .expect("referenced struct field type to exist");
+
+                &field.resolved_type
+            }
+        }
+    }
+}
+
 pub fn resolve_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     ast_expr: &ast::Expr,
+    preferred_type: Option<PreferredType>,
     initialized: Initialized,
 ) -> Result<resolved::TypedExpr, ResolveError> {
     let source = ast_expr.source;
@@ -89,7 +143,7 @@ pub fn resolve_expr(
             resolve_declare_assign_expr(ctx, declare_assign, source)
         }
         ast::ExprKind::BinaryOperation(binary_operation) => {
-            resolve_binary_operation_expr(ctx, binary_operation, source)
+            resolve_binary_operation_expr(ctx, binary_operation, preferred_type, source)
         }
         ast::ExprKind::Member(subject, field_name) => {
             resolve_member_expr(ctx, subject, field_name, source)
@@ -101,15 +155,20 @@ pub fn resolve_expr(
             resolve_struct_literal_expr(ctx, ast_type, fields, source)
         }
         ast::ExprKind::UnaryOperation(unary_operation) => {
-            resolve_unary_operation_expr(ctx, unary_operation, source)
+            resolve_unary_operation_expr(ctx, unary_operation, preferred_type, source)
         }
         ast::ExprKind::Conditional(conditional) => {
-            resolve_conditional_expr(ctx, conditional, source)
+            resolve_conditional_expr(ctx, conditional, preferred_type, source)
         }
         ast::ExprKind::While(while_loop) => {
             let condition = conform_expr_or_error(
                 ctx.resolved_ast.source_file_cache,
-                &resolve_expr(ctx, &while_loop.condition, Initialized::Require)?,
+                &resolve_expr(
+                    ctx,
+                    &while_loop.condition,
+                    Some(PreferredType::of(&resolved::Type::Boolean)),
+                    Initialized::Require,
+                )?,
                 &resolved::Type::Boolean,
             )?
             .expr;

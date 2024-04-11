@@ -28,7 +28,7 @@ enum Job {
 }
 
 #[derive(Default)]
-struct ResolveContext<'a> {
+struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
     pub type_search_contexts: HashMap<FileIdentifier, TypeSearchCtx<'a>>,
     pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchCtx<'a>>,
@@ -36,7 +36,7 @@ struct ResolveContext<'a> {
 }
 
 pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
-    let mut ctx = ResolveContext::default();
+    let mut ctx = ResolveCtx::default();
     let source_file_cache = ast.source_file_cache;
     let mut resolved_ast = resolved::Ast::new(source_file_cache);
 

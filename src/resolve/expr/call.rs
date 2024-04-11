@@ -1,4 +1,4 @@
-use super::{resolve_expr, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
@@ -31,9 +31,9 @@ pub fn resolve_call_expr(
         ));
     }
 
-    if call.arguments.len() > function.parameters.required.len()
-        && !function.parameters.is_cstyle_vararg
-    {
+    let num_required = function.parameters.required.len();
+
+    if call.arguments.len() > num_required && !function.parameters.is_cstyle_vararg {
         return Err(ResolveError::new(
             ctx.resolved_ast.source_file_cache,
             source,
@@ -46,21 +46,24 @@ pub fn resolve_call_expr(
     let mut arguments = Vec::with_capacity(call.arguments.len());
 
     for (i, argument) in call.arguments.iter().enumerate() {
-        let mut argument = resolve_expr(ctx, argument, Initialized::Require)?;
+        let preferred_type =
+            (i < num_required).then_some(PreferredType::of_parameter(function_ref, i));
+
+        let mut argument = resolve_expr(ctx, argument, preferred_type, Initialized::Require)?;
 
         let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
 
-        if let Some(parameter) = function.parameters.required.get(i) {
-            if let Some(conformed_argument) =
-                conform_expr(&argument, &parameter.resolved_type)
-            {
+        if let Some(preferred_type) =
+            preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
+        {
+            if let Some(conformed_argument) = conform_expr(&argument, preferred_type) {
                 argument = conformed_argument;
             } else {
                 return Err(ResolveError::new(
                     ctx.resolved_ast.source_file_cache,
                     source,
                     ResolveErrorKind::BadTypeForArgumentToFunction {
-                        expected: parameter.resolved_type.to_string(),
+                        expected: preferred_type.to_string(),
                         got: argument.resolved_type.to_string(),
                         name: function.name.clone(),
                         i,

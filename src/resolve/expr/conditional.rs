@@ -1,4 +1,4 @@
-use super::{resolve_expr, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
@@ -15,6 +15,7 @@ use itertools::Itertools;
 pub fn resolve_conditional_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     conditional: &ast::Conditional,
+    preferred_type: Option<PreferredType>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let ast::Conditional {
@@ -32,7 +33,7 @@ pub fn resolve_conditional_expr(
     let mut branches_without_else = Vec::with_capacity(conditions.len());
 
     for (expr, block) in conditions.iter() {
-        let condition = resolve_expr(ctx, expr, Initialized::Require)?;
+        let condition = resolve_expr(ctx, expr, preferred_type, Initialized::Require)?;
         let stmts = resolve_stmts(ctx, &block.stmts)?;
 
         let condition = conform_expr_or_error(
@@ -94,7 +95,11 @@ pub fn resolve_conditional_expr(
             })
             .collect_vec();
 
-        unify_types(&mut last_exprs[..]).ok_or_else(|| {
+        unify_types(
+            preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
+            &mut last_exprs[..],
+        )
+        .ok_or_else(|| {
             ResolveError::new(
                 ctx.resolved_ast.source_file_cache,
                 source,
