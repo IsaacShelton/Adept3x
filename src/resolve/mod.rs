@@ -20,7 +20,12 @@ use num_traits::ToPrimitive;
 use std::collections::{HashMap, VecDeque};
 
 use self::{
-    error::{ResolveError, ResolveErrorKind}, expr::ResolveExprCtx, global_search_ctx::GlobalSearchCtx, stmt::resolve_stmts, type_search_ctx::TypeSearchCtx, variable_search_ctx::VariableSearchCtx
+    error::{ResolveError, ResolveErrorKind},
+    expr::ResolveExprCtx,
+    global_search_ctx::GlobalSearchCtx,
+    stmt::resolve_stmts,
+    type_search_ctx::TypeSearchCtx,
+    variable_search_ctx::VariableSearchCtx,
 };
 
 enum Job {
@@ -271,6 +276,20 @@ fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr>
             match to_type {
                 resolved::Type::Float(size) => conform_float_value(&expr.expr, *from_size, *size),
                 _ => None,
+            }
+        }
+        resolved::Type::Pointer(inner) => {
+            if let resolved::Type::Void = **inner {
+                // ptr<void> -> ptr<ANYTHING>
+                match to_type {
+                    resolved::Type::Pointer(inner) => Some(TypedExpr::new(
+                        resolved::Type::Pointer(inner.clone()),
+                        expr.expr.clone(),
+                    )),
+                    _ => None,
+                }
+            } else {
+                None
             }
         }
         _ => None,
