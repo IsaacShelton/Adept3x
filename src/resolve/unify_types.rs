@@ -1,4 +1,4 @@
-use super::conform_expr;
+use super::{conform_expr, ConformMode};
 use crate::resolved::{self, FloatSize, IntegerBits, IntegerSign, TypedExpr};
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -13,7 +13,7 @@ pub fn unify_types(
 
     if let Some(unified_type) = &unified_type {
         for expr in exprs.iter_mut() {
-            **expr = match conform_expr(&**expr, unified_type) {
+            **expr = match conform_expr(&**expr, unified_type, ConformMode::Normal) {
                 Some(conformed) => conformed,
                 None => {
                     panic!(

@@ -2,7 +2,7 @@ use super::{
     conform_expr,
     error::{ResolveError, ResolveErrorKind},
     expr::{resolve_expr, PreferredType, ResolveExprCtx},
-    resolve_expr_to_destination, resolve_type, Initialized,
+    resolve_expr_to_destination, resolve_type, ConformMode, Initialized,
 };
 use crate::{ast, resolved};
 
@@ -42,7 +42,7 @@ pub fn resolve_stmt<'a>(
                     .unwrap()
                     .return_type;
 
-                if let Some(result) = conform_expr(&result, &return_type) {
+                if let Some(result) = conform_expr(&result, &return_type, ConformMode::Normal) {
                     Some(result.expr)
                 } else {
                     return Err(ResolveError::new(
@@ -103,17 +103,19 @@ pub fn resolve_stmt<'a>(
                 })
                 .transpose()?
                 .as_ref()
-                .map(|value| match conform_expr(value, &resolved_type) {
-                    Some(value) => Ok(value.expr),
-                    None => Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotAssignValueOfType {
-                            from: value.resolved_type.to_string(),
-                            to: resolved_type.to_string(),
-                        },
-                    )),
-                })
+                .map(
+                    |value| match conform_expr(value, &resolved_type, ConformMode::Normal) {
+                        Some(value) => Ok(value.expr),
+                        None => Err(ResolveError::new(
+                            ctx.resolved_ast.source_file_cache,
+                            source,
+                            ResolveErrorKind::CannotAssignValueOfType {
+                                from: value.resolved_type.to_string(),
+                                to: resolved_type.to_string(),
+                            },
+                        )),
+                    },
+                )
                 .transpose()?;
 
             let function = ctx
@@ -149,16 +151,17 @@ pub fn resolve_stmt<'a>(
                 Initialized::Require,
             )?;
 
-            let value = conform_expr(&value, &destination_expr.resolved_type).ok_or_else(|| {
-                ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    source,
-                    ResolveErrorKind::CannotAssignValueOfType {
-                        from: value.resolved_type.to_string(),
-                        to: destination_expr.resolved_type.to_string(),
-                    },
-                )
-            })?;
+            let value = conform_expr(&value, &destination_expr.resolved_type, ConformMode::Normal)
+                .ok_or_else(|| {
+                    ResolveError::new(
+                        ctx.resolved_ast.source_file_cache,
+                        source,
+                        ResolveErrorKind::CannotAssignValueOfType {
+                            from: value.resolved_type.to_string(),
+                            to: destination_expr.resolved_type.to_string(),
+                        },
+                    )
+                })?;
 
             let destination = resolve_expr_to_destination(
                 ctx.resolved_ast.source_file_cache,
@@ -181,7 +184,8 @@ pub fn resolve_stmt<'a>(
                         .set_initialized();
                 }
                 resolved::DestinationKind::GlobalVariable(..) => (),
-                resolved::DestinationKind::Member(..) => (),
+                resolved::DestinationKind::Member { .. } => (),
+                resolved::DestinationKind::ArrayAccess { .. } => (),
             }
 
             Ok(resolved::Stmt::new(

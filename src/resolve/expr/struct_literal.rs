@@ -2,9 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Expr, Source},
     resolve::{
-        conform_expr,
-        error::{ResolveError, ResolveErrorKind},
-        resolve_type, Initialized,
+        conform_expr, error::{ResolveError, ResolveErrorKind}, resolve_type, ConformMode, Initialized
     },
     resolved::{self, TypedExpr},
 };
@@ -84,7 +82,7 @@ pub fn resolve_struct_literal_expr(
             .expect("referenced struct field to exist");
 
         let resolved_expr =
-            conform_expr(&resolved_expr, &field.resolved_type).ok_or_else(|| {
+            conform_expr(&resolved_expr, &field.resolved_type, ConformMode::Normal).ok_or_else(|| {
                 ResolveError::new(
                     ctx.resolved_ast.source_file_cache,
                     ast_type.source,

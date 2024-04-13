@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         resolve_stmts,
         unify_types::unify_types,
-        Initialized,
+        ConformMode, Initialized,
     },
     resolved::{self, Branch, TypedExpr},
 };
@@ -40,6 +40,7 @@ pub fn resolve_conditional_expr(
             ctx.resolved_ast.source_file_cache,
             &condition,
             &resolved::Type::Boolean,
+            ConformMode::Normal,
         )?;
 
         branches_without_else.push(Branch {

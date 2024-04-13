@@ -70,13 +70,13 @@ pub fn resolve_member_expr(
     Ok(TypedExpr::new(
         found_field.resolved_type.clone(),
         resolved::Expr::new(
-            resolved::ExprKind::Member(
-                subject_destination,
+            resolved::ExprKind::Member {
+                subject: subject_destination,
                 structure_ref,
                 index,
-                found_field.resolved_type.clone(),
+                field_type: found_field.resolved_type.clone(),
                 memory_management,
-            ),
+            },
             source,
         ),
     ))

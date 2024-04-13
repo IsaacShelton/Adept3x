@@ -1,3 +1,4 @@
+mod array_access;
 mod binary_operation;
 mod call;
 mod conditional;
@@ -7,10 +8,10 @@ mod struct_literal;
 mod unary_operation;
 mod variable;
 
+use self::array_access::resolve_array_access_expr;
+
 use super::{
-    error::ResolveError, function_search_ctx::FunctionSearchCtx,
-    global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx,
-    variable_search_ctx::VariableSearchCtx, Initialized,
+    error::ResolveError, function_search_ctx::FunctionSearchCtx, global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx, variable_search_ctx::VariableSearchCtx, ConformMode, Initialized
 };
 use crate::{
     ast::{self},
@@ -148,8 +149,8 @@ pub fn resolve_expr(
         ast::ExprKind::Member(subject, field_name) => {
             resolve_member_expr(ctx, subject, field_name, source)
         }
-        ast::ExprKind::ArrayAccess(_array_access) => {
-            unimplemented!("array access resolution not implemented yet!");
+        ast::ExprKind::ArrayAccess(array_access) => {
+            resolve_array_access_expr(ctx, array_access, source)
         }
         ast::ExprKind::StructureLiteral(ast_type, fields) => {
             resolve_struct_literal_expr(ctx, ast_type, fields, source)
@@ -170,6 +171,7 @@ pub fn resolve_expr(
                     Initialized::Require,
                 )?,
                 &resolved::Type::Boolean,
+                ConformMode::Normal,
             )?
             .expr;
 

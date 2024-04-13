@@ -1,0 +1,27 @@
+
+#[foreign]
+{
+    func printf(format ptr<u8>, ...) i32
+    func malloc(size uint) ptr<void>
+    func free(pointer ptr<void>) void
+}
+
+func main i32 {
+    items ptr<i32> = malloc(4 * 10)
+
+    i i32 = 0
+    while i < 10 {
+        items[i] = 10 * i
+        i = i + 1
+    }
+
+    i i32 = 0
+    while i < 10 {
+        printf(c"items[%d] = %d\n", i, items[i])
+        i = i + 1
+    }
+
+    free(items)
+    return 0
+}
+

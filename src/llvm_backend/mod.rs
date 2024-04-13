@@ -765,13 +765,17 @@ unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::Member(pointer_value, structure_ir_type, index) => {
+            Instruction::Member {
+                subject_pointer,
+                struct_type: ir_struct_type,
+                index,
+            } => {
                 let pointer =
-                    build_value(ctx.backend_module, value_catalog, builder, pointer_value);
+                    build_value(ctx.backend_module, value_catalog, builder, subject_pointer);
 
-                let backend_type = match structure_ir_type {
+                let backend_struct_type = match ir_struct_type {
                     ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
-                        to_backend_type(ctx, structure_ir_type)
+                        to_backend_type(ctx, ir_struct_type)
                     }
                     _ => {
                         return Err(CompilerError::during_backend(
@@ -787,7 +791,29 @@ unsafe fn create_function_block(
 
                 Some(LLVMBuildGEP2(
                     builder.get(),
-                    backend_type,
+                    backend_struct_type,
+                    pointer,
+                    indices.as_mut_ptr(),
+                    indices.len().try_into().unwrap(),
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::ArrayAccess {
+                subject_pointer,
+                item_type: ir_item_type,
+                index,
+            } => {
+                let pointer =
+                    build_value(ctx.backend_module, value_catalog, builder, subject_pointer);
+
+                let index_value = build_value(ctx.backend_module, value_catalog, builder, index);
+
+                let backend_item_type = to_backend_type(ctx, ir_item_type);
+                let mut indices = [index_value];
+
+                Some(LLVMBuildGEP2(
+                    builder.get(),
+                    backend_item_type,
                     pointer,
                     indices.as_mut_ptr(),
                     indices.len().try_into().unwrap(),

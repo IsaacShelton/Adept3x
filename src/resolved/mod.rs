@@ -1,7 +1,7 @@
 mod variable_storage;
 
 use crate::{ast::Source, source_file_cache::SourceFileCache};
-use derive_more::Unwrap;
+use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -98,7 +98,7 @@ pub struct Field {
     pub privacy: Privacy,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, IsVariant)]
 pub enum Type {
     Boolean,
     Integer {
@@ -130,6 +130,13 @@ impl Type {
             Type::PlainOldData(_, _) => None,
             Type::Void => None,
             Type::ManagedStructure(_, _) => None,
+        }
+    }
+
+    pub fn is_void_pointer(&self) -> bool {
+        match self {
+            Type::Pointer(inner) if inner.is_void() => true,
+            _ => false,
         }
     }
 }
@@ -225,11 +232,7 @@ impl TypedExpr {
         }
     }
 
-    pub fn new_maybe_initialized(
-        resolved_type: Type,
-        expr: Expr,
-        is_initialized: bool,
-    ) -> Self {
+    pub fn new_maybe_initialized(resolved_type: Type, expr: Expr, is_initialized: bool) -> Self {
         Self {
             resolved_type,
             expr,
@@ -283,7 +286,13 @@ pub enum ExprKind {
     BinaryOperation(Box<BinaryOperation>),
     IntegerExtend(Box<Expr>, Type),
     FloatExtend(Box<Expr>, Type),
-    Member(Destination, StructureRef, usize, Type, MemoryManagement),
+    Member {
+        subject: Destination,
+        structure_ref: StructureRef,
+        index: usize,
+        memory_management: MemoryManagement,
+        field_type: Type,
+    },
     StructureLiteral {
         structure_type: Type,
         fields: IndexMap<String, (Expr, usize)>,
@@ -292,6 +301,14 @@ pub enum ExprKind {
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
+    ArrayAccess(Box<ArrayAccess>),
+}
+
+#[derive(Clone, Debug)]
+pub struct ArrayAccess {
+    pub subject: Expr,
+    pub item_type: Type,
+    pub index: Expr,
 }
 
 #[derive(Clone, Debug)]
@@ -348,13 +365,14 @@ pub struct Destination {
 pub enum DestinationKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),
-    Member(
-        Box<Destination>,
-        StructureRef,
-        usize,
-        Type,
-        MemoryManagement,
-    ),
+    Member {
+        subject: Box<Destination>,
+        structure_ref: StructureRef,
+        index: usize,
+        field_type: Type,
+        memory_management: MemoryManagement,
+    },
+    ArrayAccess(Box<ArrayAccess>),
 }
 
 impl TryFrom<Expr> for Destination {
@@ -375,19 +393,20 @@ impl TryFrom<ExprKind> for DestinationKind {
         match value {
             ExprKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
             ExprKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
-            ExprKind::Member(
-                destination,
+            ExprKind::Member {
+                subject,
                 structure_ref,
                 index,
-                ir_type,
+                field_type,
                 memory_management,
-            ) => Ok(DestinationKind::Member(
-                Box::new(destination),
+            } => Ok(DestinationKind::Member {
+                subject: Box::new(subject),
                 structure_ref,
                 index,
-                ir_type,
+                field_type,
                 memory_management,
-            )),
+            }),
+            ExprKind::ArrayAccess(array_access) => Ok(DestinationKind::ArrayAccess(array_access)),
             _ => Err(()),
         }
     }

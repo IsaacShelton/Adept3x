@@ -113,6 +113,13 @@ pub enum ResolveErrorKind {
         field_name: String,
         expected: String,
     },
+    CannotAccessMemberOf {
+        bad_type: String,
+    },
+    ExpectedIndexOfType {
+        expected: String,
+        got: String,
+    },
     Other {
         message: String,
     },
@@ -170,8 +177,20 @@ impl Display for ResolveError {
             ResolveErrorKind::TooManyArgumentsToFunction { name } => {
                 write!(f, "Too many arguments for call to function '{}'", name)?;
             }
-            ResolveErrorKind::BadTypeForArgumentToFunction { name, i, expected, got } => {
-                write!(f, "Bad type for argument #{} to function '{}' (expected '{}' but got '{}')", i + 1, name, expected, got)?;
+            ResolveErrorKind::BadTypeForArgumentToFunction {
+                name,
+                i,
+                expected,
+                got,
+            } => {
+                write!(
+                    f,
+                    "Bad type for argument #{} to function '{}' (expected '{}' but got '{}')",
+                    i + 1,
+                    name,
+                    expected,
+                    got
+                )?;
             }
             ResolveErrorKind::IncompatibleTypesForBinaryOperator {
                 operator,
@@ -272,7 +291,17 @@ impl Display for ResolveError {
                 field_name,
                 expected,
             } => {
-                write!(f, "Expected value of type '{}' for field '{}' of '{}'", expected, field_name, structure)?;
+                write!(
+                    f,
+                    "Expected value of type '{}' for field '{}' of '{}'",
+                    expected, field_name, structure
+                )?;
+            }
+            ResolveErrorKind::CannotAccessMemberOf { bad_type } => {
+                write!(f, "Cannot access member of type '{}'", bad_type)?;
+            }
+            ResolveErrorKind::ExpectedIndexOfType { expected, got } => {
+                write!(f, "Expected index of type '{}', got '{}'", expected, got)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

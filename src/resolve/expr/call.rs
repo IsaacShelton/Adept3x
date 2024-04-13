@@ -2,9 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
-        conform_expr, conform_expr_to_default,
-        error::{ResolveError, ResolveErrorKind},
-        Initialized,
+        conform_expr, conform_expr_to_default, error::{ResolveError, ResolveErrorKind}, ConformMode, Initialized
     },
     resolved::{self, TypedExpr},
 };
@@ -56,7 +54,7 @@ pub fn resolve_call_expr(
         if let Some(preferred_type) =
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
         {
-            if let Some(conformed_argument) = conform_expr(&argument, preferred_type) {
+            if let Some(conformed_argument) = conform_expr(&argument, preferred_type, ConformMode::ParameterPassing) {
                 argument = conformed_argument;
             } else {
                 return Err(ResolveError::new(

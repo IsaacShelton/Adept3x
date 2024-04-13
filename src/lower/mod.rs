@@ -205,7 +205,9 @@ fn lower_stmts(
                 Value::Literal(Literal::Void)
             }
             StmtKind::Assignment(assignment) => {
-                let destination = lower_destination(builder, ir_module, &assignment.destination)?;
+                let destination =
+                    lower_destination(builder, ir_module, &assignment.destination, function)?;
+
                 let source = lower_expr(builder, ir_module, &assignment.value, function)?;
 
                 builder.push(ir::Instruction::Store(ir::Store {
@@ -264,6 +266,7 @@ fn lower_destination(
     builder: &mut Builder,
     ir_module: &ir::Module,
     destination: &Destination,
+    function: &resolved::Function,
 ) -> Result<ir::Value, CompilerError> {
     match &destination.kind {
         DestinationKind::Variable(variable) => {
@@ -278,31 +281,52 @@ fn lower_destination(
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
             Ok(pointer)
         }
-        DestinationKind::Member(destination, structure_ref, index, _, memory_management) => {
-            let subject_pointer = lower_destination(builder, ir_module, destination)?;
+        DestinationKind::Member {
+            subject,
+            structure_ref,
+            index,
+            memory_management,
+            ..
+        } => {
+            let subject_pointer = lower_destination(builder, ir_module, subject, function)?;
 
             let subject_pointer = match memory_management {
                 resolved::MemoryManagement::None => subject_pointer,
                 resolved::MemoryManagement::ReferenceCounted => {
                     // Load pointer from pointed object
 
-                    let container =
+                    let struct_type =
                         ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
 
                     let subject_pointer = builder.push(ir::Instruction::Load((
                         subject_pointer,
-                        container.pointer(),
+                        struct_type.pointer(),
                     )));
 
-                    builder.push(ir::Instruction::Member(subject_pointer, container, 1))
+                    builder.push(ir::Instruction::Member {
+                        struct_type,
+                        subject_pointer,
+                        index: 1,
+                    })
                 }
             };
 
-            Ok(builder.push(ir::Instruction::Member(
+            Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
-                ir::Type::Structure(*structure_ref),
-                *index,
-            )))
+                struct_type: ir::Type::Structure(*structure_ref),
+                index: *index,
+            }))
+        }
+        DestinationKind::ArrayAccess(array_access) => {
+            let subject_pointer = lower_expr(builder, ir_module, &array_access.subject, function)?;
+            let index = lower_expr(builder, ir_module, &array_access.index, function)?;
+            let item_type = lower_type(&array_access.item_type)?;
+
+            Ok(builder.push(ir::Instruction::ArrayAccess {
+                item_type: item_type.clone(),
+                subject_pointer,
+                index,
+            }))
         }
     }
 }
@@ -575,40 +599,57 @@ fn lower_expr(
             let ir_type = lower_type(resolved_type)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
-        ExprKind::Member(
-            subject_destination,
+        ExprKind::Member {
+            subject,
             structure_ref,
             index,
-            resolved_type,
+            field_type: resolved_field_type,
             memory_management,
-        ) => {
-            let subject_pointer = lower_destination(builder, ir_module, subject_destination)?;
+        } => {
+            let subject_pointer = lower_destination(builder, ir_module, subject, function)?;
 
             let subject_pointer = match memory_management {
                 resolved::MemoryManagement::None => subject_pointer,
                 resolved::MemoryManagement::ReferenceCounted => {
                     // Load pointer from pointed object
 
-                    let container =
+                    let struct_type =
                         ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
 
                     let subject_pointer = builder.push(ir::Instruction::Load((
                         subject_pointer,
-                        container.pointer(),
+                        struct_type.pointer(),
                     )));
 
-                    builder.push(ir::Instruction::Member(subject_pointer, container, 1))
+                    builder.push(ir::Instruction::Member {
+                        subject_pointer,
+                        struct_type,
+                        index: 1,
+                    })
                 }
             };
 
-            let member = builder.push(ir::Instruction::Member(
+            let member = builder.push(ir::Instruction::Member {
                 subject_pointer,
-                ir::Type::Structure(*structure_ref),
-                *index,
-            ));
+                struct_type: ir::Type::Structure(*structure_ref),
+                index: *index,
+            });
 
-            let ir_type = lower_type(resolved_type)?;
+            let ir_type = lower_type(resolved_field_type)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
+        }
+        ExprKind::ArrayAccess(array_access) => {
+            let subject = lower_expr(builder, ir_module, &array_access.subject, function)?;
+            let index = lower_expr(builder, ir_module, &array_access.index, function)?;
+            let item_type = lower_type(&array_access.item_type)?;
+
+            let item = builder.push(ir::Instruction::ArrayAccess {
+                item_type: item_type.clone(),
+                subject_pointer: subject,
+                index,
+            });
+
+            Ok(builder.push(ir::Instruction::Load((item, item_type))))
         }
         ExprKind::StructureLiteral {
             structure_type,
@@ -640,22 +681,24 @@ fn lower_expr(
                         values,
                     ));
 
-                    let container = result_ir_type.reference_counted_no_pointer();
-                    let heap_memory = builder.push(ir::Instruction::Malloc(container.clone()));
+                    let wrapper_struct_type = result_ir_type.reference_counted_no_pointer();
+
+                    let heap_memory =
+                        builder.push(ir::Instruction::Malloc(wrapper_struct_type.clone()));
 
                     // TODO: Assert that malloc didn't return NULL
 
-                    let at_reference_count = builder.push(ir::Instruction::Member(
-                        heap_memory.clone(),
-                        container.clone(),
-                        0,
-                    ));
+                    let at_reference_count = builder.push(ir::Instruction::Member {
+                        subject_pointer: heap_memory.clone(),
+                        struct_type: wrapper_struct_type.clone(),
+                        index: 0,
+                    });
 
-                    let at_value = builder.push(ir::Instruction::Member(
-                        heap_memory.clone(),
-                        container.clone(),
-                        1,
-                    ));
+                    let at_value = builder.push(ir::Instruction::Member {
+                        subject_pointer: heap_memory.clone(),
+                        struct_type: wrapper_struct_type.clone(),
+                        index: 1,
+                    });
 
                     builder.push(ir::Instruction::Store(ir::Store {
                         source: flat.clone(),

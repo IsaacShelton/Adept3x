@@ -223,8 +223,9 @@ fn conform_expr_or_error(
     source_file_cache: &SourceFileCache,
     expr: &TypedExpr,
     target_type: &resolved::Type,
+    mode: ConformMode,
 ) -> Result<TypedExpr, ResolveError> {
-    if let Some(expr) = conform_expr(expr, target_type) {
+    if let Some(expr) = conform_expr(expr, target_type, mode) {
         Ok(expr)
     } else {
         Err(ResolveError::new(
@@ -238,7 +239,27 @@ fn conform_expr_or_error(
     }
 }
 
-fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr> {
+#[derive(Copy, Clone, Debug, Default)]
+pub enum ConformMode {
+    #[default]
+    Normal,
+    ParameterPassing,
+}
+
+impl ConformMode {
+    pub fn allow_pointer_to_void_pointer(&self) -> bool {
+        match self {
+            Self::Normal => false,
+            Self::ParameterPassing => true,
+        }
+    }
+}
+
+fn conform_expr(
+    expr: &TypedExpr,
+    to_type: &resolved::Type,
+    mode: ConformMode,
+) -> Option<TypedExpr> {
     if expr.resolved_type == *to_type {
         return Some(expr.clone());
     }
@@ -279,7 +300,7 @@ fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr>
             }
         }
         resolved::Type::Pointer(inner) => {
-            if let resolved::Type::Void = **inner {
+            if inner.is_void() {
                 // ptr<void> -> ptr<ANYTHING>
                 match to_type {
                     resolved::Type::Pointer(inner) => Some(TypedExpr::new(
@@ -288,6 +309,12 @@ fn conform_expr(expr: &TypedExpr, to_type: &resolved::Type) -> Option<TypedExpr>
                     )),
                     _ => None,
                 }
+            } else if mode.allow_pointer_to_void_pointer() && to_type.is_void_pointer() {
+                // ptr<ANYTHING> -> ptr<void>
+                Some(TypedExpr::new(
+                    resolved::Type::Pointer(Box::new(resolved::Type::Void)),
+                    expr.expr.clone(),
+                ))
             } else {
                 None
             }
