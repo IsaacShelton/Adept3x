@@ -247,7 +247,7 @@ pub enum ConformMode {
 }
 
 impl ConformMode {
-    pub fn allow_pointer_to_void_pointer(&self) -> bool {
+    pub fn allow_pointer_into_void_pointer(&self) -> bool {
         match self {
             Self::Normal => false,
             Self::ParameterPassing => true,
@@ -309,7 +309,7 @@ fn conform_expr(
                     )),
                     _ => None,
                 }
-            } else if mode.allow_pointer_to_void_pointer() && to_type.is_void_pointer() {
+            } else if mode.allow_pointer_into_void_pointer() && to_type.is_void_pointer() {
                 // ptr<ANYTHING> -> ptr<void>
                 Some(TypedExpr::new(
                     resolved::Type::Pointer(Box::new(resolved::Type::Void)),

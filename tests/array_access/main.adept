@@ -6,7 +6,7 @@
     func free(pointer ptr<void>) void
 }
 
-func main i32 {
+func main {
     items ptr<i32> = malloc(4 * 10)
 
     i i32 = 0
@@ -22,6 +22,5 @@ func main i32 {
     }
 
     free(items)
-    return 0
 }
 

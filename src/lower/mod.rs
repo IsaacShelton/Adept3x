@@ -323,7 +323,7 @@ fn lower_destination(
             let item_type = lower_type(&array_access.item_type)?;
 
             Ok(builder.push(ir::Instruction::ArrayAccess {
-                item_type: item_type.clone(),
+                item_type,
                 subject_pointer,
                 index,
             }))
@@ -611,16 +611,19 @@ fn lower_expr(
             let subject_pointer = match memory_management {
                 resolved::MemoryManagement::None => subject_pointer,
                 resolved::MemoryManagement::ReferenceCounted => {
-                    // Load pointer from pointed object
+                    // Take off reference counted wrapper
 
+                    // Get inner structure type
                     let struct_type =
                         ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
 
+                    // Load pointer to referece counted wrapper
                     let subject_pointer = builder.push(ir::Instruction::Load((
                         subject_pointer,
                         struct_type.pointer(),
                     )));
 
+                    // Obtain pointer to inner data
                     builder.push(ir::Instruction::Member {
                         subject_pointer,
                         struct_type,
@@ -629,6 +632,7 @@ fn lower_expr(
                 }
             };
 
+            // Access member of structure
             let member = builder.push(ir::Instruction::Member {
                 subject_pointer,
                 struct_type: ir::Type::Structure(*structure_ref),

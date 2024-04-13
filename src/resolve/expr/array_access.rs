@@ -1,5 +1,3 @@
-use ast::{IntegerBits, IntegerSign};
-
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
@@ -9,6 +7,7 @@ use crate::{
     },
     resolved::{self, TypedExpr},
 };
+use ast::{IntegerBits, IntegerSign};
 
 pub fn resolve_array_access_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
