@@ -254,6 +254,7 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
             FloatSize::Bits64 => ir::Type::F64,
         }),
         resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
+        resolved::Type::Unsync(inner) => lower_type(inner),
         resolved::Type::Void => Ok(ir::Type::Void),
         resolved::Type::ManagedStructure(_, structure_ref) => {
             Ok(ir::Type::Structure(*structure_ref).reference_counted_pointer())

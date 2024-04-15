@@ -49,7 +49,11 @@ compile variables
 compile variables_override
 compile variables_typed
 compile while
+
+echo "[!] RUNNING CASES WITH EXPECTED FAILURE"
+
 expect_fail_compile _should_fail/mismatching_yielded_types
+expect_fail_compile _should_fail/missing_unsync
 expect_fail_compile _should_fail/partial_initialization
 expect_fail_compile _should_fail/uninitialized_member
 expect_fail_compile _should_fail/uninitialized_simple

@@ -955,20 +955,22 @@ where
                         }
                     }
                     "pod" => {
-                        if self.input.peek_is(TokenKind::OpenAngle) {
-                            self.input.advance();
-                            let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                            self.parse_token(
-                                TokenKind::GreaterThan,
-                                Some("to close type parameters"),
-                            )?;
-                            Ok(TypeKind::PlainOldData(Box::new(inner)))
-                        } else {
-                            Ok(TypeKind::PlainOldData(Box::new(Type::new(
-                                TypeKind::Void,
-                                source,
-                            ))))
-                        }
+                        self.parse_token(TokenKind::OpenAngle, Some("to specify inner type of 'pod'"))?;
+                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                        self.parse_token(
+                            TokenKind::GreaterThan,
+                            Some("to close type parameters"),
+                        )?;
+                        Ok(TypeKind::PlainOldData(Box::new(inner)))
+                    }
+                    "unsync" => {
+                        self.parse_token(TokenKind::OpenAngle, Some("to specify inner type of 'unsync'"))?;
+                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                        self.parse_token(
+                            TokenKind::GreaterThan,
+                            Some("to close type parameters"),
+                        )?;
+                        Ok(TypeKind::Unsync(Box::new(inner)))
                     }
                     identifier => Ok(TypeKind::Named(identifier.into())),
                 }?;

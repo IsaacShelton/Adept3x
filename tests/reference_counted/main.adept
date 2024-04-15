@@ -5,14 +5,18 @@ func printf(format ptr<u8>, ...) i32
 struct Person (firstname ptr<u8>, lastname ptr<u8>)
 
 func main {
-    person := Person {
+    john := Person {
         firstname: c"John",
         lastname: c"Smith",
     }
 
-    printf(c"Welcome, %s %s\n", person.firstname, person.lastname)
+    printf(c"Welcome, %s %s\n", john.firstname, john.lastname)
 
-    person.firstname = c"Jane"
-    printf(c"Welcome, %s %s\n", person.firstname, person.lastname)
+    jane := Person {
+        firstname: c"Jane",
+        lastname: john.lastname,
+    }
+
+    printf(c"Welcome, %s %s\n", jane.firstname, jane.lastname)
 }
 

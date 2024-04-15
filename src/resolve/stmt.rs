@@ -1,8 +1,9 @@
 use super::{
     conform_expr,
+    destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
     expr::{resolve_expr, PreferredType, ResolveExprCtx},
-    resolve_expr_to_destination, resolve_type, ConformMode, Initialized,
+    resolve_type, ConformMode, Initialized,
 };
 use crate::{ast, resolved};
 
@@ -163,10 +164,8 @@ pub fn resolve_stmt<'a>(
                     )
                 })?;
 
-            let destination = resolve_expr_to_destination(
-                ctx.resolved_ast.source_file_cache,
-                destination_expr.expr,
-            )?;
+            let destination =
+                resolve_expr_to_destination(ctx.resolved_ast.source_file_cache, destination_expr)?;
 
             // Mark destination as initialized
             match &destination.kind {

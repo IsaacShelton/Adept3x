@@ -1,3 +1,5 @@
+mod core_structure_info;
+mod destination;
 mod error;
 mod expr;
 mod function_search_ctx;
@@ -9,7 +11,7 @@ mod variable_search_ctx;
 
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
-    resolved::{self, Destination, TypedExpr, VariableStorage},
+    resolved::{self, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
@@ -579,6 +581,11 @@ fn resolve_type(
         ast::TypeKind::Named(name) => type_search_context
             .find_type_or_error(&name, ast_type.source)
             .cloned(),
+        ast::TypeKind::Unsync(inner) => Ok(resolved::Type::Unsync(Box::new(resolve_type(
+            type_search_context,
+            source_file_cache,
+            inner,
+        )?))),
         ast::TypeKind::PlainOldData(inner) => match &inner.kind {
             ast::TypeKind::Named(name) => {
                 let resolved_inner_type = type_search_context
@@ -636,22 +643,6 @@ fn resolve_parameters(
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
-}
-
-pub fn resolve_expr_to_destination(
-    source_file_cache: &SourceFileCache,
-    expr: resolved::Expr,
-) -> Result<Destination, ResolveError> {
-    let source = expr.source;
-
-    match TryInto::<Destination>::try_into(expr) {
-        Ok(destination) => Ok(destination),
-        Err(_) => Err(ResolveError::new(
-            source_file_cache,
-            source,
-            ResolveErrorKind::CannotMutate,
-        )),
-    }
 }
 
 fn ensure_initialized(

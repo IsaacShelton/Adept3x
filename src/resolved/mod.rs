@@ -110,6 +110,7 @@ pub enum Type {
     Float(FloatSize),
     Pointer(Box<Type>),
     PlainOldData(String, StructureRef),
+    Unsync(Box<Type>),
     Void,
     ManagedStructure(String, StructureRef),
 }
@@ -128,6 +129,7 @@ impl Type {
             Type::FloatLiteral(_) => None,
             Type::Pointer(_) => None,
             Type::PlainOldData(_, _) => None,
+            Type::Unsync(_) => None,
             Type::Void => None,
             Type::ManagedStructure(_, _) => None,
         }
@@ -175,6 +177,9 @@ impl Display for Type {
             }
             Type::PlainOldData(name, _) => {
                 write!(f, "pod<{}>", name)?;
+            }
+            Type::Unsync(inner) => {
+                write!(f, "unsync<{}>", inner)?;
             }
             Type::Void => f.write_str("void")?,
             Type::ManagedStructure(name, _) => f.write_str(name)?,
@@ -358,7 +363,18 @@ impl Block {
 #[derive(Clone, Debug)]
 pub struct Destination {
     pub kind: DestinationKind,
+    pub resolved_type: Type,
     pub source: Source,
+}
+
+impl Destination {
+    pub fn new(kind: DestinationKind, resolved_type: Type, source: Source) -> Self {
+        Self {
+            kind,
+            source,
+            resolved_type,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -373,43 +389,6 @@ pub enum DestinationKind {
         memory_management: MemoryManagement,
     },
     ArrayAccess(Box<ArrayAccess>),
-}
-
-impl TryFrom<Expr> for Destination {
-    type Error = ();
-
-    fn try_from(value: Expr) -> Result<Self, Self::Error> {
-        value.kind.try_into().map(|kind| Destination {
-            kind,
-            source: value.source,
-        })
-    }
-}
-
-impl TryFrom<ExprKind> for DestinationKind {
-    type Error = ();
-
-    fn try_from(value: ExprKind) -> Result<Self, Self::Error> {
-        match value {
-            ExprKind::Variable(variable) => Ok(DestinationKind::Variable(variable)),
-            ExprKind::GlobalVariable(global) => Ok(DestinationKind::GlobalVariable(global)),
-            ExprKind::Member {
-                subject,
-                structure_ref,
-                index,
-                field_type,
-                memory_management,
-            } => Ok(DestinationKind::Member {
-                subject: Box::new(subject),
-                structure_ref,
-                index,
-                field_type,
-                memory_management,
-            }),
-            ExprKind::ArrayAccess(array_access) => Ok(DestinationKind::ArrayAccess(array_access)),
-            _ => Err(()),
-        }
-    }
 }
 
 #[derive(Copy, Clone, Debug)]

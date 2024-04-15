@@ -1,0 +1,19 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+struct Vector3f (x float, y float, z float)
+
+func main {
+    v := Vector3f { x: 1, y: 2, z: 3 }
+    v2 := v
+
+    printf(c"%f %f %f\n", v.x, v.y, v.z)
+
+    v2.x = 4
+    v2.y = 5
+    v2.z = 6
+
+    printf(c"%f %f %f\n", v.x, v.y, v.z)
+}
+

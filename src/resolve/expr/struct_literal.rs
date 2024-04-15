@@ -2,7 +2,10 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Expr, Source},
     resolve::{
-        conform_expr, error::{ResolveError, ResolveErrorKind}, resolve_type, ConformMode, Initialized
+        conform_expr,
+        core_structure_info::get_core_structure_info,
+        error::{ResolveError, ResolveErrorKind},
+        resolve_type, ConformMode, Initialized,
     },
     resolved::{self, TypedExpr},
 };
@@ -20,27 +23,10 @@ pub fn resolve_struct_literal_expr(
         ast_type,
     )?;
 
-    let (name, structure_ref, memory_management) = match &resolved_type {
-        resolved::Type::PlainOldData(name, structure_ref) => {
-            (name, *structure_ref, resolved::MemoryManagement::None)
-        }
-        resolved::Type::ManagedStructure(name, structure_ref) => (
-            name,
-            *structure_ref,
-            resolved::MemoryManagement::ReferenceCounted,
-        ),
-        _ => {
-            return Err(ResolveError::new(
-                ctx.resolved_ast.source_file_cache,
-                ast_type.source,
-                ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure {
-                    bad_type: ast_type.to_string(),
-                },
-            ))
-        }
-    };
+    let (name, structure_ref, memory_management) =
+        get_core_structure_info(ctx.resolved_ast.source_file_cache, &resolved_type, source)?;
 
-    let structure_type = resolved::Type::PlainOldData(name.clone(), structure_ref);
+    let structure_type = resolved::Type::PlainOldData(name.to_string(), structure_ref);
     let mut resolved_fields = IndexMap::new();
 
     for (name, value) in fields.iter() {
@@ -81,8 +67,8 @@ pub fn resolve_struct_literal_expr(
             .get_full::<str>(&name)
             .expect("referenced struct field to exist");
 
-        let resolved_expr =
-            conform_expr(&resolved_expr, &field.resolved_type, ConformMode::Normal).ok_or_else(|| {
+        let resolved_expr = conform_expr(&resolved_expr, &field.resolved_type, ConformMode::Normal)
+            .ok_or_else(|| {
                 ResolveError::new(
                     ctx.resolved_ast.source_file_cache,
                     ast_type.source,

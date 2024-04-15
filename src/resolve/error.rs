@@ -73,8 +73,13 @@ pub enum ResolveErrorKind {
         from: String,
         to: String,
     },
-    CannotMutate,
-    CannotGetFieldOfNonPlainOldDataType {
+    CannotMutate {
+        bad_type: String,
+    },
+    CannotMutateNonUnsync {
+        bad_type: String,
+    },
+    CannotGetFieldOfType {
         bad_type: String,
     },
     CannotCreatePlainOldDataOfNonStructure {
@@ -216,15 +221,18 @@ impl Display for ResolveError {
             ResolveErrorKind::CannotAssignValueOfType { from, to } => {
                 write!(f, "Cannot assign value of type '{}' to '{}'", from, to)?;
             }
-            ResolveErrorKind::CannotMutate => {
-                write!(f, "Cannot mutate value")?;
+            ResolveErrorKind::CannotMutate { bad_type } => {
+                write!(f, "Cannot mutate value of type '{}'", bad_type)?;
             }
-            ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType { bad_type } => {
+            ResolveErrorKind::CannotMutateNonUnsync { bad_type } => {
                 write!(
                     f,
-                    "Cannot get field of non-plain-old-data type '{}'",
-                    bad_type
+                    "Mutating value of type '{}' would break thread-safety, consider using 'unsync<{}>' if necessary",
+                    bad_type, bad_type
                 )?;
+            }
+            ResolveErrorKind::CannotGetFieldOfType { bad_type } => {
+                write!(f, "Cannot get field of type '{}'", bad_type)?;
             }
             ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure { bad_type } => {
                 write!(

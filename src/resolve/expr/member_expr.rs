@@ -2,10 +2,9 @@ use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
-        error::{ResolveError, ResolveErrorKind},
-        resolve_expr_to_destination, Initialized,
+        core_structure_info::get_core_structure_info, destination::resolve_expr_to_destination, error::{ResolveError, ResolveErrorKind}, Initialized
     },
-    resolved::{self, MemoryManagement, TypedExpr},
+    resolved::{self, TypedExpr},
 };
 
 pub fn resolve_member_expr(
@@ -16,21 +15,11 @@ pub fn resolve_member_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
-    let (structure_ref, memory_management) = match resolved_subject.resolved_type {
-        resolved::Type::PlainOldData(_, structure_ref) => (structure_ref, MemoryManagement::None),
-        resolved::Type::ManagedStructure(_, structure_ref) => {
-            (structure_ref, MemoryManagement::ReferenceCounted)
-        }
-        _ => {
-            return Err(ResolveError::new(
-                ctx.resolved_ast.source_file_cache,
-                subject.source,
-                ResolveErrorKind::CannotGetFieldOfNonPlainOldDataType {
-                    bad_type: resolved_subject.resolved_type.to_string(),
-                },
-            ))
-        }
-    };
+    let (_, structure_ref, memory_management) = get_core_structure_info(
+        ctx.resolved_ast.source_file_cache,
+        &resolved_subject.resolved_type,
+        source,
+    )?;
 
     let structure = ctx
         .resolved_ast
@@ -65,7 +54,7 @@ pub fn resolve_member_expr(
     }
 
     let subject_destination =
-        resolve_expr_to_destination(ctx.resolved_ast.source_file_cache, resolved_subject.expr)?;
+        resolve_expr_to_destination(ctx.resolved_ast.source_file_cache, resolved_subject)?;
 
     Ok(TypedExpr::new(
         found_field.resolved_type.clone(),
