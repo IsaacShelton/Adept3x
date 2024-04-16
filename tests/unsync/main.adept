@@ -8,72 +8,15 @@ struct Vector3f (x float, y float, z float) {
     }
 }
 
-struct List<$T> (array ptr<$T>, length uint) {
-    #[impl Drop]
-    func drop(self) {
-        free(self.array)
-    }
-}
-
-struct unsync<List<$T>> (..., capacity uint) {
-    #[impl Freeze]
-    func freeze(self) List<$T> {
-        array := malloc(sizeof $T * self.length)
-
-        for i in Range::upto(self.length) {
-            array[i] = sync::clone(self.array[i])
-        }
-
-        return { array: _, length: self.length }
-    }
-}
-
-struct Categories<$T> (positive List<$T>, negative List<$T>) {
-    func size(self) uint {
-        return self.positive.length() + self.negative.length()
-    }
-
-    func numPositive(self) uint {
-        return self.positive.length()
-    }
-
-    func numNegative(self uint) {
-        return self.negative.length()
-    }
-
-    func asList() List<Self<$T>> {
-        return [self]
-    }
-
-    #[not_unsync_compatible]
-    func asFrozenList() List<Categories<$T>> {
-        return [self]
-    }
-}
-
-struct unsync<Categories<$T>> (positive unsync<List<$T>>, negative unsync<List<$T>>)
-
 func main {
     v := unsync<Vector3f> { x: 1, y: 2, z: 3 }
     v2 := v
-
-    v2.magnitude()
-
-    categories := unsync<Categories<int>> { positive: [], negative: [] }
-    categories.positive.add(1)
-    categories.positive.add(2)
-    categories.negative.add(-1)
-    categories.negative.add(-2)
-
-    categories := categories.freeze()
    
     printf(c"%f %f %f\n", v.x, v.y, v.z)
 
     v2.x = 4
     v2.y = 5
     v2.z = 6
-
-    position := v3.freeze()
 
     printf(c"%f %f %f\n", v.x, v.y, v.z)
 }
