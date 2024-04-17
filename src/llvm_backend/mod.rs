@@ -359,7 +359,7 @@ unsafe fn create_function_block(
                     .expect("referenced global to exist"),
             ),
             Instruction::Store(store) => {
-                let source = build_value(ctx.backend_module, value_catalog, builder, &store.source);
+                let source = build_value(ctx.backend_module, value_catalog, builder, &store.new_value);
                 let destination = build_value(
                     ctx.backend_module,
                     value_catalog,

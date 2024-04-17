@@ -37,6 +37,7 @@ compile math_floats
 compile math_simple
 compile member_pod
 compile nested_expressions
+compile op_then_assign
 compile reference_counted
 compile return
 compile return_message

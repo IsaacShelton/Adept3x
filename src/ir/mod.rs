@@ -171,7 +171,7 @@ pub struct Call {
 
 #[derive(Clone, Debug)]
 pub struct Store {
-    pub source: Value,
+    pub new_value: Value,
     pub destination: Value,
 }
 

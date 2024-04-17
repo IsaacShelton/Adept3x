@@ -1,0 +1,24 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    x int = 0
+    printf(c"%d\n", x)
+
+    x += 10
+    printf(c"%d\n", x)
+
+    x -= 9
+    printf(c"%d\n", x)
+
+    x *= 13
+    printf(c"%d\n", x)
+
+    x /= 2
+    printf(c"%d\n", x)
+
+    x %= 5
+    printf(c"%d\n", x)
+}
+
