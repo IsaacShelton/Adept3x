@@ -20,5 +20,26 @@ func main {
 
     x %= 5
     printf(c"%d\n", x)
+
+    x <<= 2
+    printf(c"%d\n", x)
+
+    x >>= 2
+    printf(c"%d\n", x)
+
+    x <<<= 3
+    printf(c"%d\n", x)
+
+    x >>>= 3
+    printf(c"%d\n", x)
+
+    x |= 6
+    printf(c"%d\n", x)
+
+    x &= 3
+    printf(c"%d\n", x)
+
+    x ^= 2
+    printf(c"%d\n", x)
 }
 

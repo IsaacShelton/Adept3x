@@ -10,16 +10,16 @@ use self::{
 };
 use crate::{
     ast::{
-        self, ArrayAccess, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
-        DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier, Function, Global, Parameter,
-        Parameters, Source, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation,
-        UnaryOperator, While,
+        self, ArrayAccess, Assignment, Ast, BinaryOperation, BinaryOperator, Block, Call,
+        Conditional, Declaration, DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier,
+        Function, Global, Parameter, Parameters, Source, Stmt, StmtKind, Structure, Type, TypeKind,
+        UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
-use ast::{BinaryOperator, FloatSize};
+use ast::FloatSize;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lazy_format::lazy_format;
@@ -460,6 +460,13 @@ where
             TokenKind::MultiplyAssign => Some(BinaryOperator::Multiply),
             TokenKind::DivideAssign => Some(BinaryOperator::Divide),
             TokenKind::ModulusAssign => Some(BinaryOperator::Modulus),
+            TokenKind::AmpersandAssign => Some(BinaryOperator::BitwiseAnd),
+            TokenKind::PipeAssign => Some(BinaryOperator::BitwiseOr),
+            TokenKind::CaretAssign => Some(BinaryOperator::BitwiseXor),
+            TokenKind::LeftShiftAssign => Some(BinaryOperator::LeftShift),
+            TokenKind::RightShiftAssign => Some(BinaryOperator::RightShift),
+            TokenKind::LogicalLeftShiftAssign => Some(BinaryOperator::LogicalLeftShift),
+            TokenKind::LogicalRightShiftAssign => Some(BinaryOperator::LogicalRightShift),
             got => {
                 return Err(ParseError {
                     filename: Some(self.input.filename().to_string()),
