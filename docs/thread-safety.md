@@ -183,3 +183,35 @@ func main {
     }
 }
 ```
+
+Example of hypothetical simple HTTP server.
+
+```
+func main {
+    server := HttpServer::new()
+    server.on("/", func &index)
+    server.on("/headers", func &headers)
+    server.listen()
+}
+
+func index(request HttpRequest, responder HttpResponder) {
+    weather := fetch("https://api.weather.dev/today.json")
+
+    weather := if JSON::parse(weather) is Some(weather) {
+        weather
+    } else {
+        responder.status(::BAD_GATEWAY)
+        responder.writeln("Failed to get weather data")
+        return
+    }
+
+    responder.status(::OK)
+    responder.writeln(weather.summary)
+}
+
+func headers(request HttpRequest, responder HttpResponder) {
+    for header in request.headers {
+        responder.println("{} = {}", header.key, header.value)
+    }
+}
+```

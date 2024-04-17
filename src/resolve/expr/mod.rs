@@ -9,9 +9,10 @@ mod unary_operation;
 mod variable;
 
 use self::array_access::resolve_array_access_expr;
-
 use super::{
-    error::ResolveError, function_search_ctx::FunctionSearchCtx, global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx, variable_search_ctx::VariableSearchCtx, ConformMode, Initialized
+    error::ResolveError, function_search_ctx::FunctionSearchCtx,
+    global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx,
+    variable_search_ctx::VariableSearchCtx, ConformMode, Initialized,
 };
 use crate::{
     ast::{self},
@@ -29,6 +30,8 @@ use crate::{
     resolved::{self, FunctionRef, StructureRef, TypedExpr},
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
+
+pub use binary_operation::resolve_binary_operator;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,

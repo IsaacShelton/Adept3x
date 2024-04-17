@@ -17,10 +17,11 @@ impl Token {
     }
 
     pub fn is_end_of_file(&self) -> bool {
-        match self.kind {
-            TokenKind::EndOfFile => true,
-            _ => false,
-        }
+        self.kind.is_end_of_file()
+    }
+
+    pub fn is_assignment_like(&self) -> bool {
+        self.kind.is_assignment_like()
     }
 }
 
@@ -252,6 +253,25 @@ impl TokenKind {
             | TokenKind::Colon
             | TokenKind::Hash
             | TokenKind::Ellipsis => 0,
+        }
+    }
+
+    pub fn is_assignment_like(&self) -> bool {
+        match self {
+            Self::AddAssign
+            | Self::SubtractAssign
+            | Self::MultiplyAssign
+            | Self::DivideAssign
+            | Self::ModulusAssign
+            | Self::AmpersandAssign
+            | Self::PipeAssign
+            | Self::CaretAssign
+            | Self::LeftShiftAssign
+            | Self::RightShiftAssign
+            | Self::LogicalLeftShiftAssign
+            | Self::LogicalRightShiftAssign
+            | Self::Assign => true,
+            _ => false,
         }
     }
 }

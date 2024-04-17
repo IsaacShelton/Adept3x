@@ -11,9 +11,9 @@ use self::{
 use crate::{
     ast::{
         self, ArrayAccess, Assignment, Ast, BinaryOperation, Block, Call, Conditional, Declaration,
-        DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier, Function, Global,
-        Parameter, Parameters, Source, Stmt, StmtKind, Structure, Type, TypeKind,
-        UnaryOperation, UnaryOperator, While,
+        DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier, Function, Global, Parameter,
+        Parameters, Source, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation,
+        UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -405,13 +405,10 @@ where
                 } else {
                     let left = self.parse_expr()?;
 
-                    if self.input.peek_is(TokenKind::Assign) {
+                    if self.input.peek().is_assignment_like() {
                         self.parse_assignment(left)
                     } else {
-                        Ok(Stmt::new(
-                            StmtKind::Expr(left),
-                            self.source(location),
-                        ))
+                        Ok(Stmt::new(StmtKind::Expr(left), self.source(location)))
                     }
                 }
             }
@@ -427,7 +424,7 @@ where
     fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
         let (name, location) = self.parse_identifier_keep_location(Some("for variable name"))?;
 
-        if self.input.peek_is(TokenKind::Assign) {
+        if self.input.peek().is_assignment_like() {
             let variable = Expr::new(ExprKind::Variable(name), self.source(location));
             self.parse_assignment(variable)
         } else {
@@ -454,11 +451,36 @@ where
     }
 
     fn parse_assignment(&mut self, destination: Expr) -> Result<Stmt, ParseError> {
-        let location = self.parse_token(TokenKind::Assign, Some("for assignment"))?;
+        let location = self.input.peek().location;
+
+        let operator = match self.input.advance().kind {
+            TokenKind::Assign => None,
+            TokenKind::AddAssign => Some(BinaryOperator::Add),
+            TokenKind::SubtractAssign => Some(BinaryOperator::Subtract),
+            TokenKind::MultiplyAssign => Some(BinaryOperator::Multiply),
+            TokenKind::DivideAssign => Some(BinaryOperator::Divide),
+            TokenKind::ModulusAssign => Some(BinaryOperator::Modulus),
+            got => {
+                return Err(ParseError {
+                    filename: Some(self.input.filename().to_string()),
+                    location: Some(location),
+                    kind: ParseErrorKind::Expected {
+                        expected: "(an assignment operator)".to_string(),
+                        for_reason: Some("for assignment".to_string()),
+                        got: got.to_string(),
+                    },
+                })
+            }
+        };
+
         let value = self.parse_expr()?;
 
         Ok(Stmt::new(
-            StmtKind::Assignment(Assignment { destination, value }),
+            StmtKind::Assignment(Assignment {
+                destination,
+                value,
+                operator,
+            }),
             self.source(location),
         ))
     }
@@ -484,11 +506,7 @@ where
         self.parse_operator_expr(0, primary)
     }
 
-    fn parse_operator_expr(
-        &mut self,
-        precedence: usize,
-        expr: Expr,
-    ) -> Result<Expr, ParseError> {
+    fn parse_operator_expr(&mut self, precedence: usize, expr: Expr) -> Result<Expr, ParseError> {
         let mut lhs = expr;
 
         loop {
@@ -540,17 +558,11 @@ where
         match kind {
             TokenKind::TrueKeyword => {
                 self.input.advance().kind.unwrap_true_keyword();
-                Ok(Expr::new(
-                    ExprKind::Boolean(true),
-                    self.source(location),
-                ))
+                Ok(Expr::new(ExprKind::Boolean(true), self.source(location)))
             }
             TokenKind::FalseKeyword => {
                 self.input.advance().kind.unwrap_false_keyword();
-                Ok(Expr::new(
-                    ExprKind::Boolean(false),
-                    self.source(location),
-                ))
+                Ok(Expr::new(ExprKind::Boolean(false), self.source(location)))
             }
             TokenKind::Integer(..) => Ok(Expr::new(
                 ExprKind::Integer(self.input.advance().kind.unwrap_integer()),
@@ -689,10 +701,7 @@ where
         }
     }
 
-    fn parse_expr_primary_post(
-        &mut self,
-        mut base: Expr,
-    ) -> Result<Expr, ParseError> {
+    fn parse_expr_primary_post(&mut self, mut base: Expr) -> Result<Expr, ParseError> {
         loop {
             self.ignore_newlines();
 
@@ -955,21 +964,21 @@ where
                         }
                     }
                     "pod" => {
-                        self.parse_token(TokenKind::OpenAngle, Some("to specify inner type of 'pod'"))?;
-                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
                         self.parse_token(
-                            TokenKind::GreaterThan,
-                            Some("to close type parameters"),
+                            TokenKind::OpenAngle,
+                            Some("to specify inner type of 'pod'"),
                         )?;
+                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
                         Ok(TypeKind::PlainOldData(Box::new(inner)))
                     }
                     "unsync" => {
-                        self.parse_token(TokenKind::OpenAngle, Some("to specify inner type of 'unsync'"))?;
-                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
                         self.parse_token(
-                            TokenKind::GreaterThan,
-                            Some("to close type parameters"),
+                            TokenKind::OpenAngle,
+                            Some("to specify inner type of 'unsync'"),
                         )?;
+                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
                         Ok(TypeKind::Unsync(Box::new(inner)))
                     }
                     identifier => Ok(TypeKind::Named(identifier.into())),

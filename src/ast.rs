@@ -1,14 +1,13 @@
+use crate::{
+    line_column::Location,
+    source_file_cache::{SourceFileCache, SourceFileCacheKey},
+};
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use std::{
     collections::HashMap,
     ffi::CString,
     fmt::{Debug, Display},
-};
-
-use crate::{
-    line_column::Location,
-    source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -321,6 +320,7 @@ pub struct Declaration {
 pub struct Assignment {
     pub destination: Expr,
     pub value: Expr,
+    pub operator: Option<BinaryOperator>,
 }
 
 #[derive(Clone, Debug)]

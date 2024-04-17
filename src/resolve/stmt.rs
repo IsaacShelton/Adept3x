@@ -2,7 +2,7 @@ use super::{
     conform_expr,
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
-    expr::{resolve_expr, PreferredType, ResolveExprCtx},
+    expr::{resolve_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
     resolve_type, ConformMode, Initialized,
 };
 use crate::{ast, resolved};
@@ -187,10 +187,24 @@ pub fn resolve_stmt<'a>(
                 resolved::DestinationKind::ArrayAccess { .. } => (),
             }
 
+            let operator = assignment
+                .operator
+                .as_ref()
+                .map(|ast_operator| {
+                    resolve_binary_operator(
+                        ctx.resolved_ast.source_file_cache,
+                        ast_operator,
+                        &destination.resolved_type,
+                        source,
+                    )
+                })
+                .transpose()?;
+
             Ok(resolved::Stmt::new(
                 resolved::StmtKind::Assignment(resolved::Assignment {
                     destination,
                     value: value.expr,
+                    operator,
                 }),
                 source,
             ))

@@ -219,6 +219,7 @@ pub struct Declaration {
 pub struct Assignment {
     pub destination: Destination,
     pub value: Expr,
+    pub operator: Option<BinaryOperator>,
 }
 
 #[derive(Clone, Debug)]
