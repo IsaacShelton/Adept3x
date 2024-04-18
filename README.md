@@ -21,11 +21,8 @@ Adept distinguishes between thread-safe and non-thread-safe values, and secures 
 ### Secure Type System
 
 
-<img src="https://raw.github.com/IsaacShelton/Adept3x/master/.github/sync-unsync-ref.png" width="120" height="120">
+<img src="https://raw.github.com/IsaacShelton/Adept3x/master/.github/sync-unsync-ref.gif" width="120" height="120">
 
-Adept distinguishes between thread-safe and non-thread-safe values (`T` vs `unsync<T>`).
+Adept distinguishes between thread-safe values (`T`) and non-thread-safe values (`unsync<T>`).
 
-Adept also supports two parameter passing modes
-
-- Shared Reference `T`/`unsync<T>` which can extend the lifetime of the passed value
-- Reference `&T` which cannot
+The language also distinguishes between the two parameter passing modes: "shared reference" which can extend the lifetime of the passed value, and "inert reference" which cannot.
