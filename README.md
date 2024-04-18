@@ -2,4 +2,12 @@
 
 <img src="https://raw.github.com/IsaacShelton/Adept3x/master/.github/README_logo.png" width="240" height="240">
 
-Work-in-progress compiler that will become Adept 3.0
+A language that maximizes safety and developer productivity
+
+Work-in-progress compiler that will become Adept 3.x
+
+```
+func main {
+	println("Hello World")
+}
+```
