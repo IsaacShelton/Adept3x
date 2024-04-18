@@ -14,7 +14,7 @@ func main {
 
 ### Thread Safety
 
-<img src="https://raw.github.com/IsaacShelton/Adept3x/master/.github/thread-safety-dance.png" width="120" height="120">
+<img src="https://raw.github.com/IsaacShelton/Adept3x/master/.github/thread-safety-dance.gif" width="120" height="120">
 
 Adept distinguishes between thread-safe and non-thread-safe values, and secures code against concurrency bugs at compile-time.
 
