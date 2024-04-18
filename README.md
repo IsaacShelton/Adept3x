@@ -8,6 +8,6 @@ Work-in-progress compiler that will become Adept 3.x
 
 ```
 func main {
-	println("Hello World")
+    println("Hello World")
 }
 ```
