@@ -25,4 +25,4 @@ Adept distinguishes between thread-safe and non-thread-safe values, and secures 
 
 Adept distinguishes between thread-safe values (`T`) and non-thread-safe values (`unsync<T>`).
 
-The language also distinguishes between the two parameter passing modes: "shared reference" (`T`/`unsync<T>`) which can extend the lifetime of the passed value, and "inert reference" (`&T`) which cannot.
+Functions can choose to accept these values either by "shared reference" (`T`/`unsync<T>`) which can extend the lifetime of the passed value, or "inert reference" (`&T`) which cannot change the lifetime but accepts  both `T` and `unsync<T>`.
