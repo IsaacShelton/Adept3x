@@ -320,7 +320,7 @@ pub struct Declaration {
 pub struct Assignment {
     pub destination: Expr,
     pub value: Expr,
-    pub operator: Option<BinaryOperator>,
+    pub operator: Option<BasicBinaryOperator>,
 }
 
 #[derive(Clone, Debug)]
@@ -345,7 +345,8 @@ pub enum ExprKind {
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
-    BinaryOperation(Box<BinaryOperation>),
+    BasicBinaryOperation(Box<BasicBinaryOperation>),
+    ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     Member(Box<Expr>, String),
     ArrayAccess(Box<ArrayAccess>),
     StructureLiteral(Type, IndexMap<String, Expr>),
@@ -384,14 +385,32 @@ impl Block {
 }
 
 #[derive(Clone, Debug)]
-pub struct BinaryOperation {
-    pub operator: BinaryOperator,
+pub enum BinaryOperator {
+    Basic(BasicBinaryOperator),
+    ShortCircuiting(ShortCircuitingBinaryOperator),
+}
+
+impl From<BasicBinaryOperator> for BinaryOperator {
+    fn from(value: BasicBinaryOperator) -> Self {
+        Self::Basic(value)
+    }
+}
+
+impl From<ShortCircuitingBinaryOperator> for BinaryOperator {
+    fn from(value: ShortCircuitingBinaryOperator) -> Self {
+        Self::ShortCircuiting(value)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BasicBinaryOperation {
+    pub operator: BasicBinaryOperator,
     pub left: Expr,
     pub right: Expr,
 }
 
 #[derive(Clone, Debug)]
-pub enum BinaryOperator {
+pub enum BasicBinaryOperator {
     Add,
     Subtract,
     Multiply,
@@ -412,7 +431,7 @@ pub enum BinaryOperator {
     LogicalRightShift,
 }
 
-impl Display for BinaryOperator {
+impl Display for BasicBinaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Add => "+",
@@ -433,6 +452,28 @@ impl Display for BinaryOperator {
             Self::RightShift => ">>",
             Self::LogicalLeftShift => "<<<",
             Self::LogicalRightShift => ">>>",
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ShortCircuitingBinaryOperation {
+    pub operator: ShortCircuitingBinaryOperator,
+    pub left: Expr,
+    pub right: Expr,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ShortCircuitingBinaryOperator {
+    And,
+    Or,
+}
+
+impl Display for ShortCircuitingBinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::And => "&&",
+            Self::Or => "||",
         })
     }
 }
@@ -460,7 +501,7 @@ impl Display for UnaryOperator {
     }
 }
 
-impl BinaryOperator {
+impl BasicBinaryOperator {
     pub fn returns_boolean(&self) -> bool {
         match self {
             Self::Add => false,

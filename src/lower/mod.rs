@@ -174,7 +174,11 @@ fn lower_stmts(
 
     for stmt in stmts.iter() {
         result = match &stmt.kind {
-            StmtKind::Return(expr) => {
+            StmtKind::Return(expr, drops) => {
+                if drops.drops.len() != 0 {
+                    unimplemented!("dropping before returning");
+                }
+
                 let instruction = ir::Instruction::Return(if let Some(expr) = expr {
                     Some(lower_expr(builder, ir_module, expr, function)?)
                 } else if function.name == "main" {
@@ -218,7 +222,7 @@ fn lower_stmts(
                         destination_type,
                     )));
 
-                    lower_binary_operation(
+                    lower_basic_binary_operation(
                         builder,
                         &operator,
                         ir::BinaryOperands::new(existing_value, new_value),
@@ -501,15 +505,18 @@ fn lower_expr(
             let ir_type = lower_type(&declare_assign.resolved_type)?;
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
-        ExprKind::BinaryOperation(binary_operation) => {
-            let left = lower_expr(builder, ir_module, &binary_operation.left.expr, function)?;
-            let right = lower_expr(builder, ir_module, &binary_operation.right.expr, function)?;
+        ExprKind::BasicBinaryOperation(operation) => {
+            let left = lower_expr(builder, ir_module, &operation.left.expr, function)?;
+            let right = lower_expr(builder, ir_module, &operation.right.expr, function)?;
 
-            lower_binary_operation(
+            lower_basic_binary_operation(
                 builder,
-                &binary_operation.operator,
+                &operation.operator,
                 ir::BinaryOperands::new(left, right),
             )
+        }
+        ExprKind::ShortCircuitingBinaryOperation(operation) => {
+            lower_short_circuiting_binary_operation(builder, operation)
         }
         ExprKind::IntegerExtend(value, resolved_type) => {
             let value = lower_expr(builder, ir_module, value, function)?;
@@ -736,13 +743,13 @@ fn lower_expr(
     }
 }
 
-pub fn lower_binary_operation(
+pub fn lower_basic_binary_operation(
     builder: &mut Builder,
-    operator: &resolved::BinaryOperator,
+    operator: &resolved::BasicBinaryOperator,
     operands: ir::BinaryOperands,
 ) -> Result<Value, CompilerError> {
     match operator {
-        resolved::BinaryOperator::Add(mode) => Ok(builder.push(match mode {
+        resolved::BasicBinaryOperator::Add(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Add(operands, FloatOrInteger::Integer),
             NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
             NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
@@ -754,7 +761,7 @@ pub fn lower_binary_operation(
                 operands,
             ),
         })),
-        resolved::BinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
+        resolved::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Subtract(operands, FloatOrInteger::Integer),
             NumericMode::Float => ir::Instruction::Subtract(operands, FloatOrInteger::Float),
             NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
@@ -766,7 +773,7 @@ pub fn lower_binary_operation(
                 operands,
             ),
         })),
-        resolved::BinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
+        resolved::BasicBinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Multiply(operands, FloatOrInteger::Integer),
             NumericMode::Float => ir::Instruction::Multiply(operands, FloatOrInteger::Float),
             NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
@@ -778,47 +785,55 @@ pub fn lower_binary_operation(
                 operands,
             ),
         })),
-        resolved::BinaryOperator::Divide(mode) => {
+        resolved::BasicBinaryOperator::Divide(mode) => {
             Ok(builder.push(ir::Instruction::Divide(operands, *mode)))
         }
-        resolved::BinaryOperator::Modulus(mode) => {
+        resolved::BasicBinaryOperator::Modulus(mode) => {
             Ok(builder.push(ir::Instruction::Modulus(operands, *mode)))
         }
-        resolved::BinaryOperator::Equals(mode) => {
+        resolved::BasicBinaryOperator::Equals(mode) => {
             Ok(builder.push(ir::Instruction::Equals(operands, *mode)))
         }
-        resolved::BinaryOperator::NotEquals(mode) => {
+        resolved::BasicBinaryOperator::NotEquals(mode) => {
             Ok(builder.push(ir::Instruction::NotEquals(operands, *mode)))
         }
-        resolved::BinaryOperator::LessThan(mode) => {
+        resolved::BasicBinaryOperator::LessThan(mode) => {
             Ok(builder.push(ir::Instruction::LessThan(operands, *mode)))
         }
-        resolved::BinaryOperator::LessThanEq(mode) => {
+        resolved::BasicBinaryOperator::LessThanEq(mode) => {
             Ok(builder.push(ir::Instruction::LessThanEq(operands, *mode)))
         }
-        resolved::BinaryOperator::GreaterThan(mode) => {
+        resolved::BasicBinaryOperator::GreaterThan(mode) => {
             Ok(builder.push(ir::Instruction::GreaterThan(operands, *mode)))
         }
-        resolved::BinaryOperator::GreaterThanEq(mode) => {
+        resolved::BasicBinaryOperator::GreaterThanEq(mode) => {
             Ok(builder.push(ir::Instruction::GreaterThanEq(operands, *mode)))
         }
-        resolved::BinaryOperator::BitwiseAnd => {
+        resolved::BasicBinaryOperator::BitwiseAnd => {
             Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))
         }
-        resolved::BinaryOperator::BitwiseOr => {
+        resolved::BasicBinaryOperator::BitwiseOr => {
             Ok(builder.push(ir::Instruction::BitwiseOr(operands)))
         }
-        resolved::BinaryOperator::BitwiseXor => {
+        resolved::BasicBinaryOperator::BitwiseXor => {
             Ok(builder.push(ir::Instruction::BitwiseXor(operands)))
         }
-        resolved::BinaryOperator::LogicalLeftShift | resolved::BinaryOperator::LeftShift => {
+        resolved::BasicBinaryOperator::LogicalLeftShift
+        | resolved::BasicBinaryOperator::LeftShift => {
             Ok(builder.push(ir::Instruction::LeftShift(operands)))
         }
-        resolved::BinaryOperator::RightShift => {
+        resolved::BasicBinaryOperator::RightShift => {
             Ok(builder.push(ir::Instruction::RightShift(operands)))
         }
-        resolved::BinaryOperator::LogicalRightShift => {
+        resolved::BasicBinaryOperator::LogicalRightShift => {
             Ok(builder.push(ir::Instruction::LogicalRightShift(operands)))
         }
     }
+}
+
+pub fn lower_short_circuiting_binary_operation(
+    _builder: &mut Builder,
+    _operation: &resolved::ShortCircuitingBinaryOperation,
+) -> Result<Value, CompilerError> {
+    todo!("lower_short_circuiting_binary_operation")
 }

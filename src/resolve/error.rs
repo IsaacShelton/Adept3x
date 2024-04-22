@@ -125,6 +125,12 @@ pub enum ResolveErrorKind {
         expected: String,
         got: String,
     },
+    ExpectedTypeForSide {
+        side: String,
+        operator: String,
+        expected: String,
+        got: String,
+    },
     Other {
         message: String,
     },
@@ -310,6 +316,9 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::ExpectedIndexOfType { expected, got } => {
                 write!(f, "Expected index of type '{}', got '{}'", expected, got)?;
+            }
+            ResolveErrorKind::ExpectedTypeForSide { side, operator, expected, got } => {
+                write!(f, "Expected '{}' value for {} of '{}', got '{}' value", expected, side, operator, got)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

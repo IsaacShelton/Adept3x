@@ -1,14 +1,19 @@
 mod array_access;
-mod binary_operation;
+mod basic_binary_operation;
 mod call;
 mod conditional;
 mod declare_assign;
 mod member_expr;
+mod short_circuiting_binary_operation;
 mod struct_literal;
 mod unary_operation;
 mod variable;
 
-use self::array_access::resolve_array_access_expr;
+use self::{
+    array_access::resolve_array_access_expr,
+    basic_binary_operation::resolve_basic_binary_operation_expr,
+    short_circuiting_binary_operation::resolve_short_circuiting_binary_operation_expr,
+};
 use super::{
     error::ResolveError, function_search_ctx::FunctionSearchCtx,
     global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx,
@@ -20,9 +25,9 @@ use crate::{
         conform_expr_or_error, ensure_initialized,
         error::ResolveErrorKind,
         expr::{
-            binary_operation::resolve_binary_operation_expr, call::resolve_call_expr,
-            conditional::resolve_conditional_expr, declare_assign::resolve_declare_assign_expr,
-            member_expr::resolve_member_expr, struct_literal::resolve_struct_literal_expr,
+            call::resolve_call_expr, conditional::resolve_conditional_expr,
+            declare_assign::resolve_declare_assign_expr, member_expr::resolve_member_expr,
+            struct_literal::resolve_struct_literal_expr,
             unary_operation::resolve_unary_operation_expr, variable::resolve_variable_expr,
         },
         resolve_stmts,
@@ -31,14 +36,14 @@ use crate::{
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
 
-pub use binary_operation::resolve_binary_operator;
+pub use basic_binary_operation::resolve_basic_binary_operator;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
     pub function_search_ctx: &'b FunctionSearchCtx<'a>,
     pub type_search_ctx: &'b TypeSearchCtx<'a>,
     pub global_search_ctx: &'b GlobalSearchCtx<'a>,
-    pub variable_search_ctx: &'b mut VariableSearchCtx<'a>,
+    pub variable_search_ctx: VariableSearchCtx<'a>,
     pub resolved_function_ref: resolved::FunctionRef,
 }
 
@@ -146,8 +151,15 @@ pub fn resolve_expr(
         ast::ExprKind::DeclareAssign(declare_assign) => {
             resolve_declare_assign_expr(ctx, declare_assign, source)
         }
-        ast::ExprKind::BinaryOperation(binary_operation) => {
-            resolve_binary_operation_expr(ctx, binary_operation, preferred_type, source)
+        ast::ExprKind::BasicBinaryOperation(binary_operation) => {
+            resolve_basic_binary_operation_expr(ctx, binary_operation, preferred_type, source)
+        }
+        ast::ExprKind::ShortCircuitingBinaryOperation(short_circuiting_binary_operation) => {
+            resolve_short_circuiting_binary_operation_expr(
+                ctx,
+                short_circuiting_binary_operation,
+                source,
+            )
         }
         ast::ExprKind::Member(subject, field_name) => {
             resolve_member_expr(ctx, subject, field_name, source)
@@ -165,6 +177,8 @@ pub fn resolve_expr(
             resolve_conditional_expr(ctx, conditional, preferred_type, source)
         }
         ast::ExprKind::While(while_loop) => {
+            ctx.variable_search_ctx.begin_scope();
+
             let condition = conform_expr_or_error(
                 ctx.resolved_ast.source_file_cache,
                 &resolve_expr(
@@ -179,6 +193,7 @@ pub fn resolve_expr(
             .expr;
 
             let block = resolved::Block::new(resolve_stmts(ctx, &while_loop.block.stmts)?);
+            ctx.variable_search_ctx.end_scope();
 
             Ok(TypedExpr::new(
                 resolved::Type::Void,

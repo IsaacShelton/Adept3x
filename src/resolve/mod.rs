@@ -4,6 +4,7 @@ mod error;
 mod expr;
 mod function_search_ctx;
 mod global_search_ctx;
+mod lifetime;
 mod stmt;
 mod type_search_ctx;
 mod unify_types;
@@ -201,7 +202,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                         function_search_ctx,
                         type_search_ctx,
                         global_search_ctx,
-                        variable_search_ctx: &mut variable_search_ctx,
+                        variable_search_ctx,
                         resolved_function_ref,
                     };
 
@@ -214,6 +215,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     .expect("resolved function head to exist");
 
                 resolved_function.stmts = resolved_stmts;
+
+                lifetime::insert_drops(resolved_function);
             }
         }
     }

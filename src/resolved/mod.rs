@@ -12,6 +12,7 @@ use std::{
 };
 
 pub use self::variable_storage::VariableStorageKey;
+pub use crate::ast::ShortCircuitingBinaryOperator;
 pub use crate::ast::UnaryOperator;
 pub use crate::ast::{FloatSize, IntegerBits, IntegerSign};
 pub use variable_storage::VariableStorage;
@@ -201,9 +202,20 @@ impl Stmt {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Drops {
+    pub drops: Vec<VariableStorage>,
+}
+
+impl Drops {
+    pub fn new(drops: Vec<VariableStorage>) -> Self {
+        Self { drops }
+    }
+}
+
 #[derive(Clone, Debug, Unwrap)]
 pub enum StmtKind {
-    Return(Option<Expr>),
+    Return(Option<Expr>, Drops),
     Expr(TypedExpr),
     Declaration(Declaration),
     Assignment(Assignment),
@@ -219,7 +231,7 @@ pub struct Declaration {
 pub struct Assignment {
     pub destination: Destination,
     pub value: Expr,
-    pub operator: Option<BinaryOperator>,
+    pub operator: Option<BasicBinaryOperator>,
 }
 
 #[derive(Clone, Debug)]
@@ -289,7 +301,8 @@ pub enum ExprKind {
     NullTerminatedString(CString),
     Call(Call),
     DeclareAssign(DeclareAssign),
-    BinaryOperation(Box<BinaryOperation>),
+    BasicBinaryOperation(Box<BasicBinaryOperation>),
+    ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     IntegerExtend(Box<Expr>, Type),
     FloatExtend(Box<Expr>, Type),
     Member {
@@ -349,10 +362,10 @@ impl Block {
     pub fn get_result_type(&self) -> Type {
         if let Some(stmt) = self.stmts.last() {
             match &stmt.kind {
-                StmtKind::Return(_) => None,
+                StmtKind::Return(..) => None,
                 StmtKind::Expr(expr) => Some(expr.resolved_type.clone()),
-                StmtKind::Declaration(_) => None,
-                StmtKind::Assignment(_) => None,
+                StmtKind::Declaration(..) => None,
+                StmtKind::Assignment(..) => None,
             }
         } else {
             None
@@ -421,7 +434,7 @@ pub enum NumericMode {
 }
 
 #[derive(Clone, Debug)]
-pub enum BinaryOperator {
+pub enum BasicBinaryOperator {
     Add(NumericMode),
     Subtract(NumericMode),
     Multiply(NumericMode),
@@ -443,8 +456,15 @@ pub enum BinaryOperator {
 }
 
 #[derive(Clone, Debug)]
-pub struct BinaryOperation {
-    pub operator: BinaryOperator,
+pub struct BasicBinaryOperation {
+    pub operator: BasicBinaryOperator,
+    pub left: TypedExpr,
+    pub right: TypedExpr,
+}
+
+#[derive(Clone, Debug)]
+pub struct ShortCircuitingBinaryOperation {
+    pub operator: ShortCircuitingBinaryOperator,
     pub left: TypedExpr,
     pub right: TypedExpr,
 }

@@ -5,6 +5,7 @@ mod number_state;
 mod state;
 mod string_state;
 
+use self::state::State;
 use self::{
     hex_number_state::HexNumberState, identifier_state::IdentifierState, number_state::NumberState,
     string_state::StringState,
@@ -15,8 +16,6 @@ use crate::{
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
 use is_character::IsCharacter;
-
-use self::state::State;
 
 pub struct Lexer<I: Iterator<Item = char>> {
     characters: LookAhead<LineColumn<I>>,
@@ -257,6 +256,9 @@ where
                     if self.characters.peek().is_character('=') {
                         self.characters.next();
                         Has(Token::new(TokenKind::AmpersandAssign, location))
+                    } else if self.characters.peek().is_character('&') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::And, location))
                     } else {
                         Has(Token::new(TokenKind::Ampersand, location))
                     }
@@ -265,6 +267,9 @@ where
                     if self.characters.peek().is_character('=') {
                         self.characters.next();
                         Has(Token::new(TokenKind::PipeAssign, location))
+                    } else if self.characters.peek().is_character('|') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::Or, location))
                     } else {
                         Has(Token::new(TokenKind::Pipe, location))
                     }

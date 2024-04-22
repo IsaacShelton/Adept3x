@@ -10,10 +10,7 @@ use self::{
 };
 use crate::{
     ast::{
-        self, ArrayAccess, Assignment, Ast, BinaryOperation, BinaryOperator, Block, Call,
-        Conditional, Declaration, DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier,
-        Function, Global, Parameter, Parameters, Source, Stmt, StmtKind, Structure, Type, TypeKind,
-        UnaryOperation, UnaryOperator, While,
+        self, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier, Function, Global, Parameter, Parameters, ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -455,18 +452,18 @@ where
 
         let operator = match self.input.advance().kind {
             TokenKind::Assign => None,
-            TokenKind::AddAssign => Some(BinaryOperator::Add),
-            TokenKind::SubtractAssign => Some(BinaryOperator::Subtract),
-            TokenKind::MultiplyAssign => Some(BinaryOperator::Multiply),
-            TokenKind::DivideAssign => Some(BinaryOperator::Divide),
-            TokenKind::ModulusAssign => Some(BinaryOperator::Modulus),
-            TokenKind::AmpersandAssign => Some(BinaryOperator::BitwiseAnd),
-            TokenKind::PipeAssign => Some(BinaryOperator::BitwiseOr),
-            TokenKind::CaretAssign => Some(BinaryOperator::BitwiseXor),
-            TokenKind::LeftShiftAssign => Some(BinaryOperator::LeftShift),
-            TokenKind::RightShiftAssign => Some(BinaryOperator::RightShift),
-            TokenKind::LogicalLeftShiftAssign => Some(BinaryOperator::LogicalLeftShift),
-            TokenKind::LogicalRightShiftAssign => Some(BinaryOperator::LogicalRightShift),
+            TokenKind::AddAssign => Some(BasicBinaryOperator::Add),
+            TokenKind::SubtractAssign => Some(BasicBinaryOperator::Subtract),
+            TokenKind::MultiplyAssign => Some(BasicBinaryOperator::Multiply),
+            TokenKind::DivideAssign => Some(BasicBinaryOperator::Divide),
+            TokenKind::ModulusAssign => Some(BasicBinaryOperator::Modulus),
+            TokenKind::AmpersandAssign => Some(BasicBinaryOperator::BitwiseAnd),
+            TokenKind::PipeAssign => Some(BasicBinaryOperator::BitwiseOr),
+            TokenKind::CaretAssign => Some(BasicBinaryOperator::BitwiseXor),
+            TokenKind::LeftShiftAssign => Some(BasicBinaryOperator::LeftShift),
+            TokenKind::RightShiftAssign => Some(BasicBinaryOperator::RightShift),
+            TokenKind::LogicalLeftShiftAssign => Some(BasicBinaryOperator::LogicalLeftShift),
+            TokenKind::LogicalRightShiftAssign => Some(BasicBinaryOperator::LogicalRightShift),
             got => {
                 return Err(ParseError {
                     filename: Some(self.input.filename().to_string()),
@@ -527,25 +524,28 @@ where
                 return Ok(lhs);
             }
 
-            let binary_operator = match operator.kind {
-                TokenKind::Add => BinaryOperator::Add,
-                TokenKind::Subtract => BinaryOperator::Subtract,
-                TokenKind::Multiply => BinaryOperator::Multiply,
-                TokenKind::Divide => BinaryOperator::Divide,
-                TokenKind::Modulus => BinaryOperator::Modulus,
-                TokenKind::Equals => BinaryOperator::Equals,
-                TokenKind::NotEquals => BinaryOperator::NotEquals,
-                TokenKind::LessThan => BinaryOperator::LessThan,
-                TokenKind::LessThanEq => BinaryOperator::LessThanEq,
-                TokenKind::GreaterThan => BinaryOperator::GreaterThan,
-                TokenKind::GreaterThanEq => BinaryOperator::GreaterThanEq,
-                TokenKind::Ampersand => BinaryOperator::BitwiseAnd,
-                TokenKind::Pipe => BinaryOperator::BitwiseOr,
-                TokenKind::Caret => BinaryOperator::BitwiseXor,
-                TokenKind::LeftShift => BinaryOperator::LeftShift,
-                TokenKind::LogicalLeftShift => BinaryOperator::LogicalLeftShift,
-                TokenKind::RightShift => BinaryOperator::RightShift,
-                TokenKind::LogicalRightShift => BinaryOperator::LogicalRightShift,
+
+            let binary_operator: BinaryOperator = match operator.kind {
+                TokenKind::Add => BasicBinaryOperator::Add.into(),
+                TokenKind::Subtract => BasicBinaryOperator::Subtract.into(),
+                TokenKind::Multiply => BasicBinaryOperator::Multiply.into(),
+                TokenKind::Divide => BasicBinaryOperator::Divide.into(),
+                TokenKind::Modulus => BasicBinaryOperator::Modulus.into(),
+                TokenKind::Equals => BasicBinaryOperator::Equals.into(),
+                TokenKind::NotEquals => BasicBinaryOperator::NotEquals.into(),
+                TokenKind::LessThan => BasicBinaryOperator::LessThan.into(),
+                TokenKind::LessThanEq => BasicBinaryOperator::LessThanEq.into(),
+                TokenKind::GreaterThan => BasicBinaryOperator::GreaterThan.into(),
+                TokenKind::GreaterThanEq => BasicBinaryOperator::GreaterThanEq.into(),
+                TokenKind::Ampersand => BasicBinaryOperator::BitwiseAnd.into(),
+                TokenKind::Pipe => BasicBinaryOperator::BitwiseOr.into(),
+                TokenKind::Caret => BasicBinaryOperator::BitwiseXor.into(),
+                TokenKind::LeftShift => BasicBinaryOperator::LeftShift.into(),
+                TokenKind::LogicalLeftShift => BasicBinaryOperator::LogicalLeftShift.into(),
+                TokenKind::RightShift => BasicBinaryOperator::RightShift.into(),
+                TokenKind::LogicalRightShift => BasicBinaryOperator::LogicalRightShift.into(),
+                TokenKind::And => ShortCircuitingBinaryOperator::And.into(),
+                TokenKind::Or => ShortCircuitingBinaryOperator::Or.into(),
                 _ => return Ok(lhs),
             };
 
@@ -843,11 +843,22 @@ where
         let rhs = self.parse_math_rhs(operator_precedence)?;
 
         Ok(Expr::new(
-            ExprKind::BinaryOperation(Box::new(BinaryOperation {
-                operator,
-                left: lhs,
-                right: rhs,
-            })),
+            match operator {
+                BinaryOperator::Basic(basic_operator) => {
+                    ExprKind::BasicBinaryOperation(Box::new(BasicBinaryOperation {
+                        operator: basic_operator,
+                        left: lhs,
+                        right: rhs,
+                    }))
+                }
+                BinaryOperator::ShortCircuiting(short_circuiting_operator) => {
+                    ExprKind::ShortCircuitingBinaryOperation(Box::new(ShortCircuitingBinaryOperation {
+                        operator: short_circuiting_operator,
+                        left: lhs,
+                        right: rhs,
+                    }))
+                }
+            },
             self.source(location),
         ))
     }

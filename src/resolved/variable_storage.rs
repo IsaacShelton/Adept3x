@@ -70,4 +70,8 @@ impl VariableStorage {
     pub fn get(&self, key: VariableStorageKey) -> Option<&VariableInstance> {
         self.instances.get(key.index)
     }
+
+    pub fn count(&self) -> usize {
+        self.instances.len()
+    }
 }

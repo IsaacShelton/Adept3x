@@ -2,10 +2,13 @@ use super::{
     conform_expr,
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
-    expr::{resolve_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
+    expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
     resolve_type, ConformMode, Initialized,
 };
-use crate::{ast, resolved};
+use crate::{
+    ast,
+    resolved::{self, Drops},
+};
 
 pub fn resolve_stmts(
     ctx: &mut ResolveExprCtx<'_, '_>,
@@ -76,7 +79,7 @@ pub fn resolve_stmt<'a>(
             };
 
             Ok(resolved::Stmt::new(
-                resolved::StmtKind::Return(return_value),
+                resolved::StmtKind::Return(return_value, Drops::new(vec![])),
                 source,
             ))
         }
@@ -191,7 +194,7 @@ pub fn resolve_stmt<'a>(
                 .operator
                 .as_ref()
                 .map(|ast_operator| {
-                    resolve_binary_operator(
+                    resolve_basic_binary_operator(
                         ctx.resolved_ast.source_file_cache,
                         ast_operator,
                         &destination.resolved_type,

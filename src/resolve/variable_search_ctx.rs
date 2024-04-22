@@ -4,21 +4,34 @@ use crate::{
     resolved::{self, VariableStorageKey},
     source_file_cache::SourceFileCache,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+
+#[derive(Clone, Debug)]
+pub struct ScopedVariable {
+    pub resolved_type: resolved::Type,
+    pub key: VariableStorageKey,
+}
+
+impl ScopedVariable {
+    pub fn new(resolved_type: resolved::Type, key: VariableStorageKey) -> Self {
+        Self { resolved_type, key }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct VariableSearchCtx<'a> {
     source_file_cache: &'a SourceFileCache,
-    variables: HashMap<String, (resolved::Type, VariableStorageKey)>,
-    parent: Option<&'a VariableSearchCtx<'a>>,
+    variables: VecDeque<HashMap<String, ScopedVariable>>,
 }
 
 impl<'a> VariableSearchCtx<'a> {
     pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
+        let mut variables = VecDeque::with_capacity(16);
+        variables.push_front(HashMap::new());
+
         Self {
             source_file_cache,
-            variables: Default::default(),
-            parent: None,
+            variables,
         }
     }
 
@@ -26,7 +39,7 @@ impl<'a> VariableSearchCtx<'a> {
         &self,
         name: &str,
         source: Source,
-    ) -> Result<(&resolved::Type, &VariableStorageKey), ResolveError> {
+    ) -> Result<&ScopedVariable, ResolveError> {
         match self.find_variable(name) {
             Some(variable) => Ok(variable),
             None => Err(ResolveError::new(
@@ -39,14 +52,14 @@ impl<'a> VariableSearchCtx<'a> {
         }
     }
 
-    pub fn find_variable(&self, name: &str) -> Option<(&resolved::Type, &VariableStorageKey)> {
-        if let Some((resolved_type, key)) = self.variables.get(name) {
-            return Some((resolved_type, key));
+    pub fn find_variable(&self, name: &str) -> Option<&ScopedVariable> {
+        for variables in self.variables.iter() {
+            if let Some(scoped_variable) = variables.get(name) {
+                return Some(scoped_variable);
+            }
         }
 
-        self.parent
-            .as_ref()
-            .and_then(|parent| parent.find_variable(name))
+        None
     }
 
     pub fn put(
@@ -56,6 +69,16 @@ impl<'a> VariableSearchCtx<'a> {
         key: VariableStorageKey,
     ) {
         self.variables
-            .insert(name.to_string(), (resolved_type, key));
+            .front_mut()
+            .expect("at least one scope")
+            .insert(name.to_string(), ScopedVariable::new(resolved_type, key));
+    }
+
+    pub fn begin_scope(&mut self) {
+        self.variables.push_front(Default::default());
+    }
+
+    pub fn end_scope(&mut self) {
+        self.variables.pop_front().expect("scope to close");
     }
 }

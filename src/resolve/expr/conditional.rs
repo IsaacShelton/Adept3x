@@ -23,17 +23,12 @@ pub fn resolve_conditional_expr(
         otherwise,
     } = conditional;
 
-    let mut otherwise = otherwise
-        .as_ref()
-        .map(|otherwise| {
-            resolve_stmts(ctx, &otherwise.stmts).map(|stmts| resolved::Block::new(stmts))
-        })
-        .transpose()?;
-
     let mut branches_without_else = Vec::with_capacity(conditions.len());
 
     for (expr, block) in conditions.iter() {
+        ctx.variable_search_ctx.begin_scope();
         let condition = resolve_expr(ctx, expr, preferred_type, Initialized::Require)?;
+
         let stmts = resolve_stmts(ctx, &block.stmts)?;
 
         let condition = conform_expr_or_error(
@@ -47,7 +42,19 @@ pub fn resolve_conditional_expr(
             condition,
             block: resolved::Block::new(stmts),
         });
+
+        ctx.variable_search_ctx.end_scope();
     }
+    
+    let mut otherwise = otherwise
+        .as_ref()
+        .map(|otherwise| {
+            ctx.variable_search_ctx.begin_scope();
+            let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(|stmts| resolved::Block::new(stmts));
+            ctx.variable_search_ctx.end_scope();
+            maybe_block
+        })
+        .transpose()?;
 
     let block_results = branches_without_else
         .iter()
@@ -89,9 +96,9 @@ pub fn resolve_conditional_expr(
                     .kind
                 {
                     resolved::StmtKind::Expr(expr) => expr,
-                    resolved::StmtKind::Return(_)
-                    | resolved::StmtKind::Declaration(_)
-                    | resolved::StmtKind::Assignment(_) => unreachable!(),
+                    resolved::StmtKind::Return(..)
+                    | resolved::StmtKind::Declaration(..)
+                    | resolved::StmtKind::Assignment(..) => unreachable!(),
                 }
             })
             .collect_vec();

@@ -10,7 +10,7 @@ pub fn resolve_variable_expr(
     name: &str,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    if let Some((resolved_type, key)) = ctx.variable_search_ctx.find_variable(name) {
+    if let Some(variable) = ctx.variable_search_ctx.find_variable(name) {
         let function = ctx
             .resolved_ast
             .functions
@@ -19,16 +19,16 @@ pub fn resolve_variable_expr(
 
         let is_initialized = function
             .variables
-            .get(*key)
+            .get(variable.key)
             .expect("found variable to exist")
             .is_initialized();
 
         Ok(TypedExpr::new_maybe_initialized(
-            resolved_type.clone(),
+            variable.resolved_type.clone(),
             resolved::Expr::new(
                 resolved::ExprKind::Variable(resolved::Variable {
-                    key: *key,
-                    resolved_type: resolved_type.clone(),
+                    key: variable.key,
+                    resolved_type: variable.resolved_type.clone(),
                 }),
                 source,
             ),

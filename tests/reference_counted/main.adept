@@ -16,7 +16,9 @@ func main {
         firstname: c"Jane",
         lastname: john.lastname,
     }
+    // drop(john)
 
     printf(c"Welcome, %s %s\n", jane.firstname, jane.lastname)
+    // drop(jane)
 }
 
