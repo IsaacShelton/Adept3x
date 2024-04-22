@@ -1,0 +1,21 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    printf(c"true || oops() == %s\n", booleanName(true || oops()))
+    printf(c"false || true == %s\n", booleanName(false || true))
+    printf(c"false || false == %s\n", booleanName(false || false))
+    printf(c"false && oops() == %s\n", booleanName(false && oops()))
+    printf(c"true && false == %s\n", booleanName(true && false))
+    printf(c"true && true == %s\n", booleanName(true && true))
+}
+
+func oops() bool {
+    printf(c"Oops! This should never run!\n")
+    return true // Doesn't matter what value we return
+}
+
+func booleanName(value bool) ptr<u8> {
+    return if value { c"true" } else { c"false" }
+}

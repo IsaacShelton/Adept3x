@@ -51,9 +51,11 @@ impl Builder {
 
     pub fn current_block_id(&mut self) -> usize {
         if self.basicblocks.len() == 0 {
-            panic!("attempt to get current block id of empty ir builder");
+            self.basicblocks.push(BasicBlock::new());
+            0
+        } else {
+            self.current_basicblock_id
         }
-        self.current_basicblock_id
     }
 
     pub fn push(&mut self, instruction: Instruction) -> ir::Value {

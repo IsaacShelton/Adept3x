@@ -14,6 +14,7 @@ function expect_fail_compile() {
 
 pushd "$self" > /dev/null
 cargo build
+compile and_or
 compile annotation_groups
 compile array_access
 compile bitwise_operators
