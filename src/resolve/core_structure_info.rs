@@ -19,7 +19,6 @@ pub fn get_core_structure_info<'a>(
             *structure_ref,
             resolved::MemoryManagement::ReferenceCounted,
         )),
-        resolved::Type::Unsync(inner) => get_core_structure_info(source_file_cache, inner, source),
         _ => Err(ResolveError::new(
             source_file_cache,
             source,

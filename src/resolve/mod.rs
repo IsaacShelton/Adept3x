@@ -10,6 +10,14 @@ mod type_search_ctx;
 mod unify_types;
 mod variable_search_ctx;
 
+use self::{
+    error::{ResolveError, ResolveErrorKind},
+    expr::ResolveExprCtx,
+    global_search_ctx::GlobalSearchCtx,
+    stmt::resolve_stmts,
+    type_search_ctx::TypeSearchCtx,
+    variable_search_ctx::VariableSearchCtx,
+};
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
     resolved::{self, TypedExpr, VariableStorage},
@@ -21,15 +29,6 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::collections::{HashMap, VecDeque};
-
-use self::{
-    error::{ResolveError, ResolveErrorKind},
-    expr::ResolveExprCtx,
-    global_search_ctx::GlobalSearchCtx,
-    stmt::resolve_stmts,
-    type_search_ctx::TypeSearchCtx,
-    variable_search_ctx::VariableSearchCtx,
-};
 
 enum Job {
     Regular(FileIdentifier, usize, resolved::FunctionRef),
@@ -216,7 +215,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
                 resolved_function.stmts = resolved_stmts;
 
-                lifetime::insert_drops(resolved_function);
+                eprintln!("warning: lifetimes not implemented yet");
+                // lifetime::insert_drops(resolved_function);
             }
         }
     }
@@ -249,6 +249,7 @@ pub enum ConformMode {
     #[default]
     Normal,
     ParameterPassing,
+    Explicit,
 }
 
 impl ConformMode {
@@ -256,6 +257,7 @@ impl ConformMode {
         match self {
             Self::Normal => false,
             Self::ParameterPassing => true,
+            Self::Explicit => true,
         }
     }
 }
@@ -269,17 +271,16 @@ fn conform_expr(
         return Some(expr.clone());
     }
 
-    // Integer Literal to Integer Type Conversion
     match &expr.resolved_type {
         resolved::Type::IntegerLiteral(value) => {
-            // Integer literals -> Integer/Float
+            // Integer literal Conversion
             conform_integer_literal(value, expr.expr.source, to_type)
         }
         resolved::Type::Integer {
             bits: from_bits,
             sign: from_sign,
         } => {
-            // Integer -> Integer
+            // Integer Conversion
             match to_type {
                 resolved::Type::Integer { bits, sign } => {
                     conform_integer_value(&expr.expr, *from_bits, *from_sign, *bits, *sign)
@@ -288,7 +289,7 @@ fn conform_expr(
             }
         }
         resolved::Type::FloatLiteral(value) => {
-            // Float literals -> Float
+            // Float Literal Conversion
             match to_type {
                 resolved::Type::Float(size) => Some(TypedExpr::new(
                     resolved::Type::Float(*size),
@@ -298,13 +299,14 @@ fn conform_expr(
             }
         }
         resolved::Type::Float(from_size) => {
-            // Float -> Float
+            // Float Conversion
             match to_type {
                 resolved::Type::Float(size) => conform_float_value(&expr.expr, *from_size, *size),
                 _ => None,
             }
         }
         resolved::Type::Pointer(inner) => {
+            // Pointer Conversion
             if inner.is_void() {
                 // ptr<void> -> ptr<ANYTHING>
                 match to_type {
@@ -584,11 +586,6 @@ fn resolve_type(
         ast::TypeKind::Named(name) => type_search_context
             .find_type_or_error(&name, ast_type.source)
             .cloned(),
-        ast::TypeKind::Unsync(inner) => Ok(resolved::Type::Unsync(Box::new(resolve_type(
-            type_search_context,
-            source_file_cache,
-            inner,
-        )?))),
         ast::TypeKind::PlainOldData(inner) => match &inner.kind {
             ast::TypeKind::Named(name) => {
                 let resolved_inner_type = type_search_context

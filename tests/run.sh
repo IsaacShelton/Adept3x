@@ -38,6 +38,7 @@ compile math_floats
 compile math_simple
 compile member_pod
 compile nested_expressions
+compile object_mutation
 compile op_then_assign
 compile reference_counted
 compile return
@@ -55,7 +56,6 @@ compile while
 echo "[!] RUNNING CASES WITH EXPECTED FAILURE"
 
 expect_fail_compile _should_fail/mismatching_yielded_types
-expect_fail_compile _should_fail/missing_unsync
 expect_fail_compile _should_fail/partial_initialization
 expect_fail_compile _should_fail/uninitialized_member
 expect_fail_compile _should_fail/uninitialized_simple

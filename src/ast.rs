@@ -231,7 +231,6 @@ pub enum TypeKind {
     Float(FloatSize),
     Pointer(Box<Type>),
     PlainOldData(Box<Type>),
-    Unsync(Box<Type>),
     Void,
     Named(String),
 }
@@ -268,9 +267,6 @@ impl Display for &TypeKind {
             }
             TypeKind::PlainOldData(inner) => {
                 write!(f, "pod<{}>", inner)?;
-            }
-            TypeKind::Unsync(inner) => {
-                write!(f, "unsync<{}>", inner)?;
             }
             TypeKind::Void => {
                 write!(f, "void")?;

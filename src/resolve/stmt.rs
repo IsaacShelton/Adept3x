@@ -79,7 +79,7 @@ pub fn resolve_stmt<'a>(
             };
 
             Ok(resolved::Stmt::new(
-                resolved::StmtKind::Return(return_value, Drops::new(vec![])),
+                resolved::StmtKind::Return(return_value, Drops::default()),
                 source,
             ))
         }

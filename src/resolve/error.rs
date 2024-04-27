@@ -76,9 +76,6 @@ pub enum ResolveErrorKind {
     CannotMutate {
         bad_type: String,
     },
-    CannotMutateNonUnsync {
-        bad_type: String,
-    },
     CannotGetFieldOfType {
         bad_type: String,
     },
@@ -229,13 +226,6 @@ impl Display for ResolveError {
             }
             ResolveErrorKind::CannotMutate { bad_type } => {
                 write!(f, "Cannot mutate value of type '{}'", bad_type)?;
-            }
-            ResolveErrorKind::CannotMutateNonUnsync { bad_type } => {
-                write!(
-                    f,
-                    "Mutating value of type '{}' would break thread-safety, consider using 'unsync<{}>' if necessary",
-                    bad_type, bad_type
-                )?;
             }
             ResolveErrorKind::CannotGetFieldOfType { bad_type } => {
                 write!(f, "Cannot get field of type '{}'", bad_type)?;

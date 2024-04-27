@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use slotmap::{new_key_type, SlotMap};
+use thin_vec::ThinVec;
 use std::{
     ffi::CString,
     fmt::{Debug, Display},
@@ -111,7 +112,6 @@ pub enum Type {
     Float(FloatSize),
     Pointer(Box<Type>),
     PlainOldData(String, StructureRef),
-    Unsync(Box<Type>),
     Void,
     ManagedStructure(String, StructureRef),
 }
@@ -130,7 +130,6 @@ impl Type {
             Type::FloatLiteral(_) => None,
             Type::Pointer(_) => None,
             Type::PlainOldData(_, _) => None,
-            Type::Unsync(_) => None,
             Type::Void => None,
             Type::ManagedStructure(_, _) => None,
         }
@@ -179,9 +178,6 @@ impl Display for Type {
             Type::PlainOldData(name, _) => {
                 write!(f, "pod<{}>", name)?;
             }
-            Type::Unsync(inner) => {
-                write!(f, "unsync<{}>", inner)?;
-            }
             Type::Void => f.write_str("void")?,
             Type::ManagedStructure(name, _) => f.write_str(name)?,
         }
@@ -194,22 +190,31 @@ impl Display for Type {
 pub struct Stmt {
     pub kind: StmtKind,
     pub source: Source,
+    pub drops: Drops,
 }
 
 impl Stmt {
     pub fn new(kind: StmtKind, source: Source) -> Self {
-        Self { kind, source }
+        Self {
+            kind,
+            source,
+            drops: Drops::default(),
+        }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Drops {
-    pub drops: Vec<VariableStorage>,
+    pub drops: ThinVec<VariableStorageKey>,
 }
 
 impl Drops {
-    pub fn new(drops: Vec<VariableStorage>) -> Self {
-        Self { drops }
+    pub fn push(&mut self, variable: VariableStorageKey) {
+        self.drops.push(variable);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &VariableStorageKey> + '_ {
+        self.drops.iter()
     }
 }
 
@@ -467,6 +472,7 @@ pub struct ShortCircuitingBinaryOperation {
     pub operator: ShortCircuitingBinaryOperator,
     pub left: TypedExpr,
     pub right: TypedExpr,
+    pub drops: Drops,
 }
 
 #[derive(Clone, Debug)]

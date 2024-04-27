@@ -23,16 +23,7 @@ pub fn resolve_expr_to_destination(
             } => {
                 match subject.resolved_type {
                     Type::PlainOldData(..) => (),
-                    Type::Unsync(..) => (),
-                    Type::ManagedStructure(..) => {
-                        return Err(ResolveError::new(
-                            source_file_cache,
-                            source,
-                            ResolveErrorKind::CannotMutateNonUnsync {
-                                bad_type: subject.resolved_type.to_string(),
-                            },
-                        ))
-                    }
+                    Type::ManagedStructure(..) => (),
                     _ => {
                         return Err(ResolveError::new(
                             source_file_cache,

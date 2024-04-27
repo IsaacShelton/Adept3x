@@ -7,7 +7,7 @@ struct Vector3f (x float, y float, z float)
 func main {
     v := Vector3f { x: 1, y: 2, z: 3 }
     v2 := v
-
+   
     printf(c"%f %f %f\n", v.x, v.y, v.z)
 
     v2.x = 4

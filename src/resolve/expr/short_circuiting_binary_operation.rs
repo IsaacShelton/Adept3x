@@ -4,7 +4,7 @@ use crate::{
     resolve::{
         conform_expr, error::{ResolveError, ResolveErrorKind}, ConformMode, Initialized
     },
-    resolved::{self, TypedExpr},
+    resolved::{self, Drops, TypedExpr},
 };
 
 pub fn resolve_short_circuiting_binary_operation_expr(
@@ -17,13 +17,6 @@ pub fn resolve_short_circuiting_binary_operation_expr(
     let left = resolve_expr(
         ctx,
         &binary_operation.left,
-        preferred_type,
-        Initialized::Require,
-    )?;
-
-    let right = resolve_expr(
-        ctx,
-        &binary_operation.right,
         preferred_type,
         Initialized::Require,
     )?;
@@ -41,6 +34,15 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         )
     })?;
 
+    ctx.variable_search_ctx.begin_scope();
+
+    let right = resolve_expr(
+        ctx,
+        &binary_operation.right,
+        preferred_type,
+        Initialized::Require,
+    )?;
+
     let right = conform_expr(&right, &resolved::Type::Boolean, ConformMode::Normal).ok_or_else(|| {
         ResolveError::new(
             ctx.resolved_ast.source_file_cache,
@@ -54,6 +56,8 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         )
     })?;
 
+    ctx.variable_search_ctx.end_scope();
+
     Ok(TypedExpr::new(
         resolved::Type::Boolean,
         resolved::Expr::new(
@@ -62,6 +66,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
                     operator: binary_operation.operator,
                     left,
                     right,
+                    drops: Drops::default(),
                 },
             )),
             source,

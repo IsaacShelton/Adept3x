@@ -990,15 +990,6 @@ where
                         self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
                         Ok(TypeKind::PlainOldData(Box::new(inner)))
                     }
-                    "unsync" => {
-                        self.parse_token(
-                            TokenKind::OpenAngle,
-                            Some("to specify inner type of 'unsync'"),
-                        )?;
-                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
-                        Ok(TypeKind::Unsync(Box::new(inner)))
-                    }
                     identifier => Ok(TypeKind::Named(identifier.into())),
                 }?;
 
@@ -1042,6 +1033,8 @@ fn is_terminating_token(kind: &TokenKind) -> bool {
 fn is_right_associative(kind: &TokenKind) -> bool {
     match kind {
         TokenKind::DeclareAssign => true,
+        TokenKind::And => true,
+        TokenKind::Or => true,
         _ => false,
     }
 }
