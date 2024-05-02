@@ -215,8 +215,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
                 resolved_function.stmts = resolved_stmts;
 
-                eprintln!("warning: lifetimes not implemented yet");
-                // lifetime::insert_drops(resolved_function);
+                lifetime::insert_drops(resolved_function);
             }
         }
     }

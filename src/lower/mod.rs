@@ -5,7 +5,7 @@ use crate::{
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
-        NumericMode, StmtKind,
+        NumericMode, StmtKind, VariableStorageKey,
     },
 };
 use builder::Builder;
@@ -175,8 +175,8 @@ fn lower_stmts(
     for stmt in stmts.iter() {
         result = match &stmt.kind {
             StmtKind::Return(expr, drops) => {
-                if drops.drops.len() != 0 {
-                    unimplemented!("dropping before returning");
+                for variable_key in drops.drops.iter() {
+                    lower_drop(builder, *variable_key, function)?;
                 }
 
                 let instruction = ir::Instruction::Return(if let Some(expr) = expr {
@@ -238,10 +238,37 @@ fn lower_stmts(
 
                 Value::Literal(Literal::Void)
             }
+        };
+
+        for variable_key in stmt.drops.iter() {
+            lower_drop(builder, *variable_key, function)?;
         }
     }
 
     Ok(result)
+}
+
+fn lower_drop(
+    builder: &mut Builder,
+    variable_key: VariableStorageKey,
+    function: &resolved::Function,
+) -> Result<(), CompilerError> {
+    let variable = function
+        .variables
+        .get(variable_key)
+        .expect("referenced variable to exist");
+
+    if variable.resolved_type.is_managed_structure() {
+        let variable_pointer = lower_variable_to_value(variable_key);
+
+        let ir_type = lower_type(&variable.resolved_type)?;
+
+        let pointer = builder.push(ir::Instruction::Load((variable_pointer, ir_type)));
+
+        builder.push(ir::Instruction::Free(pointer));
+    }
+
+    Ok(())
 }
 
 fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError> {
@@ -283,6 +310,13 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
     }
 }
 
+fn lower_variable_to_value(key: VariableStorageKey) -> Value {
+    Value::Reference(ValueReference {
+        basicblock_id: 0,
+        instruction_id: key.index,
+    })
+}
+
 fn lower_destination(
     builder: &mut Builder,
     ir_module: &ir::Module,
@@ -290,14 +324,7 @@ fn lower_destination(
     function: &resolved::Function,
 ) -> Result<ir::Value, CompilerError> {
     match &destination.kind {
-        DestinationKind::Variable(variable) => {
-            let pointer = Value::Reference(ValueReference {
-                basicblock_id: 0,
-                instruction_id: variable.key.index,
-            });
-
-            Ok(pointer)
-        }
+        DestinationKind::Variable(variable) => Ok(lower_variable_to_value(variable.key)),
         DestinationKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
             Ok(pointer)
