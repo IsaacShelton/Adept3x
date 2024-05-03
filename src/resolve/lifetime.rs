@@ -232,7 +232,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
             ));
 
             let hidden_scope =
-                &insert_drops_for_expr(ctx.deeper("short circutable"), &mut operation.right.expr);
+                &insert_drops_for_expr(ctx.deeper("short circuitable"), &mut operation.right.expr);
 
             // Variables declared in the potentially skipped section need to be dropped
             // in the case that the section is executed
@@ -271,10 +271,12 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         }
         ExprKind::Conditional(conditional) => {
             if let Some(branch) = conditional.branches.first_mut() {
-                mini_scope.union_with(&insert_drops_for_expr(
+                let condition_scope = insert_drops_for_expr(
                     ctx.clone(),
                     &mut branch.condition.expr,
-                ));
+                );
+
+                mini_scope.union_with(&condition_scope);
             }
 
             lifetime_log!("warning: declaring variables in conditions of non-first branches is not properly handled yet");

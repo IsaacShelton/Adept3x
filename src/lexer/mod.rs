@@ -1,6 +1,5 @@
 mod hex_number_state;
 mod identifier_state;
-mod is_character;
 mod number_state;
 mod state;
 mod string_state;
@@ -10,22 +9,16 @@ use self::{
     hex_number_state::HexNumberState, identifier_state::IdentifierState, number_state::NumberState,
     string_state::StringState,
 };
+use crate::lexical_utils::{FeedResult, IsCharacter};
 use crate::{
     line_column::LineColumn,
     look_ahead::LookAhead,
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
-use is_character::IsCharacter;
 
 pub struct Lexer<I: Iterator<Item = char>> {
     characters: LookAhead<LineColumn<I>>,
     state: State,
-}
-
-enum FeedResult<T> {
-    Has(T),
-    Waiting,
-    Done,
 }
 
 impl<I> Lexer<I>

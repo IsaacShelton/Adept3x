@@ -1,5 +1,11 @@
 use crate::line_column::Location;
 
+pub enum FeedResult<T> {
+    Has(T),
+    Waiting,
+    Done,
+}
+
 pub trait IsCharacter {
     fn is_character(&self, c: char) -> bool;
 }

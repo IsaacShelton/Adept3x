@@ -260,12 +260,9 @@ fn lower_drop(
 
     if variable.resolved_type.is_managed_structure() {
         let variable_pointer = lower_variable_to_value(variable_key);
-
-        let ir_type = lower_type(&variable.resolved_type)?;
-
-        let pointer = builder.push(ir::Instruction::Load((variable_pointer, ir_type)));
-
-        builder.push(ir::Instruction::Free(pointer));
+        let variable_type = lower_type(&variable.resolved_type)?;
+        let heap_pointer = builder.push(ir::Instruction::Load((variable_pointer, variable_type)));
+        builder.push(ir::Instruction::Free(heap_pointer));
     }
 
     Ok(())
@@ -501,14 +498,9 @@ fn lower_expr(
             })))
         }
         ExprKind::Variable(variable) => {
-            let pointer = Value::Reference(ValueReference {
-                basicblock_id: 0,
-                instruction_id: variable.key.index,
-            });
-
-            let ir_type = lower_type(&variable.resolved_type)?;
-
-            Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
+            let pointer_to_variable = lower_variable_to_value(variable.key);
+            let variable_type = lower_type(&variable.resolved_type)?;
+            Ok(builder.push(ir::Instruction::Load((pointer_to_variable, variable_type))))
         }
         ExprKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));

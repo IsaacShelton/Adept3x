@@ -1,10 +1,12 @@
 #![allow(dead_code)]
 
 mod ast;
+mod c;
 mod cli;
 mod error;
 mod ir;
 mod lexer;
+mod lexical_utils;
 mod line_column;
 mod llvm_backend;
 mod look_ahead;
