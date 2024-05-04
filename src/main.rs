@@ -18,6 +18,7 @@ mod resolved;
 mod source_file_cache;
 mod token;
 
+use crate::c::preprocessor::preprocess;
 use crate::source_file_cache::SourceFileCache;
 use cli::{BuildCommand, NewCommand};
 use indoc::indoc;
@@ -61,6 +62,12 @@ fn build_project(build_command: BuildCommand) {
             filepath.parent().unwrap()
         }
     };
+
+    if filepath.extension().unwrap() == "h" {
+        let content = std::fs::read_to_string(filepath).expect("file to exist");
+        println!("{:?}", preprocess(&content).unwrap());
+        return;
+    }
 
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");
