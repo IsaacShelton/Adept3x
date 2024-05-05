@@ -64,3 +64,22 @@ where
         self.buffer.pop_front().or_else(|| self.iterator.next())
     }
 }
+
+impl<I: Iterator<Item = char>> LookAhead<I> {
+    // Advances past a sequence of characters if all match.
+    // Returns true if advanced, otherwise false
+    pub fn eat(&mut self, sequence: &str) -> bool {
+        for (i, expected) in sequence.chars().enumerate() {
+            match self.peek_nth(i) {
+                Some(c) if *c == expected => (),
+                _ => return false,
+            }
+        }
+
+        for _ in 0..sequence.len() {
+            self.next();
+        }
+
+        true
+    }
+}

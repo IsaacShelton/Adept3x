@@ -10,12 +10,21 @@ impl PreToken {
 }
 
 #[derive(Clone, Debug)]
+pub enum Encoding {
+    Default,
+    Utf8, // 'u8'
+    Utf16, // 'u'
+    Utf32, // 'U'
+    Wide, // 'L'
+}
+
+#[derive(Clone, Debug)]
 pub enum PreTokenKind {
     HeaderName(String),
     Identifier(String),
     Number(String),
-    CharacterConstant(String),
-    StringLiteral(String),
+    CharacterConstant(Encoding, String),
+    StringLiteral(Encoding, String),
     Punctuator(Punctuator),
     UniversalCharacterName(char), // e.g. '\u1F3E'
     Other(char),
@@ -44,8 +53,8 @@ pub enum Punctuator {
     Decrement,
     HashConcat,
     Ampersand,
-    Plus,
-    Minus,
+    Add,
+    Subtract,
     BitComplement,
     Not,
     Divide,
