@@ -60,10 +60,12 @@ fn lex_line(
 
     let mut preceeded_by_whitespace = true;
 
-    while let Some(c) = line.next() {
+    while let Some(peek_c) = line.peek() {
         match &mut state {
             State::Idle => {
                 use Punctuator::*;
+
+                let c = line.next().unwrap();
 
                 match c {
                     // Whitespace
@@ -156,50 +158,50 @@ fn lex_line(
             }
             State::Number(existing) => {
                 // Yes, preprocessor numbers are weird, but this is the definition according to the C standard.
-                match c {
-                    '\'' if line
-                        .peek()
-                        .map_or(false, |c| c.is_ascii_digit() || is_non_digit(*c)) =>
-                    {
-                        existing.push(c);
+                let peek_c = *peek_c;
+                let next = line.peek_nth(1);
+
+                match peek_c {
+                    '\'' if next.map_or(false, |c| c.is_ascii_digit() || is_non_digit(*c)) => {
+                        existing.push(line.next().expect("digit separator"));
                         existing.push(line.next().expect("following digit character to exist"));
                     }
-                    'e' | 'E' | 'p' | 'P'
-                        if line.peek().map_or(false, |c| matches!(c, '+' | '-')) =>
-                    {
-                        existing.push(c);
+                    'e' | 'E' | 'p' | 'P' if next.map_or(false, |c| matches!(c, '+' | '-')) => {
+                        existing.push(line.next().expect("exponent marker"));
                         existing.push(line.next().expect("following sign character to exist"));
                     }
-                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '$' | '.' => existing.push(c),
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '$' | '.' => {
+                        existing.push(line.next().unwrap())
+                    }
                     _ => tokens.push(PreToken::new(state.finalize().expect("number"))),
                 }
             }
             State::MultiLineComment => {
-                if c == '*' && line.eat("/") {
+                if line.eat("*/") {
                     // Close multi-line comment
                     state = State::Idle;
                 }
             }
             State::Identifier(existing) => {
-                if is_identifier_continue(c) {
-                    existing.push(c);
+                if is_identifier_continue(*peek_c) {
+                    existing.push(line.next().expect("identifier character"));
                 } else {
                     tokens.push(PreToken::new(state.finalize().expect("identifier")));
                 }
             }
-            State::CharacterConstant(_encoding, existing) => match c {
+            State::CharacterConstant(_encoding, existing) => match line.next().unwrap() {
                 '\'' => tokens.push(PreToken::new(state.finalize().expect("character constant"))),
                 '\\' => existing.push(escape_sequence(&mut line)?),
-                _ => existing.push(c),
+                character => existing.push(character),
             },
-            State::StringLiteral(_encoding, existing) => match c {
+            State::StringLiteral(_encoding, existing) => match line.next().unwrap() {
                 '"' => tokens.push(PreToken::new(state.finalize().expect("string literal"))),
                 '\\' => existing.push(escape_sequence(&mut line)?),
-                _ => existing.push(c),
+                character => existing.push(character),
             },
-            State::HeaderName(existing) => match c {
+            State::HeaderName(existing) => match line.next().unwrap() {
                 '>' => tokens.push(PreToken::new(state.finalize().expect("header name"))),
-                _ => existing.push(c),
+                character => existing.push(character),
             },
         }
     }
@@ -241,15 +243,15 @@ fn escape_sequence<I: Iterator<Item = char>>(
         Some('r') => Ok('\r'),
         Some('t') => Ok('\t'),
         Some('v') => Ok('\u{0B}'),
-        Some('0'..='7') => {
-            // Octal
-            // Either \0 \00 or \000
+        Some(start_digit @ '0'..='7') => {
+            // Octal - Either \0 \00 or \000
 
             let mut digits = String::with_capacity(3);
+            digits.push(start_digit);
 
-            for _ in 0..3 {
-                match line.next() {
-                    Some(digit) if matches!(digit, '0'..='7') => digits.push(digit),
+            for _ in 0..2 {
+                match line.peek() {
+                    Some(digit) if matches!(digit, '0'..='7') => digits.push(line.next().unwrap()),
                     _ => break,
                 }
             }
@@ -260,8 +262,8 @@ fn escape_sequence<I: Iterator<Item = char>>(
             let mut digits = String::with_capacity(8);
 
             loop {
-                match line.next() {
-                    Some(digit) if digit.is_ascii_hexdigit() => digits.push(digit),
+                match line.peek() {
+                    Some(digit) if digit.is_ascii_hexdigit() => digits.push(line.next().unwrap()),
                     _ => break,
                 }
             }
