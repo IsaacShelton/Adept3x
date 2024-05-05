@@ -16,12 +16,26 @@ pub enum PreprocessorError {
     UnterminatedHeaderName,
     BadEscapeSequence,
     BadEscapedCodepoint,
+    ParseError(ParseError),
+}
+
+#[derive(Clone, Debug)]
+pub enum ParseError {
+    ExpectedGroupPart,
+    ExpectedIdentifier,
+    UnexpectedToken { after: String },
+    ExpectedEndif,
+    UnrecognizedDirective(String),
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
     let lines = LineSplicer::new(content.chars());
-    let tokens = lex(lines)?;
-    let _ast = parse(&tokens);
+    let mut tokens = lex(lines)?;
+
+    let _ast = match parse(tokens.drain(0..)) {
+        Ok(ast) => ast,
+        Err(err) => return Err(PreprocessorError::ParseError(err)),
+    };
 
     // macro_expansion();
 

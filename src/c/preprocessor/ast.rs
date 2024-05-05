@@ -7,7 +7,7 @@ pub struct PreprocessorAst {
 
 #[derive(Clone, Debug)]
 pub struct Group {
-    pub groups: Vec<GroupPart>,
+    pub parts: Vec<GroupPart>,
 }
 
 #[derive(Clone, Debug)]
@@ -27,7 +27,7 @@ pub struct IfSection {
 
 #[derive(Clone, Debug)]
 pub enum IfGroup {
-    If(IfLike),
+    IfLike(IfLike),
     IfDefLike(IfDefLike),
 }
 
