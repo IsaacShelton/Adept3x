@@ -8,6 +8,7 @@ pub enum State {
     Identifier(String),
     CharacterConstant(Encoding, String),
     StringLiteral(Encoding, String),
+    HeaderName(String),
 }
 
 impl State {
@@ -27,6 +28,7 @@ impl State {
             Self::Identifier(value) => Some(PreTokenKind::Identifier(value)),
             Self::CharacterConstant(encoding, value) => Some(PreTokenKind::CharacterConstant(encoding, value)),
             Self::StringLiteral(encoding, value) => Some(PreTokenKind::StringLiteral(encoding, value)),
+            Self::HeaderName(value) => Some(PreTokenKind::HeaderName(value)),
         }
     }
 }

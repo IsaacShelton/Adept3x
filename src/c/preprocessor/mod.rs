@@ -10,13 +10,14 @@ pub enum PreprocessorError {
     UnterminatedMultiLineComment,
     UnterminatedCharacterConstant,
     UnterminatedStringLiteral,
+    UnterminatedHeaderName,
     BadEscapeSequence,
     BadEscapedCodepoint,
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
     let lines = line_splice(content);
-    let tokens = lex(&lines);
+    let tokens = lex(&lines)?;
 
     // macro_expansion();
 
@@ -70,12 +71,36 @@ fn lex_line(
         tokens.push(PreToken::new(PreTokenKind::Punctuator(punctuator)));
     }
 
+    fn prefer_header_name(tokens: &Vec<PreToken>) -> bool {
+        if tokens.len() < 2 {
+            return false;
+        }
+
+        let a = &tokens[tokens.len() - 2];
+        let b = &tokens[tokens.len() - 1];
+
+        // `#include` and `#embed`
+        if a.is_hash() && (b.is_identifier("include") || b.is_identifier("embed")) {
+            return true;
+        }
+
+        // `__has_include(` and `__has_embed(`
+        if (a.is_identifier("__has_include") || a.is_identifier("__has_embed")) && b.is_open_paren()
+        {
+            return true;
+        }
+
+        false
+    }
+
     while let Some(c) = line.next() {
         match &mut state {
             State::Idle => {
                 use Punctuator::*;
 
                 match c {
+                    // Whitespace
+                    ' ' | '\t' | /*\v*/ '\u{0B}' | /*\f*/ '\u{0C}' => (),
                     // Numbers
                     '0'..='9' => {
                         state = State::Number(c.into());
@@ -98,6 +123,8 @@ fn lex_line(
                     'u' if line.eat("\"") => state = State::string(Encoding::Utf16),
                     'U' if line.eat("\"") => state = State::string(Encoding::Utf32),
                     'L' if line.eat("\"") => state = State::string(Encoding::Wide),
+                    // Header Name
+                    '<' if prefer_header_name(&tokens) => state = State::HeaderName("".into()),
                     // Punctuators
                     '.' if line.eat("..") => push_punctuator_token(&mut tokens, Ellipses),
                     '-' if line.eat(">") => push_punctuator_token(&mut tokens, Arrow),
@@ -157,26 +184,22 @@ fn lex_line(
             }
             State::Number(existing) => {
                 // Yes, preprocessor numbers are weird, but this is the definition according to the C standard.
-                if is_identifier_continue(c) {
-                    existing.push(c);
-                } else if c == '\''
-                    && line
+                match c {
+                    '\'' if line
                         .peek()
-                        .map_or(false, |c| c.is_ascii_digit() || is_non_digit(*c))
-                {
-                    existing.push(c);
-                    existing.push(line.next().expect("following character to exist"));
-                } else if (c == 'e' || c == 'E' || c == 'p' || c == 'P')
-                    && line.peek().map_or(false, |c| is_sign(*c))
-                {
-                    existing.push(c);
-                    existing.push(line.next().expect("following character to exist"));
-                } else if c == '.' {
-                    existing.push(c);
-                } else {
-                    tokens.push(PreToken::new(
-                        state.finalize().expect("preprocessor number result"),
-                    ))
+                        .map_or(false, |c| c.is_ascii_digit() || is_non_digit(*c)) =>
+                    {
+                        existing.push(c);
+                        existing.push(line.next().expect("following digit character to exist"));
+                    }
+                    'e' | 'E' | 'p' | 'P'
+                        if line.peek().map_or(false, |c| matches!(c, '+' | '-')) =>
+                    {
+                        existing.push(c);
+                        existing.push(line.next().expect("following sign character to exist"));
+                    }
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '$' | '.' => existing.push(c),
+                    _ => tokens.push(PreToken::new(state.finalize().expect("number"))),
                 }
             }
             State::MultiLineComment => {
@@ -189,40 +212,33 @@ fn lex_line(
                 if is_identifier_continue(c) {
                     existing.push(c);
                 } else {
-                    tokens.push(PreToken::new(
-                        state.finalize().expect("preprocessor identifier result"),
-                    ));
+                    tokens.push(PreToken::new(state.finalize().expect("identifier")));
                 }
             }
             State::CharacterConstant(_encoding, existing) => match c {
-                '\'' => tokens.push(PreToken::new(
-                    state
-                        .finalize()
-                        .expect("preprocessor character constant result"),
-                )),
+                '\'' => tokens.push(PreToken::new(state.finalize().expect("character constant"))),
                 '\\' => existing.push(escape_sequence(&mut line)?),
                 _ => existing.push(c),
             },
             State::StringLiteral(_encoding, existing) => match c {
-                '"' => tokens.push(PreToken::new(
-                    state
-                        .finalize()
-                        .expect("preprocessor string literal result"),
-                )),
+                '"' => tokens.push(PreToken::new(state.finalize().expect("string literal"))),
                 '\\' => existing.push(escape_sequence(&mut line)?),
+                _ => existing.push(c),
+            },
+            State::HeaderName(existing) => match c {
+                '>' => tokens.push(PreToken::new(state.finalize().expect("header name"))),
                 _ => existing.push(c),
             },
         }
     }
 
     let next_state = match state {
-        State::MultiLineComment => State::MultiLineComment,
-        State::CharacterConstant(..) => {
-            return Err(PreprocessorError::UnterminatedCharacterConstant)
-        }
-        State::StringLiteral(..) => return Err(PreprocessorError::UnterminatedStringLiteral),
-        _ => State::Idle,
-    };
+        State::MultiLineComment => Ok(State::MultiLineComment),
+        State::CharacterConstant(..) => Err(PreprocessorError::UnterminatedCharacterConstant),
+        State::StringLiteral(..) => Err(PreprocessorError::UnterminatedStringLiteral),
+        State::HeaderName(..) => Err(PreprocessorError::UnterminatedHeaderName),
+        _ => Ok(State::Idle),
+    }?;
 
     if let Some(token_kind) = state.finalize() {
         tokens.push(PreToken::new(token_kind));
@@ -246,13 +262,13 @@ fn escape_sequence<I: Iterator<Item = char>>(
         Some('"') => Ok('"'),
         Some('?') => Ok('?'),
         Some('\\') => Ok('\\'),
-        Some('a') => Ok(0x07 as char),
-        Some('b') => Ok(0x08 as char),
-        Some('f') => Ok(0x0C as char),
+        Some('a') => Ok('\u{07}'),
+        Some('b') => Ok('\u{08}'),
+        Some('f') => Ok('\u{0C}'),
         Some('n') => Ok('\n'),
         Some('r') => Ok('\r'),
         Some('t') => Ok('\t'),
-        Some('v') => Ok(0x0B as char),
+        Some('v') => Ok('\u{0B}'),
         Some('0'..='7') => {
             // Octal
             // Either \0 \00 or \000
@@ -318,8 +334,4 @@ fn is_identifier_continue(c: char) -> bool {
 fn is_non_digit(c: char) -> bool {
     // NOTE: We support the extension of using '$' in identifier/non-digit character
     c.is_ascii_alphabetic() || c == '_' || c == '$'
-}
-
-fn is_sign(c: char) -> bool {
-    c == '+' || c == '-'
 }

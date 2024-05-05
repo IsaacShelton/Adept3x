@@ -12,10 +12,10 @@ impl PreToken {
 #[derive(Clone, Debug)]
 pub enum Encoding {
     Default,
-    Utf8, // 'u8'
+    Utf8,  // 'u8'
     Utf16, // 'u'
     Utf32, // 'U'
-    Wide, // 'L'
+    Wide,  // 'L'
 }
 
 #[derive(Clone, Debug)]
@@ -28,6 +28,29 @@ pub enum PreTokenKind {
     Punctuator(Punctuator),
     UniversalCharacterName(char), // e.g. '\u1F3E'
     Other(char),
+}
+
+impl PreToken {
+    pub fn is_hash(&self) -> bool {
+        match self.kind {
+            PreTokenKind::Punctuator(Punctuator::Hash) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_identifier(&self, content: &str) -> bool {
+        match &self.kind {
+            PreTokenKind::Identifier(identifier) if content == identifier => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_open_paren(&self) -> bool {
+        match self.kind {
+            PreTokenKind::Punctuator(Punctuator::OpenParen) => true,
+            _ => false,
+        }
+    }
 }
 
 // We don't support the use of digraphs. e.g. '<:', ':>', '<%', '%>', '%:', '%:%:'
