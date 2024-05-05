@@ -49,13 +49,16 @@ fn lex_line(
         }
 
         // `__has_include(` and `__has_embed(`
-        if (a.is_identifier("__has_include") || a.is_identifier("__has_embed")) && b.is_open_paren()
+        if (a.is_identifier("__has_include") || a.is_identifier("__has_embed"))
+            && b.is_open_paren_disregard_whitespace()
         {
             return true;
         }
 
         false
     }
+
+    let mut preceeded_by_whitespace = true;
 
     while let Some(c) = line.next() {
         match &mut state {
@@ -115,7 +118,7 @@ fn lex_line(
                     '^' if line.eat("=") => push_punctuator_token(&mut tokens, BitXorAssign),
                     '[' => push_punctuator_token(&mut tokens, OpenBracket),
                     ']' => push_punctuator_token(&mut tokens, CloseBracket),
-                    '(' => push_punctuator_token(&mut tokens, OpenParen),
+                    '(' => push_punctuator_token(&mut tokens, OpenParen { preceeded_by_whitespace }),
                     ')' => push_punctuator_token(&mut tokens, CloseParen),
                     '{' => push_punctuator_token(&mut tokens, OpenCurly),
                     '}' => push_punctuator_token(&mut tokens, CloseCurly),
@@ -145,6 +148,11 @@ fn lex_line(
                     // Other Unrecognized Characters
                     _ => tokens.push(PreToken::new(PreTokenKind::Other(c))),
                 }
+
+                preceeded_by_whitespace = match c {
+                    ' ' | '\t' | /*\v*/ '\u{0B}' | /*\f*/ '\u{0C}' => true,
+                    _ => false,
+                };
             }
             State::Number(existing) => {
                 // Yes, preprocessor numbers are weird, but this is the definition according to the C standard.

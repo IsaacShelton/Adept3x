@@ -45,9 +45,9 @@ impl PreToken {
         }
     }
 
-    pub fn is_open_paren(&self) -> bool {
+    pub fn is_open_paren_disregard_whitespace(&self) -> bool {
         match self.kind {
-            PreTokenKind::Punctuator(Punctuator::OpenParen) => true,
+            PreTokenKind::Punctuator(Punctuator::OpenParen { .. }) => true,
             _ => false,
         }
     }
@@ -59,7 +59,7 @@ impl PreToken {
 pub enum Punctuator {
     OpenBracket,
     CloseBracket,
-    OpenParen,
+    OpenParen { preceeded_by_whitespace: bool },
     CloseParen,
     OpenCurly,
     CloseCurly,

@@ -65,7 +65,7 @@ fn build_project(build_command: BuildCommand) {
 
     if filepath.extension().unwrap() == "h" {
         let content = std::fs::read_to_string(filepath).expect("file to exist");
-        println!("{:?}", preprocess(&content).unwrap());
+        println!("{}", preprocess(&content).unwrap());
         return;
     }
 

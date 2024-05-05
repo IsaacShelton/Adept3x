@@ -1,7 +1,7 @@
 use super::{
     ast::{
-        ConstantExpression, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike, IfGroup, IfLike,
-        PreprocessorAst, TextLine,
+        ConstantExpression, ControlLine, Define, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike,
+        IfGroup, IfLike, PreprocessorAst, TextLine,
     },
     token::{PreToken, PreTokenKind, Punctuator},
     ParseError,
@@ -122,9 +122,48 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
                     else_group,
                 }))
             }
+            Some("define") => Ok(GroupPart::ControlLine(ControlLine::Define(
+                if line.get(3).map_or(false, |line| {
+                    matches!(
+                        line.kind,
+                        PreTokenKind::Punctuator(Punctuator::OpenParen {
+                            preceeded_by_whitespace: false
+                        })
+                    )
+                }) {
+                    Self::parse_define_macro(&line)?
+                } else {
+                    Self::parse_define_regular(&line)?
+                },
+            ))),
+            Some("include") => Ok(GroupPart::ControlLine(ControlLine::Include(
+                line[2..].to_vec(),
+            ))),
             Some(unknown) => Err(ParseError::UnrecognizedDirective(unknown.into())),
             None => Ok(GroupPart::TextLine(TextLine { content: line })),
         }
+    }
+
+    pub fn parse_define_macro(_line: &[PreToken]) -> Result<Define, ParseError> {
+        unimplemented!("macro defines are not supportedy yet");
+    }
+
+    pub fn parse_define_regular(line: &[PreToken]) -> Result<Define, ParseError> {
+        // # define NAME REPLACEMENT_TOKENS...
+
+        let name = match line.get(2) {
+            Some(PreToken {
+                kind: PreTokenKind::Identifier(name),
+            }) => name.to_string(),
+            _ => return Err(ParseError::ExpectedDefinitionName),
+        };
+
+        let replacement_tokens = line[3..].to_vec();
+
+        Ok(Define {
+            kind: super::ast::DefineKind::Normal(replacement_tokens),
+            name,
+        })
     }
 
     pub fn parse_if_like(&mut self, line: &[PreToken]) -> Result<IfLike, ParseError> {
