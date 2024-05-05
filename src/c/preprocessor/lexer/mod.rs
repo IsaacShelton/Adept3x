@@ -180,6 +180,8 @@ fn lex_line(
                 if line.eat("*/") {
                     // Close multi-line comment
                     state = State::Idle;
+                } else {
+                    line.next().expect("character ignored by comment");
                 }
             }
             State::Identifier(existing) => {
