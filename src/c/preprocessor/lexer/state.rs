@@ -1,4 +1,4 @@
-use super::token::{Encoding, PreTokenKind};
+use crate::c::preprocessor::token::{Encoding, PreTokenKind};
 
 #[derive(Clone, Debug)]
 pub enum State {
