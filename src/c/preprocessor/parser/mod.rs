@@ -181,7 +181,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_undef(line: &[PreToken]) -> Result<ControlLine, ParseError> {
-        // # define NAME REPLACEMENT_TOKENS...
+        // # undef NAME
 
         let name = match line.get(2) {
             Some(PreToken {
@@ -198,6 +198,8 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_pragma(line: &[PreToken]) -> Result<GroupPart, ParseError> {
+        // # pragma ...
+
         let name = match line.get(2) {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
