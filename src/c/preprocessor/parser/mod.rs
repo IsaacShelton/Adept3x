@@ -139,6 +139,20 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             Some("include") => Ok(GroupPart::ControlLine(ControlLine::Include(
                 line[2..].to_vec(),
             ))),
+            Some("embed") => Ok(GroupPart::ControlLine(ControlLine::Embed(
+                line[2..].to_vec(),
+            ))),
+            Some("undef") => Ok(GroupPart::ControlLine(Self::parse_undef(&line)?)),
+            Some("line") => Ok(GroupPart::ControlLine(ControlLine::Line(
+                line[2..].to_vec(),
+            ))),
+            Some("error") => Ok(GroupPart::ControlLine(ControlLine::Error(
+                line[2..].to_vec(),
+            ))),
+            Some("warning") => Ok(GroupPart::ControlLine(ControlLine::Warning(
+                line[2..].to_vec(),
+            ))),
+            Some("pragma") => Ok(Self::parse_pragma(&line)?),
             Some(unknown) => Err(ParseError::UnrecognizedDirective(unknown.into())),
             None => Ok(GroupPart::TextLine(TextLine { content: line })),
         }
@@ -164,6 +178,41 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             kind: super::ast::DefineKind::Normal(replacement_tokens),
             name,
         })
+    }
+
+    pub fn parse_undef(line: &[PreToken]) -> Result<ControlLine, ParseError> {
+        // # define NAME REPLACEMENT_TOKENS...
+
+        let name = match line.get(2) {
+            Some(PreToken {
+                kind: PreTokenKind::Identifier(name),
+            }) => name.to_string(),
+            _ => return Err(ParseError::ExpectedDefinitionName),
+        };
+
+        if line.len() != 3 {
+            Err(ParseError::ExpectedNewlineAfterDirective)
+        } else {
+            Ok(ControlLine::Undef(name))
+        }
+    }
+
+    pub fn parse_pragma(line: &[PreToken]) -> Result<GroupPart, ParseError> {
+        let name = match line.get(2) {
+            Some(PreToken {
+                kind: PreTokenKind::Identifier(name),
+            }) => Some(name.as_str()),
+            _ => None,
+        };
+
+        if let Some("STDC") = name {
+            eprintln!("warning: #pragma STDC not supported yet");
+            Ok(GroupPart::TextLine(TextLine { content: vec![] }))
+        } else {
+            Err(ParseError::UnrecognizedPragmaDirective(
+                name.unwrap_or("<invalid pragma directive>").into(),
+            ))
+        }
     }
 
     pub fn parse_if_like(&mut self, line: &[PreToken]) -> Result<IfLike, ParseError> {

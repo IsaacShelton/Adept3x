@@ -27,6 +27,8 @@ pub enum ParseError {
     ExpectedEndif,
     UnrecognizedDirective(String),
     ExpectedDefinitionName,
+    ExpectedNewlineAfterDirective,
+    UnrecognizedPragmaDirective(String),
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {

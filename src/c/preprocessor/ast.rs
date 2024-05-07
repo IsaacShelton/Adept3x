@@ -38,7 +38,65 @@ pub struct IfLike {
 }
 
 #[derive(Clone, Debug)]
-pub enum ConstantExpression {}
+pub enum ConstantExpression {
+    Ternary,
+    LogicalOr,
+    LogicalAnd,
+    InclusiveOr,
+    ExclusiveOr,
+    BitwiseAnd,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanEq,
+    GreaterThanEq,
+    LeftShift,
+    RightShift,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulus,
+    Cast,
+    PreIncrement,
+    PreDecrement,
+    Unary(UnaryOperator),
+    SizeofExpression,
+    SizeofType,
+    AlignofType,
+    ArrayAccess,
+    Call,
+    MemberViaValue,
+    MemberViaPointer,
+    PostIncrement,
+    PostDecrement,
+    CompoundLiteral,
+    Identifier,
+    Constant(Constant),
+    StringLiteral,
+    GenericSelection,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnaryOperator {
+    AddressOf,
+    Dereference,
+    Add,
+    Subtract,
+    BitComplement,
+    Not,
+}
+
+#[derive(Clone, Debug)]
+pub enum Constant {
+    Integer,
+    Float,
+    Character,
+    True,
+    False,
+    Nullptr,
+}
 
 #[derive(Clone, Debug)]
 pub enum IfDefKind {
