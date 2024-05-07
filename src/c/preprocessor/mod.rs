@@ -1,9 +1,11 @@
 mod ast;
+mod expand;
 mod lexer;
 mod line_splice;
 mod parser;
 mod token;
 
+use self::expand::{expand_ast, Environment};
 use self::lexer::lex;
 use self::line_splice::LineSplicer;
 use self::parser::parse;
@@ -33,6 +35,7 @@ pub enum ParseError {
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
     let lines = LineSplicer::new(content.chars());
+
     let mut tokens = lex(lines)?;
 
     let ast = match parse(tokens.drain(0..)) {
@@ -40,7 +43,7 @@ pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
         Err(err) => return Err(PreprocessorError::ParseError(err)),
     };
 
-    // macro_expansion();
+    let expanded = expand_ast(&ast, Environment::default())?;
 
-    Ok(format!("{:#?}", ast))
+    Ok(format!("{:#?}", expanded))
 }

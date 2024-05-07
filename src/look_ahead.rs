@@ -19,7 +19,7 @@ where
     pub fn new(iterator: I) -> Self {
         Self {
             iterator,
-            buffer: VecDeque::new(),
+            buffer: VecDeque::with_capacity(4),
         }
     }
 

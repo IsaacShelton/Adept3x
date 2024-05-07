@@ -64,7 +64,7 @@ impl<I: Iterator<Item = char>> Iterator for LineSplicer<I> {
                 }
                 None if !self.current_line.is_empty() => {
                     return Some(Line {
-                        content: std::mem::take(&mut self.current_line),
+                        content: std::mem::replace(&mut self.current_line, String::with_capacity(128)),
                         line_number: self.next_line_number,
                     });
                 }

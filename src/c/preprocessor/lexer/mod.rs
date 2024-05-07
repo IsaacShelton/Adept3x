@@ -29,7 +29,7 @@ fn lex_line(
 ) -> Result<(Vec<PreToken>, State), PreprocessorError> {
     let mut line = LookAhead::new(line.chars());
     let mut state = starting_state;
-    let mut tokens = Vec::new();
+    let mut tokens = Vec::with_capacity(16);
 
     fn push_punctuator_token(tokens: &mut Vec<PreToken>, punctuator: Punctuator) {
         tokens.push(PreToken::new(PreTokenKind::Punctuator(punctuator)));

@@ -1,12 +1,15 @@
 use super::{
     ast::{
-        ConstantExpression, ControlLine, Define, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike,
-        IfGroup, IfLike, PreprocessorAst, TextLine,
+        ConstantExpression, ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart,
+        IfDefKind, IfDefLike, IfGroup, IfLike, PreprocessorAst, TextLine,
     },
     token::{PreToken, PreTokenKind, Punctuator},
     ParseError,
 };
-use crate::{c::preprocessor::ast::IfSection, look_ahead::LookAhead};
+use crate::{
+    c::preprocessor::ast::{Constant, IfSection},
+    look_ahead::LookAhead,
+};
 use std::borrow::Borrow;
 
 pub struct Parser<I: Iterator<Item = Vec<PreToken>>> {
@@ -158,8 +161,20 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         }
     }
 
-    pub fn parse_define_macro(_line: &[PreToken]) -> Result<Define, ParseError> {
-        unimplemented!("macro defines are not supportedy yet");
+    pub fn parse_define_macro(line: &[PreToken]) -> Result<Define, ParseError> {
+        eprintln!("warning: macro defines are not supported yet");
+
+        let name = match line.get(2) {
+            Some(PreToken {
+                kind: PreTokenKind::Identifier(name),
+            }) => name.to_string(),
+            _ => return Err(ParseError::ExpectedDefinitionName),
+        };
+
+        Ok(Define {
+            kind: DefineKind::Normal(vec![]),
+            name,
+        })
     }
 
     pub fn parse_define_regular(line: &[PreToken]) -> Result<Define, ParseError> {
@@ -175,7 +190,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         let replacement_tokens = line[3..].to_vec();
 
         Ok(Define {
-            kind: super::ast::DefineKind::Normal(replacement_tokens),
+            kind: DefineKind::Normal(replacement_tokens),
             name,
         })
     }
@@ -258,7 +273,8 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_constant_expression(_line: &[PreToken]) -> Result<ConstantExpression, ParseError> {
-        unimplemented!("parse constant expression");
+        eprintln!("warning: c preprocessor parse constant expression");
+        Ok(ConstantExpression::Constant(Constant::False))
     }
 }
 

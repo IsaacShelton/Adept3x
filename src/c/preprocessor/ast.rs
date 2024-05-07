@@ -59,14 +59,15 @@ pub enum ConstantExpression {
     Divide,
     Modulus,
     Cast,
-    PreIncrement,
-    PreDecrement,
-    Unary(UnaryOperator),
     SizeofExpression,
     SizeofType,
     AlignofType,
+    PreIncrement,
+    PreDecrement,
+    Unary(UnaryOperator),
     ArrayAccess,
     Call,
+    Defined,
     MemberViaValue,
     MemberViaPointer,
     PostIncrement,
@@ -133,6 +134,22 @@ pub enum ControlLine {
 pub struct Define {
     pub kind: DefineKind,
     pub name: String,
+}
+
+impl Define {
+    pub fn overwrites(&self, other: &Define) -> bool {
+        match &self.kind {
+            DefineKind::Normal(_) => matches!(other.kind, DefineKind::Normal(_)),
+            DefineKind::Macro(self_macro) => {
+                if let DefineKind::Macro(other_macro) = &other.kind {
+                    self_macro.parameters.len() == other_macro.parameters.len()
+                        && self_macro.is_variadic == other_macro.is_variadic
+                } else {
+                    false
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
