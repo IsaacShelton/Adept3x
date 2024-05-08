@@ -19,6 +19,7 @@ pub enum PreprocessorError {
     BadEscapeSequence,
     BadEscapedCodepoint,
     ParseError(ParseError),
+    BadInclude,
 }
 
 #[derive(Clone, Debug)]
@@ -35,7 +36,6 @@ pub enum ParseError {
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
     let lines = LineSplicer::new(content.chars());
-
     let mut tokens = lex(lines)?;
 
     let ast = match parse(tokens.drain(0..)) {
