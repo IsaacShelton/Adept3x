@@ -130,7 +130,7 @@ pub enum ControlLine {
     Pragma(Vec<PreToken>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Define {
     pub kind: DefineKind,
     pub name: String,
@@ -152,13 +152,13 @@ impl Define {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum DefineKind {
     Normal(Vec<PreToken>),
     Macro(Macro),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Macro {
     pub parameters: Vec<String>,
     pub is_variadic: bool,

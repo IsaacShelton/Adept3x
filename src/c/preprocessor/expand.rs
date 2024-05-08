@@ -5,7 +5,10 @@ use super::{
 };
 use crate::c::preprocessor::ast::GroupPart;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, VecDeque},
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct Environment {
@@ -32,6 +35,32 @@ impl Environment {
                 .insert(define.name.clone(), vec![define.clone()]);
         }
     }
+
+    pub fn find_define(&self, name: &str, arity: Option<usize>) -> Option<&Define> {
+        if let Some(defines) = self.defines.get(name) {
+            for define in defines.iter() {
+                let matches = match &define.kind {
+                    DefineKind::Normal(_) => arity.is_none(),
+                    DefineKind::Macro(macro_definition) => {
+                        if let Some(arity) = arity {
+                            let length = macro_definition.parameters.len();
+                            length == arity || (length > arity && macro_definition.is_variadic)
+                        } else {
+                            false
+                        }
+                    }
+                };
+
+                if matches {
+                    return Some(define);
+                }
+            }
+
+            None
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -50,12 +79,12 @@ pub fn expand_ast(
         match part {
             GroupPart::IfSection(_) => todo!(),
             GroupPart::ControlLine(control_line) => {
-                expand_control_line(control_line, &mut environment)?
+                tokens.append(&mut expand_control_line(control_line, &mut environment)?);
             }
             GroupPart::TextLine(text_line) => {
-                tokens.append(&mut expand_text_line(text_line, &environment)?)
+                tokens.append(&mut expand_text_line(text_line, &environment)?);
             }
-            GroupPart::HashNonDirective => todo!(),
+            GroupPart::HashNonDirective => (), // Ignored during expansion
         }
     }
 
@@ -65,19 +94,19 @@ pub fn expand_ast(
 fn expand_control_line(
     control_line: &ControlLine,
     environment: &mut Environment,
-) -> Result<(), PreprocessorError> {
+) -> Result<Vec<Token>, PreprocessorError> {
     match control_line {
-        ControlLine::Include(_) => todo!(),
-        ControlLine::Embed(_) => todo!(),
+        ControlLine::Include(_) => unimplemented!("#include expansion not implemented yet"),
+        ControlLine::Embed(_) => unimplemented!("#embed expansion not implemented yet"),
         ControlLine::Define(define) => {
             environment.add_define(define);
-            Ok(())
+            Ok(vec![])
         }
-        ControlLine::Undef(_) => todo!(),
-        ControlLine::Line(_) => todo!(),
-        ControlLine::Error(_) => todo!(),
-        ControlLine::Warning(_) => todo!(),
-        ControlLine::Pragma(_) => todo!(),
+        ControlLine::Undef(_) => unimplemented!("#undef expansion not implemented yet"),
+        ControlLine::Line(_) => unimplemented!("#line expansion not implemented yet"),
+        ControlLine::Error(_) => unimplemented!("#error expansion not implemented yet"),
+        ControlLine::Warning(_) => unimplemented!("#warning expansion not implemented yet"),
+        ControlLine::Pragma(_) => unimplemented!("#pragma expansion not implemented yet"),
     }
 }
 
@@ -85,60 +114,96 @@ fn expand_text_line(
     text_line: &TextLine,
     environment: &Environment,
 ) -> Result<Vec<Token>, PreprocessorError> {
-    tokenize(&expand_region(&text_line.content, environment)?)
+    let mut depleted = Depleted::new();
+    tokenize(&expand_region(
+        &text_line.content,
+        environment,
+        &mut depleted,
+    )?)
+}
+
+struct Depleted {
+    pub hashes: VecDeque<u64>,
+}
+
+impl Depleted {
+    pub fn new() -> Self {
+        Self {
+            hashes: Default::default(),
+        }
+    }
+
+    pub fn push(&mut self, define: &Define) {
+        self.hashes.push_back(Self::hash_define(define));
+    }
+
+    pub fn pop(&mut self) {
+        self.hashes.pop_back();
+    }
+
+    pub fn contains(&self, define: &Define) -> bool {
+        let hash = Self::hash_define(define);
+
+        for item in self.hashes.iter().rev() {
+            if *item == hash {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn hash_define(define: &Define) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        define.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 fn expand_region(
-    original_tokens: &[PreToken],
+    tokens: &[PreToken],
     environment: &Environment,
+    depleted: &mut Depleted,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
-    let mut expanded = Vec::<PreToken>::with_capacity(original_tokens.len() + 16);
-    expanded.extend(original_tokens.iter().cloned());
+    let mut expanded = Vec::with_capacity(tokens.len() + 16);
 
-    let mut i = 0;
-
-    while i < expanded.len() {
-        match &expanded[i].kind {
-            PreTokenKind::Identifier(definition_name) => {
-                // TODO: Incorporate list of values already expanded for regions,
-                // and determine if macros of the same name but different definitions should be
-                // able to run, etc.
-
-                // TODO: Definitions cannot be used in their own expansion, and should be left
-                // untouched in that case according to the standard. This requirement still
-                // needs to be implementated.
-
-                let define = if let Some(definitions) = environment.defines.get(definition_name) {
-                    definitions.first()
-                } else {
-                    None
-                };
-
-                if let Some(define) = define {
-                    match &define.kind {
-                        DefineKind::Normal(replacement) => {
-                            expanded.splice(i..=i, replacement.iter().cloned());
-                        }
-                        DefineKind::Macro(_) => todo!(),
-                    }
-
-                    i = 0;
-                    continue;
-                }
-            }
-            PreTokenKind::HeaderName(_)
-            | PreTokenKind::Number(_)
-            | PreTokenKind::CharacterConstant(_, _)
-            | PreTokenKind::StringLiteral(_, _)
-            | PreTokenKind::Punctuator(_)
-            | PreTokenKind::UniversalCharacterName(_)
-            | PreTokenKind::Other(_) => (),
-        }
-
-        i += 1;
+    for token in tokens.iter() {
+        expanded.append(&mut expand_token(token, environment, depleted)?);
     }
 
     Ok(expanded)
+}
+
+fn expand_token(
+    token: &PreToken,
+    environment: &Environment,
+    depleted: &mut Depleted,
+) -> Result<Vec<PreToken>, PreprocessorError> {
+    match &token.kind {
+        PreTokenKind::Identifier(name) => {
+            if let Some(define) = environment.find_define(name, None) {
+                if !depleted.contains(define) {
+                    depleted.push(define);
+                    let replacement = match &define.kind {
+                        DefineKind::Normal(replacement) => replacement,
+                        DefineKind::Macro(_) => unimplemented!("expanding macro define"),
+                    };
+                    let expanded = expand_region(&replacement, environment, depleted)?;
+                    depleted.pop();
+                    return Ok(expanded);
+                }
+            }
+
+            Ok(vec![token.clone()])
+        }
+        PreTokenKind::HeaderName(_)
+        | PreTokenKind::Number(_)
+        | PreTokenKind::CharacterConstant(_, _)
+        | PreTokenKind::StringLiteral(_, _)
+        | PreTokenKind::Punctuator(_)
+        | PreTokenKind::UniversalCharacterName(_)
+        | PreTokenKind::Other(_) => Ok(vec![token.clone()]),
+    }
 }
 
 fn tokenize(tokens: &[PreToken]) -> Result<Vec<Token>, PreprocessorError> {

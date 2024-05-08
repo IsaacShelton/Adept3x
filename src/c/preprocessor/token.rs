@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct PreToken {
     pub kind: PreTokenKind,
 }
@@ -9,7 +9,7 @@ impl PreToken {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum Encoding {
     Default,
     Utf8,  // 'u8'
@@ -18,7 +18,7 @@ pub enum Encoding {
     Wide,  // 'L'
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum PreTokenKind {
     HeaderName(String),
     Identifier(String),
@@ -55,7 +55,7 @@ impl PreToken {
 
 // We don't support the use of digraphs. e.g. '<:', ':>', '<%', '%>', '%:', '%:%:'
 // (nor trigraphs, as they were removed in C23)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum Punctuator {
     OpenBracket,
     CloseBracket,
