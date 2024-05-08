@@ -3,7 +3,7 @@ mod expand;
 mod lexer;
 mod line_splice;
 mod parser;
-mod token;
+mod pre_token;
 
 use self::expand::{expand_ast, Environment};
 use self::lexer::lex;
@@ -20,6 +20,8 @@ pub enum PreprocessorError {
     BadEscapedCodepoint,
     ParseError(ParseError),
     BadInclude,
+    ErrorDirective(String),
+    UnsupportedPragma,
 }
 
 #[derive(Clone, Debug)]

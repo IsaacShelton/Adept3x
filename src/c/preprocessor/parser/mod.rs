@@ -3,7 +3,7 @@ use super::{
         ConstantExpression, ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart,
         IfDefKind, IfDefLike, IfGroup, IfLike, PreprocessorAst, TextLine,
     },
-    token::{PreToken, PreTokenKind, Punctuator},
+    pre_token::{PreToken, PreTokenKind, Punctuator},
     ParseError,
 };
 use crate::{

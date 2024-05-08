@@ -1,4 +1,4 @@
-use super::token::PreToken;
+use super::pre_token::PreToken;
 use num_bigint::BigInt;
 use num_traits::Zero;
 

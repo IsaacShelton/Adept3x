@@ -1,9 +1,12 @@
 mod state;
 
 use self::state::State;
-use super::{line_splice::Line, token::PreToken, PreprocessorError};
+use super::{line_splice::Line, pre_token::PreToken, PreprocessorError};
 use crate::{
-    c::preprocessor::token::{Encoding, PreTokenKind, Punctuator},
+    c::{
+        encoding::Encoding,
+        preprocessor::pre_token::{PreTokenKind, Punctuator},
+    },
     look_ahead::LookAhead,
 };
 

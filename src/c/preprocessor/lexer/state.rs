@@ -1,4 +1,4 @@
-use crate::c::preprocessor::token::{Encoding, PreTokenKind};
+use crate::c::{encoding::Encoding, preprocessor::pre_token::PreTokenKind};
 
 #[derive(Clone, Debug)]
 pub enum State {
@@ -26,8 +26,12 @@ impl State {
             Self::Number(value) => Some(PreTokenKind::Number(value)),
             Self::MultiLineComment => None,
             Self::Identifier(value) => Some(PreTokenKind::Identifier(value)),
-            Self::CharacterConstant(encoding, value) => Some(PreTokenKind::CharacterConstant(encoding, value)),
-            Self::StringLiteral(encoding, value) => Some(PreTokenKind::StringLiteral(encoding, value)),
+            Self::CharacterConstant(encoding, value) => {
+                Some(PreTokenKind::CharacterConstant(encoding, value))
+            }
+            Self::StringLiteral(encoding, value) => {
+                Some(PreTokenKind::StringLiteral(encoding, value))
+            }
             Self::HeaderName(value) => Some(PreTokenKind::HeaderName(value)),
         }
     }

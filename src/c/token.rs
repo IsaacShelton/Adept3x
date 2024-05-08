@@ -1,3 +1,4 @@
+use super::punctuator::Punctuator;
 use crate::line_column::Location;
 use derive_more::{Deref, IsVariant, Unwrap};
 
@@ -37,6 +38,7 @@ pub enum CTokenKind {
     VoidKeyword,
     VolatileKeyword,
     WhileKeyword,
+    Punctuator(Punctuator),
 }
 
 #[derive(Clone, Debug, PartialEq, Deref)]
