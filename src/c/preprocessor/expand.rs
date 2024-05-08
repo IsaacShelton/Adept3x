@@ -55,6 +55,10 @@ impl Environment {
     pub fn find_defines_of_name(&self, name: &str) -> Option<&Vec<Define>> {
         self.defines.get(name)
     }
+
+    pub fn remove_define(&mut self, name: &str) {
+        self.defines.remove(name);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -200,7 +204,10 @@ fn expand_control_line(
             environment.add_define(define);
             Ok(vec![])
         }
-        ControlLine::Undef(_) => unimplemented!("#undef expansion not implemented yet"),
+        ControlLine::Undef(identifier) => {
+            environment.remove_define(identifier);
+            Ok(vec![])
+        }
         ControlLine::Line(_) => unimplemented!("#line expansion not implemented yet"),
         ControlLine::Error(_) => unimplemented!("#error expansion not implemented yet"),
         ControlLine::Warning(_) => unimplemented!("#warning expansion not implemented yet"),
