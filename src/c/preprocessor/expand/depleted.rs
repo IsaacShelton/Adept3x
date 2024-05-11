@@ -13,6 +13,9 @@ use std::{
     NOTE: We store only the hashes of the `#define`s already used in this expansion path.
     This should improve performance, reduce memory consumption, and since we're using a
     cryptographic hash, collisions should be effectively impossible.
+
+    Also, since we store the hash directly, we get to skip recomputing it two extra times
+    for each expansion of a `#define`.
 */
 
 pub struct Depleted {

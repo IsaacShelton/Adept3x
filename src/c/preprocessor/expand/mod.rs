@@ -1,11 +1,12 @@
 mod control_line;
 mod depleted;
+mod embed;
 mod environment;
+mod expr;
 mod include;
 mod region;
-mod embed;
 
-use self::{control_line::expand_control_line, region::expand_region};
+use self::{control_line::expand_control_line, expr::ExprParser, region::expand_region};
 use super::{
     ast::{
         ElifGroup, Group, IfDefKind, IfDefLike, IfGroup, IfLike, IfSection, PreprocessorAst,
@@ -68,7 +69,12 @@ fn expand_if_like(
     environment: &mut Environment,
     depleted: &mut Depleted,
 ) -> Result<Option<Vec<Token>>, PreprocessorError> {
-    if if_like.constant_expression.is_true() {
+    let condition = expand_region(&if_like.tokens, environment, depleted)?;
+
+    let expression =
+        ExprParser::parse(condition.iter()).map_err(|err| PreprocessorError::ParseError(err))?;
+
+    if expression.is_true() {
         Ok(Some(expand_group(&if_like.group, environment, depleted)?))
     } else {
         Ok(None)

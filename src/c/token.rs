@@ -1,6 +1,7 @@
-use super::punctuator::Punctuator;
+use super::{encoding::Encoding, punctuator::Punctuator};
 use crate::line_column::Location;
 use derive_more::{Deref, IsVariant, Unwrap};
+use num_bigint::BigInt;
 
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum CTokenKind {
@@ -39,6 +40,31 @@ pub enum CTokenKind {
     VolatileKeyword,
     WhileKeyword,
     Punctuator(Punctuator),
+    Integer(BigInt, IntegerSuffix),
+    Float(f64, FloatSuffix),
+    CharacterConstant(Encoding, String),
+    StringLiteral(Encoding, String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum IntegerSuffix {
+    Regular,
+    Unsigned,
+    Long,
+    UnsignedLong,
+    LongLong,
+    UnsignedLongLong,
+    BigInteger,
+    UnsignedBigInteger,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum FloatSuffix {
+    Float,
+    LongDouble,
+    Decimal32,
+    Decimal64,
+    Decimal128,
 }
 
 #[derive(Clone, Debug, PartialEq, Deref)]

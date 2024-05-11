@@ -1,5 +1,5 @@
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub enum Encoding {
     Default,
     Utf8,  // 'u8'

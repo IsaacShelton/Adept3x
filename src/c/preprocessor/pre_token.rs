@@ -1,5 +1,6 @@
-use std::fmt::Display;
 use crate::c::encoding::Encoding;
+use std::fmt::Display;
+
 pub use crate::c::punctuator::Punctuator;
 
 #[derive(Clone, Debug, Hash)]
@@ -69,6 +70,51 @@ impl Display for PreTokenKind {
     }
 }
 
+impl PreTokenKind {
+    pub fn precedence(&self) -> usize {
+        let punctuator = match self {
+            Self::Punctuator(punctuator) => punctuator,
+            _ => return 0,
+        };
+
+        match punctuator {
+            Punctuator::Increment => 15,
+            Punctuator::Decrement => 15,
+            Punctuator::Not => 14,
+            Punctuator::BitComplement => 14,
+            Punctuator::Multiply => 12,
+            Punctuator::Divide => 12,
+            Punctuator::Modulus => 12,
+            Punctuator::Add => 11,
+            Punctuator::Subtract => 11,
+            Punctuator::LeftShift => 10,
+            Punctuator::RightShift => 10,
+            Punctuator::LessThan => 9,
+            Punctuator::GreaterThan => 9,
+            Punctuator::LessThanEq => 9,
+            Punctuator::GreaterThanEq => 9,
+            Punctuator::DoubleEquals => 8,
+            Punctuator::NotEquals => 8,
+            Punctuator::Ampersand => 7,
+            Punctuator::BitXor => 6,
+            Punctuator::BitOr => 5,
+            Punctuator::LogicalAnd => 4,
+            Punctuator::LogicalOr => 3,
+            Punctuator::MultiplyAssign
+            | Punctuator::DivideAssign
+            | Punctuator::ModulusAssign
+            | Punctuator::AddAssign
+            | Punctuator::SubtractAssign
+            | Punctuator::LeftShiftAssign
+            | Punctuator::RightShiftAssign
+            | Punctuator::BitAndAssign
+            | Punctuator::BitXorAssign
+            | Punctuator::BitOrAssign => 1,
+            _ => 0,
+        }
+    }
+}
+
 fn escape(content: &str, around: char) -> String {
     let mut result = String::with_capacity(content.len() + 16);
 
@@ -94,4 +140,3 @@ fn escape(content: &str, around: char) -> String {
 
     result
 }
-

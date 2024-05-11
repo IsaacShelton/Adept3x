@@ -1,5 +1,4 @@
 use super::pre_token::PreToken;
-use num_bigint::BigInt;
 use num_traits::Zero;
 
 #[derive(Clone, Debug)]
@@ -35,13 +34,19 @@ pub enum IfGroup {
 
 #[derive(Clone, Debug)]
 pub struct IfLike {
-    pub constant_expression: ConstantExpression,
+    pub tokens: Vec<PreToken>,
     pub group: Group,
 }
 
 #[derive(Clone, Debug)]
-pub enum ConstantExpression {
-    Ternary,
+pub struct Ternary {
+    condition: ConstExpr,
+    when_true: ConstExpr,
+    when_false: ConstExpr,
+}
+
+#[derive(Clone, Debug)]
+pub enum BinaryOperator {
     LogicalOr,
     LogicalAnd,
     InclusiveOr,
@@ -60,183 +65,102 @@ pub enum ConstantExpression {
     Multiply,
     Divide,
     Modulus,
-    Cast,
-    SizeofExpression,
-    SizeofType,
-    AlignofType,
-    PreIncrement,
-    PreDecrement,
-    Unary(UnaryOperator),
-    ArrayAccess,
-    Call,
-    Defined,
-    MemberViaValue,
-    MemberViaPointer,
-    PostIncrement,
-    PostDecrement,
-    CompoundLiteral,
-    Identifier,
-    Constant(Constant),
-    StringLiteral,
-    GenericSelection,
 }
 
-impl ConstantExpression {
-    pub fn is_true(&self) -> bool {
-        match self.evaluate() {
-            Constant::True => true,
-            Constant::Integer(value) => !value.is_zero(),
-            Constant::Character(character) => character != '\0',
-            _ => false,
-        }
-    }
+#[derive(Clone, Debug)]
+pub struct BinaryOperation {
+    pub operator: BinaryOperator,
+    pub left: ConstExpr,
+    pub right: ConstExpr,
+}
 
-    pub fn evaluate(&self) -> Constant {
-        match self {
-            ConstantExpression::Ternary => {
-                unimplemented!("ternary not yet implemented for ConstantExpression::is_true")
+impl BinaryOperation {
+    pub fn evaluate(&self) -> i64 {
+        match self.operator {
+            BinaryOperator::LogicalOr => {
+                (!self.left.evaluate().is_zero() || !self.right.evaluate().is_zero()) as i64
             }
-            ConstantExpression::LogicalOr => {
-                unimplemented!("logicalOr not yet implemented for ConstantExpression::is_true")
+            BinaryOperator::LogicalAnd => {
+                (!self.left.evaluate().is_zero() && !self.right.evaluate().is_zero()) as i64
             }
-            ConstantExpression::LogicalAnd => {
-                unimplemented!("logicalAnd not yet implemented for ConstantExpression::is_true")
+            BinaryOperator::InclusiveOr => self.left.evaluate() | self.right.evaluate(),
+            BinaryOperator::ExclusiveOr => self.left.evaluate() ^ self.right.evaluate(),
+            BinaryOperator::BitwiseAnd => self.left.evaluate() & self.right.evaluate(),
+            BinaryOperator::Equals => (self.left.evaluate() == self.right.evaluate()) as i64,
+            BinaryOperator::NotEquals => (self.left.evaluate() != self.right.evaluate()) as i64,
+            BinaryOperator::LessThan => (self.left.evaluate() < self.right.evaluate()) as i64,
+            BinaryOperator::GreaterThan => (self.left.evaluate() > self.right.evaluate()) as i64,
+            BinaryOperator::LessThanEq => (self.left.evaluate() <= self.right.evaluate()) as i64,
+            BinaryOperator::GreaterThanEq => (self.left.evaluate() >= self.right.evaluate()) as i64,
+            BinaryOperator::LeftShift => {
+                (self
+                    .left
+                    .evaluate()
+                    .overflowing_shl(self.right.evaluate() as u32))
+                .0 as i64
             }
-            ConstantExpression::InclusiveOr => {
-                unimplemented!("inclusiveOr not yet implemented for ConstantExpression::is_true")
+            BinaryOperator::RightShift => {
+                (self
+                    .left
+                    .evaluate()
+                    .overflowing_shr(self.right.evaluate() as u32))
+                .0 as i64
             }
-            ConstantExpression::ExclusiveOr => {
-                unimplemented!("exclusiveOr not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::BitwiseAnd => {
-                unimplemented!("bitwiseAnd not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Equals => {
-                unimplemented!("equals not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::NotEquals => {
-                unimplemented!("notEquals not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::LessThan => {
-                unimplemented!("lessThan not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::GreaterThan => {
-                unimplemented!("greaterThan not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::LessThanEq => {
-                unimplemented!("lessThanEq not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::GreaterThanEq => {
-                unimplemented!("greaterThanEq not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::LeftShift => {
-                unimplemented!("leftShift not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::RightShift => {
-                unimplemented!("rightShift not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Add => {
-                unimplemented!("add not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Subtract => {
-                unimplemented!("subtract not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Multiply => {
-                unimplemented!("multiply not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Divide => {
-                unimplemented!("divide not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Modulus => {
-                unimplemented!("modulus not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Cast => {
-                unimplemented!("cast not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::SizeofExpression => {
-                unimplemented!(
-                    "sizeofExpression not yet implemented for ConstantExpression::is_true"
-                )
-            }
-            ConstantExpression::SizeofType => {
-                unimplemented!("sizeofType not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::AlignofType => {
-                unimplemented!("alignofType not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::PreIncrement => {
-                unimplemented!("preIncrement not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::PreDecrement => {
-                unimplemented!("preDecrement not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Unary(_unary) => {
-                unimplemented!("unary not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::ArrayAccess => {
-                unimplemented!("arrayAccess not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Call => {
-                unimplemented!("call not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Defined => {
-                unimplemented!("defined not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::MemberViaValue => {
-                unimplemented!("memberViaValue not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::MemberViaPointer => {
-                unimplemented!(
-                    "memberViaPointer not yet implemented for ConstantExpression::is_true"
-                )
-            }
-            ConstantExpression::PostIncrement => {
-                unimplemented!("postIncrement not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::PostDecrement => {
-                unimplemented!("postDecrement not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::CompoundLiteral => {
-                unimplemented!(
-                    "compoundLiteral not yet implemented for ConstantExpression::is_true"
-                )
-            }
-            ConstantExpression::Identifier => {
-                unimplemented!("identifier not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::Constant(_constant) => {
-                unimplemented!("constant not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::StringLiteral => {
-                unimplemented!("stringLiteral not yet implemented for ConstantExpression::is_true")
-            }
-            ConstantExpression::GenericSelection => {
-                unimplemented!(
-                    "genericSelection not yet implemented for ConstantExpression::is_true"
-                )
-            }
+            BinaryOperator::Add => self.left.evaluate().wrapping_add(self.right.evaluate()),
+            BinaryOperator::Subtract => self.left.evaluate().wrapping_sub(self.right.evaluate()),
+            BinaryOperator::Multiply => self.left.evaluate().wrapping_mul(self.right.evaluate()),
+            BinaryOperator::Divide => self.left.evaluate().wrapping_div(self.right.evaluate()),
+            BinaryOperator::Modulus => self.left.evaluate().wrapping_rem(self.right.evaluate()),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum UnaryOperator {
-    AddressOf,
-    Dereference,
-    Add,
-    Subtract,
+    Positive,
+    Negative,
     BitComplement,
     Not,
 }
 
 #[derive(Clone, Debug)]
-pub enum Constant {
-    Integer(BigInt),
-    Float,
-    Character(char),
-    True,
-    False,
-    Nullptr,
+pub struct UnaryOperation {
+    pub operator: UnaryOperator,
+    pub inner: ConstExpr,
+}
+
+impl UnaryOperation {
+    pub fn evaluate(&self) -> i64 {
+        match self.operator {
+            UnaryOperator::Positive => self.inner.evaluate(),
+            UnaryOperator::Negative => -self.inner.evaluate(),
+            UnaryOperator::BitComplement => !self.inner.evaluate(),
+            UnaryOperator::Not => self.inner.evaluate().is_zero() as i64,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ConstExpr {
+    Ternary(Box<Ternary>),
+    BinaryOperation(Box<BinaryOperation>),
+    UnaryOperation(Box<UnaryOperation>),
+    Constant(i64),
+}
+
+impl ConstExpr {
+    pub fn is_true(&self) -> bool {
+        !self.evaluate().is_zero()
+    }
+
+    pub fn evaluate(&self) -> i64 {
+        match self {
+            ConstExpr::Ternary(_) => todo!(),
+            ConstExpr::BinaryOperation(binary_operation) => binary_operation.evaluate(),
+            ConstExpr::UnaryOperation(unary) => unary.evaluate(),
+            ConstExpr::Constant(constant) => *constant,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

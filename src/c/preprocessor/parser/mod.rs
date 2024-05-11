@@ -1,15 +1,12 @@
 use super::{
     ast::{
-        ConstantExpression, ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart,
-        IfDefKind, IfDefLike, IfGroup, IfLike, PreprocessorAst, TextLine,
+        ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike,
+        IfGroup, IfLike, PreprocessorAst, TextLine,
     },
     pre_token::{PreToken, PreTokenKind, Punctuator},
     ParseError,
 };
-use crate::{
-    c::preprocessor::ast::{Constant, IfSection},
-    look_ahead::LookAhead,
-};
+use crate::{c::preprocessor::ast::IfSection, look_ahead::LookAhead};
 use std::borrow::Borrow;
 
 pub struct Parser<I: Iterator<Item = Vec<PreToken>>> {
@@ -233,10 +230,8 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_if_like(&mut self, line: &[PreToken]) -> Result<IfLike, ParseError> {
-        let constant_expression = Self::parse_constant_expression(&line[2..])?;
-
         Ok(IfLike {
-            constant_expression,
+            tokens: line[2..].to_vec(),
             group: self.parse_group()?,
         })
     }
@@ -271,18 +266,12 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             _ => Err(ParseError::ExpectedIdentifier),
         }
     }
-
-    pub fn parse_constant_expression(_line: &[PreToken]) -> Result<ConstantExpression, ParseError> {
-        eprintln!("warning: c preprocessor parse constant expression");
-        Ok(ConstantExpression::Constant(Constant::False))
-    }
 }
 
 pub fn parse(tokens: impl Iterator<Item = Vec<PreToken>>) -> Result<PreprocessorAst, ParseError> {
     let mut parser = Parser::new(tokens);
 
-    let ast = PreprocessorAst {
+    Ok(PreprocessorAst {
         group: parser.parse_group()?,
-    };
-    Ok(ast)
+    })
 }

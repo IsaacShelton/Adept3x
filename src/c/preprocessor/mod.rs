@@ -26,6 +26,7 @@ pub enum PreprocessorError {
 
 #[derive(Clone, Debug)]
 pub enum ParseError {
+    // Initial parsing errors...
     ExpectedGroupPart,
     ExpectedIdentifier,
     UnexpectedToken { after: String },
@@ -34,6 +35,9 @@ pub enum ParseError {
     ExpectedDefinitionName,
     ExpectedNewlineAfterDirective,
     UnrecognizedPragmaDirective(String),
+    // Expression parsing errors... (These occur during expansion)
+    ExpectedExpression,
+    BadInteger,
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
