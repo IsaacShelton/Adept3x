@@ -40,8 +40,8 @@
 
 use crate::{
     c::preprocessor::{
-        ast::ConstExpr,
-        pre_token::{PreToken, PreTokenKind},
+        ast::{BinaryOperation, BinaryOperator, ConstExpr},
+        pre_token::{PreToken, PreTokenKind, Punctuator},
         ParseError,
     },
     look_ahead::LookAhead,
@@ -113,10 +113,101 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
     fn parse_operator_expr(
         &mut self,
-        _precedence: usize,
-        _expr: ConstExpr,
+        precedence: usize,
+        expr: ConstExpr,
     ) -> Result<ConstExpr, ParseError> {
-        // TODO: Parse operator expressions and handle ternarys
-        todo!()
+        let mut lhs = expr;
+
+        loop {
+            let operator = match self.input.peek() {
+                Some(operator) => operator,
+                None => return Ok(lhs),
+            };
+
+            let next_precedence = operator.kind.precedence();
+
+            if is_terminating_token(&operator.kind)
+                || (next_precedence + is_right_associative(&operator.kind) as usize) < precedence
+            {
+                return Ok(lhs);
+            }
+
+            let binary_operator = match &operator.kind {
+                PreTokenKind::Punctuator(Punctuator::LogicalOr) => BinaryOperator::LogicalOr,
+                PreTokenKind::Punctuator(Punctuator::LogicalAnd) => BinaryOperator::LogicalAnd,
+                PreTokenKind::Punctuator(Punctuator::BitOr) => BinaryOperator::InclusiveOr,
+                PreTokenKind::Punctuator(Punctuator::BitXor) => BinaryOperator::ExclusiveOr,
+                PreTokenKind::Punctuator(Punctuator::Ampersand) => BinaryOperator::BitwiseAnd,
+                PreTokenKind::Punctuator(Punctuator::DoubleEquals) => BinaryOperator::Equals,
+                PreTokenKind::Punctuator(Punctuator::NotEquals) => BinaryOperator::NotEquals,
+                PreTokenKind::Punctuator(Punctuator::LessThan) => BinaryOperator::LessThan,
+                PreTokenKind::Punctuator(Punctuator::GreaterThan) => BinaryOperator::GreaterThan,
+                PreTokenKind::Punctuator(Punctuator::LessThanEq) => BinaryOperator::LessThanEq,
+                PreTokenKind::Punctuator(Punctuator::GreaterThanEq) => {
+                    BinaryOperator::GreaterThanEq
+                }
+                PreTokenKind::Punctuator(Punctuator::LeftShift) => BinaryOperator::LeftShift,
+                PreTokenKind::Punctuator(Punctuator::RightShift) => BinaryOperator::RightShift,
+                PreTokenKind::Punctuator(Punctuator::Add) => BinaryOperator::Add,
+                PreTokenKind::Punctuator(Punctuator::Subtract) => BinaryOperator::Subtract,
+                PreTokenKind::Punctuator(Punctuator::Multiply) => BinaryOperator::Multiply,
+                PreTokenKind::Punctuator(Punctuator::Divide) => BinaryOperator::Divide,
+                PreTokenKind::Punctuator(Punctuator::Modulus) => BinaryOperator::Modulus,
+                _ => return Ok(lhs),
+            };
+
+            lhs = self.parse_math(lhs, binary_operator, next_precedence)?;
+        }
+    }
+
+    fn parse_math(
+        &mut self,
+        lhs: ConstExpr,
+        operator: BinaryOperator,
+        operator_precedence: usize,
+    ) -> Result<ConstExpr, ParseError> {
+        let rhs = self.parse_math_rhs(operator_precedence)?;
+
+        Ok(ConstExpr::BinaryOperation(Box::new(BinaryOperation {
+            operator,
+            left: lhs,
+            right: rhs,
+        })))
+    }
+
+    fn parse_math_rhs(&mut self, operator_precedence: usize) -> Result<ConstExpr, ParseError> {
+        // Skip over operator token
+        self.input.next();
+
+        let rhs = self.parse_expr_primary()?;
+
+        let next_operator = match self.input.peek() {
+            Some(operator) => operator,
+            None => return Ok(rhs),
+        };
+
+        let next_precedence = next_operator.kind.precedence();
+
+        if !((next_precedence + is_right_associative(&next_operator.kind) as usize)
+            < operator_precedence)
+        {
+            self.parse_operator_expr(operator_precedence + 1, rhs)
+        } else {
+            Ok(rhs)
+        }
+    }
+}
+
+fn is_terminating_token(kind: &PreTokenKind) -> bool {
+    match kind {
+        PreTokenKind::Punctuator(Punctuator::Comma | Punctuator::CloseParen) => true,
+        _ => false,
+    }
+}
+
+fn is_right_associative(kind: &PreTokenKind) -> bool {
+    match kind {
+        PreTokenKind::Punctuator(Punctuator::Ternary) => true,
+        _ => false,
     }
 }
