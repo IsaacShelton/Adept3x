@@ -40,7 +40,7 @@
 
 use crate::{
     c::preprocessor::{
-        ast::{BinaryOperation, BinaryOperator, ConstExpr},
+        ast::{BinaryOperation, BinaryOperator, ConstExpr, Ternary},
         pre_token::{PreToken, PreTokenKind, Punctuator},
         ParseError,
     },
@@ -84,7 +84,8 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         // TODO: Clean this up
         match token.map(|token| &token.kind) {
             Some(PreTokenKind::Identifier(..)) => {
-                // Undeclared defines are zero
+                // Undeclared defines are zero.
+                // (it would've been replaced before expression parsing otherwise)
                 self.input.next().unwrap();
                 Ok(ConstExpr::Constant(0))
             }
@@ -135,6 +136,28 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         }
     }
 
+    fn parse_ternary(&mut self, condition: ConstExpr) -> Result<ConstExpr, ParseError> {
+        // Eat '?'
+        self.input.next().unwrap();
+
+        let when_true = self.parse_expr()?;
+
+        // Eat ':'
+        // TODO: CLEANUP: Clean this up messy part
+        match self.input.peek().map(|pre_token| &pre_token.kind) {
+            Some(PreTokenKind::Punctuator(Punctuator::Colon)) => _ = self.input.next().unwrap(),
+            _ => return Err(ParseError::ExpectedColon),
+        }
+
+        let when_false = self.parse_expr()?;
+
+        Ok(ConstExpr::Ternary(Box::new(Ternary {
+            condition,
+            when_true,
+            when_false,
+        })))
+    }
+
     fn parse_operator_expr(
         &mut self,
         precedence: usize,
@@ -154,6 +177,12 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
                 || (next_precedence + is_right_associative(&operator.kind) as usize) < precedence
             {
                 return Ok(lhs);
+            }
+
+            // Special case for parsing ternary expressions
+            if let PreTokenKind::Punctuator(Punctuator::Ternary) = &operator.kind {
+                lhs = self.parse_ternary(lhs)?;
+                continue;
             }
 
             let binary_operator = match &operator.kind {
@@ -224,7 +253,9 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
 fn is_terminating_token(kind: &PreTokenKind) -> bool {
     match kind {
-        PreTokenKind::Punctuator(Punctuator::Comma | Punctuator::CloseParen) => true,
+        PreTokenKind::Punctuator(
+            Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon,
+        ) => true,
         _ => false,
     }
 }

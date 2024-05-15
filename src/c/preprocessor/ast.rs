@@ -40,9 +40,19 @@ pub struct IfLike {
 
 #[derive(Clone, Debug)]
 pub struct Ternary {
-    condition: ConstExpr,
-    when_true: ConstExpr,
-    when_false: ConstExpr,
+    pub condition: ConstExpr,
+    pub when_true: ConstExpr,
+    pub when_false: ConstExpr,
+}
+
+impl Ternary {
+    pub fn evaluate(&self) -> i64 {
+        if self.condition.is_true() {
+            self.when_true.evaluate()
+        } else {
+            self.when_false.evaluate()
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -155,7 +165,7 @@ impl ConstExpr {
 
     pub fn evaluate(&self) -> i64 {
         match self {
-            ConstExpr::Ternary(_) => todo!(),
+            ConstExpr::Ternary(ternary) => ternary.evaluate(),
             ConstExpr::BinaryOperation(binary_operation) => binary_operation.evaluate(),
             ConstExpr::UnaryOperation(unary) => unary.evaluate(),
             ConstExpr::Constant(constant) => *constant,

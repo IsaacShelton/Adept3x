@@ -39,6 +39,7 @@ pub enum ParseError {
     ExpectedExpression,
     BadInteger,
     ExpectedCloseParen,
+    ExpectedColon,
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {

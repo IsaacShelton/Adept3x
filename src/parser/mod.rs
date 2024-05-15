@@ -10,7 +10,11 @@ use self::{
 };
 use crate::{
     ast::{
-        self, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind, Field, File, FileIdentifier, Function, Global, Parameter, Parameters, ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While
+        self, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
+        BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind,
+        Field, File, FileIdentifier, Function, Global, Parameter, Parameters,
+        ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
+        Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -524,7 +528,6 @@ where
                 return Ok(lhs);
             }
 
-
             let binary_operator: BinaryOperator = match operator.kind {
                 TokenKind::Add => BasicBinaryOperator::Add.into(),
                 TokenKind::Subtract => BasicBinaryOperator::Subtract.into(),
@@ -852,11 +855,13 @@ where
                     }))
                 }
                 BinaryOperator::ShortCircuiting(short_circuiting_operator) => {
-                    ExprKind::ShortCircuitingBinaryOperation(Box::new(ShortCircuitingBinaryOperation {
-                        operator: short_circuiting_operator,
-                        left: lhs,
-                        right: rhs,
-                    }))
+                    ExprKind::ShortCircuitingBinaryOperation(Box::new(
+                        ShortCircuitingBinaryOperation {
+                            operator: short_circuiting_operator,
+                            left: lhs,
+                            right: rhs,
+                        },
+                    ))
                 }
             },
             self.source(location),
