@@ -1033,8 +1033,6 @@ fn is_terminating_token(kind: &TokenKind) -> bool {
 fn is_right_associative(kind: &TokenKind) -> bool {
     match kind {
         TokenKind::DeclareAssign => true,
-        TokenKind::And => true,
-        TokenKind::Or => true,
         _ => false,
     }
 }

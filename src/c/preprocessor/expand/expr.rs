@@ -81,9 +81,33 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
     fn parse_expr_primary_base(&mut self) -> Result<ConstExpr, ParseError> {
         let token = self.input.peek();
 
+        // TODO: Clean this up
         match token.map(|token| &token.kind) {
-            Some(PreTokenKind::Identifier(..)) => Ok(ConstExpr::Constant(0)), // Undeclared defines are zero
-            Some(PreTokenKind::Number(numeric)) => Self::parse_number(numeric),
+            Some(PreTokenKind::Identifier(..)) => {
+                // Undeclared defines are zero
+                self.input.next().unwrap();
+                Ok(ConstExpr::Constant(0))
+            }
+            Some(PreTokenKind::Number(numeric)) => {
+                self.input.next().unwrap();
+                Self::parse_number(numeric)
+            }
+            Some(PreTokenKind::Punctuator(Punctuator::OpenParen { .. })) => {
+                // Eat '('
+                self.input.next().unwrap();
+
+                let inner = self.parse_expr()?;
+
+                // Eat ')'
+                match self.input.peek().map(|pre_token| &pre_token.kind) {
+                    Some(PreTokenKind::Punctuator(Punctuator::CloseParen)) => {
+                        self.input.next().unwrap();
+                    }
+                    _ => return Err(ParseError::ExpectedCloseParen),
+                }
+
+                Ok(inner)
+            }
             _ => Err(ParseError::ExpectedExpression),
         }
     }

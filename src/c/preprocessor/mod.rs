@@ -38,6 +38,7 @@ pub enum ParseError {
     // Expression parsing errors... (These occur during expansion)
     ExpectedExpression,
     BadInteger,
+    ExpectedCloseParen,
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
