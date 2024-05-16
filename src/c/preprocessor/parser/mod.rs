@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::{
     ast::{
         ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike,
@@ -6,7 +8,10 @@ use super::{
     pre_token::{PreToken, PreTokenKind, Punctuator},
     ParseError,
 };
-use crate::{c::preprocessor::ast::IfSection, look_ahead::LookAhead};
+use crate::{
+    c::preprocessor::ast::{IfSection, Macro},
+    look_ahead::LookAhead,
+};
 use std::borrow::Borrow;
 
 pub struct Parser<I: Iterator<Item = Vec<PreToken>>> {
@@ -159,8 +164,6 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_define_macro(line: &[PreToken]) -> Result<Define, ParseError> {
-        eprintln!("warning: macro defines are not supported yet");
-
         let name = match line.get(2) {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
@@ -168,8 +171,57 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             _ => return Err(ParseError::ExpectedDefinitionName),
         };
 
+        let mut tokens = LookAhead::new(line.iter().skip(3));
+
+        match tokens.next() {
+            Some(PreToken {
+                kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+            }) => (),
+            _ => return Err(ParseError::ExpectedOpenParen),
+        }
+
+        let mut parameters = Vec::new();
+        let mut is_variadic = false;
+
+        loop {
+            match tokens.next() {
+                Some(PreToken {
+                    kind: PreTokenKind::Identifier(name),
+                }) => {
+                    parameters.push(name.into());
+                }
+                Some(PreToken {
+                    kind: PreTokenKind::Punctuator(Punctuator::Ellipses),
+                }) => {
+                    is_variadic = true;
+                }
+                Some(PreToken {
+                    kind: PreTokenKind::Punctuator(Punctuator::CloseParen),
+                }) if parameters.is_empty() => break,
+                _ => return Err(ParseError::ExpectedParameterName),
+            }
+
+            match tokens.next() {
+                Some(PreToken {
+                    kind: PreTokenKind::Punctuator(Punctuator::Comma),
+                }) => {
+                    if is_variadic {
+                        return Err(ParseError::ExpectedCloseParenAfterVarArgs);
+                    }
+                }
+                Some(PreToken {
+                    kind: PreTokenKind::Punctuator(Punctuator::CloseParen),
+                }) => break,
+                _ => return Err(ParseError::ExpectedComma),
+            }
+        }
+
         Ok(Define {
-            kind: DefineKind::Normal(vec![]),
+            kind: DefineKind::Macro(Macro {
+                parameters,
+                is_variadic,
+                body: tokens.cloned().collect_vec(),
+            }),
             name,
         })
     }

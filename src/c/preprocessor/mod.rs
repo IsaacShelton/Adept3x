@@ -35,6 +35,10 @@ pub enum ParseError {
     ExpectedDefinitionName,
     ExpectedNewlineAfterDirective,
     UnrecognizedPragmaDirective(String),
+    ExpectedOpenParen,
+    ExpectedParameterName,
+    ExpectedComma,
+    ExpectedCloseParenAfterVarArgs,
     // Expression parsing errors... (These occur during expansion)
     ExpectedExpression,
     BadInteger,

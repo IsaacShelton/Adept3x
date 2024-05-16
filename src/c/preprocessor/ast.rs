@@ -236,6 +236,7 @@ pub enum DefineKind {
 pub struct Macro {
     pub parameters: Vec<String>,
     pub is_variadic: bool,
+    pub body: Vec<PreToken>,
 }
 
 #[derive(Clone, Debug)]

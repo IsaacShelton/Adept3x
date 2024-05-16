@@ -396,7 +396,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Signed8(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into int8",
+                            "Cannot fit {} into i8",
                             value
                         )))
                     }
@@ -406,7 +406,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Unsigned8(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into uint8",
+                            "Cannot fit {} into u8",
                             value
                         )))
                     }
@@ -416,7 +416,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Signed16(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into int16",
+                            "Cannot fit {} into i16",
                             value
                         )))
                     }
@@ -426,7 +426,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Unsigned16(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into uint16",
+                            "Cannot fit {} into u16",
                             value
                         )))
                     }
@@ -436,7 +436,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Signed32(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into int32",
+                            "Cannot fit {} into i32",
                             value
                         )))
                     }
@@ -446,7 +446,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Unsigned32(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into uint32",
+                            "Cannot fit {} into u32",
                             value
                         )))
                     }
@@ -456,7 +456,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Signed64(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into int64",
+                            "Cannot fit {} into i64",
                             value
                         )))
                     }
@@ -466,7 +466,7 @@ fn lower_expr(
                         Ok(ir::Value::Literal(Literal::Unsigned64(value)))
                     } else {
                         Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into uint64",
+                            "Cannot fit {} into u64",
                             value
                         )))
                     }

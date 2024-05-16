@@ -83,11 +83,12 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
         // TODO: Clean this up
         match token.map(|token| &token.kind) {
-            Some(PreTokenKind::Identifier(..)) => {
-                // Undeclared defines are zero.
+            Some(PreTokenKind::Identifier(name)) => {
+                // Undeclared defines are zero (expect if identifier is `true` as per C23).
                 // (it would've been replaced before expression parsing otherwise)
                 self.input.next().unwrap();
-                Ok(ConstExpr::Constant(0))
+
+                Ok(ConstExpr::Constant(if name == "true" { 1 } else { 0 }))
             }
             Some(PreTokenKind::Number(numeric)) => {
                 self.input.next().unwrap();
