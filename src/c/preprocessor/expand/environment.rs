@@ -27,6 +27,9 @@ impl Environment {
             let is_match = match &define.kind {
                 DefineKind::Normal(_) => arity.is_none(),
                 DefineKind::Macro(m) => arity.map_or(false, |arity| {
+                    // TODO: This may not be fully compliant when a variadic macro and a normal
+                    // macro of the same name are both candiates for the match. Ensure compliance
+                    // with the spec
                     arity == m.parameters.len() || (arity > m.parameters.len() && m.is_variadic)
                 }),
             };

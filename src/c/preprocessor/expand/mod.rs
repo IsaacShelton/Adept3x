@@ -17,7 +17,6 @@ use super::{
 };
 use crate::c::preprocessor::ast::GroupPart;
 use depleted::Depleted;
-use itertools::Itertools;
 
 pub use self::environment::Environment;
 
@@ -29,17 +28,19 @@ pub enum Token {
 pub fn expand_ast(
     ast: &PreprocessorAst,
     environment: Environment,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     let mut environment = environment;
     let mut depleted = Depleted::new();
-    expand_group(&ast.group, &mut environment, &mut depleted)
+    let pre_tokens = expand_group(&ast.group, &mut environment, &mut depleted)?;
+
+    expand_region(&pre_tokens, &environment, &mut depleted)
 }
 
 fn expand_group(
     group: &Group,
     environment: &mut Environment,
     depleted: &mut Depleted,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     let mut tokens = Vec::with_capacity(1024);
 
     for part in group.parts.iter() {
@@ -55,7 +56,7 @@ fn expand_group(
                 )?);
             }
             GroupPart::TextLine(text_line) => {
-                tokens.append(&mut expand_text_line(text_line, environment, depleted)?);
+                tokens.append(&mut expand_text_line(text_line)?);
             }
             GroupPart::HashNonDirective => (), // Ignored during expansion
         }
@@ -68,7 +69,7 @@ fn expand_if_like(
     if_like: &IfLike,
     environment: &mut Environment,
     depleted: &mut Depleted,
-) -> Result<Option<Vec<Token>>, PreprocessorError> {
+) -> Result<Option<Vec<PreToken>>, PreprocessorError> {
     let condition = expand_region(&if_like.tokens, environment, depleted)?;
 
     let expression =
@@ -85,7 +86,7 @@ fn expand_if_def_like(
     if_def_like: &IfDefLike,
     environment: &mut Environment,
     depleted: &mut Depleted,
-) -> Result<Option<Vec<Token>>, PreprocessorError> {
+) -> Result<Option<Vec<PreToken>>, PreprocessorError> {
     let invert = match if_def_like.kind {
         IfDefKind::Defined => false,
         IfDefKind::NotDefined => true,
@@ -106,7 +107,7 @@ fn expand_if_section(
     if_section: &IfSection,
     environment: &mut Environment,
     depleted: &mut Depleted,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     if let Some(tokens) = match &if_section.if_group {
         IfGroup::IfLike(if_like) => expand_if_like(if_like, environment, depleted)?,
         IfGroup::IfDefLike(if_def_like) => expand_if_def_like(if_def_like, environment, depleted)?,
@@ -132,17 +133,6 @@ fn expand_if_section(
     }
 }
 
-fn expand_text_line(
-    text_line: &TextLine,
-    environment: &Environment,
-    depleted: &mut Depleted,
-) -> Result<Vec<Token>, PreprocessorError> {
-    tokenize(&expand_region(&text_line.content, environment, depleted)?)
-}
-
-fn tokenize(tokens: &[PreToken]) -> Result<Vec<Token>, PreprocessorError> {
-    Ok(tokens
-        .iter()
-        .map(|token| Token::PreToken(token.clone()))
-        .collect_vec())
+fn expand_text_line(text_line: &TextLine) -> Result<Vec<PreToken>, PreprocessorError> {
+    Ok(text_line.content.to_vec())
 }

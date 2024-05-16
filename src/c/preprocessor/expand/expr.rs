@@ -84,7 +84,7 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         // TODO: Clean this up
         match token.map(|token| &token.kind) {
             Some(PreTokenKind::Identifier(name)) => {
-                // Undeclared defines are zero (expect if identifier is `true` as per C23).
+                // Undeclared defines are zero (except if identifier is `true` as per C23).
                 // (it would've been replaced before expression parsing otherwise)
                 self.input.next().unwrap();
 

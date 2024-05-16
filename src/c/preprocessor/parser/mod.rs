@@ -164,14 +164,14 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_define_macro(line: &[PreToken]) -> Result<Define, ParseError> {
-        let name = match line.get(2) {
+        let mut tokens = LookAhead::new(line.iter().skip(2));
+
+        let name = match tokens.next() {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
             }) => name.to_string(),
             _ => return Err(ParseError::ExpectedDefinitionName),
         };
-
-        let mut tokens = LookAhead::new(line.iter().skip(3));
 
         match tokens.next() {
             Some(PreToken {

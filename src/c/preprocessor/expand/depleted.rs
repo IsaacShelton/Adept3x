@@ -1,6 +1,7 @@
 use crate::c::preprocessor::ast::Define;
 use std::{
-    collections::HashSet, hash::{DefaultHasher, Hash, Hasher}
+    collections::HashSet,
+    hash::{DefaultHasher, Hash, Hasher},
 };
 
 /*

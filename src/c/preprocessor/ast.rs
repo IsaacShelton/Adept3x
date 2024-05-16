@@ -1,4 +1,5 @@
 use super::pre_token::PreToken;
+use derive_more::Unwrap;
 use num_traits::Zero;
 
 #[derive(Clone, Debug)]
@@ -226,7 +227,7 @@ impl Define {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, Unwrap)]
 pub enum DefineKind {
     Normal(Vec<PreToken>),
     Macro(Macro),

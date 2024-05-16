@@ -1,4 +1,4 @@
-use super::{depleted::Depleted, region::expand_region, Environment, Token};
+use super::{depleted::Depleted, region::expand_region, Environment};
 use crate::c::preprocessor::{
     pre_token::{PreToken, PreTokenKind},
     PreprocessorError,
@@ -8,7 +8,7 @@ pub fn expand_include(
     files: &[PreToken],
     environment: &mut Environment,
     depleted: &mut Depleted,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     let files = expand_region(files, environment, depleted)?;
 
     if files.len() != 1 {

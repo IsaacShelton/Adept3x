@@ -1,4 +1,4 @@
-use super::{depleted::Depleted, embed::expand_embed, include::expand_include, Environment, Token};
+use super::{depleted::Depleted, embed::expand_embed, include::expand_include, Environment};
 use crate::c::preprocessor::{
     ast::{ControlLine, Define},
     pre_token::PreToken,
@@ -10,7 +10,7 @@ pub fn expand_control_line(
     control_line: &ControlLine,
     environment: &mut Environment,
     depleted: &mut Depleted,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     match control_line {
         ControlLine::Include(files) => expand_include(files, environment, depleted),
         ControlLine::Embed(options) => expand_embed(options, environment, depleted),
@@ -26,7 +26,7 @@ pub fn expand_control_line(
 fn expand_define(
     define: &Define,
     environment: &mut Environment,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     environment.add_define(define);
     Ok(vec![])
 }
@@ -34,18 +34,18 @@ fn expand_define(
 fn expand_undef(
     name: &str,
     environment: &mut Environment,
-) -> Result<Vec<Token>, PreprocessorError> {
+) -> Result<Vec<PreToken>, PreprocessorError> {
     environment.remove_define(name);
     Ok(vec![])
 }
 
-fn expand_error(tokens: &[PreToken]) -> Result<Vec<Token>, PreprocessorError> {
+fn expand_error(tokens: &[PreToken]) -> Result<Vec<PreToken>, PreprocessorError> {
     Err(PreprocessorError::ErrorDirective(
         tokens.iter().map(|token| token.to_string()).join(" "),
     ))
 }
 
-fn expand_warning(tokens: &[PreToken]) -> Result<Vec<Token>, PreprocessorError> {
+fn expand_warning(tokens: &[PreToken]) -> Result<Vec<PreToken>, PreprocessorError> {
     eprintln!(
         "#warning: {}",
         tokens.iter().map(|token| token.to_string()).join(" ")
@@ -53,6 +53,6 @@ fn expand_warning(tokens: &[PreToken]) -> Result<Vec<Token>, PreprocessorError> 
     Ok(vec![])
 }
 
-fn expand_pragma(_tokens: &[PreToken]) -> Result<Vec<Token>, PreprocessorError> {
+fn expand_pragma(_tokens: &[PreToken]) -> Result<Vec<PreToken>, PreprocessorError> {
     Err(PreprocessorError::UnsupportedPragma)
 }
