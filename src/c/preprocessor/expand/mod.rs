@@ -92,9 +92,7 @@ fn expand_if_def_like(
         IfDefKind::NotDefined => true,
     };
 
-    let defined = environment
-        .find_defines_of_name(&if_def_like.identifier)
-        .is_some();
+    let defined = environment.find_define(&if_def_like.identifier).is_some();
 
     Ok(if defined ^ invert {
         Some(expand_group(&if_def_like.group, environment, depleted)?)

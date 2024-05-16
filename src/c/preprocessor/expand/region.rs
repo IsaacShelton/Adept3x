@@ -1,11 +1,13 @@
 use super::{depleted::Depleted, Environment};
 use crate::{
     c::preprocessor::{
+        ast::{Define, DefineKind, FunctionMacro},
         pre_token::{PreToken, PreTokenKind, Punctuator},
         ParseError, PreprocessorError,
     },
     look_ahead::LookAhead,
 };
+use itertools::Itertools;
 
 pub fn expand_region(
     pre_tokens: &[PreToken],
@@ -31,23 +33,24 @@ fn expand_token<'a>(
 ) -> Result<(), PreprocessorError> {
     match &token.kind {
         PreTokenKind::Identifier(name) => {
-            if let Some(PreToken {
-                kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
-            }) = tokens.peek()
-            {
-                return expand_macro(name, tokens, environment, depleted, expanded);
-            }
-
-            if let Some(define) = environment.find_define(name, None) {
+            if let Some(define) = environment.find_define(name) {
                 let hash = Depleted::hash_define(define);
 
                 if !depleted.contains(hash) {
-                    let replacement = define.kind.clone().unwrap_normal();
-
                     depleted.push(hash);
-                    expanded.append(&mut expand_region(&replacement, environment, depleted)?);
-                    depleted.pop(hash);
 
+                    expanded.append(&mut match &define.kind {
+                        DefineKind::ObjectMacro(replacement) => {
+                            expand_region(replacement, environment, depleted)?
+                        }
+                        DefineKind::FunctionMacro(function_macro) => expand_region(
+                            &expand_function_macro(tokens, function_macro)?,
+                            environment,
+                            depleted,
+                        )?,
+                    });
+
+                    depleted.pop(hash);
                     return Ok(());
                 }
             }
@@ -68,17 +71,119 @@ fn expand_token<'a>(
     }
 }
 
-fn expand_macro<'a>(
-    _name: &str,
+fn expand_function_macro<'a>(
     tokens: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
-    _environment: &Environment,
-    _depleted: &mut Depleted,
-    _expanded: &mut Vec<PreToken>,
-) -> Result<(), PreprocessorError> {
+    function_macro: &FunctionMacro,
+) -> Result<Vec<PreToken>, PreprocessorError> {
     // Eat '('
-    tokens.next().unwrap();
+    match tokens.next() {
+        Some(PreToken {
+            kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+        }) => (),
+        _ => return Err(PreprocessorError::ParseError(ParseError::ExpectedOpenParen)),
+    }
 
-    Err(PreprocessorError::ParseError(
-        ParseError::ExpectedCloseParen,
-    ))
+    // Parse function-macro arguments
+    let mut args = Vec::<Vec<PreToken>>::with_capacity(4);
+    let mut paren_depth = 0;
+
+    loop {
+        let part = match tokens.next() {
+            Some(
+                token @ PreToken {
+                    kind: PreTokenKind::Punctuator(Punctuator::CloseParen),
+                },
+            ) => {
+                if paren_depth == 0 {
+                    break;
+                } else {
+                    paren_depth -= 1;
+                    Some(token.clone())
+                }
+            }
+            Some(
+                token @ PreToken {
+                    kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+                },
+            ) => {
+                paren_depth += 1;
+                Some(token.clone())
+            }
+            Some(PreToken {
+                kind: PreTokenKind::Punctuator(Punctuator::Comma),
+            }) if paren_depth == 0 => {
+                args.push(Vec::new());
+                None
+            }
+            Some(token) => Some(token.clone()),
+            None => {
+                return Err(PreprocessorError::ParseError(
+                    ParseError::ExpectedCloseParen,
+                ))
+            }
+        };
+
+        if let Some(part) = part {
+            // Append argument part to current argument
+            if args.is_empty() {
+                args.push(Vec::new());
+            }
+
+            args.last_mut()
+                .expect("at least one function-macro argument has been created")
+                .push(part);
+        }
+    }
+
+    // Validate number of arguments
+    if args.len() != function_macro.parameters.len()
+        && !(args.len() > function_macro.parameters.len() && function_macro.is_variadic)
+    {
+        return Err(PreprocessorError::ParseError(
+            if !function_macro.is_variadic && args.len() > function_macro.parameters.len() {
+                ParseError::TooManyArguments
+            } else {
+                ParseError::NotEnoughArguments
+            },
+        ));
+    }
+
+    // Create environment to replace parameters with specified argument values
+    let mut environment = Environment::default();
+    let mut depleted = Depleted::new();
+
+    for i in 0..function_macro.parameters.len() {
+        environment.add_define(Define {
+            kind: DefineKind::ObjectMacro(std::mem::take(&mut args[i])),
+            name: function_macro.parameters[i].clone(),
+        });
+    }
+
+    // Create __VA__ARGS__ definition if applicable
+    if args.len() > function_macro.parameters.len() {
+        #[allow(unstable_name_collisions)]
+        let rest = args
+            .splice(
+                function_macro.parameters.len()..args.len(),
+                std::iter::empty(),
+            )
+            .flatten()
+            .intersperse(PreToken {
+                // NOTE: The location information of inserted comma preprocessor tokens will be
+                // missing, but an error message caused by them is extremely rare in
+                // practice so doesn't really matter
+                // TODO: Remember location information of each comma preprocessor token that needs
+                // to be inserted
+                kind: PreTokenKind::Punctuator(Punctuator::Comma),
+            })
+            .collect_vec();
+
+        environment.add_define(Define {
+            kind: DefineKind::ObjectMacro(rest),
+            name: "__VA_ARGS__".into(),
+        });
+    }
+
+    // Evaluate function macro with arguments
+    expand_region(&function_macro.body, &environment, &mut depleted)
 }

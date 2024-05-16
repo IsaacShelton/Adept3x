@@ -27,7 +27,7 @@ fn expand_define(
     define: &Define,
     environment: &mut Environment,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
-    environment.add_define(define);
+    environment.add_define(define.clone());
     Ok(vec![])
 }
 

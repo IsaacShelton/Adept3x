@@ -211,30 +211,14 @@ pub struct Define {
     pub name: String,
 }
 
-impl Define {
-    pub fn overwrites(&self, other: &Define) -> bool {
-        match &self.kind {
-            DefineKind::Normal(_) => matches!(other.kind, DefineKind::Normal(_)),
-            DefineKind::Macro(self_macro) => {
-                if let DefineKind::Macro(other_macro) = &other.kind {
-                    self_macro.parameters.len() == other_macro.parameters.len()
-                        && self_macro.is_variadic == other_macro.is_variadic
-                } else {
-                    false
-                }
-            }
-        }
-    }
-}
-
 #[derive(Clone, Debug, Hash, Unwrap)]
 pub enum DefineKind {
-    Normal(Vec<PreToken>),
-    Macro(Macro),
+    ObjectMacro(Vec<PreToken>),
+    FunctionMacro(FunctionMacro),
 }
 
 #[derive(Clone, Debug, Hash)]
-pub struct Macro {
+pub struct FunctionMacro {
     pub parameters: Vec<String>,
     pub is_variadic: bool,
     pub body: Vec<PreToken>,

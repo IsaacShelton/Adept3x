@@ -9,7 +9,7 @@ use super::{
     ParseError,
 };
 use crate::{
-    c::preprocessor::ast::{IfSection, Macro},
+    c::preprocessor::ast::{IfSection, FunctionMacro},
     look_ahead::LookAhead,
 };
 use std::borrow::Borrow;
@@ -136,9 +136,9 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
                         })
                     )
                 }) {
-                    Self::parse_define_macro(&line)?
+                    Self::parse_define_function_macro(&line)?
                 } else {
-                    Self::parse_define_regular(&line)?
+                    Self::parse_define_object_macro(&line)?
                 },
             ))),
             Some("include") => Ok(GroupPart::ControlLine(ControlLine::Include(
@@ -163,7 +163,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         }
     }
 
-    pub fn parse_define_macro(line: &[PreToken]) -> Result<Define, ParseError> {
+    pub fn parse_define_function_macro(line: &[PreToken]) -> Result<Define, ParseError> {
         let mut tokens = LookAhead::new(line.iter().skip(2));
 
         let name = match tokens.next() {
@@ -217,7 +217,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         }
 
         Ok(Define {
-            kind: DefineKind::Macro(Macro {
+            kind: DefineKind::FunctionMacro(FunctionMacro {
                 parameters,
                 is_variadic,
                 body: tokens.cloned().collect_vec(),
@@ -226,7 +226,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         })
     }
 
-    pub fn parse_define_regular(line: &[PreToken]) -> Result<Define, ParseError> {
+    pub fn parse_define_object_macro(line: &[PreToken]) -> Result<Define, ParseError> {
         // # define NAME REPLACEMENT_TOKENS...
 
         let name = match line.get(2) {
@@ -239,7 +239,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         let replacement_tokens = line[3..].to_vec();
 
         Ok(Define {
-            kind: DefineKind::Normal(replacement_tokens),
+            kind: DefineKind::ObjectMacro(replacement_tokens),
             name,
         })
     }
