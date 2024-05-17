@@ -39,9 +39,13 @@ fn expand_token<'a>(
                 if !depleted.contains(hash) {
                     let replacement = match &define.kind {
                         DefineKind::ObjectMacro(replacement) => replacement,
-                        DefineKind::FunctionMacro(function_macro) => {
-                            &expand_function_macro(tokens, function_macro, environment, depleted)?
-                        }
+                        DefineKind::FunctionMacro(function_macro) => &expand_function_macro(
+                            token,
+                            tokens,
+                            function_macro,
+                            environment,
+                            depleted,
+                        )?,
                     };
 
                     depleted.push(hash);
@@ -68,6 +72,7 @@ fn expand_token<'a>(
 }
 
 fn expand_function_macro<'a>(
+    token: &PreToken,
     tokens: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
     function_macro: &FunctionMacro,
     parent_environment: &Environment,
@@ -79,9 +84,8 @@ fn expand_function_macro<'a>(
             kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
         }) => (),
         _ => {
-            return Err(PreprocessorError::ParseError(
-                ParseError::ExpectedOpenParenDuringExpansion,
-            ))
+            // Not invoking the macro, just using the name
+            return Ok(vec![token.clone()]);
         }
     }
 
