@@ -65,12 +65,13 @@ fn expand_token<'a>(
                     ) = (expanded.last(), tokens.peek())
                     {
                         let nested = environment.find_define(name);
+                        let hash = Depleted::hash_define(define);
 
                         match nested {
                             Some(Define {
                                 kind: DefineKind::FunctionMacro(function_macro),
                                 ..
-                            }) => {
+                            }) if !depleted.contains(hash) => {
                                 let replacement = &expand_function_macro(
                                     &expanded.pop().unwrap(),
                                     tokens,
