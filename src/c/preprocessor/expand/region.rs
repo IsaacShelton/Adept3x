@@ -48,9 +48,50 @@ fn expand_token<'a>(
                         )?,
                     };
 
+                    // Expand the replacement in the context of the current environment
                     depleted.push(hash);
                     expanded.append(&mut expand_region(replacement, environment, depleted)?);
                     depleted.pop(hash);
+
+                    // Process any function-macro invocations that span between expanded function-macro
+                    // results and upcoming tokens
+                    while let (
+                        Some(PreToken {
+                            kind: PreTokenKind::Identifier(name),
+                        }),
+                        Some(PreToken {
+                            kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+                        }),
+                    ) = (expanded.last(), tokens.peek())
+                    {
+                        let nested = environment.find_define(name);
+
+                        match nested {
+                            Some(Define {
+                                kind: DefineKind::FunctionMacro(function_macro),
+                                ..
+                            }) => {
+                                let replacement = &expand_function_macro(
+                                    &expanded.pop().unwrap(),
+                                    tokens,
+                                    function_macro,
+                                    environment,
+                                    depleted,
+                                )?;
+
+                                depleted.push(hash);
+                                expanded.append(&mut expand_region(
+                                    replacement,
+                                    environment,
+                                    depleted,
+                                )?);
+                                depleted.pop(hash);
+                            }
+                            _ => break,
+                        }
+                    }
+
+                    // Macro invocation was successful
                     return Ok(());
                 }
             }
