@@ -112,6 +112,9 @@ fn expand_function_macro<'a>(
             Some(PreToken {
                 kind: PreTokenKind::Punctuator(Punctuator::Comma),
             }) if paren_depth == 0 => {
+                if args.is_empty() {
+                    args.push(Vec::new());
+                }
                 args.push(Vec::new());
                 None
             }
@@ -167,21 +170,50 @@ fn expand_function_macro<'a>(
                 function_macro.parameters.len()..args.len(),
                 std::iter::empty(),
             )
-            .flatten()
-            .intersperse(PreToken {
+            .intersperse(vec![PreToken {
                 // NOTE: The location information of inserted comma preprocessor tokens will be
                 // missing, but an error message caused by them is extremely rare in
                 // practice so doesn't really matter
                 // TODO: Remember location information of each comma preprocessor token that needs
                 // to be inserted
                 kind: PreTokenKind::Punctuator(Punctuator::Comma),
-            })
+            }])
+            .flatten()
             .collect_vec();
 
         environment.add_define(Define {
             kind: DefineKind::ObjectMacro(rest),
             name: "__VA_ARGS__".into(),
         });
+
+        // Add `#define __VA_OPT__(...) __VA_ARGS__` to local environment
+        environment.add_define(Define {
+            kind: DefineKind::FunctionMacro(FunctionMacro {
+                parameters: vec![],
+                is_variadic: true,
+                body: vec![PreToken::new(PreTokenKind::Identifier(
+                    "__VA_ARGS__".into(),
+                ))],
+            }),
+            name: "__VA_OPT__".into(),
+        })
+    } else if function_macro.is_variadic {
+        // No variadic arguments passed, despite this function-macro
+        // being variadic, so we must define __VA_ARGS__ to be empty.
+        environment.add_define(Define {
+            kind: DefineKind::ObjectMacro(vec![]),
+            name: "__VA_ARGS__".into(),
+        });
+
+        // Add `#define __VA_OPT__(...)` to local environment
+        environment.add_define(Define {
+            kind: DefineKind::FunctionMacro(FunctionMacro {
+                parameters: vec![],
+                is_variadic: true,
+                body: vec![],
+            }),
+            name: "__VA_OPT__".into(),
+        })
     }
 
     // Evaluate function macro with arguments

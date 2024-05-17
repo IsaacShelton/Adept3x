@@ -10,6 +10,19 @@ use self::lexer::lex;
 use self::line_splice::LineSplicer;
 use self::parser::parse;
 
+/*
+   Missing features:
+   - # stringizing
+   - ## concatenating
+   - __has_include
+   - __has_embed
+   - #embed (and its options)
+   - #pragma STDC (all of its options)
+   - __FILE__
+   - __LINE__
+   - etc.
+*/
+
 #[derive(Clone, Debug)]
 pub enum PreprocessorError {
     UnterminatedMultiLineComment,

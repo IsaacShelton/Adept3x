@@ -15,7 +15,7 @@ impl Environment {
     pub fn find_define(&self, name: &str) -> Option<&Define> {
         // NOTE: The major C compilers don't allow defining both an object-like
         // and a function-like macro of the same name at the same time,
-        // so we will follow suite, although this violates the standard.
+        // so we will follow suit, although this violates the standard.
         self.defines.get(name)
     }
 
