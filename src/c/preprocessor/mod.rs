@@ -59,6 +59,7 @@ pub enum ParseError {
     ExpectedColon,
     NotEnoughArguments,
     TooManyArguments,
+    ExpectedOpenParenDuringExpansion,
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {

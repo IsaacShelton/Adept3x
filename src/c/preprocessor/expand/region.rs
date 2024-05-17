@@ -37,19 +37,15 @@ fn expand_token<'a>(
                 let hash = Depleted::hash_define(define);
 
                 if !depleted.contains(hash) {
-                    depleted.push(hash);
-
-                    expanded.append(&mut match &define.kind {
-                        DefineKind::ObjectMacro(replacement) => {
-                            expand_region(replacement, environment, depleted)?
+                    let replacement = match &define.kind {
+                        DefineKind::ObjectMacro(replacement) => replacement,
+                        DefineKind::FunctionMacro(function_macro) => {
+                            &expand_function_macro(tokens, function_macro, environment, depleted)?
                         }
-                        DefineKind::FunctionMacro(function_macro) => expand_region(
-                            &expand_function_macro(tokens, function_macro)?,
-                            environment,
-                            depleted,
-                        )?,
-                    });
+                    };
 
+                    depleted.push(hash);
+                    expanded.append(&mut expand_region(replacement, environment, depleted)?);
                     depleted.pop(hash);
                     return Ok(());
                 }
@@ -74,13 +70,19 @@ fn expand_token<'a>(
 fn expand_function_macro<'a>(
     tokens: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
     function_macro: &FunctionMacro,
+    parent_environment: &Environment,
+    parent_depleted: &mut Depleted,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
     // Eat '('
     match tokens.next() {
         Some(PreToken {
             kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
         }) => (),
-        _ => return Err(PreprocessorError::ParseError(ParseError::ExpectedOpenParen)),
+        _ => {
+            return Err(PreprocessorError::ParseError(
+                ParseError::ExpectedOpenParenDuringExpansion,
+            ))
+        }
     }
 
     // Parse function-macro arguments
@@ -151,12 +153,16 @@ fn expand_function_macro<'a>(
         ));
     }
 
+    // Expand the values for each argument
+    for arg in args.iter_mut() {
+        *arg = expand_region(&arg, parent_environment, parent_depleted)?;
+    }
+
     // Create environment to replace parameters with specified argument values
-    let mut environment = Environment::default();
-    let mut depleted = Depleted::new();
+    let mut args_only_environment = Environment::default();
 
     for i in 0..function_macro.parameters.len() {
-        environment.add_define(Define {
+        args_only_environment.add_define(Define {
             kind: DefineKind::ObjectMacro(std::mem::take(&mut args[i])),
             name: function_macro.parameters[i].clone(),
         });
@@ -181,13 +187,16 @@ fn expand_function_macro<'a>(
             .flatten()
             .collect_vec();
 
-        environment.add_define(Define {
+        // Expand value that will be used for __VA_ARGS__
+        let rest = expand_region(&rest, parent_environment, parent_depleted)?;
+
+        args_only_environment.add_define(Define {
             kind: DefineKind::ObjectMacro(rest),
             name: "__VA_ARGS__".into(),
         });
 
         // Add `#define __VA_OPT__(...) __VA_ARGS__` to local environment
-        environment.add_define(Define {
+        args_only_environment.add_define(Define {
             kind: DefineKind::FunctionMacro(FunctionMacro {
                 parameters: vec![],
                 is_variadic: true,
@@ -196,17 +205,17 @@ fn expand_function_macro<'a>(
                 ))],
             }),
             name: "__VA_OPT__".into(),
-        })
+        });
     } else if function_macro.is_variadic {
         // No variadic arguments passed, despite this function-macro
         // being variadic, so we must define __VA_ARGS__ to be empty.
-        environment.add_define(Define {
+        args_only_environment.add_define(Define {
             kind: DefineKind::ObjectMacro(vec![]),
             name: "__VA_ARGS__".into(),
         });
 
         // Add `#define __VA_OPT__(...)` to local environment
-        environment.add_define(Define {
+        args_only_environment.add_define(Define {
             kind: DefineKind::FunctionMacro(FunctionMacro {
                 parameters: vec![],
                 is_variadic: true,
@@ -217,5 +226,6 @@ fn expand_function_macro<'a>(
     }
 
     // Evaluate function macro with arguments
-    expand_region(&function_macro.body, &environment, &mut depleted)
+    let mut depleted = Depleted::new();
+    expand_region(&function_macro.body, &args_only_environment, &mut depleted)
 }
