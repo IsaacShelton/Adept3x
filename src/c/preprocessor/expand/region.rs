@@ -24,7 +24,7 @@ pub fn expand_region(
         expand_token(token, &mut tokens, environment, depleted, &mut expanded)?;
     }
 
-    Ok(expanded)
+    resolve_concats(expanded.drain(..))
 }
 
 fn expand_token<'a>(
@@ -322,4 +322,63 @@ fn inject_stringized_arguments(
     }
 
     result
+}
+
+// Handles '##' concatenation operator
+fn resolve_concats(
+    tokens: impl Iterator<Item = PreToken>,
+) -> Result<Vec<PreToken>, PreprocessorError> {
+    let mut tokens = LookAhead::new(tokens);
+    let mut result = Vec::new();
+
+    while let Some(first) = tokens.next() {
+        if let Some(PreTokenKind::Punctuator(Punctuator::HashConcat)) =
+            tokens.peek().map(|token| &token.kind)
+        {
+            if tokens.peek_nth(1).is_some() {
+                tokens.next().expect("eat '##'");
+                let second = tokens.next().expect("second argument to '##'");
+                result.push(concat(&first, &second)?);
+                continue;
+            }
+        }
+
+        result.push(first);
+    }
+
+    Ok(result)
+}
+
+fn concat(a: &PreToken, b: &PreToken) -> Result<PreToken, PreprocessorError> {
+    // NOTE: We don't support concatenating punctuator tokens. It doesn't
+    // seem like this feature is ever used intentionally, so we won't support it for now.
+    // If someone can find a real-world use case please let me know.
+    match (&a.kind, &b.kind) {
+        (PreTokenKind::Identifier(a_name), PreTokenKind::Identifier(b_name)) => Ok(PreToken::new(
+            PreTokenKind::Identifier(format!("{}{}", a_name, b_name)),
+        )),
+        (PreTokenKind::Identifier(a_name), PreTokenKind::Number(b_number)) => Ok(PreToken::new(
+            PreTokenKind::Identifier(format!("{}{}", a_name, b_number)),
+        )),
+        (PreTokenKind::Number(a_number), PreTokenKind::Identifier(b_identifier)) => {
+            Ok(PreToken::new(PreTokenKind::Number(format!(
+                "{}{}",
+                a_number, b_identifier
+            ))))
+        }
+        (
+            PreTokenKind::StringLiteral(a_encoding, a_content),
+            PreTokenKind::StringLiteral(b_encoding, b_content),
+        ) => {
+            if a_encoding == b_encoding {
+                Ok(PreToken::new(PreTokenKind::StringLiteral(
+                    a_encoding.clone(),
+                    format!("{}{}", a_content, b_content),
+                )))
+            } else {
+                Err(PreprocessorError::CannotConcatTokens)
+            }
+        }
+        _ => Err(PreprocessorError::CannotConcatTokens),
+    }
 }

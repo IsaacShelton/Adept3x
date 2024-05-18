@@ -12,13 +12,16 @@ use self::parser::parse;
 
 /*
    Missing features:
-   - ## concatenating
+   - ## concatenating (missing compatibility with "placeholder token" semantics and non-concat '##' operator)
+   - defined
    - __has_include
    - __has_embed
+   - __has_c_attribute
    - #embed (and its options)
    - #pragma STDC (all of its options)
    - __FILE__
    - __LINE__
+   - __DATE__
    - etc.
 */
 
@@ -34,6 +37,7 @@ pub enum PreprocessorError {
     BadInclude,
     ErrorDirective(String),
     UnsupportedPragma,
+    CannotConcatTokens,
 }
 
 #[derive(Clone, Debug)]
