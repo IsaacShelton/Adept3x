@@ -1,9 +1,12 @@
 use super::{depleted::Depleted, Environment};
 use crate::{
-    c::preprocessor::{
-        ast::{Define, DefineKind, FunctionMacro},
-        pre_token::{PreToken, PreTokenKind, Punctuator},
-        ParseError, PreprocessorError,
+    c::{
+        encoding::Encoding,
+        preprocessor::{
+            ast::{Define, DefineKind, FunctionMacro},
+            pre_token::{PreToken, PreTokenKind, Punctuator},
+            ParseError, PreprocessorError,
+        },
     },
     look_ahead::LookAhead,
 };
@@ -199,6 +202,9 @@ fn expand_function_macro<'a>(
         ));
     }
 
+    // Inject stringized arguments
+    let body = inject_stringized_arguments(function_macro, &args);
+
     // Expand the values for each argument
     for arg in args.iter_mut() {
         *arg = expand_region(&arg, parent_environment, parent_depleted)?;
@@ -273,5 +279,47 @@ fn expand_function_macro<'a>(
 
     // Evaluate function macro with arguments
     let mut depleted = Depleted::new();
-    expand_region(&function_macro.body, &args_only_environment, &mut depleted)
+    expand_region(&body, &args_only_environment, &mut depleted)
+}
+
+// Handles '# PARAMETER_NAME' sequences inside of function-macro bodies during expansion
+fn inject_stringized_arguments(
+    function_macro: &FunctionMacro,
+    args: &[Vec<PreToken>],
+) -> Vec<PreToken> {
+    let mut result = Vec::new();
+    let mut tokens = LookAhead::new(function_macro.body.iter());
+
+    // TODO: CLEANUP: This part could be cleaned up
+    while let Some(token) = tokens.next() {
+        if let PreTokenKind::Punctuator(Punctuator::Hash) = &token.kind {
+            if let Some(PreToken {
+                kind: PreTokenKind::Identifier(param_name),
+            }) = tokens.peek()
+            {
+                if let Some((index, _)) = function_macro
+                    .parameters
+                    .iter()
+                    .find_position(|param| *param == param_name)
+                {
+                    tokens
+                        .next()
+                        .expect("eat paramater name after '#' during stringization of parameter during macro expansion");
+
+                    let arg_tokens = args.get(index).expect("argument specified for parameter");
+                    let stringized = arg_tokens.iter().map(|t| t.to_string()).join(" ");
+
+                    result.push(PreToken::new(PreTokenKind::StringLiteral(
+                        Encoding::Default,
+                        stringized,
+                    )));
+                    continue;
+                }
+            }
+        }
+
+        result.push(token.clone());
+    }
+
+    result
 }

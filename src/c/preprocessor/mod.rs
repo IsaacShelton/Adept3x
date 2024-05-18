@@ -12,7 +12,6 @@ use self::parser::parse;
 
 /*
    Missing features:
-   - # stringizing
    - ## concatenating
    - __has_include
    - __has_embed
