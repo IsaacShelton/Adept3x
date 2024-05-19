@@ -2,17 +2,17 @@ use itertools::Itertools;
 
 use super::{
     ast::{
-        ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike,
-        IfGroup, IfLike, PlaceholderAffinity, PreprocessorAst, TextLine,
+        ControlLine, ControlLineKind, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind,
+        IfDefLike, IfGroup, IfLike, PlaceholderAffinity, PreprocessorAst, TextLine,
     },
     pre_token::{PreToken, PreTokenKind, Punctuator},
-    ParseError,
+    ParseError, ParseErrorKind,
 };
 use crate::{
     c::preprocessor::ast::{FunctionMacro, IfSection},
     look_ahead::LookAhead,
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, num::NonZeroU32};
 
 pub struct Parser<I: Iterator<Item = Vec<PreToken>>> {
     lines: LookAhead<I>,
@@ -64,23 +64,24 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     }
 
     pub fn parse_group_part(&mut self) -> Result<GroupPart, ParseError> {
-        let line = match self.lines.next() {
+        let entire_line = match self.lines.next() {
             Some(line) => line,
-            None => return Err(ParseError::ExpectedGroupPart),
+            None => return Err(ParseErrorKind::ExpectedGroupPart.at(None)),
         };
 
-        let directive_name = get_directive_name(&line);
+        let line = entire_line.first().and_then(|token| token.line);
+        let directive_name = get_directive_name(&entire_line);
 
         match directive_name {
             Some(directive_name @ ("if" | "ifdef" | "ifndef")) => {
                 let if_group = match directive_name {
-                    "if" => IfGroup::IfLike(self.parse_if_like(&line)?),
-                    "ifdef" => {
-                        IfGroup::IfDefLike(self.parse_if_def_like(IfDefKind::Defined, &line)?)
-                    }
-                    "ifndef" => {
-                        IfGroup::IfDefLike(self.parse_if_def_like(IfDefKind::NotDefined, &line)?)
-                    }
+                    "if" => IfGroup::IfLike(self.parse_if_like(&entire_line)?),
+                    "ifdef" => IfGroup::IfDefLike(
+                        self.parse_if_def_like(IfDefKind::Defined, &entire_line)?,
+                    ),
+                    "ifndef" => IfGroup::IfDefLike(
+                        self.parse_if_def_like(IfDefKind::NotDefined, &entire_line)?,
+                    ),
                     _ => unreachable!(),
                 };
 
@@ -118,7 +119,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
                 if let Some("endif") = self.lines.peek().and_then(|line| get_directive_name(line)) {
                     self.lines.next();
                 } else {
-                    return Err(ParseError::ExpectedEndif);
+                    return Err(ParseErrorKind::ExpectedEndif.at(None));
                 }
 
                 Ok(GroupPart::IfSection(IfSection {
@@ -127,51 +128,66 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
                     else_group,
                 }))
             }
-            Some("define") => Ok(GroupPart::ControlLine(ControlLine::Define(
-                if line.get(3).map_or(false, |line| {
-                    matches!(
-                        line.kind,
-                        PreTokenKind::Punctuator(Punctuator::OpenParen {
-                            preceeded_by_whitespace: false
-                        })
-                    )
-                }) {
-                    Self::parse_define_function_macro(&line)?
-                } else {
-                    Self::parse_define_object_macro(&line)?
-                },
-            ))),
-            Some("include") => Ok(GroupPart::ControlLine(ControlLine::Include(
-                line[2..].to_vec(),
-            ))),
-            Some("embed") => Ok(GroupPart::ControlLine(ControlLine::Embed(
-                line[2..].to_vec(),
-            ))),
-            Some("undef") => Ok(GroupPart::ControlLine(Self::parse_undef(&line)?)),
-            Some("line") => Ok(GroupPart::ControlLine(ControlLine::Line(
-                line[2..].to_vec(),
-            ))),
-            Some("error") => Ok(GroupPart::ControlLine(ControlLine::Error(
-                line[2..].to_vec(),
-            ))),
-            Some("warning") => Ok(GroupPart::ControlLine(ControlLine::Warning(
-                line[2..].to_vec(),
-            ))),
-            Some("pragma") => Ok(Self::parse_pragma(&line)?),
-            Some(unknown) => Err(ParseError::UnrecognizedDirective(unknown.into())),
-            None => Ok(GroupPart::TextLine(TextLine { content: line })),
+            Some("define") => Ok(GroupPart::ControlLine(
+                ControlLineKind::Define(
+                    if entire_line.get(3).map_or(false, |token| {
+                        matches!(
+                            token.kind,
+                            PreTokenKind::Punctuator(Punctuator::OpenParen {
+                                preceeded_by_whitespace: false
+                            })
+                        )
+                    }) {
+                        Self::parse_define_function_macro(&entire_line)?
+                    } else {
+                        Self::parse_define_object_macro(&entire_line)?
+                    },
+                )
+                .at(line),
+            )),
+            Some("include") => Ok(GroupPart::ControlLine(
+                ControlLineKind::Include(entire_line[2..].to_vec()).at(line),
+            )),
+            Some("embed") => Ok(GroupPart::ControlLine(
+                ControlLineKind::Embed(entire_line[2..].to_vec()).at(line),
+            )),
+            Some("undef") => Ok(GroupPart::ControlLine(Self::parse_undef(
+                &entire_line,
+                line,
+            )?)),
+            Some("line") => Ok(GroupPart::ControlLine(
+                ControlLineKind::Line(entire_line[2..].to_vec()).at(line),
+            )),
+            Some("error") => Ok(GroupPart::ControlLine(
+                ControlLineKind::Error(entire_line[2..].to_vec()).at(line),
+            )),
+            Some("warning") => Ok(GroupPart::ControlLine(
+                ControlLineKind::Warning(entire_line[2..].to_vec()).at(line),
+            )),
+            Some("pragma") => Ok(Self::parse_pragma(&entire_line)?),
+            Some(unknown) => Err(ParseErrorKind::UnrecognizedDirective(unknown.into())
+                .at(entire_line.first().and_then(|token| token.line))),
+            None => Ok(GroupPart::TextLine(TextLine {
+                content: entire_line,
+            })),
         }
     }
 
-    pub fn parse_define_function_macro(line: &[PreToken]) -> Result<Define, ParseError> {
-        let mut tokens = LookAhead::new(line.iter().skip(2));
-        let name = eat_identifier(&mut tokens).ok_or(ParseError::ExpectedDefinitionName)?;
+    pub fn parse_define_function_macro(entire_line: &[PreToken]) -> Result<Define, ParseError> {
+        let line_number = entire_line.first().and_then(|token| token.line);
+        let mut tokens = LookAhead::new(entire_line.iter().skip(2));
+
+        let name = eat_identifier(&mut tokens).ok_or_else(|| {
+            ParseErrorKind::ExpectedDefinitionName
+                .at(entire_line.first().and_then(|token| token.line))
+        })?;
 
         match tokens.next() {
             Some(PreToken {
                 kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+                ..
             }) => (),
-            _ => return Err(ParseError::ExpectedOpenParen),
+            _ => return Err(ParseErrorKind::ExpectedOpenParen.at(line_number)),
         }
 
         let mut parameters = Vec::new();
@@ -181,32 +197,37 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             match tokens.next() {
                 Some(PreToken {
                     kind: PreTokenKind::Identifier(name),
+                    ..
                 }) => {
                     parameters.push(name.into());
                 }
                 Some(PreToken {
                     kind: PreTokenKind::Punctuator(Punctuator::Ellipses),
+                    ..
                 }) => {
                     is_variadic = true;
                 }
                 Some(PreToken {
                     kind: PreTokenKind::Punctuator(Punctuator::CloseParen),
+                    ..
                 }) if parameters.is_empty() => break,
-                _ => return Err(ParseError::ExpectedParameterName),
+                _ => return Err(ParseErrorKind::ExpectedParameterName.at(line_number)),
             }
 
             match tokens.next() {
                 Some(PreToken {
                     kind: PreTokenKind::Punctuator(Punctuator::Comma),
+                    ..
                 }) => {
                     if is_variadic {
-                        return Err(ParseError::ExpectedCloseParenAfterVarArgs);
+                        return Err(ParseErrorKind::ExpectedCloseParenAfterVarArgs.at(line_number));
                     }
                 }
                 Some(PreToken {
                     kind: PreTokenKind::Punctuator(Punctuator::CloseParen),
+                    ..
                 }) => break,
-                _ => return Err(ParseError::ExpectedComma),
+                _ => return Err(ParseErrorKind::ExpectedComma.at(line_number)),
             }
         }
 
@@ -224,11 +245,14 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     pub fn parse_define_object_macro(line: &[PreToken]) -> Result<Define, ParseError> {
         // # define NAME REPLACEMENT_TOKENS...
 
+        let line_number = line.first().and_then(|token| token.line);
+
         let name = match line.get(2) {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
+                ..
             }) => name.to_string(),
-            _ => return Err(ParseError::ExpectedDefinitionName),
+            _ => return Err(ParseErrorKind::ExpectedDefinitionName.at(line_number)),
         };
 
         let replacement_tokens = line[3..].to_vec();
@@ -239,20 +263,27 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         })
     }
 
-    pub fn parse_undef(line: &[PreToken]) -> Result<ControlLine, ParseError> {
+    pub fn parse_undef(
+        entire_line: &[PreToken],
+        line: Option<NonZeroU32>,
+    ) -> Result<ControlLine, ParseError> {
         // # undef NAME
 
-        let name = match line.get(2) {
+        let name = match entire_line.get(2) {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
+                ..
             }) => name.to_string(),
-            _ => return Err(ParseError::ExpectedDefinitionName),
+            Some(PreToken { line, .. }) => {
+                return Err(ParseErrorKind::ExpectedDefinitionName.at(*line))
+            }
+            None => return Err(ParseErrorKind::ExpectedDefinitionName.at(line)),
         };
 
-        if line.len() != 3 {
-            Err(ParseError::ExpectedNewlineAfterDirective)
+        if let Some(extraneous) = entire_line.get(3) {
+            Err(ParseErrorKind::ExpectedNewlineAfterDirective.at(extraneous.line))
         } else {
-            Ok(ControlLine::Undef(name))
+            Ok(ControlLineKind::Undef(name).at(line))
         }
     }
 
@@ -262,6 +293,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         let name = match line.get(2) {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
+                ..
             }) => Some(name.as_str()),
             _ => None,
         };
@@ -270,9 +302,10 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             eprintln!("warning: #pragma STDC not supported yet");
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else {
-            Err(ParseError::UnrecognizedPragmaDirective(
+            Err(ParseErrorKind::UnrecognizedPragmaDirective(
                 name.unwrap_or("<invalid pragma directive>").into(),
-            ))
+            )
+            .at(line.first().and_then(|token| token.line)))
         }
     }
 
@@ -286,9 +319,10 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
     pub fn parse_if_def_like(
         &mut self,
         kind: IfDefKind,
-        line: &[PreToken],
+        entire_line: &[PreToken],
     ) -> Result<IfDefLike, ParseError> {
-        let identifier = Self::parse_line_identifier(&line[2..])?;
+        let line_number = entire_line.get(0).and_then(|token| token.line);
+        let identifier = Self::parse_line_identifier(&entire_line[2..], line_number)?;
 
         Ok(IfDefLike {
             kind,
@@ -297,20 +331,25 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         })
     }
 
-    pub fn parse_line_identifier(rest_line: &[PreToken]) -> Result<String, ParseError> {
+    pub fn parse_line_identifier(
+        rest_line: &[PreToken],
+        line_number: Option<NonZeroU32>,
+    ) -> Result<String, ParseError> {
         match rest_line {
             [PreToken {
                 kind: PreTokenKind::Identifier(identifier),
+                ..
             }, ..] => {
-                if rest_line.len() == 1 {
-                    Ok(identifier.into())
-                } else {
-                    Err(ParseError::UnexpectedToken {
+                if let Some(extraneous) = rest_line.get(1) {
+                    Err(ParseErrorKind::UnexpectedToken {
                         after: "identifier for preprocessor directive".into(),
-                    })
+                    }
+                    .at(extraneous.line))
+                } else {
+                    Ok(identifier.into())
                 }
             }
-            _ => Err(ParseError::ExpectedIdentifier),
+            _ => Err(ParseErrorKind::ExpectedIdentifier.at(line_number)),
         }
     }
 
@@ -327,16 +366,18 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
                         }
                         Some(PreTokenKind::Punctuator(Punctuator::OpenParen { .. })) => {
                             eat_identifier(&mut tokens)
-                                .ok_or(ParseError::ExpectedDefinitionName)
+                                .ok_or_else(|| {
+                                    ParseErrorKind::ExpectedDefinitionName.at(token.line)
+                                })
                                 .and_then(|name| {
-                                    eat_punctuator(&mut tokens, Punctuator::CloseParen)
+                                    eat_punctuator(&mut tokens, Punctuator::CloseParen, token.line)
                                         .and_then(|_| Ok(PreTokenKind::IsDefined(name.to_string())))
                                 })
                         }
-                        _ => Err(ParseError::ExpectedDefinitionName),
+                        _ => Err(ParseErrorKind::ExpectedDefinitionName.at(token.line)),
                     }?;
 
-                    result.push(PreToken::new(new_token_kind));
+                    result.push(PreToken::new(new_token_kind, token.line));
                 }
                 _ => result.push(token.clone()),
             }
@@ -349,13 +390,14 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
 pub fn eat_punctuator<'a>(
     input: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
     expected: impl Borrow<Punctuator>,
+    line_number: Option<NonZeroU32>,
 ) -> Result<(), ParseError> {
     match input.peek().map(|token| &token.kind) {
         Some(PreTokenKind::Punctuator(punctuator)) if *punctuator == *expected.borrow() => {
             input.next().unwrap();
             Ok(())
         }
-        _ => Err(ParseError::ExpectedPunctuator(expected.borrow().clone())),
+        _ => Err(ParseErrorKind::ExpectedPunctuator(expected.borrow().clone()).at(line_number)),
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::{lexical_utils::IsCharacter, look_ahead::LookAhead};
+use std::num::NonZeroU32;
 
 /*
    Handles splicing together of physical source lines to form logical source lines.
@@ -11,7 +12,7 @@ use crate::{lexical_utils::IsCharacter, look_ahead::LookAhead};
 #[derive(Clone, Debug)]
 pub struct Line {
     pub content: String,
-    pub line_number: usize,
+    pub line_number: NonZeroU32,
 }
 
 pub struct LineSplicer<I>
@@ -20,8 +21,8 @@ where
 {
     chars: LookAhead<I>,
     current_line: String,
-    next_line_number: usize,
-    newlines: usize,
+    next_line_number: NonZeroU32,
+    newlines: u32,
 }
 
 impl<I: Iterator<Item = char>> LineSplicer<I> {
@@ -29,7 +30,7 @@ impl<I: Iterator<Item = char>> LineSplicer<I> {
         Self {
             chars: LookAhead::new(iterator),
             current_line: String::new(),
-            next_line_number: 1,
+            next_line_number: NonZeroU32::new(1).unwrap(),
             newlines: 0,
         }
     }
@@ -47,7 +48,7 @@ impl<I: Iterator<Item = char>> Iterator for LineSplicer<I> {
 
                     // Advance line number for next line
                     self.newlines += 1;
-                    self.next_line_number = self.newlines;
+                    self.next_line_number = NonZeroU32::new(1 + self.newlines).unwrap();
 
                     return Some(Line {
                         content: std::mem::take(&mut self.current_line),
@@ -64,7 +65,10 @@ impl<I: Iterator<Item = char>> Iterator for LineSplicer<I> {
                 }
                 None if !self.current_line.is_empty() => {
                     return Some(Line {
-                        content: std::mem::replace(&mut self.current_line, String::with_capacity(128)),
+                        content: std::mem::replace(
+                            &mut self.current_line,
+                            String::with_capacity(128),
+                        ),
                         line_number: self.next_line_number,
                     });
                 }

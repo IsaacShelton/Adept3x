@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use super::{depleted::Depleted, Environment};
 use crate::{
     c::{
@@ -5,7 +7,7 @@ use crate::{
         preprocessor::{
             ast::{Define, DefineKind, FunctionMacro, PlaceholderAffinity},
             pre_token::{PreToken, PreTokenKind, Punctuator},
-            ParseError, PreprocessorError,
+            ParseErrorKind, PreprocessorError, PreprocessorErrorKind,
         },
     },
     look_ahead::LookAhead,
@@ -79,9 +81,11 @@ fn expand_token<'a>(
                     while let (
                         Some(PreToken {
                             kind: PreTokenKind::Identifier(name),
+                            ..
                         }),
                         Some(PreToken {
                             kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+                            ..
                         }),
                     ) = (expanded.last(), tokens.peek())
                     {
@@ -124,13 +128,14 @@ fn expand_token<'a>(
             Ok(())
         }
         PreTokenKind::IsDefined(name) => {
-            expanded.push(PreToken::new(PreTokenKind::Number(
-                if environment.find_define(name).is_some() {
+            expanded.push(PreToken::new(
+                PreTokenKind::Number(if environment.find_define(name).is_some() {
                     "1".into()
                 } else {
                     "0".into()
-                },
-            )));
+                }),
+                None,
+            ));
             Ok(())
         }
         PreTokenKind::HeaderName(_)
@@ -158,6 +163,7 @@ fn expand_function_macro<'a>(
     match tokens.next() {
         Some(PreToken {
             kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+            ..
         }) => (),
         _ => {
             // Not invoking the macro, just using the name
@@ -174,6 +180,7 @@ fn expand_function_macro<'a>(
             Some(
                 token @ PreToken {
                     kind: PreTokenKind::Punctuator(Punctuator::CloseParen),
+                    ..
                 },
             ) => {
                 if paren_depth == 0 {
@@ -186,6 +193,7 @@ fn expand_function_macro<'a>(
             Some(
                 token @ PreToken {
                     kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
+                    ..
                 },
             ) => {
                 paren_depth += 1;
@@ -193,6 +201,7 @@ fn expand_function_macro<'a>(
             }
             Some(PreToken {
                 kind: PreTokenKind::Punctuator(Punctuator::Comma),
+                ..
             }) if paren_depth == 0 => {
                 if args.is_empty() {
                     args.push(Vec::new());
@@ -202,9 +211,10 @@ fn expand_function_macro<'a>(
             }
             Some(token) => Some(token.clone()),
             None => {
-                return Err(PreprocessorError::ParseError(
-                    ParseError::ExpectedCloseParen,
-                ))
+                return Err(
+                    PreprocessorErrorKind::ParseError(ParseErrorKind::ExpectedCloseParen)
+                        .at(token.line),
+                )
             }
         };
 
@@ -229,13 +239,14 @@ fn expand_function_macro<'a>(
     if args.len() != function_macro.parameters.len()
         && !(args.len() > function_macro.parameters.len() && function_macro.is_variadic)
     {
-        return Err(PreprocessorError::ParseError(
+        return Err(PreprocessorErrorKind::ParseError(
             if !function_macro.is_variadic && args.len() > function_macro.parameters.len() {
-                ParseError::TooManyArguments
+                ParseErrorKind::TooManyArguments
             } else {
-                ParseError::NotEnoughArguments
+                ParseErrorKind::NotEnoughArguments
             },
-        ));
+        )
+        .at(token.line));
     }
 
     // Inject stringized arguments
@@ -252,7 +263,7 @@ fn expand_function_macro<'a>(
     for i in 0..function_macro.parameters.len() {
         // Replace all empty arg values with placeholder token
         if args[i].is_empty() {
-            args[i].push(PreToken::new(PreTokenKind::Placeholder));
+            args[i].push(PreToken::new(PreTokenKind::Placeholder, None));
         }
 
         args_only_environment.add_define(Define {
@@ -269,14 +280,15 @@ fn expand_function_macro<'a>(
                 function_macro.parameters.len()..args.len(),
                 std::iter::empty(),
             )
-            .intersperse(vec![PreToken {
+            .intersperse(vec![PreToken::new(
                 // NOTE: The location information of inserted comma preprocessor tokens will be
                 // missing, but an error message caused by them is extremely rare in
                 // practice so doesn't really matter
                 // TODO: Remember location information of each comma preprocessor token that needs
                 // to be inserted
-                kind: PreTokenKind::Punctuator(Punctuator::Comma),
-            }])
+                PreTokenKind::Punctuator(Punctuator::Comma),
+                None,
+            )])
             .flatten()
             .collect_vec();
 
@@ -285,7 +297,7 @@ fn expand_function_macro<'a>(
 
         // Replace __VA_ARGS__ with placeholder token if empty
         if rest.is_empty() {
-            rest.push(PreToken::new(PreTokenKind::Placeholder));
+            rest.push(PreToken::new(PreTokenKind::Placeholder, None));
         }
 
         args_only_environment.add_define(Define {
@@ -299,9 +311,10 @@ fn expand_function_macro<'a>(
                 affinity: PlaceholderAffinity::Keep,
                 parameters: vec![],
                 is_variadic: true,
-                body: vec![PreToken::new(PreTokenKind::Identifier(
-                    "__VA_ARGS__".into(),
-                ))],
+                body: vec![PreToken::new(
+                    PreTokenKind::Identifier("__VA_ARGS__".into()),
+                    None,
+                )],
             }),
             name: "__VA_OPT__".into(),
         });
@@ -310,7 +323,7 @@ fn expand_function_macro<'a>(
         // being variadic, so we must define __VA_ARGS__ to be empty (a placeholder token).
         args_only_environment.add_define(Define {
             kind: DefineKind::ObjectMacro(
-                vec![PreToken::new(PreTokenKind::Placeholder)],
+                vec![PreToken::new(PreTokenKind::Placeholder, None)],
                 PlaceholderAffinity::Keep,
             ),
             name: "__VA_ARGS__".into(),
@@ -346,6 +359,7 @@ fn inject_stringized_arguments(
         if let PreTokenKind::Punctuator(Punctuator::Hash) = &token.kind {
             if let Some(PreToken {
                 kind: PreTokenKind::Identifier(param_name),
+                ..
             }) = tokens.peek_nth(0)
             {
                 if let Some((index, _)) = function_macro
@@ -360,10 +374,10 @@ fn inject_stringized_arguments(
                     let arg_tokens = args.get(index).expect("argument specified for parameter");
                     let stringized = arg_tokens.iter().map(|t| t.to_string()).join(" ");
 
-                    result.push(PreToken::new(PreTokenKind::StringLiteral(
-                        Encoding::Default,
-                        stringized,
-                    )));
+                    result.push(PreToken::new(
+                        PreTokenKind::StringLiteral(Encoding::Default, stringized),
+                        arg_tokens.get(0).and_then(|token| token.line),
+                    ));
                     continue;
                 }
             }
@@ -391,14 +405,14 @@ fn resolve_concats(
                 let is_two_placeholders =
                     first.kind.is_placeholder() && second.kind.is_placeholder();
 
-                tokens.next().expect("eat '##'");
+                let concat_location = tokens.next().expect("eat '##'").line;
 
                 if is_two_placeholders {
                     // Leave the second placeholder token as the concatenated result.
                     // We need to do this, because it will affect further concatenations.
                 } else {
                     let second = tokens.next().expect("second argument to '##'");
-                    result.push(concat(&first, &second)?);
+                    result.push(concat(&first, &second, concat_location)?);
                 }
 
                 continue;
@@ -411,10 +425,10 @@ fn resolve_concats(
             }) {
                 // Resolve generated '# (placeholder)' occurances
                 result.pop().unwrap();
-                result.push(PreToken::new(PreTokenKind::StringLiteral(
-                    Encoding::Default,
-                    "".into(),
-                )));
+                result.push(PreToken::new(
+                    PreTokenKind::StringLiteral(Encoding::Default, "".into()),
+                    None,
+                ));
             } else if !strip_placeholders {
                 // Otherwise preserve the placeholder if requested
                 result.push(first.clone());
@@ -428,7 +442,11 @@ fn resolve_concats(
     Ok(result)
 }
 
-fn concat(a: &PreToken, b: &PreToken) -> Result<PreToken, PreprocessorError> {
+fn concat(
+    a: &PreToken,
+    b: &PreToken,
+    line: Option<NonZeroU32>,
+) -> Result<PreToken, PreprocessorError> {
     // NOTE: We don't support concatenating punctuator tokens. It doesn't
     // seem like this feature is ever used intentionally, so we won't support it for now.
     // If someone can find a real-world use case please let me know.
@@ -437,29 +455,34 @@ fn concat(a: &PreToken, b: &PreToken) -> Result<PreToken, PreprocessorError> {
         (_, PreTokenKind::Placeholder) => Ok(a.clone()),
         (PreTokenKind::Identifier(a_name), PreTokenKind::Identifier(b_name)) => Ok(PreToken::new(
             PreTokenKind::Identifier(format!("{}{}", a_name, b_name)),
+            a.line,
         )),
         (PreTokenKind::Identifier(a_name), PreTokenKind::Number(b_number)) => Ok(PreToken::new(
             PreTokenKind::Identifier(format!("{}{}", a_name, b_number)),
+            a.line,
         )),
         (PreTokenKind::Number(a_number), PreTokenKind::Identifier(b_identifier)) => {
-            Ok(PreToken::new(PreTokenKind::Number(format!(
-                "{}{}",
-                a_number, b_identifier
-            ))))
+            Ok(PreToken::new(
+                PreTokenKind::Number(format!("{}{}", a_number, b_identifier)),
+                a.line,
+            ))
         }
         (
             PreTokenKind::StringLiteral(a_encoding, a_content),
             PreTokenKind::StringLiteral(b_encoding, b_content),
         ) => {
             if a_encoding == b_encoding {
-                Ok(PreToken::new(PreTokenKind::StringLiteral(
-                    a_encoding.clone(),
-                    format!("{}{}", a_content, b_content),
-                )))
+                Ok(PreToken::new(
+                    PreTokenKind::StringLiteral(
+                        a_encoding.clone(),
+                        format!("{}{}", a_content, b_content),
+                    ),
+                    a.line,
+                ))
             } else {
-                Err(PreprocessorError::CannotConcatTokens)
+                Err(PreprocessorErrorKind::CannotConcatTokens.at(line))
             }
         }
-        _ => Err(PreprocessorError::CannotConcatTokens),
+        _ => Err(PreprocessorErrorKind::CannotConcatTokens.at(line)),
     }
 }

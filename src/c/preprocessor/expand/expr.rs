@@ -43,11 +43,14 @@ use crate::{
         ast::{BinaryOperation, BinaryOperator, ConstExpr, Ternary, UnaryOperation, UnaryOperator},
         parser::{eat_identifier, eat_punctuator},
         pre_token::{PreToken, PreTokenKind, Punctuator},
-        ParseError,
+        ParseError, ParseErrorKind,
     },
     look_ahead::LookAhead,
 };
-use std::{borrow::Borrow, num::IntErrorKind};
+use std::{
+    borrow::Borrow,
+    num::{IntErrorKind, NonZeroU32},
+};
 
 pub struct ExprParser<'a, I>
 where
@@ -65,13 +68,15 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
     pub fn parse(tokens: I) -> Result<ConstExpr, ParseError> {
         let mut parser = Self::new(tokens);
+        let line = parser.input.peek().and_then(|token| token.line);
+
         let full_expr = parser.parse_expr()?;
         parser
             .input
             .next()
             .is_none()
             .then_some(full_expr)
-            .ok_or(ParseError::ExpectedEndOfExpression)
+            .ok_or_else(|| ParseErrorKind::ExpectedEndOfExpression.at(line))
     }
 
     pub fn parse_expr(&mut self) -> Result<ConstExpr, ParseError> {
@@ -94,7 +99,7 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
                 // (it would've been replaced before expression parsing otherwise)
                 Ok(ConstExpr::Constant(if name == "true" { 1 } else { 0 }))
             }
-            Some(PreTokenKind::Number(numeric)) => Self::parse_number(numeric),
+            Some(PreTokenKind::Number(numeric)) => Self::parse_number(numeric, token.unwrap().line),
             Some(PreTokenKind::Punctuator(
                 punctuator @ (Punctuator::Not
                 | Punctuator::Add
@@ -106,7 +111,7 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
                 self.eat_punctuator(Punctuator::CloseParen)?;
                 Ok(inner)
             }
-            _ => Err(ParseError::ExpectedExpression),
+            _ => Err(ParseErrorKind::ExpectedExpression.at(token.and_then(|token| token.line))),
         }
     }
 
@@ -127,7 +132,10 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         })))
     }
 
-    fn parse_number(number: &str) -> Result<ConstExpr, ParseError> {
+    fn parse_number(
+        number: &str,
+        line_number: Option<NonZeroU32>,
+    ) -> Result<ConstExpr, ParseError> {
         if number.starts_with("0x") || number.starts_with("0X") {
             Self::parse_number_radix(&number[..2], 16)
         } else if number.starts_with("0") {
@@ -135,18 +143,19 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         } else {
             Self::parse_number_radix(number, 10)
         }
+        .map_err(|err| err.at(line_number))
     }
 
-    fn parse_number_radix(number: &str, radix: u32) -> Result<ConstExpr, ParseError> {
+    fn parse_number_radix(number: &str, radix: u32) -> Result<ConstExpr, ParseErrorKind> {
         match i64::from_str_radix(number, radix) {
             Ok(value) => Ok(ConstExpr::Constant(value)),
             Err(error) if *error.kind() == IntErrorKind::PosOverflow => {
                 match u64::from_str_radix(number, radix) {
                     Ok(value) => Ok(ConstExpr::Constant(value as i64)),
-                    Err(_) => Err(ParseError::BadInteger),
+                    Err(_) => Err(ParseErrorKind::BadInteger),
                 }
             }
-            Err(_) => Err(ParseError::BadInteger),
+            Err(_) => Err(ParseErrorKind::BadInteger),
         }
     }
 
@@ -256,7 +265,8 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
     }
 
     fn eat_punctuator(&mut self, expected: impl Borrow<Punctuator>) -> Result<(), ParseError> {
-        eat_punctuator(&mut self.input, expected)
+        let line_number = self.input.peek().and_then(|token| token.line);
+        eat_punctuator(&mut self.input, expected, line_number)
     }
 
     fn eat_identifier(&mut self) -> Option<&str> {

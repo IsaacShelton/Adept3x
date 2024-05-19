@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use super::pre_token::PreToken;
 use derive_more::{IsVariant, Unwrap};
 use num_traits::Zero;
@@ -194,7 +196,19 @@ pub enum ElifGroup {
 }
 
 #[derive(Clone, Debug)]
-pub enum ControlLine {
+pub struct ControlLine {
+    pub kind: ControlLineKind,
+    pub line: Option<NonZeroU32>,
+}
+
+impl ControlLine {
+    pub fn new(kind: ControlLineKind, line: Option<NonZeroU32>) -> Self {
+        Self { kind, line }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ControlLineKind {
     Include(Vec<PreToken>),
     Embed(Vec<PreToken>),
     Define(Define),
@@ -203,6 +217,12 @@ pub enum ControlLine {
     Error(Vec<PreToken>),
     Warning(Vec<PreToken>),
     Pragma(Vec<PreToken>),
+}
+
+impl ControlLineKind {
+    pub fn at(self, line: Option<NonZeroU32>) -> ControlLine {
+        ControlLine::new(self, line)
+    }
 }
 
 #[derive(Clone, Debug, Hash)]

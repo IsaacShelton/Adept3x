@@ -10,6 +10,7 @@ use self::lexer::lex;
 use self::line_splice::LineSplicer;
 use self::parser::parse;
 use self::pre_token::Punctuator;
+use std::num::NonZeroU32;
 
 /*
    Missing features:
@@ -25,22 +26,61 @@ use self::pre_token::Punctuator;
 */
 
 #[derive(Clone, Debug)]
-pub enum PreprocessorError {
+pub struct PreprocessorError {
+    pub kind: PreprocessorErrorKind,
+    pub line: Option<NonZeroU32>,
+}
+
+impl PreprocessorError {
+    pub fn new(kind: PreprocessorErrorKind, line: Option<NonZeroU32>) -> Self {
+        Self { kind, line }
+    }
+}
+
+impl From<ParseError> for PreprocessorError {
+    fn from(value: ParseError) -> Self {
+        Self {
+            kind: PreprocessorErrorKind::ParseError(value.kind),
+            line: value.line,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum PreprocessorErrorKind {
     UnterminatedMultiLineComment,
     UnterminatedCharacterConstant,
     UnterminatedStringLiteral,
     UnterminatedHeaderName,
     BadEscapeSequence,
     BadEscapedCodepoint,
-    ParseError(ParseError),
+    ParseError(ParseErrorKind),
     BadInclude,
     ErrorDirective(String),
     UnsupportedPragma,
     CannotConcatTokens,
 }
 
+impl PreprocessorErrorKind {
+    pub fn at(self, line: Option<NonZeroU32>) -> PreprocessorError {
+        PreprocessorError::new(self, line)
+    }
+}
+
 #[derive(Clone, Debug)]
-pub enum ParseError {
+pub struct ParseError {
+    pub kind: ParseErrorKind,
+    pub line: Option<NonZeroU32>,
+}
+
+impl ParseError {
+    pub fn new(kind: ParseErrorKind, line: Option<NonZeroU32>) -> Self {
+        Self { kind, line }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ParseErrorKind {
     // Initial parsing errors...
     ExpectedGroupPart,
     ExpectedIdentifier,
@@ -66,13 +106,19 @@ pub enum ParseError {
     ExpectedEndOfExpression,
 }
 
+impl ParseErrorKind {
+    pub fn at(self, line: Option<NonZeroU32>) -> ParseError {
+        ParseError::new(self, line)
+    }
+}
+
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
     let lines = LineSplicer::new(content.chars());
     let mut tokens = lex(lines)?;
 
     let ast = match parse(tokens.drain(0..)) {
         Ok(ast) => ast,
-        Err(err) => return Err(PreprocessorError::ParseError(err)),
+        Err(err) => return Err(err.into()),
     };
 
     let expanded = expand_ast(&ast, Environment::default())?;

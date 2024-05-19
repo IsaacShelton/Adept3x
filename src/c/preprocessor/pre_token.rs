@@ -1,17 +1,18 @@
 use crate::c::encoding::Encoding;
 use derive_more::IsVariant;
-use std::fmt::Display;
+use std::{fmt::Display, num::NonZeroU32};
 
 pub use crate::c::punctuator::Punctuator;
 
 #[derive(Clone, Debug, Hash)]
 pub struct PreToken {
     pub kind: PreTokenKind,
+    pub line: Option<NonZeroU32>,
 }
 
 impl PreToken {
-    pub fn new(kind: PreTokenKind) -> Self {
-        Self { kind }
+    pub fn new(kind: PreTokenKind, line: Option<NonZeroU32>) -> Self {
+        Self { kind, line }
     }
 }
 
@@ -30,7 +31,7 @@ pub enum PreTokenKind {
     StringLiteral(Encoding, String),
     Punctuator(Punctuator),
     UniversalCharacterName(char), // e.g. '\u1F3E'
-    IsDefined(String),            // e.g. `defined NAME` or `define(NAME)`
+    IsDefined(String),            // e.g. `defined NAME` or `defined(NAME)`
     Other(char),
     Placeholder, // a non-lexical token, has no textual representation (used for '##' concats with empty)
 }

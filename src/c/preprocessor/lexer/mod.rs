@@ -1,7 +1,9 @@
 mod state;
 
+use std::num::NonZeroU32;
+
 use self::state::State;
-use super::{line_splice::Line, pre_token::PreToken, PreprocessorError};
+use super::{line_splice::Line, pre_token::PreToken, PreprocessorError, PreprocessorErrorKind};
 use crate::{
     c::{
         encoding::Encoding,
@@ -15,27 +17,35 @@ pub fn lex(lines: impl Iterator<Item = Line>) -> Result<Vec<Vec<PreToken>>, Prep
     let mut continuation_state = State::Idle;
 
     for line in lines {
-        let (new_tokens, next_state) = lex_line(&line.content, continuation_state)?;
+        let (new_tokens, next_state) = lex_line(&line, continuation_state)?;
         tokens.push(new_tokens);
         continuation_state = next_state;
     }
 
     match continuation_state {
-        State::MultiLineComment => Err(PreprocessorError::UnterminatedMultiLineComment),
+        State::MultiLineComment => Err(PreprocessorErrorKind::UnterminatedMultiLineComment.at(None)),
         _ => Ok(tokens),
     }
 }
 
 fn lex_line(
-    line: &str,
+    line: &Line,
     starting_state: State,
 ) -> Result<(Vec<PreToken>, State), PreprocessorError> {
-    let mut line = LookAhead::new(line.chars());
+    let line_number = line.line_number;
+    let mut line = LookAhead::new(line.content.chars());
     let mut state = starting_state;
     let mut tokens = Vec::with_capacity(16);
 
-    fn push_punctuator_token(tokens: &mut Vec<PreToken>, punctuator: Punctuator) {
-        tokens.push(PreToken::new(PreTokenKind::Punctuator(punctuator)));
+    fn push_punctuator_token(
+        tokens: &mut Vec<PreToken>,
+        punctuator: Punctuator,
+        line_number: NonZeroU32,
+    ) {
+        tokens.push(PreToken::new(
+            PreTokenKind::Punctuator(punctuator),
+            Some(line_number),
+        ));
     }
 
     fn prefer_header_name(tokens: &Vec<PreToken>) -> bool {
@@ -98,60 +108,60 @@ fn lex_line(
                     // Header Name
                     '<' if prefer_header_name(&tokens) => state = State::HeaderName("".into()),
                     // Punctuators
-                    '.' if line.eat("..") => push_punctuator_token(&mut tokens, Ellipses),
-                    '-' if line.eat(">") => push_punctuator_token(&mut tokens, Arrow),
-                    '+' if line.eat("+") => push_punctuator_token(&mut tokens, Increment),
-                    '-' if line.eat("-") => push_punctuator_token(&mut tokens, Decrement),
-                    '#' if line.eat("#") => push_punctuator_token(&mut tokens, HashConcat),
-                    '<' if line.eat("<") => push_punctuator_token(&mut tokens, LeftShift),
-                    '>' if line.eat(">") => push_punctuator_token(&mut tokens, RightShift),
-                    '!' if line.eat("=") => push_punctuator_token(&mut tokens, NotEquals),
-                    '<' if line.eat("=") => push_punctuator_token(&mut tokens, LessThanEq),
-                    '>' if line.eat("=") => push_punctuator_token(&mut tokens, GreaterThanEq),
-                    '=' if line.eat("=") => push_punctuator_token(&mut tokens, DoubleEquals),
-                    '&' if line.eat("&") => push_punctuator_token(&mut tokens, LogicalAnd),
-                    '|' if line.eat("|") => push_punctuator_token(&mut tokens, LogicalOr),
-                    '*' if line.eat("=") => push_punctuator_token(&mut tokens, MultiplyAssign),
-                    '/' if line.eat("=") => push_punctuator_token(&mut tokens, DivideAssign),
-                    '%' if line.eat("=") => push_punctuator_token(&mut tokens, ModulusAssign),
-                    '+' if line.eat("=") => push_punctuator_token(&mut tokens, AddAssign),
-                    '-' if line.eat("=") => push_punctuator_token(&mut tokens, SubtractAssign),
-                    '<' if line.eat("<=") => push_punctuator_token(&mut tokens, LeftShiftAssign),
-                    '>' if line.eat(">=") => push_punctuator_token(&mut tokens, RightShiftAssign),
-                    '&' if line.eat("=") => push_punctuator_token(&mut tokens, BitAndAssign),
-                    '|' if line.eat("=") => push_punctuator_token(&mut tokens, BitOrAssign),
-                    '^' if line.eat("=") => push_punctuator_token(&mut tokens, BitXorAssign),
-                    '[' => push_punctuator_token(&mut tokens, OpenBracket),
-                    ']' => push_punctuator_token(&mut tokens, CloseBracket),
-                    '(' => push_punctuator_token(&mut tokens, OpenParen { preceeded_by_whitespace }),
-                    ')' => push_punctuator_token(&mut tokens, CloseParen),
-                    '{' => push_punctuator_token(&mut tokens, OpenCurly),
-                    '}' => push_punctuator_token(&mut tokens, CloseCurly),
-                    ',' => push_punctuator_token(&mut tokens, Comma),
-                    ':' => push_punctuator_token(&mut tokens, Colon),
-                    ';' => push_punctuator_token(&mut tokens, Semicolon),
-                    '*' => push_punctuator_token(&mut tokens, Multiply),
-                    '=' => push_punctuator_token(&mut tokens, Assign),
-                    '#' => push_punctuator_token(&mut tokens, Hash),
-                    '.' => push_punctuator_token(&mut tokens, Dot),
-                    '&' => push_punctuator_token(&mut tokens, Ampersand),
-                    '+' => push_punctuator_token(&mut tokens, Add),
-                    '-' => push_punctuator_token(&mut tokens, Subtract),
-                    '~' => push_punctuator_token(&mut tokens, BitComplement),
-                    '!' => push_punctuator_token(&mut tokens, Not),
-                    '/' => push_punctuator_token(&mut tokens, Divide),
-                    '%' => push_punctuator_token(&mut tokens, Modulus),
-                    '<' => push_punctuator_token(&mut tokens, LessThan),
-                    '>' => push_punctuator_token(&mut tokens, GreaterThan),
-                    '^' => push_punctuator_token(&mut tokens, BitXor),
-                    '|' => push_punctuator_token(&mut tokens, BitOr),
-                    '?' => push_punctuator_token(&mut tokens, Ternary),
+                    '.' if line.eat("..") => push_punctuator_token(&mut tokens, Ellipses, line_number),
+                    '-' if line.eat(">") => push_punctuator_token(&mut tokens, Arrow, line_number),
+                    '+' if line.eat("+") => push_punctuator_token(&mut tokens, Increment, line_number),
+                    '-' if line.eat("-") => push_punctuator_token(&mut tokens, Decrement, line_number),
+                    '#' if line.eat("#") => push_punctuator_token(&mut tokens, HashConcat, line_number),
+                    '<' if line.eat("<") => push_punctuator_token(&mut tokens, LeftShift, line_number),
+                    '>' if line.eat(">") => push_punctuator_token(&mut tokens, RightShift, line_number),
+                    '!' if line.eat("=") => push_punctuator_token(&mut tokens, NotEquals, line_number),
+                    '<' if line.eat("=") => push_punctuator_token(&mut tokens, LessThanEq, line_number),
+                    '>' if line.eat("=") => push_punctuator_token(&mut tokens, GreaterThanEq, line_number),
+                    '=' if line.eat("=") => push_punctuator_token(&mut tokens, DoubleEquals, line_number),
+                    '&' if line.eat("&") => push_punctuator_token(&mut tokens, LogicalAnd, line_number),
+                    '|' if line.eat("|") => push_punctuator_token(&mut tokens, LogicalOr, line_number),
+                    '*' if line.eat("=") => push_punctuator_token(&mut tokens, MultiplyAssign, line_number),
+                    '/' if line.eat("=") => push_punctuator_token(&mut tokens, DivideAssign, line_number),
+                    '%' if line.eat("=") => push_punctuator_token(&mut tokens, ModulusAssign, line_number),
+                    '+' if line.eat("=") => push_punctuator_token(&mut tokens, AddAssign, line_number),
+                    '-' if line.eat("=") => push_punctuator_token(&mut tokens, SubtractAssign, line_number),
+                    '<' if line.eat("<=") => push_punctuator_token(&mut tokens, LeftShiftAssign, line_number),
+                    '>' if line.eat(">=") => push_punctuator_token(&mut tokens, RightShiftAssign, line_number),
+                    '&' if line.eat("=") => push_punctuator_token(&mut tokens, BitAndAssign, line_number),
+                    '|' if line.eat("=") => push_punctuator_token(&mut tokens, BitOrAssign, line_number),
+                    '^' if line.eat("=") => push_punctuator_token(&mut tokens, BitXorAssign, line_number),
+                    '[' => push_punctuator_token(&mut tokens, OpenBracket, line_number),
+                    ']' => push_punctuator_token(&mut tokens, CloseBracket, line_number),
+                    '(' => push_punctuator_token(&mut tokens, OpenParen { preceeded_by_whitespace }, line_number),
+                    ')' => push_punctuator_token(&mut tokens, CloseParen, line_number),
+                    '{' => push_punctuator_token(&mut tokens, OpenCurly, line_number),
+                    '}' => push_punctuator_token(&mut tokens, CloseCurly, line_number),
+                    ',' => push_punctuator_token(&mut tokens, Comma, line_number),
+                    ':' => push_punctuator_token(&mut tokens, Colon, line_number),
+                    ';' => push_punctuator_token(&mut tokens, Semicolon, line_number),
+                    '*' => push_punctuator_token(&mut tokens, Multiply, line_number),
+                    '=' => push_punctuator_token(&mut tokens, Assign, line_number),
+                    '#' => push_punctuator_token(&mut tokens, Hash, line_number),
+                    '.' => push_punctuator_token(&mut tokens, Dot, line_number),
+                    '&' => push_punctuator_token(&mut tokens, Ampersand, line_number),
+                    '+' => push_punctuator_token(&mut tokens, Add, line_number),
+                    '-' => push_punctuator_token(&mut tokens, Subtract, line_number),
+                    '~' => push_punctuator_token(&mut tokens, BitComplement, line_number),
+                    '!' => push_punctuator_token(&mut tokens, Not, line_number),
+                    '/' => push_punctuator_token(&mut tokens, Divide, line_number),
+                    '%' => push_punctuator_token(&mut tokens, Modulus, line_number),
+                    '<' => push_punctuator_token(&mut tokens, LessThan, line_number),
+                    '>' => push_punctuator_token(&mut tokens, GreaterThan, line_number),
+                    '^' => push_punctuator_token(&mut tokens, BitXor, line_number),
+                    '|' => push_punctuator_token(&mut tokens, BitOr, line_number),
+                    '?' => push_punctuator_token(&mut tokens, Ternary, line_number),
                     // Identifiers
                     'a'..='z' | 'A'..='Z' | '_' | '$' => {
                         state = State::Identifier(c.into());
                     }
                     // Other Unrecognized Characters
-                    _ => tokens.push(PreToken::new(PreTokenKind::Other(c))),
+                    _ => tokens.push(PreToken::new(PreTokenKind::Other(c), Some(line_number))),
                 }
 
                 preceeded_by_whitespace = match c {
@@ -176,7 +186,10 @@ fn lex_line(
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '$' | '.' => {
                         existing.push(line.next().unwrap())
                     }
-                    _ => tokens.push(PreToken::new(state.finalize().expect("number"))),
+                    _ => tokens.push(PreToken::new(
+                        state.finalize().expect("number"),
+                        Some(line_number),
+                    )),
                 }
             }
             State::MultiLineComment => {
@@ -191,21 +204,33 @@ fn lex_line(
                 if is_identifier_continue(*peek_c) {
                     existing.push(line.next().expect("identifier character"));
                 } else {
-                    tokens.push(PreToken::new(state.finalize().expect("identifier")));
+                    tokens.push(PreToken::new(
+                        state.finalize().expect("identifier"),
+                        Some(line_number),
+                    ));
                 }
             }
             State::CharacterConstant(_encoding, existing) => match line.next().unwrap() {
-                '\'' => tokens.push(PreToken::new(state.finalize().expect("character constant"))),
-                '\\' => existing.push(escape_sequence(&mut line)?),
+                '\'' => tokens.push(PreToken::new(
+                    state.finalize().expect("character constant"),
+                    Some(line_number),
+                )),
+                '\\' => existing.push(escape_sequence(&mut line, line_number)?),
                 character => existing.push(character),
             },
             State::StringLiteral(_encoding, existing) => match line.next().unwrap() {
-                '"' => tokens.push(PreToken::new(state.finalize().expect("string literal"))),
-                '\\' => existing.push(escape_sequence(&mut line)?),
+                '"' => tokens.push(PreToken::new(
+                    state.finalize().expect("string literal"),
+                    Some(line_number),
+                )),
+                '\\' => existing.push(escape_sequence(&mut line, line_number)?),
                 character => existing.push(character),
             },
             State::HeaderName(existing) => match line.next().unwrap() {
-                '>' => tokens.push(PreToken::new(state.finalize().expect("header name"))),
+                '>' => tokens.push(PreToken::new(
+                    state.finalize().expect("header name"),
+                    Some(line_number),
+                )),
                 character => existing.push(character),
             },
         }
@@ -213,28 +238,29 @@ fn lex_line(
 
     let next_state = match state {
         State::MultiLineComment => Ok(State::MultiLineComment),
-        State::CharacterConstant(..) => Err(PreprocessorError::UnterminatedCharacterConstant),
-        State::StringLiteral(..) => Err(PreprocessorError::UnterminatedStringLiteral),
-        State::HeaderName(..) => Err(PreprocessorError::UnterminatedHeaderName),
+        State::CharacterConstant(..) => Err(PreprocessorErrorKind::UnterminatedCharacterConstant.at(Some(line_number))),
+        State::StringLiteral(..) => Err(PreprocessorErrorKind::UnterminatedStringLiteral.at(Some(line_number))),
+        State::HeaderName(..) => Err(PreprocessorErrorKind::UnterminatedHeaderName.at(Some(line_number))),
         _ => Ok(State::Idle),
     }?;
 
     if let Some(token_kind) = state.finalize() {
-        tokens.push(PreToken::new(token_kind));
+        tokens.push(PreToken::new(token_kind, Some(line_number)));
     }
 
     Ok((tokens, next_state))
 }
 
-fn make_character(digits: &str, radix: u32) -> Result<char, PreprocessorError> {
-    let codepoint =
-        u32::from_str_radix(&digits, radix).map_err(|_| PreprocessorError::BadEscapedCodepoint)?;
+fn make_character(digits: &str, radix: u32, line_number: NonZeroU32) -> Result<char, PreprocessorError> {
+    let codepoint = u32::from_str_radix(&digits, radix)
+        .map_err(|_| PreprocessorErrorKind::BadEscapedCodepoint.at(Some(line_number)))?;
 
-    char::from_u32(codepoint).ok_or(PreprocessorError::BadEscapedCodepoint)
+    char::from_u32(codepoint).ok_or(PreprocessorErrorKind::BadEscapedCodepoint.at(Some(line_number)))
 }
 
 fn escape_sequence<I: Iterator<Item = char>>(
     line: &mut LookAhead<I>,
+    line_number: NonZeroU32,
 ) -> Result<char, PreprocessorError> {
     match line.next() {
         Some('\'') => Ok('\''),
@@ -261,7 +287,7 @@ fn escape_sequence<I: Iterator<Item = char>>(
                 }
             }
 
-            make_character(&digits, 8)
+            make_character(&digits, 8, line_number)
         }
         Some('x') => {
             let mut digits = String::with_capacity(8);
@@ -273,7 +299,7 @@ fn escape_sequence<I: Iterator<Item = char>>(
                 }
             }
 
-            make_character(&digits, 16)
+            make_character(&digits, 16, line_number)
         }
         Some('u') => {
             let mut digits = String::with_capacity(4);
@@ -281,11 +307,11 @@ fn escape_sequence<I: Iterator<Item = char>>(
             for _ in 0..4 {
                 match line.next() {
                     Some(digit) if digit.is_ascii_hexdigit() => digits.push(digit),
-                    _ => return Err(PreprocessorError::BadEscapedCodepoint),
+                    _ => return Err(PreprocessorErrorKind::BadEscapedCodepoint.at(Some(line_number))),
                 }
             }
 
-            make_character(&digits, 16)
+            make_character(&digits, 16, line_number)
         }
         Some('U') => {
             let mut digits = String::with_capacity(8);
@@ -293,13 +319,13 @@ fn escape_sequence<I: Iterator<Item = char>>(
             for _ in 0..8 {
                 match line.next() {
                     Some(digit) if digit.is_ascii_hexdigit() => digits.push(digit),
-                    _ => return Err(PreprocessorError::BadEscapedCodepoint),
+                    _ => return Err(PreprocessorErrorKind::BadEscapedCodepoint.at(Some(line_number))),
                 }
             }
 
-            make_character(&digits, 16)
+            make_character(&digits, 16, line_number)
         }
-        _ => Err(PreprocessorError::BadEscapeSequence),
+        _ => Err(PreprocessorErrorKind::BadEscapeSequence.at(Some(line_number))),
     }
 }
 
