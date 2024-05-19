@@ -30,6 +30,7 @@ pub enum PreTokenKind {
     StringLiteral(Encoding, String),
     Punctuator(Punctuator),
     UniversalCharacterName(char), // e.g. '\u1F3E'
+    IsDefined(String),            // e.g. `defined NAME` or `define(NAME)`
     Other(char),
     Placeholder, // a non-lexical token, has no textual representation (used for '##' concats with empty)
 }
@@ -67,6 +68,7 @@ impl Display for PreTokenKind {
             PreTokenKind::StringLiteral(_, content) => write!(f, "\"{}\"", escape(content, '"')),
             PreTokenKind::Punctuator(punctuator) => punctuator.fmt(f),
             PreTokenKind::UniversalCharacterName(_) => Ok(()),
+            PreTokenKind::IsDefined(name) => write!(f, "defined({})", name),
             PreTokenKind::Other(c) => write!(f, "{}", c),
             PreTokenKind::Placeholder => Ok(()),
         }

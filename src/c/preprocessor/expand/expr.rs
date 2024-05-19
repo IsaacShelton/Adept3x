@@ -40,13 +40,14 @@
 
 use crate::{
     c::preprocessor::{
-        ast::{BinaryOperation, BinaryOperator, ConstExpr, Ternary},
+        ast::{BinaryOperation, BinaryOperator, ConstExpr, Ternary, UnaryOperation, UnaryOperator},
+        parser::{eat_identifier, eat_punctuator},
         pre_token::{PreToken, PreTokenKind, Punctuator},
         ParseError,
     },
     look_ahead::LookAhead,
 };
-use std::num::IntErrorKind;
+use std::{borrow::Borrow, num::IntErrorKind};
 
 pub struct ExprParser<'a, I>
 where
@@ -64,7 +65,13 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
     pub fn parse(tokens: I) -> Result<ConstExpr, ParseError> {
         let mut parser = Self::new(tokens);
-        parser.parse_expr()
+        let full_expr = parser.parse_expr()?;
+        parser
+            .input
+            .next()
+            .is_none()
+            .then_some(full_expr)
+            .ok_or(ParseError::ExpectedEndOfExpression)
     }
 
     pub fn parse_expr(&mut self) -> Result<ConstExpr, ParseError> {
@@ -79,39 +86,45 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
     }
 
     fn parse_expr_primary_base(&mut self) -> Result<ConstExpr, ParseError> {
-        let token = self.input.peek();
+        let token = self.input.next();
 
-        // TODO: Clean this up
         match token.map(|token| &token.kind) {
             Some(PreTokenKind::Identifier(name)) => {
                 // Undeclared defines are zero (except if identifier is `true` as per C23).
                 // (it would've been replaced before expression parsing otherwise)
-                self.input.next().unwrap();
-
                 Ok(ConstExpr::Constant(if name == "true" { 1 } else { 0 }))
             }
-            Some(PreTokenKind::Number(numeric)) => {
-                self.input.next().unwrap();
-                Self::parse_number(numeric)
-            }
+            Some(PreTokenKind::Number(numeric)) => Self::parse_number(numeric),
+            Some(PreTokenKind::Punctuator(
+                punctuator @ (Punctuator::Not
+                | Punctuator::Add
+                | Punctuator::Subtract
+                | Punctuator::BitComplement),
+            )) => self.parse_unary_operation(punctuator),
             Some(PreTokenKind::Punctuator(Punctuator::OpenParen { .. })) => {
-                // Eat '('
-                self.input.next().unwrap();
-
                 let inner = self.parse_expr()?;
-
-                // Eat ')'
-                match self.input.peek().map(|pre_token| &pre_token.kind) {
-                    Some(PreTokenKind::Punctuator(Punctuator::CloseParen)) => {
-                        self.input.next().unwrap();
-                    }
-                    _ => return Err(ParseError::ExpectedCloseParen),
-                }
-
+                self.eat_punctuator(Punctuator::CloseParen)?;
                 Ok(inner)
             }
             _ => Err(ParseError::ExpectedExpression),
         }
+    }
+
+    fn parse_unary_operation(&mut self, punctuator: &Punctuator) -> Result<ConstExpr, ParseError> {
+        let inner = self.parse_expr()?;
+
+        let operator = match punctuator {
+            Punctuator::Not => UnaryOperator::Not,
+            Punctuator::Add => UnaryOperator::Positive,
+            Punctuator::Subtract => UnaryOperator::Negative,
+            Punctuator::BitComplement => UnaryOperator::BitComplement,
+            _ => unreachable!(),
+        };
+
+        Ok(ConstExpr::UnaryOperation(Box::new(UnaryOperation {
+            operator,
+            inner,
+        })))
     }
 
     fn parse_number(number: &str) -> Result<ConstExpr, ParseError> {
@@ -138,18 +151,9 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
     }
 
     fn parse_ternary(&mut self, condition: ConstExpr) -> Result<ConstExpr, ParseError> {
-        // Eat '?'
-        self.input.next().unwrap();
-
+        self.eat_punctuator(Punctuator::Ternary)?;
         let when_true = self.parse_expr()?;
-
-        // Eat ':'
-        // TODO: CLEANUP: Clean this up messy part
-        match self.input.peek().map(|pre_token| &pre_token.kind) {
-            Some(PreTokenKind::Punctuator(Punctuator::Colon)) => _ = self.input.next().unwrap(),
-            _ => return Err(ParseError::ExpectedColon),
-        }
-
+        self.eat_punctuator(Punctuator::Colon)?;
         let when_false = self.parse_expr()?;
 
         Ok(ConstExpr::Ternary(Box::new(Ternary {
@@ -249,6 +253,14 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         } else {
             Ok(rhs)
         }
+    }
+
+    fn eat_punctuator(&mut self, expected: impl Borrow<Punctuator>) -> Result<(), ParseError> {
+        eat_punctuator(&mut self.input, expected)
+    }
+
+    fn eat_identifier(&mut self) -> Option<&str> {
+        eat_identifier(&mut self.input)
     }
 }
 

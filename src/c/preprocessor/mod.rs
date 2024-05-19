@@ -9,10 +9,10 @@ use self::expand::{expand_ast, Environment};
 use self::lexer::lex;
 use self::line_splice::LineSplicer;
 use self::parser::parse;
+use self::pre_token::Punctuator;
 
 /*
    Missing features:
-   - defined
    - __has_include
    - __has_embed
    - __has_c_attribute
@@ -54,6 +54,7 @@ pub enum ParseError {
     ExpectedParameterName,
     ExpectedComma,
     ExpectedCloseParenAfterVarArgs,
+    ExpectedPunctuator(Punctuator),
     // Expression parsing errors... (These occur during expansion)
     ExpectedExpression,
     BadInteger,
@@ -62,6 +63,7 @@ pub enum ParseError {
     NotEnoughArguments,
     TooManyArguments,
     ExpectedOpenParenDuringExpansion,
+    ExpectedEndOfExpression,
 }
 
 pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {

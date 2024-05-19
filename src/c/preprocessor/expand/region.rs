@@ -123,6 +123,16 @@ fn expand_token<'a>(
             expanded.push(token.clone());
             Ok(())
         }
+        PreTokenKind::IsDefined(name) => {
+            expanded.push(PreToken::new(PreTokenKind::Number(
+                if environment.find_define(name).is_some() {
+                    "1".into()
+                } else {
+                    "0".into()
+                },
+            )));
+            Ok(())
+        }
         PreTokenKind::HeaderName(_)
         | PreTokenKind::Number(_)
         | PreTokenKind::CharacterConstant(_, _)

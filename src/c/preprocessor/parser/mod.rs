@@ -165,13 +165,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
 
     pub fn parse_define_function_macro(line: &[PreToken]) -> Result<Define, ParseError> {
         let mut tokens = LookAhead::new(line.iter().skip(2));
-
-        let name = match tokens.next() {
-            Some(PreToken {
-                kind: PreTokenKind::Identifier(name),
-            }) => name.to_string(),
-            _ => return Err(ParseError::ExpectedDefinitionName),
-        };
+        let name = eat_identifier(&mut tokens).ok_or(ParseError::ExpectedDefinitionName)?;
 
         match tokens.next() {
             Some(PreToken {
@@ -223,7 +217,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
                 is_variadic,
                 body: tokens.cloned().collect_vec(),
             }),
-            name,
+            name: name.to_string(),
         })
     }
 
@@ -284,7 +278,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
 
     pub fn parse_if_like(&mut self, line: &[PreToken]) -> Result<IfLike, ParseError> {
         Ok(IfLike {
-            tokens: line[2..].to_vec(),
+            tokens: Self::prepare_for_parsing(&line[2..])?,
             group: self.parse_group()?,
         })
     }
@@ -318,6 +312,62 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
             }
             _ => Err(ParseError::ExpectedIdentifier),
         }
+    }
+
+    pub fn prepare_for_parsing(tokens: &[PreToken]) -> Result<Vec<PreToken>, ParseError> {
+        let mut tokens = LookAhead::new(tokens.iter());
+        let mut result = Vec::with_capacity(tokens.len());
+
+        while let Some(token) = tokens.next() {
+            match &token.kind {
+                PreTokenKind::Identifier(name) if name.as_str() == "defined" => {
+                    let new_token_kind = match tokens.next().map(|token| &token.kind) {
+                        Some(PreTokenKind::Identifier(name)) => {
+                            Ok(PreTokenKind::IsDefined(name.clone()))
+                        }
+                        Some(PreTokenKind::Punctuator(Punctuator::OpenParen { .. })) => {
+                            eat_identifier(&mut tokens)
+                                .ok_or(ParseError::ExpectedDefinitionName)
+                                .and_then(|name| {
+                                    eat_punctuator(&mut tokens, Punctuator::CloseParen)
+                                        .and_then(|_| Ok(PreTokenKind::IsDefined(name.to_string())))
+                                })
+                        }
+                        _ => Err(ParseError::ExpectedDefinitionName),
+                    }?;
+
+                    result.push(PreToken::new(new_token_kind));
+                }
+                _ => result.push(token.clone()),
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+pub fn eat_punctuator<'a>(
+    input: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
+    expected: impl Borrow<Punctuator>,
+) -> Result<(), ParseError> {
+    match input.peek().map(|token| &token.kind) {
+        Some(PreTokenKind::Punctuator(punctuator)) if *punctuator == *expected.borrow() => {
+            input.next().unwrap();
+            Ok(())
+        }
+        _ => Err(ParseError::ExpectedPunctuator(expected.borrow().clone())),
+    }
+}
+
+pub fn eat_identifier<'a>(
+    input: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
+) -> Option<&'a str> {
+    match input.peek().map(|token| &token.kind) {
+        Some(PreTokenKind::Identifier(identifier)) => {
+            input.next().unwrap();
+            Some(identifier)
+        }
+        _ => None,
     }
 }
 
