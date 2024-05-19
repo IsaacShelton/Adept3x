@@ -12,7 +12,6 @@ use self::parser::parse;
 
 /*
    Missing features:
-   - ## concatenating (missing compatibility with "placeholder token" semantics and non-concat '##' operator)
    - defined
    - __has_include
    - __has_embed

@@ -1,4 +1,5 @@
 use crate::c::encoding::Encoding;
+use derive_more::IsVariant;
 use std::fmt::Display;
 
 pub use crate::c::punctuator::Punctuator;
@@ -20,7 +21,7 @@ impl Display for PreToken {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, IsVariant)]
 pub enum PreTokenKind {
     HeaderName(String),
     Identifier(String),
@@ -30,6 +31,7 @@ pub enum PreTokenKind {
     Punctuator(Punctuator),
     UniversalCharacterName(char), // e.g. '\u1F3E'
     Other(char),
+    Placeholder, // a non-lexical token, has no textual representation (used for '##' concats with empty)
 }
 
 impl PreToken {
@@ -66,6 +68,7 @@ impl Display for PreTokenKind {
             PreTokenKind::Punctuator(punctuator) => punctuator.fmt(f),
             PreTokenKind::UniversalCharacterName(_) => Ok(()),
             PreTokenKind::Other(c) => write!(f, "{}", c),
+            PreTokenKind::Placeholder => Ok(()),
         }
     }
 }

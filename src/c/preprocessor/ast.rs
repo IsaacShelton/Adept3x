@@ -1,5 +1,5 @@
 use super::pre_token::PreToken;
-use derive_more::Unwrap;
+use derive_more::{IsVariant, Unwrap};
 use num_traits::Zero;
 
 #[derive(Clone, Debug)]
@@ -211,14 +211,21 @@ pub struct Define {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Hash, Unwrap)]
+#[derive(Clone, Debug, Hash, IsVariant)]
+pub enum PlaceholderAffinity {
+    Keep,
+    Discard,
+}
+
+#[derive(Clone, Debug, Hash, Unwrap, IsVariant)]
 pub enum DefineKind {
-    ObjectMacro(Vec<PreToken>),
+    ObjectMacro(Vec<PreToken>, PlaceholderAffinity),
     FunctionMacro(FunctionMacro),
 }
 
 #[derive(Clone, Debug, Hash)]
 pub struct FunctionMacro {
+    pub affinity: PlaceholderAffinity,
     pub parameters: Vec<String>,
     pub is_variadic: bool,
     pub body: Vec<PreToken>,

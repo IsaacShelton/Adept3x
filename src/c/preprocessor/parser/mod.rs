@@ -3,13 +3,13 @@ use itertools::Itertools;
 use super::{
     ast::{
         ControlLine, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind, IfDefLike,
-        IfGroup, IfLike, PreprocessorAst, TextLine,
+        IfGroup, IfLike, PlaceholderAffinity, PreprocessorAst, TextLine,
     },
     pre_token::{PreToken, PreTokenKind, Punctuator},
     ParseError,
 };
 use crate::{
-    c::preprocessor::ast::{IfSection, FunctionMacro},
+    c::preprocessor::ast::{FunctionMacro, IfSection},
     look_ahead::LookAhead,
 };
 use std::borrow::Borrow;
@@ -218,6 +218,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
 
         Ok(Define {
             kind: DefineKind::FunctionMacro(FunctionMacro {
+                affinity: PlaceholderAffinity::Discard,
                 parameters,
                 is_variadic,
                 body: tokens.cloned().collect_vec(),
@@ -239,7 +240,7 @@ impl<I: Iterator<Item = Vec<PreToken>>> Parser<I> {
         let replacement_tokens = line[3..].to_vec();
 
         Ok(Define {
-            kind: DefineKind::ObjectMacro(replacement_tokens),
+            kind: DefineKind::ObjectMacro(replacement_tokens, PlaceholderAffinity::Discard),
             name,
         })
     }
