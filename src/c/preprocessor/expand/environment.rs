@@ -8,14 +8,12 @@ pub struct Environment {
 
 impl Environment {
     pub fn add_define(&mut self, define: Define) {
-        self.defines
-            .insert(define.name.clone(), define);
+        // NOTE: According to the C standard, macros are not supposed to be redefined unless they
+        // are "identical", but most compilers allow redefining so we will follow suit.
+        self.defines.insert(define.name.clone(), define);
     }
 
     pub fn find_define(&self, name: &str) -> Option<&Define> {
-        // NOTE: The major C compilers don't allow defining both an object-like
-        // and a function-like macro of the same name at the same time,
-        // so we will follow suit, although this violates the standard.
         self.defines.get(name)
     }
 

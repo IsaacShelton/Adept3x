@@ -119,6 +119,7 @@ fn expand_token<'a>(
                 }
             }
 
+            // Otherwise, just a normal identifier
             expanded.push(token.clone());
             Ok(())
         }
