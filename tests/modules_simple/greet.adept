@@ -1,5 +1,5 @@
 
 func greet(name ptr<u8>) {
-    printf(c"Welcome, %s!", name)
+    printf(c"Welcome, %s!\n", name)
 }
 

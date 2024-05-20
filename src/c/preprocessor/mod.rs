@@ -25,6 +25,8 @@ use std::num::NonZeroU32;
    - etc.
 */
 
+pub use self::pre_token::{PreToken, PreTokenKind};
+
 #[derive(Clone, Debug)]
 pub struct PreprocessorError {
     pub kind: PreprocessorErrorKind,
