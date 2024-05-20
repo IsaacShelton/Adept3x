@@ -1,0 +1,5 @@
+
+func greet(name ptr<u8>) {
+    printf(c"Welcome, %s!", name)
+}
+

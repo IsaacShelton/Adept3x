@@ -1025,6 +1025,16 @@ pub fn parse(
     Parser::new(Input::new(tokens, source_file_cache, key)).parse()
 }
 
+pub fn parse_into(
+    tokens: impl Iterator<Item = Token>,
+    source_file_cache: &SourceFileCache,
+    key: SourceFileCacheKey,
+    ast: &mut Ast,
+    filename: String,
+) -> Result<(), ParseError> {
+    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast, filename)
+}
+
 fn is_terminating_token(kind: &TokenKind) -> bool {
     match kind {
         TokenKind::Comma => true,

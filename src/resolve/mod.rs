@@ -37,9 +37,9 @@ enum Job {
 #[derive(Default)]
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
-    pub type_search_contexts: HashMap<FileIdentifier, TypeSearchCtx<'a>>,
-    pub function_search_contexts: HashMap<FileIdentifier, FunctionSearchCtx<'a>>,
-    pub global_search_contexts: HashMap<FileIdentifier, GlobalSearchCtx<'a>>,
+    pub type_search_contexts: HashMap<String, TypeSearchCtx<'a>>,
+    pub function_search_contexts: HashMap<String, FunctionSearchCtx<'a>>,
+    pub global_search_contexts: HashMap<String, GlobalSearchCtx<'a>>,
 }
 
 pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
@@ -51,7 +51,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     for (file_identifier, file) in ast.files.iter() {
         let type_search_context = ctx
             .type_search_contexts
-            .entry(file_identifier.clone())
+            .entry(ast.primary_filename.clone())
             .or_insert_with(|| TypeSearchCtx::new(source_file_cache));
 
         for structure in file.structures.iter() {
@@ -85,7 +85,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
         let global_search_context = ctx
             .global_search_contexts
-            .entry(file_identifier.clone())
+            .entry(ast.primary_filename.clone())
             .or_insert_with(|| GlobalSearchCtx::new(source_file_cache));
 
         for global in file.globals.iter() {
@@ -126,7 +126,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
             let function_search_context = ctx
                 .function_search_contexts
-                .entry(file_identifier.clone())
+                .entry(ast.primary_filename.clone())
                 .or_insert_with(|| FunctionSearchCtx::new(source_file_cache));
 
             // You can blame stable rust for having to do this.
@@ -155,17 +155,17 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             Job::Regular(file_identifier, function_index, resolved_function_ref) => {
                 let function_search_ctx = ctx
                     .function_search_contexts
-                    .get(&file_identifier)
+                    .get(&ast.primary_filename)
                     .expect("function search context to exist for file");
 
                 let type_search_ctx = ctx
                     .type_search_contexts
-                    .get(&file_identifier)
+                    .get(&ast.primary_filename)
                     .expect("type search context to exist for file");
 
                 let global_search_ctx = ctx
                     .global_search_contexts
-                    .get(&file_identifier)
+                    .get(&ast.primary_filename)
                     .expect("global search context to exist for file");
 
                 let ast_file = ast
