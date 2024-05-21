@@ -12,6 +12,12 @@ where
     buffer: VecDeque<I::Item>,
 }
 
+impl<I: Iterator<Item: Clone> + Clone> Clone for LookAhead<I> {
+    fn clone(&self) -> Self {
+        Self { iterator: self.iterator.clone(), buffer: self.buffer.clone() }
+    }
+}
+
 impl<I> LookAhead<I>
 where
     I: Iterator,

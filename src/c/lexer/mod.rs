@@ -4,11 +4,12 @@ use super::{
 };
 use crate::{c::token::IntegerSuffix, line_column::Location};
 
-pub struct Lexer<I: Iterator<Item = PreToken>> {
+#[derive(Clone)]
+pub struct Lexer<'a, I: Iterator<Item = &'a PreToken> + Clone> {
     pub input: I,
 }
 
-impl<I: Iterator<Item = PreToken>> Lexer<I> {
+impl<'a, I: Iterator<Item = &'a PreToken> + Clone> Lexer<'a, I> {
     pub fn new(input: I) -> Self {
         Self { input }
     }
@@ -21,7 +22,7 @@ pub enum LexError {
     UnrepresentableInteger,
 }
 
-impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
+impl<'a, I: Iterator<Item = &'a PreToken> + Clone> Iterator for Lexer<'a, I> {
     type Item = CToken;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -83,25 +84,23 @@ impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
                 "_Generic" => CTokenKind::GenericKeyword,
                 "_Imaginary" => CTokenKind::ImaginaryKeyword,
                 "_Noreturn" => CTokenKind::NoreturnKeyword,
-                _ => CTokenKind::Identifier(name),
+                _ => CTokenKind::Identifier(name.to_string()),
             },
             PreTokenKind::Number(number) => match lex_number(&number) {
                 Ok(token) => token,
                 Err(err) => CTokenKind::LexError(err),
             },
             PreTokenKind::CharacterConstant(encoding, content) => {
-                CTokenKind::CharacterConstant(encoding, content)
+                CTokenKind::CharacterConstant(encoding.clone(), content.clone())
             }
             PreTokenKind::StringLiteral(encoding, content) => {
-                CTokenKind::StringLiteral(encoding, content)
+                CTokenKind::StringLiteral(encoding.clone(), content.clone())
             }
-            PreTokenKind::Punctuator(punctuator) => CTokenKind::Punctuator(punctuator),
+            PreTokenKind::Punctuator(punctuator) => CTokenKind::Punctuator(punctuator.clone()),
             PreTokenKind::UniversalCharacterName(..) => {
                 CTokenKind::LexError(LexError::UniversalCharacterNameNotSupported)
             }
-            PreTokenKind::Other(..) => {
-                CTokenKind::LexError(LexError::UnrecognizedSymbol)
-            }
+            PreTokenKind::Other(..) => CTokenKind::LexError(LexError::UnrecognizedSymbol),
             PreTokenKind::HeaderName(_)
             | PreTokenKind::IsDefined(_)
             | PreTokenKind::Placeholder => unreachable!(),

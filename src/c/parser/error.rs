@@ -6,6 +6,12 @@ pub struct ParseError {
     line: Option<NonZeroU32>,
 }
 
+impl ParseError {
+    pub fn new(kind: ParseErrorKind, line: Option<NonZeroU32>) -> Self {
+        Self { kind, line }
+    }
+}
+
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(line) = self.line {
@@ -18,12 +24,22 @@ impl Display for ParseError {
 }
 
 #[derive(Clone, Debug)]
-pub enum ParseErrorKind {}
+pub enum ParseErrorKind {
+    ExpectedDeclaration,
+    FailedToParseTypeSpecifier,
+    FailedToParseTypeSpecifierQualifier,
+}
 
 impl Display for ParseErrorKind {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            _ => todo!(),
+            ParseErrorKind::ExpectedDeclaration => f.write_str("Expected declaration"),
+            ParseErrorKind::FailedToParseTypeSpecifier => {
+                f.write_str("Failed to parse type specifier")
+            }
+            ParseErrorKind::FailedToParseTypeSpecifierQualifier => {
+                f.write_str("Failed to parse type specifier qualifier")
+            }
         }
     }
 }

@@ -4,40 +4,43 @@ use crate::{
     repeating_last::RepeatingLast,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, collections::VecDeque};
 
-pub struct Input<'a, I: Iterator<Item = CToken>> {
+pub struct Input<'a, I: Iterator<Item = CToken> + Clone> {
     source_file_cache: &'a SourceFileCache,
-    iterator: LookAhead<RepeatingLast<I>>,
+    stack: VecDeque<LookAhead<RepeatingLast<I>>>,
     key: SourceFileCacheKey,
 }
 
 impl<'a, I> Input<'a, I>
 where
-    I: Iterator<Item = CToken>,
+    I: Iterator<Item = CToken> + Clone,
 {
     pub fn new(
         iterator: I,
         source_file_cache: &'a SourceFileCache,
         key: SourceFileCacheKey,
     ) -> Self {
+        let mut stack = VecDeque::with_capacity(4);
+        stack.push_front(LookAhead::new(RepeatingLast::new(iterator)));
+
         Self {
-            iterator: LookAhead::new(RepeatingLast::new(iterator)),
+            stack,
             source_file_cache,
             key,
         }
     }
 
     pub fn peek(&mut self) -> &CToken {
-        self.iterator.peek_nth(0).unwrap()
+        self.stack.front_mut().unwrap().peek_nth(0).unwrap()
     }
 
     pub fn peek_nth(&mut self, n: usize) -> &CToken {
-        self.iterator.peek_nth(n).unwrap()
+        self.stack.front_mut().unwrap().peek_nth(n).unwrap()
     }
 
     pub fn peek_n(&mut self, n: usize) -> &[CToken] {
-        self.iterator.peek_n(n)
+        self.stack.front_mut().unwrap().peek_n(n)
     }
 
     pub fn peek_is(&mut self, token: impl Borrow<CTokenKind>) -> bool {
@@ -50,7 +53,24 @@ where
     }
 
     pub fn advance(&mut self) -> CToken {
-        self.iterator.next().unwrap()
+        self.stack.front_mut().unwrap().next().unwrap()
+    }
+
+    pub fn speculate(&mut self) {
+        self.stack.push_front(self.stack.front().unwrap().clone());
+    }
+
+    pub fn backtrack(&mut self) {
+        self.stack.pop_front();
+        assert!(!self.stack.is_empty());
+    }
+
+    pub fn success(&mut self) {
+        // Indicates that a speculation was successful,
+        // so we can remove the backtrack point
+        let success = self.stack.pop_front().unwrap();
+        let _ = self.stack.pop_front().unwrap();
+        self.stack.push_front(success);
     }
 
     pub fn filename(&self) -> &str {

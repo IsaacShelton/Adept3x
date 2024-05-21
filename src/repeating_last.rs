@@ -12,6 +12,15 @@ where
     next_item: Option<I::Item>,
 }
 
+impl<I: Iterator<Item: Clone> + Clone> Clone for RepeatingLast<I> {
+    fn clone(&self) -> Self {
+        Self {
+            iterator: self.iterator.clone(),
+            next_item: self.next_item.clone(),
+        }
+    }
+}
+
 impl<I> RepeatingLast<I>
 where
     I: Iterator,

@@ -127,8 +127,8 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
                 exit_unless(parse(lexer, &source_file_cache, key));
             }
         } else {
-            let mut preprocessed = exit_unless(c::preprocessor::preprocess(content));
-            let lexer = c::Lexer::new(preprocessed.drain(..));
+            let preprocessed = exit_unless(c::preprocessor::preprocess(content));
+            let lexer = c::Lexer::new(preprocessed.iter());
 
             if let Some(ast) = &mut ast {
                 exit_unless(c::parse_into(
