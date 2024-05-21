@@ -1,14 +1,13 @@
 use super::{encoding::Encoding, punctuator::Punctuator};
 use crate::line_column::Location;
 use derive_more::{Deref, IsVariant, Unwrap};
-use num_bigint::BigInt;
 
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum CTokenKind {
     EndOfFile,
     Identifier(String),
     Punctuator(Punctuator),
-    Integer(BigInt, IntegerSuffix),
+    Integer(Integer),
     Float(f64, FloatSuffix),
     CharacterConstant(Encoding, String),
     StringLiteral(Encoding, String),
@@ -69,15 +68,44 @@ pub enum CTokenKind {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Integer {
+    Int(i32),
+    UnsignedInt(u32),
+    Long(i64),
+    UnsignedLong(u64),
+    LongLong(i64),
+    UnsignedLongLong(u64),
+}
+
+impl Integer {
+    pub fn try_new(representation: &str, suffix: IntegerSuffix, radix: u32) -> Option<Integer> {
+        Some(match suffix {
+            IntegerSuffix::Int => Integer::Int(i32::from_str_radix(representation, radix).ok()?),
+            IntegerSuffix::UnsignedInt => {
+                Integer::UnsignedInt(u32::from_str_radix(representation, radix).ok()?)
+            }
+            IntegerSuffix::Long => Integer::Long(i64::from_str_radix(representation, radix).ok()?),
+            IntegerSuffix::UnsignedLong => {
+                Integer::UnsignedLong(u64::from_str_radix(representation, radix).ok()?)
+            }
+            IntegerSuffix::LongLong => {
+                Integer::LongLong(i64::from_str_radix(representation, radix).ok()?)
+            }
+            IntegerSuffix::UnsignedLongLong => {
+                Integer::UnsignedLongLong(u64::from_str_radix(representation, radix).ok()?)
+            }
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum IntegerSuffix {
-    Regular,
-    Unsigned,
+    Int,
+    UnsignedInt,
     Long,
     UnsignedLong,
     LongLong,
     UnsignedLongLong,
-    BigInteger,
-    UnsignedBigInteger,
 }
 
 #[derive(Clone, Debug, PartialEq)]

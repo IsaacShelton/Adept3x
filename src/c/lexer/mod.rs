@@ -1,8 +1,8 @@
 use super::{
     preprocessor::{PreToken, PreTokenKind},
-    token::{CToken, CTokenKind},
+    token::{CToken, CTokenKind, Integer},
 };
-use crate::line_column::Location;
+use crate::{c::token::IntegerSuffix, line_column::Location};
 
 pub struct Lexer<I: Iterator<Item = PreToken>> {
     pub input: I,
@@ -12,6 +12,7 @@ pub struct Lexer<I: Iterator<Item = PreToken>> {
 pub enum LexError {
     UniversalCharacterNameNotSupported,
     UnrecognizedSymbol,
+    UnrepresentableInteger,
 }
 
 impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
@@ -107,6 +108,114 @@ impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
     }
 }
 
-fn lex_number(_number: &str) -> Result<CTokenKind, LexError> {
-    unimplemented!("lexing C numbers is not implemented yet");
+fn lex_number(number: &str) -> Result<CTokenKind, LexError> {
+    // TODO: Cleanup this procedure
+
+    let number = number.replace("'", "");
+
+    let (number, radix) = if number.starts_with("0") {
+        (&number[..], 8)
+    } else if number.starts_with("0x") || number.starts_with("0X") {
+        (&number[2..], 16)
+    } else if number.starts_with("0b") || number.starts_with("0B") {
+        (&number[2..], 2)
+    } else {
+        (&number[..], 10)
+    };
+
+    // This part is ugly, but at least it's fast
+
+    let (number, is_unsigned) = if number.ends_with("U") || number.ends_with("u") {
+        (&number[..number.len() - 1], true)
+    } else {
+        (number, false)
+    };
+
+    let (number, is_long_long) = if number.ends_with("LL") || number.ends_with("ll") {
+        (&number[..number.len() - 2], true)
+    } else {
+        (number, false)
+    };
+
+    let (number, is_long) = if number.ends_with("L") || number.ends_with("l") {
+        (&number[..number.len() - 1], true)
+    } else {
+        (number, false)
+    };
+
+    let (number, is_unsigned) = if !is_unsigned && (number.ends_with("U") || number.ends_with("u"))
+    {
+        (&number[..number.len() - 1], true)
+    } else {
+        (number, is_unsigned)
+    };
+
+    let requested = match (is_unsigned, is_long, is_long_long) {
+        (false, false, false) => IntegerSuffix::Int,
+        (true, false, false) => IntegerSuffix::UnsignedInt,
+        (false, true, false) => IntegerSuffix::Long,
+        (true, true, false) => IntegerSuffix::UnsignedLong,
+        (false, false, true) => IntegerSuffix::LongLong,
+        (true, false, true) => IntegerSuffix::UnsignedLongLong,
+        _ => unreachable!(),
+    };
+
+    // The correct type for an integer literal is whichever of these fits it first
+    // (Section 6.4.4.1 of the C standard)
+    let possibilities = match radix {
+        10 => match requested {
+            IntegerSuffix::Int => vec![
+                IntegerSuffix::Int,
+                IntegerSuffix::Long,
+                IntegerSuffix::LongLong,
+            ],
+            IntegerSuffix::UnsignedInt => vec![
+                IntegerSuffix::UnsignedInt,
+                IntegerSuffix::UnsignedLong,
+                IntegerSuffix::UnsignedLongLong,
+            ],
+            IntegerSuffix::Long => vec![IntegerSuffix::Long, IntegerSuffix::LongLong],
+            IntegerSuffix::UnsignedLong => {
+                vec![IntegerSuffix::UnsignedLong, IntegerSuffix::UnsignedLongLong]
+            }
+            IntegerSuffix::LongLong => vec![IntegerSuffix::LongLong],
+            IntegerSuffix::UnsignedLongLong => vec![IntegerSuffix::UnsignedLongLong],
+        },
+        _ => match requested {
+            IntegerSuffix::Int => vec![
+                IntegerSuffix::Int,
+                IntegerSuffix::UnsignedInt,
+                IntegerSuffix::Long,
+                IntegerSuffix::UnsignedLong,
+                IntegerSuffix::LongLong,
+                IntegerSuffix::UnsignedLongLong,
+            ],
+            IntegerSuffix::UnsignedInt => vec![
+                IntegerSuffix::UnsignedInt,
+                IntegerSuffix::UnsignedLong,
+                IntegerSuffix::UnsignedLongLong,
+            ],
+            IntegerSuffix::Long => vec![
+                IntegerSuffix::Long,
+                IntegerSuffix::UnsignedLong,
+                IntegerSuffix::LongLong,
+                IntegerSuffix::UnsignedLongLong,
+            ],
+            IntegerSuffix::UnsignedLong => {
+                vec![IntegerSuffix::UnsignedLong, IntegerSuffix::UnsignedLongLong]
+            }
+            IntegerSuffix::LongLong => {
+                vec![IntegerSuffix::LongLong, IntegerSuffix::UnsignedLongLong]
+            }
+            IntegerSuffix::UnsignedLongLong => vec![IntegerSuffix::UnsignedLongLong],
+        },
+    };
+
+    for possible_type in possibilities {
+        if let Some(integer) = Integer::try_new(number, possible_type, radix) {
+            return Ok(CTokenKind::Integer(integer));
+        }
+    }
+
+    Err(LexError::UnrepresentableInteger)
 }
