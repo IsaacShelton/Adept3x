@@ -10,6 +10,7 @@ use self::lexer::lex;
 use self::line_splice::LineSplicer;
 use self::parser::parse;
 use self::pre_token::Punctuator;
+use std::fmt::Display;
 use std::num::NonZeroU32;
 
 /*
@@ -48,6 +49,18 @@ impl From<ParseError> for PreprocessorError {
     }
 }
 
+impl Display for PreprocessorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(line) = self.line {
+            write!(f, "error on line {}: ", line)?;
+        } else {
+            write!(f, "error: ")?;
+        }
+
+        self.kind.fmt(f)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum PreprocessorErrorKind {
     UnterminatedMultiLineComment,
@@ -69,6 +82,34 @@ impl PreprocessorErrorKind {
     }
 }
 
+impl Display for PreprocessorErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PreprocessorErrorKind::UnterminatedMultiLineComment => {
+                f.write_str("Unterminated multi-line comment")
+            }
+            PreprocessorErrorKind::UnterminatedCharacterConstant => {
+                f.write_str("Unterminated character constant")
+            }
+            PreprocessorErrorKind::UnterminatedStringLiteral => {
+                f.write_str("Unterminated string literal")
+            }
+            PreprocessorErrorKind::UnterminatedHeaderName => {
+                f.write_str("Unterminated header name")
+            }
+            PreprocessorErrorKind::BadEscapeSequence => f.write_str("Bad escape sequence"),
+            PreprocessorErrorKind::BadEscapedCodepoint => f.write_str("Bad escaped codepoint"),
+            PreprocessorErrorKind::ParseError(err) => err.fmt(f),
+            PreprocessorErrorKind::BadInclude => f.write_str("Bad #include"),
+            PreprocessorErrorKind::ErrorDirective(message) => write!(f, "{}", message),
+            PreprocessorErrorKind::UnsupportedPragma => f.write_str("Unsupported pragma"),
+            PreprocessorErrorKind::CannotConcatTokens => {
+                f.write_str("Cannot concatenate those preprocessor tokens")
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ParseError {
     pub kind: ParseErrorKind,
@@ -78,6 +119,18 @@ pub struct ParseError {
 impl ParseError {
     pub fn new(kind: ParseErrorKind, line: Option<NonZeroU32>) -> Self {
         Self { kind, line }
+    }
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(line) = self.line {
+            write!(f, "error on line {}: ", line)?;
+        } else {
+            write!(f, "error: ")?;
+        }
+
+        self.kind.fmt(f)
     }
 }
 
@@ -114,7 +167,65 @@ impl ParseErrorKind {
     }
 }
 
-pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
+impl Display for ParseErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseErrorKind::ExpectedGroupPart => {
+                f.write_str("expected group part during preprocessing")
+            }
+            ParseErrorKind::ExpectedIdentifier => {
+                f.write_str("expected identifier during preprocessing")
+            }
+            ParseErrorKind::UnexpectedToken { after } => {
+                write!(f, "Unexpected token after {} during preprocessing", after)
+            }
+            ParseErrorKind::ExpectedEndif => f.write_str("unexpected #endif"),
+            ParseErrorKind::UnrecognizedDirective(directive) => {
+                write!(f, "Unrecognized preprocessing directive #{}", directive)
+            }
+            ParseErrorKind::ExpectedDefinitionName => {
+                f.write_str("Expected definition name during preprocessing")
+            }
+            ParseErrorKind::ExpectedNewlineAfterDirective => {
+                f.write_str("Expected newline after preprocessing directive")
+            }
+            ParseErrorKind::UnrecognizedPragmaDirective(directive) => {
+                write!(f, "Unrecognized pragma directive {}", directive)
+            }
+            ParseErrorKind::ExpectedOpenParen => f.write_str("Expected '(' during preprocessing"),
+            ParseErrorKind::ExpectedParameterName => {
+                f.write_str("Expected parameter name during preprocessing")
+            }
+            ParseErrorKind::ExpectedComma => f.write_str("Expected ',' during preprocessing"),
+            ParseErrorKind::ExpectedCloseParenAfterVarArgs => {
+                f.write_str("Expected ')' after '...' in macro parameter list")
+            }
+            ParseErrorKind::ExpectedPunctuator(punctuator) => {
+                write!(f, "Expected '{}' during preprocessing", punctuator)
+            }
+            ParseErrorKind::ExpectedExpression => {
+                f.write_str("Expected expression during preprocessing")
+            }
+            ParseErrorKind::BadInteger => f.write_str("Bad integer during preprocessing"),
+            ParseErrorKind::ExpectedCloseParen => f.write_str("Expected ')' during preprocessing"),
+            ParseErrorKind::ExpectedColon => f.write_str("Expected ':' during preprocessing"),
+            ParseErrorKind::NotEnoughArguments => {
+                f.write_str("Not enough arguments to preprocessing macro")
+            }
+            ParseErrorKind::TooManyArguments => {
+                f.write_str("Too many arguments to preprocessing macro")
+            }
+            ParseErrorKind::ExpectedOpenParenDuringExpansion => {
+                f.write_str("Expected '(' during preprocessor macro expansion")
+            }
+            ParseErrorKind::ExpectedEndOfExpression => {
+                f.write_str("Expected end of expression during preprocessing")
+            }
+        }
+    }
+}
+
+pub fn preprocess(content: &str) -> Result<Vec<PreToken>, PreprocessorError> {
     let lines = LineSplicer::new(content.chars());
     let mut tokens = lex(lines)?;
 
@@ -123,7 +234,5 @@ pub fn preprocess(content: &str) -> Result<String, PreprocessorError> {
         Err(err) => return Err(err.into()),
     };
 
-    let expanded = expand_ast(&ast, Environment::default())?;
-
-    Ok(format!("{:#?}", expanded))
+    expand_ast(&ast, Environment::default())
 }

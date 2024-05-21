@@ -1,0 +1,67 @@
+use crate::{
+    c::token::{CToken, CTokenKind},
+    look_ahead::LookAhead,
+    repeating_last::RepeatingLast,
+    source_file_cache::{SourceFileCache, SourceFileCacheKey},
+};
+use std::borrow::Borrow;
+
+pub struct Input<'a, I: Iterator<Item = CToken>> {
+    source_file_cache: &'a SourceFileCache,
+    iterator: LookAhead<RepeatingLast<I>>,
+    key: SourceFileCacheKey,
+}
+
+impl<'a, I> Input<'a, I>
+where
+    I: Iterator<Item = CToken>,
+{
+    pub fn new(
+        iterator: I,
+        source_file_cache: &'a SourceFileCache,
+        key: SourceFileCacheKey,
+    ) -> Self {
+        Self {
+            iterator: LookAhead::new(RepeatingLast::new(iterator)),
+            source_file_cache,
+            key,
+        }
+    }
+
+    pub fn peek(&mut self) -> &CToken {
+        self.iterator.peek_nth(0).unwrap()
+    }
+
+    pub fn peek_nth(&mut self, n: usize) -> &CToken {
+        self.iterator.peek_nth(n).unwrap()
+    }
+
+    pub fn peek_n(&mut self, n: usize) -> &[CToken] {
+        self.iterator.peek_n(n)
+    }
+
+    pub fn peek_is(&mut self, token: impl Borrow<CTokenKind>) -> bool {
+        self.peek().kind == *token.borrow()
+    }
+
+    pub fn peek_is_or_eof(&mut self, token: impl Borrow<CTokenKind>) -> bool {
+        let next = &self.peek().kind;
+        next == token.borrow() || next.is_end_of_file()
+    }
+
+    pub fn advance(&mut self) -> CToken {
+        self.iterator.next().unwrap()
+    }
+
+    pub fn filename(&self) -> &str {
+        self.source_file_cache.get(self.key).filename()
+    }
+
+    pub fn key(&self) -> SourceFileCacheKey {
+        self.key
+    }
+
+    pub fn source_file_cache(&self) -> &'a SourceFileCache {
+        self.source_file_cache
+    }
+}

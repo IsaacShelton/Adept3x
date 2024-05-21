@@ -1,10 +1,11 @@
-use super::{encoding::Encoding, punctuator::Punctuator};
+use super::{encoding::Encoding, lexer::LexError, punctuator::Punctuator};
 use crate::line_column::Location;
 use derive_more::{Deref, IsVariant, Unwrap};
 
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum CTokenKind {
     EndOfFile,
+    LexError(LexError),
     Identifier(String),
     Punctuator(Punctuator),
     Integer(Integer),

@@ -27,9 +27,10 @@ use llvm_backend::llvm_backend;
 use lower::lower;
 use parser::{parse, parse_into};
 use resolve::resolve;
-use std::fs::metadata;
+use std::fmt::Display;
 use std::path::Path;
 use std::process::exit;
+use std::{ffi::OsStr, fs::metadata};
 use walkdir::{DirEntry, WalkDir};
 
 fn main() {
@@ -51,94 +52,7 @@ fn build_project(build_command: BuildCommand) {
 
     match metadata(filepath) {
         Ok(metadata) if metadata.is_dir() => {
-            let folder_path = filepath;
-            let walker = WalkDir::new(filepath).min_depth(1).into_iter();
-            let mut ast = None;
-
-            let output_binary_filepath = folder_path.join("a.out");
-            let output_object_filepath = folder_path.join("a.o");
-
-            fn is_hidden(entry: &DirEntry) -> bool {
-                entry
-                    .file_name()
-                    .to_str()
-                    .map(|s| s.starts_with("."))
-                    .unwrap_or(false)
-            }
-
-            for entry in walker.filter_entry(|e| !is_hidden(e)) {
-                let entry = entry.expect("walk dir");
-
-                let is_adept = entry
-                    .path()
-                    .extension()
-                    .map_or(false, |extension| extension == "adept");
-
-                if !is_adept {
-                    continue;
-                }
-
-                let filename = entry.path().to_string_lossy().to_string();
-
-                let key = match source_file_cache.add(&filename) {
-                    Ok(key) => key,
-                    Err(_) => {
-                        eprintln!("Failed to open file {}", filename);
-                        exit(1);
-                    }
-                };
-
-                let content = source_file_cache.get(key).content();
-                let lexer = Lexer::new(content.chars());
-
-                if let Some(ast) = &mut ast {
-                    match parse_into(lexer, &source_file_cache, key, ast, filename.to_string()) {
-                        Ok(()) => (),
-                        Err(parse_error) => {
-                            eprintln!("{}", parse_error);
-                            exit(1);
-                        }
-                    }
-                } else {
-                    ast = match parse(lexer, &source_file_cache, key) {
-                        Ok(ast) => Some(ast),
-                        Err(parse_error) => {
-                            eprintln!("{}", parse_error);
-                            exit(1);
-                        }
-                    };
-                }
-            }
-
-            let ast = if let Some(ast) = ast {
-                ast
-            } else {
-                eprintln!("must have at least one adept file in directory in order to compile");
-                exit(1);
-            };
-
-            let resolved_ast = match resolve(&ast) {
-                Ok(resolved_ast) => resolved_ast,
-                Err(error) => {
-                    eprintln!("{}", error);
-                    exit(1);
-                }
-            };
-
-            let ir_module = match lower(&resolved_ast) {
-                Ok(ir_module) => ir_module,
-                Err(error) => {
-                    eprintln!("{}", error);
-                    exit(1);
-                }
-            };
-
-            match unsafe {
-                llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath)
-            } {
-                Err(error) => eprintln!("{}", error),
-                Ok(()) => (),
-            }
+            compile_project(&source_file_cache, filepath);
         }
         _ => {
             if !filepath.is_file() {
@@ -148,7 +62,7 @@ fn build_project(build_command: BuildCommand) {
 
             if filepath.extension().unwrap_or_default() == "h" {
                 let content = std::fs::read_to_string(filepath).expect("file to exist");
-                println!("{}", preprocess(&content).unwrap());
+                println!("{:?}", preprocess(&content).unwrap());
                 return;
             }
 
@@ -156,6 +70,93 @@ fn build_project(build_command: BuildCommand) {
             compile(&source_file_cache, project_folder, &filename);
         }
     }
+}
+
+fn exit_unless<T, E: Display>(result: Result<T, E>) -> T {
+    match result {
+        Ok(value) => value,
+        Err(err) => {
+            eprintln!("{}", err);
+            exit(1);
+        }
+    }
+}
+
+fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
+    let folder_path = filepath;
+    let walker = WalkDir::new(filepath).min_depth(1).into_iter();
+    let mut ast = None;
+
+    let output_binary_filepath = folder_path.join("a.out");
+    let output_object_filepath = folder_path.join("a.o");
+
+    for entry in walker.filter_entry(|e| !is_hidden(e)) {
+        let entry = entry.expect("walk dir");
+        let extension = entry.path().extension();
+
+        let is_header = match extension.and_then(OsStr::to_str) {
+            Some("adept") => false,
+            Some("h") => true,
+            _ => continue,
+        };
+
+        let filename = entry.path().to_string_lossy().to_string();
+
+        let key = match source_file_cache.add(&filename) {
+            Ok(key) => key,
+            Err(_) => {
+                eprintln!("Failed to open file {}", filename);
+                exit(1);
+            }
+        };
+
+        let content = source_file_cache.get(key).content();
+
+        if !is_header {
+            let lexer = Lexer::new(content.chars());
+
+            if let Some(ast) = &mut ast {
+                exit_unless(parse_into(
+                    lexer,
+                    &source_file_cache,
+                    key,
+                    ast,
+                    filename.to_string(),
+                ));
+            } else {
+                exit_unless(parse(lexer, &source_file_cache, key));
+            }
+        } else {
+            let mut preprocessed = exit_unless(c::preprocessor::preprocess(content));
+            let lexer = c::Lexer::new(preprocessed.drain(..));
+
+            if let Some(ast) = &mut ast {
+                exit_unless(c::parse_into(
+                    lexer,
+                    &source_file_cache,
+                    key,
+                    ast,
+                    filename.to_string(),
+                ));
+            } else {
+                exit_unless(c::parse(lexer, &source_file_cache, key));
+            }
+        }
+    }
+
+    let ast = if let Some(ast) = ast {
+        ast
+    } else {
+        eprintln!("must have at least one adept file in directory in order to compile");
+        exit(1);
+    };
+
+    let resolved_ast = exit_unless(resolve(&ast));
+    let ir_module = exit_unless(lower(&resolved_ast));
+
+    exit_unless(unsafe {
+        llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath)
+    });
 }
 
 fn compile(source_file_cache: &SourceFileCache, project_folder: &Path, filename: &str) {
@@ -239,4 +240,12 @@ fn put_file(directory_name: &str, filename: &str, content: &str) {
         eprintln!("Failed to create {} file", filename);
         exit(1);
     }
+}
+
+fn is_hidden(entry: &DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s.starts_with("."))
+        .unwrap_or(false)
 }

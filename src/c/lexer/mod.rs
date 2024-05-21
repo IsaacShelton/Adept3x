@@ -8,7 +8,13 @@ pub struct Lexer<I: Iterator<Item = PreToken>> {
     pub input: I,
 }
 
-#[derive(Clone, Debug)]
+impl<I: Iterator<Item = PreToken>> Lexer<I> {
+    pub fn new(input: I) -> Self {
+        Self { input }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum LexError {
     UniversalCharacterNameNotSupported,
     UnrecognizedSymbol,
@@ -16,7 +22,7 @@ pub enum LexError {
 }
 
 impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
-    type Item = Result<CToken, LexError>;
+    type Item = CToken;
 
     fn next(&mut self) -> Option<Self::Item> {
         let PreToken { kind, line } = self.input.next()?;
@@ -81,7 +87,7 @@ impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
             },
             PreTokenKind::Number(number) => match lex_number(&number) {
                 Ok(token) => token,
-                Err(err) => return Some(Err(err)),
+                Err(err) => CTokenKind::LexError(err),
             },
             PreTokenKind::CharacterConstant(encoding, content) => {
                 CTokenKind::CharacterConstant(encoding, content)
@@ -91,20 +97,20 @@ impl<I: Iterator<Item = PreToken>> Iterator for Lexer<I> {
             }
             PreTokenKind::Punctuator(punctuator) => CTokenKind::Punctuator(punctuator),
             PreTokenKind::UniversalCharacterName(..) => {
-                return Some(Err(LexError::UniversalCharacterNameNotSupported));
+                CTokenKind::LexError(LexError::UniversalCharacterNameNotSupported)
             }
             PreTokenKind::Other(..) => {
-                return Some(Err(LexError::UnrecognizedSymbol));
+                CTokenKind::LexError(LexError::UnrecognizedSymbol)
             }
             PreTokenKind::HeaderName(_)
             | PreTokenKind::IsDefined(_)
             | PreTokenKind::Placeholder => unreachable!(),
         };
 
-        Some(Ok(CToken::new(
+        Some(CToken::new(
             kind,
             Location::new(line.map(u32::from).unwrap_or(0), 1),
-        )))
+        ))
     }
 }
 
