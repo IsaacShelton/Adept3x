@@ -26,7 +26,10 @@ impl<'a, I: Iterator<Item = &'a PreToken> + Clone> Iterator for Lexer<'a, I> {
     type Item = CToken;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let PreToken { kind, line } = self.input.next()?;
+        let PreToken { kind, line } = match self.input.next() {
+            Some(token) => token,
+            None => return Some(CToken::new(CTokenKind::EndOfFile, Location::new(0, 1))),
+        };
 
         let kind = match kind {
             PreTokenKind::Identifier(name) => match name.as_str() {

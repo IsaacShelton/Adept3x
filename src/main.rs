@@ -101,6 +101,7 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
         };
 
         let filename = entry.path().to_string_lossy().to_string();
+        println!("[=] {}", filename);
 
         let key = match source_file_cache.add(&filename) {
             Ok(key) => key,
@@ -124,7 +125,7 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
                     filename.to_string(),
                 ));
             } else {
-                exit_unless(parse(lexer, &source_file_cache, key));
+                ast = Some(exit_unless(parse(lexer, &source_file_cache, key)));
             }
         } else {
             let preprocessed = exit_unless(c::preprocessor::preprocess(content));
@@ -139,7 +140,7 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
                     filename.to_string(),
                 ));
             } else {
-                exit_unless(c::parse(lexer, &source_file_cache, key));
+                ast = Some(exit_unless(c::parse(lexer, &source_file_cache, key)));
             }
         }
     }
