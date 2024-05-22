@@ -68,6 +68,15 @@ pub enum CTokenKind {
     NoreturnKeyword,
 }
 
+impl CTokenKind {
+    pub fn is_open_paren(&self) -> bool {
+        match self {
+            CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Integer {
     Int(i32),

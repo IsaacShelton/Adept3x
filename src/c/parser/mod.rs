@@ -1,6 +1,8 @@
 mod error;
 mod input;
 
+use std::collections::HashMap;
+
 use self::error::ParseErrorKind;
 pub use self::{error::ParseError, input::Input};
 use super::{
@@ -17,6 +19,39 @@ where
     I: Iterator<Item = CToken> + Clone,
 {
     input: Input<'a, I>,
+    typedefs: HashMap<String, CTypedef>,
+}
+
+#[derive(Clone, Debug)]
+struct CTypedef {}
+
+#[derive(Clone, Debug)]
+struct ParameterTypeList {
+    pub parameter_declarations: Vec<ParameterDeclaration>,
+    pub is_variadic: bool,
+}
+
+#[derive(Clone, Debug)]
+enum Declarator {
+    Named(String),
+    Function(Box<Declarator>, ParameterTypeList),
+}
+
+#[derive(Clone, Debug)]
+enum AbstractDeclarator {}
+
+#[derive(Clone, Debug)]
+enum ParameterDeclarationCore {
+    Declarator(Declarator),
+    AbstractDeclarator(AbstractDeclarator),
+    Nothing,
+}
+
+#[derive(Clone, Debug)]
+struct ParameterDeclaration {
+    pub attributes: Vec<()>,
+    pub declaration_specifiers: Vec<()>,
+    pub core: ParameterDeclarationCore,
 }
 
 impl<'a, I> Parser<'a, I>
@@ -24,7 +59,10 @@ where
     I: Iterator<Item = CToken> + Clone,
 {
     pub fn new(input: Input<'a, I>) -> Self {
-        Self { input }
+        Self {
+            input,
+            typedefs: HashMap::default(),
+        }
     }
 
     pub fn parse(mut self) -> Result<Ast<'a>, ParseError> {
@@ -54,14 +92,14 @@ where
 
     fn parse_external_declaration(&mut self, _ast_file: &mut File) -> Result<(), ParseError> {
         self.input.speculate();
-        if let Ok(function_definition) = self.parse_function_definition() {
+        if let Ok(_function_definition) = self.parse_function_definition() {
             self.input.success();
             return Ok(());
         }
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(declaration) = self.parse_declaration() {
+        if let Ok(_declaration) = self.parse_declaration() {
             self.input.success();
             return Ok(());
         }
@@ -78,7 +116,7 @@ where
         Ok(())
     }
 
-    fn parse_attribute_specifier_sequence(&mut self) -> Result<(), ParseError> {
+    fn parse_attribute_specifier_sequence(&mut self) -> Result<Vec<()>, ParseError> {
         while self.eat_sequence(&[
             CTokenKind::Punctuator(Punctuator::OpenBracket),
             CTokenKind::Punctuator(Punctuator::OpenBracket),
@@ -87,10 +125,10 @@ where
             unimplemented!("parsing c attributes");
         }
 
-        Ok(())
+        Ok(vec![])
     }
 
-    fn parse_declaration_specifiers(&mut self) -> Result<(), ParseError> {
+    fn parse_declaration_specifiers(&mut self) -> Result<Vec<()>, ParseError> {
         let mut specifiers = vec![];
 
         loop {
@@ -107,7 +145,7 @@ where
         }
 
         self.parse_attribute_specifier_sequence()?;
-        Ok(())
+        Ok(vec![])
     }
 
     fn parse_declaration_specifier(&mut self) -> Result<(), ParseError> {
@@ -152,7 +190,10 @@ where
         }
 
         self.input.backtrack();
-        Err(todo!())
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse type specifier qualifier"),
+            None,
+        ))
     }
 
     fn parse_type_specifier(&mut self) -> Result<(), ParseError> {
@@ -171,6 +212,7 @@ where
             | CTokenKind::DoubleKeyword
             | CTokenKind::SignedKeyword
             | CTokenKind::UnsignedKeyword => {
+                self.input.advance();
                 return Ok(());
             }
             _ => (),
@@ -211,7 +253,10 @@ where
         }
         self.input.backtrack();
 
-        Err(todo!())
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse type specifier"),
+            None,
+        ))
     }
 
     fn parse_type_qualifier(&mut self) -> Result<(), ParseError> {
@@ -223,28 +268,36 @@ where
                 self.input.advance();
                 Ok(())
             }
-            _ => Err(todo!()),
+            _ => Err(ParseError::new(
+                ParseErrorKind::Misc("Failed to parse type qualifier"),
+                None,
+            )),
         }
     }
 
     fn parse_alignment_specifier(&mut self) -> Result<(), ParseError> {
-        if !self.eat_sequence(&[CTokenKind::AlignasKeyword]) {
-            return Ok(());
+        self.input.speculate();
+        if self.eat_sequence(&[CTokenKind::AlignasKeyword]) {
+            if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = self.input.peek().kind {
+                self.input.advance();
+                todo!();
+                self.input.success();
+                return Ok(());
+            }
         }
 
-        if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = self.input.peek().kind {
-            self.input.advance();
-        } else {
-            return Err(todo!());
-        }
+        self.input.backtrack();
 
-        unimplemented!("parse alignment specifier");
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse alignment specifier"),
+            None,
+        ))
     }
 
-    fn parse_declarator(&mut self) -> Result<(), ParseError> {
+    fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
         self.input.speculate();
 
-        if let Ok(pointer) = self.parse_pointer() {
+        if let Ok(_pointer) = self.parse_pointer() {
             self.input.success();
             todo!()
         } else {
@@ -256,20 +309,23 @@ where
 
     fn parse_pointer(&mut self) -> Result<(), ParseError> {
         if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::Multiply)]) {
-            return Err(todo!());
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Failed to parse pointer type"),
+                None,
+            ));
         }
 
         self.parse_attribute_specifier_sequence()?;
         self.parse_type_qualifier_list()?;
 
-        if let Ok(more) = self.parse_pointer() {
+        if let Ok(_more) = self.parse_pointer() {
             todo!()
         } else {
             todo!()
         }
     }
 
-    fn parse_type_qualifier_list(&mut self) -> Result<(), ParseError> {
+    fn parse_type_qualifier_list(&mut self) -> Result<Vec<()>, ParseError> {
         let mut qualifiers = vec![];
 
         loop {
@@ -285,38 +341,197 @@ where
             break;
         }
 
-        todo!() // Ok(qualifiers)
+        Ok(qualifiers)
     }
 
-    fn parse_direct_declarator(&mut self) -> Result<(), ParseError> {
-        // One of
-        // identifier attribute-specifier-sequence?
-        // (direct-delcarator)
+    fn parse_direct_declarator(&mut self) -> Result<Declarator, ParseError> {
+        let mut declarator = if let CTokenKind::Identifier(name) = &self.input.peek().kind {
+            let name = name.clone();
+            self.input.advance();
+            let attributes = self.parse_attribute_specifier_sequence()?;
+            Declarator::Named(name)
+        } else if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = &self.input.peek().kind
+        {
+            self.input.advance();
+            let declarator = self.parse_declarator()?;
 
-        // Followed by
-        // Any number of (array-declarator and function-declarator postfixes) +
-        // attribute-specifier-sequence?
+            if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseParen)]) {
+                return Err(ParseError::new(
+                    ParseErrorKind::Misc("Failed to parse ')' for direct declarator"),
+                    None,
+                ));
+            }
+
+            declarator
+        } else {
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Expected declarator"),
+                None,
+            ));
+        };
+
+        loop {
+            match &self.input.peek().kind {
+                CTokenKind::Punctuator(Punctuator::OpenBracket) => todo!(),
+                CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => {
+                    declarator = self.parse_function_declarator(declarator)?
+                }
+                _ => break,
+            }
+        }
+
+        let attributes = self.parse_attribute_specifier_sequence()?;
+        Ok(declarator)
+    }
+
+    fn parse_function_declarator(
+        &mut self,
+        declarator: Declarator,
+    ) -> Result<Declarator, ParseError> {
+        assert!(self.input.advance().kind.is_open_paren());
+        let parameter_type_list = self.parse_parameter_type_list()?;
+        self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseParen)]);
+        Ok(Declarator::Function(
+            Box::new(declarator),
+            parameter_type_list,
+        ))
+    }
+
+    fn parse_parameter_type_list(&mut self) -> Result<ParameterTypeList, ParseError> {
+        let mut parameter_declarations = Vec::new();
+        let mut is_variadic = false;
+
+        loop {
+            if let CTokenKind::Punctuator(Punctuator::Ellipses) = self.input.peek().kind {
+                self.input.advance();
+                is_variadic = true;
+                break;
+            }
+
+            let declaration = self.parse_parameter_declaration()?;
+            parameter_declarations.push(declaration);
+
+            match self.input.peek().kind {
+                CTokenKind::Punctuator(Punctuator::CloseParen) => break,
+                CTokenKind::Punctuator(Punctuator::Comma) => {
+                    let _ = self.input.advance();
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::Misc(
+                            "Expected ',' after parameter declaration in parameter type list",
+                        ),
+                        None,
+                    ))
+                }
+            }
+        }
+
+        Ok(ParameterTypeList {
+            parameter_declarations,
+            is_variadic,
+        })
+    }
+
+    fn parse_parameter_declaration(&mut self) -> Result<ParameterDeclaration, ParseError> {
+        let attributes = self.parse_attribute_specifier_sequence()?;
+        let declaration_specifiers = self.parse_declaration_specifiers()?;
+
+        self.input.speculate();
+        if let Ok(declarator) = self.parse_declarator() {
+            self.input.success();
+            return Ok(ParameterDeclaration {
+                attributes,
+                declaration_specifiers,
+                core: ParameterDeclarationCore::Declarator(declarator),
+            });
+        }
+        self.input.backtrack();
+
+        self.input.speculate();
+        if let Ok(abstract_declarator) = self.parse_abstract_declarator() {
+            self.input.success();
+            return Ok(ParameterDeclaration {
+                attributes,
+                declaration_specifiers,
+                core: ParameterDeclarationCore::AbstractDeclarator(abstract_declarator),
+            });
+        }
+        self.input.backtrack();
+
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse parameter declaration"),
+            None,
+        ))
+    }
+
+    fn parse_abstract_declarator(&mut self) -> Result<AbstractDeclarator, ParseError> {
         todo!()
     }
 
     fn parse_atomic_type_specifier(&mut self) -> Result<(), ParseError> {
-        todo!()
+        if self.input.peek_is(CTokenKind::AtomicKeyword) {
+            todo!()
+        }
+
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse atomic specifier"),
+            None,
+        ))
     }
 
     fn parse_struct_or_union_specifier(&mut self) -> Result<(), ParseError> {
-        todo!()
+        if let CTokenKind::StructKeyword | CTokenKind::UnionKeyword = self.input.peek().kind {
+            self.input.advance();
+            todo!()
+        }
+
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse struct or union specifier"),
+            None,
+        ))
     }
 
     fn parse_typedef_name(&mut self) -> Result<(), ParseError> {
-        todo!()
+        if let CTokenKind::Identifier(name) = &self.input.peek().kind {
+            if let Some(_typedef) = self.typedefs.get(name) {
+                self.input.advance();
+                return Ok(());
+            }
+        }
+
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse typedef name"),
+            None,
+        ))
     }
 
     fn parse_enum_specifier(&mut self) -> Result<(), ParseError> {
-        todo!()
+        if let CTokenKind::StructKeyword | CTokenKind::UnionKeyword = self.input.peek().kind {
+            self.input.advance();
+            todo!();
+        }
+
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse enum specifier"),
+            None,
+        ))
     }
 
     fn parse_typeof_specifier(&mut self) -> Result<(), ParseError> {
-        todo!()
+        self.input.speculate();
+
+        if let CTokenKind::TypeofKeyword | CTokenKind::TypeofUnqualKeyword =
+            self.input.advance().kind
+        {
+            todo!()
+        }
+
+        self.input.backtrack();
+        Err(ParseError::new(
+            ParseErrorKind::Misc("Failed to parse typeof specifier"),
+            None,
+        ))
     }
 
     fn parse_declaration(&mut self) -> Result<(), ParseError> {

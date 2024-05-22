@@ -26,20 +26,14 @@ impl Display for ParseError {
 #[derive(Clone, Debug)]
 pub enum ParseErrorKind {
     ExpectedDeclaration,
-    FailedToParseTypeSpecifier,
-    FailedToParseTypeSpecifierQualifier,
+    Misc(&'static str),
 }
 
 impl Display for ParseErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseErrorKind::ExpectedDeclaration => f.write_str("Expected declaration"),
-            ParseErrorKind::FailedToParseTypeSpecifier => {
-                f.write_str("Failed to parse type specifier")
-            }
-            ParseErrorKind::FailedToParseTypeSpecifierQualifier => {
-                f.write_str("Failed to parse type specifier qualifier")
-            }
+            ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }
 }
