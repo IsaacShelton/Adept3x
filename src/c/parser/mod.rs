@@ -33,7 +33,7 @@ struct ParameterTypeList {
 #[derive(Clone, Debug)]
 enum Declarator {
     Named(String),
-    Pointer(Box<Declarator>),
+    Pointers(Box<Declarator>, Pointers),
     Function(Box<Declarator>, ParameterTypeList),
 }
 
@@ -56,7 +56,13 @@ struct ParameterDeclaration {
 
 #[derive(Clone, Debug)]
 struct Pointers {
-    pub pointers: Vec<()>,
+    pub pointers: Vec<Pointer>,
+}
+
+#[derive(Clone, Debug)]
+struct Pointer {
+    pub attributes: Vec<()>,
+    pub type_qualifiers: Vec<TypeQualifier>,
 }
 
 #[derive(Clone, Debug)]
@@ -76,7 +82,41 @@ enum DeclarationSpecifier {
     Typedef,
     Inline,
     Noreturn,
-    TypeSpecifierQualifier(()),
+    TypeSpecifierQualifier(TypeSpecifierQualifier),
+}
+
+#[derive(Clone, Debug)]
+enum TypeSpecifierQualifier {
+    TypeSpecifier(TypeSpecifier),
+    TypeQualifier(TypeQualifier),
+    AlignmentSpecifier(AlignmentSpecifier),
+}
+
+#[derive(Clone, Debug)]
+enum TypeSpecifier {
+    Void,
+    Char,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double,
+    Signed,
+    Unsigned,
+}
+
+#[derive(Clone, Debug)]
+enum TypeQualifier {
+    Const,
+    Restrict,
+    Volatile,
+    Atomic,
+}
+
+#[derive(Clone, Debug)]
+enum AlignmentSpecifier {
+    AlignAsType(()),
+    AlisnAsConstExpr(()),
 }
 
 #[derive(Clone, Debug)]
@@ -204,25 +244,27 @@ where
         Ok(result)
     }
 
-    fn parse_type_specifier_qualifier(&mut self) -> Result<(), ParseError> {
+    fn parse_type_specifier_qualifier(&mut self) -> Result<TypeSpecifierQualifier, ParseError> {
         self.input.speculate();
-        if let Ok(_) = self.parse_type_specifier() {
+        if let Ok(type_specifier) = self.parse_type_specifier() {
             self.input.success();
-            return Ok(());
+            return Ok(TypeSpecifierQualifier::TypeSpecifier(type_specifier));
         }
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(_) = self.parse_type_qualifier() {
+        if let Ok(type_qualifier) = self.parse_type_qualifier() {
             self.input.success();
-            return Ok(());
+            return Ok(TypeSpecifierQualifier::TypeQualifier(type_qualifier));
         }
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(_) = self.parse_alignment_specifier() {
+        if let Ok(alignment_specifier) = self.parse_alignment_specifier() {
             self.input.success();
-            return Ok(());
+            return Ok(TypeSpecifierQualifier::AlignmentSpecifier(
+                alignment_specifier,
+            ));
         }
 
         self.input.backtrack();
@@ -232,60 +274,60 @@ where
         ))
     }
 
-    fn parse_type_specifier(&mut self) -> Result<(), ParseError> {
-        match self.input.peek().kind {
+    fn parse_type_specifier(&mut self) -> Result<TypeSpecifier, ParseError> {
+        if let Some(type_specifier) = match self.input.peek().kind {
             CTokenKind::Decimal32Keyword => unimplemented!("_Decimal32"),
             CTokenKind::Decimal64Keyword => unimplemented!("_Decimal64"),
             CTokenKind::Decimal128Keyword => unimplemented!("_Decimal128"),
             CTokenKind::ComplexKeyword => unimplemented!("_Complex"),
             CTokenKind::BitIntKeyword => unimplemented!("_BitInt"),
-            CTokenKind::VoidKeyword
-            | CTokenKind::CharKeyword
-            | CTokenKind::ShortKeyword
-            | CTokenKind::IntKeyword
-            | CTokenKind::LongKeyword
-            | CTokenKind::FloatKeyword
-            | CTokenKind::DoubleKeyword
-            | CTokenKind::SignedKeyword
-            | CTokenKind::UnsignedKeyword => {
-                self.input.advance();
-                return Ok(());
-            }
-            _ => (),
+            CTokenKind::VoidKeyword => Some(TypeSpecifier::Void),
+            CTokenKind::CharKeyword => Some(TypeSpecifier::Char),
+            CTokenKind::ShortKeyword => Some(TypeSpecifier::Short),
+            CTokenKind::IntKeyword => Some(TypeSpecifier::Int),
+            CTokenKind::LongKeyword => Some(TypeSpecifier::Long),
+            CTokenKind::FloatKeyword => Some(TypeSpecifier::Float),
+            CTokenKind::DoubleKeyword => Some(TypeSpecifier::Double),
+            CTokenKind::SignedKeyword => Some(TypeSpecifier::Signed),
+            CTokenKind::UnsignedKeyword => Some(TypeSpecifier::Unsigned),
+            _ => None,
+        } {
+            self.input.advance();
+            return Ok(type_specifier);
         }
 
         self.input.speculate();
         if let Ok(..) = self.parse_atomic_type_specifier() {
             self.input.success();
-            return Ok(());
+            return Ok(todo!());
         }
         self.input.backtrack();
 
         self.input.speculate();
         if let Ok(..) = self.parse_struct_or_union_specifier() {
             self.input.success();
-            return Ok(());
+            return Ok(todo!());
         }
         self.input.backtrack();
 
         self.input.speculate();
         if let Ok(..) = self.parse_enum_specifier() {
             self.input.success();
-            return Ok(());
+            return Ok(todo!());
         }
         self.input.backtrack();
 
         self.input.speculate();
         if let Ok(..) = self.parse_typedef_name() {
             self.input.success();
-            return Ok(());
+            return Ok(todo!());
         }
         self.input.backtrack();
 
         self.input.speculate();
         if let Ok(..) = self.parse_typeof_specifier() {
             self.input.success();
-            return Ok(());
+            return Ok(todo!());
         }
         self.input.backtrack();
 
@@ -295,30 +337,32 @@ where
         ))
     }
 
-    fn parse_type_qualifier(&mut self) -> Result<(), ParseError> {
-        match self.input.peek().kind {
-            CTokenKind::ConstKeyword
-            | CTokenKind::RestrictKeyword
-            | CTokenKind::VolatileKeyword
-            | CTokenKind::AtomicKeyword => {
-                self.input.advance();
-                Ok(())
+    fn parse_type_qualifier(&mut self) -> Result<TypeQualifier, ParseError> {
+        let type_qualifier = match self.input.peek().kind {
+            CTokenKind::ConstKeyword => TypeQualifier::Const,
+            CTokenKind::RestrictKeyword => TypeQualifier::Restrict,
+            CTokenKind::VolatileKeyword => TypeQualifier::Volatile,
+            CTokenKind::AtomicKeyword => TypeQualifier::Atomic,
+            _ => {
+                return Err(ParseError::new(
+                    ParseErrorKind::Misc("Failed to parse type qualifier"),
+                    None,
+                ))
             }
-            _ => Err(ParseError::new(
-                ParseErrorKind::Misc("Failed to parse type qualifier"),
-                None,
-            )),
-        }
+        };
+
+        self.input.advance();
+        Ok(type_qualifier)
     }
 
-    fn parse_alignment_specifier(&mut self) -> Result<(), ParseError> {
+    fn parse_alignment_specifier(&mut self) -> Result<AlignmentSpecifier, ParseError> {
         self.input.speculate();
         if self.eat_sequence(&[CTokenKind::AlignasKeyword]) {
             if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = self.input.peek().kind {
                 self.input.advance();
                 todo!();
                 self.input.success();
-                return Ok(());
+                return Ok(todo!());
             }
         }
 
@@ -344,22 +388,31 @@ where
             }
         };
 
-        self.parse_direct_declarator()
+        let declarator = self.parse_direct_declarator()?;
+
+        if pointers.pointers.is_empty() {
+            Ok(declarator)
+        } else {
+            Ok(Declarator::Pointers(Box::new(declarator), pointers))
+        }
     }
 
     fn parse_pointers(&mut self) -> Result<Pointers, ParseError> {
         let mut pointers = Pointers { pointers: vec![] };
 
         while self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::Multiply)]) {
-            self.parse_attribute_specifier_sequence()?;
-            self.parse_type_qualifier_list()?;
-            pointers.pointers.push(());
+            let attributes = self.parse_attribute_specifier_sequence()?;
+            let type_qualifiers = self.parse_type_qualifier_list()?;
+            pointers.pointers.push(Pointer {
+                attributes,
+                type_qualifiers,
+            });
         }
 
         Ok(pointers)
     }
 
-    fn parse_type_qualifier_list(&mut self) -> Result<Vec<()>, ParseError> {
+    fn parse_type_qualifier_list(&mut self) -> Result<Vec<TypeQualifier>, ParseError> {
         let mut qualifiers = vec![];
 
         loop {
@@ -606,9 +659,9 @@ where
         }
 
         println!("parsed declaration");
-        println!(" -> attribute_specifiers = {:?}", attribute_specifiers);
-        println!(" -> declaration specifiers = {:?}", declaration_specifiers);
-        println!(" -> init_declarator_list = {:?}", init_declarator_list);
+        println!(" -> attribute_specifiers = {:#?}", attribute_specifiers);
+        println!(" -> declaration specifiers = {:#?}", declaration_specifiers);
+        println!(" -> init_declarator_list = {:#?}", init_declarator_list);
         return Ok(());
     }
 

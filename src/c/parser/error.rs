@@ -19,7 +19,7 @@ impl Display for ParseError {
         } else {
             write!(f, "error: ")?;
         }
-        self.fmt(f)
+        self.kind.fmt(f)
     }
 }
 
