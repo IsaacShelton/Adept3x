@@ -77,6 +77,7 @@ impl Pointers {
 pub struct Pointer {
     pub attributes: Vec<()>,
     pub type_qualifiers: Vec<TypeQualifier>,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -180,7 +181,6 @@ impl<'a> Parser<'a> {
 
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
-            println!("{:#?}", external_declaration);
 
             for init_declarator in external_declaration.init_declarator_list.iter() {
                 match &init_declarator.declarator {
@@ -275,9 +275,10 @@ impl<'a> Parser<'a> {
             CTokenKind::InlineKeyword => DeclarationSpecifier::Inline,
             CTokenKind::NoreturnKeyword => DeclarationSpecifier::Noreturn,
             _ => {
-                return Ok(DeclarationSpecifier::TypeSpecifierQualifier(
+                let r = DeclarationSpecifier::TypeSpecifierQualifier(
                     self.parse_type_specifier_qualifier()?,
-                ));
+                );
+                return Ok(r);
             }
         };
 
@@ -445,12 +446,16 @@ impl<'a> Parser<'a> {
     fn parse_pointers(&mut self) -> Result<Pointers, ParseError> {
         let mut pointers = Pointers { pointers: vec![] };
 
-        while self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::Multiply)]) {
+        while let Some(source) =
+            self.eat_sequence_source(&[CTokenKind::Punctuator(Punctuator::Multiply)])
+        {
             let attributes = self.parse_attribute_specifier_sequence()?;
+
             let type_qualifiers = self.parse_type_qualifier_list()?;
             pointers.pointers.push(Pointer {
                 attributes,
                 type_qualifiers,
+                source,
             });
         }
 
@@ -820,17 +825,27 @@ impl<'a> Parser<'a> {
     }
 
     fn eat_sequence(&mut self, expected: &[CTokenKind]) -> bool {
+        self.eat_sequence_source(expected).is_some()
+    }
+
+    fn eat_sequence_source(&mut self, expected: &[CTokenKind]) -> Option<Source> {
         for (i, expected_kind) in expected.iter().enumerate() {
             if self.input.peek_nth(i).kind != *expected_kind {
-                return false;
+                return None;
             }
         }
+
+        let source = if expected.len() > 0 {
+            Some(self.input.peek().source)
+        } else {
+            None
+        };
 
         for _ in 0..expected.len() {
             self.input.advance();
         }
 
-        true
+        source
     }
 }
 

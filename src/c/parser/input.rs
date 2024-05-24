@@ -46,19 +46,19 @@ impl<'a> Input<'a> {
 
     pub fn peek(&self) -> &CToken {
         self.tokens
-            .get(self.stack.last().unwrap() + 1)
+            .get(*self.stack.last().unwrap())
             .unwrap_or_else(|| self.eof())
     }
 
     pub fn peek_nth(&self, n: usize) -> &CToken {
         self.tokens
-            .get(self.stack.last().unwrap() + 1 + n)
+            .get(self.stack.last().unwrap() + n)
             .unwrap_or_else(|| self.eof())
     }
 
     pub fn peek_n(&self, n: usize) -> &[CToken] {
         let start = *self.stack.last().unwrap();
-        let end = (start + 1 + n).min(self.tokens.len());
+        let end = (start + n).min(self.tokens.len());
         &self.tokens[start..end]
     }
 
@@ -71,11 +71,14 @@ impl<'a> Input<'a> {
     }
 
     pub fn advance(&mut self) -> &CToken {
-        *self.stack.last_mut().unwrap() += 1;
+        let index = *self.stack.last().unwrap();
 
-        self.tokens
-            .get(*self.stack.last().unwrap())
-            .unwrap_or_else(|| self.eof())
+        if let Some(token) = self.tokens.get(index) {
+            *self.stack.last_mut().unwrap() += 1;
+            token
+        } else {
+            self.eof()
+        }
     }
 
     pub fn speculate(&mut self) {

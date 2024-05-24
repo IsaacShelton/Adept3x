@@ -3,17 +3,17 @@
 self="$(dirname -- "$0")"
 
 function compile_module() {
-    echo "[-] Compiling '$1'"
+    echo "[ ] Compiling '$1'"
     ../target/debug/adept $1
 }
 
 function compile() {
-    echo "[-] Compiling '$1'"
+    echo "[=] Compiling '$1'"
     ../target/debug/adept $1/main.adept
 }
 
 function expect_fail_compile() {
-    echo "[-] Expecting failure to compile '$1'"
+    echo "[=] Expecting failure to compile '$1'"
     ../target/debug/adept $1/main.adept
 }
 
@@ -43,6 +43,7 @@ compile math_floats
 compile math_simple
 compile member_pod
 compile_module modules_simple
+compile_module modules_headers
 compile nested_expressions
 compile object_mutation
 compile op_then_assign
