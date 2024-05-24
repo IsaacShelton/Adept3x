@@ -1,12 +1,12 @@
 use append_only_vec::AppendOnlyVec;
-use std::fs::read_to_string;
+use std::{fs::read_to_string, process::exit};
 
 #[derive(Debug)]
 pub struct SourceFileCache {
     files: AppendOnlyVec<SourceFile>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub struct SourceFileCacheKey {
     index: u32,
 }
@@ -35,6 +35,17 @@ impl SourceFileCache {
                 })
             }
             Err(error) => Err(error),
+        }
+    }
+
+
+    pub fn add_or_exit(&self, filename: &str) -> SourceFileCacheKey {
+        match self.add(&filename) {
+            Ok(key) => key,
+            Err(_) => {
+                eprintln!("Failed to open file {}", filename);
+                exit(1)
+            }
         }
     }
 }

@@ -1,21 +1,22 @@
-use std::num::NonZeroU32;
-
 use super::{depleted::Depleted, region::expand_region, Environment};
-use crate::c::preprocessor::{
-    pre_token::{PreToken, PreTokenKind},
-    PreprocessorError, PreprocessorErrorKind,
+use crate::{
+    ast::Source,
+    c::preprocessor::{
+        pre_token::{PreToken, PreTokenKind},
+        PreprocessorError, PreprocessorErrorKind,
+    },
 };
 
 pub fn expand_include(
     files: &[PreToken],
     environment: &mut Environment,
     depleted: &mut Depleted,
-    line: Option<NonZeroU32>,
+    source: Source,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
     let files = expand_region(files, environment, depleted)?;
 
     if files.len() != 1 {
-        return Err(PreprocessorErrorKind::BadInclude.at(line));
+        return Err(PreprocessorErrorKind::BadInclude.at(source));
     }
 
     // We can choose to satisfy these includes however we want
@@ -24,7 +25,7 @@ pub fn expand_include(
         PreTokenKind::StringLiteral(_encoding, header_name) => {
             eprintln!("including \"{}\"", header_name)
         }
-        _ => return Err(PreprocessorErrorKind::BadInclude.at(line)),
+        _ => return Err(PreprocessorErrorKind::BadInclude.at(source)),
     }
 
     Ok(vec![])

@@ -1,6 +1,6 @@
-use std::iter::Fuse;
+use std::iter::{Fuse, FusedIterator};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Location {
     pub line: u32,
     pub column: u32,
@@ -19,6 +19,8 @@ pub struct LineColumn<I: Iterator<Item = char>> {
     next_line: u32,
     next_column: u32,
 }
+
+impl<I: Iterator<Item = char>> FusedIterator for LineColumn<I> {}
 
 impl<I> Iterator for LineColumn<I>
 where

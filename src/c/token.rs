@@ -1,5 +1,5 @@
 use super::{encoding::Encoding, lexer::LexError, punctuator::Punctuator};
-use crate::line_column::Location;
+use crate::ast::Source;
 use derive_more::{Deref, IsVariant, Unwrap};
 
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
@@ -127,16 +127,16 @@ pub enum FloatSuffix {
     Decimal128,
 }
 
-#[derive(Clone, Debug, PartialEq, Deref)]
+#[derive(Clone, Debug, Deref)]
 pub struct CToken {
     #[deref]
     pub kind: CTokenKind,
 
-    pub location: Location,
+    pub source: Source,
 }
 
 impl CToken {
-    pub fn new(kind: CTokenKind, location: Location) -> CToken {
-        CToken { kind, location }
+    pub fn new(kind: CTokenKind, source: Source) -> CToken {
+        CToken { kind, source }
     }
 }

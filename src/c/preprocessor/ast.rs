@@ -1,12 +1,12 @@
-use std::num::NonZeroU32;
-
 use super::pre_token::PreToken;
+use crate::ast::Source;
 use derive_more::{IsVariant, Unwrap};
 use num_traits::Zero;
 
 #[derive(Clone, Debug)]
 pub struct PreprocessorAst {
     pub group: Group,
+    pub eof: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -39,6 +39,7 @@ pub enum IfGroup {
 pub struct IfLike {
     pub tokens: Vec<PreToken>,
     pub group: Group,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -198,12 +199,12 @@ pub enum ElifGroup {
 #[derive(Clone, Debug)]
 pub struct ControlLine {
     pub kind: ControlLineKind,
-    pub line: Option<NonZeroU32>,
+    pub source: Source,
 }
 
 impl ControlLine {
-    pub fn new(kind: ControlLineKind, line: Option<NonZeroU32>) -> Self {
-        Self { kind, line }
+    pub fn new(kind: ControlLineKind, source: Source) -> Self {
+        Self { kind, source }
     }
 }
 
@@ -220,8 +221,8 @@ pub enum ControlLineKind {
 }
 
 impl ControlLineKind {
-    pub fn at(self, line: Option<NonZeroU32>) -> ControlLine {
-        ControlLine::new(self, line)
+    pub fn at(self, source: Source) -> ControlLine {
+        ControlLine::new(self, source)
     }
 }
 

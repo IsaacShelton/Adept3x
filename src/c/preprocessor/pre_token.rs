@@ -1,18 +1,18 @@
-use crate::c::encoding::Encoding;
+use crate::{ast::Source, c::encoding::Encoding, inflow::InflowEnd};
 use derive_more::IsVariant;
-use std::{fmt::Display, num::NonZeroU32};
+use std::fmt::Display;
 
 pub use crate::c::punctuator::Punctuator;
 
 #[derive(Clone, Debug, Hash)]
 pub struct PreToken {
     pub kind: PreTokenKind,
-    pub line: Option<NonZeroU32>,
+    pub source: Source,
 }
 
 impl PreToken {
-    pub fn new(kind: PreTokenKind, line: Option<NonZeroU32>) -> Self {
-        Self { kind, line }
+    pub fn new(kind: PreTokenKind, source: Source) -> Self {
+        Self { kind, source }
     }
 }
 
@@ -24,6 +24,7 @@ impl Display for PreToken {
 
 #[derive(Clone, Debug, Hash, IsVariant)]
 pub enum PreTokenKind {
+    EndOfSequence,
     HeaderName(String),
     Identifier(String),
     Number(String),
@@ -41,6 +42,13 @@ impl PreToken {
         match self.kind {
             PreTokenKind::Punctuator(Punctuator::Hash) => true,
             _ => false,
+        }
+    }
+
+    pub fn identifier<'a>(&'a self) -> Option<&'a str> {
+        match &self.kind {
+            PreTokenKind::Identifier(identifier) => Some(identifier),
+            _ => None,
         }
     }
 
@@ -62,6 +70,7 @@ impl PreToken {
 impl Display for PreTokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            PreTokenKind::EndOfSequence => write!(f, "<end of sequence>"),
             PreTokenKind::HeaderName(name) => write!(f, "<{}>", name),
             PreTokenKind::Identifier(identifier) => f.write_str(identifier),
             PreTokenKind::Number(number) => f.write_str(number),
@@ -77,6 +86,10 @@ impl Display for PreTokenKind {
 }
 
 impl PreTokenKind {
+    pub fn at(self, source: Source) -> PreToken {
+        PreToken { kind: self, source }
+    }
+
     pub fn precedence(&self) -> usize {
         let punctuator = match self {
             Self::Punctuator(punctuator) => punctuator,
@@ -145,4 +158,19 @@ fn escape(content: &str, around: char) -> String {
     }
 
     result
+}
+
+impl InflowEnd for PreToken {
+    fn is_inflow_end(&self) -> bool {
+        self.kind.is_inflow_end()
+    }
+}
+
+impl InflowEnd for PreTokenKind {
+    fn is_inflow_end(&self) -> bool {
+        match self {
+            PreTokenKind::EndOfSequence => true,
+            _ => false,
+        }
+    }
 }

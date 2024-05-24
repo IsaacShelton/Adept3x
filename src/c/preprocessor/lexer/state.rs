@@ -1,38 +1,45 @@
-use crate::c::{encoding::Encoding, preprocessor::pre_token::PreTokenKind};
+use crate::{
+    ast::Source,
+    c::{
+        encoding::Encoding,
+        preprocessor::{pre_token::PreTokenKind, PreToken},
+    },
+};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum State {
+    #[default]
     Idle,
-    Number(String),
-    MultiLineComment,
-    Identifier(String),
-    CharacterConstant(Encoding, String),
-    StringLiteral(Encoding, String),
-    HeaderName(String),
+    Number(String, Source),
+    MultiLineComment(Source),
+    Identifier(String, Source),
+    CharacterConstant(Encoding, String, Source),
+    StringLiteral(Encoding, String, Source),
+    HeaderName(String, Source),
 }
 
 impl State {
-    pub fn string(encoding: Encoding) -> Self {
-        Self::StringLiteral(encoding, "".into())
+    pub fn string(encoding: Encoding, source: Source) -> Self {
+        Self::StringLiteral(encoding, "".into(), source)
     }
 
-    pub fn character(encoding: Encoding) -> Self {
-        Self::CharacterConstant(encoding, "".into())
+    pub fn character(encoding: Encoding, source: Source) -> Self {
+        Self::CharacterConstant(encoding, "".into(), source)
     }
 
-    pub fn finalize(&mut self) -> Option<PreTokenKind> {
+    pub fn finalize(&mut self) -> Option<PreToken> {
         match std::mem::replace(self, State::Idle) {
             Self::Idle => None,
-            Self::Number(value) => Some(PreTokenKind::Number(value)),
-            Self::MultiLineComment => None,
-            Self::Identifier(value) => Some(PreTokenKind::Identifier(value)),
-            Self::CharacterConstant(encoding, value) => {
-                Some(PreTokenKind::CharacterConstant(encoding, value))
+            Self::Number(value, source) => Some(PreTokenKind::Number(value).at(source)),
+            Self::MultiLineComment(_) => None,
+            Self::Identifier(value, source) => Some(PreTokenKind::Identifier(value).at(source)),
+            Self::CharacterConstant(encoding, value, source) => {
+                Some(PreTokenKind::CharacterConstant(encoding, value).at(source))
             }
-            Self::StringLiteral(encoding, value) => {
-                Some(PreTokenKind::StringLiteral(encoding, value))
+            Self::StringLiteral(encoding, value, source) => {
+                Some(PreTokenKind::StringLiteral(encoding, value).at(source))
             }
-            Self::HeaderName(value) => Some(PreTokenKind::HeaderName(value)),
+            Self::HeaderName(value, source) => Some(PreTokenKind::HeaderName(value).at(source)),
         }
     }
 }

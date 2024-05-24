@@ -10,7 +10,7 @@ use std::{
     fmt::{Debug, Display},
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub struct Source {
     pub key: SourceFileCacheKey,
     pub location: Location,

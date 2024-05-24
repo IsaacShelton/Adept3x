@@ -1,6 +1,3 @@
-use crate::{lexical_utils::IsCharacter, look_ahead::LookAhead};
-use std::num::NonZeroU32;
-
 /*
    Handles splicing together of physical source lines to form logical source lines.
 
@@ -9,71 +6,101 @@ use std::num::NonZeroU32;
    Each line that ends in a backslash will be joined with the following line
 */
 
-#[derive(Clone, Debug)]
-pub struct Line {
-    pub content: String,
-    pub line_number: NonZeroU32,
+use crate::{
+    ast::Source,
+    text::{Character, Text, TextStream},
+};
+use std::{cell::RefCell, rc::Rc};
+
+#[derive(Debug)]
+pub struct LineSplicer<T: Text> {
+    text: Rc<RefCell<T>>,
 }
 
-pub struct LineSplicer<I>
-where
-    I: Iterator<Item = char>,
-{
-    chars: LookAhead<I>,
-    current_line: String,
-    next_line_number: NonZeroU32,
-    newlines: u32,
-}
-
-impl<I: Iterator<Item = char>> LineSplicer<I> {
-    pub fn new(iterator: I) -> Self {
+impl<T: Text> LineSplicer<T> {
+    pub fn new(text: T) -> Self {
         Self {
-            chars: LookAhead::new(iterator),
-            current_line: String::new(),
-            next_line_number: NonZeroU32::new(1).unwrap(),
-            newlines: 0,
+            text: Rc::new(RefCell::new(text)),
+        }
+    }
+
+    pub fn next_line(&self) -> Result<Line<T>, Source> {
+        // We share a text source with the line we produce
+        // in order to avoid needing to allocate memory for it.
+        // So, we must ensure that no preivous lines still are being used.
+        assert_eq!(Rc::strong_count(&self.text), 1);
+
+        match RefCell::borrow_mut(&self.text).peek() {
+            Character::At(_, _) => Ok(Line {
+                text: LineSource::Text(self.text.clone()),
+            }),
+            Character::End(source) => Err(source),
         }
     }
 }
 
-impl<I: Iterator<Item = char>> Iterator for LineSplicer<I> {
-    type Item = Line;
+#[derive(Debug)]
+enum LineSource<T: Text> {
+    Text(Rc<RefCell<T>>),
+    End(Source),
+}
 
-    fn next(&mut self) -> Option<Self::Item> {
+#[derive(Debug)]
+pub struct Line<T: Text> {
+    text: LineSource<T>,
+}
+
+impl<T: Text> Line<T> {
+    pub fn source(&self) -> Source {
+        match &self.text {
+            LineSource::Text(text) => RefCell::borrow_mut(text).source(),
+            LineSource::End(source) => *source,
+        }
+    }
+}
+
+impl<T> Drop for Line<T>
+where
+    T: Text,
+{
+    fn drop(&mut self) {
+        // We need to consume the rest of the line, since we share a text source and
+        // the following line will need to start at its beginning.
         loop {
-            match self.chars.next() {
-                Some('\n') => {
-                    // Remember line number of current line
-                    let line_number = self.next_line_number;
-
-                    // Advance line number for next line
-                    self.newlines += 1;
-                    self.next_line_number = NonZeroU32::new(1 + self.newlines).unwrap();
-
-                    return Some(Line {
-                        content: std::mem::take(&mut self.current_line),
-                        line_number,
-                    });
+            match self.text {
+                LineSource::Text(_) => {
+                    let _ = self.next();
                 }
-                Some('\\') if self.chars.peek().is_character('\n') => {
-                    // Join current line with next line, since it ended in a backslash
-                    self.newlines += 1;
-                    self.chars.next();
-                }
-                Some(c) => {
-                    self.current_line.push(c);
-                }
-                None if !self.current_line.is_empty() => {
-                    return Some(Line {
-                        content: std::mem::replace(
-                            &mut self.current_line,
-                            String::with_capacity(128),
-                        ),
-                        line_number: self.next_line_number,
-                    });
-                }
-                None => return None,
+                LineSource::End(_) => break,
             }
+        }
+    }
+}
+
+impl<T: Text> TextStream for Line<T> {
+    fn next(&mut self) -> Character {
+        match &self.text {
+            LineSource::Text(text) => {
+                let character = loop {
+                    let mut text = RefCell::borrow_mut(text);
+                    match text.next() {
+                        Character::At('\n', source) | Character::End(source) => {
+                            break Character::End(source);
+                        }
+                        Character::At('\\', _) if text.eat("\n") => (),
+                        Character::At(c, source) => {
+                            break Character::At(c, source);
+                        }
+                    }
+                };
+
+                if let Character::End(source) = character {
+                    self.text = LineSource::End(source);
+                }
+
+                character
+            }
+            LineSource::End(source) => Character::End(*source),
         }
     }
 }

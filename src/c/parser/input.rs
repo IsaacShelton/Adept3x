@@ -1,46 +1,65 @@
+use std::borrow::Borrow;
+
 use crate::{
     c::token::{CToken, CTokenKind},
-    look_ahead::LookAhead,
-    repeating_last::RepeatingLast,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
-use std::{borrow::Borrow, collections::VecDeque};
 
-pub struct Input<'a, I: Iterator<Item = CToken> + Clone> {
+pub struct Input<'a> {
     source_file_cache: &'a SourceFileCache,
-    stack: VecDeque<LookAhead<RepeatingLast<I>>>,
     key: SourceFileCacheKey,
+    tokens: Vec<CToken>,
+    stack: Vec<usize>,
 }
 
-impl<'a, I> Input<'a, I>
-where
-    I: Iterator<Item = CToken> + Clone,
-{
+impl<'a> Input<'a> {
     pub fn new(
-        iterator: I,
+        tokens: Vec<CToken>,
         source_file_cache: &'a SourceFileCache,
         key: SourceFileCacheKey,
     ) -> Self {
-        let mut stack = VecDeque::with_capacity(4);
-        stack.push_front(LookAhead::new(RepeatingLast::new(iterator)));
+        assert!(tokens.last().map_or(false, |token| token.is_end_of_file()));
 
         Self {
-            stack,
             source_file_cache,
+            tokens,
             key,
+            stack: vec![0],
         }
     }
 
-    pub fn peek(&mut self) -> &CToken {
-        self.stack.front_mut().unwrap().peek_nth(0).unwrap()
+    pub fn filename(&self) -> &str {
+        self.source_file_cache.get(self.key).filename()
     }
 
-    pub fn peek_nth(&mut self, n: usize) -> &CToken {
-        self.stack.front_mut().unwrap().peek_nth(n).unwrap()
+    pub fn source_file_cache(&self) -> &'a SourceFileCache {
+        self.source_file_cache
     }
 
-    pub fn peek_n(&mut self, n: usize) -> &[CToken] {
-        self.stack.front_mut().unwrap().peek_n(n)
+    pub fn key(&self) -> SourceFileCacheKey {
+        self.key
+    }
+
+    pub fn eof(&self) -> &CToken {
+        self.tokens.last().unwrap()
+    }
+
+    pub fn peek(&self) -> &CToken {
+        self.tokens
+            .get(self.stack.last().unwrap() + 1)
+            .unwrap_or_else(|| self.eof())
+    }
+
+    pub fn peek_nth(&self, n: usize) -> &CToken {
+        self.tokens
+            .get(self.stack.last().unwrap() + 1 + n)
+            .unwrap_or_else(|| self.eof())
+    }
+
+    pub fn peek_n(&self, n: usize) -> &[CToken] {
+        let start = *self.stack.last().unwrap();
+        let end = (start + 1 + n).min(self.tokens.len());
+        &self.tokens[start..end]
     }
 
     pub fn peek_is(&mut self, token: impl Borrow<CTokenKind>) -> bool {
@@ -48,40 +67,32 @@ where
     }
 
     pub fn peek_is_or_eof(&mut self, token: impl Borrow<CTokenKind>) -> bool {
-        let next = &self.peek().kind;
-        next == token.borrow() || next.is_end_of_file()
+        self.peek_is(token) || self.peek().is_end_of_file()
     }
 
-    pub fn advance(&mut self) -> CToken {
-        self.stack.front_mut().unwrap().next().unwrap()
+    pub fn advance(&mut self) -> &CToken {
+        *self.stack.last_mut().unwrap() += 1;
+
+        self.tokens
+            .get(*self.stack.last().unwrap())
+            .unwrap_or_else(|| self.eof())
     }
 
     pub fn speculate(&mut self) {
-        self.stack.push_front(self.stack.front().unwrap().clone());
+        self.stack.push(*self.stack.last().unwrap());
     }
 
     pub fn backtrack(&mut self) {
-        self.stack.pop_front();
+        self.stack.pop();
         assert!(!self.stack.is_empty());
     }
 
     pub fn success(&mut self) {
         // Indicates that a speculation was successful,
         // so we can remove the backtrack point
-        let success = self.stack.pop_front().unwrap();
-        let _ = self.stack.pop_front().unwrap();
-        self.stack.push_front(success);
-    }
 
-    pub fn filename(&self) -> &str {
-        self.source_file_cache.get(self.key).filename()
-    }
-
-    pub fn key(&self) -> SourceFileCacheKey {
-        self.key
-    }
-
-    pub fn source_file_cache(&self) -> &'a SourceFileCache {
-        self.source_file_cache
+        let success = self.stack.pop().unwrap();
+        let _ = self.stack.pop().unwrap();
+        self.stack.push(success);
     }
 }

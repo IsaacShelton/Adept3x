@@ -2,14 +2,16 @@ use super::{
     preprocessor::{PreToken, PreTokenKind},
     token::{CToken, CTokenKind, Integer},
 };
-use crate::{c::token::IntegerSuffix, line_column::Location};
+use crate::{
+    c::token::IntegerSuffix,
+    inflow::{Inflow, InflowEnd, InflowStream},
+};
 
-#[derive(Clone)]
-pub struct Lexer<'a, I: Iterator<Item = &'a PreToken> + Clone> {
+pub struct Lexer<I: Inflow<PreToken>> {
     pub input: I,
 }
 
-impl<'a, I: Iterator<Item = &'a PreToken> + Clone> Lexer<'a, I> {
+impl<I: Inflow<PreToken>> Lexer<I> {
     pub fn new(input: I) -> Self {
         Self { input }
     }
@@ -22,16 +24,23 @@ pub enum LexError {
     UnrepresentableInteger,
 }
 
-impl<'a, I: Iterator<Item = &'a PreToken> + Clone> Iterator for Lexer<'a, I> {
+impl InflowEnd for CToken {
+    fn is_inflow_end(&self) -> bool {
+        match &self.kind {
+            CTokenKind::EndOfFile => true,
+            _ => false,
+        }
+    }
+}
+
+impl<I: Inflow<PreToken>> InflowStream for Lexer<I> {
     type Item = CToken;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let PreToken { kind, line } = match self.input.next() {
-            Some(token) => token,
-            None => return Some(CToken::new(CTokenKind::EndOfFile, Location::new(0, 1))),
-        };
+    fn next(&mut self) -> Self::Item {
+        let PreToken { kind, source } = self.input.next();
 
         let kind = match kind {
+            PreTokenKind::EndOfSequence => return CToken::new(CTokenKind::EndOfFile, source),
             PreTokenKind::Identifier(name) => match name.as_str() {
                 "alignas" | "_Alignas" => CTokenKind::AlignasKeyword,
                 "alignof" | "_Alignof" => CTokenKind::AlignofKeyword,
@@ -109,10 +118,7 @@ impl<'a, I: Iterator<Item = &'a PreToken> + Clone> Iterator for Lexer<'a, I> {
             | PreTokenKind::Placeholder => unreachable!(),
         };
 
-        Some(CToken::new(
-            kind,
-            Location::new(line.map(u32::from).unwrap_or(0), 1),
-        ))
+        CToken::new(kind, source)
     }
 }
 

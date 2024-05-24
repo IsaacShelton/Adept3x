@@ -1,5 +1,8 @@
 mod error;
 mod input;
+mod translation;
+
+use itertools::Itertools;
 
 use self::error::ParseErrorKind;
 pub use self::{error::ParseError, input::Input};
@@ -8,71 +11,82 @@ use super::{
     token::{CToken, CTokenKind},
 };
 use crate::{
-    ast::{Ast, File, FileIdentifier},
+    ast::{Ast, FileIdentifier, Source},
+    c::parser::translation::declare_function,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
 use std::collections::HashMap;
 
-pub struct Parser<'a, I>
-where
-    I: Iterator<Item = CToken> + Clone,
-{
-    input: Input<'a, I>,
+pub struct Parser<'a> {
+    input: Input<'a>,
     typedefs: HashMap<String, CTypedef>,
 }
 
 #[derive(Clone, Debug)]
-struct CTypedef {}
+pub struct CTypedef {}
 
 #[derive(Clone, Debug)]
-struct ParameterTypeList {
+pub struct ParameterTypeList {
     pub parameter_declarations: Vec<ParameterDeclaration>,
     pub is_variadic: bool,
 }
 
 #[derive(Clone, Debug)]
-enum Declarator {
+pub enum Declarator {
     Named(String),
     Pointers(Box<Declarator>, Pointers),
     Function(Box<Declarator>, ParameterTypeList),
 }
 
 #[derive(Clone, Debug)]
-enum AbstractDeclarator {}
+pub enum AbstractDeclarator {}
 
 #[derive(Clone, Debug)]
-enum ParameterDeclarationCore {
+pub enum ParameterDeclarationCore {
     Declarator(Declarator),
     AbstractDeclarator(AbstractDeclarator),
     Nothing,
 }
 
 #[derive(Clone, Debug)]
-struct ParameterDeclaration {
+pub struct ParameterDeclaration {
     pub attributes: Vec<()>,
     pub declaration_specifiers: DeclarationSpecifiers,
     pub core: ParameterDeclarationCore,
 }
 
-#[derive(Clone, Debug)]
-struct Pointers {
+#[derive(Clone, Debug, Default)]
+pub struct Pointers {
     pub pointers: Vec<Pointer>,
 }
 
+impl Pointers {
+    pub fn concat(&self, other: &Pointers) -> Self {
+        let pointers = self
+            .pointers
+            .iter()
+            .chain(other.pointers.iter())
+            .cloned()
+            .collect_vec();
+
+        Self { pointers }
+    }
+}
+
 #[derive(Clone, Debug)]
-struct Pointer {
+pub struct Pointer {
     pub attributes: Vec<()>,
     pub type_qualifiers: Vec<TypeQualifier>,
 }
 
 #[derive(Clone, Debug)]
-struct InitDeclarator {
+pub struct InitDeclarator {
     pub declarator: Declarator,
     pub initializer: Option<()>,
 }
 
 #[derive(Clone, Debug)]
-enum DeclarationSpecifier {
+pub enum DeclarationSpecifier {
     Auto,
     Constexpr,
     Extern,
@@ -86,14 +100,20 @@ enum DeclarationSpecifier {
 }
 
 #[derive(Clone, Debug)]
-enum TypeSpecifierQualifier {
+pub enum TypeSpecifierQualifier {
     TypeSpecifier(TypeSpecifier),
     TypeQualifier(TypeQualifier),
     AlignmentSpecifier(AlignmentSpecifier),
 }
 
 #[derive(Clone, Debug)]
-enum TypeSpecifier {
+pub struct TypeSpecifier {
+    kind: TypeSpecifierKind,
+    source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeSpecifierKind {
     Void,
     Char,
     Short,
@@ -106,7 +126,7 @@ enum TypeSpecifier {
 }
 
 #[derive(Clone, Debug)]
-enum TypeQualifier {
+pub enum TypeQualifier {
     Const,
     Restrict,
     Volatile,
@@ -114,22 +134,26 @@ enum TypeQualifier {
 }
 
 #[derive(Clone, Debug)]
-enum AlignmentSpecifier {
+pub enum AlignmentSpecifier {
     AlignAsType(()),
     AlisnAsConstExpr(()),
 }
 
 #[derive(Clone, Debug)]
-struct DeclarationSpecifiers {
+pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub attributes: Vec<()>,
 }
 
-impl<'a, I> Parser<'a, I>
-where
-    I: Iterator<Item = CToken> + Clone,
-{
-    pub fn new(input: Input<'a, I>) -> Self {
+#[derive(Clone, Debug)]
+pub struct ExternalDeclaration {
+    pub attribute_specifiers: Vec<()>,
+    pub declaration_specifiers: DeclarationSpecifiers,
+    pub init_declarator_list: Vec<InitDeclarator>,
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(input: Input<'a>) -> Self {
         Self {
             input,
             typedefs: HashMap::default(),
@@ -155,24 +179,41 @@ where
         let ast_file = ast.new_file(FileIdentifier::Local(filename));
 
         while !self.input.peek().is_end_of_file() {
-            self.parse_external_declaration(ast_file)?;
+            let external_declaration = self.parse_external_declaration()?;
+            println!("{:#?}", external_declaration);
+
+            for init_declarator in external_declaration.init_declarator_list.iter() {
+                match &init_declarator.declarator {
+                    Declarator::Named(_) => todo!(),
+                    Declarator::Pointers(_, _) => todo!(),
+                    Declarator::Function(declarator, parameter_type_list) => {
+                        declare_function(
+                            ast_file,
+                            &external_declaration.attribute_specifiers[..],
+                            &external_declaration.declaration_specifiers,
+                            declarator,
+                            parameter_type_list,
+                        )?;
+                    }
+                }
+            }
         }
 
         Ok(())
     }
 
-    fn parse_external_declaration(&mut self, _ast_file: &mut File) -> Result<(), ParseError> {
+    fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
         self.input.speculate();
         if let Ok(_function_definition) = self.parse_function_definition() {
             self.input.success();
-            return Ok(());
+            return Ok(todo!());
         }
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(_declaration) = self.parse_declaration() {
+        if let Ok(declaration) = self.parse_declaration() {
             self.input.success();
-            return Ok(());
+            return Ok(declaration);
         }
         self.input.backtrack();
 
@@ -275,25 +316,29 @@ where
     }
 
     fn parse_type_specifier(&mut self) -> Result<TypeSpecifier, ParseError> {
-        if let Some(type_specifier) = match self.input.peek().kind {
+        if let Some(type_specifier_kind) = match self.input.peek().kind {
             CTokenKind::Decimal32Keyword => unimplemented!("_Decimal32"),
             CTokenKind::Decimal64Keyword => unimplemented!("_Decimal64"),
             CTokenKind::Decimal128Keyword => unimplemented!("_Decimal128"),
             CTokenKind::ComplexKeyword => unimplemented!("_Complex"),
             CTokenKind::BitIntKeyword => unimplemented!("_BitInt"),
-            CTokenKind::VoidKeyword => Some(TypeSpecifier::Void),
-            CTokenKind::CharKeyword => Some(TypeSpecifier::Char),
-            CTokenKind::ShortKeyword => Some(TypeSpecifier::Short),
-            CTokenKind::IntKeyword => Some(TypeSpecifier::Int),
-            CTokenKind::LongKeyword => Some(TypeSpecifier::Long),
-            CTokenKind::FloatKeyword => Some(TypeSpecifier::Float),
-            CTokenKind::DoubleKeyword => Some(TypeSpecifier::Double),
-            CTokenKind::SignedKeyword => Some(TypeSpecifier::Signed),
-            CTokenKind::UnsignedKeyword => Some(TypeSpecifier::Unsigned),
+            CTokenKind::VoidKeyword => Some(TypeSpecifierKind::Void),
+            CTokenKind::CharKeyword => Some(TypeSpecifierKind::Char),
+            CTokenKind::ShortKeyword => Some(TypeSpecifierKind::Short),
+            CTokenKind::IntKeyword => Some(TypeSpecifierKind::Int),
+            CTokenKind::LongKeyword => Some(TypeSpecifierKind::Long),
+            CTokenKind::FloatKeyword => Some(TypeSpecifierKind::Float),
+            CTokenKind::DoubleKeyword => Some(TypeSpecifierKind::Double),
+            CTokenKind::SignedKeyword => Some(TypeSpecifierKind::Signed),
+            CTokenKind::UnsignedKeyword => Some(TypeSpecifierKind::Unsigned),
             _ => None,
         } {
-            self.input.advance();
-            return Ok(type_specifier);
+            let source = self.input.advance().source;
+
+            return Ok(TypeSpecifier {
+                kind: type_specifier_kind,
+                source,
+            });
         }
 
         self.input.speculate();
@@ -621,11 +666,11 @@ where
         ))
     }
 
-    fn parse_declaration(&mut self) -> Result<(), ParseError> {
+    fn parse_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
         if self.input.peek_is(CTokenKind::StaticAssertKeyword) {
             // static_assert
             todo!();
-            return Ok(());
+            return Ok(todo!());
         }
 
         let attribute_specifiers = self.parse_attribute_specifier_sequence()?;
@@ -636,7 +681,7 @@ where
         {
             // attribute-declaration
             todo!();
-            return Ok(());
+            return Ok(todo!());
         }
 
         let declaration_specifiers = self.parse_declaration_specifiers()?;
@@ -658,11 +703,11 @@ where
             ));
         }
 
-        println!("parsed declaration");
-        println!(" -> attribute_specifiers = {:#?}", attribute_specifiers);
-        println!(" -> declaration specifiers = {:#?}", declaration_specifiers);
-        println!(" -> init_declarator_list = {:#?}", init_declarator_list);
-        return Ok(());
+        return Ok(ExternalDeclaration {
+            attribute_specifiers,
+            declaration_specifiers,
+            init_declarator_list,
+        });
     }
 
     fn parse_init_declarator_list(&mut self) -> Result<Vec<InitDeclarator>, ParseError> {
@@ -790,7 +835,7 @@ where
 }
 
 pub fn parse(
-    tokens: impl Iterator<Item = CToken> + Clone,
+    tokens: Vec<CToken>,
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
 ) -> Result<Ast, ParseError> {
@@ -798,7 +843,7 @@ pub fn parse(
 }
 
 pub fn parse_into(
-    tokens: impl Iterator<Item = CToken> + Clone,
+    tokens: Vec<CToken>,
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
     ast: &mut Ast,

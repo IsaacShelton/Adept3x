@@ -1,7 +1,6 @@
-use std::num::NonZeroU32;
-
 use super::{depleted::Depleted, Environment};
 use crate::{
+    ast::Source,
     c::{
         encoding::Encoding,
         preprocessor::{
@@ -34,9 +33,10 @@ pub fn expand_region_allow_concats(
     environment: &Environment,
     depleted: &mut Depleted,
     strip_placeholders: bool,
+    start_of_macro_call: Source,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
     let mut expanded = expand_region(pre_tokens, environment, depleted)?;
-    resolve_concats(expanded.drain(..), strip_placeholders)
+    resolve_concats(expanded.drain(..), strip_placeholders, start_of_macro_call)
 }
 
 fn expand_token<'a>(
@@ -49,6 +49,7 @@ fn expand_token<'a>(
     match &token.kind {
         PreTokenKind::Identifier(name) => {
             if let Some(define) = environment.find_define(name) {
+                let start_of_macro = token.source;
                 let hash = Depleted::hash_define(define);
 
                 if !depleted.contains(hash) {
@@ -73,6 +74,7 @@ fn expand_token<'a>(
                         environment,
                         depleted,
                         placeholder_affinity.is_discard(),
+                        start_of_macro,
                     )?);
                     depleted.pop(hash);
 
@@ -111,6 +113,7 @@ fn expand_token<'a>(
                                     environment,
                                     depleted,
                                     function_macro.affinity.is_discard(),
+                                    start_of_macro,
                                 )?);
                                 depleted.pop(hash);
                             }
@@ -134,7 +137,7 @@ fn expand_token<'a>(
                 } else {
                     "0".into()
                 }),
-                None,
+                token.source,
             ));
             Ok(())
         }
@@ -149,6 +152,7 @@ fn expand_token<'a>(
             expanded.push(token.clone());
             Ok(())
         }
+        PreTokenKind::EndOfSequence => unreachable!(),
     }
 }
 
@@ -159,6 +163,8 @@ fn expand_function_macro<'a>(
     parent_environment: &Environment,
     parent_depleted: &mut Depleted,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
+    let start_of_macro_call = token.source;
+
     // Eat '('
     match tokens.next() {
         Some(PreToken {
@@ -213,7 +219,7 @@ fn expand_function_macro<'a>(
             None => {
                 return Err(
                     PreprocessorErrorKind::ParseError(ParseErrorKind::ExpectedCloseParen)
-                        .at(token.line),
+                        .at(token.source),
                 )
             }
         };
@@ -246,11 +252,11 @@ fn expand_function_macro<'a>(
                 ParseErrorKind::NotEnoughArguments
             },
         )
-        .at(token.line));
+        .at(token.source));
     }
 
     // Inject stringized arguments
-    let body = inject_stringized_arguments(function_macro, &args);
+    let body = inject_stringized_arguments(function_macro, &args, start_of_macro_call);
 
     // Expand the values for each argument
     for arg in args.iter_mut() {
@@ -263,7 +269,10 @@ fn expand_function_macro<'a>(
     for i in 0..function_macro.parameters.len() {
         // Replace all empty arg values with placeholder token
         if args[i].is_empty() {
-            args[i].push(PreToken::new(PreTokenKind::Placeholder, None));
+            args[i].push(PreToken::new(
+                PreTokenKind::Placeholder,
+                start_of_macro_call,
+            ));
         }
 
         args_only_environment.add_define(Define {
@@ -287,7 +296,7 @@ fn expand_function_macro<'a>(
                 // TODO: Remember location information of each comma preprocessor token that needs
                 // to be inserted
                 PreTokenKind::Punctuator(Punctuator::Comma),
-                None,
+                start_of_macro_call,
             )])
             .flatten()
             .collect_vec();
@@ -297,7 +306,10 @@ fn expand_function_macro<'a>(
 
         // Replace __VA_ARGS__ with placeholder token if empty
         if rest.is_empty() {
-            rest.push(PreToken::new(PreTokenKind::Placeholder, None));
+            rest.push(PreToken::new(
+                PreTokenKind::Placeholder,
+                start_of_macro_call,
+            ));
         }
 
         args_only_environment.add_define(Define {
@@ -313,7 +325,7 @@ fn expand_function_macro<'a>(
                 is_variadic: true,
                 body: vec![PreToken::new(
                     PreTokenKind::Identifier("__VA_ARGS__".into()),
-                    None,
+                    start_of_macro_call,
                 )],
             }),
             name: "__VA_OPT__".into(),
@@ -323,7 +335,10 @@ fn expand_function_macro<'a>(
         // being variadic, so we must define __VA_ARGS__ to be empty (a placeholder token).
         args_only_environment.add_define(Define {
             kind: DefineKind::ObjectMacro(
-                vec![PreToken::new(PreTokenKind::Placeholder, None)],
+                vec![PreToken::new(
+                    PreTokenKind::Placeholder,
+                    start_of_macro_call,
+                )],
                 PlaceholderAffinity::Keep,
             ),
             name: "__VA_ARGS__".into(),
@@ -350,6 +365,7 @@ fn expand_function_macro<'a>(
 fn inject_stringized_arguments(
     function_macro: &FunctionMacro,
     args: &[Vec<PreToken>],
+    start_of_macro_call: Source,
 ) -> Vec<PreToken> {
     let mut result = Vec::new();
     let mut tokens = LookAhead::new(function_macro.body.iter());
@@ -376,7 +392,7 @@ fn inject_stringized_arguments(
 
                     result.push(PreToken::new(
                         PreTokenKind::StringLiteral(Encoding::Default, stringized),
-                        arg_tokens.get(0).and_then(|token| token.line),
+                        start_of_macro_call,
                     ));
                     continue;
                 }
@@ -393,6 +409,7 @@ fn inject_stringized_arguments(
 fn resolve_concats(
     tokens: impl Iterator<Item = PreToken>,
     strip_placeholders: bool,
+    start_of_macro_call: Source,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
     let mut tokens = LookAhead::new(tokens);
     let mut result = Vec::new();
@@ -405,14 +422,14 @@ fn resolve_concats(
                 let is_two_placeholders =
                     first.kind.is_placeholder() && second.kind.is_placeholder();
 
-                let concat_location = tokens.next().expect("eat '##'").line;
+                let concat_source = tokens.next().expect("eat '##'").source;
 
                 if is_two_placeholders {
                     // Leave the second placeholder token as the concatenated result.
                     // We need to do this, because it will affect further concatenations.
                 } else {
                     let second = tokens.next().expect("second argument to '##'");
-                    result.push(concat(&first, &second, concat_location)?);
+                    result.push(concat(&first, &second, concat_source)?);
                 }
 
                 continue;
@@ -427,7 +444,7 @@ fn resolve_concats(
                 result.pop().unwrap();
                 result.push(PreToken::new(
                     PreTokenKind::StringLiteral(Encoding::Default, "".into()),
-                    None,
+                    start_of_macro_call,
                 ));
             } else if !strip_placeholders {
                 // Otherwise preserve the placeholder if requested
@@ -442,11 +459,7 @@ fn resolve_concats(
     Ok(result)
 }
 
-fn concat(
-    a: &PreToken,
-    b: &PreToken,
-    line: Option<NonZeroU32>,
-) -> Result<PreToken, PreprocessorError> {
+fn concat(a: &PreToken, b: &PreToken, source: Source) -> Result<PreToken, PreprocessorError> {
     // NOTE: We don't support concatenating punctuator tokens. It doesn't
     // seem like this feature is ever used intentionally, so we won't support it for now.
     // If someone can find a real-world use case please let me know.
@@ -455,16 +468,16 @@ fn concat(
         (_, PreTokenKind::Placeholder) => Ok(a.clone()),
         (PreTokenKind::Identifier(a_name), PreTokenKind::Identifier(b_name)) => Ok(PreToken::new(
             PreTokenKind::Identifier(format!("{}{}", a_name, b_name)),
-            a.line,
+            a.source,
         )),
         (PreTokenKind::Identifier(a_name), PreTokenKind::Number(b_number)) => Ok(PreToken::new(
             PreTokenKind::Identifier(format!("{}{}", a_name, b_number)),
-            a.line,
+            a.source,
         )),
         (PreTokenKind::Number(a_number), PreTokenKind::Identifier(b_identifier)) => {
             Ok(PreToken::new(
                 PreTokenKind::Number(format!("{}{}", a_number, b_identifier)),
-                a.line,
+                a.source,
             ))
         }
         (
@@ -477,12 +490,12 @@ fn concat(
                         a_encoding.clone(),
                         format!("{}{}", a_content, b_content),
                     ),
-                    a.line,
+                    a.source,
                 ))
             } else {
-                Err(PreprocessorErrorKind::CannotConcatTokens.at(line))
+                Err(PreprocessorErrorKind::CannotConcatTokens.at(source))
             }
         }
-        _ => Err(PreprocessorErrorKind::CannotConcatTokens.at(line)),
+        _ => Err(PreprocessorErrorKind::CannotConcatTokens.at(source)),
     }
 }

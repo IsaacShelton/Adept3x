@@ -14,7 +14,10 @@ where
 
 impl<I: Iterator<Item: Clone> + Clone> Clone for LookAhead<I> {
     fn clone(&self) -> Self {
-        Self { iterator: self.iterator.clone(), buffer: self.buffer.clone() }
+        Self {
+            iterator: self.iterator.clone(),
+            buffer: self.buffer.clone(),
+        }
     }
 }
 
@@ -33,6 +36,10 @@ where
         self.peek_nth(0)
     }
 
+    pub fn peek_mut<'a>(&'a mut self) -> Option<&'a mut I::Item> {
+        self.peek_nth_mut(0)
+    }
+
     pub fn peek_n<'a>(&'a mut self, count: usize) -> &'a [I::Item] {
         while self.buffer.len() <= count {
             if let Some(value) = self.iterator.next() {
@@ -48,6 +55,10 @@ where
     }
 
     pub fn peek_nth<'a>(&'a mut self, index: usize) -> Option<&'a I::Item> {
+        self.peek_nth_mut(index).map(|reference| &*reference)
+    }
+
+    pub fn peek_nth_mut<'a>(&'a mut self, index: usize) -> Option<&'a mut I::Item> {
         while self.buffer.len() <= index {
             if let Some(value) = self.iterator.next() {
                 self.buffer.push_back(value);
@@ -56,7 +67,7 @@ where
             }
         }
 
-        self.buffer.get(index)
+        self.buffer.get_mut(index)
     }
 }
 

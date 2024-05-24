@@ -4,6 +4,7 @@ mod ast;
 mod c;
 mod cli;
 mod error;
+mod inflow;
 mod ir;
 mod lexer;
 mod lexical_utils;
@@ -16,10 +17,13 @@ mod repeating_last;
 mod resolve;
 mod resolved;
 mod source_file_cache;
+mod text;
 mod token;
 
-use crate::c::preprocessor::preprocess;
+use crate::c::preprocessor::{PreToken, PreTokenKind};
+use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
 use crate::source_file_cache::SourceFileCache;
+use crate::text::IntoText;
 use cli::{BuildCommand, NewCommand};
 use indoc::indoc;
 use lexer::Lexer;
@@ -61,8 +65,15 @@ fn build_project(build_command: BuildCommand) {
             }
 
             if filepath.extension().unwrap_or_default() == "h" {
-                let content = std::fs::read_to_string(filepath).expect("file to exist");
-                println!("{:?}", preprocess(&content).unwrap());
+                for i in 0..10000 {
+                    let key = source_file_cache.add_or_exit(&filename);
+                    let text = source_file_cache.get(key).content().chars().into_text(key);
+                    let preprocessed = exit_unless(c::preprocessor::preprocess(text));
+
+                    if i == 9999 {
+                        println!("{:?}", preprocessed);
+                    }
+                }
                 return;
             }
 
@@ -103,14 +114,7 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
         let filename = entry.path().to_string_lossy().to_string();
         println!("[=] {}", filename);
 
-        let key = match source_file_cache.add(&filename) {
-            Ok(key) => key,
-            Err(_) => {
-                eprintln!("Failed to open file {}", filename);
-                exit(1);
-            }
-        };
-
+        let key = source_file_cache.add_or_exit(&filename);
         let content = source_file_cache.get(key).content();
 
         if !is_header {
@@ -128,19 +132,28 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
                 ast = Some(exit_unless(parse(lexer, &source_file_cache, key)));
             }
         } else {
-            let preprocessed = exit_unless(c::preprocessor::preprocess(content));
-            let lexer = c::Lexer::new(preprocessed.iter());
+            let (preprocessed, eof_source) =
+                exit_unless(c::preprocessor::preprocess(content.chars().into_text(key)));
+
+            let mut lexer = c::Lexer::new(
+                preprocessed
+                    .into_iter()
+                    .into_inflow_stream(PreToken::new(PreTokenKind::EndOfSequence, eof_source))
+                    .into_inflow(),
+            );
+
+            let lexed = lexer.collect_vec(true);
 
             if let Some(ast) = &mut ast {
                 exit_unless(c::parse_into(
-                    lexer,
+                    lexed,
                     &source_file_cache,
                     key,
                     ast,
                     filename.to_string(),
                 ));
             } else {
-                ast = Some(exit_unless(c::parse(lexer, &source_file_cache, key)));
+                ast = Some(exit_unless(c::parse(lexed, &source_file_cache, key)));
             }
         }
     }
