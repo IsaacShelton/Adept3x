@@ -275,10 +275,9 @@ impl<'a> Parser<'a> {
             CTokenKind::InlineKeyword => DeclarationSpecifier::Inline,
             CTokenKind::NoreturnKeyword => DeclarationSpecifier::Noreturn,
             _ => {
-                let r = DeclarationSpecifier::TypeSpecifierQualifier(
+                return Ok(DeclarationSpecifier::TypeSpecifierQualifier(
                     self.parse_type_specifier_qualifier()?,
-                );
-                return Ok(r);
+                ));
             }
         };
 

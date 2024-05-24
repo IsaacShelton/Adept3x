@@ -17,13 +17,13 @@ pub fn declare_function(
     declarator: &Declarator,
     parameter_type_list: &ParameterTypeList,
 ) -> Result<(), ParseError> {
-    let (name, return_type) = get_function_name_and_type(declarator, declaration_specifiers)?;
+    let (name, return_type) = get_name_and_type(declarator, declaration_specifiers)?;
     let mut required = vec![];
 
     for param in parameter_type_list.parameter_declarations.iter() {
         let (name, ast_type) = match &param.core {
             ParameterDeclarationCore::Declarator(declarator) => {
-                get_function_name_and_type(declarator, &param.declaration_specifiers)?
+                get_name_and_type(declarator, &param.declaration_specifiers)?
             }
             ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
             ParameterDeclarationCore::Nothing => todo!(),
@@ -48,24 +48,20 @@ pub fn declare_function(
     Ok(())
 }
 
-fn get_function_name_and_type(
+fn get_name_and_type(
     declarator: &Declarator,
     declaration_specifiers: &DeclarationSpecifiers,
 ) -> Result<(String, Type), ParseError> {
     let (name, pointers) = get_name_and_pointers(declarator)?;
-    let mut ast_type = get_return_type(declaration_specifiers)?;
+    let mut ast_type = get_base_type(declaration_specifiers)?;
 
     for pointer in pointers.pointers.iter() {
-        for qualfier in pointer.type_qualifiers.iter() {
-            match qualfier {
-                TypeQualifier::Const => (),
-                TypeQualifier::Restrict => todo!(),
-                TypeQualifier::Volatile => todo!(),
-                TypeQualifier::Atomic => todo!(),
-            }
-        }
-
         ast_type = Type::new(TypeKind::Pointer(Box::new(ast_type)), pointer.source);
+
+        for type_qualfier in pointer.type_qualifiers.iter() {
+            ast_type = augment_ast_type_with_type_qualifier(Some(ast_type), type_qualfier)?
+                .expect("type is present");
+        }
     }
 
     Ok((name, ast_type))
@@ -85,7 +81,7 @@ fn get_name_and_pointers(declarator: &Declarator) -> Result<(String, Pointers), 
     }
 }
 
-fn get_return_type(declaration_specifiers: &DeclarationSpecifiers) -> Result<Type, ParseError> {
+fn get_base_type(declaration_specifiers: &DeclarationSpecifiers) -> Result<Type, ParseError> {
     let mut ast_type = None;
 
     for specifier in declaration_specifiers.specifiers.iter() {
