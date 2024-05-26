@@ -128,7 +128,7 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
         &mut self,
         punctuator: &Punctuator,
     ) -> Result<ConstExpr, PreprocessorError> {
-        let inner = self.parse_expr()?;
+        let inner = self.parse_expr_primary()?;
 
         let operator = match punctuator {
             Punctuator::Not => UnaryOperator::Not,
@@ -145,6 +145,13 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
     }
 
     fn parse_number(number: &str, source: Source) -> Result<ConstExpr, PreprocessorError> {
+        // Remove trailing 'L' if present
+        let number = if number.ends_with("L") {
+            &number[..number.len() - 1]
+        } else {
+            number
+        };
+
         if number.starts_with("0x") || number.starts_with("0X") {
             Self::parse_number_radix(&number[..2], 16)
         } else if number.starts_with("0") {
