@@ -15,11 +15,10 @@ where
 
     pub fn unexpected_token(&self, token: &Token) -> ParseError {
         ParseError {
-            filename: Some(self.input.filename().to_string()),
-            location: Some(token.location),
             kind: ParseErrorKind::UnexpectedToken {
                 unexpected: token.kind.to_string(),
             },
+            source: self.source(token.location),
         }
     }
 
@@ -30,21 +29,19 @@ where
         token: Token,
     ) -> ParseError {
         ParseError {
-            filename: Some(self.input.filename().to_string()),
-            location: Some(token.location),
             kind: ParseErrorKind::Expected {
                 expected: expected.to_string(),
                 for_reason: for_reason.map(|reason| reason.to_string()),
                 got: token.kind.to_string(),
             },
+            source: self.source(token.location),
         }
     }
 
     pub fn expected_top_level_construct(&self, token: &Token) -> ParseError {
         ParseError {
-            filename: Some(self.input.filename().to_string()),
-            location: Some(token.location),
             kind: ParseErrorKind::ExpectedTopLevelConstruct,
+            source: self.source(token.location),
         }
     }
 
@@ -55,12 +52,11 @@ where
         for_reason: Option<impl ToString>,
     ) -> ParseError {
         ParseError {
-            filename: Some(self.input.filename().to_string()),
-            location: Some(location),
             kind: ParseErrorKind::UnexpectedAnnotation {
                 name,
                 for_reason: for_reason.map(|reason| reason.to_string()),
             },
+            source: self.source(location),
         }
     }
 }

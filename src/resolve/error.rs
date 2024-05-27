@@ -1,25 +1,15 @@
-use crate::{ast::Source, line_column::Location, source_file_cache::SourceFileCache};
-use colored::Colorize;
+use crate::{ast::Source, show::Show, source_file_cache::SourceFileCache};
 use itertools::Itertools;
 use std::fmt::Display;
 
 pub struct ResolveError {
-    pub filename: Option<String>,
-    pub location: Option<Location>,
     pub kind: ResolveErrorKind,
+    pub source: Source,
 }
 
 impl ResolveError {
-    pub fn new(
-        source_file_cache: &SourceFileCache,
-        source: Source,
-        kind: ResolveErrorKind,
-    ) -> Self {
-        Self {
-            filename: Some(source_file_cache.get(source.key).filename().to_string()),
-            location: Some(source.location),
-            kind,
-        }
+    pub fn new(kind: ResolveErrorKind, source: Source) -> Self {
+        Self { kind, source }
     }
 }
 
@@ -133,23 +123,32 @@ pub enum ResolveErrorKind {
     },
 }
 
-impl Display for ResolveError {
+impl ResolveErrorKind {
+    pub fn at(self, source: Source) -> ResolveError {
+        ResolveError { kind: self, source }
+    }
+}
+
+impl Show for ResolveError {
+    fn show(
+        &self,
+        w: &mut impl std::fmt::Write,
+        source_file_cache: &SourceFileCache,
+    ) -> std::fmt::Result {
+        write!(
+            w,
+            "{}:{}:{}: error: {}",
+            source_file_cache.get(self.source.key).filename(),
+            self.source.location.line,
+            self.source.location.column,
+            self.kind
+        )
+    }
+}
+
+impl Display for ResolveErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(filename) = &self.filename {
-            write!(f, "{}:", filename)?;
-        }
-
-        if let Some(location) = self.location {
-            write!(f, "{}:{}:", location.line, location.column)?;
-        }
-
-        if self.filename.is_some() || self.location.is_some() {
-            write!(f, " ")?;
-        }
-
-        write!(f, "{}", "error: ".bright_red())?;
-
-        match &self.kind {
+        match self {
             ResolveErrorKind::CannotReturnValueOfType {
                 returning,
                 expected,
@@ -307,8 +306,17 @@ impl Display for ResolveError {
             ResolveErrorKind::ExpectedIndexOfType { expected, got } => {
                 write!(f, "Expected index of type '{}', got '{}'", expected, got)?;
             }
-            ResolveErrorKind::ExpectedTypeForSide { side, operator, expected, got } => {
-                write!(f, "Expected '{}' value for {} of '{}', got '{}' value", expected, side, operator, got)?;
+            ResolveErrorKind::ExpectedTypeForSide {
+                side,
+                operator,
+                expected,
+                got,
+            } => {
+                write!(
+                    f,
+                    "Expected '{}' value for {} of '{}', got '{}' value",
+                    expected, side, operator, got
+                )?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

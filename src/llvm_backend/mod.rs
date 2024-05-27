@@ -18,9 +18,9 @@ use self::{
     value_catalog::ValueCatalog,
 };
 use crate::{
-    error::CompilerError,
     ir::{self, Instruction},
     resolved::FloatOrInteger,
+    show::Show,
 };
 use colored::Colorize;
 use cstr::cstr;
@@ -71,11 +71,40 @@ use std::{
     ptr::null_mut,
 };
 
+#[derive(Clone, Debug)]
+pub struct BackendError {
+    pub message: String,
+}
+
+impl From<String> for BackendError {
+    fn from(message: String) -> Self {
+        Self { message }
+    }
+}
+
+impl From<&str> for BackendError {
+    fn from(message: &str) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+impl Show for BackendError {
+    fn show(
+        &self,
+        w: &mut impl std::fmt::Write,
+        _source_file_cache: &crate::source_file_cache::SourceFileCache,
+    ) -> std::fmt::Result {
+        write!(w, "error: {}", self.message)
+    }
+}
+
 pub unsafe fn llvm_backend(
     ir_module: &ir::Module,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
-) -> Result<(), CompilerError> {
+) -> Result<(), BackendError> {
     LLVM_InitializeAllTargetInfos();
     LLVM_InitializeAllTargets();
     LLVM_InitializeAllTargetMCs();
@@ -138,11 +167,10 @@ pub unsafe fn llvm_backend(
     );
 
     if !llvm_emit_error_message.is_null() {
-        return Err(CompilerError::during_backend(
-            CString::from_raw(llvm_emit_error_message)
-                .to_string_lossy()
-                .into_owned(),
-        ));
+        return Err(CString::from_raw(llvm_emit_error_message)
+            .to_string_lossy()
+            .into_owned()
+            .into());
     }
 
     // Link resulting object file to create executable
@@ -172,11 +200,11 @@ unsafe fn create_structures(ctx: &mut BackendContext) {
     }
 }
 
-unsafe fn create_static_variables() -> Result<(), CompilerError> {
+unsafe fn create_static_variables() -> Result<(), BackendError> {
     Ok(())
 }
 
-unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), CompilerError> {
+unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), BackendError> {
     for (global_ref, global) in ctx.ir_module.globals.iter() {
         let backend_type = to_backend_type(ctx, &global.ir_type);
 
@@ -209,7 +237,7 @@ unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), CompilerError> 
     Ok(())
 }
 
-unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), CompilerError> {
+unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
         let mut parameters = to_backend_types(ctx, &function.parameters);
         let return_type = to_backend_type(ctx, &function.return_type);
@@ -236,7 +264,7 @@ unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), Compiler
     Ok(())
 }
 
-unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), CompilerError> {
+unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), BackendError> {
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
         if let Some(ir_function) = ctx.ir_module.functions.get(ir_function_ref) {
             let mut builder = Builder::new();
@@ -305,7 +333,7 @@ unsafe fn create_function_block(
     mut llvm_basicblock: LLVMBasicBlockRef,
     function_skeleton: LLVMValueRef,
     basicblocks: &[(usize, &ir::BasicBlock, LLVMBasicBlockRef)],
-) -> Result<(), CompilerError> {
+) -> Result<(), BackendError> {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
 
     for instruction in ir_basicblock.iter() {
@@ -359,7 +387,8 @@ unsafe fn create_function_block(
                     .expect("referenced global to exist"),
             ),
             Instruction::Store(store) => {
-                let source = build_value(ctx.backend_module, value_catalog, builder, &store.new_value);
+                let source =
+                    build_value(ctx.backend_module, value_catalog, builder, &store.new_value);
                 let destination = build_value(
                     ctx.backend_module,
                     value_catalog,
@@ -777,11 +806,7 @@ unsafe fn create_function_block(
                     ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
                         to_backend_type(ctx, ir_struct_type)
                     }
-                    _ => {
-                        return Err(CompilerError::during_backend(
-                            "cannot use member instruction on non-structure",
-                        ))
-                    }
+                    _ => return Err("cannot use member instruction on non-structure".into()),
                 };
 
                 let mut indices = [
@@ -1021,11 +1046,11 @@ unsafe fn to_backend_types(ctx: &BackendContext, ir_types: &[ir::Type]) -> Vec<L
     ir_types.iter().map(|ty| to_backend_type(ctx, ty)).collect()
 }
 
-unsafe fn implement_static_init() -> Result<(), CompilerError> {
+unsafe fn implement_static_init() -> Result<(), BackendError> {
     Ok(())
 }
 
-unsafe fn implement_static_deinit() -> Result<(), CompilerError> {
+unsafe fn implement_static_deinit() -> Result<(), BackendError> {
     Ok(())
 }
 
@@ -1033,7 +1058,7 @@ unsafe fn get_triple() -> CString {
     return CString::from_raw(LLVMGetDefaultTargetTriple());
 }
 
-unsafe fn get_target_from_triple(triple: &CStr) -> Result<LLVMTargetRef, CompilerError> {
+unsafe fn get_target_from_triple(triple: &CStr) -> Result<LLVMTargetRef, BackendError> {
     let mut target: MaybeUninit<LLVMTargetRef> = MaybeUninit::zeroed();
     let mut error_message: MaybeUninit<*mut i8> = MaybeUninit::zeroed();
 
@@ -1045,11 +1070,10 @@ unsafe fn get_target_from_triple(triple: &CStr) -> Result<LLVMTargetRef, Compile
     {
         let message = CStr::from_ptr(error_message.assume_init()).to_owned();
         LLVMDisposeMessage(error_message.assume_init());
-        Err(CompilerError::during_backend(
-            message
-                .into_string()
-                .unwrap_or_else(|_| "Failed to get target triple for platform".into()),
-        ))
+        Err(message
+            .into_string()
+            .unwrap_or_else(|_| "Failed to get target triple for platform".into())
+            .into())
     } else {
         Ok(target.assume_init())
     }

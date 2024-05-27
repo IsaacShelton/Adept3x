@@ -6,11 +6,11 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use slotmap::{new_key_type, SlotMap};
-use thin_vec::ThinVec;
 use std::{
     ffi::CString,
     fmt::{Debug, Display},
 };
+use thin_vec::ThinVec;
 
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::ShortCircuitingBinaryOperator;
@@ -62,6 +62,7 @@ pub struct Function {
     pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
     pub variables: VariableStorage,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -100,8 +101,26 @@ pub struct Field {
     pub privacy: Privacy,
 }
 
+#[derive(Clone, Debug)]
+pub struct Type {
+    pub kind: TypeKind,
+    pub source: Source,
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.kind, f)
+    }
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind.eq(&other.kind)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, IsVariant)]
-pub enum Type {
+pub enum TypeKind {
     Boolean,
     Integer {
         bits: IntegerBits,
@@ -116,40 +135,44 @@ pub enum Type {
     ManagedStructure(String, StructureRef),
 }
 
-impl Type {
+impl TypeKind {
+    pub fn at(self, source: Source) -> Type {
+        Type { kind: self, source }
+    }
+
     pub fn sign(&self) -> Option<IntegerSign> {
         match self {
-            Type::Boolean => None,
-            Type::Integer { sign, .. } => Some(*sign),
-            Type::IntegerLiteral(value) => Some(if value >= &BigInt::zero() {
+            TypeKind::Boolean => None,
+            TypeKind::Integer { sign, .. } => Some(*sign),
+            TypeKind::IntegerLiteral(value) => Some(if value >= &BigInt::zero() {
                 IntegerSign::Unsigned
             } else {
                 IntegerSign::Signed
             }),
-            Type::Float(_) => None,
-            Type::FloatLiteral(_) => None,
-            Type::Pointer(_) => None,
-            Type::PlainOldData(_, _) => None,
-            Type::Void => None,
-            Type::ManagedStructure(_, _) => None,
+            TypeKind::Float(_) => None,
+            TypeKind::FloatLiteral(_) => None,
+            TypeKind::Pointer(_) => None,
+            TypeKind::PlainOldData(_, _) => None,
+            TypeKind::Void => None,
+            TypeKind::ManagedStructure(_, _) => None,
         }
     }
 
     pub fn is_void_pointer(&self) -> bool {
         match self {
-            Type::Pointer(inner) if inner.is_void() => true,
+            TypeKind::Pointer(inner) if inner.kind.is_void() => true,
             _ => false,
         }
     }
 }
 
-impl Display for Type {
+impl Display for TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::Boolean => {
+            TypeKind::Boolean => {
                 write!(f, "bool")?;
             }
-            Type::Integer { bits, sign } => {
+            TypeKind::Integer { bits, sign } => {
                 f.write_str(match (bits, sign) {
                     (IntegerBits::Normal, IntegerSign::Signed) => "int",
                     (IntegerBits::Normal, IntegerSign::Unsigned) => "uint",
@@ -163,23 +186,23 @@ impl Display for Type {
                     (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
                 })?;
             }
-            Type::IntegerLiteral(value) => {
+            TypeKind::IntegerLiteral(value) => {
                 write!(f, "integer {}", value)?;
             }
-            Type::Float(size) => match size {
+            TypeKind::Float(size) => match size {
                 FloatSize::Normal => f.write_str("float")?,
                 FloatSize::Bits32 => f.write_str("f32")?,
                 FloatSize::Bits64 => f.write_str("f64")?,
             },
-            Type::FloatLiteral(value) => write!(f, "float {}", value)?,
-            Type::Pointer(inner) => {
-                write!(f, "ptr<{}>", inner)?;
+            TypeKind::FloatLiteral(value) => write!(f, "float {}", value)?,
+            TypeKind::Pointer(inner) => {
+                write!(f, "ptr<{}>", inner.kind)?;
             }
-            Type::PlainOldData(name, _) => {
+            TypeKind::PlainOldData(name, _) => {
                 write!(f, "pod<{}>", name)?;
             }
-            Type::Void => f.write_str("void")?,
-            Type::ManagedStructure(name, _) => f.write_str(name)?,
+            TypeKind::Void => f.write_str("void")?,
+            TypeKind::ManagedStructure(name, _) => f.write_str(name)?,
         }
 
         Ok(())
@@ -364,7 +387,7 @@ impl Block {
         Self { stmts }
     }
 
-    pub fn get_result_type(&self) -> Type {
+    pub fn get_result_type(&self, source: Source) -> Type {
         if let Some(stmt) = self.stmts.last() {
             match &stmt.kind {
                 StmtKind::Return(..) => None,
@@ -375,7 +398,7 @@ impl Block {
         } else {
             None
         }
-        .unwrap_or(Type::Void)
+        .unwrap_or(TypeKind::Void.at(source))
     }
 }
 

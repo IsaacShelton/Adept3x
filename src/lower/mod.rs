@@ -1,7 +1,7 @@
 mod builder;
+mod error;
 
 use crate::{
-    error::CompilerError,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
@@ -10,7 +10,9 @@ use crate::{
 };
 use builder::Builder;
 
-pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, CompilerError> {
+use self::error::{LowerError, LowerErrorKind};
+
+pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, LowerError> {
     let mut ir_module = ir::Module::new();
 
     for (structure_ref, structure) in ast.structures.iter() {
@@ -32,7 +34,7 @@ fn lower_structure(
     ir_module: &mut ir::Module,
     structure_ref: resolved::StructureRef,
     structure: &resolved::Structure,
-) -> Result<(), CompilerError> {
+) -> Result<(), LowerError> {
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     for field in structure.fields.values() {
@@ -54,7 +56,7 @@ fn lower_global(
     ir_module: &mut ir::Module,
     global_ref: resolved::GlobalRef,
     global: &resolved::Global,
-) -> Result<(), CompilerError> {
+) -> Result<(), LowerError> {
     ir_module.globals.insert(
         global_ref,
         Global {
@@ -72,7 +74,7 @@ fn lower_function(
     ir_module: &mut ir::Module,
     function_ref: resolved::FunctionRef,
     function: &resolved::Function,
-) -> Result<(), CompilerError> {
+) -> Result<(), LowerError> {
     let basicblocks = if !function.is_foreign {
         let mut builder = Builder::new();
 
@@ -113,7 +115,7 @@ fn lower_function(
         lower_stmts(&mut builder, ir_module, &function.stmts, function)?;
 
         if !builder.is_block_terminated() {
-            if let resolved::Type::Void = function.return_type {
+            if function.return_type.kind.is_void() {
                 if function.name == "main" && !builder.is_block_terminated() {
                     builder.push(ir::Instruction::Return(Some(ir::Value::Literal(
                         Literal::Signed32(0),
@@ -122,10 +124,11 @@ fn lower_function(
                     builder.terminate();
                 }
             } else {
-                return Err(CompilerError::during_lower(format!(
-                    "Must return a value of type '{}' before exiting function '{}'",
-                    function.return_type, function.name
-                )));
+                return Err(LowerErrorKind::MustReturnValueOfTypeBeforeExitingFunction {
+                    return_type: function.return_type.to_string(),
+                    function: function.name.clone(),
+                }
+                .at(function.source));
             }
         }
 
@@ -169,7 +172,7 @@ fn lower_stmts(
     ir_module: &ir::Module,
     stmts: &[resolved::Stmt],
     function: &resolved::Function,
-) -> Result<Value, CompilerError> {
+) -> Result<Value, LowerError> {
     let mut result = Value::Literal(Literal::Void);
 
     for stmt in stmts.iter() {
@@ -252,13 +255,13 @@ fn lower_drop(
     builder: &mut Builder,
     variable_key: VariableStorageKey,
     function: &resolved::Function,
-) -> Result<(), CompilerError> {
+) -> Result<(), LowerError> {
     let variable = function
         .variables
         .get(variable_key)
         .expect("referenced variable to exist");
 
-    if variable.resolved_type.is_managed_structure() {
+    if variable.resolved_type.kind.is_managed_structure() {
         let variable_pointer = lower_variable_to_value(variable_key);
         let variable_type = lower_type(&variable.resolved_type)?;
         let heap_pointer = builder.push(ir::Instruction::Load((variable_pointer, variable_type)));
@@ -268,12 +271,12 @@ fn lower_drop(
     Ok(())
 }
 
-fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError> {
+fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
     use resolved::{IntegerBits as Bits, IntegerSign as Sign};
 
-    match resolved_type {
-        resolved::Type::Boolean => Ok(ir::Type::Boolean),
-        resolved::Type::Integer { bits, sign } => Ok(match (bits, sign) {
+    match &resolved_type.kind {
+        resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
+        resolved::TypeKind::Integer { bits, sign } => Ok(match (bits, sign) {
             (Bits::Normal, Sign::Signed) => ir::Type::S64,
             (Bits::Normal, Sign::Unsigned) => ir::Type::U64,
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
@@ -285,25 +288,31 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, CompilerError>
             (Bits::Bits64, Sign::Signed) => ir::Type::S64,
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
-        resolved::Type::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
-            "Cannot lower unspecialized integer literal {}",
-            value
-        ))),
-        resolved::Type::FloatLiteral(value) => Err(CompilerError::during_lower(format!(
-            "Cannot lower unspecialized float literal {}",
-            value
-        ))),
-        resolved::Type::Float(size) => Ok(match size {
+        resolved::TypeKind::IntegerLiteral(value) => {
+            Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
+                value: value.to_string(),
+            }
+            .at(resolved_type.source))
+        }
+        resolved::TypeKind::FloatLiteral(value) => {
+            Err(LowerErrorKind::CannotLowerUnspecializedFloatLiteral {
+                value: value.to_string(),
+            }
+            .at(resolved_type.source))
+        }
+        resolved::TypeKind::Float(size) => Ok(match size {
             FloatSize::Normal => ir::Type::F64,
             FloatSize::Bits32 => ir::Type::F32,
             FloatSize::Bits64 => ir::Type::F64,
         }),
-        resolved::Type::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
-        resolved::Type::Void => Ok(ir::Type::Void),
-        resolved::Type::ManagedStructure(_, structure_ref) => {
+        resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
+        resolved::TypeKind::Void => Ok(ir::Type::Void),
+        resolved::TypeKind::ManagedStructure(_, structure_ref) => {
             Ok(ir::Type::Structure(*structure_ref).reference_counted_pointer())
         }
-        resolved::Type::PlainOldData(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
+        resolved::TypeKind::PlainOldData(_, structure_ref) => {
+            Ok(ir::Type::Structure(*structure_ref))
+        }
     }
 }
 
@@ -319,7 +328,7 @@ fn lower_destination(
     ir_module: &ir::Module,
     destination: &Destination,
     function: &resolved::Function,
-) -> Result<ir::Value, CompilerError> {
+) -> Result<ir::Value, LowerError> {
     match &destination.kind {
         DestinationKind::Variable(variable) => Ok(lower_variable_to_value(variable.key)),
         DestinationKind::GlobalVariable(global_variable) => {
@@ -381,12 +390,14 @@ fn lower_expr(
     ir_module: &ir::Module,
     expr: &Expr,
     function: &resolved::Function,
-) -> Result<ir::Value, CompilerError> {
+) -> Result<ir::Value, LowerError> {
     match &expr.kind {
-        ExprKind::IntegerLiteral(value) => Err(CompilerError::during_lower(format!(
-            "Cannot lower unspecialized integer literal {}",
-            value
-        ))),
+        ExprKind::IntegerLiteral(value) => {
+            Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
+                value: value.to_string(),
+            }
+            .at(expr.source))
+        }
         ExprKind::Integer { value, bits, sign } => {
             use resolved::{IntegerLiteralBits as Bits, IntegerSign as Sign};
 
@@ -395,83 +406,66 @@ fn lower_expr(
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed8(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into i8",
-                            value
-                        )))
+                        Err("i8")
                     }
                 }
                 (Bits::Bits8, Sign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned8(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into u8",
-                            value
-                        )))
+                        Err("u8")
                     }
                 }
                 (Bits::Bits16, Sign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed16(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into i16",
-                            value
-                        )))
+                        Err("i16")
                     }
                 }
                 (Bits::Bits16, Sign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned16(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into u16",
-                            value
-                        )))
+                        Err("u16")
                     }
                 }
                 (Bits::Bits32, Sign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed32(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into i32",
-                            value
-                        )))
+                        Err("i32")
                     }
                 }
                 (Bits::Bits32, Sign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned32(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into u32",
-                            value
-                        )))
+                        Err("u32")
                     }
                 }
                 (Bits::Bits64, Sign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed64(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into i64",
-                            value
-                        )))
+                        Err("i64")
                     }
                 }
                 (Bits::Bits64, Sign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned64(value)))
                     } else {
-                        Err(CompilerError::during_lower(format!(
-                            "Cannot fit {} into u64",
-                            value
-                        )))
+                        Err("u64")
                     }
                 }
             }
+            .map_err(|expected_type| {
+                LowerErrorKind::CannotFit {
+                    value: value.to_string(),
+                    expected_type: expected_type.to_string(),
+                }
+                .at(expr.source)
+            })
         }
         ExprKind::Float(size, value) => Ok(Value::Literal(match size {
             FloatSize::Bits32 => Literal::Float32(*value as f32),
@@ -542,6 +536,7 @@ fn lower_expr(
 
             Ok(builder.push(
                 match resolved_type
+                    .kind
                     .sign()
                     .expect("integer extend result type to be an integer type")
                 {
@@ -765,7 +760,7 @@ pub fn lower_basic_binary_operation(
     builder: &mut Builder,
     operator: &resolved::BasicBinaryOperator,
     operands: ir::BinaryOperands,
-) -> Result<Value, CompilerError> {
+) -> Result<Value, LowerError> {
     match operator {
         resolved::BasicBinaryOperator::Add(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Add(operands, FloatOrInteger::Integer),
@@ -863,7 +858,7 @@ pub fn lower_short_circuiting_binary_operation(
     ir_module: &ir::Module,
     operation: &resolved::ShortCircuitingBinaryOperation,
     function: &resolved::Function,
-) -> Result<Value, CompilerError> {
+) -> Result<Value, LowerError> {
     let short_circuit = lower_pre_short_circuit(builder, ir_module, operation, function)?;
     let merge_block_id = builder.new_block();
     builder.continues_to(merge_block_id);
@@ -912,7 +907,7 @@ fn lower_pre_short_circuit(
     ir_module: &ir::Module,
     operation: &resolved::ShortCircuitingBinaryOperation,
     function: &resolved::Function,
-) -> Result<BinaryShortCircuit, CompilerError> {
+) -> Result<BinaryShortCircuit, LowerError> {
     let left = lower_expr(builder, ir_module, &operation.left.expr, function)?;
 
     let left_done_block_id = builder.current_block_id();

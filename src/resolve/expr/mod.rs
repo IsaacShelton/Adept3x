@@ -111,39 +111,37 @@ pub fn resolve_expr(
     let resolved_expr = match &ast_expr.kind {
         ast::ExprKind::Variable(name) => resolve_variable_expr(ctx, name, source),
         ast::ExprKind::Integer(value) => Ok(TypedExpr::new(
-            resolved::Type::IntegerLiteral(value.clone()),
+            resolved::TypeKind::IntegerLiteral(value.clone()).at(source),
             resolved::Expr::new(resolved::ExprKind::IntegerLiteral(value.clone()), source),
         )),
         ast::ExprKind::Float(value) => Ok(TypedExpr::new(
-            resolved::Type::FloatLiteral(*value),
+            resolved::TypeKind::FloatLiteral(*value).at(source),
             resolved::Expr::new(resolved::ExprKind::Float(FloatSize::Normal, *value), source),
         )),
         ast::ExprKind::NullTerminatedString(value) => Ok(TypedExpr::new(
-            resolved::Type::Pointer(Box::new(resolved::Type::Integer {
-                bits: IntegerBits::Bits8,
-                sign: IntegerSign::Unsigned,
-            })),
+            resolved::TypeKind::Pointer(Box::new(
+                resolved::TypeKind::Integer {
+                    bits: IntegerBits::Bits8,
+                    sign: IntegerSign::Unsigned,
+                }
+                .at(source),
+            ))
+            .at(source),
             resolved::Expr::new(
                 resolved::ExprKind::NullTerminatedString(value.clone()),
                 source,
             ),
         )),
         ast::ExprKind::String(value) => {
-            let resolved_type = ctx.type_search_ctx.find_type_or_error("String", source)?;
+            let type_kind = ctx.type_search_ctx.find_type_or_error("String", source)?;
 
-            let structure_ref = match resolved_type {
-                resolved::Type::ManagedStructure(_, structure_ref) => structure_ref,
-                _ => {
-                    return Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::StringTypeNotDefined,
-                    ))
-                }
+            let structure_ref = match type_kind {
+                resolved::TypeKind::ManagedStructure(_, structure_ref) => structure_ref,
+                _ => return Err(ResolveErrorKind::StringTypeNotDefined.at(source)),
             };
 
             Ok(TypedExpr::new(
-                resolved::Type::ManagedStructure("String".into(), *structure_ref),
+                resolved::TypeKind::ManagedStructure("String".into(), *structure_ref).at(source),
                 resolved::Expr::new(resolved::ExprKind::String(value.clone()), source),
             ))
         }
@@ -180,15 +178,15 @@ pub fn resolve_expr(
             ctx.variable_search_ctx.begin_scope();
 
             let condition = conform_expr_or_error(
-                ctx.resolved_ast.source_file_cache,
                 &resolve_expr(
                     ctx,
                     &while_loop.condition,
-                    Some(PreferredType::of(&resolved::Type::Boolean)),
+                    Some(PreferredType::of(&resolved::TypeKind::Boolean.at(source))),
                     Initialized::Require,
                 )?,
-                &resolved::Type::Boolean,
+                &resolved::TypeKind::Boolean.at(source),
                 ConformMode::Normal,
+                source,
             )?
             .expr;
 
@@ -196,7 +194,7 @@ pub fn resolve_expr(
             ctx.variable_search_ctx.end_scope();
 
             Ok(TypedExpr::new(
-                resolved::Type::Void,
+                resolved::TypeKind::Void.at(source),
                 resolved::Expr::new(
                     resolved::ExprKind::While(resolved::While {
                         condition: Box::new(condition),
@@ -207,14 +205,14 @@ pub fn resolve_expr(
             ))
         }
         ast::ExprKind::Boolean(value) => Ok(TypedExpr::new(
-            resolved::Type::Boolean,
+            resolved::TypeKind::Boolean.at(source),
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
     }?;
 
     match initialized {
         Initialized::Require => {
-            ensure_initialized(ctx.resolved_ast.source_file_cache, ast_expr, &resolved_expr)?;
+            ensure_initialized(ast_expr, &resolved_expr)?;
         }
         Initialized::AllowUninitialized => (),
     }

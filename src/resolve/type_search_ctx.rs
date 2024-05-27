@@ -5,7 +5,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct TypeSearchCtx<'a> {
     source_file_cache: &'a SourceFileCache,
-    types: HashMap<String, resolved::Type>,
+    types: HashMap<String, resolved::TypeKind>,
 }
 
 impl<'a> TypeSearchCtx<'a> {
@@ -20,24 +20,21 @@ impl<'a> TypeSearchCtx<'a> {
         &self,
         name: &str,
         source: Source,
-    ) -> Result<&resolved::Type, ResolveError> {
+    ) -> Result<&resolved::TypeKind, ResolveError> {
         match self.find_type(name) {
             Some(info) => Ok(info),
-            None => Err(ResolveError::new(
-                self.source_file_cache,
-                source,
-                ResolveErrorKind::UndeclaredType {
-                    name: name.to_string(),
-                },
-            )),
+            None => Err(ResolveErrorKind::UndeclaredType {
+                name: name.to_string(),
+            }
+            .at(source)),
         }
     }
 
-    pub fn find_type(&self, name: &str) -> Option<&resolved::Type> {
+    pub fn find_type(&self, name: &str) -> Option<&resolved::TypeKind> {
         self.types.get(name)
     }
 
-    pub fn put(&mut self, name: impl ToString, resolved_type: resolved::Type) {
-        self.types.insert(name.to_string(), resolved_type);
+    pub fn put(&mut self, name: impl ToString, value: resolved::TypeKind) {
+        self.types.insert(name.to_string(), value);
     }
 }

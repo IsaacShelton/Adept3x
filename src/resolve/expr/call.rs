@@ -2,7 +2,9 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, Source},
     resolve::{
-        conform_expr, conform_expr_to_default, error::{ResolveError, ResolveErrorKind}, ConformMode, Initialized
+        conform_expr, conform_expr_to_default,
+        error::{ResolveError, ResolveErrorKind},
+        ConformMode, Initialized,
     },
     resolved::{self, TypedExpr},
 };
@@ -20,25 +22,19 @@ pub fn resolve_call_expr(
     let return_type = function.return_type.clone();
 
     if call.arguments.len() < function.parameters.required.len() {
-        return Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::NotEnoughArgumentsToFunction {
-                name: function.name.to_string(),
-            },
-        ));
+        return Err(ResolveErrorKind::NotEnoughArgumentsToFunction {
+            name: function.name.to_string(),
+        }
+        .at(source));
     }
 
     let num_required = function.parameters.required.len();
 
     if call.arguments.len() > num_required && !function.parameters.is_cstyle_vararg {
-        return Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::TooManyArgumentsToFunction {
-                name: function.name.to_string(),
-            },
-        ));
+        return Err(ResolveErrorKind::TooManyArgumentsToFunction {
+            name: function.name.to_string(),
+        }
+        .at(source));
     }
 
     let mut arguments = Vec::with_capacity(call.arguments.len());
@@ -54,19 +50,21 @@ pub fn resolve_call_expr(
         if let Some(preferred_type) =
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
         {
-            if let Some(conformed_argument) = conform_expr(&argument, preferred_type, ConformMode::ParameterPassing) {
+            if let Some(conformed_argument) = conform_expr(
+                &argument,
+                preferred_type,
+                ConformMode::ParameterPassing,
+                source,
+            ) {
                 argument = conformed_argument;
             } else {
-                return Err(ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    source,
-                    ResolveErrorKind::BadTypeForArgumentToFunction {
-                        expected: preferred_type.to_string(),
-                        got: argument.resolved_type.to_string(),
-                        name: function.name.clone(),
-                        i,
-                    },
-                ));
+                return Err(ResolveErrorKind::BadTypeForArgumentToFunction {
+                    expected: preferred_type.to_string(),
+                    got: argument.resolved_type.to_string(),
+                    name: function.name.clone(),
+                    i,
+                }
+                .at(source));
             }
         } else {
             match conform_expr_to_default(argument, ctx.resolved_ast.source_file_cache) {

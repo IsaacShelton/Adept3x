@@ -1,4 +1,4 @@
-use crate::{ast::Source, c::preprocessor::pre_token::Punctuator};
+use crate::{ast::Source, c::preprocessor::pre_token::Punctuator, show::Show, source_file_cache::SourceFileCache};
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -13,9 +13,20 @@ impl ParseError {
     }
 }
 
-impl Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "error on line {}: ", self.source.location.line)
+impl Show for ParseError {
+    fn show(
+        &self,
+        w: &mut impl std::fmt::Write,
+        source_file_cache: &SourceFileCache,
+    ) -> std::fmt::Result {
+        write!(
+            w,
+            "{}:{}:{}: error: {}",
+            source_file_cache.get(self.source.key).filename(),
+            self.source.location.line,
+            self.source.location.column,
+            self.kind
+        )
     }
 }
 

@@ -24,33 +24,30 @@ pub fn resolve_array_access_expr(
     let index = resolve_expr(
         ctx,
         &array_access.index,
-        Some(PreferredType::of(&resolved::Type::Integer {
-            bits: IntegerBits::Bits64,
-            sign: IntegerSign::Unsigned,
-        })),
+        Some(PreferredType::of(
+            &resolved::TypeKind::Integer {
+                bits: IntegerBits::Bits64,
+                sign: IntegerSign::Unsigned,
+            }
+            .at(source),
+        )),
         Initialized::Require,
     )?;
 
-    let item_type = match subject.resolved_type {
-        resolved::Type::Pointer(inner) => Ok(*inner),
-        bad_type => Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::CannotAccessMemberOf {
-                bad_type: bad_type.to_string(),
-            },
-        )),
+    let item_type = match &subject.resolved_type.kind {
+        resolved::TypeKind::Pointer(inner) => Ok((**inner).clone()),
+        bad_type => Err(ResolveErrorKind::CannotAccessMemberOf {
+            bad_type: bad_type.to_string(),
+        }
+        .at(source)),
     }?;
 
-    if !item_type.is_integer() {
-        return Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::ExpectedIndexOfType {
-                expected: "(any integer type)".to_string(),
-                got: item_type.to_string(),
-            },
-        ));
+    if !item_type.kind.is_integer() {
+        return Err(ResolveErrorKind::ExpectedIndexOfType {
+            expected: "(any integer type)".to_string(),
+            got: item_type.to_string(),
+        }
+        .at(source));
     }
 
     Ok(TypedExpr::new(

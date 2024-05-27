@@ -24,13 +24,10 @@ impl<'a> FunctionSearchCtx<'a> {
     ) -> Result<resolved::FunctionRef, ResolveError> {
         match self.find_function(name) {
             Some(function) => Ok(function),
-            None => Err(ResolveError::new(
-                self.source_file_cache,
-                source,
-                ResolveErrorKind::FailedToFindFunction {
-                    name: name.to_string(),
-                },
-            )),
+            None => Err(ResolveErrorKind::FailedToFindFunction {
+                name: name.to_string(),
+            }
+            .at(source)),
         }
     }
 

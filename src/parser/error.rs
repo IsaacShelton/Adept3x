@@ -1,12 +1,10 @@
-use crate::line_column::Location;
-use colored::Colorize;
+use crate::{ast::Source, show::Show, source_file_cache::SourceFileCache};
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 pub struct ParseError {
-    pub filename: Option<String>,
-    pub location: Option<Location>,
     pub kind: ParseErrorKind,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -43,23 +41,26 @@ pub enum ParseErrorKind {
     },
 }
 
-impl Display for ParseError {
+impl Show for ParseError {
+    fn show(
+        &self,
+        w: &mut impl std::fmt::Write,
+        source_file_cache: &SourceFileCache,
+    ) -> std::fmt::Result {
+        write!(
+            w,
+            "{}:{}:{}: error: {}",
+            source_file_cache.get(self.source.key).filename(),
+            self.source.location.line,
+            self.source.location.column,
+            self.kind
+        )
+    }
+}
+
+impl Display for ParseErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(filename) = &self.filename {
-            write!(f, "{}:", filename)?;
-        }
-
-        if let Some(location) = self.location {
-            write!(f, "{}:{}:", location.line, location.column)?;
-        }
-
-        if self.filename.is_some() || self.location.is_some() {
-            write!(f, " ")?;
-        }
-
-        write!(f, "{}", "error: ".bright_red())?;
-
-        match &self.kind {
+        match self {
             ParseErrorKind::UnexpectedToken { unexpected } => {
                 write!(f, "Unexpected token {}", unexpected)?;
             }

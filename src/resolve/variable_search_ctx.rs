@@ -42,13 +42,10 @@ impl<'a> VariableSearchCtx<'a> {
     ) -> Result<&ScopedVariable, ResolveError> {
         match self.find_variable(name) {
             Some(variable) => Ok(variable),
-            None => Err(ResolveError::new(
-                self.source_file_cache,
-                source,
-                ResolveErrorKind::UndeclaredVariable {
-                    name: name.to_string(),
-                },
-            )),
+            None => Err(ResolveErrorKind::UndeclaredVariable {
+                name: name.to_string(),
+            }
+            .at(source)),
         }
     }
 

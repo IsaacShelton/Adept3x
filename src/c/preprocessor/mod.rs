@@ -6,6 +6,8 @@ mod parser;
 mod pre_token;
 
 use crate::ast::Source;
+use crate::show::Show;
+use crate::source_file_cache::SourceFileCache;
 use crate::text::Text;
 
 use self::expand::{expand_ast, Environment};
@@ -50,10 +52,20 @@ impl From<ParseError> for PreprocessorError {
     }
 }
 
-impl Display for PreprocessorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "error on line {}: ", self.source.location.line)?;
-        self.kind.fmt(f)
+impl Show for PreprocessorError {
+    fn show(
+        &self,
+        w: &mut impl std::fmt::Write,
+        source_file_cache: &SourceFileCache,
+    ) -> std::fmt::Result {
+        write!(
+            w,
+            "{}:{}:{}: error: {}",
+            source_file_cache.get(self.source.key).filename(),
+            self.source.location.line,
+            self.source.location.column,
+            self.kind
+        )
     }
 }
 

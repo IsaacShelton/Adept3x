@@ -77,10 +77,10 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_packed: structure.is_packed,
             });
 
-            let resolved_type =
-                resolved::Type::ManagedStructure(structure.name.clone(), structure_key);
-
-            type_search_context.put(structure.name.clone(), resolved_type);
+            type_search_context.put(
+                structure.name.clone(),
+                resolved::TypeKind::ManagedStructure(structure.name.clone(), structure_key),
+            );
         }
 
         let global_search_context = ctx
@@ -119,6 +119,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 stmts: vec![],
                 is_foreign: function.is_foreign,
                 variables: VariableStorage::new(),
+                source: function.source,
             });
 
             ctx.jobs
@@ -224,22 +225,19 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 }
 
 fn conform_expr_or_error(
-    source_file_cache: &SourceFileCache,
     expr: &TypedExpr,
     target_type: &resolved::Type,
     mode: ConformMode,
+    conform_source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    if let Some(expr) = conform_expr(expr, target_type, mode) {
+    if let Some(expr) = conform_expr(expr, target_type, mode, conform_source) {
         Ok(expr)
     } else {
-        Err(ResolveError::new(
-            source_file_cache,
-            expr.expr.source,
-            ResolveErrorKind::TypeMismatch {
-                left: expr.resolved_type.to_string(),
-                right: target_type.to_string(),
-            },
-        ))
+        Err(ResolveErrorKind::TypeMismatch {
+            left: expr.resolved_type.to_string(),
+            right: target_type.to_string(),
+        }
+        .at(expr.expr.source))
     }
 }
 
@@ -265,60 +263,71 @@ fn conform_expr(
     expr: &TypedExpr,
     to_type: &resolved::Type,
     mode: ConformMode,
+    conform_source: Source,
 ) -> Option<TypedExpr> {
     if expr.resolved_type == *to_type {
         return Some(expr.clone());
     }
 
-    match &expr.resolved_type {
-        resolved::Type::IntegerLiteral(value) => {
+    match &expr.resolved_type.kind {
+        resolved::TypeKind::IntegerLiteral(value) => {
             // Integer literal Conversion
             conform_integer_literal(value, expr.expr.source, to_type)
         }
-        resolved::Type::Integer {
+        resolved::TypeKind::Integer {
             bits: from_bits,
             sign: from_sign,
         } => {
             // Integer Conversion
-            match to_type {
-                resolved::Type::Integer { bits, sign } => {
-                    conform_integer_value(&expr.expr, *from_bits, *from_sign, *bits, *sign)
-                }
+            match &to_type.kind {
+                resolved::TypeKind::Integer { bits, sign } => conform_integer_value(
+                    &expr.expr,
+                    *from_bits,
+                    *from_sign,
+                    *bits,
+                    *sign,
+                    to_type.source,
+                ),
                 _ => None,
             }
         }
-        resolved::Type::FloatLiteral(value) => {
+        resolved::TypeKind::FloatLiteral(value) => {
             // Float Literal Conversion
-            match to_type {
-                resolved::Type::Float(size) => Some(TypedExpr::new(
-                    resolved::Type::Float(*size),
-                    resolved::Expr::new(resolved::ExprKind::Float(*size, *value), expr.expr.source),
+            match &to_type.kind {
+                resolved::TypeKind::Float(size) => Some(TypedExpr::new(
+                    resolved::TypeKind::Float(*size).at(to_type.source),
+                    resolved::Expr::new(resolved::ExprKind::Float(*size, *value), conform_source),
                 )),
                 _ => None,
             }
         }
-        resolved::Type::Float(from_size) => {
+        resolved::TypeKind::Float(from_size) => {
             // Float Conversion
-            match to_type {
-                resolved::Type::Float(size) => conform_float_value(&expr.expr, *from_size, *size),
+            match &to_type.kind {
+                resolved::TypeKind::Float(size) => {
+                    conform_float_value(&expr.expr, *from_size, *size, to_type.source)
+                }
                 _ => None,
             }
         }
-        resolved::Type::Pointer(inner) => {
+        resolved::TypeKind::Pointer(inner) => {
             // Pointer Conversion
-            if inner.is_void() {
+            if inner.kind.is_void() {
                 // ptr<void> -> ptr<ANYTHING>
-                match to_type {
-                    resolved::Type::Pointer(inner) => Some(TypedExpr::new(
-                        resolved::Type::Pointer(inner.clone()),
+                match &to_type.kind {
+                    resolved::TypeKind::Pointer(inner) => Some(TypedExpr::new(
+                        resolved::TypeKind::Pointer(inner.clone()).at(to_type.source),
                         expr.expr.clone(),
                     )),
                     _ => None,
                 }
-            } else if mode.allow_pointer_into_void_pointer() && to_type.is_void_pointer() {
+            } else if mode.allow_pointer_into_void_pointer() && to_type.kind.is_void_pointer() {
                 // ptr<ANYTHING> -> ptr<void>
                 Some(TypedExpr::new(
-                    resolved::Type::Pointer(Box::new(resolved::Type::Void)),
+                    resolved::TypeKind::Pointer(Box::new(
+                        resolved::TypeKind::Void.at(to_type.source),
+                    ))
+                    .at(to_type.source),
                     expr.expr.clone(),
                 ))
             } else {
@@ -333,8 +342,9 @@ fn conform_float_value(
     expr: &resolved::Expr,
     from_size: FloatSize,
     to_size: FloatSize,
+    type_source: Source,
 ) -> Option<TypedExpr> {
-    let result_type = resolved::Type::Float(to_size);
+    let result_type = resolved::TypeKind::Float(to_size).at(type_source);
 
     let from_bits = from_size.bits();
     let to_bits = to_size.bits();
@@ -362,6 +372,7 @@ fn conform_integer_value(
     from_sign: IntegerSign,
     to_bits: IntegerBits,
     to_sign: IntegerSign,
+    type_source: Source,
 ) -> Option<TypedExpr> {
     if from_sign != to_sign && !(to_bits > from_bits) {
         return None;
@@ -371,10 +382,11 @@ fn conform_integer_value(
         return None;
     }
 
-    let result_type = resolved::Type::Integer {
+    let result_type = resolved::TypeKind::Integer {
         bits: to_bits,
         sign: to_sign,
-    };
+    }
+    .at(type_source);
 
     if from_sign == to_sign && to_bits == from_bits {
         return Some(TypedExpr::new(result_type, expr.clone()));
@@ -393,12 +405,12 @@ fn conform_expr_to_default(
     expr: TypedExpr,
     source_file_cache: &SourceFileCache,
 ) -> Result<TypedExpr, ResolveError> {
-    match expr.resolved_type {
-        resolved::Type::IntegerLiteral(value) => {
-            conform_integer_to_default_or_error(source_file_cache, &value, expr.expr.source)
+    match &expr.resolved_type.kind {
+        resolved::TypeKind::IntegerLiteral(value) => {
+            conform_integer_to_default_or_error(&value, expr.expr.source)
         }
-        resolved::Type::FloatLiteral(value) => {
-            Ok(conform_float_to_default(value, expr.expr.source))
+        resolved::TypeKind::FloatLiteral(value) => {
+            Ok(conform_float_to_default(*value, expr.expr.source))
         }
         _ => Ok(expr),
     }
@@ -406,25 +418,21 @@ fn conform_expr_to_default(
 
 fn conform_float_to_default(value: f64, source: Source) -> TypedExpr {
     TypedExpr::new(
-        resolved::Type::Float(FloatSize::Normal),
+        resolved::TypeKind::Float(FloatSize::Normal).at(source),
         resolved::Expr::new(resolved::ExprKind::Float(FloatSize::Normal, value), source),
     )
 }
 
 fn conform_integer_to_default_or_error(
-    source_file_cache: &SourceFileCache,
     value: &BigInt,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     match conform_integer_to_default(&value, source) {
         Some(resolved) => Ok(resolved),
-        None => Err(ResolveError::new(
-            source_file_cache,
-            source,
-            ResolveErrorKind::UnrepresentableInteger {
-                value: value.to_string(),
-            },
-        )),
+        None => Err(ResolveErrorKind::UnrepresentableInteger {
+            value: value.to_string(),
+        }
+        .at(source)),
     }
 }
 
@@ -432,14 +440,16 @@ fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExp
     use resolved::{IntegerBits::*, IntegerSign::*};
 
     let possible_types = [
-        resolved::Type::Integer {
+        resolved::TypeKind::Integer {
             bits: Bits64,
             sign: Signed,
-        },
-        resolved::Type::Integer {
+        }
+        .at(source),
+        resolved::TypeKind::Integer {
             bits: Bits64,
             sign: Unsigned,
-        },
+        }
+        .at(source),
     ];
 
     for possible_type in possible_types.iter() {
@@ -456,22 +466,23 @@ fn conform_integer_literal(
     source: Source,
     to_type: &resolved::Type,
 ) -> Option<TypedExpr> {
-    match to_type {
-        resolved::Type::Float(size) => value.to_f64().map(|literal| {
+    match &to_type.kind {
+        resolved::TypeKind::Float(size) => value.to_f64().map(|literal| {
             TypedExpr::new(
-                resolved::Type::Float(*size),
+                resolved::TypeKind::Float(*size).at(source),
                 resolved::Expr::new(resolved::ExprKind::Float(*size, literal), source),
             )
         }),
-        resolved::Type::Integer { bits, sign } => {
+        resolved::TypeKind::Integer { bits, sign } => {
             use resolved::{IntegerBits::*, IntegerLiteralBits, IntegerSign::*};
 
             let make_integer = |integer_literal_bits| {
                 Some(TypedExpr::new(
-                    resolved::Type::Integer {
+                    resolved::TypeKind::Integer {
                         bits: *bits,
                         sign: *sign,
-                    },
+                    }
+                    .at(source),
                     resolved::Expr::new(
                         resolved::ExprKind::Integer {
                             value: value.clone(),
@@ -571,53 +582,49 @@ fn resolve_type(
     ast_type: &ast::Type,
 ) -> Result<resolved::Type, ResolveError> {
     match &ast_type.kind {
-        ast::TypeKind::Boolean => Ok(resolved::Type::Boolean),
-        ast::TypeKind::Integer { bits, sign } => Ok(resolved::Type::Integer {
+        ast::TypeKind::Boolean => Ok(resolved::TypeKind::Boolean),
+        ast::TypeKind::Integer { bits, sign } => Ok(resolved::TypeKind::Integer {
             bits: *bits,
             sign: *sign,
         }),
-        ast::TypeKind::Pointer(inner) => Ok(resolved::Type::Pointer(Box::new(resolve_type(
+        ast::TypeKind::Pointer(inner) => Ok(resolved::TypeKind::Pointer(Box::new(resolve_type(
             type_search_context,
             source_file_cache,
             &inner,
         )?))),
-        ast::TypeKind::Void => Ok(resolved::Type::Void),
+        ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
         ast::TypeKind::Named(name) => type_search_context
             .find_type_or_error(&name, ast_type.source)
             .cloned(),
         ast::TypeKind::PlainOldData(inner) => match &inner.kind {
             ast::TypeKind::Named(name) => {
-                let resolved_inner_type = type_search_context
+                let resolved_inner_kind = type_search_context
                     .find_type_or_error(&name, ast_type.source)
                     .cloned()?;
 
-                let structure_ref = match resolved_inner_type {
-                    resolved::Type::ManagedStructure(_, structure_ref) => structure_ref,
+                let structure_ref = match resolved_inner_kind {
+                    resolved::TypeKind::ManagedStructure(_, structure_ref) => structure_ref,
                     _ => {
-                        return Err(ResolveError::new(
-                            source_file_cache,
-                            inner.source,
-                            ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
-                                bad_type: inner.to_string(),
-                            },
-                        ));
+                        return Err(ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
+                            bad_type: inner.to_string(),
+                        }
+                        .at(inner.source));
                     }
                 };
 
-                Ok(resolved::Type::PlainOldData(name.clone(), structure_ref))
+                Ok(resolved::TypeKind::PlainOldData(
+                    name.clone(),
+                    structure_ref,
+                ))
             }
-            _ => {
-                return Err(ResolveError::new(
-                    source_file_cache,
-                    inner.source,
-                    ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
-                        bad_type: inner.to_string(),
-                    },
-                ));
+            _ => Err(ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
+                bad_type: inner.to_string(),
             }
+            .at(inner.source)),
         },
-        ast::TypeKind::Float(size) => Ok(resolved::Type::Float(*size)),
+        ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Float(*size)),
     }
+    .map(|kind| kind.at(ast_type.source))
 }
 
 fn resolve_parameters(
@@ -645,24 +652,20 @@ fn resolve_parameters(
 }
 
 fn ensure_initialized(
-    source_file_cache: &SourceFileCache,
     subject: &ast::Expr,
     resolved_subject: &TypedExpr,
 ) -> Result<(), ResolveError> {
     if resolved_subject.is_initialized {
         Ok(())
     } else {
-        Err(ResolveError::new(
-            source_file_cache,
-            subject.source,
-            match &subject.kind {
-                ast::ExprKind::Variable(variable_name) => {
-                    ResolveErrorKind::CannotUseUninitializedVariable {
-                        variable_name: variable_name.clone(),
-                    }
+        Err(match &subject.kind {
+            ast::ExprKind::Variable(variable_name) => {
+                ResolveErrorKind::CannotUseUninitializedVariable {
+                    variable_name: variable_name.clone(),
                 }
-                _ => ResolveErrorKind::CannotUseUninitializedValue,
-            },
-        ))
+            }
+            _ => ResolveErrorKind::CannotUseUninitializedValue,
+        }
+        .at(subject.source))
     }
 }

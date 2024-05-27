@@ -3,7 +3,6 @@
 mod ast;
 mod c;
 mod cli;
-mod error;
 mod inflow;
 mod ir;
 mod lexer;
@@ -16,6 +15,7 @@ mod parser;
 mod repeating_last;
 mod resolve;
 mod resolved;
+mod show;
 mod source_file_cache;
 mod text;
 mod token;
@@ -31,7 +31,9 @@ use llvm_backend::llvm_backend;
 use lower::lower;
 use parser::{parse, parse_into};
 use resolve::resolve;
-use std::fmt::Display;
+use show::Show;
+use std::fmt;
+use std::io;
 use std::path::Path;
 use std::process::exit;
 use std::{ffi::OsStr, fs::metadata};
@@ -68,7 +70,8 @@ fn build_project(build_command: BuildCommand) {
                 for i in 0..10000 {
                     let key = source_file_cache.add_or_exit(&filename);
                     let text = source_file_cache.get(key).content().chars().into_text(key);
-                    let preprocessed = exit_unless(c::preprocessor::preprocess(text));
+                    let preprocessed =
+                        exit_unless(c::preprocessor::preprocess(text), &source_file_cache);
 
                     if i == 9999 {
                         println!("{:?}", preprocessed);
@@ -83,11 +86,24 @@ fn build_project(build_command: BuildCommand) {
     }
 }
 
-fn exit_unless<T, E: Display>(result: Result<T, E>) -> T {
+struct ErrorFormatter<W: io::Write> {
+    writer: W,
+}
+
+impl<W: io::Write> fmt::Write for ErrorFormatter<W> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.writer.write_all(s.as_bytes()).map_err(|_| fmt::Error)
+    }
+}
+
+fn exit_unless<T, E: Show>(result: Result<T, E>, source_file_cache: &SourceFileCache) -> T {
     match result {
         Ok(value) => value,
         Err(err) => {
-            eprintln!("{}", err);
+            let mut message = String::new();
+            err.show(&mut message, source_file_cache)
+                .expect("show error message");
+            eprintln!("{}", message);
             exit(1);
         }
     }
@@ -121,19 +137,21 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
             let lexer = Lexer::new(content.chars());
 
             if let Some(ast) = &mut ast {
-                exit_unless(parse_into(
-                    lexer,
-                    &source_file_cache,
-                    key,
-                    ast,
-                    filename.to_string(),
-                ));
+                exit_unless(
+                    parse_into(lexer, &source_file_cache, key, ast, filename.to_string()),
+                    source_file_cache,
+                );
             } else {
-                ast = Some(exit_unless(parse(lexer, &source_file_cache, key)));
+                ast = Some(exit_unless(
+                    parse(lexer, &source_file_cache, key),
+                    source_file_cache,
+                ));
             }
         } else {
-            let (preprocessed, eof_source) =
-                exit_unless(c::preprocessor::preprocess(content.chars().into_text(key)));
+            let (preprocessed, eof_source) = exit_unless(
+                c::preprocessor::preprocess(content.chars().into_text(key)),
+                source_file_cache,
+            );
 
             let mut lexer = c::Lexer::new(
                 preprocessed
@@ -145,15 +163,15 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
             let lexed = lexer.collect_vec(true);
 
             if let Some(ast) = &mut ast {
-                exit_unless(c::parse_into(
-                    lexed,
-                    &source_file_cache,
-                    key,
-                    ast,
-                    filename.to_string(),
-                ));
+                exit_unless(
+                    c::parse_into(lexed, &source_file_cache, key, ast, filename.to_string()),
+                    source_file_cache,
+                );
             } else {
-                ast = Some(exit_unless(c::parse(lexed, &source_file_cache, key)));
+                ast = Some(exit_unless(
+                    c::parse(lexed, &source_file_cache, key),
+                    source_file_cache,
+                ));
             }
         }
     }
@@ -165,12 +183,13 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
         exit(1);
     };
 
-    let resolved_ast = exit_unless(resolve(&ast));
-    let ir_module = exit_unless(lower(&resolved_ast));
+    let resolved_ast = exit_unless(resolve(&ast), source_file_cache);
+    let ir_module = exit_unless(lower(&resolved_ast), source_file_cache);
 
-    exit_unless(unsafe {
-        llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath)
-    });
+    exit_unless(
+        unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) },
+        source_file_cache,
+    );
 }
 
 fn compile(source_file_cache: &SourceFileCache, project_folder: &Path, filename: &str) {
@@ -187,34 +206,18 @@ fn compile(source_file_cache: &SourceFileCache, project_folder: &Path, filename:
 
     let content = source_file_cache.get(key).content();
 
-    let ast = match parse(Lexer::new(content.chars()), &source_file_cache, key) {
-        Ok(ast) => ast,
-        Err(parse_error) => {
-            eprintln!("{}", parse_error);
-            exit(1);
-        }
-    };
+    let ast = exit_unless(
+        parse(Lexer::new(content.chars()), &source_file_cache, key),
+        source_file_cache,
+    );
+    let resolved_ast = exit_unless(resolve(&ast), source_file_cache);
 
-    let resolved_ast = match resolve(&ast) {
-        Ok(resolved_ast) => resolved_ast,
-        Err(error) => {
-            eprintln!("{}", error);
-            exit(1);
-        }
-    };
+    let ir_module = exit_unless(lower(&resolved_ast), source_file_cache);
 
-    let ir_module = match lower(&resolved_ast) {
-        Ok(ir_module) => ir_module,
-        Err(error) => {
-            eprintln!("{}", error);
-            exit(1);
-        }
-    };
-
-    match unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) } {
-        Err(error) => eprintln!("{}", error),
-        Ok(()) => (),
-    }
+    exit_unless(
+        unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) },
+        source_file_cache,
+    );
 }
 
 fn new_project(new_command: NewCommand) {

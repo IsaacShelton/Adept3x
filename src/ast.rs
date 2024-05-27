@@ -93,6 +93,7 @@ pub struct Function {
     pub return_type: Type,
     pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]

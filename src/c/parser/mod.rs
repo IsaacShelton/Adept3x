@@ -32,10 +32,22 @@ pub struct ParameterTypeList {
 }
 
 #[derive(Clone, Debug)]
-pub enum Declarator {
+pub struct Declarator {
+    pub kind: DeclaratorKind,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum DeclaratorKind {
     Named(String),
     Pointers(Box<Declarator>, Pointers),
     Function(Box<Declarator>, ParameterTypeList),
+}
+
+impl DeclaratorKind {
+    pub fn at(self, source: Source) -> Declarator {
+        Declarator { kind: self, source }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -87,7 +99,13 @@ pub struct InitDeclarator {
 }
 
 #[derive(Clone, Debug)]
-pub enum DeclarationSpecifier {
+pub struct DeclarationSpecifier {
+    kind: DeclarationSpecifierKind,
+    source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum DeclarationSpecifierKind {
     Auto,
     Constexpr,
     Extern,
@@ -98,6 +116,12 @@ pub enum DeclarationSpecifier {
     Inline,
     Noreturn,
     TypeSpecifierQualifier(TypeSpecifierQualifier),
+}
+
+impl DeclarationSpecifierKind {
+    pub fn at(self, source: Source) -> DeclarationSpecifier {
+        DeclarationSpecifier { kind: self, source }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -183,10 +207,10 @@ impl<'a> Parser<'a> {
             let external_declaration = self.parse_external_declaration()?;
 
             for init_declarator in external_declaration.init_declarator_list.iter() {
-                match &init_declarator.declarator {
-                    Declarator::Named(_) => todo!(),
-                    Declarator::Pointers(_, _) => todo!(),
-                    Declarator::Function(declarator, parameter_type_list) => {
+                match &init_declarator.declarator.kind {
+                    DeclaratorKind::Named(_) => todo!(),
+                    DeclaratorKind::Pointers(_, _) => todo!(),
+                    DeclaratorKind::Function(declarator, parameter_type_list) => {
                         declare_function(
                             ast_file,
                             &external_declaration.attribute_specifiers[..],
@@ -217,7 +241,10 @@ impl<'a> Parser<'a> {
         }
         self.input.backtrack();
 
-        Err(ParseError::new(ParseErrorKind::ExpectedDeclaration, None))
+        Err(ParseError::new(
+            ParseErrorKind::ExpectedDeclaration,
+            self.input.peek().source,
+        ))
     }
 
     fn parse_function_definition(&mut self) -> Result<(), ParseError> {
@@ -264,25 +291,29 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_declaration_specifier(&mut self) -> Result<DeclarationSpecifier, ParseError> {
-        let result = match self.input.peek().kind {
-            CTokenKind::AutoKeyword => DeclarationSpecifier::Auto,
-            CTokenKind::ConstexprKeyword => DeclarationSpecifier::Constexpr,
-            CTokenKind::ExternKeyword => DeclarationSpecifier::Extern,
-            CTokenKind::RegisterKeyword => DeclarationSpecifier::Register,
-            CTokenKind::StaticKeyword => DeclarationSpecifier::Static,
-            CTokenKind::ThreadLocalKeyword => DeclarationSpecifier::ThreadLocal,
-            CTokenKind::TypedefKeyword => DeclarationSpecifier::Typedef,
-            CTokenKind::InlineKeyword => DeclarationSpecifier::Inline,
-            CTokenKind::NoreturnKeyword => DeclarationSpecifier::Noreturn,
+        let CToken { kind, source } = self.input.peek();
+        let source = *source;
+
+        let result = match kind {
+            CTokenKind::AutoKeyword => DeclarationSpecifierKind::Auto,
+            CTokenKind::ConstexprKeyword => DeclarationSpecifierKind::Constexpr,
+            CTokenKind::ExternKeyword => DeclarationSpecifierKind::Extern,
+            CTokenKind::RegisterKeyword => DeclarationSpecifierKind::Register,
+            CTokenKind::StaticKeyword => DeclarationSpecifierKind::Static,
+            CTokenKind::ThreadLocalKeyword => DeclarationSpecifierKind::ThreadLocal,
+            CTokenKind::TypedefKeyword => DeclarationSpecifierKind::Typedef,
+            CTokenKind::InlineKeyword => DeclarationSpecifierKind::Inline,
+            CTokenKind::NoreturnKeyword => DeclarationSpecifierKind::Noreturn,
             _ => {
-                return Ok(DeclarationSpecifier::TypeSpecifierQualifier(
+                return Ok(DeclarationSpecifierKind::TypeSpecifierQualifier(
                     self.parse_type_specifier_qualifier()?,
-                ));
+                )
+                .at(source));
             }
         };
 
         self.input.advance();
-        Ok(result)
+        Ok(result.at(source))
     }
 
     fn parse_type_specifier_qualifier(&mut self) -> Result<TypeSpecifierQualifier, ParseError> {
@@ -311,7 +342,7 @@ impl<'a> Parser<'a> {
         self.input.backtrack();
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse type specifier qualifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -378,7 +409,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse type specifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -391,7 +422,7 @@ impl<'a> Parser<'a> {
             _ => {
                 return Err(ParseError::new(
                     ParseErrorKind::Misc("Failed to parse type qualifier"),
-                    None,
+                    self.input.peek().source,
                 ))
             }
         };
@@ -415,11 +446,12 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse alignment specifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
     fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
+        let source = self.input.peek().source;
         self.input.speculate();
 
         let pointers = match self.parse_pointers() {
@@ -438,7 +470,7 @@ impl<'a> Parser<'a> {
         if pointers.pointers.is_empty() {
             Ok(declarator)
         } else {
-            Ok(Declarator::Pointers(Box::new(declarator), pointers))
+            Ok(DeclaratorKind::Pointers(Box::new(declarator), pointers).at(source))
         }
     }
 
@@ -483,9 +515,9 @@ impl<'a> Parser<'a> {
     fn parse_direct_declarator(&mut self) -> Result<Declarator, ParseError> {
         let mut declarator = if let CTokenKind::Identifier(name) = &self.input.peek().kind {
             let name = name.clone();
-            self.input.advance();
+            let source = self.input.advance().source;
             let attributes = self.parse_attribute_specifier_sequence()?;
-            Declarator::Named(name)
+            DeclaratorKind::Named(name).at(source)
         } else if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = &self.input.peek().kind
         {
             self.input.advance();
@@ -494,7 +526,7 @@ impl<'a> Parser<'a> {
             if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseParen)]) {
                 return Err(ParseError::new(
                     ParseErrorKind::Misc("Failed to parse ')' for direct declarator"),
-                    None,
+                    self.input.peek().source,
                 ));
             }
 
@@ -502,7 +534,7 @@ impl<'a> Parser<'a> {
         } else {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected declarator"),
-                None,
+                self.input.peek().source,
             ));
         };
 
@@ -524,13 +556,13 @@ impl<'a> Parser<'a> {
         &mut self,
         declarator: Declarator,
     ) -> Result<Declarator, ParseError> {
+        let source = self.input.peek().source;
         assert!(self.input.advance().kind.is_open_paren());
+
         let parameter_type_list = self.parse_parameter_type_list()?;
         self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseParen)]);
-        Ok(Declarator::Function(
-            Box::new(declarator),
-            parameter_type_list,
-        ))
+
+        Ok(DeclaratorKind::Function(Box::new(declarator), parameter_type_list).at(source))
     }
 
     fn parse_parameter_type_list(&mut self) -> Result<ParameterTypeList, ParseError> {
@@ -557,7 +589,7 @@ impl<'a> Parser<'a> {
                         ParseErrorKind::Misc(
                             "Expected ',' after parameter declaration in parameter type list",
                         ),
-                        None,
+                        self.input.peek().source,
                     ))
                 }
             }
@@ -597,7 +629,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse parameter declaration"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -612,7 +644,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse atomic specifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -624,7 +656,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse struct or union specifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -638,7 +670,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse typedef name"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -650,7 +682,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse enum specifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -666,7 +698,7 @@ impl<'a> Parser<'a> {
         self.input.backtrack();
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse typeof specifier"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -696,14 +728,14 @@ impl<'a> Parser<'a> {
                 ParseErrorKind::Misc(
                     "Expected at least one init declarator when attribute specifiers present",
                 ),
-                None,
+                self.input.peek().source,
             ));
         }
 
         if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::Semicolon)]) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected ';' after declaration"),
-                None,
+                self.input.peek().source,
             ));
         }
 
@@ -770,7 +802,7 @@ impl<'a> Parser<'a> {
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse initializer"),
-            None,
+            self.input.peek().source,
         ))
     }
 
@@ -778,7 +810,7 @@ impl<'a> Parser<'a> {
         if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::OpenCurly)]) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '{' to begin braced initializer"),
-                None,
+                self.input.peek().source,
             ));
         }
 
@@ -787,7 +819,7 @@ impl<'a> Parser<'a> {
         if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseCurly)]) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '}' to close braced initializer"),
-                None,
+                self.input.peek().source,
             ));
         }
 
@@ -807,7 +839,7 @@ impl<'a> Parser<'a> {
         if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::OpenCurly)]) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '{' to begin compound statement"),
-                None,
+                self.input.peek().source,
             ));
         }
 
@@ -816,7 +848,7 @@ impl<'a> Parser<'a> {
         if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseCurly)]) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '}' to close compound statement"),
-                None,
+                self.input.peek().source,
             ));
         }
 

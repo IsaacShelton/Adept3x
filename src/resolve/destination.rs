@@ -1,13 +1,7 @@
 use super::error::{ResolveError, ResolveErrorKind};
-use crate::{
-    resolved::{Destination, DestinationKind, ExprKind, Type, TypedExpr},
-    source_file_cache::SourceFileCache,
-};
+use crate::resolved::{Destination, DestinationKind, ExprKind, TypeKind, TypedExpr};
 
-pub fn resolve_expr_to_destination(
-    source_file_cache: &SourceFileCache,
-    typed_expr: TypedExpr,
-) -> Result<Destination, ResolveError> {
+pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination, ResolveError> {
     let source = typed_expr.expr.source;
 
     Ok(Destination::new(
@@ -21,17 +15,14 @@ pub fn resolve_expr_to_destination(
                 field_type,
                 memory_management,
             } => {
-                match subject.resolved_type {
-                    Type::PlainOldData(..) => (),
-                    Type::ManagedStructure(..) => (),
+                match &subject.resolved_type.kind {
+                    TypeKind::PlainOldData(..) => (),
+                    TypeKind::ManagedStructure(..) => (),
                     _ => {
-                        return Err(ResolveError::new(
-                            source_file_cache,
-                            source,
-                            ResolveErrorKind::CannotMutate {
-                                bad_type: subject.resolved_type.to_string(),
-                            },
-                        ))
+                        return Err(ResolveErrorKind::CannotMutate {
+                            bad_type: subject.resolved_type.to_string(),
+                        }
+                        .at(source))
                     }
                 }
 
@@ -45,13 +36,10 @@ pub fn resolve_expr_to_destination(
             }
             ExprKind::ArrayAccess(array_access) => DestinationKind::ArrayAccess(array_access),
             _ => {
-                return Err(ResolveError::new(
-                    source_file_cache,
-                    source,
-                    ResolveErrorKind::CannotMutate {
-                        bad_type: typed_expr.resolved_type.to_string(),
-                    },
-                ))
+                return Err(ResolveErrorKind::CannotMutate {
+                    bad_type: typed_expr.resolved_type.to_string(),
+                }
+                .at(source))
             }
         },
         typed_expr.resolved_type,

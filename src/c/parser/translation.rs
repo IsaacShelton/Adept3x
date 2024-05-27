@@ -1,7 +1,7 @@
 use super::{
-    error::ParseErrorKind, DeclarationSpecifier, DeclarationSpecifiers, Declarator,
-    ParameterTypeList, ParseError, Pointers, TypeQualifier, TypeSpecifier, TypeSpecifierKind,
-    TypeSpecifierQualifier,
+    error::ParseErrorKind, DeclarationSpecifierKind, DeclarationSpecifiers,
+    Declarator, DeclaratorKind, ParameterTypeList, ParseError, Pointers, TypeQualifier,
+    TypeSpecifier, TypeSpecifierKind, TypeSpecifierQualifier,
 };
 use crate::{
     ast::{
@@ -17,6 +17,7 @@ pub fn declare_function(
     declarator: &Declarator,
     parameter_type_list: &ParameterTypeList,
 ) -> Result<(), ParseError> {
+    let source = declarator.source;
     let (name, return_type) = get_name_and_type(declarator, declaration_specifiers)?;
     let mut required = vec![];
 
@@ -43,6 +44,7 @@ pub fn declare_function(
         return_type,
         stmts: vec![],
         is_foreign: true,
+        source,
     });
 
     Ok(())
@@ -53,7 +55,7 @@ fn get_name_and_type(
     declaration_specifiers: &DeclarationSpecifiers,
 ) -> Result<(String, Type), ParseError> {
     let (name, pointers) = get_name_and_pointers(declarator)?;
-    let mut ast_type = get_base_type(declaration_specifiers)?;
+    let mut ast_type = get_base_type(declaration_specifiers, declarator.source)?;
 
     for pointer in pointers.pointers.iter() {
         ast_type = Type::new(TypeKind::Pointer(Box::new(ast_type)), pointer.source);
@@ -68,44 +70,47 @@ fn get_name_and_type(
 }
 
 fn get_name_and_pointers(declarator: &Declarator) -> Result<(String, Pointers), ParseError> {
-    match declarator {
-        Declarator::Named(name) => Ok((name.to_string(), Pointers::default())),
-        Declarator::Pointers(inner, pointers) => {
+    match &declarator.kind {
+        DeclaratorKind::Named(name) => Ok((name.to_string(), Pointers::default())),
+        DeclaratorKind::Pointers(inner, pointers) => {
             let (name, more_pointers) = get_name_and_pointers(inner)?;
             Ok((name, pointers.concat(&more_pointers)))
         }
-        Declarator::Function(..) => Err(ParseError::new(
+        DeclaratorKind::Function(_, _) => Err(ParseError::new(
             ParseErrorKind::CannotReturnFunctionPointerType,
-            None,
+            declarator.source,
         )),
     }
 }
 
-fn get_base_type(declaration_specifiers: &DeclarationSpecifiers) -> Result<Type, ParseError> {
+fn get_base_type(
+    declaration_specifiers: &DeclarationSpecifiers,
+    parent_source: Source,
+) -> Result<Type, ParseError> {
     let mut ast_type = None;
 
     for specifier in declaration_specifiers.specifiers.iter() {
-        match specifier {
-            DeclarationSpecifier::Auto => {
+        match &specifier.kind {
+            DeclarationSpecifierKind::Auto => {
                 return Err(ParseError::new(
                     ParseErrorKind::AutoNotSupportedForReturnType,
-                    None,
+                    specifier.source,
                 ))
             }
-            DeclarationSpecifier::Constexpr => {
+            DeclarationSpecifierKind::Constexpr => {
                 return Err(ParseError::new(
                     ParseErrorKind::ConstexprNotSupportedForReturnType,
-                    None,
+                    specifier.source,
                 ))
             }
-            DeclarationSpecifier::Extern => todo!(),
-            DeclarationSpecifier::Register => todo!(),
-            DeclarationSpecifier::Static => todo!(),
-            DeclarationSpecifier::ThreadLocal => todo!(),
-            DeclarationSpecifier::Typedef => todo!(),
-            DeclarationSpecifier::Inline => todo!(),
-            DeclarationSpecifier::Noreturn => todo!(),
-            DeclarationSpecifier::TypeSpecifierQualifier(type_specifier_qualifier) => {
+            DeclarationSpecifierKind::Extern => todo!(),
+            DeclarationSpecifierKind::Register => todo!(),
+            DeclarationSpecifierKind::Static => todo!(),
+            DeclarationSpecifierKind::ThreadLocal => todo!(),
+            DeclarationSpecifierKind::Typedef => todo!(),
+            DeclarationSpecifierKind::Inline => todo!(),
+            DeclarationSpecifierKind::Noreturn => todo!(),
+            DeclarationSpecifierKind::TypeSpecifierQualifier(type_specifier_qualifier) => {
                 ast_type = augment_ast_type(ast_type, type_specifier_qualifier)?;
             }
         }
@@ -114,8 +119,8 @@ fn get_base_type(declaration_specifiers: &DeclarationSpecifiers) -> Result<Type,
     match ast_type {
         Some(ast_type) => Ok(ast_type),
         None => Err(ParseError::new(
-            ParseErrorKind::Misc("Function is missing return type"),
-            None,
+            ParseErrorKind::Misc("Missing base type"),
+            parent_source,
         )),
     }
 }
@@ -153,7 +158,10 @@ fn augment_ast_type_with_type_specifier(
 ) -> Result<Option<Type>, ParseError> {
     match type_specifier.kind {
         TypeSpecifierKind::Void => match ast_type {
-            Some(..) => Err(ParseError::new(ParseErrorKind::InvalidType, None)),
+            Some(..) => Err(ParseError::new(
+                ParseErrorKind::InvalidType,
+                type_specifier.source,
+            )),
             None => Ok(Some(Type::new(TypeKind::Void, type_specifier.source))),
         },
         TypeSpecifierKind::Char => augment_ast_type_as_integer(
@@ -184,7 +192,7 @@ fn augment_ast_type_as_integer(
     source: Source,
 ) -> Result<Option<Type>, ParseError> {
     match ast_type {
-        Some(..) => Err(ParseError::new(ParseErrorKind::InvalidType, None)),
+        Some(..) => Err(ParseError::new(ParseErrorKind::InvalidType, source)),
         None => Ok(Some(Type::new(TypeKind::Integer { bits, sign }, source))),
     }
 }

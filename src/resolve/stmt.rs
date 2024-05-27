@@ -46,17 +46,16 @@ pub fn resolve_stmt<'a>(
                     .unwrap()
                     .return_type;
 
-                if let Some(result) = conform_expr(&result, &return_type, ConformMode::Normal) {
+                if let Some(result) =
+                    conform_expr(&result, &return_type, ConformMode::Normal, source)
+                {
                     Some(result.expr)
                 } else {
-                    return Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotReturnValueOfType {
-                            returning: result.resolved_type.to_string(),
-                            expected: return_type.to_string(),
-                        },
-                    ));
+                    return Err(ResolveErrorKind::CannotReturnValueOfType {
+                        returning: result.resolved_type.to_string(),
+                        expected: return_type.to_string(),
+                    }
+                    .at(source));
                 }
             } else {
                 let function = ctx
@@ -65,14 +64,11 @@ pub fn resolve_stmt<'a>(
                     .get(ctx.resolved_function_ref)
                     .unwrap();
 
-                if function.return_type != resolved::Type::Void {
-                    return Err(ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotReturnVoid {
-                            expected: function.return_type.to_string(),
-                        },
-                    ));
+                if function.return_type.kind != resolved::TypeKind::Void {
+                    return Err(ResolveErrorKind::CannotReturnVoid {
+                        expected: function.return_type.to_string(),
+                    }
+                    .at(source));
                 }
 
                 None
@@ -107,19 +103,16 @@ pub fn resolve_stmt<'a>(
                 })
                 .transpose()?
                 .as_ref()
-                .map(
-                    |value| match conform_expr(value, &resolved_type, ConformMode::Normal) {
+                .map(|value| {
+                    match conform_expr(value, &resolved_type, ConformMode::Normal, source) {
                         Some(value) => Ok(value.expr),
-                        None => Err(ResolveError::new(
-                            ctx.resolved_ast.source_file_cache,
-                            source,
-                            ResolveErrorKind::CannotAssignValueOfType {
-                                from: value.resolved_type.to_string(),
-                                to: resolved_type.to_string(),
-                            },
-                        )),
-                    },
-                )
+                        None => Err(ResolveErrorKind::CannotAssignValueOfType {
+                            from: value.resolved_type.to_string(),
+                            to: resolved_type.to_string(),
+                        }
+                        .at(source)),
+                    }
+                })
                 .transpose()?;
 
             let function = ctx
@@ -155,20 +148,21 @@ pub fn resolve_stmt<'a>(
                 Initialized::Require,
             )?;
 
-            let value = conform_expr(&value, &destination_expr.resolved_type, ConformMode::Normal)
-                .ok_or_else(|| {
-                    ResolveError::new(
-                        ctx.resolved_ast.source_file_cache,
-                        source,
-                        ResolveErrorKind::CannotAssignValueOfType {
-                            from: value.resolved_type.to_string(),
-                            to: destination_expr.resolved_type.to_string(),
-                        },
-                    )
-                })?;
+            let value = conform_expr(
+                &value,
+                &destination_expr.resolved_type,
+                ConformMode::Normal,
+                source,
+            )
+            .ok_or_else(|| {
+                ResolveErrorKind::CannotAssignValueOfType {
+                    from: value.resolved_type.to_string(),
+                    to: destination_expr.resolved_type.to_string(),
+                }
+                .at(source)
+            })?;
 
-            let destination =
-                resolve_expr_to_destination(ctx.resolved_ast.source_file_cache, destination_expr)?;
+            let destination = resolve_expr_to_destination(destination_expr)?;
 
             // Mark destination as initialized
             match &destination.kind {

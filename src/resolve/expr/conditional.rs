@@ -32,10 +32,10 @@ pub fn resolve_conditional_expr(
         let stmts = resolve_stmts(ctx, &block.stmts)?;
 
         let condition = conform_expr_or_error(
-            ctx.resolved_ast.source_file_cache,
             &condition,
-            &resolved::Type::Boolean,
+            &resolved::TypeKind::Boolean.at(source),
             ConformMode::Normal,
+            source,
         )?;
 
         branches_without_else.push(Branch {
@@ -45,12 +45,13 @@ pub fn resolve_conditional_expr(
 
         ctx.variable_search_ctx.end_scope();
     }
-    
+
     let mut otherwise = otherwise
         .as_ref()
         .map(|otherwise| {
             ctx.variable_search_ctx.begin_scope();
-            let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(|stmts| resolved::Block::new(stmts));
+            let maybe_block =
+                resolve_stmts(ctx, &otherwise.stmts).map(|stmts| resolved::Block::new(stmts));
             ctx.variable_search_ctx.end_scope();
             maybe_block
         })
@@ -60,28 +61,25 @@ pub fn resolve_conditional_expr(
         .iter()
         .map(|branch| &branch.block)
         .chain(otherwise.iter())
-        .map(|block| block.get_result_type())
+        .map(|block| block.get_result_type(source))
         .collect_vec();
 
     let result_type = if block_results
         .iter()
-        .any(|result| result == &resolved::Type::Void)
+        .any(|result| result.kind == resolved::TypeKind::Void)
     {
         block_results
             .iter()
             .all_equal()
-            .then_some(resolved::Type::Void)
+            .then_some(resolved::TypeKind::Void.at(source))
             .ok_or_else(|| {
-                ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    source,
-                    ResolveErrorKind::MismatchingYieldedTypes {
-                        got: block_results
-                            .iter()
-                            .map(|resolved_type| resolved_type.to_string())
-                            .collect_vec(),
-                    },
-                )
+                ResolveErrorKind::MismatchingYieldedTypes {
+                    got: block_results
+                        .iter()
+                        .map(|resolved_type| resolved_type.kind.to_string())
+                        .collect_vec(),
+                }
+                .at(source)
             })
     } else {
         let mut last_exprs = branches_without_else
@@ -106,18 +104,16 @@ pub fn resolve_conditional_expr(
         unify_types(
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
             &mut last_exprs[..],
+            source,
         )
         .ok_or_else(|| {
-            ResolveError::new(
-                ctx.resolved_ast.source_file_cache,
-                source,
-                ResolveErrorKind::MismatchingYieldedTypes {
-                    got: block_results
-                        .iter()
-                        .map(|resolved_type| resolved_type.to_string())
-                        .collect_vec(),
-                },
-            )
+            ResolveErrorKind::MismatchingYieldedTypes {
+                got: block_results
+                    .iter()
+                    .map(|resolved_type| resolved_type.kind.to_string())
+                    .collect_vec(),
+            }
+            .at(source)
         })
     }?;
 

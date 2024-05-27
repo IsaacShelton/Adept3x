@@ -180,11 +180,10 @@ where
             "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, location)),
             "packed" => Ok(Annotation::new(AnnotationKind::Packed, location)),
             _ => Err(ParseError {
-                filename: Some(self.input.filename().to_string()),
-                location: Some(location),
                 kind: ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,
                 },
+                source: self.source(location),
             }),
         }
     }
@@ -297,7 +296,8 @@ where
             }
         }
 
-        self.input.advance();
+        let location = self.input.advance().location;
+        let source = self.source(location);
 
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
@@ -328,6 +328,7 @@ where
             return_type,
             stmts,
             is_foreign,
+            source,
         })
     }
 
@@ -470,8 +471,7 @@ where
             TokenKind::LogicalRightShiftAssign => Some(BasicBinaryOperator::LogicalRightShift),
             got => {
                 return Err(ParseError {
-                    filename: Some(self.input.filename().to_string()),
-                    location: Some(location),
+                    source: self.source(location),
                     kind: ParseErrorKind::Expected {
                         expected: "(an assignment operator)".to_string(),
                         for_reason: Some("for assignment".to_string()),
@@ -703,9 +703,8 @@ where
             unexpected => {
                 let unexpected = unexpected.to_string();
                 Err(ParseError {
-                    filename: Some(self.input.filename().to_string()),
-                    location: Some(location),
                     kind: ParseErrorKind::UnexpectedToken { unexpected },
+                    source: self.source(location),
                 })
             }
         }
@@ -781,9 +780,8 @@ where
 
             if fields.get(&field_name).is_some() {
                 return Err(ParseError {
-                    filename: Some(self.input.filename().to_string()),
-                    location: Some(field_location),
                     kind: ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name },
+                    source: self.source(field_location),
                 });
             }
 
@@ -1001,13 +999,12 @@ where
                 Ok(Type::new(type_kind, source))
             }
             unexpected => Err(ParseError {
-                filename: Some(self.input.filename().to_string()),
-                location: Some(unexpected.location),
                 kind: ParseErrorKind::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),
                     for_reason: for_reason.map(|for_reason| for_reason.to_string()),
                     got: unexpected.to_string(),
                 },
+                source: self.source(unexpected.location),
             }),
         }
     }

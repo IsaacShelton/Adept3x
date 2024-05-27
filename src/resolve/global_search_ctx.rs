@@ -27,13 +27,10 @@ impl<'a> GlobalSearchCtx<'a> {
     ) -> Result<(&resolved::Type, &GlobalRef), ResolveError> {
         match self.find_global(name) {
             Some(global) => Ok(global),
-            None => Err(ResolveError::new(
-                self.source_file_cache,
-                source,
-                ResolveErrorKind::UndeclaredVariable {
-                    name: name.to_string(),
-                },
-            )),
+            None => Err(ResolveErrorKind::UndeclaredVariable {
+                name: name.to_string(),
+            }
+            .at(source)),
         }
     }
 

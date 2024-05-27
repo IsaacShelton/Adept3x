@@ -23,10 +23,11 @@ pub fn resolve_struct_literal_expr(
         ast_type,
     )?;
 
-    let (name, structure_ref, memory_management) =
-        get_core_structure_info(ctx.resolved_ast.source_file_cache, &resolved_type, source)?;
+    let (name, structure_ref, memory_management) = get_core_structure_info(&resolved_type, source)?;
 
-    let structure_type = resolved::Type::PlainOldData(name.to_string(), structure_ref);
+    let structure_type =
+        resolved::TypeKind::PlainOldData(name.to_string(), structure_ref).at(source);
+
     let mut resolved_fields = IndexMap::new();
 
     for (name, value) in fields.iter() {
@@ -39,13 +40,10 @@ pub fn resolve_struct_literal_expr(
                 .expect("referenced structure to exist");
 
             if !structure.fields.contains_key::<str>(&name) {
-                return Err(ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    source,
-                    ResolveErrorKind::FieldDoesNotExist {
-                        field_name: name.to_string(),
-                    },
-                ));
+                return Err(ResolveErrorKind::FieldDoesNotExist {
+                    field_name: name.to_string(),
+                }
+                .at(source));
             }
         }
 
@@ -67,18 +65,20 @@ pub fn resolve_struct_literal_expr(
             .get_full::<str>(&name)
             .expect("referenced struct field to exist");
 
-        let resolved_expr = conform_expr(&resolved_expr, &field.resolved_type, ConformMode::Normal)
-            .ok_or_else(|| {
-                ResolveError::new(
-                    ctx.resolved_ast.source_file_cache,
-                    ast_type.source,
-                    ResolveErrorKind::ExpectedTypeForField {
-                        structure: ast_type.to_string(),
-                        field_name: name.to_string(),
-                        expected: field.resolved_type.to_string(),
-                    },
-                )
-            })?;
+        let resolved_expr = conform_expr(
+            &resolved_expr,
+            &field.resolved_type,
+            ConformMode::Normal,
+            source,
+        )
+        .ok_or_else(|| {
+            ResolveErrorKind::ExpectedTypeForField {
+                structure: ast_type.to_string(),
+                field_name: name.to_string(),
+                expected: field.resolved_type.to_string(),
+            }
+            .at(ast_type.source)
+        })?;
 
         resolved_fields.insert(name.to_string(), (resolved_expr.expr, index));
     }
@@ -99,11 +99,7 @@ pub fn resolve_struct_literal_expr(
             })
             .collect();
 
-        return Err(ResolveError::new(
-            ctx.resolved_ast.source_file_cache,
-            source,
-            ResolveErrorKind::MissingFields { fields: missing },
-        ));
+        return Err(ResolveErrorKind::MissingFields { fields: missing }.at(source));
     }
 
     Ok(TypedExpr::new(
