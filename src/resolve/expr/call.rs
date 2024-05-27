@@ -67,7 +67,7 @@ pub fn resolve_call_expr(
                 .at(source));
             }
         } else {
-            match conform_expr_to_default(argument, ctx.resolved_ast.source_file_cache) {
+            match conform_expr_to_default(argument) {
                 Ok(conformed_argument) => argument = conformed_argument,
                 Err(error) => return Err(error),
             }

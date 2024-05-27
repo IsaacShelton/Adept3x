@@ -7,7 +7,6 @@ use crate::{
         Initialized,
     },
     resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpr},
-    source_file_cache::SourceFileCache,
 };
 use ast::{IntegerBits, IntegerSign};
 
@@ -45,12 +44,8 @@ pub fn resolve_basic_binary_operation_expr(
         .at(source)
     })?;
 
-    let operator = resolve_basic_binary_operator(
-        ctx.resolved_ast.source_file_cache,
-        &binary_operation.operator,
-        &unified_type,
-        source,
-    )?;
+    let operator =
+        resolve_basic_binary_operator(&binary_operation.operator, &unified_type, source)?;
 
     let result_type = binary_operation
         .operator
@@ -72,7 +67,6 @@ pub fn resolve_basic_binary_operation_expr(
 }
 
 pub fn resolve_basic_binary_operator(
-    source_file_cache: &SourceFileCache,
     ast_operator: &ast::BasicBinaryOperator,
     resolved_type: &resolved::Type,
     source: Source,

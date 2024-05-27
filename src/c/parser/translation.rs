@@ -1,7 +1,7 @@
 use super::{
-    error::ParseErrorKind, DeclarationSpecifierKind, DeclarationSpecifiers,
-    Declarator, DeclaratorKind, ParameterTypeList, ParseError, Pointers, TypeQualifier,
-    TypeSpecifier, TypeSpecifierKind, TypeSpecifierQualifier,
+    error::ParseErrorKind, DeclarationSpecifierKind, DeclarationSpecifiers, Declarator,
+    DeclaratorKind, ParameterTypeList, ParseError, Pointers, TypeQualifier, TypeSpecifier,
+    TypeSpecifierKind, TypeSpecifierQualifier,
 };
 use crate::{
     ast::{
@@ -9,6 +9,16 @@ use crate::{
     },
     c::parser::ParameterDeclarationCore,
 };
+
+pub fn declare_named(
+    _ast_file: &mut File,
+    _attribute_specifiers: &[()],
+    declaration_specifiers: &DeclarationSpecifiers,
+    name: &str,
+) -> Result<(), ParseError> {
+    println!("{} {:#?}", name, declaration_specifiers);
+    todo!()
+}
 
 pub fn declare_function(
     ast_file: &mut File,
@@ -76,7 +86,7 @@ fn get_name_and_pointers(declarator: &Declarator) -> Result<(String, Pointers), 
             let (name, more_pointers) = get_name_and_pointers(inner)?;
             Ok((name, pointers.concat(&more_pointers)))
         }
-        DeclaratorKind::Function(_, _) => Err(ParseError::new(
+        DeclaratorKind::Function(..) => Err(ParseError::new(
             ParseErrorKind::CannotReturnFunctionPointerType,
             declarator.source,
         )),
@@ -156,7 +166,7 @@ fn augment_ast_type_with_type_specifier(
     ast_type: Option<Type>,
     type_specifier: &TypeSpecifier,
 ) -> Result<Option<Type>, ParseError> {
-    match type_specifier.kind {
+    match &type_specifier.kind {
         TypeSpecifierKind::Void => match ast_type {
             Some(..) => Err(ParseError::new(
                 ParseErrorKind::InvalidType,
@@ -170,18 +180,29 @@ fn augment_ast_type_with_type_specifier(
             IntegerSign::Unsigned,
             type_specifier.source,
         ),
-        TypeSpecifierKind::Short => todo!(),
+        TypeSpecifierKind::Short => augment_ast_type_as_integer(
+            ast_type,
+            IntegerBits::Bits16,
+            IntegerSign::Signed,
+            type_specifier.source,
+        ),
         TypeSpecifierKind::Int => augment_ast_type_as_integer(
             ast_type,
             IntegerBits::Bits8,
             IntegerSign::Signed,
             type_specifier.source,
         ),
-        TypeSpecifierKind::Long => todo!(),
+        TypeSpecifierKind::Long => augment_ast_type_as_integer(
+            ast_type,
+            IntegerBits::Bits64,
+            IntegerSign::Signed,
+            type_specifier.source,
+        ),
         TypeSpecifierKind::Float => todo!(),
         TypeSpecifierKind::Double => todo!(),
         TypeSpecifierKind::Signed => todo!(),
         TypeSpecifierKind::Unsigned => todo!(),
+        TypeSpecifierKind::Composite(_composite) => todo!(),
     }
 }
 

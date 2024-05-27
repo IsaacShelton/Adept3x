@@ -4,8 +4,8 @@ mod translation;
 
 use itertools::Itertools;
 
-use self::error::ParseErrorKind;
 pub use self::{error::ParseError, input::Input};
+use self::{error::ParseErrorKind, translation::declare_named};
 use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
@@ -132,6 +132,12 @@ pub enum TypeSpecifierQualifier {
 }
 
 #[derive(Clone, Debug)]
+pub struct SpecifierQualifierList {
+    pub attributes: Vec<()>,
+    pub type_specifier_qualifiers: Vec<TypeSpecifierQualifier>,
+}
+
+#[derive(Clone, Debug)]
 pub struct TypeSpecifier {
     kind: TypeSpecifierKind,
     source: Source,
@@ -148,6 +154,7 @@ pub enum TypeSpecifierKind {
     Double,
     Signed,
     Unsigned,
+    Composite(Composite),
 }
 
 #[derive(Clone, Debug)]
@@ -171,10 +178,68 @@ pub struct DeclarationSpecifiers {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExternalDeclaration {
+pub enum MemberDeclaration {
+    Member(Member),
+    StaticAssert(StaticAssertDeclaration),
+}
+
+#[derive(Clone, Debug)]
+pub struct StaticAssertDeclaration {
+    pub condition: ConstantExpression,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Member {
+    pub attributes: Vec<()>,
+    pub specifier_qualifiers: SpecifierQualifierList,
+    pub member_declarations: Vec<MemberDeclarator>,
+}
+
+#[derive(Clone, Debug)]
+pub enum MemberDeclarator {
+    Declarator(Declarator),
+    BitField(Option<Declarator>, ConstantExpression),
+}
+
+#[derive(Clone, Debug)]
+pub enum ExternalDeclaration {
+    Declaration(Declaration),
+    FunctionDefinition(FunctionDefinition),
+}
+
+#[derive(Clone, Debug)]
+pub enum Declaration {
+    Common(CommonDeclaration),
+    StaticAssert(StaticAssertDeclaration),
+    Attribute(Vec<()>),
+}
+
+#[derive(Clone, Debug)]
+pub struct CommonDeclaration {
     pub attribute_specifiers: Vec<()>,
     pub declaration_specifiers: DeclarationSpecifiers,
     pub init_declarator_list: Vec<InitDeclarator>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionDefinition {}
+
+#[derive(Clone, Debug)]
+pub struct ConstantExpression {}
+
+#[derive(Clone, Debug)]
+pub enum CompositeKind {
+    Struct,
+    Union,
+}
+
+#[derive(Clone, Debug)]
+pub struct Composite {
+    pub kind: CompositeKind,
+    pub source: Source,
+    pub attributes: Vec<()>,
+    pub members: Option<Vec<MemberDeclaration>>,
 }
 
 impl<'a> Parser<'a> {
@@ -206,20 +271,34 @@ impl<'a> Parser<'a> {
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
 
-            for init_declarator in external_declaration.init_declarator_list.iter() {
-                match &init_declarator.declarator.kind {
-                    DeclaratorKind::Named(_) => todo!(),
-                    DeclaratorKind::Pointers(_, _) => todo!(),
-                    DeclaratorKind::Function(declarator, parameter_type_list) => {
-                        declare_function(
-                            ast_file,
-                            &external_declaration.attribute_specifiers[..],
-                            &external_declaration.declaration_specifiers,
-                            declarator,
-                            parameter_type_list,
-                        )?;
+            match external_declaration {
+                ExternalDeclaration::Declaration(declaration) => match declaration {
+                    Declaration::Common(declaration) => {
+                        for init_declarator in declaration.init_declarator_list.iter() {
+                            match &init_declarator.declarator.kind {
+                                DeclaratorKind::Named(name) => declare_named(
+                                    ast_file,
+                                    &declaration.attribute_specifiers[..],
+                                    &declaration.declaration_specifiers,
+                                    name,
+                                )?,
+                                DeclaratorKind::Pointers(_, _) => todo!(),
+                                DeclaratorKind::Function(declarator, parameter_type_list) => {
+                                    declare_function(
+                                        ast_file,
+                                        &declaration.attribute_specifiers[..],
+                                        &declaration.declaration_specifiers,
+                                        declarator,
+                                        parameter_type_list,
+                                    )?;
+                                }
+                            }
+                        }
                     }
-                }
+                    Declaration::StaticAssert(_) => todo!(),
+                    Declaration::Attribute(_) => todo!(),
+                },
+                ExternalDeclaration::FunctionDefinition(_) => todo!(),
             }
         }
 
@@ -380,9 +459,15 @@ impl<'a> Parser<'a> {
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(..) = self.parse_struct_or_union_specifier() {
+        if let Ok(composite) = self.parse_struct_or_union_specifier() {
             self.input.success();
-            return Ok(todo!());
+
+            let source = composite.source;
+
+            return Ok(TypeSpecifier {
+                kind: TypeSpecifierKind::Composite(composite),
+                source,
+            });
         }
         self.input.backtrack();
 
@@ -648,16 +733,176 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_struct_or_union_specifier(&mut self) -> Result<(), ParseError> {
-        if let CTokenKind::StructKeyword | CTokenKind::UnionKeyword = self.input.peek().kind {
-            self.input.advance();
-            todo!()
+    fn parse_struct_or_union_specifier(&mut self) -> Result<Composite, ParseError> {
+        let kind = match self.input.peek().kind {
+            CTokenKind::StructKeyword => CompositeKind::Struct,
+            CTokenKind::UnionKeyword => CompositeKind::Union,
+            _ => {
+                return Err(
+                    ParseErrorKind::Misc("Failed to parse struct or union specifier")
+                        .at(self.input.peek().source),
+                )
+            }
+        };
+
+        let source = self.input.advance().source;
+        let attributes = self.parse_attribute_specifier_sequence()?;
+
+        let identifier = if self.input.peek().kind.is_identifier() {
+            Some(self.input.advance().kind.clone().unwrap_identifier())
+        } else {
+            None
+        };
+
+        self.input.speculate();
+        let members = if let Ok(member_declaration_list) =
+            self.parse_member_declaration_list_including_braces()
+        {
+            self.input.success();
+            Some(member_declaration_list)
+        } else {
+            self.input.backtrack();
+            None
+        };
+
+        if identifier.is_none() && members.is_none() {
+            return Err(ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList
+                .at(self.input.peek().source));
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse struct or union specifier"),
-            self.input.peek().source,
-        ))
+        Ok(Composite {
+            kind,
+            source,
+            attributes,
+            members,
+        })
+    }
+
+    fn parse_member_declaration_list_including_braces(
+        &mut self,
+    ) -> Result<Vec<MemberDeclaration>, ParseError> {
+        if !self.eat_punctuator(Punctuator::OpenCurly) {
+            return Err(
+                ParseErrorKind::Misc("Expected '{' to begin member declaration list")
+                    .at(self.input.peek().source),
+            );
+        }
+
+        let mut member_declarations = vec![];
+
+        while !matches!(
+            self.input.peek().kind,
+            CTokenKind::EndOfFile | CTokenKind::Punctuator(Punctuator::CloseCurly)
+        ) {
+            member_declarations.push(self.parse_member_declaration()?);
+        }
+
+        if !self.eat_punctuator(Punctuator::CloseCurly) {
+            return Err(
+                ParseErrorKind::Misc("Expected '}' to close member declaration list")
+                    .at(self.input.peek().source),
+            );
+        }
+
+        Ok(member_declarations)
+    }
+
+    fn parse_member_declaration(&mut self) -> Result<MemberDeclaration, ParseError> {
+        if self.input.peek().kind.is_static_assert_keyword() {
+            return Ok(MemberDeclaration::StaticAssert(self.parse_static_assert()?));
+        }
+
+        let attributes = self.parse_attribute_specifier_sequence()?;
+        let specifier_qualifiers = self.parse_specifier_qualifier_list()?;
+        let member_declarations = self.parse_member_declarator_list()?;
+
+        if !self.eat_punctuator(Punctuator::Semicolon) {
+            return Err(ParseErrorKind::ExpectedSemicolon.at(self.input.peek().source));
+        }
+
+        Ok(MemberDeclaration::Member(Member {
+            attributes,
+            specifier_qualifiers,
+            member_declarations,
+        }))
+    }
+
+    fn parse_member_declarator_list(&mut self) -> Result<Vec<MemberDeclarator>, ParseError> {
+        let mut member_declarators = vec![];
+
+        loop {
+            if member_declarators.len() != 0 {
+                if !self.eat_punctuator(Punctuator::Comma) {
+                    break;
+                }
+            }
+
+            self.input.speculate();
+
+            if let Ok(member_declarator) = self.parse_member_declarator() {
+                self.input.success();
+                member_declarators.push(member_declarator);
+                continue;
+            }
+
+            self.input.backtrack();
+            break;
+        }
+
+        Ok(member_declarators)
+    }
+
+    fn parse_member_declarator(&mut self) -> Result<MemberDeclarator, ParseError> {
+        let declarator = if !self
+            .input
+            .peek_is(CTokenKind::Punctuator(Punctuator::Colon))
+        {
+            Some(self.parse_declarator()?)
+        } else {
+            None
+        };
+
+        let bits = if self.eat_punctuator(Punctuator::Colon) {
+            Some(self.parse_constant_expression()?)
+        } else {
+            None
+        };
+
+        if let Some(bits) = bits {
+            Ok(MemberDeclarator::BitField(declarator, bits))
+        } else if let Some(declarator) = declarator {
+            Ok(MemberDeclarator::Declarator(declarator))
+        } else {
+            Err(ParseErrorKind::ExpectedMemberDeclarator.at(self.input.peek().source))
+        }
+    }
+
+    fn parse_constant_expression(&mut self) -> Result<ConstantExpression, ParseError> {
+        todo!()
+    }
+
+    fn parse_specifier_qualifier_list(&mut self) -> Result<SpecifierQualifierList, ParseError> {
+        let mut type_specifier_qualifiers = vec![];
+
+        loop {
+            self.input.speculate();
+
+            if let Ok(type_specifier_qualifier) = self.parse_type_specifier_qualifier() {
+                self.input.success();
+                type_specifier_qualifiers.push(type_specifier_qualifier);
+                continue;
+            }
+
+            self.input.backtrack();
+            break;
+        }
+
+        let attributes = self.parse_attribute_specifier_sequence()?;
+
+        Ok(SpecifierQualifierList {
+            attributes,
+            type_specifier_qualifiers,
+        })
     }
 
     fn parse_typedef_name(&mut self) -> Result<(), ParseError> {
@@ -687,26 +932,34 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_typeof_specifier(&mut self) -> Result<(), ParseError> {
-        self.input.speculate();
-
         if let CTokenKind::TypeofKeyword | CTokenKind::TypeofUnqualKeyword =
             self.input.advance().kind
         {
             todo!()
         }
 
-        self.input.backtrack();
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse typeof specifier"),
             self.input.peek().source,
         ))
     }
 
+    fn parse_static_assert(&mut self) -> Result<StaticAssertDeclaration, ParseError> {
+        if !self.eat(CTokenKind::StaticAssertKeyword) {
+            return Err(ParseErrorKind::Misc(
+                "Expected 'static_assert' keyword to begin static assert",
+            )
+            .at(self.input.peek().source));
+        }
+
+        todo!()
+    }
+
     fn parse_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
         if self.input.peek_is(CTokenKind::StaticAssertKeyword) {
-            // static_assert
-            todo!();
-            return Ok(todo!());
+            return Ok(ExternalDeclaration::Declaration(Declaration::StaticAssert(
+                self.parse_static_assert()?,
+            )));
         }
 
         let attribute_specifiers = self.parse_attribute_specifier_sequence()?;
@@ -739,11 +992,13 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        return Ok(ExternalDeclaration {
-            attribute_specifiers,
-            declaration_specifiers,
-            init_declarator_list,
-        });
+        return Ok(ExternalDeclaration::Declaration(Declaration::Common(
+            CommonDeclaration {
+                attribute_specifiers,
+                declaration_specifiers,
+                init_declarator_list,
+            },
+        )));
     }
 
     fn parse_init_declarator_list(&mut self) -> Result<Vec<InitDeclarator>, ParseError> {
@@ -752,8 +1007,8 @@ impl<'a> Parser<'a> {
         loop {
             self.input.speculate();
             if let Ok(init_declarator) = self.parse_init_declarator() {
-                list.push(init_declarator);
                 self.input.success();
+                list.push(init_declarator);
             } else {
                 self.input.backtrack();
                 return Ok(list);
@@ -807,7 +1062,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_braced_initializer(&mut self) -> Result<(), ParseError> {
-        if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::OpenCurly)]) {
+        if !self.eat_punctuator(Punctuator::OpenCurly) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '{' to begin braced initializer"),
                 self.input.peek().source,
@@ -816,7 +1071,7 @@ impl<'a> Parser<'a> {
 
         todo!();
 
-        if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseCurly)]) {
+        if !self.eat_punctuator(Punctuator::CloseCurly) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '}' to close braced initializer"),
                 self.input.peek().source,
@@ -836,7 +1091,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_compound_statement(&mut self) -> Result<(), ParseError> {
-        if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::OpenCurly)]) {
+        if !self.eat_punctuator(Punctuator::OpenCurly) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '{' to begin compound statement"),
                 self.input.peek().source,
@@ -845,7 +1100,7 @@ impl<'a> Parser<'a> {
 
         todo!();
 
-        if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseCurly)]) {
+        if !self.eat_punctuator(Punctuator::CloseCurly) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '}' to close compound statement"),
                 self.input.peek().source,
@@ -853,6 +1108,24 @@ impl<'a> Parser<'a> {
         }
 
         Ok(())
+    }
+
+    fn eat(&mut self, expected: CTokenKind) -> bool {
+        if self.input.peek().kind == expected {
+            self.input.advance();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn eat_punctuator(&mut self, expected: Punctuator) -> bool {
+        if self.input.peek().kind == CTokenKind::Punctuator(expected) {
+            self.input.advance();
+            true
+        } else {
+            false
+        }
     }
 
     fn eat_sequence(&mut self, expected: &[CTokenKind]) -> bool {

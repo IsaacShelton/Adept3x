@@ -4,7 +4,7 @@ mod state;
 
 use self::{lex_line::lex_line, state::State};
 use super::{line_splice::LineSplicer, PreprocessorErrorKind};
-use crate::text::{IntoText, TextStream};
+use crate::text::TextStream;
 use crate::{inflow::InflowStream, text::Text};
 
 // Lexer for C preprocessor

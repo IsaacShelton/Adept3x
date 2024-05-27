@@ -20,6 +20,13 @@ impl Source {
     pub fn new(key: SourceFileCacheKey, location: Location) -> Self {
         Self { key, location }
     }
+
+    pub fn internal() -> Self {
+        Self {
+            key: SourceFileCache::INTERNAL_KEY,
+            location: Location { line: 1, column: 1 },
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

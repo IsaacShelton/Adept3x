@@ -10,10 +10,12 @@ pub fn resolve_declare_assign_expr(
     declare_assign: &ast::DeclareAssign,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let value = conform_expr_to_default(
-        resolve_expr(ctx, &declare_assign.value, None, Initialized::Require)?,
-        ctx.resolved_ast.source_file_cache,
-    )?;
+    let value = conform_expr_to_default(resolve_expr(
+        ctx,
+        &declare_assign.value,
+        None,
+        Initialized::Require,
+    )?)?;
 
     let function = ctx
         .resolved_ast

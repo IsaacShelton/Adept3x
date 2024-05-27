@@ -37,7 +37,16 @@ pub enum ParseErrorKind {
     AutoNotSupportedForReturnType,
     ConstexprNotSupportedForReturnType,
     InvalidType,
+    ExpectedTypeNameOrMemberDeclarationList,
+    ExpectedSemicolon,
+    ExpectedMemberDeclarator,
     Misc(&'static str),
+}
+
+impl ParseErrorKind {
+    pub fn at(self, source: Source) -> ParseError {
+        ParseError { kind: self, source }
+    }
 }
 
 impl Display for ParseErrorKind {
@@ -54,6 +63,11 @@ impl Display for ParseErrorKind {
                 f.write_str("'constexpr' not supported for return type")
             }
             ParseErrorKind::InvalidType => f.write_str("Invalid type"),
+            ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList => {
+                f.write_str("Expected type name or member declaration list")
+            }
+            ParseErrorKind::ExpectedSemicolon => f.write_str("Expected ';'"),
+            ParseErrorKind::ExpectedMemberDeclarator => f.write_str("Expected member declarator"),
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }

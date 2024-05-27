@@ -401,10 +401,7 @@ fn conform_integer_value(
     ))
 }
 
-fn conform_expr_to_default(
-    expr: TypedExpr,
-    source_file_cache: &SourceFileCache,
-) -> Result<TypedExpr, ResolveError> {
+fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {
     match &expr.resolved_type.kind {
         resolved::TypeKind::IntegerLiteral(value) => {
             conform_integer_to_default_or_error(&value, expr.expr.source)

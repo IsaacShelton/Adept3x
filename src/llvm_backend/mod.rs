@@ -18,9 +18,7 @@ use self::{
     value_catalog::ValueCatalog,
 };
 use crate::{
-    ir::{self, Instruction},
-    resolved::FloatOrInteger,
-    show::Show,
+    ir::{self, Instruction}, resolved::FloatOrInteger, show::Show, source_file_cache::SourceFileCache
 };
 use colored::Colorize;
 use cstr::cstr;
@@ -94,7 +92,7 @@ impl Show for BackendError {
     fn show(
         &self,
         w: &mut impl std::fmt::Write,
-        _source_file_cache: &crate::source_file_cache::SourceFileCache,
+        _source_file_cache: &SourceFileCache,
     ) -> std::fmt::Result {
         write!(w, "error: {}", self.message)
     }

@@ -12,10 +12,20 @@ pub struct SourceFileCacheKey {
 }
 
 impl SourceFileCache {
+    pub const INTERNAL_KEY: SourceFileCacheKey = SourceFileCacheKey { index: 0 };
+
     pub fn new() -> Self {
-        Self {
-            files: AppendOnlyVec::new(),
-        }
+        let files = AppendOnlyVec::new();
+
+        assert_eq!(
+            files.push(SourceFile {
+                filename: "<internal>".into(),
+                content: "".into(),
+            }),
+            0
+        );
+
+        Self { files }
     }
 
     pub fn get(&self, key: SourceFileCacheKey) -> &SourceFile {
@@ -37,7 +47,6 @@ impl SourceFileCache {
             Err(error) => Err(error),
         }
     }
-
 
     pub fn add_or_exit(&self, filename: &str) -> SourceFileCacheKey {
         match self.add(&filename) {

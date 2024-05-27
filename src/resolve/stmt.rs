@@ -189,7 +189,6 @@ pub fn resolve_stmt<'a>(
                 .as_ref()
                 .map(|ast_operator| {
                     resolve_basic_binary_operator(
-                        ctx.resolved_ast.source_file_cache,
                         ast_operator,
                         &destination.resolved_type,
                         source,

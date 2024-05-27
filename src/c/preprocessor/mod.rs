@@ -10,6 +10,7 @@ use crate::show::Show;
 use crate::source_file_cache::SourceFileCache;
 use crate::text::Text;
 
+use self::ast::{Define, DefineKind};
 use self::expand::{expand_ast, Environment};
 use self::lexer::Lexer;
 use self::parser::{parse, ParseError, ParseErrorKind};
@@ -128,5 +129,27 @@ pub fn preprocess(text: impl Text) -> Result<(Vec<PreToken>, Source), Preprocess
         Err(err) => return Err(err.into()),
     };
 
-    Ok((expand_ast(&ast, Environment::default())?, ast.eof))
+    Ok((expand_ast(&ast, stdc())?, ast.eof))
+}
+
+fn stdc() -> Environment {
+    let mut stdc = Environment::default();
+
+    stdc.add_define(Define {
+        kind: DefineKind::ObjectMacro(vec![], ast::PlaceholderAffinity::Discard),
+        name: "__STDC__".into(),
+    });
+
+    stdc.add_define(Define {
+        kind: DefineKind::ObjectMacro(
+            vec![PreToken::new(
+                PreTokenKind::Number("202311L".into()),
+                Source::internal(),
+            )],
+            ast::PlaceholderAffinity::Discard,
+        ),
+        name: "__STDC_VERSION__".into(),
+    });
+
+    stdc
 }
