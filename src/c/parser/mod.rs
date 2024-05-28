@@ -253,6 +253,23 @@ pub struct Composite {
     pub members: Option<Vec<MemberDeclaration>>,
 }
 
+macro_rules! speculate {
+    ($input:expr, $expression:expr) => {{
+        $input.speculate();
+
+        match $expression {
+            Ok(ok) => {
+                $input.success();
+                Ok(ok)
+            }
+            Err(err) => {
+                $input.backtrack();
+                Err(err)
+            }
+        }
+    }};
+}
+
 impl<'a> Parser<'a> {
     pub fn new(input: Input<'a>) -> Self {
         Self {
@@ -319,29 +336,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
-        self.input.speculate();
-        if let Ok(_function_definition) = self.parse_function_definition() {
-            self.input.success();
+        if let Ok(_function_definition) = speculate!(self.input, self.parse_function_definition()) {
             return Ok(todo!());
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        match self.parse_declaration() {
-            Ok(declaration) => {
-                self.input.success();
-                return Ok(declaration);
-            }
-            Err(err) => {
-                self.input.backtrack();
-                return Err(err);
-            }
-        }
-
-        Err(ParseError::new(
-            ParseErrorKind::ExpectedDeclaration,
-            self.input.peek().source,
-        ))
+        return speculate!(self.input, self.parse_declaration());
     }
 
     fn parse_function_definition(&mut self) -> Result<(), ParseError> {
@@ -368,16 +367,10 @@ impl<'a> Parser<'a> {
         let mut specifiers = vec![];
 
         loop {
-            self.input.speculate();
-
-            if let Ok(specifier) = self.parse_declaration_specifier() {
-                self.input.success();
-                specifiers.push(specifier);
-                continue;
+            match speculate!(self.input, self.parse_declaration_specifier()) {
+                Ok(specifier) => specifiers.push(specifier),
+                _ => break,
             }
-
-            self.input.backtrack();
-            break;
         }
 
         let attributes = self.parse_attribute_specifier_sequence()?;
@@ -414,29 +407,20 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_specifier_qualifier(&mut self) -> Result<TypeSpecifierQualifier, ParseError> {
-        self.input.speculate();
-        if let Ok(type_specifier) = self.parse_type_specifier() {
-            self.input.success();
+        if let Ok(type_specifier) = speculate!(self.input, self.parse_type_specifier()) {
             return Ok(TypeSpecifierQualifier::TypeSpecifier(type_specifier));
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(type_qualifier) = self.parse_type_qualifier() {
-            self.input.success();
+        if let Ok(type_qualifier) = speculate!(self.input, self.parse_type_qualifier()) {
             return Ok(TypeSpecifierQualifier::TypeQualifier(type_qualifier));
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(alignment_specifier) = self.parse_alignment_specifier() {
-            self.input.success();
+        if let Ok(alignment_specifier) = speculate!(self.input, self.parse_alignment_specifier()) {
             return Ok(TypeSpecifierQualifier::AlignmentSpecifier(
                 alignment_specifier,
             ));
         }
 
-        self.input.backtrack();
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse type specifier qualifier"),
             self.input.peek().source,
@@ -471,46 +455,31 @@ impl<'a> Parser<'a> {
 
         let source = self.input.peek().source;
 
-        self.input.speculate();
-        if let Ok(..) = self.parse_atomic_type_specifier() {
-            self.input.success();
+        if let Ok(..) = speculate!(self.input, self.parse_atomic_type_specifier()) {
             return Ok(todo!());
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(composite) = self.parse_struct_or_union_specifier() {
-            self.input.success();
+        if let Ok(composite) = speculate!(self.input, self.parse_struct_or_union_specifier()) {
             return Ok(TypeSpecifier {
                 kind: TypeSpecifierKind::Composite(composite),
                 source,
             });
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(..) = self.parse_enum_specifier() {
-            self.input.success();
+        if let Ok(..) = speculate!(self.input, self.parse_enum_specifier()) {
             return Ok(todo!());
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(typedef_name) = self.parse_typedef_name() {
-            self.input.success();
+        if let Ok(typedef_name) = speculate!(self.input, self.parse_typedef_name()) {
             return Ok(TypeSpecifier {
                 kind: TypeSpecifierKind::TypedefName(typedef_name),
                 source,
             });
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(..) = self.parse_typeof_specifier() {
-            self.input.success();
+        if let Ok(..) = speculate!(self.input, self.parse_typeof_specifier()) {
             return Ok(todo!());
         }
-        self.input.backtrack();
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse type specifier"),
@@ -556,19 +525,7 @@ impl<'a> Parser<'a> {
 
     fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
         let source = self.input.peek().source;
-        self.input.speculate();
-
-        let pointers = match self.parse_pointers() {
-            Ok(pointers) => {
-                self.input.success();
-                pointers
-            }
-            Err(err) => {
-                self.input.backtrack();
-                return Err(err);
-            }
-        };
-
+        let pointers = self.parse_pointers()?;
         let declarator = self.parse_direct_declarator()?;
 
         if pointers.pointers.is_empty() {
@@ -599,16 +556,10 @@ impl<'a> Parser<'a> {
         let mut qualifiers = vec![];
 
         loop {
-            self.input.speculate();
-
-            if let Ok(qualifier) = self.parse_type_qualifier() {
-                self.input.success();
-                qualifiers.push(qualifier);
-                continue;
+            match speculate!(self.input, self.parse_type_qualifier()) {
+                Ok(qualifier) => qualifiers.push(qualifier),
+                _ => break,
             }
-
-            self.input.backtrack();
-            break;
         }
 
         Ok(qualifiers)
@@ -682,7 +633,7 @@ impl<'a> Parser<'a> {
             return Err(ParseErrorKind::Misc("Expected '[' to begin array declarator").at(source));
         }
 
-        let parameter_type_list = self.parse_parameter_type_list()?;
+        todo!("array declarator insides");
 
         if !self.eat_punctuator(Punctuator::CloseParen) {
             return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
@@ -732,27 +683,22 @@ impl<'a> Parser<'a> {
         let attributes = self.parse_attribute_specifier_sequence()?;
         let declaration_specifiers = self.parse_declaration_specifiers()?;
 
-        self.input.speculate();
-        if let Ok(declarator) = self.parse_declarator() {
-            self.input.success();
+        if let Ok(declarator) = speculate!(self.input, self.parse_declarator()) {
             return Ok(ParameterDeclaration {
                 attributes,
                 declaration_specifiers,
                 core: ParameterDeclarationCore::Declarator(declarator),
             });
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(abstract_declarator) = self.parse_abstract_declarator() {
-            self.input.success();
+
+        if let Ok(abstract_declarator) = speculate!(self.input, self.parse_abstract_declarator()) {
             return Ok(ParameterDeclaration {
                 attributes,
                 declaration_specifiers,
                 core: ParameterDeclarationCore::AbstractDeclarator(abstract_declarator),
             });
         }
-        self.input.backtrack();
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse parameter declaration"),
@@ -796,16 +742,11 @@ impl<'a> Parser<'a> {
             None
         };
 
-        self.input.speculate();
-        let members = if let Ok(member_declaration_list) =
+        let members = speculate!(
+            self.input,
             self.parse_member_declaration_list_including_braces()
-        {
-            self.input.success();
-            Some(member_declaration_list)
-        } else {
-            self.input.backtrack();
-            None
-        };
+        )
+        .ok();
 
         if identifier.is_none() && members.is_none() {
             return Err(ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList
@@ -879,16 +820,10 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            self.input.speculate();
-
-            if let Ok(member_declarator) = self.parse_member_declarator() {
-                self.input.success();
-                member_declarators.push(member_declarator);
-                continue;
+            match speculate!(self.input, self.parse_member_declarator()) {
+                Ok(member_declarator) => member_declarators.push(member_declarator),
+                _ => break,
             }
-
-            self.input.backtrack();
-            break;
         }
 
         Ok(member_declarators)
@@ -927,16 +862,10 @@ impl<'a> Parser<'a> {
         let mut type_specifier_qualifiers = vec![];
 
         loop {
-            self.input.speculate();
-
-            if let Ok(type_specifier_qualifier) = self.parse_type_specifier_qualifier() {
-                self.input.success();
-                type_specifier_qualifiers.push(type_specifier_qualifier);
-                continue;
+            match speculate!(self.input, self.parse_type_specifier_qualifier()) {
+                Ok(qualifier) => type_specifier_qualifiers.push(qualifier),
+                _ => break,
             }
-
-            self.input.backtrack();
-            break;
         }
 
         let attributes = self.parse_attribute_specifier_sequence()?;
@@ -1048,14 +977,10 @@ impl<'a> Parser<'a> {
         let mut list = vec![];
 
         loop {
-            self.input.speculate();
-            if let Ok(init_declarator) = self.parse_init_declarator() {
-                self.input.success();
-                list.push(init_declarator);
-            } else {
-                self.input.backtrack();
-                return Ok(list);
-            };
+            match speculate!(self.input, self.parse_init_declarator()) {
+                Ok(init_declarator) => list.push(init_declarator),
+                Err(_) => return Ok(list),
+            }
 
             if !self.eat_punctuator(Punctuator::Comma) {
                 break;
@@ -1081,21 +1006,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_initializer(&mut self) -> Result<(), ParseError> {
-        self.input.speculate();
-        if let Ok(..) = self.parse_braced_initializer() {
-            self.input.success();
+        if let Ok(..) = speculate!(self.input, self.parse_braced_initializer()) {
             todo!();
             return Ok(());
         }
-        self.input.backtrack();
 
-        self.input.speculate();
-        if let Ok(..) = self.parse_assignment_expression() {
-            self.input.success();
+        if let Ok(..) = speculate!(self.input, self.parse_assignment_expression()) {
             todo!();
             return Ok(());
         }
-        self.input.backtrack();
 
         Err(ParseError::new(
             ParseErrorKind::Misc("Failed to parse initializer"),
