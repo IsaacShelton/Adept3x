@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use super::{
-    error::ParseErrorKind, DeclarationSpecifierKind, DeclarationSpecifiers, Declarator,
+    error::ParseErrorKind, CTypedef, DeclarationSpecifierKind, DeclarationSpecifiers, Declarator,
     DeclaratorKind, ParameterTypeList, ParseError, Pointers, TypeQualifier, TypeSpecifier,
     TypeSpecifierKind, TypeSpecifierQualifier,
 };
@@ -15,9 +17,14 @@ pub fn declare_named(
     _attribute_specifiers: &[()],
     declaration_specifiers: &DeclarationSpecifiers,
     name: &str,
+    typedefs: &mut HashMap<String, CTypedef>,
 ) -> Result<(), ParseError> {
     println!("{} {:#?}", name, declaration_specifiers);
-    todo!()
+
+    // todo!()
+
+    typedefs.insert(name.to_string(), CTypedef {});
+    Ok(())
 }
 
 pub fn declare_function(
@@ -64,7 +71,7 @@ fn get_name_and_type(
     declarator: &Declarator,
     declaration_specifiers: &DeclarationSpecifiers,
 ) -> Result<(String, Type), ParseError> {
-    let (name, pointers) = get_name_and_pointers(declarator)?;
+    let (name, pointers) = get_name_and_decorators(declarator)?;
     let mut ast_type = get_base_type(declaration_specifiers, declarator.source)?;
 
     for pointer in pointers.pointers.iter() {
@@ -79,17 +86,20 @@ fn get_name_and_type(
     Ok((name, ast_type))
 }
 
-fn get_name_and_pointers(declarator: &Declarator) -> Result<(String, Pointers), ParseError> {
+fn get_name_and_decorators(declarator: &Declarator) -> Result<(String, Pointers), ParseError> {
     match &declarator.kind {
         DeclaratorKind::Named(name) => Ok((name.to_string(), Pointers::default())),
         DeclaratorKind::Pointers(inner, pointers) => {
-            let (name, more_pointers) = get_name_and_pointers(inner)?;
+            let (name, more_pointers) = get_name_and_decorators(inner)?;
             Ok((name, pointers.concat(&more_pointers)))
         }
         DeclaratorKind::Function(..) => Err(ParseError::new(
             ParseErrorKind::CannotReturnFunctionPointerType,
             declarator.source,
         )),
+        DeclaratorKind::Array(..) => {
+            todo!()
+        }
     }
 }
 
@@ -203,6 +213,7 @@ fn augment_ast_type_with_type_specifier(
         TypeSpecifierKind::Signed => todo!(),
         TypeSpecifierKind::Unsigned => todo!(),
         TypeSpecifierKind::Composite(_composite) => todo!(),
+        TypeSpecifierKind::TypedefName(_typedef_name) => todo!(),
     }
 }
 

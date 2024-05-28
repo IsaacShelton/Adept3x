@@ -26,6 +26,12 @@ pub struct Parser<'a> {
 pub struct CTypedef {}
 
 #[derive(Clone, Debug)]
+pub struct TypedefName {
+    name: String,
+    source: Source,
+}
+
+#[derive(Clone, Debug)]
 pub struct ParameterTypeList {
     pub parameter_declarations: Vec<ParameterDeclaration>,
     pub is_variadic: bool,
@@ -42,6 +48,7 @@ pub enum DeclaratorKind {
     Named(String),
     Pointers(Box<Declarator>, Pointers),
     Function(Box<Declarator>, ParameterTypeList),
+    Array(Box<Declarator>, ArrayQualifier),
 }
 
 impl DeclaratorKind {
@@ -84,6 +91,9 @@ impl Pointers {
         Self { pointers }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct ArrayQualifier {}
 
 #[derive(Clone, Debug)]
 pub struct Pointer {
@@ -155,6 +165,7 @@ pub enum TypeSpecifierKind {
     Signed,
     Unsigned,
     Composite(Composite),
+    TypedefName(TypedefName),
 }
 
 #[derive(Clone, Debug)]
@@ -281,6 +292,7 @@ impl<'a> Parser<'a> {
                                     &declaration.attribute_specifiers[..],
                                     &declaration.declaration_specifiers,
                                     name,
+                                    &mut self.typedefs,
                                 )?,
                                 DeclaratorKind::Pointers(_, _) => todo!(),
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
@@ -292,6 +304,7 @@ impl<'a> Parser<'a> {
                                         parameter_type_list,
                                     )?;
                                 }
+                                DeclaratorKind::Array(_, _) => todo!(),
                             }
                         }
                     }
@@ -314,11 +327,16 @@ impl<'a> Parser<'a> {
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(declaration) = self.parse_declaration() {
-            self.input.success();
-            return Ok(declaration);
+        match self.parse_declaration() {
+            Ok(declaration) => {
+                self.input.success();
+                return Ok(declaration);
+            }
+            Err(err) => {
+                self.input.backtrack();
+                return Err(err);
+            }
         }
-        self.input.backtrack();
 
         Err(ParseError::new(
             ParseErrorKind::ExpectedDeclaration,
@@ -451,6 +469,8 @@ impl<'a> Parser<'a> {
             });
         }
 
+        let source = self.input.peek().source;
+
         self.input.speculate();
         if let Ok(..) = self.parse_atomic_type_specifier() {
             self.input.success();
@@ -461,9 +481,6 @@ impl<'a> Parser<'a> {
         self.input.speculate();
         if let Ok(composite) = self.parse_struct_or_union_specifier() {
             self.input.success();
-
-            let source = composite.source;
-
             return Ok(TypeSpecifier {
                 kind: TypeSpecifierKind::Composite(composite),
                 source,
@@ -479,9 +496,12 @@ impl<'a> Parser<'a> {
         self.input.backtrack();
 
         self.input.speculate();
-        if let Ok(..) = self.parse_typedef_name() {
+        if let Ok(typedef_name) = self.parse_typedef_name() {
             self.input.success();
-            return Ok(todo!());
+            return Ok(TypeSpecifier {
+                kind: TypeSpecifierKind::TypedefName(typedef_name),
+                source,
+            });
         }
         self.input.backtrack();
 
@@ -517,22 +537,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_alignment_specifier(&mut self) -> Result<AlignmentSpecifier, ParseError> {
-        self.input.speculate();
-        if self.eat_sequence(&[CTokenKind::AlignasKeyword]) {
-            if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = self.input.peek().kind {
-                self.input.advance();
-                todo!();
-                self.input.success();
-                return Ok(todo!());
-            }
+        if !self.eat(CTokenKind::AlignasKeyword) {
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Expected 'alignas' keyword to begin alignment specifier"),
+                self.input.peek().source,
+            ));
         }
 
-        self.input.backtrack();
+        if !self.eat_open_paren() {
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Expected '(' after 'alignas' keyword"),
+                self.input.peek().source,
+            ));
+        }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse alignment specifier"),
-            self.input.peek().source,
-        ))
+        todo!()
     }
 
     fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
@@ -562,9 +581,7 @@ impl<'a> Parser<'a> {
     fn parse_pointers(&mut self) -> Result<Pointers, ParseError> {
         let mut pointers = Pointers { pointers: vec![] };
 
-        while let Some(source) =
-            self.eat_sequence_source(&[CTokenKind::Punctuator(Punctuator::Multiply)])
-        {
+        while let Some(source) = self.eat_punctuator_source(Punctuator::Multiply) {
             let attributes = self.parse_attribute_specifier_sequence()?;
 
             let type_qualifiers = self.parse_type_qualifier_list()?;
@@ -598,17 +615,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_direct_declarator(&mut self) -> Result<Declarator, ParseError> {
-        let mut declarator = if let CTokenKind::Identifier(name) = &self.input.peek().kind {
-            let name = name.clone();
-            let source = self.input.advance().source;
+        let mut declarator = if let Some((name, source)) = self.eat_identifier_source() {
             let attributes = self.parse_attribute_specifier_sequence()?;
             DeclaratorKind::Named(name).at(source)
-        } else if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = &self.input.peek().kind
-        {
-            self.input.advance();
+        } else if self.eat_open_paren() {
             let declarator = self.parse_declarator()?;
 
-            if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseParen)]) {
+            if !self.eat_punctuator(Punctuator::CloseParen) {
                 return Err(ParseError::new(
                     ParseErrorKind::Misc("Failed to parse ')' for direct declarator"),
                     self.input.peek().source,
@@ -625,7 +638,9 @@ impl<'a> Parser<'a> {
 
         loop {
             match &self.input.peek().kind {
-                CTokenKind::Punctuator(Punctuator::OpenBracket) => todo!(),
+                CTokenKind::Punctuator(Punctuator::OpenBracket) => {
+                    declarator = self.parse_array_declarator(declarator)?
+                }
                 CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => {
                     declarator = self.parse_function_declarator(declarator)?
                 }
@@ -642,12 +657,39 @@ impl<'a> Parser<'a> {
         declarator: Declarator,
     ) -> Result<Declarator, ParseError> {
         let source = self.input.peek().source;
-        assert!(self.input.advance().kind.is_open_paren());
+
+        if !self.eat_open_paren() {
+            return Err(
+                ParseErrorKind::Misc("Expected '(' to begin function declarator").at(source),
+            );
+        }
 
         let parameter_type_list = self.parse_parameter_type_list()?;
-        self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::CloseParen)]);
+
+        if !self.eat_punctuator(Punctuator::CloseParen) {
+            return Err(
+                ParseErrorKind::Misc("Expected ')' to close function declarator").at(source),
+            );
+        }
 
         Ok(DeclaratorKind::Function(Box::new(declarator), parameter_type_list).at(source))
+    }
+
+    fn parse_array_declarator(&mut self, declarator: Declarator) -> Result<Declarator, ParseError> {
+        let source = self.input.peek().source;
+
+        if !self.eat_punctuator(Punctuator::OpenBracket) {
+            return Err(ParseErrorKind::Misc("Expected '[' to begin array declarator").at(source));
+        }
+
+        let parameter_type_list = self.parse_parameter_type_list()?;
+
+        if !self.eat_punctuator(Punctuator::CloseParen) {
+            return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
+        }
+
+        let array_qualifier = todo!();
+        Ok(DeclaratorKind::Array(Box::new(declarator), array_qualifier).at(source))
     }
 
     fn parse_parameter_type_list(&mut self) -> Result<ParameterTypeList, ParseError> {
@@ -905,11 +947,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_typedef_name(&mut self) -> Result<(), ParseError> {
+    fn parse_typedef_name(&mut self) -> Result<TypedefName, ParseError> {
         if let CTokenKind::Identifier(name) = &self.input.peek().kind {
-            if let Some(_typedef) = self.typedefs.get(name) {
-                self.input.advance();
-                return Ok(());
+            if self.typedefs.get(name).is_some() {
+                let name = name.clone();
+                let source = self.input.advance().source;
+                return Ok(TypedefName { name, source });
             }
         }
 
@@ -985,7 +1028,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        if !self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::Semicolon)]) {
+        if !self.eat_punctuator(Punctuator::Semicolon) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected ';' after declaration"),
                 self.input.peek().source,
@@ -1014,9 +1057,8 @@ impl<'a> Parser<'a> {
                 return Ok(list);
             };
 
-            match self.input.peek().kind {
-                CTokenKind::Punctuator(Punctuator::Comma) => (),
-                _ => break,
+            if !self.eat_punctuator(Punctuator::Comma) {
+                break;
             }
         }
 
@@ -1026,7 +1068,7 @@ impl<'a> Parser<'a> {
     fn parse_init_declarator(&mut self) -> Result<InitDeclarator, ParseError> {
         let declarator = self.parse_declarator()?;
 
-        let initializer = if self.eat_sequence(&[CTokenKind::Punctuator(Punctuator::Assign)]) {
+        let initializer = if self.eat_punctuator(Punctuator::Assign) {
             Some(self.parse_initializer()?)
         } else {
             None
@@ -1119,8 +1161,47 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn eat_identifier(&mut self) -> Option<String> {
+        match &self.input.peek().kind {
+            CTokenKind::Identifier(name) => {
+                let name = name.clone();
+                self.input.advance();
+                Some(name)
+            }
+            _ => None,
+        }
+    }
+
+    fn eat_identifier_source(&mut self) -> Option<(String, Source)> {
+        match &self.input.peek().kind {
+            CTokenKind::Identifier(name) => {
+                let name = name.clone();
+                let source = self.input.advance().source;
+                Some((name, source))
+            }
+            _ => None,
+        }
+    }
+
     fn eat_punctuator(&mut self, expected: Punctuator) -> bool {
         if self.input.peek().kind == CTokenKind::Punctuator(expected) {
+            self.input.advance();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn eat_punctuator_source(&mut self, expected: Punctuator) -> Option<Source> {
+        if self.input.peek().kind == CTokenKind::Punctuator(expected) {
+            Some(self.input.advance().source)
+        } else {
+            None
+        }
+    }
+
+    fn eat_open_paren(&mut self) -> bool {
+        if let CTokenKind::Punctuator(Punctuator::OpenParen { .. }) = self.input.peek().kind {
             self.input.advance();
             true
         } else {
