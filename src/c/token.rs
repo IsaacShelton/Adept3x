@@ -75,6 +75,10 @@ impl CTokenKind {
             _ => false,
         }
     }
+
+    pub fn precedence(&self) -> usize {
+        todo!("c token precedence")
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

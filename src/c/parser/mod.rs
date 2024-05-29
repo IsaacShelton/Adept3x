@@ -1,11 +1,12 @@
 mod error;
+mod expr;
 mod input;
 mod translation;
 
 use itertools::Itertools;
 
 pub use self::{error::ParseError, input::Input};
-use self::{error::ParseErrorKind, translation::declare_named};
+use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
 use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
@@ -93,7 +94,13 @@ impl Pointers {
 }
 
 #[derive(Clone, Debug)]
-pub struct ArrayQualifier {}
+pub struct ArrayQualifier {
+    expression: Option<Expr>,
+    type_qualifiers: Vec<TypeQualifier>,
+    is_static: bool,
+    is_param_vla: bool,
+    source: Source,
+}
 
 #[derive(Clone, Debug)]
 pub struct Pointer {
@@ -633,14 +640,31 @@ impl<'a> Parser<'a> {
             return Err(ParseErrorKind::Misc("Expected '[' to begin array declarator").at(source));
         }
 
-        todo!("array declarator insides");
+        let mut is_static = self.eat(CTokenKind::StaticKeyword);
+        let type_qualifiers = self.parse_type_qualifier_list()?;
+
+        if !is_static {
+            is_static = self.eat(CTokenKind::StaticKeyword);
+        }
+
+        let expression = speculate!(self.input, self.parse_assignment_expr()).ok();
+        let is_param_vla = expression.is_none() && self.eat_punctuator(Punctuator::Multiply);
 
         if !self.eat_punctuator(Punctuator::CloseParen) {
             return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
         }
 
-        let array_qualifier = todo!();
-        Ok(DeclaratorKind::Array(Box::new(declarator), array_qualifier).at(source))
+        Ok(DeclaratorKind::Array(
+            Box::new(declarator),
+            ArrayQualifier {
+                expression,
+                type_qualifiers,
+                is_static,
+                is_param_vla,
+                source,
+            },
+        )
+        .at(source))
     }
 
     fn parse_parameter_type_list(&mut self) -> Result<ParameterTypeList, ParseError> {
@@ -690,7 +714,6 @@ impl<'a> Parser<'a> {
                 core: ParameterDeclarationCore::Declarator(declarator),
             });
         }
-
 
         if let Ok(abstract_declarator) = speculate!(self.input, self.parse_abstract_declarator()) {
             return Ok(ParameterDeclaration {
@@ -904,16 +927,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_typeof_specifier(&mut self) -> Result<(), ParseError> {
-        if let CTokenKind::TypeofKeyword | CTokenKind::TypeofUnqualKeyword =
-            self.input.advance().kind
-        {
-            todo!()
+        match self.input.advance().kind {
+            CTokenKind::TypeofKeyword => todo!(),
+            CTokenKind::TypeofUnqualKeyword => todo!(),
+            _ => Err(ParseError::new(
+                ParseErrorKind::Misc("Failed to parse typeof specifier"),
+                self.input.peek().source,
+            )),
         }
-
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse typeof specifier"),
-            self.input.peek().source,
-        ))
     }
 
     fn parse_static_assert(&mut self) -> Result<StaticAssertDeclaration, ParseError> {
@@ -936,10 +957,7 @@ impl<'a> Parser<'a> {
 
         let attribute_specifiers = self.parse_attribute_specifier_sequence()?;
 
-        if self
-            .input
-            .peek_is(CTokenKind::Punctuator(Punctuator::Semicolon))
-        {
+        if self.eat_punctuator(Punctuator::Semicolon) {
             // attribute-declaration
             todo!();
             return Ok(todo!());
@@ -1011,7 +1029,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
-        if let Ok(..) = speculate!(self.input, self.parse_assignment_expression()) {
+        if let Ok(..) = speculate!(self.input, self.parse_assignment_expr()) {
             todo!();
             return Ok(());
         }
@@ -1041,10 +1059,6 @@ impl<'a> Parser<'a> {
 
         todo!();
         Ok(())
-    }
-
-    fn parse_assignment_expression(&mut self) -> Result<(), ParseError> {
-        todo!()
     }
 
     fn parse_function_body(&mut self) -> Result<(), ParseError> {
