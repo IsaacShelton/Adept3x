@@ -1,11 +1,10 @@
 mod error;
 mod expr;
 mod input;
+mod speculate;
 mod translation;
 
-use itertools::Itertools;
-
-pub use self::{error::ParseError, input::Input};
+use self::speculate::speculate;
 use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
 use super::{
     punctuator::Punctuator,
@@ -16,7 +15,10 @@ use crate::{
     c::parser::translation::declare_function,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
+use itertools::Itertools;
 use std::collections::HashMap;
+
+pub use self::{error::ParseError, input::Input};
 
 pub struct Parser<'a> {
     input: Input<'a>,
@@ -258,23 +260,6 @@ pub struct Composite {
     pub source: Source,
     pub attributes: Vec<()>,
     pub members: Option<Vec<MemberDeclaration>>,
-}
-
-macro_rules! speculate {
-    ($input:expr, $expression:expr) => {{
-        $input.speculate();
-
-        match $expression {
-            Ok(ok) => {
-                $input.success();
-                Ok(ok)
-            }
-            Err(err) => {
-                $input.backtrack();
-                Err(err)
-            }
-        }
-    }};
 }
 
 impl<'a> Parser<'a> {

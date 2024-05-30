@@ -119,6 +119,7 @@ impl PreTokenKind {
             Punctuator::BitOr => 5,
             Punctuator::LogicalAnd => 4,
             Punctuator::LogicalOr => 3,
+            Punctuator::Ternary => 2,
             Punctuator::MultiplyAssign
             | Punctuator::DivideAssign
             | Punctuator::ModulusAssign

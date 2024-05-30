@@ -1,7 +1,10 @@
-use super::{error::ParseErrorKind, ParseError, Parser};
+use super::{
+    error::ParseErrorKind, AbstractDeclarator, ParseError, Parser, SpecifierQualifierList,
+};
 use crate::{
     ast::Source,
     c::{
+        parser::speculate::speculate,
         punctuator::Punctuator,
         token::{CTokenKind, Integer},
     },
@@ -19,6 +22,7 @@ pub enum ExprKind {
     Compound(Vec<Expr>),
     BinaryOperation(Box<BinaryOperation>),
     Ternary(Box<Ternary>),
+    Cast(Box<Cast>),
 }
 
 impl ExprKind {
@@ -47,6 +51,17 @@ pub enum BinaryOperator {
     Multiply,
     Divide,
     Modulus,
+    Assign,
+    AddAssign,
+    SubtractAssign,
+    MultiplyAssign,
+    DivideAssign,
+    ModulusAssign,
+    LeftShiftAssign,
+    RightShiftAssign,
+    BitAndAssign,
+    BitXorAssign,
+    BitOrAssign,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +76,13 @@ pub struct Ternary {
     pub condition: Expr,
     pub when_true: Expr,
     pub when_false: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct Cast {
+    pub specializer_qualifiers: SpecifierQualifierList,
+    pub abstract_declarator: Option<AbstractDeclarator>,
+    pub inner: Expr,
 }
 
 // Implements expression parsing for the C parser
@@ -93,12 +115,76 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr_primary(&mut self) -> Result<Expr, ParseError> {
-        let _base = self.parse_expr_primary_base();
+        let _base = self.parse_cast_expr();
         todo!("post-fix operators")
     }
 
-    fn parse_expr_primary_base(&mut self) -> Result<Expr, ParseError> {
-        todo!("parse expression primary base")
+    fn parse_cast_expr(&mut self) -> Result<Expr, ParseError> {
+        if let Ok(cast) = speculate!(self.input, self.parse_cast()) {
+            return Ok(cast);
+        }
+
+        self.parse_unary_expr()
+    }
+
+    fn parse_unary_expr(&mut self) -> Result<Expr, ParseError> {
+        if self.eat_punctuator(Punctuator::Ampersand) {
+            let inner = self.parse_cast_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::Multiply) {
+            let inner = self.parse_cast_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::Add) {
+            let inner = self.parse_cast_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::Subtract) {
+            let inner = self.parse_cast_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::BitComplement) {
+            let inner = self.parse_cast_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::Not) {
+            let inner = self.parse_cast_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::Increment) {
+            let inner = self.parse_unary_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat_punctuator(Punctuator::Decrement) {
+            let inner = self.parse_unary_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat(CTokenKind::SizeofKeyword) {
+            if self.eat_open_paren() {
+                todo!();
+            } else {
+                todo!();
+            }
+
+            let inner = self.parse_unary_expr()?;
+            return Ok(todo!());
+        }
+
+        if self.eat(CTokenKind::AlignofKeyword) {
+            todo!();
+            return Ok(todo!());
+        }
+
+        self.parse_postfix_expr()
     }
 
     fn parse_operator_expr(&mut self, precedence: usize, expr: Expr) -> Result<Expr, ParseError> {
@@ -139,10 +225,30 @@ impl<'a> Parser<'a> {
                 CTokenKind::Punctuator(Punctuator::Multiply) => BinaryOperator::Multiply,
                 CTokenKind::Punctuator(Punctuator::Divide) => BinaryOperator::Divide,
                 CTokenKind::Punctuator(Punctuator::Modulus) => BinaryOperator::Modulus,
+                CTokenKind::Punctuator(Punctuator::Assign) => BinaryOperator::Assign,
+                CTokenKind::Punctuator(Punctuator::AddAssign) => BinaryOperator::AddAssign,
+                CTokenKind::Punctuator(Punctuator::SubtractAssign) => {
+                    BinaryOperator::SubtractAssign
+                }
+                CTokenKind::Punctuator(Punctuator::MultiplyAssign) => {
+                    BinaryOperator::MultiplyAssign
+                }
+                CTokenKind::Punctuator(Punctuator::DivideAssign) => BinaryOperator::DivideAssign,
+                CTokenKind::Punctuator(Punctuator::ModulusAssign) => BinaryOperator::ModulusAssign,
+                CTokenKind::Punctuator(Punctuator::LeftShiftAssign) => {
+                    BinaryOperator::LeftShiftAssign
+                }
+                CTokenKind::Punctuator(Punctuator::RightShiftAssign) => {
+                    BinaryOperator::RightShiftAssign
+                }
+                CTokenKind::Punctuator(Punctuator::BitAndAssign) => BinaryOperator::BitAndAssign,
+                CTokenKind::Punctuator(Punctuator::BitXorAssign) => BinaryOperator::BitXorAssign,
+                CTokenKind::Punctuator(Punctuator::BitOrAssign) => BinaryOperator::BitOrAssign,
+
                 _ => return Ok(lhs),
             };
 
-            lhs = self.parse_math(lhs, binary_operator, next_precedence)?;
+            lhs = self.parse_math(lhs, binary_operator, next_precedence, operator.source)?;
         }
     }
 
@@ -151,8 +257,34 @@ impl<'a> Parser<'a> {
         lhs: Expr,
         operator: BinaryOperator,
         operator_precedence: usize,
+        source: Source,
     ) -> Result<Expr, ParseError> {
-        todo!()
+        let rhs = self.parse_math_rhs(operator_precedence)?;
+
+        Ok(ExprKind::BinaryOperation(Box::new(BinaryOperation {
+            operator,
+            left: lhs,
+            right: rhs,
+        }))
+        .at(source))
+    }
+
+    fn parse_math_rhs(&mut self, operator_precedence: usize) -> Result<Expr, ParseError> {
+        // Skip over operator token
+        self.input.advance();
+
+        let rhs = self.parse_expr_primary()?;
+
+        let next_operator = self.input.peek();
+        let next_precedence = next_operator.kind.precedence();
+
+        if !((next_precedence + is_right_associative(&next_operator.kind) as usize)
+            < operator_precedence)
+        {
+            self.parse_operator_expr(operator_precedence + 1, rhs)
+        } else {
+            Ok(rhs)
+        }
     }
 
     fn parse_ternary(&mut self, condition: Expr) -> Result<Expr, ParseError> {
@@ -178,11 +310,36 @@ impl<'a> Parser<'a> {
         }))
         .at(source))
     }
+
+    fn parse_cast(&mut self) -> Result<Expr, ParseError> {
+        let source = self.input.peek().source;
+
+        if !self.eat_open_paren() {
+            return Err(ParseErrorKind::Misc("Expected '(' to begin cast").at(source));
+        }
+
+        let specializer_qualifiers = self.parse_specifier_qualifier_list()?;
+        let abstract_declarator = speculate!(self.input, self.parse_abstract_declarator()).ok();
+
+        if !self.eat_punctuator(Punctuator::CloseParen) {
+            return Err(ParseErrorKind::Misc("Expected ')' to close cast").at(source));
+        }
+
+        let inner = self.parse_expr_primary()?;
+
+        Ok(ExprKind::Cast(Box::new(Cast {
+            specializer_qualifiers,
+            abstract_declarator,
+            inner,
+        }))
+        .at(source))
+    }
 }
 
 fn is_terminating_token(kind: &CTokenKind) -> bool {
     match kind {
-        CTokenKind::Punctuator(Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon) => {
+        CTokenKind::EndOfFile
+        | CTokenKind::Punctuator(Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon) => {
             true
         }
         _ => false,

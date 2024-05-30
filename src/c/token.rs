@@ -77,7 +77,43 @@ impl CTokenKind {
     }
 
     pub fn precedence(&self) -> usize {
-        todo!("c token precedence")
+        let punctuator = match self {
+            Self::Punctuator(punctuator) => punctuator,
+            _ => return 0,
+        };
+
+        match punctuator {
+            Punctuator::Dot | Punctuator::Arrow => 15,
+            Punctuator::Increment
+            | Punctuator::Decrement
+            | Punctuator::Not
+            | Punctuator::BitComplement => 14,
+            Punctuator::Multiply | Punctuator::Divide | Punctuator::Modulus => 12,
+            Punctuator::Add | Punctuator::Subtract => 11,
+            Punctuator::LeftShift | Punctuator::RightShift => 10,
+            Punctuator::LessThan
+            | Punctuator::GreaterThan
+            | Punctuator::LessThanEq
+            | Punctuator::GreaterThanEq => 9,
+            Punctuator::DoubleEquals | Punctuator::NotEquals => 8,
+            Punctuator::Ampersand => 7,
+            Punctuator::BitXor => 6,
+            Punctuator::BitOr => 5,
+            Punctuator::LogicalAnd => 4,
+            Punctuator::LogicalOr => 3,
+            Punctuator::Ternary => 2,
+            Punctuator::MultiplyAssign
+            | Punctuator::DivideAssign
+            | Punctuator::ModulusAssign
+            | Punctuator::AddAssign
+            | Punctuator::SubtractAssign
+            | Punctuator::LeftShiftAssign
+            | Punctuator::RightShiftAssign
+            | Punctuator::BitAndAssign
+            | Punctuator::BitXorAssign
+            | Punctuator::BitOrAssign => 1,
+            _ => 0,
+        }
     }
 }
 
