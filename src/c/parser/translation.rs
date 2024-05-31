@@ -184,6 +184,12 @@ fn augment_ast_type_with_type_specifier(
             )),
             None => Ok(Some(Type::new(TypeKind::Void, type_specifier.source))),
         },
+        TypeSpecifierKind::Bool => augment_ast_type_as_integer(
+            ast_type,
+            IntegerBits::Bits8,
+            IntegerSign::Unsigned,
+            type_specifier.source,
+        ),
         TypeSpecifierKind::Char => augment_ast_type_as_integer(
             ast_type,
             IntegerBits::Bits8,

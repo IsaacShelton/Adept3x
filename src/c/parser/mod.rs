@@ -6,6 +6,7 @@ mod translation;
 
 use self::speculate::speculate;
 use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
+use super::token::Integer;
 use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
@@ -23,6 +24,7 @@ pub use self::{error::ParseError, input::Input};
 pub struct Parser<'a> {
     input: Input<'a>,
     typedefs: HashMap<String, CTypedef>,
+    enum_constants: HashMap<String, Integer>,
 }
 
 #[derive(Clone, Debug)]
@@ -165,6 +167,7 @@ pub struct TypeSpecifier {
 #[derive(Clone, Debug)]
 pub enum TypeSpecifierKind {
     Void,
+    Bool,
     Char,
     Short,
     Int,
@@ -267,6 +270,7 @@ impl<'a> Parser<'a> {
         Self {
             input,
             typedefs: HashMap::default(),
+            enum_constants: HashMap::default(),
         }
     }
 
@@ -426,6 +430,7 @@ impl<'a> Parser<'a> {
             CTokenKind::Decimal128Keyword => unimplemented!("_Decimal128"),
             CTokenKind::ComplexKeyword => unimplemented!("_Complex"),
             CTokenKind::BitIntKeyword => unimplemented!("_BitInt"),
+            CTokenKind::BoolKeyword => Some(TypeSpecifierKind::Bool),
             CTokenKind::VoidKeyword => Some(TypeSpecifierKind::Void),
             CTokenKind::CharKeyword => Some(TypeSpecifierKind::Char),
             CTokenKind::ShortKeyword => Some(TypeSpecifierKind::Short),
@@ -632,10 +637,10 @@ impl<'a> Parser<'a> {
             is_static = self.eat(CTokenKind::StaticKeyword);
         }
 
-        let expression = speculate!(self.input, self.parse_assignment_expr()).ok();
+        let expression = speculate!(self.input, self.parse_expr_singular()).ok();
         let is_param_vla = expression.is_none() && self.eat_punctuator(Punctuator::Multiply);
 
-        if !self.eat_punctuator(Punctuator::CloseParen) {
+        if !self.eat_punctuator(Punctuator::CloseBracket) {
             return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
         }
 
@@ -961,6 +966,7 @@ impl<'a> Parser<'a> {
         }
 
         if !self.eat_punctuator(Punctuator::Semicolon) {
+            // TODO: Improve error message
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected ';' after declaration"),
                 self.input.peek().source,
@@ -1014,7 +1020,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
-        if let Ok(..) = speculate!(self.input, self.parse_assignment_expr()) {
+        if let Ok(..) = speculate!(self.input, self.parse_expr_singular()) {
             todo!();
             return Ok(());
         }

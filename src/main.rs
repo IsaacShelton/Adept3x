@@ -67,16 +67,11 @@ fn build_project(build_command: BuildCommand) {
             }
 
             if filepath.extension().unwrap_or_default() == "h" {
-                for i in 0..10000 {
-                    let key = source_file_cache.add_or_exit(&filename);
-                    let text = source_file_cache.get(key).content().chars().into_text(key);
-                    let preprocessed =
-                        exit_unless(c::preprocessor::preprocess(text), &source_file_cache);
-
-                    if i == 9999 {
-                        println!("{:?}", preprocessed);
-                    }
-                }
+                let key = source_file_cache.add_or_exit(&filename);
+                let text = source_file_cache.get(key).content().chars().into_text(key);
+                let preprocessed =
+                    exit_unless(c::preprocessor::preprocess(text), &source_file_cache);
+                println!("{:?}", preprocessed);
                 return;
             }
 
