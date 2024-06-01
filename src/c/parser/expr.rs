@@ -185,7 +185,7 @@ impl<'a> Parser<'a> {
             return Ok(ExprKind::Nullptr.at(source));
         }
 
-        Err(ParseErrorKind::Misc("Expected expression").at(source))
+        Err(ParseErrorKind::Misc("Expected expression constant atom").at(source))
     }
 
     fn parse_expr_atom(&mut self) -> Result<Expr, ParseError> {
@@ -228,7 +228,7 @@ impl<'a> Parser<'a> {
             todo!()
         }
 
-        Err(ParseErrorKind::Misc("Expected expression").at(source))
+        Err(ParseErrorKind::Misc("Expected expression atom").at(source))
     }
 
     pub fn parse_expr_primary(&mut self) -> Result<Expr, ParseError> {

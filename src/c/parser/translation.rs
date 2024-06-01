@@ -219,6 +219,7 @@ fn augment_ast_type_with_type_specifier(
         TypeSpecifierKind::Signed => todo!(),
         TypeSpecifierKind::Unsigned => todo!(),
         TypeSpecifierKind::Composite(_composite) => todo!(),
+        TypeSpecifierKind::Enumeration(_enumeration) => todo!(),
         TypeSpecifierKind::TypedefName(_typedef_name) => todo!(),
     }
 }

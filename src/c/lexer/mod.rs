@@ -127,12 +127,12 @@ fn lex_number(number: &str) -> Result<CTokenKind, LexError> {
 
     let number = number.replace("'", "");
 
-    let (number, radix) = if number.starts_with("0") {
-        (&number[..], 8)
-    } else if number.starts_with("0x") || number.starts_with("0X") {
+    let (number, radix) = if number.starts_with("0x") || number.starts_with("0X") {
         (&number[2..], 16)
     } else if number.starts_with("0b") || number.starts_with("0B") {
         (&number[2..], 2)
+    } else if number.starts_with("0") {
+        (&number[..], 8)
     } else {
         (&number[..], 10)
     };

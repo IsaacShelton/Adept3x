@@ -177,6 +177,7 @@ pub enum TypeSpecifierKind {
     Signed,
     Unsigned,
     Composite(Composite),
+    Enumeration(Enumeration),
     TypedefName(TypedefName),
 }
 
@@ -249,7 +250,9 @@ pub struct CommonDeclaration {
 pub struct FunctionDefinition {}
 
 #[derive(Clone, Debug)]
-pub struct ConstantExpression {}
+pub struct ConstantExpression {
+    pub value: Expr,
+}
 
 #[derive(Clone, Debug)]
 pub enum CompositeKind {
@@ -263,6 +266,41 @@ pub struct Composite {
     pub source: Source,
     pub attributes: Vec<()>,
     pub members: Option<Vec<MemberDeclaration>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumTypeSpecifier {
+    pub specifier_qualifier_list: SpecifierQualifierList,
+}
+
+#[derive(Clone, Debug)]
+pub struct Enumerator {
+    pub name: String,
+    pub attributes: Vec<()>,
+    pub value: Option<ConstantExpression>,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum Enumeration {
+    Definition(EnumerationDefinition),
+    Reference(EnumerationReference),
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumerationDefinition {
+    pub name: Option<String>,
+    pub attributes: Vec<()>,
+    pub enum_type_specifier: Option<EnumTypeSpecifier>,
+    pub body: Vec<Enumerator>,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumerationReference {
+    pub name: String,
+    pub enum_type_specifier: Option<EnumTypeSpecifier>,
+    pub source: Source,
 }
 
 impl<'a> Parser<'a> {
@@ -463,8 +501,11 @@ impl<'a> Parser<'a> {
             });
         }
 
-        if let Ok(..) = speculate!(self.input, self.parse_enum_specifier()) {
-            return Ok(todo!());
+        if let Ok(enumeration) = speculate!(self.input, self.parse_enum_specifier()) {
+            return Ok(TypeSpecifier {
+                kind: TypeSpecifierKind::Enumeration(enumeration),
+                source,
+            });
         }
 
         if let Ok(typedef_name) = speculate!(self.input, self.parse_typedef_name()) {
@@ -868,7 +909,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_constant_expression(&mut self) -> Result<ConstantExpression, ParseError> {
-        todo!()
+        let value = self.parse_expr_singular()?;
+
+        eprintln!("warning: constant expressions are not validated to not contain '='");
+
+        Ok(ConstantExpression { value })
     }
 
     fn parse_specifier_qualifier_list(&mut self) -> Result<SpecifierQualifierList, ParseError> {
@@ -904,16 +949,116 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_enum_specifier(&mut self) -> Result<(), ParseError> {
-        if let CTokenKind::StructKeyword | CTokenKind::UnionKeyword = self.input.peek().kind {
-            self.input.advance();
-            todo!();
+    fn parse_enum_specifier(&mut self) -> Result<Enumeration, ParseError> {
+        let source = self.input.peek().source;
+
+        if !self.eat(CTokenKind::EnumKeyword) {
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Failed to parse enum specifier"),
+                self.input.peek().source,
+            ));
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse enum specifier"),
-            self.input.peek().source,
-        ))
+        let enum_start_of_head = self.input.peek().source;
+        let attributes = self.parse_attribute_specifier_sequence()?;
+        let name = self.eat_identifier();
+        let enum_type_specifier = self.parse_enum_type_specifier()?;
+        let body = self.parse_enum_body()?;
+
+        if let Some(body) = body {
+            // Enum definition
+            Ok(Enumeration::Definition(EnumerationDefinition {
+                name,
+                attributes,
+                enum_type_specifier,
+                body,
+                source,
+            }))
+        } else if let Some(name) = name {
+            // Enum reference
+            if !attributes.is_empty() {
+                return Err(ParseError::new(
+                    ParseErrorKind::Misc("Cannot specify attributes on enum reference"),
+                    enum_start_of_head,
+                ));
+            }
+
+            Ok(Enumeration::Reference(EnumerationReference {
+                name,
+                enum_type_specifier,
+                source,
+            }))
+        } else {
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Expected name of enum"),
+                enum_start_of_head,
+            ));
+        }
+    }
+
+    fn parse_enum_type_specifier(&mut self) -> Result<Option<EnumTypeSpecifier>, ParseError> {
+        if !self.eat_punctuator(Punctuator::Colon) {
+            return Ok(None);
+        }
+
+        let specifier_qualifier_list = self.parse_specifier_qualifier_list()?;
+
+        Ok(Some(EnumTypeSpecifier {
+            specifier_qualifier_list,
+        }))
+    }
+
+    fn parse_enum_body(&mut self) -> Result<Option<Vec<Enumerator>>, ParseError> {
+        if !self.eat_punctuator(Punctuator::OpenCurly) {
+            return Ok(None);
+        }
+
+        let mut enumerators = vec![];
+
+        while !self
+            .input
+            .peek_is_or_eof(CTokenKind::Punctuator(Punctuator::CloseCurly))
+        {
+            enumerators.push(self.parse_enumerator()?);
+
+            if !self.eat_punctuator(Punctuator::Comma)
+                && !self
+                    .input
+                    .peek_is(CTokenKind::Punctuator(Punctuator::CloseCurly))
+            {
+                return Err(ParseErrorKind::Misc("Expected ',' or '}' after enumerator")
+                    .at(self.input.peek().source));
+            }
+        }
+
+        if !self.eat_punctuator(Punctuator::CloseCurly) {
+            return Err(ParseErrorKind::Misc("Expected '}' after enumeration body")
+                .at(self.input.peek().source));
+        }
+
+        Ok(Some(enumerators))
+    }
+
+    fn parse_enumerator(&mut self) -> Result<Enumerator, ParseError> {
+        let (name, source) = self.eat_identifier_source().ok_or_else(|| {
+            ParseErrorKind::Misc("Expected name of enumerator inside enumeration body")
+                .at(self.input.peek().source)
+        })?;
+
+        let attributes = self.parse_attribute_specifier_sequence()?;
+
+        let value = if self.eat_punctuator(Punctuator::Assign) {
+            Some(self.parse_constant_expression()?)
+        } else {
+            None
+        };
+
+        Ok(Enumerator {
+            name,
+            attributes,
+            value,
+            source,
+        })
     }
 
     fn parse_typeof_specifier(&mut self) -> Result<(), ParseError> {
