@@ -313,6 +313,12 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
         resolved::TypeKind::PlainOldData(_, structure_ref) => {
             Ok(ir::Type::Structure(*structure_ref))
         }
+        resolved::TypeKind::AnonymousStruct() => {
+            todo!()
+        }
+        resolved::TypeKind::AnonymousUnion() => {
+            todo!()
+        }
     }
 }
 

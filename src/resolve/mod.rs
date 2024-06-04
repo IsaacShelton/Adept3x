@@ -620,6 +620,8 @@ fn resolve_type(
             .at(inner.source)),
         },
         ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Float(*size)),
+        ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
+        ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
     }
     .map(|kind| kind.at(ast_type.source))
 }

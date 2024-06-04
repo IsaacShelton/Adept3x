@@ -1,3 +1,5 @@
+#![allow(unreachable_code)]
+
 mod error;
 mod expr;
 mod input;
@@ -129,6 +131,17 @@ pub struct DeclarationSpecifier {
     source: Source,
 }
 
+impl From<TypeSpecifierQualifier> for DeclarationSpecifier {
+    fn from(tsq: TypeSpecifierQualifier) -> Self {
+        let source = tsq.source();
+
+        DeclarationSpecifier {
+            kind: DeclarationSpecifierKind::TypeSpecifierQualifier(tsq),
+            source,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum DeclarationSpecifierKind {
     Auto,
@@ -154,6 +167,16 @@ pub enum TypeSpecifierQualifier {
     TypeSpecifier(TypeSpecifier),
     TypeQualifier(TypeQualifier),
     AlignmentSpecifier(AlignmentSpecifier),
+}
+
+impl TypeSpecifierQualifier {
+    pub fn source(&self) -> Source {
+        match self {
+            TypeSpecifierQualifier::TypeSpecifier(ts) => ts.source,
+            TypeSpecifierQualifier::TypeQualifier(tq) => tq.source,
+            TypeSpecifierQualifier::AlignmentSpecifier(al) => al.source,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -186,7 +209,13 @@ pub enum TypeSpecifierKind {
 }
 
 #[derive(Clone, Debug)]
-pub enum TypeQualifier {
+pub struct TypeQualifier {
+    pub kind: TypeQualifierKind,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeQualifierKind {
     Const,
     Restrict,
     Volatile,
@@ -194,7 +223,13 @@ pub enum TypeQualifier {
 }
 
 #[derive(Clone, Debug)]
-pub enum AlignmentSpecifier {
+pub struct AlignmentSpecifier {
+    pub kind: AlignmentSpecifierKind,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum AlignmentSpecifierKind {
     AlignAsType(()),
     AlisnAsConstExpr(()),
 }
@@ -203,6 +238,21 @@ pub enum AlignmentSpecifier {
 pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub attributes: Vec<()>,
+}
+
+impl From<&SpecifierQualifierList> for DeclarationSpecifiers {
+    fn from(value: &SpecifierQualifierList) -> Self {
+        let specifiers = value
+            .type_specifier_qualifiers
+            .iter()
+            .map(|tsq| DeclarationSpecifier::from(tsq.clone()))
+            .collect_vec();
+
+        Self {
+            attributes: value.attributes.clone(),
+            specifiers,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -221,7 +271,7 @@ pub struct StaticAssertDeclaration {
 pub struct Member {
     pub attributes: Vec<()>,
     pub specifier_qualifiers: SpecifierQualifierList,
-    pub member_declarations: Vec<MemberDeclarator>,
+    pub member_declarators: Vec<MemberDeclarator>,
 }
 
 #[derive(Clone, Debug)]
@@ -545,11 +595,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_qualifier(&mut self) -> Result<TypeQualifier, ParseError> {
-        let type_qualifier = match self.input.peek().kind {
-            CTokenKind::ConstKeyword => TypeQualifier::Const,
-            CTokenKind::RestrictKeyword => TypeQualifier::Restrict,
-            CTokenKind::VolatileKeyword => TypeQualifier::Volatile,
-            CTokenKind::AtomicKeyword => TypeQualifier::Atomic,
+        let kind = match self.input.peek().kind {
+            CTokenKind::ConstKeyword => TypeQualifierKind::Const,
+            CTokenKind::RestrictKeyword => TypeQualifierKind::Restrict,
+            CTokenKind::VolatileKeyword => TypeQualifierKind::Volatile,
+            CTokenKind::AtomicKeyword => TypeQualifierKind::Atomic,
             _ => {
                 return Err(ParseError::new(
                     ParseErrorKind::Misc("Failed to parse type qualifier"),
@@ -558,8 +608,8 @@ impl<'a> Parser<'a> {
             }
         };
 
-        self.input.advance();
-        Ok(type_qualifier)
+        let source = self.input.advance().source;
+        Ok(TypeQualifier { kind, source })
     }
 
     fn parse_alignment_specifier(&mut self) -> Result<AlignmentSpecifier, ParseError> {
@@ -624,7 +674,7 @@ impl<'a> Parser<'a> {
 
     fn parse_direct_declarator(&mut self) -> Result<Declarator, ParseError> {
         let mut declarator = if let Some((name, source)) = self.eat_identifier_source() {
-            let attributes = self.parse_attribute_specifier_sequence()?;
+            let _attributes = self.parse_attribute_specifier_sequence()?;
             DeclaratorKind::Named(name).at(source)
         } else if self.eat_open_paren() {
             let declarator = self.parse_declarator()?;
@@ -656,7 +706,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let attributes = self.parse_attribute_specifier_sequence()?;
+        let _attributes = self.parse_attribute_specifier_sequence()?;
         Ok(declarator)
     }
 
@@ -882,7 +932,7 @@ impl<'a> Parser<'a> {
         Ok(MemberDeclaration::Member(Member {
             attributes,
             specifier_qualifiers,
-            member_declarations,
+            member_declarators: member_declarations,
         }))
     }
 

@@ -207,6 +207,8 @@ impl Display for TypeKind {
             }
             TypeKind::Void => f.write_str("void")?,
             TypeKind::ManagedStructure(name, _) => f.write_str(name)?,
+            TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
+            TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
         }
 
         Ok(())

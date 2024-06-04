@@ -11,6 +11,13 @@ impl ParseError {
     pub fn new(kind: ParseErrorKind, source: Source) -> Self {
         Self { kind, source }
     }
+
+    pub fn message(message: &'static str, source: Source) -> Self {
+        Self {
+            kind: ParseErrorKind::Misc(message),
+            source,
+        }
+    }
 }
 
 impl Show for ParseError {
@@ -34,8 +41,6 @@ impl Show for ParseError {
 pub enum ParseErrorKind {
     ExpectedDeclaration,
     CannotReturnFunctionPointerType,
-    AutoNotSupportedForReturnType,
-    ConstexprNotSupportedForReturnType,
     InvalidType,
     ExpectedTypeNameOrMemberDeclarationList,
     ExpectedSemicolon,
@@ -55,12 +60,6 @@ impl Display for ParseErrorKind {
             ParseErrorKind::ExpectedDeclaration => f.write_str("Expected declaration"),
             ParseErrorKind::CannotReturnFunctionPointerType => {
                 f.write_str("Cannot return function pointer type")
-            }
-            ParseErrorKind::AutoNotSupportedForReturnType => {
-                f.write_str("'auto' not supported for return type")
-            }
-            ParseErrorKind::ConstexprNotSupportedForReturnType => {
-                f.write_str("'constexpr' not supported for return type")
             }
             ParseErrorKind::InvalidType => f.write_str("Invalid type"),
             ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList => {

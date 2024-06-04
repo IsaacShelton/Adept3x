@@ -241,6 +241,14 @@ pub enum TypeKind {
     PlainOldData(Box<Type>),
     Void,
     Named(String),
+    AnonymousStruct(AnonymousStruct),
+    AnonymousUnion(),
+}
+
+#[derive(Clone, Debug)]
+pub struct AnonymousStruct {
+    pub fields: IndexMap<String, Field>,
+    pub packed: bool,
 }
 
 impl Display for Type {
@@ -287,6 +295,8 @@ impl Display for &TypeKind {
                 FloatSize::Bits32 => "f32",
                 FloatSize::Bits64 => "f64",
             })?,
+            TypeKind::AnonymousStruct(..) => f.write_str("(anonymous struct)")?,
+            TypeKind::AnonymousUnion(..) => f.write_str("(anonymous union)")?,
         }
 
         Ok(())
