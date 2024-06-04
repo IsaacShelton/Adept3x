@@ -11,6 +11,7 @@ use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
 };
+use crate::ast::{Type, TypeKind};
 use crate::{
     ast::{Ast, FileIdentifier, Source},
     c::parser::translation::declare_function,
@@ -28,7 +29,9 @@ pub struct Parser<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct CTypedef {}
+pub struct CTypedef {
+    ast_type: Type,
+}
 
 #[derive(Clone, Debug)]
 pub struct TypedefName {
@@ -77,6 +80,7 @@ pub struct ParameterDeclaration {
     pub attributes: Vec<()>,
     pub declaration_specifiers: DeclarationSpecifiers,
     pub core: ParameterDeclarationCore,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -305,9 +309,22 @@ pub struct EnumerationReference {
 
 impl<'a> Parser<'a> {
     pub fn new(input: Input<'a>) -> Self {
+        let mut typedefs = HashMap::default();
+
+        eprintln!("warning: automatically inserting va_list definition");
+        typedefs.insert(
+            "va_list".into(),
+            CTypedef {
+                ast_type: Type::new(
+                    TypeKind::Pointer(Box::new(Type::new(TypeKind::Void, Source::internal()))),
+                    Source::internal(),
+                ),
+            },
+        );
+
         Self {
             input,
-            typedefs: HashMap::default(),
+            typedefs,
             enum_constants: HashMap::default(),
         }
     }
@@ -340,6 +357,7 @@ impl<'a> Parser<'a> {
                             match &init_declarator.declarator.kind {
                                 DeclaratorKind::Named(name) => declare_named(
                                     ast_file,
+                                    &init_declarator.declarator,
                                     &declaration.attribute_specifiers[..],
                                     &declaration.declaration_specifiers,
                                     name,
@@ -348,6 +366,7 @@ impl<'a> Parser<'a> {
                                 DeclaratorKind::Pointers(_, _) => todo!(),
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
+                                        &self.typedefs,
                                         ast_file,
                                         &declaration.attribute_specifiers[..],
                                         &declaration.declaration_specifiers,
@@ -735,6 +754,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_parameter_declaration(&mut self) -> Result<ParameterDeclaration, ParseError> {
+        let source = self.input.peek().source;
         let attributes = self.parse_attribute_specifier_sequence()?;
         let declaration_specifiers = self.parse_declaration_specifiers()?;
 
@@ -743,6 +763,7 @@ impl<'a> Parser<'a> {
                 attributes,
                 declaration_specifiers,
                 core: ParameterDeclarationCore::Declarator(declarator),
+                source,
             });
         }
 
@@ -751,6 +772,7 @@ impl<'a> Parser<'a> {
                 attributes,
                 declaration_specifiers,
                 core: ParameterDeclarationCore::AbstractDeclarator(abstract_declarator),
+                source,
             });
         }
 
@@ -955,7 +977,7 @@ impl<'a> Parser<'a> {
         if !self.eat(CTokenKind::EnumKeyword) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Failed to parse enum specifier"),
-                self.input.peek().source,
+                source,
             ));
         }
 
@@ -1001,10 +1023,8 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        let specifier_qualifier_list = self.parse_specifier_qualifier_list()?;
-
         Ok(Some(EnumTypeSpecifier {
-            specifier_qualifier_list,
+            specifier_qualifier_list: self.parse_specifier_qualifier_list()?,
         }))
     }
 

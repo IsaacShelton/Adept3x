@@ -133,6 +133,8 @@ pub enum TypeKind {
     PlainOldData(String, StructureRef),
     Void,
     ManagedStructure(String, StructureRef),
+    AnonymousStruct(),
+    AnonymousUnion(),
 }
 
 impl TypeKind {
@@ -155,6 +157,8 @@ impl TypeKind {
             TypeKind::PlainOldData(_, _) => None,
             TypeKind::Void => None,
             TypeKind::ManagedStructure(_, _) => None,
+            TypeKind::AnonymousStruct(..) => None,
+            TypeKind::AnonymousUnion(..) => None,
         }
     }
 
