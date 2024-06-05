@@ -1,5 +1,6 @@
 use crate::{
     line_column::Location,
+    resolved::IntegerLiteralBits,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
 use indexmap::IndexMap;
@@ -167,6 +168,17 @@ pub enum IntegerBits {
     Bits32,
     Bits64,
     Normal,
+}
+
+impl From<IntegerLiteralBits> for IntegerBits {
+    fn from(value: IntegerLiteralBits) -> Self {
+        match value {
+            IntegerLiteralBits::Bits8 => Self::Bits8,
+            IntegerLiteralBits::Bits16 => Self::Bits16,
+            IntegerLiteralBits::Bits32 => Self::Bits32,
+            IntegerLiteralBits::Bits64 => Self::Bits64,
+        }
+    }
 }
 
 impl IntegerBits {
@@ -363,7 +375,7 @@ impl Expr {
 pub enum ExprKind {
     Variable(String),
     Boolean(bool),
-    Integer(BigInt),
+    Integer(Integer),
     Float(f64),
     String(String),
     NullTerminatedString(CString),
@@ -377,6 +389,27 @@ pub enum ExprKind {
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
+}
+
+impl ExprKind {
+    pub fn at(self, source: Source) -> Expr {
+        Expr::new(self, source)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Integer {
+    Known(IntegerLiteralBits, IntegerSign, BigInt),
+    Generic(BigInt),
+}
+
+impl Integer {
+    pub fn value(&self) -> &BigInt {
+        match self {
+            Integer::Known(_, _, value) => value,
+            Integer::Generic(value) => value,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

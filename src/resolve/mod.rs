@@ -624,7 +624,7 @@ fn resolve_type(
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
         ast::TypeKind::FixedArray(fixed_array) => {
             if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
-                if let Ok(size) = integer.try_into() {
+                if let Ok(size) = integer.value().try_into() {
                     let inner = resolve_type(
                         type_search_context,
                         source_file_cache,

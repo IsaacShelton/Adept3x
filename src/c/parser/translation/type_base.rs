@@ -13,6 +13,8 @@ use crate::{
 use indexmap::IndexMap;
 use std::collections::HashMap;
 
+use super::expr::translate_expr;
+
 #[derive(Debug)]
 pub struct TypeBase {
     pub ast_type: Type,
@@ -365,7 +367,7 @@ fn decorate_array(
             Ok(Type::new(
                 TypeKind::FixedArray(Box::new(FixedArray {
                     ast_type,
-                    count: todo!("c expression to expression"),
+                    count: translate_expr(count)?,
                 })),
                 source,
             ))

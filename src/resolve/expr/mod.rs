@@ -110,10 +110,29 @@ pub fn resolve_expr(
 
     let resolved_expr = match &ast_expr.kind {
         ast::ExprKind::Variable(name) => resolve_variable_expr(ctx, name, source),
-        ast::ExprKind::Integer(value) => Ok(TypedExpr::new(
-            resolved::TypeKind::IntegerLiteral(value.clone()).at(source),
-            resolved::Expr::new(resolved::ExprKind::IntegerLiteral(value.clone()), source),
-        )),
+        ast::ExprKind::Integer(value) => {
+            let (resolved_type, expr) = match value {
+                ast::Integer::Known(bits, sign, value) => (
+                    resolved::TypeKind::Integer {
+                        bits: IntegerBits::from(*bits),
+                        sign: *sign,
+                    }
+                    .at(source),
+                    resolved::ExprKind::Integer {
+                        value: value.clone(),
+                        bits: *bits,
+                        sign: *sign,
+                    }
+                    .at(source),
+                ),
+                ast::Integer::Generic(value) => (
+                    resolved::TypeKind::IntegerLiteral(value.clone()).at(source),
+                    resolved::Expr::new(resolved::ExprKind::IntegerLiteral(value.clone()), source),
+                ),
+            };
+
+            Ok(TypedExpr::new(resolved_type, expr))
+        }
         ast::ExprKind::Float(value) => Ok(TypedExpr::new(
             resolved::TypeKind::FloatLiteral(*value).at(source),
             resolved::Expr::new(resolved::ExprKind::Float(FloatSize::Normal, *value), source),

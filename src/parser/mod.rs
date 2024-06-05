@@ -12,7 +12,7 @@ use crate::{
     ast::{
         self, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
         BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind,
-        Field, File, FileIdentifier, FixedArray, Function, Global, Parameter, Parameters,
+        Field, File, FileIdentifier, FixedArray, Function, Global, Integer, Parameter, Parameters,
         ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
         Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
     },
@@ -575,7 +575,7 @@ where
                 Ok(Expr::new(ExprKind::Boolean(false), self.source(location)))
             }
             TokenKind::Integer(..) => Ok(Expr::new(
-                ExprKind::Integer(self.input.advance().kind.unwrap_integer()),
+                ExprKind::Integer(Integer::Generic(self.input.advance().kind.unwrap_integer())),
                 self.source(location),
             )),
             TokenKind::Float(..) => Ok(Expr::new(

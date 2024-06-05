@@ -304,7 +304,7 @@ impl TypedExpr {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IntegerLiteralBits {
     Bits8,
     Bits16,
@@ -366,6 +366,12 @@ pub enum ExprKind {
     Conditional(Conditional),
     While(While),
     ArrayAccess(Box<ArrayAccess>),
+}
+
+impl ExprKind {
+    pub fn at(self, source: Source) -> Expr {
+        Expr::new(self, source)
+    }
 }
 
 #[derive(Clone, Debug)]
