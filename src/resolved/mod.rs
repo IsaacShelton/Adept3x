@@ -135,6 +135,13 @@ pub enum TypeKind {
     ManagedStructure(String, StructureRef),
     AnonymousStruct(),
     AnonymousUnion(),
+    FixedArray(Box<FixedArray>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FixedArray {
+    pub size: u64,
+    pub inner: Type,
 }
 
 impl TypeKind {
@@ -159,6 +166,7 @@ impl TypeKind {
             TypeKind::ManagedStructure(_, _) => None,
             TypeKind::AnonymousStruct(..) => None,
             TypeKind::AnonymousUnion(..) => None,
+            TypeKind::FixedArray(..) => None,
         }
     }
 
@@ -209,6 +217,9 @@ impl Display for TypeKind {
             TypeKind::ManagedStructure(name, _) => f.write_str(name)?,
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
+            TypeKind::FixedArray(fixed_array) => {
+                write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?
+            }
         }
 
         Ok(())

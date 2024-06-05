@@ -118,6 +118,7 @@ pub enum ResolveErrorKind {
         expected: String,
         got: String,
     },
+    ArraySizeTooLarge,
     Other {
         message: String,
     },
@@ -317,6 +318,9 @@ impl Display for ResolveErrorKind {
                     "Expected '{}' value for {} of '{}', got '{}' value",
                     expected, side, operator, got
                 )?;
+            }
+            ResolveErrorKind::ArraySizeTooLarge => {
+                write!(f, "Array size is too large")?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

@@ -18,7 +18,10 @@ use self::{
     value_catalog::ValueCatalog,
 };
 use crate::{
-    ir::{self, Instruction}, resolved::FloatOrInteger, show::Show, source_file_cache::SourceFileCache
+    ir::{self, Instruction},
+    resolved::FloatOrInteger,
+    show::Show,
+    source_file_cache::SourceFileCache,
 };
 use colored::Colorize;
 use cstr::cstr;
@@ -26,19 +29,20 @@ use ir::{FloatOrSign, IntegerSign};
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMAddIncoming, LLVMAppendBasicBlock, LLVMBuildAShr,
-        LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildArrayMalloc, LLVMBuildBr,
-        LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFAdd, LLVMBuildFCmp,
-        LLVMBuildFDiv, LLVMBuildFMul, LLVMBuildFNeg, LLVMBuildFRem, LLVMBuildFSub, LLVMBuildFree,
-        LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull, LLVMBuildIsNull,
-        LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMalloc, LLVMBuildMul, LLVMBuildNeg, LLVMBuildNot,
-        LLVMBuildOr, LLVMBuildPhi, LLVMBuildRet, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl,
-        LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable,
-        LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage, LLVMDoubleType,
-        LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type, LLVMInt1Type,
-        LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd,
-        LLVMPrintModuleToString, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
-        LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
+        LLVMAddFunction, LLVMAddGlobal, LLVMAddIncoming, LLVMAppendBasicBlock, LLVMArrayType2,
+        LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildArrayMalloc,
+        LLVMBuildBr, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildExtractValue, LLVMBuildFAdd,
+        LLVMBuildFCmp, LLVMBuildFDiv, LLVMBuildFMul, LLVMBuildFNeg, LLVMBuildFRem, LLVMBuildFSub,
+        LLVMBuildFree, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildInsertValue, LLVMBuildIsNotNull,
+        LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMalloc, LLVMBuildMul,
+        LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildPhi, LLVMBuildRet, LLVMBuildSDiv,
+        LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
+        LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage,
+        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type,
+        LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
+        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
+        LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
+        LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -1036,6 +1040,10 @@ unsafe fn to_backend_type(ctx: &BackendContext, ir_type: &ir::Type) -> LLVMTypeR
                 ),
                 0,
             )
+        }
+        ir::Type::FixedArray(fixed_array) => {
+            let element_type = to_backend_type(ctx, &fixed_array.inner);
+            LLVMArrayType2(element_type, fixed_array.size)
         }
     }
 }

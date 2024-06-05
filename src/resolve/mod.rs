@@ -622,7 +622,25 @@ fn resolve_type(
         ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Float(*size)),
         ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
-        ast::TypeKind::FixedArray(..) => todo!("resolved fixed array type"),
+        ast::TypeKind::FixedArray(fixed_array) => {
+            if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
+                if let Ok(size) = integer.try_into() {
+                    let inner = resolve_type(
+                        type_search_context,
+                        source_file_cache,
+                        &fixed_array.ast_type,
+                    )?;
+
+                    Ok(resolved::TypeKind::FixedArray(Box::new(
+                        resolved::FixedArray { size, inner },
+                    )))
+                } else {
+                    Err(ResolveErrorKind::ArraySizeTooLarge.at(fixed_array.count.source))
+                }
+            } else {
+                todo!("resolve fixed array type with variable size")
+            }
+        }
     }
     .map(|kind| kind.at(ast_type.source))
 }

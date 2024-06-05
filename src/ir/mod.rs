@@ -194,6 +194,13 @@ pub enum Type {
     AnonymousComposite(TypeComposite),
     Function(TypeFunction),
     UntypedEnum(TypeUntypedEnum),
+    FixedArray(Box<FixedArray>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FixedArray {
+    pub size: u64,
+    pub inner: Type,
 }
 
 impl Type {

@@ -314,10 +314,19 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
             Ok(ir::Type::Structure(*structure_ref))
         }
         resolved::TypeKind::AnonymousStruct() => {
-            todo!()
+            todo!("lower anonymous struct")
         }
         resolved::TypeKind::AnonymousUnion() => {
-            todo!()
+            todo!("lower anonymous union")
+        }
+        resolved::TypeKind::FixedArray(fixed_array) => {
+            let size = fixed_array.size;
+            let inner = lower_type(&fixed_array.inner)?;
+
+            Ok(ir::Type::FixedArray(Box::new(ir::FixedArray {
+                size,
+                inner,
+            })))
         }
     }
 }
