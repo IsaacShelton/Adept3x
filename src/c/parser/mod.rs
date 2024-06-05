@@ -56,7 +56,7 @@ pub struct Declarator {
 #[derive(Clone, Debug)]
 pub enum DeclaratorKind {
     Named(String),
-    Pointers(Box<Declarator>, Pointers),
+    Pointer(Box<Declarator>, Pointer),
     Function(Box<Declarator>, ParameterTypeList),
     Array(Box<Declarator>, ArrayQualifier),
 }
@@ -86,20 +86,36 @@ pub struct ParameterDeclaration {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct Pointers {
-    pub pointers: Vec<Pointer>,
+pub struct Decorators {
+    decorators: Vec<Decorator>,
 }
 
-impl Pointers {
-    pub fn concat(&self, other: &Pointers) -> Self {
-        let pointers = self
-            .pointers
-            .iter()
-            .chain(other.pointers.iter())
-            .cloned()
-            .collect_vec();
+#[derive(Clone, Debug)]
+pub enum Decorator {
+    Pointer(Pointer),
+    Array(ArrayQualifier),
+}
 
-        Self { pointers }
+impl Decorator {
+    pub fn source(&self) -> Source {
+        match self {
+            Decorator::Pointer(pointer) => pointer.source,
+            Decorator::Array(array) => array.source,
+        }
+    }
+}
+
+impl Decorators {
+    pub fn then_pointer(&mut self, pointer: Pointer) {
+        self.decorators.push(Decorator::Pointer(pointer))
+    }
+
+    pub fn then_array(&mut self, array: ArrayQualifier) {
+        self.decorators.push(Decorator::Array(array))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Decorator> {
+        self.decorators.iter().rev()
     }
 }
 
@@ -413,7 +429,7 @@ impl<'a> Parser<'a> {
                                     name,
                                     &mut self.typedefs,
                                 )?,
-                                DeclaratorKind::Pointers(_, _) => todo!(),
+                                DeclaratorKind::Pointer(..) => todo!(),
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
                                         &self.typedefs,
@@ -632,24 +648,24 @@ impl<'a> Parser<'a> {
 
     fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
         let source = self.input.peek().source;
-        let pointers = self.parse_pointers()?;
-        let declarator = self.parse_direct_declarator()?;
+        let mut pointers = self.parse_pointers()?;
+        let mut declarator = self.parse_direct_declarator()?;
 
-        if pointers.pointers.is_empty() {
-            Ok(declarator)
-        } else {
-            Ok(DeclaratorKind::Pointers(Box::new(declarator), pointers).at(source))
+        for pointer in pointers.drain(..) {
+            declarator = DeclaratorKind::Pointer(Box::new(declarator), pointer).at(source);
         }
+
+        Ok(declarator)
     }
 
-    fn parse_pointers(&mut self) -> Result<Pointers, ParseError> {
-        let mut pointers = Pointers { pointers: vec![] };
+    fn parse_pointers(&mut self) -> Result<Vec<Pointer>, ParseError> {
+        let mut pointers = vec![];
 
         while let Some(source) = self.eat_punctuator_source(Punctuator::Multiply) {
             let attributes = self.parse_attribute_specifier_sequence()?;
 
             let type_qualifiers = self.parse_type_qualifier_list()?;
-            pointers.pointers.push(Pointer {
+            pointers.push(Pointer {
                 attributes,
                 type_qualifiers,
                 source,

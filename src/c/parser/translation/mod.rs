@@ -21,7 +21,7 @@ pub fn declare_named(
     println!("{} {:#?}", name, declaration_specifiers);
 
     let (name, ast_type, is_typedef) =
-        get_name_and_type(typedefs, declarator, declaration_specifiers)?;
+        get_name_and_type(typedefs, declarator, declaration_specifiers, false)?;
 
     if is_typedef {
         typedefs.insert(name.to_string(), CTypedef { ast_type });
@@ -41,13 +41,13 @@ pub fn declare_function(
 ) -> Result<(), ParseError> {
     let source = declarator.source;
     let (name, return_type, is_typedef) =
-        get_name_and_type(typedefs, declarator, declaration_specifiers)?;
+        get_name_and_type(typedefs, declarator, declaration_specifiers, false)?;
     let mut required = vec![];
 
     for param in parameter_type_list.parameter_declarations.iter() {
         let (name, ast_type, is_typedef) = match &param.core {
             ParameterDeclarationCore::Declarator(declarator) => {
-                get_name_and_type(typedefs, declarator, &param.declaration_specifiers)?
+                get_name_and_type(typedefs, declarator, &param.declaration_specifiers, true)?
             }
             ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
             ParameterDeclarationCore::Nothing => todo!(),

@@ -238,6 +238,7 @@ pub enum TypeKind {
     },
     Float(FloatSize),
     Pointer(Box<Type>),
+    FixedArray(Box<FixedArray>),
     PlainOldData(Box<Type>),
     Void,
     Named(String),
@@ -249,6 +250,12 @@ pub enum TypeKind {
 pub struct AnonymousStruct {
     pub fields: IndexMap<String, Field>,
     pub packed: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct FixedArray {
+    pub ast_type: Type,
+    pub count: Expr,
 }
 
 impl Display for Type {
@@ -297,6 +304,9 @@ impl Display for &TypeKind {
             })?,
             TypeKind::AnonymousStruct(..) => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion(..) => f.write_str("(anonymous union)")?,
+            TypeKind::FixedArray(fixed_array) => {
+                write!(f, "array<(amount), {}>", fixed_array.ast_type.to_string())?;
+            }
         }
 
         Ok(())

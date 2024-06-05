@@ -1,13 +1,13 @@
 use crate::{
     ast::{
-        AnonymousStruct, Field, FloatSize, IntegerBits, IntegerSign, Privacy, Source, Type,
-        TypeKind,
+        AnonymousStruct, Field, FixedArray, FloatSize, IntegerBits, IntegerSign, Privacy, Source,
+        Type, TypeKind,
     },
     c::parser::{
-        error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, Composite, CompositeKind,
-        DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind,
-        MemberDeclaration, MemberDeclarator, ParseError, Pointers, TypeQualifierKind,
-        TypeSpecifierKind, TypeSpecifierQualifier,
+        error::ParseErrorKind, AlignmentSpecifierKind, ArrayQualifier, CTypedef, Composite,
+        CompositeKind, DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind,
+        Decorator, Decorators, MemberDeclaration, MemberDeclarator, ParseError, Pointer,
+        TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
     },
 };
 use indexmap::IndexMap;
@@ -271,6 +271,7 @@ pub fn make_anonymous_composite(
                                         typedefs,
                                         declarator,
                                         &DeclarationSpecifiers::from(&member.specifier_qualifiers),
+                                        false,
                                     )?;
 
                                     fields.insert(
@@ -310,40 +311,86 @@ pub fn get_name_and_type(
     typedefs: &HashMap<String, CTypedef>,
     declarator: &Declarator,
     declaration_specifiers: &DeclarationSpecifiers,
+    for_parameter: bool,
 ) -> Result<(String, Type, bool), ParseError> {
-    let (name, pointers) = get_name_and_decorators(declarator)?;
+    let (name, decorators) = get_name_and_decorators(declarator)?;
     let type_base = get_type_base(typedefs, declaration_specifiers, declarator.source)?;
 
     let mut ast_type = type_base.ast_type;
 
-    for pointer in pointers.pointers.iter() {
-        ast_type = Type::new(TypeKind::Pointer(Box::new(ast_type)), pointer.source);
-
-        if !pointer.type_qualifiers.is_empty() {
-            eprintln!("warning: ignoring pointer type qualifiers");
+    for decorator in decorators.iter() {
+        match decorator {
+            Decorator::Pointer(pointer) => {
+                ast_type = decorate_pointer(ast_type, pointer, decorator.source())?;
+            }
+            Decorator::Array(array) => {
+                ast_type = decorate_array(ast_type, array, for_parameter, decorator.source())?;
+            }
         }
     }
 
     Ok((name, ast_type, type_base.is_typedef))
 }
 
-fn get_name_and_decorators(declarator: &Declarator) -> Result<(String, Pointers), ParseError> {
+fn decorate_pointer(ast_type: Type, pointer: &Pointer, source: Source) -> Result<Type, ParseError> {
+    if !pointer.type_qualifiers.is_empty() {
+        eprintln!("warning: ignoring pointer type qualifiers");
+    }
+
+    Ok(Type::new(TypeKind::Pointer(Box::new(ast_type)), source))
+}
+
+fn decorate_array(
+    ast_type: Type,
+    array: &ArrayQualifier,
+    for_parameter: bool,
+    source: Source,
+) -> Result<Type, ParseError> {
+    if !array.type_qualifiers.is_empty() {
+        todo!("array type qualifiers not supported yet");
+    }
+
+    if array.is_static {
+        todo!("array static");
+    }
+
+    if array.is_param_vla {
+        todo!("array get_name_and_type VLA");
+    }
+
+    if for_parameter {
+        todo!("array get_name_and_type for parameter");
+    } else {
+        if let Some(count) = &array.expression {
+            Ok(Type::new(
+                TypeKind::FixedArray(Box::new(FixedArray {
+                    ast_type,
+                    count: todo!("c expression to expression"),
+                })),
+                source,
+            ))
+        } else {
+            todo!("array get_name_and_type array non-parameter vla?");
+        }
+    }
+}
+
+fn get_name_and_decorators(declarator: &Declarator) -> Result<(String, Decorators), ParseError> {
     match &declarator.kind {
-        DeclaratorKind::Named(name) => Ok((name.to_string(), Pointers::default())),
-        DeclaratorKind::Pointers(inner, pointers) => {
-            let (name, more_pointers) = get_name_and_decorators(inner)?;
-            Ok((name, pointers.concat(&more_pointers)))
+        DeclaratorKind::Named(name) => Ok((name.to_string(), Decorators::default())),
+        DeclaratorKind::Pointer(inner, pointer) => {
+            let (name, mut decorators) = get_name_and_decorators(inner)?;
+            decorators.then_pointer(pointer.clone());
+            Ok((name, decorators))
         }
         DeclaratorKind::Function(..) => Err(ParseError::new(
             ParseErrorKind::CannotReturnFunctionPointerType,
             declarator.source,
         )),
-        DeclaratorKind::Array(..) => {
-            eprintln!(
-                "warning: array decorators not implemented yet - {:?}",
-                declarator.source
-            );
-            todo!()
+        DeclaratorKind::Array(inner, array_qualifier) => {
+            let (name, mut decorators) = get_name_and_decorators(inner)?;
+            decorators.then_array(array_qualifier.clone());
+            Ok((name, decorators))
         }
     }
 }
