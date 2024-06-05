@@ -37,6 +37,7 @@ pub enum ParseErrorKind {
         field_name: String,
     },
     ExpectedCommaInTypeParameters,
+    ExpectedTypeParameters,
     Other {
         message: String,
     },
@@ -118,6 +119,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::ExpectedCommaInTypeParameters => {
                 write!(f, "Expected ',' during type parameters")?;
+            }
+            ParseErrorKind::ExpectedTypeParameters => {
+                write!(f, "Expected type parameters")?;
             }
             ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

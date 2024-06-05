@@ -984,32 +984,29 @@ where
                         }
                     }
                     "array" => {
-                        if self.input.eat(TokenKind::OpenAngle) {
-                            let count = self.parse_expr()?;
-
-                            if !self.input.eat(TokenKind::Comma) {
-                                return Err(ParseError {
-                                    kind: ParseErrorKind::ExpectedCommaInTypeParameters,
-                                    source: self.source_here(),
-                                });
-                            }
-
-                            let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                            self.parse_token(
-                                TokenKind::GreaterThan,
-                                Some("to close type parameters"),
-                            )?;
-
-                            Ok(TypeKind::FixedArray(Box::new(FixedArray {
-                                ast_type: inner,
-                                count,
-                            })))
-                        } else {
-                            Ok(TypeKind::Pointer(Box::new(Type::new(
-                                TypeKind::Void,
+                        if !self.input.eat(TokenKind::OpenAngle) {
+                            return Err(ParseError {
+                                kind: ParseErrorKind::ExpectedTypeParameters,
                                 source,
-                            ))))
+                            });
                         }
+
+                        let count = self.parse_expr()?;
+
+                        if !self.input.eat(TokenKind::Comma) {
+                            return Err(ParseError {
+                                kind: ParseErrorKind::ExpectedCommaInTypeParameters,
+                                source: self.source_here(),
+                            });
+                        }
+
+                        let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
+
+                        Ok(TypeKind::FixedArray(Box::new(FixedArray {
+                            ast_type: inner,
+                            count,
+                        })))
                     }
                     "pod" => {
                         self.parse_token(
