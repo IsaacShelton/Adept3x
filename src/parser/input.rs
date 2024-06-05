@@ -53,6 +53,15 @@ where
         self.iterator.next().unwrap()
     }
 
+    pub fn eat(&mut self, token: impl Borrow<TokenKind>) -> bool {
+        if self.peek_is(token) {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn filename(&self) -> &str {
         self.source_file_cache.get(self.key).filename()
     }

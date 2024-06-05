@@ -12,7 +12,7 @@ use crate::{
     ast::{
         self, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
         BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind,
-        Field, File, FileIdentifier, Function, Global, Parameter, Parameters,
+        Field, File, FileIdentifier, FixedArray, Function, Global, Parameter, Parameters,
         ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
         Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
     },
@@ -969,14 +969,41 @@ where
                     "f64" => Ok(TypeKind::Float(FloatSize::Bits64)),
                     "void" => Ok(TypeKind::Void),
                     "ptr" => {
-                        if self.input.peek_is(TokenKind::OpenAngle) {
-                            self.input.advance();
+                        if self.input.eat(TokenKind::OpenAngle) {
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
                             self.parse_token(
                                 TokenKind::GreaterThan,
                                 Some("to close type parameters"),
                             )?;
                             Ok(TypeKind::Pointer(Box::new(inner)))
+                        } else {
+                            Ok(TypeKind::Pointer(Box::new(Type::new(
+                                TypeKind::Void,
+                                source,
+                            ))))
+                        }
+                    }
+                    "array" => {
+                        if self.input.eat(TokenKind::OpenAngle) {
+                            let count = self.parse_expr()?;
+
+                            if !self.input.eat(TokenKind::Comma) {
+                                return Err(ParseError {
+                                    kind: ParseErrorKind::ExpectedCommaInTypeParameters,
+                                    source: self.source_here(),
+                                });
+                            }
+
+                            let inner = self.parse_type(None::<&str>, None::<&str>)?;
+                            self.parse_token(
+                                TokenKind::GreaterThan,
+                                Some("to close type parameters"),
+                            )?;
+
+                            Ok(TypeKind::FixedArray(Box::new(FixedArray {
+                                ast_type: inner,
+                                count,
+                            })))
                         } else {
                             Ok(TypeKind::Pointer(Box::new(Type::new(
                                 TypeKind::Void,
@@ -1011,6 +1038,10 @@ where
 
     fn source(&self, location: Location) -> Source {
         Source::new(self.input.key(), location)
+    }
+
+    fn source_here(&mut self) -> Source {
+        Source::new(self.input.key(), self.input.peek().location)
     }
 }
 
