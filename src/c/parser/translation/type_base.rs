@@ -1,16 +1,19 @@
 use crate::{
     ast::{
-        AnonymousStruct, Field, FixedArray, FloatSize, IntegerBits, IntegerSign, Privacy, Source,
-        Type, TypeKind,
+        AnonymousEnum, AnonymousStruct, EnumMember, Field, FixedArray, FloatSize, IntegerBits,
+        IntegerSign, Privacy, Source, Type, TypeKind,
     },
     c::parser::{
-        error::ParseErrorKind, AlignmentSpecifierKind, ArrayQualifier, CTypedef, Composite,
-        CompositeKind, DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind,
-        Decorator, Decorators, MemberDeclaration, MemberDeclarator, ParseError, Pointer,
+        error::ParseErrorKind, translation::eval::evaluate_to_const_integer,
+        AlignmentSpecifierKind, ArrayQualifier, CTypedef, Composite, CompositeKind,
+        DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind, Decorator,
+        Decorators, Enumeration, MemberDeclaration, MemberDeclarator, ParseError, Pointer,
         TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
     },
 };
 use indexmap::IndexMap;
+use num_bigint::BigInt;
+use num_traits::Zero;
 use std::collections::HashMap;
 
 use super::expr::translate_expr;
@@ -213,7 +216,9 @@ pub fn get_type_base(
                     }
                     TypeSpecifierKind::Composite(composite) => builder
                         .concrete(make_anonymous_composite(typedefs, composite)?, ts.source)?,
-                    TypeSpecifierKind::Enumeration(_) => todo!("enumeration tsq"),
+                    TypeSpecifierKind::Enumeration(enumeration) => {
+                        builder.concrete(make_anonymous_enum(enumeration)?, ts.source)?
+                    }
                     TypeSpecifierKind::TypedefName(typedef_name) => {
                         let ast_type = typedefs
                             .get(&typedef_name.name)
@@ -241,6 +246,59 @@ pub fn get_type_base(
     builder.build()
 }
 
+pub fn make_anonymous_enum(enumeration: &Enumeration) -> Result<TypeKind, ParseError> {
+    match enumeration {
+        Enumeration::Definition(definition) => {
+            if !definition.attributes.is_empty() {
+                todo!("enum attributes not supported yet")
+            }
+
+            let mut members = IndexMap::with_capacity(definition.body.len());
+            let mut next_value = BigInt::zero();
+
+            for enumerator in definition.body.iter() {
+                if !enumerator.attributes.is_empty() {
+                    todo!("attributes not supported on enum members yet");
+                }
+
+                let value = if let Some(value) = &enumerator.value {
+                    evaluate_to_const_integer(&value.value)?
+                } else {
+                    let value = next_value.clone();
+                    next_value += 1;
+                    value
+                };
+
+                let enum_member = EnumMember {
+                    value,
+                    explicit_value: enumerator.value.is_some(),
+                };
+
+                if members
+                    .insert(enumerator.name.clone(), enum_member)
+                    .is_some()
+                {
+                    return Err(ParseErrorKind::DuplicateEnumMember(enumerator.name.clone())
+                        .at(enumerator.source));
+                }
+            }
+
+            if definition.enum_type_specifier.is_some() {
+                todo!("anonymous enum type specifiers not supported yet");
+            }
+
+            Ok(TypeKind::AnonymousEnum(AnonymousEnum { members }))
+        }
+        Enumeration::Reference(reference) => {
+            if reference.enum_type_specifier.is_some() {
+                todo!("support enum type specifiers")
+            }
+
+            Ok(TypeKind::EnumNamed(reference.name.clone()))
+        }
+    }
+}
+
 pub fn make_anonymous_composite(
     typedefs: &HashMap<String, CTypedef>,
     composite: &Composite,
@@ -251,9 +309,18 @@ pub fn make_anonymous_composite(
         );
     }
 
-    let members = composite.members.as_ref().ok_or_else(|| {
-        ParseError::message("unfinished composites not supported yet", composite.source)
-    })?;
+    let members = if let Some(members) = composite.members.as_ref() {
+        members
+    } else {
+        let name = composite.name.as_ref().ok_or_else(|| {
+            ParseErrorKind::Misc("incomplete struct must have name").at(composite.source)
+        })?;
+
+        return Ok(match &composite.kind {
+            CompositeKind::Struct => TypeKind::StructNamed(name.clone()),
+            CompositeKind::Union => TypeKind::UnionNamed(name.clone()),
+        });
+    };
 
     match &composite.kind {
         CompositeKind::Struct => {

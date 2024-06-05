@@ -38,6 +38,7 @@ pub enum ParseErrorKind {
     },
     ExpectedCommaInTypeParameters,
     ExpectedTypeParameters,
+    ExpectedTypeName,
     Other {
         message: String,
     },
@@ -122,6 +123,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::ExpectedTypeParameters => {
                 write!(f, "Expected type parameters")?;
+            }
+            ParseErrorKind::ExpectedTypeName => {
+                write!(f, "Expected type name")?;
             }
             ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

@@ -1,0 +1,51 @@
+use crate::c::{
+    encoding::Encoding,
+    parser::{
+        error::ParseErrorKind,
+        expr::{Expr, ExprKind},
+        ParseError,
+    },
+};
+use num_bigint::BigInt;
+use num_traits::Zero;
+
+pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
+    match &expr.kind {
+        ExprKind::Integer(integer) => {
+            return Ok(integer.into());
+        }
+        ExprKind::Boolean(x) => return Ok(BigInt::from(*x as i64)),
+        ExprKind::Nullptr => return Ok(BigInt::zero()),
+        ExprKind::Character(encoding, s) => match encoding {
+            Encoding::Default => return Ok(BigInt::from(s.as_bytes()[0])),
+            Encoding::Utf8 => (),
+            Encoding::Utf16 => (),
+            Encoding::Utf32 => (),
+            Encoding::Wide => (),
+        },
+        ExprKind::BinaryOperation(_) => {
+            todo!("binary operations not supported in constant integer expressions yet")
+        }
+        ExprKind::Ternary(_) => {
+            todo!("ternary expressions not supported in constant integer expressions yet")
+        }
+        ExprKind::Cast(_) => todo!("type casts not supported in constant integer expressions yet"),
+        ExprKind::Subscript(_) => {
+            todo!("subscripts not supported in constant integer expressions yet")
+        }
+        ExprKind::Field(_) => {
+            todo!("field accesses not supported in constant integer expressions yet")
+        }
+        ExprKind::Identifier(_) => {
+            todo!("variables not supported in constant integer expressions yet")
+        }
+        ExprKind::EnumConstant(_, integer) => return Ok(integer.into()),
+        ExprKind::Float(_, _)
+        | ExprKind::StringLiteral(_, _)
+        | ExprKind::Compound(_)
+        | ExprKind::PostIncrement(_)
+        | ExprKind::PostDecrement(_) => (),
+    }
+
+    Err(ParseErrorKind::MustBeConstantInteger.at(expr.source))
+}

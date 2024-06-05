@@ -1,3 +1,4 @@
+mod eval;
 mod expr;
 mod type_base;
 
@@ -6,7 +7,7 @@ use super::{
     ParseError,
 };
 use crate::{
-    ast::{File, Function, Parameter, Parameters},
+    ast::{self, File, Function, Parameter, Parameters},
     c::parser::{translation::type_base::get_name_and_type, ParameterDeclarationCore},
 };
 use std::collections::HashMap;
@@ -33,7 +34,7 @@ pub fn declare_named(
 }
 
 pub fn declare_function(
-    typedefs: &HashMap<String, CTypedef>,
+    typedefs: &mut HashMap<String, CTypedef>,
     ast_file: &mut File,
     _attribute_specifiers: &[()],
     declaration_specifiers: &DeclarationSpecifiers,
@@ -62,7 +63,15 @@ pub fn declare_function(
     }
 
     if is_typedef {
-        todo!();
+        let ast_type = ast::TypeKind::FunctionPointer(ast::FunctionPointer {
+            parameters: required,
+            return_type: Box::new(return_type),
+            is_cstyle_variadic: parameter_type_list.is_variadic,
+        })
+        .at(declarator.source);
+
+        typedefs.insert(name, CTypedef { ast_type });
+        return Ok(());
     }
 
     let parameters = Parameters {

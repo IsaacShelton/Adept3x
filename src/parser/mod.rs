@@ -1008,6 +1008,15 @@ where
                             count,
                         })))
                     }
+                    "struct" => Ok(TypeKind::StructNamed(
+                        self.parse_name_type_parameters(source)?,
+                    )),
+                    "union" => Ok(TypeKind::UnionNamed(
+                        self.parse_name_type_parameters(source)?,
+                    )),
+                    "enum" => Ok(TypeKind::EnumNamed(
+                        self.parse_name_type_parameters(source)?,
+                    )),
                     "pod" => {
                         self.parse_token(
                             TokenKind::OpenAngle,
@@ -1031,6 +1040,23 @@ where
                 source: self.source(unexpected.location),
             }),
         }
+    }
+
+    fn parse_name_type_parameters(&mut self, source: Source) -> Result<String, ParseError> {
+        if !self.input.eat(TokenKind::OpenAngle) {
+            return Err(ParseError {
+                kind: ParseErrorKind::ExpectedTypeParameters,
+                source,
+            });
+        }
+
+        let name = self.input.eat_identifier().ok_or_else(|| ParseError {
+            kind: ParseErrorKind::ExpectedTypeName,
+            source: self.source_here(),
+        })?;
+
+        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
+        Ok(name)
     }
 
     fn source(&self, location: Location) -> Source {

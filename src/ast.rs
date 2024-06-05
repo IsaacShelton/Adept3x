@@ -256,6 +256,17 @@ pub enum TypeKind {
     Named(String),
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(),
+    AnonymousEnum(AnonymousEnum),
+    StructNamed(String),
+    UnionNamed(String),
+    EnumNamed(String),
+    FunctionPointer(FunctionPointer),
+}
+
+impl TypeKind {
+    pub fn at(self, source: Source) -> Type {
+        Type { kind: self, source }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -265,15 +276,32 @@ pub struct AnonymousStruct {
 }
 
 #[derive(Clone, Debug)]
+pub struct AnonymousEnum {
+    pub members: IndexMap<String, EnumMember>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumMember {
+    pub value: BigInt,
+    pub explicit_value: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct FixedArray {
     pub ast_type: Type,
     pub count: Expr,
 }
 
+#[derive(Clone, Debug)]
+pub struct FunctionPointer {
+    pub parameters: Vec<Parameter>,
+    pub return_type: Box<Type>,
+    pub is_cstyle_variadic: bool,
+}
+
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.kind)?;
-        Ok(())
+        write!(f, "{}", &self.kind)
     }
 }
 
@@ -316,8 +344,21 @@ impl Display for &TypeKind {
             })?,
             TypeKind::AnonymousStruct(..) => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion(..) => f.write_str("(anonymous union)")?,
+            TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<(amount), {}>", fixed_array.ast_type.to_string())?;
+            }
+            TypeKind::StructNamed(name) => {
+                write!(f, "struct<{}>", name)?;
+            }
+            TypeKind::UnionNamed(name) => {
+                write!(f, "union<{}>", name)?;
+            }
+            TypeKind::EnumNamed(name) => {
+                write!(f, "enum<{}>", name)?;
+            }
+            TypeKind::FunctionPointer(_function) => {
+                write!(f, "(function pointer type)")?;
             }
         }
 

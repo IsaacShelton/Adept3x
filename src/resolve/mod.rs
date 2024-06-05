@@ -622,6 +622,7 @@ fn resolve_type(
         ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Float(*size)),
         ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
+        ast::TypeKind::AnonymousEnum(..) => todo!("resolve anonymous enum type"),
         ast::TypeKind::FixedArray(fixed_array) => {
             if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
                 if let Ok(size) = integer.value().try_into() {
@@ -641,6 +642,10 @@ fn resolve_type(
                 todo!("resolve fixed array type with variable size")
             }
         }
+        ast::TypeKind::StructNamed(..) => todo!("resolve named struct type"),
+        ast::TypeKind::UnionNamed(..) => todo!("resolve named union type"),
+        ast::TypeKind::EnumNamed(..) => todo!("resolve named enum type"),
+        ast::TypeKind::FunctionPointer(..) => todo!("resolved function pointer type"),
     }
     .map(|kind| kind.at(ast_type.source))
 }

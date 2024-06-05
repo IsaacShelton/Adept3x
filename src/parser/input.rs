@@ -62,6 +62,13 @@ where
         }
     }
 
+    pub fn eat_identifier(&mut self) -> Option<String> {
+        self.peek()
+            .kind
+            .is_identifier()
+            .then(|| self.advance().kind.unwrap_identifier())
+    }
+
     pub fn filename(&self) -> &str {
         self.source_file_cache.get(self.key).filename()
     }

@@ -45,6 +45,8 @@ pub enum ParseErrorKind {
     ExpectedTypeNameOrMemberDeclarationList,
     ExpectedSemicolon,
     ExpectedMemberDeclarator,
+    DuplicateEnumMember(String),
+    MustBeConstantInteger,
     Misc(&'static str),
 }
 
@@ -67,6 +69,8 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::ExpectedSemicolon => f.write_str("Expected ';'"),
             ParseErrorKind::ExpectedMemberDeclarator => f.write_str("Expected member declarator"),
+            ParseErrorKind::DuplicateEnumMember(name) => write!(f, "Duplicate enum member '{}'", name),
+            ParseErrorKind::MustBeConstantInteger => write!(f, "Must be constant integer expression"),
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }

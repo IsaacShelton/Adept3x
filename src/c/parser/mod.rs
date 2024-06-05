@@ -334,6 +334,7 @@ pub enum CompositeKind {
 pub struct Composite {
     pub kind: CompositeKind,
     pub source: Source,
+    pub name: Option<String>,
     pub attributes: Vec<()>,
     pub members: Option<Vec<MemberDeclaration>>,
 }
@@ -355,6 +356,15 @@ pub struct Enumerator {
 pub enum Enumeration {
     Definition(EnumerationDefinition),
     Reference(EnumerationReference),
+}
+
+impl Enumeration {
+    pub fn source(&self) -> Source {
+        match self {
+            Enumeration::Definition(definition) => definition.source,
+            Enumeration::Reference(reference) => reference.source,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -429,10 +439,12 @@ impl<'a> Parser<'a> {
                                     name,
                                     &mut self.typedefs,
                                 )?,
-                                DeclaratorKind::Pointer(..) => todo!(),
+                                DeclaratorKind::Pointer(_declarator, pointer) => {
+                                    todo!("pointer declarators - {:?}", pointer.source)
+                                }
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
-                                        &self.typedefs,
+                                        &mut self.typedefs,
                                         ast_file,
                                         &declaration.attribute_specifiers[..],
                                         &declaration.declaration_specifiers,
@@ -878,7 +890,7 @@ impl<'a> Parser<'a> {
         let source = self.input.advance().source;
         let attributes = self.parse_attribute_specifier_sequence()?;
 
-        let identifier = if self.input.peek().kind.is_identifier() {
+        let name = if self.input.peek().kind.is_identifier() {
             Some(self.input.advance().kind.clone().unwrap_identifier())
         } else {
             None
@@ -890,7 +902,7 @@ impl<'a> Parser<'a> {
         )
         .ok();
 
-        if identifier.is_none() && members.is_none() {
+        if name.is_none() && members.is_none() {
             return Err(ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList
                 .at(self.input.peek().source));
         }
@@ -898,6 +910,7 @@ impl<'a> Parser<'a> {
         Ok(Composite {
             kind,
             source,
+            name,
             attributes,
             members,
         })

@@ -1,6 +1,7 @@
 use super::{encoding::Encoding, lexer::LexError, punctuator::Punctuator};
 use crate::ast::Source;
 use derive_more::{Deref, IsVariant, Unwrap};
+use num_bigint::BigInt;
 
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum CTokenKind {
@@ -125,6 +126,19 @@ pub enum Integer {
     UnsignedLong(u64),
     LongLong(i64),
     UnsignedLongLong(u64),
+}
+
+impl Into<BigInt> for &Integer {
+    fn into(self) -> BigInt {
+        return match self {
+            Integer::Int(x) => BigInt::from(*x),
+            Integer::UnsignedInt(x) => BigInt::from(*x),
+            Integer::Long(x) => BigInt::from(*x),
+            Integer::UnsignedLong(x) => BigInt::from(*x),
+            Integer::LongLong(x) => BigInt::from(*x),
+            Integer::UnsignedLongLong(x) => BigInt::from(*x),
+        };
+    }
 }
 
 impl Integer {
