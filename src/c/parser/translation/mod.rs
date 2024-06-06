@@ -17,11 +17,8 @@ pub fn declare_named(
     declarator: &Declarator,
     _attribute_specifiers: &[()],
     declaration_specifiers: &DeclarationSpecifiers,
-    name: &str,
     typedefs: &mut HashMap<String, CTypedef>,
 ) -> Result<(), ParseError> {
-    println!("{} {:#?}", name, declaration_specifiers);
-
     let (name, ast_type, is_typedef) =
         get_name_and_type(typedefs, declarator, declaration_specifiers, false)?;
 

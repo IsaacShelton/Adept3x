@@ -1,14 +1,15 @@
 use crate::{
     ast::{
-        AnonymousEnum, AnonymousStruct, EnumMember, Field, FixedArray, FloatSize, IntegerBits,
-        IntegerSign, Privacy, Source, Type, TypeKind,
+        AnonymousEnum, AnonymousStruct, EnumMember, Field, FixedArray, FloatSize, FunctionPointer,
+        IntegerBits, IntegerSign, Parameter, Privacy, Source, Type, TypeKind,
     },
     c::parser::{
         error::ParseErrorKind, translation::eval::evaluate_to_const_integer,
         AlignmentSpecifierKind, ArrayQualifier, CTypedef, Composite, CompositeKind,
         DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind, Decorator,
-        Decorators, Enumeration, MemberDeclaration, MemberDeclarator, ParseError, Pointer,
-        TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
+        Decorators, Enumeration, FunctionQualifier, MemberDeclaration, MemberDeclarator,
+        ParameterDeclarationCore, ParseError, Pointer, TypeQualifierKind, TypeSpecifierKind,
+        TypeSpecifierQualifier,
     },
 };
 use indexmap::IndexMap;
@@ -382,7 +383,7 @@ pub fn get_name_and_type(
     declaration_specifiers: &DeclarationSpecifiers,
     for_parameter: bool,
 ) -> Result<(String, Type, bool), ParseError> {
-    let (name, decorators) = get_name_and_decorators(declarator)?;
+    let (name, decorators) = get_name_and_decorators(typedefs, declarator)?;
     let type_base = get_type_base(typedefs, declaration_specifiers, declarator.source)?;
 
     let mut ast_type = type_base.ast_type;
@@ -394,6 +395,9 @@ pub fn get_name_and_type(
             }
             Decorator::Array(array) => {
                 ast_type = decorate_array(ast_type, array, for_parameter, decorator.source())?;
+            }
+            Decorator::Function(function) => {
+                ast_type = decorate_function(ast_type, function, decorator.source())?;
             }
         }
     }
@@ -444,20 +448,66 @@ fn decorate_array(
     }
 }
 
-fn get_name_and_decorators(declarator: &Declarator) -> Result<(String, Decorators), ParseError> {
+fn decorate_function(
+    ast_type: Type,
+    function: &FunctionQualifier,
+    source: Source,
+) -> Result<Type, ParseError> {
+    Ok(TypeKind::FunctionPointer(FunctionPointer {
+        parameters: function.parameters.clone(),
+        return_type: Box::new(ast_type),
+        is_cstyle_variadic: function.is_cstyle_variadic,
+    })
+    .at(source))
+}
+
+fn get_name_and_decorators(
+    typedefs: &HashMap<String, CTypedef>,
+    declarator: &Declarator,
+) -> Result<(String, Decorators), ParseError> {
     match &declarator.kind {
         DeclaratorKind::Named(name) => Ok((name.to_string(), Decorators::default())),
         DeclaratorKind::Pointer(inner, pointer) => {
-            let (name, mut decorators) = get_name_and_decorators(inner)?;
+            let (name, mut decorators) = get_name_and_decorators(typedefs, inner)?;
             decorators.then_pointer(pointer.clone());
             Ok((name, decorators))
         }
-        DeclaratorKind::Function(..) => Err(ParseError::new(
-            ParseErrorKind::CannotReturnFunctionPointerType,
-            declarator.source,
-        )),
+        DeclaratorKind::Function(inner, parameter_type_list) => {
+            let (name, mut decorators) = get_name_and_decorators(typedefs, inner)?;
+            let mut parameters =
+                Vec::with_capacity(parameter_type_list.parameter_declarations.len());
+
+            for parameter in parameter_type_list.parameter_declarations.iter() {
+                let (parameter_name, parameter_type) = match &parameter.core {
+                    ParameterDeclarationCore::Declarator(declarator) => {
+                        let (parameter_name, ast_type, _) = get_name_and_type(
+                            typedefs,
+                            declarator,
+                            &parameter.declaration_specifiers,
+                            true,
+                        )?;
+                        (parameter_name, ast_type)
+                    }
+                    ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
+                    ParameterDeclarationCore::Nothing => todo!(),
+                };
+
+                parameters.push(Parameter {
+                    name: parameter_name,
+                    ast_type: parameter_type,
+                });
+            }
+
+            decorators.then_function(FunctionQualifier {
+                parameters,
+                source: declarator.source,
+                is_cstyle_variadic: parameter_type_list.is_variadic,
+            });
+
+            Ok((name, decorators))
+        }
         DeclaratorKind::Array(inner, array_qualifier) => {
-            let (name, mut decorators) = get_name_and_decorators(inner)?;
+            let (name, mut decorators) = get_name_and_decorators(typedefs, inner)?;
             decorators.then_array(array_qualifier.clone());
             Ok((name, decorators))
         }

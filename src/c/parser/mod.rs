@@ -13,7 +13,7 @@ use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
 };
-use crate::ast::{Type, TypeKind};
+use crate::ast::{Parameter, Type, TypeKind};
 use crate::{
     ast::{Ast, FileIdentifier, Source},
     c::parser::translation::declare_function,
@@ -94,6 +94,7 @@ pub struct Decorators {
 pub enum Decorator {
     Pointer(Pointer),
     Array(ArrayQualifier),
+    Function(FunctionQualifier),
 }
 
 impl Decorator {
@@ -101,6 +102,7 @@ impl Decorator {
         match self {
             Decorator::Pointer(pointer) => pointer.source,
             Decorator::Array(array) => array.source,
+            Decorator::Function(function) => function.source,
         }
     }
 }
@@ -112,6 +114,10 @@ impl Decorators {
 
     pub fn then_array(&mut self, array: ArrayQualifier) {
         self.decorators.push(Decorator::Array(array))
+    }
+
+    pub fn then_function(&mut self, function: FunctionQualifier) {
+        self.decorators.push(Decorator::Function(function));
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Decorator> {
@@ -126,6 +132,13 @@ pub struct ArrayQualifier {
     is_static: bool,
     is_param_vla: bool,
     source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionQualifier {
+    pub parameters: Vec<Parameter>,
+    pub is_cstyle_variadic: bool,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -431,17 +444,15 @@ impl<'a> Parser<'a> {
                     Declaration::Common(declaration) => {
                         for init_declarator in declaration.init_declarator_list.iter() {
                             match &init_declarator.declarator.kind {
-                                DeclaratorKind::Named(name) => declare_named(
+                                DeclaratorKind::Named(..)
+                                | DeclaratorKind::Pointer(..)
+                                | DeclaratorKind::Array(..) => declare_named(
                                     ast_file,
                                     &init_declarator.declarator,
                                     &declaration.attribute_specifiers[..],
                                     &declaration.declaration_specifiers,
-                                    name,
                                     &mut self.typedefs,
                                 )?,
-                                DeclaratorKind::Pointer(_declarator, pointer) => {
-                                    todo!("pointer declarators - {:?}", pointer.source)
-                                }
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
                                         &mut self.typedefs,
@@ -452,7 +463,6 @@ impl<'a> Parser<'a> {
                                         parameter_type_list,
                                     )?;
                                 }
-                                DeclaratorKind::Array(_, _) => todo!(),
                             }
                         }
                     }
@@ -861,7 +871,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_abstract_declarator(&mut self) -> Result<AbstractDeclarator, ParseError> {
-        todo!()
+        todo!(
+            "parse_abstract_declarator at {:?}",
+            self.input.peek().source
+        )
     }
 
     fn parse_atomic_type_specifier(&mut self) -> Result<(), ParseError> {

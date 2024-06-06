@@ -40,7 +40,6 @@ impl Show for ParseError {
 #[derive(Clone, Debug)]
 pub enum ParseErrorKind {
     ExpectedDeclaration,
-    CannotReturnFunctionPointerType,
     InvalidType,
     ExpectedTypeNameOrMemberDeclarationList,
     ExpectedSemicolon,
@@ -60,17 +59,18 @@ impl Display for ParseErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseErrorKind::ExpectedDeclaration => f.write_str("Expected declaration"),
-            ParseErrorKind::CannotReturnFunctionPointerType => {
-                f.write_str("Cannot return function pointer type")
-            }
             ParseErrorKind::InvalidType => f.write_str("Invalid type"),
             ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList => {
                 f.write_str("Expected type name or member declaration list")
             }
             ParseErrorKind::ExpectedSemicolon => f.write_str("Expected ';'"),
             ParseErrorKind::ExpectedMemberDeclarator => f.write_str("Expected member declarator"),
-            ParseErrorKind::DuplicateEnumMember(name) => write!(f, "Duplicate enum member '{}'", name),
-            ParseErrorKind::MustBeConstantInteger => write!(f, "Must be constant integer expression"),
+            ParseErrorKind::DuplicateEnumMember(name) => {
+                write!(f, "Duplicate enum member '{}'", name)
+            }
+            ParseErrorKind::MustBeConstantInteger => {
+                write!(f, "Must be constant integer expression")
+            }
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }
