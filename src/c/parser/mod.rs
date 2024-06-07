@@ -19,6 +19,7 @@ use crate::{
     c::parser::translation::declare_function,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
+use derive_more::IsVariant;
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -47,6 +48,12 @@ pub struct ParameterTypeList {
     pub is_variadic: bool,
 }
 
+#[derive(Clone, Debug, IsVariant)]
+pub enum Abstraction {
+    Normal,
+    Abstract,
+}
+
 #[derive(Clone, Debug)]
 pub struct Declarator {
     pub kind: DeclaratorKind,
@@ -68,7 +75,24 @@ impl DeclaratorKind {
 }
 
 #[derive(Clone, Debug)]
-pub enum AbstractDeclarator {}
+pub struct AbstractDeclarator {
+    pub kind: AbstractDeclaratorKind,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug, IsVariant)]
+pub enum AbstractDeclaratorKind {
+    Nothing,
+    Pointer(Box<AbstractDeclarator>, Pointer),
+    Function(Box<AbstractDeclarator>, ParameterTypeList),
+    Array(Box<AbstractDeclarator>, ArrayQualifier),
+}
+
+impl AbstractDeclaratorKind {
+    pub fn at(self, source: Source) -> AbstractDeclarator {
+        AbstractDeclarator { kind: self, source }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum ParameterDeclarationCore {
@@ -680,6 +704,25 @@ impl<'a> Parser<'a> {
         Ok(declarator)
     }
 
+    fn parse_abstract_declarator(&mut self) -> Result<AbstractDeclarator, ParseError> {
+        let source = self.input.peek().source;
+        let mut pointers = self.parse_pointers()?;
+        let mut declarator = self.parse_direct_abstract_declarator_or_nothing()?;
+
+        for pointer in pointers.drain(..) {
+            declarator = AbstractDeclaratorKind::Pointer(Box::new(declarator), pointer).at(source);
+        }
+
+        if declarator.kind.is_nothing() {
+            return Err(ParseError::new(
+                ParseErrorKind::Misc("Expected abstract declarator"),
+                self.input.peek().source,
+            ));
+        }
+
+        Ok(declarator)
+    }
+
     fn parse_pointers(&mut self) -> Result<Vec<Pointer>, ParseError> {
         let mut pointers = vec![];
 
@@ -735,17 +778,110 @@ impl<'a> Parser<'a> {
         loop {
             match &self.input.peek().kind {
                 CTokenKind::Punctuator(Punctuator::OpenBracket) => {
-                    declarator = self.parse_array_declarator(declarator)?
+                    declarator = self.parse_array_declarator(declarator)?;
+                    let _attributes = self.parse_attribute_specifier_sequence()?;
                 }
                 CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => {
-                    declarator = self.parse_function_declarator(declarator)?
+                    declarator = self.parse_function_declarator(declarator)?;
+                    let _attributes = self.parse_attribute_specifier_sequence()?;
                 }
                 _ => break,
             }
         }
 
-        let _attributes = self.parse_attribute_specifier_sequence()?;
         Ok(declarator)
+    }
+
+    fn parse_direct_abstract_declarator_or_nothing(
+        &mut self,
+    ) -> Result<AbstractDeclarator, ParseError> {
+        let mut abstract_declarator = if self.eat_open_paren() {
+            let declarator = self.parse_abstract_declarator()?;
+
+            if !self.eat_punctuator(Punctuator::CloseParen) {
+                return Err(ParseError::new(
+                    ParseErrorKind::Misc("Failed to parse ')' for direct declarator"),
+                    self.input.peek().source,
+                ));
+            }
+
+            declarator
+        } else {
+            AbstractDeclaratorKind::Nothing.at(self.input.peek().source)
+        };
+
+        loop {
+            match &self.input.peek().kind {
+                CTokenKind::Punctuator(Punctuator::OpenBracket) => {
+                    abstract_declarator =
+                        self.parse_abstract_array_declarator(abstract_declarator)?;
+                    let _attributes = self.parse_attribute_specifier_sequence()?;
+                }
+                CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => {
+                    abstract_declarator =
+                        self.parse_abstract_function_declarator(abstract_declarator)?;
+                    let _attributes = self.parse_attribute_specifier_sequence()?;
+                }
+                _ => break,
+            }
+        }
+
+        Ok(abstract_declarator)
+    }
+
+    fn parse_array_qualifier(
+        &mut self,
+        abstraction: Abstraction,
+    ) -> Result<ArrayQualifier, ParseError> {
+        let source = self.input.peek().source;
+
+        if !self.eat_punctuator(Punctuator::OpenBracket) {
+            return Err(ParseErrorKind::Misc("Expected '[' to begin array declarator").at(source));
+        }
+
+        let mut is_static = self.eat(CTokenKind::StaticKeyword);
+        let type_qualifiers = self.parse_type_qualifier_list()?;
+
+        if !is_static {
+            is_static = self.eat(CTokenKind::StaticKeyword);
+        }
+
+        let expression = speculate!(self.input, self.parse_expr_singular()).ok();
+        let is_param_vla = expression.is_none() && self.eat_punctuator(Punctuator::Multiply);
+
+        if !self.eat_punctuator(Punctuator::CloseBracket) {
+            return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
+        }
+
+        if is_param_vla && !type_qualifiers.is_empty() && abstraction.is_abstract() {
+            return Err(ParseErrorKind::Misc(
+                "Cannot specify type qualifiers for abstract array declarator",
+            )
+            .at(source));
+        }
+
+        Ok(ArrayQualifier {
+            expression,
+            type_qualifiers,
+            is_static,
+            is_param_vla,
+            source,
+        })
+    }
+
+    fn parse_array_declarator(&mut self, declarator: Declarator) -> Result<Declarator, ParseError> {
+        let source = self.input.peek().source;
+        let array_qualifier = self.parse_array_qualifier(Abstraction::Normal)?;
+        Ok(DeclaratorKind::Array(Box::new(declarator), array_qualifier).at(source))
+    }
+
+    fn parse_abstract_array_declarator(
+        &mut self,
+        declarator: AbstractDeclarator,
+    ) -> Result<AbstractDeclarator, ParseError> {
+        let source = self.input.peek().source;
+        let array_qualifier = self.parse_array_qualifier(Abstraction::Abstract)?;
+        Ok(AbstractDeclaratorKind::Array(Box::new(declarator), array_qualifier).at(source))
     }
 
     fn parse_function_declarator(
@@ -771,38 +907,29 @@ impl<'a> Parser<'a> {
         Ok(DeclaratorKind::Function(Box::new(declarator), parameter_type_list).at(source))
     }
 
-    fn parse_array_declarator(&mut self, declarator: Declarator) -> Result<Declarator, ParseError> {
+    fn parse_abstract_function_declarator(
+        &mut self,
+        declarator: AbstractDeclarator,
+    ) -> Result<AbstractDeclarator, ParseError> {
         let source = self.input.peek().source;
 
-        if !self.eat_punctuator(Punctuator::OpenBracket) {
-            return Err(ParseErrorKind::Misc("Expected '[' to begin array declarator").at(source));
+        if !self.eat_open_paren() {
+            return Err(
+                ParseErrorKind::Misc("Expected '(' to begin abstract function declarator")
+                    .at(source),
+            );
         }
 
-        let mut is_static = self.eat(CTokenKind::StaticKeyword);
-        let type_qualifiers = self.parse_type_qualifier_list()?;
+        let parameter_type_list = self.parse_parameter_type_list()?;
 
-        if !is_static {
-            is_static = self.eat(CTokenKind::StaticKeyword);
+        if !self.eat_punctuator(Punctuator::CloseParen) {
+            return Err(
+                ParseErrorKind::Misc("Expected ')' to close abstract function declarator")
+                    .at(source),
+            );
         }
 
-        let expression = speculate!(self.input, self.parse_expr_singular()).ok();
-        let is_param_vla = expression.is_none() && self.eat_punctuator(Punctuator::Multiply);
-
-        if !self.eat_punctuator(Punctuator::CloseBracket) {
-            return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
-        }
-
-        Ok(DeclaratorKind::Array(
-            Box::new(declarator),
-            ArrayQualifier {
-                expression,
-                type_qualifiers,
-                is_static,
-                is_param_vla,
-                source,
-            },
-        )
-        .at(source))
+        Ok(AbstractDeclaratorKind::Function(Box::new(declarator), parameter_type_list).at(source))
     }
 
     fn parse_parameter_type_list(&mut self) -> Result<ParameterTypeList, ParseError> {
@@ -864,17 +991,12 @@ impl<'a> Parser<'a> {
             });
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse parameter declaration"),
-            self.input.peek().source,
-        ))
-    }
-
-    fn parse_abstract_declarator(&mut self) -> Result<AbstractDeclarator, ParseError> {
-        todo!(
-            "parse_abstract_declarator at {:?}",
-            self.input.peek().source
-        )
+        Ok(ParameterDeclaration {
+            attributes,
+            declaration_specifiers,
+            core: ParameterDeclarationCore::Nothing,
+            source,
+        })
     }
 
     fn parse_atomic_type_specifier(&mut self) -> Result<(), ParseError> {
