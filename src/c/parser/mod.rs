@@ -94,7 +94,7 @@ impl AbstractDeclaratorKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IsVariant)]
 pub enum ParameterDeclarationCore {
     Declarator(Declarator),
     AbstractDeclarator(AbstractDeclarator),
@@ -213,6 +213,13 @@ impl DeclarationSpecifierKind {
     pub fn at(self, source: Source) -> DeclarationSpecifier {
         DeclarationSpecifier { kind: self, source }
     }
+
+    pub fn is_void(&self) -> bool {
+        match self {
+            Self::TypeSpecifierQualifier(tsq) => tsq.is_void(),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -230,6 +237,14 @@ impl TypeSpecifierQualifier {
             TypeSpecifierQualifier::AlignmentSpecifier(al) => al.source,
         }
     }
+
+    pub fn is_void(&self) -> bool {
+        match self {
+            TypeSpecifierQualifier::TypeSpecifier(ts) => ts.kind.is_void(),
+            TypeSpecifierQualifier::TypeQualifier(_) => false,
+            TypeSpecifierQualifier::AlignmentSpecifier(_) => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -244,7 +259,7 @@ pub struct TypeSpecifier {
     source: Source,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IsVariant)]
 pub enum TypeSpecifierKind {
     Void,
     Bool,
@@ -762,7 +777,7 @@ impl<'a> Parser<'a> {
 
             if !self.eat_punctuator(Punctuator::CloseParen) {
                 return Err(ParseError::new(
-                    ParseErrorKind::Misc("Failed to parse ')' for direct declarator"),
+                    ParseErrorKind::Misc("Expected ')' to close nested direct declarator"),
                     self.input.peek().source,
                 ));
             }
@@ -800,7 +815,7 @@ impl<'a> Parser<'a> {
 
             if !self.eat_punctuator(Punctuator::CloseParen) {
                 return Err(ParseError::new(
-                    ParseErrorKind::Misc("Failed to parse ')' for direct declarator"),
+                    ParseErrorKind::Misc("Expected ')' to close nested direct abstract declarator"),
                     self.input.peek().source,
                 ));
             }

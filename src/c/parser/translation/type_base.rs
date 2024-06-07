@@ -17,7 +17,7 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use std::collections::HashMap;
 
-use super::expr::translate_expr;
+use super::{expr::translate_expr, has_parameters};
 
 #[derive(Debug)]
 pub struct TypeBase {
@@ -477,25 +477,29 @@ fn get_name_and_decorators(
             let mut parameters =
                 Vec::with_capacity(parameter_type_list.parameter_declarations.len());
 
-            for parameter in parameter_type_list.parameter_declarations.iter() {
-                let (parameter_name, parameter_type) = match &parameter.core {
-                    ParameterDeclarationCore::Declarator(declarator) => {
-                        let (parameter_name, ast_type, _) = get_name_and_type(
-                            typedefs,
-                            declarator,
-                            &parameter.declaration_specifiers,
-                            true,
-                        )?;
-                        (parameter_name, ast_type)
-                    }
-                    ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
-                    ParameterDeclarationCore::Nothing => todo!(),
-                };
+            if has_parameters(parameter_type_list) {
+                for parameter in parameter_type_list.parameter_declarations.iter() {
+                    let (parameter_name, parameter_type) = match &parameter.core {
+                        ParameterDeclarationCore::Declarator(declarator) => {
+                            let (parameter_name, ast_type, _) = get_name_and_type(
+                                typedefs,
+                                declarator,
+                                &parameter.declaration_specifiers,
+                                true,
+                            )?;
+                            (parameter_name, ast_type)
+                        }
+                        ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
+                        ParameterDeclarationCore::Nothing => {
+                            todo!()
+                        }
+                    };
 
-                parameters.push(Parameter {
-                    name: parameter_name,
-                    ast_type: parameter_type,
-                });
+                    parameters.push(Parameter {
+                        name: parameter_name,
+                        ast_type: parameter_type,
+                    });
+                }
             }
 
             decorators.then_function(FunctionQualifier {
