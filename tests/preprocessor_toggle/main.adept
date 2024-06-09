@@ -1,0 +1,5 @@
+
+func main {
+    printf(c"Hello world, from protected printf!\n")
+}
+

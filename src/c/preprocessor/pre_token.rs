@@ -14,6 +14,16 @@ impl PreToken {
     pub fn new(kind: PreTokenKind, source: Source) -> Self {
         Self { kind, source }
     }
+
+    /// Converts token into a form that isn't affected by the preprocessor
+    pub fn protect(self) -> Self {
+        let PreToken { kind, source } = self;
+
+        match kind {
+            PreTokenKind::Identifier(name) => PreTokenKind::ProtectedIdentifier(name).at(source),
+            _ => kind.at(source),
+        }
+    }
 }
 
 impl Display for PreToken {
@@ -27,6 +37,7 @@ pub enum PreTokenKind {
     EndOfSequence,
     HeaderName(String),
     Identifier(String),
+    ProtectedIdentifier(String),
     Number(String),
     CharacterConstant(Encoding, String),
     StringLiteral(Encoding, String),
@@ -59,6 +70,13 @@ impl PreToken {
         }
     }
 
+    pub fn get_identifier(&self) -> Option<&str> {
+        match &self.kind {
+            PreTokenKind::Identifier(identifier) => Some(identifier),
+            _ => None,
+        }
+    }
+
     pub fn is_open_paren_disregard_whitespace(&self) -> bool {
         match self.kind {
             PreTokenKind::Punctuator(Punctuator::OpenParen { .. }) => true,
@@ -73,6 +91,9 @@ impl Display for PreTokenKind {
             PreTokenKind::EndOfSequence => write!(f, "<end of sequence>"),
             PreTokenKind::HeaderName(name) => write!(f, "<{}>", name),
             PreTokenKind::Identifier(identifier) => f.write_str(identifier),
+            PreTokenKind::ProtectedIdentifier(identifier) => {
+                write!(f, "<protected> {}", identifier)
+            }
             PreTokenKind::Number(number) => f.write_str(number),
             PreTokenKind::CharacterConstant(_, content) => write!(f, "'{}'", escape(content, '\'')),
             PreTokenKind::StringLiteral(_, content) => write!(f, "\"{}\"", escape(content, '"')),

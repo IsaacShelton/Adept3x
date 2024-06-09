@@ -146,6 +146,7 @@ fn expand_token<'a>(
         | PreTokenKind::CharacterConstant(_, _)
         | PreTokenKind::StringLiteral(_, _)
         | PreTokenKind::Punctuator(_)
+        | PreTokenKind::ProtectedIdentifier(_)
         | PreTokenKind::UniversalCharacterName(_)
         | PreTokenKind::Other(_)
         | PreTokenKind::Placeholder => {

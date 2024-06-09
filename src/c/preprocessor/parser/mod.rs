@@ -22,11 +22,15 @@ pub use error::{ParseError, ParseErrorKind};
 
 pub struct Parser<T: Inflow<LexedLine>> {
     lines: T,
+    disabled: bool,
 }
 
 impl<T: Inflow<LexedLine>> Parser<T> {
     pub fn new(lines: T) -> Self {
-        Self { lines }
+        Self {
+            lines,
+            disabled: false,
+        }
     }
 
     pub fn parse_eof(&mut self) -> Result<Source, PreprocessorError> {
@@ -191,13 +195,21 @@ impl<T: Inflow<LexedLine>> Parser<T> {
             Some("warning") => Ok(GroupPart::ControlLine(
                 ControlLineKind::Warning(entire_line[2..].to_vec()).at(start_of_line),
             )),
-            Some("pragma") => Ok(Self::parse_pragma(&entire_line)?),
+            Some("pragma") => Ok(self.parse_pragma(&entire_line)?),
             Some(unknown) => Err(ParseErrorKind::UnrecognizedDirective(unknown.into())
                 .at(start_of_line)
                 .into()),
-            None => Ok(GroupPart::TextLine(TextLine {
-                content: entire_line,
-            })),
+            None => {
+                let mut entire_line = entire_line;
+
+                Ok(GroupPart::TextLine(TextLine {
+                    content: if self.disabled {
+                        entire_line.drain(..).map(PreToken::protect).collect_vec()
+                    } else {
+                        entire_line
+                    },
+                }))
+            }
         }
     }
 
@@ -326,7 +338,7 @@ impl<T: Inflow<LexedLine>> Parser<T> {
         }
     }
 
-    pub fn parse_pragma(line: &[PreToken]) -> Result<GroupPart, PreprocessorError> {
+    pub fn parse_pragma(&mut self, line: &[PreToken]) -> Result<GroupPart, PreprocessorError> {
         // # pragma ...
 
         let (name, source) = match line.get(2) {
@@ -345,7 +357,13 @@ impl<T: Inflow<LexedLine>> Parser<T> {
             }
         };
 
-        if name == "STDC" {
+        if name == "once" {
+            eprintln!("warning: #pragma once not supported yet");
+            Ok(GroupPart::TextLine(TextLine { content: vec![] }))
+        } else if name == "ADEPT" {
+            self.parse_adept_pragma(line)?;
+            Ok(GroupPart::TextLine(TextLine { content: vec![] }))
+        } else if name == "STDC" {
             eprintln!("warning: #pragma STDC not supported yet");
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else {
@@ -353,6 +371,31 @@ impl<T: Inflow<LexedLine>> Parser<T> {
                 .at(source)
                 .into())
         }
+    }
+
+    pub fn parse_adept_pragma(&mut self, line: &[PreToken]) -> Result<(), PreprocessorError> {
+        // #pragma ADEPT ...
+        //               ^
+
+        let start_source = line[2].source;
+
+        if let Some("PREPROCESSOR") = line.get(3).and_then(|category| category.get_identifier()) {
+            match line.get(4).and_then(|action| action.get_identifier()) {
+                Some("ENABLE") => {
+                    self.disabled = false;
+                    return Ok(());
+                }
+                Some("DISABLE") => {
+                    self.disabled = true;
+                    return Ok(());
+                }
+                _ => (),
+            }
+        }
+
+        Err(ParseErrorKind::UnrecognizedAdeptPragmaDirective
+            .at(start_source)
+            .into())
     }
 
     pub fn parse_if_like(

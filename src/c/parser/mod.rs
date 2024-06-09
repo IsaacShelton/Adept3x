@@ -714,8 +714,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_abstract_declarator(&mut self) -> Result<AbstractDeclarator, ParseError> {
-        let mut pointers = self.parse_pointers()?;
-        let mut declarator = self.parse_direct_abstract_declarator_or_nothing(pointers)?;
+        let pointers = self.parse_pointers()?;
+        let declarator = self.parse_direct_abstract_declarator_or_nothing(pointers)?;
 
         if declarator.kind.is_nothing() {
             return Err(ParseError::new(

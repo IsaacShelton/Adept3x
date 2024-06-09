@@ -41,6 +41,7 @@ pub enum ParseErrorKind {
     ExpectedDefinitionName,
     ExpectedNewlineAfterDirective,
     UnrecognizedPragmaDirective(String),
+    UnrecognizedAdeptPragmaDirective,
     ExpectedOpenParen,
     ExpectedParameterName,
     ExpectedComma,
@@ -87,6 +88,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::UnrecognizedPragmaDirective(directive) => {
                 write!(f, "Unrecognized pragma directive {}", directive)
+            }
+            ParseErrorKind::UnrecognizedAdeptPragmaDirective => {
+                write!(f, "Unrecognized adept pragma directive")
             }
             ParseErrorKind::ExpectedOpenParen => f.write_str("Expected '(' during preprocessing"),
             ParseErrorKind::ExpectedParameterName => {
