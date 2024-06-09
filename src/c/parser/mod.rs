@@ -145,7 +145,7 @@ impl Decorators {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Decorator> {
-        self.decorators.iter().rev()
+        self.decorators.iter()
     }
 }
 
@@ -708,25 +708,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
-        let source = self.input.peek().source;
-        let mut pointers = self.parse_pointers()?;
-        let mut declarator = self.parse_direct_declarator()?;
-
-        for pointer in pointers.drain(..) {
-            declarator = DeclaratorKind::Pointer(Box::new(declarator), pointer).at(source);
-        }
-
+        let pointers = self.parse_pointers()?;
+        let declarator = self.parse_direct_declarator(pointers)?;
         Ok(declarator)
     }
 
     fn parse_abstract_declarator(&mut self) -> Result<AbstractDeclarator, ParseError> {
-        let source = self.input.peek().source;
         let mut pointers = self.parse_pointers()?;
-        let mut declarator = self.parse_direct_abstract_declarator_or_nothing()?;
-
-        for pointer in pointers.drain(..) {
-            declarator = AbstractDeclaratorKind::Pointer(Box::new(declarator), pointer).at(source);
-        }
+        let mut declarator = self.parse_direct_abstract_declarator_or_nothing(pointers)?;
 
         if declarator.kind.is_nothing() {
             return Err(ParseError::new(
@@ -768,7 +757,10 @@ impl<'a> Parser<'a> {
         Ok(qualifiers)
     }
 
-    fn parse_direct_declarator(&mut self) -> Result<Declarator, ParseError> {
+    fn parse_direct_declarator(
+        &mut self,
+        mut pointers: Vec<Pointer>,
+    ) -> Result<Declarator, ParseError> {
         let mut declarator = if let Some((name, source)) = self.eat_identifier_source() {
             let _attributes = self.parse_attribute_specifier_sequence()?;
             DeclaratorKind::Named(name).at(source)
@@ -790,6 +782,11 @@ impl<'a> Parser<'a> {
             ));
         };
 
+        for pointer in pointers.drain(..) {
+            let source = pointer.source;
+            declarator = DeclaratorKind::Pointer(Box::new(declarator), pointer).at(source);
+        }
+
         loop {
             match &self.input.peek().kind {
                 CTokenKind::Punctuator(Punctuator::OpenBracket) => {
@@ -809,6 +806,7 @@ impl<'a> Parser<'a> {
 
     fn parse_direct_abstract_declarator_or_nothing(
         &mut self,
+        mut pointers: Vec<Pointer>,
     ) -> Result<AbstractDeclarator, ParseError> {
         let mut abstract_declarator = if self.eat_open_paren() {
             let declarator = self.parse_abstract_declarator()?;
@@ -824,6 +822,12 @@ impl<'a> Parser<'a> {
         } else {
             AbstractDeclaratorKind::Nothing.at(self.input.peek().source)
         };
+
+        for pointer in pointers.drain(..) {
+            let source = pointer.source;
+            abstract_declarator =
+                AbstractDeclaratorKind::Pointer(Box::new(abstract_declarator), pointer).at(source);
+        }
 
         loop {
             match &self.input.peek().kind {

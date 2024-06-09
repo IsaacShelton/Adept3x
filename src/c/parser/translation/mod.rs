@@ -54,8 +54,8 @@ fn has_parameters(parameter_type_list: &ParameterTypeList) -> bool {
         }
     }
 
-    // Technically, not having `void` as the parameters means any number,
-    // but we don't support that yet, so just assume zero if that's the case
+    // Technically, an empty parameter list means to accept any number of arguments, e.g.
+    // when not `(void)`, but we don't support that yet, so just assume zero when that occurs
     parameter_type_list.parameter_declarations.len() != 0
 }
 

@@ -1,3 +1,4 @@
+use super::{expr::translate_expr, has_parameters};
 use crate::{
     ast::{
         AnonymousEnum, AnonymousStruct, EnumMember, Field, FixedArray, FloatSize, FunctionPointer,
@@ -16,8 +17,6 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use std::collections::HashMap;
-
-use super::{expr::translate_expr, has_parameters};
 
 #[derive(Debug)]
 pub struct TypeBase {
