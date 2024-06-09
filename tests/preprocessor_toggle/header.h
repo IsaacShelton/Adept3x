@@ -7,7 +7,7 @@
    the likelihood of user-defined macros interfering.
 
    None of them have a way to declare
-   functions, structs, etc. without being vulenerable
+   functions, structs, etc. without being vulnerable
    to malicious definitions created by the user or
    other headers.
 
@@ -42,6 +42,15 @@
    We won't suffer from this problem in our standard headers.
 */
 
+/*
+    NOTE: Enabling/disabling the preprocessor only affects text lines.
+
+    Otherwise, you'd never be able to re-enable it!
+
+    Perhaps it could use a better name to indicate this, although nothing
+    short comes to mind
+*/
+
 #ifndef _HEADER_H_INCLUDED
 #define _HEADER_H_INCLUDED
 
@@ -56,7 +65,7 @@
 /*
     NOTE: These identifiers would normally be replaced by the
     preprocesser, but since we're smart and disabled it, the
-    declaration will proceed unharmed to the C compilation
+    declaration will proceed unharmed to C compilation
 */
 int printf(const char *format, ...);
 
