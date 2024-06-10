@@ -13,14 +13,14 @@ use crate::{
 use std::collections::HashMap;
 
 pub fn declare_named(
-    _ast_file: &mut File,
+    ast_file: &mut File,
     declarator: &Declarator,
     _attribute_specifiers: &[()],
     declaration_specifiers: &DeclarationSpecifiers,
     typedefs: &mut HashMap<String, CTypedef>,
 ) -> Result<(), ParseError> {
     let (name, ast_type, is_typedef) =
-        get_name_and_type(typedefs, declarator, declaration_specifiers, false)?;
+        get_name_and_type(ast_file, typedefs, declarator, declaration_specifiers, false)?;
 
     if is_typedef {
         typedefs.insert(name.to_string(), CTypedef { ast_type });
@@ -69,14 +69,14 @@ pub fn declare_function(
 ) -> Result<(), ParseError> {
     let source = declarator.source;
     let (name, return_type, is_typedef) =
-        get_name_and_type(typedefs, declarator, declaration_specifiers, false)?;
+        get_name_and_type(ast_file, typedefs, declarator, declaration_specifiers, false)?;
     let mut required = vec![];
 
     if has_parameters(&parameter_type_list) {
         for param in parameter_type_list.parameter_declarations.iter() {
             let (name, ast_type, is_typedef) = match &param.core {
                 ParameterDeclarationCore::Declarator(declarator) => {
-                    get_name_and_type(typedefs, declarator, &param.declaration_specifiers, true)?
+                    get_name_and_type(ast_file, typedefs, declarator, &param.declaration_specifiers, true)?
                 }
                 ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
                 ParameterDeclarationCore::Nothing => todo!(),

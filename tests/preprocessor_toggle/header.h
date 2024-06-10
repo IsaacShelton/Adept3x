@@ -43,7 +43,7 @@
 */
 
 /*
-    NOTE: Enabling/disabling the preprocessor only affects text lines.
+    NOTE: Enabling/disabling the preprocessor only affects non-directive lines.
 
     Otherwise, you'd never be able to re-enable it!
 

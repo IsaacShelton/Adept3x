@@ -1,8 +1,9 @@
 use super::{expr::translate_expr, has_parameters};
 use crate::{
     ast::{
-        AnonymousEnum, AnonymousStruct, EnumMember, Field, FixedArray, FloatSize, FunctionPointer,
-        IntegerBits, IntegerSign, Parameter, Privacy, Source, Type, TypeKind,
+        self, AnonymousEnum, AnonymousStruct, EnumMember, Field, FixedArray, FloatSize,
+        FunctionPointer, IntegerBits, IntegerSign, Parameter, Privacy, Source, Structure, Type,
+        TypeKind,
     },
     c::parser::{
         error::ParseErrorKind, translation::eval::evaluate_to_const_integer,
@@ -136,6 +137,7 @@ impl TypeBaseBuilder {
 }
 
 pub fn get_type_base(
+    ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     declaration_specifiers: &DeclarationSpecifiers,
     parent_source: Source,
@@ -215,7 +217,7 @@ pub fn get_type_base(
                         builder.sign(IntegerSign::Unsigned, ts.source)?
                     }
                     TypeSpecifierKind::Composite(composite) => builder
-                        .concrete(make_anonymous_composite(typedefs, composite)?, ts.source)?,
+                        .concrete(make_composite(ast_file, typedefs, composite)?, ts.source)?,
                     TypeSpecifierKind::Enumeration(enumeration) => {
                         builder.concrete(make_anonymous_enum(enumeration)?, ts.source)?
                     }
@@ -289,17 +291,18 @@ pub fn make_anonymous_enum(enumeration: &Enumeration) -> Result<TypeKind, ParseE
 
             Ok(TypeKind::AnonymousEnum(AnonymousEnum { members }))
         }
-        Enumeration::Reference(reference) => {
-            if reference.enum_type_specifier.is_some() {
+        Enumeration::Named(named) => {
+            if named.enum_type_specifier.is_some() {
                 todo!("support enum type specifiers")
             }
 
-            Ok(TypeKind::EnumNamed(reference.name.clone()))
+            Ok(TypeKind::Named(format!("enum<{}>", named.name)))
         }
     }
 }
 
-pub fn make_anonymous_composite(
+pub fn make_composite(
+    ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     composite: &Composite,
 ) -> Result<TypeKind, ParseError> {
@@ -317,8 +320,8 @@ pub fn make_anonymous_composite(
         })?;
 
         return Ok(match &composite.kind {
-            CompositeKind::Struct => TypeKind::StructNamed(name.clone()),
-            CompositeKind::Union => TypeKind::UnionNamed(name.clone()),
+            CompositeKind::Struct => TypeKind::Named(format!("struct<{}>", name)),
+            CompositeKind::Union => TypeKind::Named(format!("union<{}>", name)),
         });
     };
 
@@ -337,6 +340,7 @@ pub fn make_anonymous_composite(
                             match member_declarator {
                                 MemberDeclarator::Declarator(declarator) => {
                                     let (name, ast_type, is_typedef) = get_name_and_type(
+                                        ast_file,
                                         typedefs,
                                         declarator,
                                         &DeclarationSpecifiers::from(&member.specifier_qualifiers),
@@ -363,12 +367,24 @@ pub fn make_anonymous_composite(
                 }
             }
 
-            let anonymous_struct = AnonymousStruct {
-                fields,
-                packed: false,
-            };
+            let is_packed = false;
 
-            Ok(TypeKind::AnonymousStruct(anonymous_struct))
+            if let Some(name) = &composite.name {
+                let name = format!("struct<{}>", name);
+
+                ast_file.structures.push(Structure {
+                    name: name.clone(),
+                    fields,
+                    is_packed,
+                    prefer_pod: true,
+                });
+
+                Ok(TypeKind::Named(name))
+            } else {
+                let anonymous_struct = AnonymousStruct { fields, is_packed };
+
+                Ok(TypeKind::AnonymousStruct(anonymous_struct))
+            }
         }
         CompositeKind::Union => {
             todo!("union composites")
@@ -377,13 +393,19 @@ pub fn make_anonymous_composite(
 }
 
 pub fn get_name_and_type(
+    ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     declarator: &Declarator,
     declaration_specifiers: &DeclarationSpecifiers,
     for_parameter: bool,
 ) -> Result<(String, Type, bool), ParseError> {
-    let (name, decorators) = get_name_and_decorators(typedefs, declarator)?;
-    let type_base = get_type_base(typedefs, declaration_specifiers, declarator.source)?;
+    let (name, decorators) = get_name_and_decorators(ast_file, typedefs, declarator)?;
+    let type_base = get_type_base(
+        ast_file,
+        typedefs,
+        declaration_specifiers,
+        declarator.source,
+    )?;
 
     let mut ast_type = type_base.ast_type;
 
@@ -461,18 +483,19 @@ fn decorate_function(
 }
 
 fn get_name_and_decorators(
+    ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     declarator: &Declarator,
 ) -> Result<(String, Decorators), ParseError> {
     match &declarator.kind {
         DeclaratorKind::Named(name) => Ok((name.to_string(), Decorators::default())),
         DeclaratorKind::Pointer(inner, pointer) => {
-            let (name, mut decorators) = get_name_and_decorators(typedefs, inner)?;
+            let (name, mut decorators) = get_name_and_decorators(ast_file, typedefs, inner)?;
             decorators.then_pointer(pointer.clone());
             Ok((name, decorators))
         }
         DeclaratorKind::Function(inner, parameter_type_list) => {
-            let (name, mut decorators) = get_name_and_decorators(typedefs, inner)?;
+            let (name, mut decorators) = get_name_and_decorators(ast_file, typedefs, inner)?;
             let mut parameters =
                 Vec::with_capacity(parameter_type_list.parameter_declarations.len());
 
@@ -481,6 +504,7 @@ fn get_name_and_decorators(
                     let (parameter_name, parameter_type) = match &parameter.core {
                         ParameterDeclarationCore::Declarator(declarator) => {
                             let (parameter_name, ast_type, _) = get_name_and_type(
+                                ast_file,
                                 typedefs,
                                 declarator,
                                 &parameter.declaration_specifiers,
@@ -510,7 +534,7 @@ fn get_name_and_decorators(
             Ok((name, decorators))
         }
         DeclaratorKind::Array(inner, array_qualifier) => {
-            let (name, mut decorators) = get_name_and_decorators(typedefs, inner)?;
+            let (name, mut decorators) = get_name_and_decorators(ast_file, typedefs, inner)?;
             decorators.then_array(array_qualifier.clone());
             Ok((name, decorators))
         }

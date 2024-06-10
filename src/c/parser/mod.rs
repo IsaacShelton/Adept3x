@@ -407,14 +407,14 @@ pub struct Enumerator {
 #[derive(Clone, Debug)]
 pub enum Enumeration {
     Definition(EnumerationDefinition),
-    Reference(EnumerationReference),
+    Named(EnumerationNamed),
 }
 
 impl Enumeration {
     pub fn source(&self) -> Source {
         match self {
             Enumeration::Definition(definition) => definition.source,
-            Enumeration::Reference(reference) => reference.source,
+            Enumeration::Named(reference) => reference.source,
         }
     }
 }
@@ -429,7 +429,7 @@ pub struct EnumerationDefinition {
 }
 
 #[derive(Clone, Debug)]
-pub struct EnumerationReference {
+pub struct EnumerationNamed {
     pub name: String,
     pub enum_type_specifier: Option<EnumTypeSpecifier>,
     pub source: Source,
@@ -1238,7 +1238,7 @@ impl<'a> Parser<'a> {
                 ));
             }
 
-            Ok(Enumeration::Reference(EnumerationReference {
+            Ok(Enumeration::Named(EnumerationNamed {
                 name,
                 enum_type_specifier,
                 source,

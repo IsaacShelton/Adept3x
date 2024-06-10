@@ -274,6 +274,7 @@ where
             name,
             fields,
             is_packed,
+            prefer_pod: false,
         })
     }
 
@@ -1008,15 +1009,18 @@ where
                             count,
                         })))
                     }
-                    "struct" => Ok(TypeKind::StructNamed(
-                        self.parse_name_type_parameters(source)?,
-                    )),
-                    "union" => Ok(TypeKind::UnionNamed(
-                        self.parse_name_type_parameters(source)?,
-                    )),
-                    "enum" => Ok(TypeKind::EnumNamed(
-                        self.parse_name_type_parameters(source)?,
-                    )),
+                    "struct" => Ok(TypeKind::Named(format!(
+                        "struct<{}>",
+                        self.parse_name_type_parameters(source)?
+                    ))),
+                    "union" => Ok(TypeKind::Named(format!(
+                        "union<{}>",
+                        self.parse_name_type_parameters(source)?
+                    ))),
+                    "enum" => Ok(TypeKind::Named(format!(
+                        "enum<{}>",
+                        self.parse_name_type_parameters(source)?
+                    ))),
                     "pod" => {
                         self.parse_token(
                             TokenKind::OpenAngle,

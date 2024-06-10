@@ -49,7 +49,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Create initial jobs
     for (file_identifier, file) in ast.files.iter() {
-        let type_search_context = ctx
+        let type_search_ctx = ctx
             .type_search_contexts
             .entry(ast.primary_filename.clone())
             .or_insert_with(|| TypeSearchCtx::new(source_file_cache));
@@ -62,7 +62,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     field_name.into(),
                     resolved::Field {
                         resolved_type: resolve_type(
-                            type_search_context,
+                            type_search_ctx,
                             source_file_cache,
                             &field.ast_type,
                         )?,
@@ -77,10 +77,17 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_packed: structure.is_packed,
             });
 
-            type_search_context.put(
-                structure.name.clone(),
-                resolved::TypeKind::ManagedStructure(structure.name.clone(), structure_key),
-            );
+            if structure.prefer_pod {
+                type_search_ctx.put(
+                    structure.name.clone(),
+                    resolved::TypeKind::PlainOldData(structure.name.clone(), structure_key),
+                );
+            } else {
+                type_search_ctx.put(
+                    structure.name.clone(),
+                    resolved::TypeKind::ManagedStructure(structure.name.clone(), structure_key),
+                );
+            }
         }
 
         let global_search_context = ctx
@@ -89,8 +96,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             .or_insert_with(|| GlobalSearchCtx::new(source_file_cache));
 
         for global in file.globals.iter() {
-            let resolved_type =
-                resolve_type(type_search_context, source_file_cache, &global.ast_type)?;
+            let resolved_type = resolve_type(type_search_ctx, source_file_cache, &global.ast_type)?;
 
             let global_ref = resolved_ast.globals.insert(resolved::Global {
                 name: global.name.clone(),
@@ -107,12 +113,12 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: function.name.clone(),
                 parameters: resolve_parameters(
-                    type_search_context,
+                    type_search_ctx,
                     source_file_cache,
                     &function.parameters,
                 )?,
                 return_type: resolve_type(
-                    type_search_context,
+                    type_search_ctx,
                     source_file_cache,
                     &function.return_type,
                 )?,
@@ -584,11 +590,20 @@ fn resolve_type(
             bits: *bits,
             sign: *sign,
         }),
-        ast::TypeKind::Pointer(inner) => Ok(resolved::TypeKind::Pointer(Box::new(resolve_type(
-            type_search_context,
-            source_file_cache,
-            &inner,
-        )?))),
+        ast::TypeKind::Pointer(inner) => {
+            let inner = match resolve_type(type_search_context, source_file_cache, &inner) {
+                Ok(inner) => inner,
+                Err(err) => {
+                    if inner.kind.allow_undeclared() {
+                        resolved::TypeKind::Void.at(inner.source)
+                    } else {
+                        return Err(err);
+                    }
+                }
+            };
+
+            Ok(resolved::TypeKind::Pointer(Box::new(inner)))
+        }
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
         ast::TypeKind::Named(name) => type_search_context
             .find_type_or_error(&name, ast_type.source)
@@ -601,6 +616,7 @@ fn resolve_type(
 
                 let structure_ref = match resolved_inner_kind {
                     resolved::TypeKind::ManagedStructure(_, structure_ref) => structure_ref,
+                    resolved::TypeKind::PlainOldData(_, structure_ref) => structure_ref,
                     _ => {
                         return Err(ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
                             bad_type: inner.to_string(),
@@ -642,9 +658,6 @@ fn resolve_type(
                 todo!("resolve fixed array type with variable size")
             }
         }
-        ast::TypeKind::StructNamed(..) => todo!("resolve named struct type"),
-        ast::TypeKind::UnionNamed(..) => todo!("resolve named union type"),
-        ast::TypeKind::EnumNamed(..) => todo!("resolve named enum type"),
         ast::TypeKind::FunctionPointer(..) => todo!("resolved function pointer type"),
     }
     .map(|kind| kind.at(ast_type.source))

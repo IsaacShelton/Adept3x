@@ -130,6 +130,7 @@ pub struct Structure {
     pub name: String,
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
+    pub prefer_pod: bool,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -257,9 +258,6 @@ pub enum TypeKind {
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(),
     AnonymousEnum(AnonymousEnum),
-    StructNamed(String),
-    UnionNamed(String),
-    EnumNamed(String),
     FunctionPointer(FunctionPointer),
 }
 
@@ -267,12 +265,23 @@ impl TypeKind {
     pub fn at(self, source: Source) -> Type {
         Type { kind: self, source }
     }
+
+    pub fn allow_undeclared(&self) -> bool {
+        // TODO: CLEANUP: This is a bad way of doing it, should `Named` have property for this?
+        // This is very rarely needed though, so it's yet to be seen if that would be an improvement.
+        if let TypeKind::Named(name) = self {
+            if name.starts_with("struct<") {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct AnonymousStruct {
     pub fields: IndexMap<String, Field>,
-    pub packed: bool,
+    pub is_packed: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -347,15 +356,6 @@ impl Display for &TypeKind {
             TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<(amount), {}>", fixed_array.ast_type.to_string())?;
-            }
-            TypeKind::StructNamed(name) => {
-                write!(f, "struct<{}>", name)?;
-            }
-            TypeKind::UnionNamed(name) => {
-                write!(f, "union<{}>", name)?;
-            }
-            TypeKind::EnumNamed(name) => {
-                write!(f, "enum<{}>", name)?;
             }
             TypeKind::FunctionPointer(_function) => {
                 write!(f, "(function pointer type)")?;
