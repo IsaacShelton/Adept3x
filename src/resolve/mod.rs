@@ -47,13 +47,13 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     let source_file_cache = ast.source_file_cache;
     let mut resolved_ast = resolved::Ast::new(source_file_cache);
 
-    // Create initial jobs
-    for (file_identifier, file) in ast.files.iter() {
-        let type_search_ctx = ctx
-            .type_search_contexts
-            .entry(ast.primary_filename.clone())
-            .or_insert_with(|| TypeSearchCtx::new(source_file_cache));
+    let type_search_ctx = ctx
+        .type_search_contexts
+        .entry(ast.primary_filename.clone())
+        .or_insert_with(|| TypeSearchCtx::new(source_file_cache));
 
+    // Precompute resolved struct types
+    for (_, file) in ast.files.iter() {
         for structure in file.structures.iter() {
             let mut fields = IndexMap::new();
 
@@ -89,12 +89,15 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 );
             }
         }
+    }
 
-        let global_search_context = ctx
-            .global_search_contexts
-            .entry(ast.primary_filename.clone())
-            .or_insert_with(|| GlobalSearchCtx::new(source_file_cache));
+    let global_search_context = ctx
+        .global_search_contexts
+        .entry(ast.primary_filename.clone())
+        .or_insert_with(|| GlobalSearchCtx::new(source_file_cache));
 
+    // Resolve global variables
+    for (_, file) in ast.files.iter() {
         for global in file.globals.iter() {
             let resolved_type = resolve_type(type_search_ctx, source_file_cache, &global.ast_type)?;
 
@@ -108,7 +111,10 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
             global_search_context.put(global.name.clone(), resolved_type, global_ref);
         }
+    }
 
+    // Create initial function jobs
+    for (file_identifier, file) in ast.files.iter() {
         for (i, function) in file.functions.iter().enumerate() {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: function.name.clone(),
