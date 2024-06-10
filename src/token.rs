@@ -281,7 +281,20 @@ impl TokenKind {
         }
     }
 
+    pub fn could_start_type(&self) -> bool {
+        match self {
+            TokenKind::Identifier(_)
+            | TokenKind::StructKeyword
+            | TokenKind::UnionKeyword
+            | TokenKind::EnumKeyword => true,
+            _ => false,
+        }
+    }
+
     pub fn at(self, location: Location) -> Token {
-        Token { kind: self, location }
+        Token {
+            kind: self,
+            location,
+        }
     }
 }

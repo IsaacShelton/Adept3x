@@ -403,7 +403,7 @@ where
 
         match self.input.peek().kind {
             TokenKind::Identifier(_) => {
-                if let TokenKind::Identifier(..) = self.input.peek_nth(1).kind {
+                if self.input.peek_nth(1).kind.could_start_type() {
                     self.parse_declaration()
                 } else {
                     let left = self.parse_expr()?;
@@ -605,6 +605,9 @@ where
                 let inner = self.parse_expr()?;
                 self.parse_token(TokenKind::CloseParen, Some("to close nested expression"))?;
                 Ok(inner)
+            }
+            TokenKind::StructKeyword | TokenKind::UnionKeyword | TokenKind::EnumKeyword => {
+                self.parse_structure_literal()
             }
             TokenKind::Identifier(_) => match self.input.peek_nth(1).kind {
                 TokenKind::OpenAngle => self.parse_structure_literal(),

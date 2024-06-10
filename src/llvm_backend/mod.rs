@@ -186,10 +186,6 @@ pub unsafe fn llvm_backend(
     Ok(())
 }
 
-struct Point {
-    pub structure: StructureRef,
-}
-
 unsafe fn create_structure(
     ctx: &BackendContext,
     structure_key: &StructureRef,
