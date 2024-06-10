@@ -655,7 +655,33 @@ fn resolve_type(
                 todo!("resolve fixed array type with variable size")
             }
         }
-        ast::TypeKind::FunctionPointer(..) => todo!("resolved function pointer type"),
+        ast::TypeKind::FunctionPointer(function_pointer) => {
+            let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
+
+            for parameter in function_pointer.parameters.iter() {
+                let resolved_type =
+                    resolve_type(type_search_context, source_file_cache, &parameter.ast_type)?;
+
+                parameters.push(resolved::Parameter {
+                    name: parameter.name.clone(),
+                    resolved_type,
+                });
+            }
+
+            let return_type = Box::new(resolve_type(
+                type_search_context,
+                source_file_cache,
+                &function_pointer.return_type,
+            )?);
+
+            Ok(resolved::TypeKind::FunctionPointer(
+                resolved::FunctionPointer {
+                    parameters,
+                    return_type,
+                    is_cstyle_variadic: function_pointer.is_cstyle_variadic,
+                },
+            ))
+        }
     }
     .map(|kind| kind.at(ast_type.source))
 }

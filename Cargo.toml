@@ -22,4 +22,5 @@ lazy_format = "2.0.3"
 bit-vec = "0.6.3"
 thin-vec = "0.2.13"
 walkdir = "2.5.0"
+once_map = "0.4.18"
 

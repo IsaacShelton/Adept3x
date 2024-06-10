@@ -3,6 +3,7 @@ use super::{
 };
 use crate::{ir, resolved::StructureRef};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
+use once_map::unsync::OnceMap;
 use std::collections::HashMap;
 
 pub struct Phi2Relocation {
@@ -29,7 +30,7 @@ pub struct BackendContext<'a> {
     pub intrinsics: Intrinsics,
     pub relocations: Vec<Phi2Relocation>,
     pub static_variables: Vec<StaticVariable>,
-    pub structure_cache: HashMap<StructureRef, LLVMTypeRef>,
+    pub structure_cache: OnceMap<StructureRef, LLVMTypeRef>,
 }
 
 impl<'a> BackendContext<'a> {

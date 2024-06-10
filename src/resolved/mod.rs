@@ -86,6 +86,12 @@ pub struct Parameter {
     pub resolved_type: Type,
 }
 
+impl PartialEq for Parameter {
+    fn eq(&self, other: &Self) -> bool {
+        self.resolved_type.eq(&other.resolved_type)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Structure {
     pub name: String,
@@ -136,12 +142,20 @@ pub enum TypeKind {
     AnonymousStruct(),
     AnonymousUnion(),
     FixedArray(Box<FixedArray>),
+    FunctionPointer(FunctionPointer),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FixedArray {
     pub size: u64,
     pub inner: Type,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FunctionPointer {
+    pub parameters: Vec<Parameter>,
+    pub return_type: Box<Type>,
+    pub is_cstyle_variadic: bool,
 }
 
 impl TypeKind {
@@ -167,6 +181,7 @@ impl TypeKind {
             TypeKind::AnonymousStruct(..) => None,
             TypeKind::AnonymousUnion(..) => None,
             TypeKind::FixedArray(..) => None,
+            TypeKind::FunctionPointer(..) => None,
         }
     }
 
@@ -218,8 +233,9 @@ impl Display for TypeKind {
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
             TypeKind::FixedArray(fixed_array) => {
-                write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?
+                write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
+            TypeKind::FunctionPointer(..) => f.write_str("(function pointer type)")?,
         }
 
         Ok(())

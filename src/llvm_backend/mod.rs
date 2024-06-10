@@ -19,7 +19,7 @@ use self::{
 };
 use crate::{
     ir::{self, Instruction},
-    resolved::FloatOrInteger,
+    resolved::{FloatOrInteger, StructureRef},
     show::Show,
     source_file_cache::SourceFileCache,
 };
@@ -40,9 +40,8 @@ use llvm_sys::{
         LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage,
         LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type,
         LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
-        LLVMPositionBuilderAtEnd, LLVMPrintModuleToString, LLVMSetExternallyInitialized,
-        LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
-        LLVMStructType, LLVMVoidType,
+        LLVMPositionBuilderAtEnd, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
+        LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -66,6 +65,7 @@ use llvm_sys::{
 };
 use std::{
     cell::OnceCell,
+    collections::HashSet,
     ffi::{c_char, c_double, c_ulonglong, CStr, CString, OsStr},
     mem::MaybeUninit,
     path::Path,
@@ -135,7 +135,6 @@ pub unsafe fn llvm_backend(
 
     let mut ctx = BackendContext::new(ir_module, &backend_module, &target_data);
 
-    create_structures(&mut ctx);
     create_static_variables()?;
     create_globals(&mut ctx)?;
     create_function_heads(&mut ctx)?;
@@ -145,10 +144,10 @@ pub unsafe fn llvm_backend(
 
     let mut llvm_emit_error_message: *mut c_char = null_mut();
 
-    #[allow(unused_variables)]
-    let module_representation = CStr::from_ptr(LLVMPrintModuleToString(backend_module.get()));
-
-    // println!("{}", module_representation.to_string_lossy());
+    // Print generated LLVM IR?
+    {
+        // println!("{}", CStr::from_ptr(LLVMPrintModuleToString(backend_module.get())).to_string_lossy());
+    }
 
     let output_object_filename =
         CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
@@ -187,19 +186,41 @@ pub unsafe fn llvm_backend(
     Ok(())
 }
 
-unsafe fn create_structures(ctx: &mut BackendContext) {
-    for (structure_key, ir_structure) in ctx.ir_module.structures.iter() {
-        let mut subtypes = to_backend_types(ctx, &ir_structure.fields);
+struct Point {
+    pub structure: StructureRef,
+}
 
-        let struct_type = LLVMStructType(
+unsafe fn create_structure(
+    ctx: &BackendContext,
+    structure_key: &StructureRef,
+    visited: &mut HashSet<StructureRef>,
+) -> Result<LLVMTypeRef, BackendError> {
+    // Ensure not infinite size
+    if visited.contains(structure_key) {
+        // TODO: Improve error message
+        return Err(BackendError {
+            message: "Recursive data structure".into(),
+        });
+    }
+
+    // Get cached type or insert computed type
+    ctx.structure_cache.try_insert_cloned(*structure_key, |_| {
+        let ir_structure = ctx
+            .ir_module
+            .structures
+            .get(structure_key)
+            .expect("referenced IR structure to exist");
+
+        visited.insert(*structure_key);
+        let mut subtypes = to_backend_types(ctx, &ir_structure.fields, visited)?;
+        visited.remove(structure_key);
+
+        Ok(LLVMStructType(
             subtypes.as_mut_ptr(),
             subtypes.len().try_into().unwrap(),
             ir_structure.is_packed.into(),
-        );
-
-        ctx.structure_cache
-            .insert(structure_key.clone(), struct_type);
-    }
+        ))
+    })
 }
 
 unsafe fn create_static_variables() -> Result<(), BackendError> {
@@ -208,7 +229,7 @@ unsafe fn create_static_variables() -> Result<(), BackendError> {
 
 unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), BackendError> {
     for (global_ref, global) in ctx.ir_module.globals.iter() {
-        let backend_type = to_backend_type(ctx, &global.ir_type);
+        let backend_type = to_backend_type(ctx, &global.ir_type, &mut HashSet::default())?;
 
         let name = CString::new(global.mangled_name.as_bytes()).unwrap();
         let backend_global = LLVMAddGlobal(ctx.backend_module.get(), backend_type, name.as_ptr());
@@ -241,8 +262,8 @@ unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), BackendError> {
 
 unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
-        let mut parameters = to_backend_types(ctx, &function.parameters);
-        let return_type = to_backend_type(ctx, &function.return_type);
+        let mut parameters = to_backend_types(ctx, &function.parameters, &mut HashSet::default())?;
+        let return_type = to_backend_type(ctx, &function.return_type, &mut HashSet::default())?;
 
         let name = CString::new(function.mangled_name.as_bytes()).unwrap();
 
@@ -338,6 +359,9 @@ unsafe fn create_function_block(
 ) -> Result<(), BackendError> {
     LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
 
+    // Set used while traversing generated types, reusable
+    let mut visited = HashSet::default();
+
     for instruction in ir_basicblock.iter() {
         let result = match instruction {
             Instruction::Return(value) => {
@@ -352,11 +376,11 @@ unsafe fn create_function_block(
             }
             Instruction::Alloca(ir_type) => Some(LLVMBuildAlloca(
                 builder.get(),
-                to_backend_type(ctx, ir_type),
+                to_backend_type(ctx, ir_type, &mut visited)?,
                 cstr!("").as_ptr(),
             )),
             Instruction::Malloc(ir_type) => {
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildMalloc(
                     builder.get(),
                     backend_type,
@@ -364,7 +388,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::MallocArray(ir_type, count) => {
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 let count = build_value(ctx.backend_module, value_catalog, builder, count);
                 Some(LLVMBuildArrayMalloc(
                     builder.get(),
@@ -378,7 +402,7 @@ unsafe fn create_function_block(
                 Some(LLVMBuildFree(builder.get(), backend_value))
             }
             Instruction::SizeOf(ir_type) => {
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 let size = LLVMABISizeOfType(ctx.target_data.get(), backend_type);
                 Some(LLVMConstInt(LLVMInt64Type(), size, false.into()))
             }
@@ -402,7 +426,7 @@ unsafe fn create_function_block(
             }
             Instruction::Load((value, ir_type)) => {
                 let pointer = build_value(ctx.backend_module, value_catalog, builder, value);
-                let llvm_type = to_backend_type(ctx, ir_type);
+                let llvm_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildLoad2(
                     builder.get(),
                     llvm_type,
@@ -417,7 +441,7 @@ unsafe fn create_function_block(
                         .functions
                         .get(&call.function)
                         .expect("callee to exist"),
-                );
+                )?;
 
                 let function_value = *ctx
                     .func_skeletons
@@ -738,7 +762,7 @@ unsafe fn create_function_block(
             }
             Instruction::Bitcast(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildBitCast(
                     builder.get(),
                     value,
@@ -748,7 +772,7 @@ unsafe fn create_function_block(
             }
             Instruction::ZeroExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildZExt(
                     builder.get(),
                     value,
@@ -758,7 +782,7 @@ unsafe fn create_function_block(
             }
             Instruction::SignExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildSExt(
                     builder.get(),
                     value,
@@ -768,7 +792,7 @@ unsafe fn create_function_block(
             }
             Instruction::FloatExtend(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildFPExt(
                     builder.get(),
                     value,
@@ -778,7 +802,7 @@ unsafe fn create_function_block(
             }
             Instruction::Truncate(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildTrunc(
                     builder.get(),
                     value,
@@ -788,7 +812,7 @@ unsafe fn create_function_block(
             }
             Instruction::TruncateFloat(value, ir_type) => {
                 let value = build_value(ctx.backend_module, value_catalog, builder, value);
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildFPTrunc(
                     builder.get(),
                     value,
@@ -806,7 +830,7 @@ unsafe fn create_function_block(
 
                 let backend_struct_type = match ir_struct_type {
                     ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
-                        to_backend_type(ctx, ir_struct_type)
+                        to_backend_type(ctx, ir_struct_type, &mut visited)?
                     }
                     _ => return Err("cannot use member instruction on non-structure".into()),
                 };
@@ -835,7 +859,7 @@ unsafe fn create_function_block(
 
                 let index_value = build_value(ctx.backend_module, value_catalog, builder, index);
 
-                let backend_item_type = to_backend_type(ctx, ir_item_type);
+                let backend_item_type = to_backend_type(ctx, ir_item_type, &mut visited)?;
                 let mut indices = [index_value];
 
                 Some(LLVMBuildGEP2(
@@ -848,7 +872,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::StructureLiteral(ir_type, values) => {
-                let backend_type = to_backend_type(ctx, ir_type);
+                let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 let mut literal = LLVMGetUndef(backend_type);
 
                 for (index, value) in values.iter().enumerate() {
@@ -911,7 +935,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::Phi(phi) => {
-                let backend_type = to_backend_type(ctx, &phi.ir_type);
+                let backend_type = to_backend_type(ctx, &phi.ir_type, &mut visited)?;
                 let phi_node = LLVMBuildPhi(builder.get(), backend_type, cstr!("").as_ptr());
 
                 builder.add_phi_relocation(PhiRelocation {
@@ -929,17 +953,21 @@ unsafe fn create_function_block(
     Ok(())
 }
 
-unsafe fn get_function_type(ctx: &BackendContext, function: &ir::Function) -> LLVMTypeRef {
-    let return_type = to_backend_type(ctx, &function.return_type);
-    let mut parameters = to_backend_types(ctx, &function.parameters);
+unsafe fn get_function_type(
+    ctx: &BackendContext,
+    function: &ir::Function,
+) -> Result<LLVMTypeRef, BackendError> {
+    let mut visited = HashSet::default();
+    let return_type = to_backend_type(ctx, &function.return_type, &mut visited)?;
+    let mut parameters = to_backend_types(ctx, &function.parameters, &mut visited)?;
     let is_vararg = if function.is_cstyle_variadic { 1 } else { 0 };
 
-    LLVMFunctionType(
+    Ok(LLVMFunctionType(
         return_type,
         parameters.as_mut_ptr(),
         parameters.len().try_into().unwrap(),
         is_vararg,
-    )
+    ))
 }
 
 unsafe fn build_binary_operands(
@@ -1001,8 +1029,12 @@ unsafe fn build_value(
     }
 }
 
-unsafe fn to_backend_type(ctx: &BackendContext, ir_type: &ir::Type) -> LLVMTypeRef {
-    match ir_type {
+unsafe fn to_backend_type(
+    ctx: &BackendContext,
+    ir_type: &ir::Type,
+    visited: &mut HashSet<StructureRef>,
+) -> Result<LLVMTypeRef, BackendError> {
+    Ok(match ir_type {
         ir::Type::Void => LLVMVoidType(),
         ir::Type::Boolean => LLVMInt1Type(),
         ir::Type::S8 | ir::Type::U8 => LLVMInt8Type(),
@@ -1011,10 +1043,10 @@ unsafe fn to_backend_type(ctx: &BackendContext, ir_type: &ir::Type) -> LLVMTypeR
         ir::Type::S64 | ir::Type::U64 => LLVMInt64Type(),
         ir::Type::F32 => LLVMFloatType(),
         ir::Type::F64 => LLVMDoubleType(),
-        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to), 0),
+        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to, visited)?, 0),
         ir::Type::UntypedEnum(_) => panic!("Cannot convert untyped enum to backend type"),
         ir::Type::AnonymousComposite(composite) => {
-            let mut subtypes = to_backend_types(ctx, &composite.subtypes);
+            let mut subtypes = to_backend_types(ctx, &composite.subtypes, visited)?;
 
             LLVMStructType(
                 subtypes.as_mut_ptr(),
@@ -1022,14 +1054,10 @@ unsafe fn to_backend_type(ctx: &BackendContext, ir_type: &ir::Type) -> LLVMTypeR
                 composite.is_packed.into(),
             )
         }
-        ir::Type::Structure(structure_ref) => ctx
-            .structure_cache
-            .get(structure_ref)
-            .expect("referenced structure to exist")
-            .clone(),
+        ir::Type::Structure(structure_ref) => create_structure(ctx, structure_ref, visited)?,
         ir::Type::Function(function) => {
-            let return_type = to_backend_type(ctx, &function.return_type);
-            let mut params = to_backend_types(ctx, &function.parameters);
+            let return_type = to_backend_type(ctx, &function.return_type, visited)?;
+            let mut params = to_backend_types(ctx, &function.parameters, visited)?;
 
             LLVMPointerType(
                 LLVMFunctionType(
@@ -1042,14 +1070,24 @@ unsafe fn to_backend_type(ctx: &BackendContext, ir_type: &ir::Type) -> LLVMTypeR
             )
         }
         ir::Type::FixedArray(fixed_array) => {
-            let element_type = to_backend_type(ctx, &fixed_array.inner);
+            let element_type = to_backend_type(ctx, &fixed_array.inner, visited)?;
             LLVMArrayType2(element_type, fixed_array.size)
         }
-    }
+    })
 }
 
-unsafe fn to_backend_types(ctx: &BackendContext, ir_types: &[ir::Type]) -> Vec<LLVMTypeRef> {
-    ir_types.iter().map(|ty| to_backend_type(ctx, ty)).collect()
+unsafe fn to_backend_types(
+    ctx: &BackendContext,
+    ir_types: &[ir::Type],
+    visited: &mut HashSet<StructureRef>,
+) -> Result<Vec<LLVMTypeRef>, BackendError> {
+    let mut results = Vec::with_capacity(ir_types.len());
+
+    for ir_type in ir_types.iter() {
+        results.push(to_backend_type(ctx, ir_type, visited)?);
+    }
+
+    Ok(results)
 }
 
 unsafe fn implement_static_init() -> Result<(), BackendError> {

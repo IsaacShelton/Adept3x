@@ -328,6 +328,21 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
                 inner,
             })))
         }
+        resolved::TypeKind::FunctionPointer(function_pointer) => {
+            let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
+
+            for parameter in function_pointer.parameters.iter() {
+                parameters.push(lower_type(&parameter.resolved_type)?);
+            }
+
+            let return_type = Box::new(lower_type(&function_pointer.return_type)?);
+
+            Ok(ir::Type::Function(ir::TypeFunction {
+                parameters,
+                return_type,
+                is_cstyle_variadic: function_pointer.is_cstyle_variadic,
+            }))
+        }
     }
 }
 
