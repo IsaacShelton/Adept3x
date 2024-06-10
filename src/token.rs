@@ -56,6 +56,8 @@ pub enum TokenKind {
     FuncKeyword,
     ReturnKeyword,
     StructKeyword,
+    UnionKeyword,
+    EnumKeyword,
     IfKeyword,
     ElseKeyword,
     ElifKeyword,
@@ -128,6 +130,8 @@ impl Display for TokenKind {
             TokenKind::FuncKeyword => "'func' keyword",
             TokenKind::ReturnKeyword => "'return' keyword",
             TokenKind::StructKeyword => "'struct' keyword",
+            TokenKind::UnionKeyword => "'union' keyword",
+            TokenKind::EnumKeyword => "'enum' keyword",
             TokenKind::IfKeyword => "'if' keyword",
             TokenKind::ElseKeyword => "'else' keyword",
             TokenKind::ElifKeyword => "'elif' keyword",
@@ -242,6 +246,8 @@ impl TokenKind {
             | TokenKind::FuncKeyword
             | TokenKind::ReturnKeyword
             | TokenKind::StructKeyword
+            | TokenKind::UnionKeyword
+            | TokenKind::EnumKeyword
             | TokenKind::IfKeyword
             | TokenKind::ElseKeyword
             | TokenKind::ElifKeyword
@@ -273,5 +279,9 @@ impl TokenKind {
             | Self::Assign => true,
             _ => false,
         }
+    }
+
+    pub fn at(self, location: Location) -> Token {
+        Token { kind: self, location }
     }
 }

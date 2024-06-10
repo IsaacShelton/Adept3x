@@ -10,6 +10,13 @@ impl Location {
     pub fn new(line: u32, column: u32) -> Self {
         Self { line, column }
     }
+
+    pub fn shift_column(&self, amount: u32) -> Self {
+        Self {
+            line: self.line,
+            column: self.column + amount,
+        }
+    }
 }
 
 pub struct LineColumn<I: Iterator<Item = char>> {

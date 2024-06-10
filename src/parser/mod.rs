@@ -908,6 +908,65 @@ where
         ))
     }
 
+    /// Parses closing '>' brackets of type parameters.
+    /// This function may partially consume tokens, so be
+    /// aware that any previously peeked tokens may no longer be in
+    /// the same lookahead position after calling this function.
+    fn parse_type_parameters_close(&mut self) -> Result<(), ParseError> {
+        let closer = self.input.advance();
+
+        /// Sub-function for properly handling trailing `=` signs
+        /// resulting from partially consuming '>'-like tokens.
+        fn merge_trailing_equals<I: Iterator<Item = Token>>(
+            parser: &mut Parser<I>,
+            closer: &Token,
+            column_offset: u32,
+        ) {
+            if parser.input.eat(TokenKind::Assign) {
+                parser
+                    .input
+                    .unadvance(TokenKind::Equals.at(closer.location.shift_column(column_offset)));
+            } else {
+                parser
+                    .input
+                    .unadvance(TokenKind::Assign.at(closer.location.shift_column(column_offset)));
+            }
+        }
+
+        match &closer.kind {
+            TokenKind::GreaterThan => Ok(()),
+            TokenKind::RightShift => {
+                self.input
+                    .unadvance(TokenKind::GreaterThan.at(closer.location.shift_column(1)));
+                Ok(())
+            }
+            TokenKind::LogicalRightShift => {
+                self.input
+                    .unadvance(TokenKind::RightShift.at(closer.location.shift_column(1)));
+                Ok(())
+            }
+            TokenKind::RightShiftAssign => {
+                merge_trailing_equals(self, &closer, 2);
+
+                self.input
+                    .unadvance(TokenKind::GreaterThan.at(closer.location.shift_column(1)));
+                Ok(())
+            }
+            TokenKind::LogicalRightShiftAssign => {
+                merge_trailing_equals(self, &closer, 3);
+
+                self.input
+                    .unadvance(TokenKind::RightShift.at(closer.location.shift_column(1)));
+                Ok(())
+            }
+            TokenKind::GreaterThanEq => {
+                merge_trailing_equals(self, &closer, 1);
+                Ok(())
+            }
+            _ => Err(self.unexpected_token(&closer)),
+        }
+    }
+
     fn parse_type(
         &mut self,
         prefix: Option<impl ToString>,
@@ -972,10 +1031,7 @@ where
                     "ptr" => {
                         if self.input.eat(TokenKind::OpenAngle) {
                             let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                            self.parse_token(
-                                TokenKind::GreaterThan,
-                                Some("to close type parameters"),
-                            )?;
+                            self.parse_type_parameters_close()?;
                             Ok(TypeKind::Pointer(Box::new(inner)))
                         } else {
                             Ok(TypeKind::Pointer(Box::new(Type::new(
@@ -1002,32 +1058,20 @@ where
                         }
 
                         let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
+                        self.parse_type_parameters_close()?;
 
                         Ok(TypeKind::FixedArray(Box::new(FixedArray {
                             ast_type: inner,
                             count,
                         })))
                     }
-                    "struct" => Ok(TypeKind::Named(format!(
-                        "struct<{}>",
-                        self.parse_name_type_parameters(source)?
-                    ))),
-                    "union" => Ok(TypeKind::Named(format!(
-                        "union<{}>",
-                        self.parse_name_type_parameters(source)?
-                    ))),
-                    "enum" => Ok(TypeKind::Named(format!(
-                        "enum<{}>",
-                        self.parse_name_type_parameters(source)?
-                    ))),
                     "pod" => {
                         self.parse_token(
                             TokenKind::OpenAngle,
                             Some("to specify inner type of 'pod'"),
                         )?;
                         let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
+                        self.parse_type_parameters_close()?;
                         Ok(TypeKind::PlainOldData(Box::new(inner)))
                     }
                     identifier => Ok(TypeKind::Named(identifier.into())),
@@ -1035,6 +1079,30 @@ where
 
                 Ok(Type::new(type_kind, source))
             }
+            Token {
+                kind: TokenKind::StructKeyword,
+                ..
+            } => Ok(TypeKind::Named(format!(
+                "struct<{}>",
+                self.parse_name_type_parameters(source)?
+            ))
+            .at(source)),
+            Token {
+                kind: TokenKind::UnionKeyword,
+                ..
+            } => Ok(TypeKind::Named(format!(
+                "union<{}>",
+                self.parse_name_type_parameters(source)?
+            ))
+            .at(source)),
+            Token {
+                kind: TokenKind::EnumKeyword,
+                ..
+            } => Ok(TypeKind::Named(format!(
+                "enum<{}>",
+                self.parse_name_type_parameters(source)?
+            ))
+            .at(source)),
             unexpected => Err(ParseError {
                 kind: ParseErrorKind::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),
@@ -1059,7 +1127,7 @@ where
             source: self.source_here(),
         })?;
 
-        self.parse_token(TokenKind::GreaterThan, Some("to close type parameters"))?;
+        self.parse_type_parameters_close()?;
         Ok(name)
     }
 

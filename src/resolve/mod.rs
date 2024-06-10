@@ -593,13 +593,10 @@ fn resolve_type(
         ast::TypeKind::Pointer(inner) => {
             let inner = match resolve_type(type_search_context, source_file_cache, &inner) {
                 Ok(inner) => inner,
-                Err(err) => {
-                    if inner.kind.allow_undeclared() {
-                        resolved::TypeKind::Void.at(inner.source)
-                    } else {
-                        return Err(err);
-                    }
+                Err(_) if inner.kind.allow_undeclared() => {
+                    resolved::TypeKind::Void.at(inner.source)
                 }
+                Err(err) => return Err(err),
             };
 
             Ok(resolved::TypeKind::Pointer(Box::new(inner)))

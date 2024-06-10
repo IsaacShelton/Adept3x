@@ -69,6 +69,12 @@ where
 
         self.buffer.get_mut(index)
     }
+
+    // Adds input to the front of the queue,
+    // useful for partially consuming tokens during parsing.
+    pub fn unadvance(&mut self, item: I::Item) {
+        self.buffer.push_front(item);
+    }
 }
 
 impl<I: Iterator> Iterator for LookAhead<I>

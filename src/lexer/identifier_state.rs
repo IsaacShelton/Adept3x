@@ -17,6 +17,8 @@ impl IdentifierState {
                 "func" => TokenKind::FuncKeyword,
                 "return" => TokenKind::ReturnKeyword,
                 "struct" => TokenKind::StructKeyword,
+                "union" => TokenKind::UnionKeyword,
+                "enum" => TokenKind::EnumKeyword,
                 "if" => TokenKind::IfKeyword,
                 "else" => TokenKind::ElseKeyword,
                 "elif" => TokenKind::ElifKeyword,

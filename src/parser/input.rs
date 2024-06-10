@@ -80,4 +80,10 @@ where
     pub fn source_file_cache(&self) -> &'a SourceFileCache {
         self.source_file_cache
     }
+
+    // Adds input to the front of the queue,
+    // useful for partially consuming tokens during parsing.
+    pub fn unadvance(&mut self, token: Token) {
+        self.iterator.unadvance(token)
+    }
 }

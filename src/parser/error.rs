@@ -44,6 +44,12 @@ pub enum ParseErrorKind {
     },
 }
 
+impl ParseErrorKind {
+    pub fn at(self, source: Source) -> ParseError {
+        ParseError { kind: self, source }
+    }
+}
+
 impl Show for ParseError {
     fn show(
         &self,

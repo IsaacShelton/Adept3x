@@ -414,7 +414,7 @@ impl Enumeration {
     pub fn source(&self) -> Source {
         match self {
             Enumeration::Definition(definition) => definition.source,
-            Enumeration::Named(reference) => reference.source,
+            Enumeration::Named(name) => name.source,
         }
     }
 }
