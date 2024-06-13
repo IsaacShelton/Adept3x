@@ -72,6 +72,7 @@ pub enum FileIdentifier {
 pub struct File {
     pub functions: Vec<Function>,
     pub structures: Vec<Structure>,
+    pub aliases: Vec<Alias>,
     pub globals: Vec<Global>,
 }
 
@@ -80,6 +81,7 @@ impl File {
         File {
             functions: vec![],
             structures: vec![],
+            aliases: vec![],
             globals: vec![],
         }
     }
@@ -144,6 +146,12 @@ pub enum Privacy {
 pub struct Field {
     pub ast_type: Type,
     pub privacy: Privacy,
+}
+
+#[derive(Clone, Debug)]
+pub struct Alias {
+    pub name: String,
+    pub value: Type,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Hash)]

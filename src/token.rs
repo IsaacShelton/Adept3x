@@ -58,6 +58,7 @@ pub enum TokenKind {
     StructKeyword,
     UnionKeyword,
     EnumKeyword,
+    AliasKeyword,
     IfKeyword,
     ElseKeyword,
     ElifKeyword,
@@ -132,6 +133,7 @@ impl Display for TokenKind {
             TokenKind::StructKeyword => "'struct' keyword",
             TokenKind::UnionKeyword => "'union' keyword",
             TokenKind::EnumKeyword => "'enum' keyword",
+            TokenKind::AliasKeyword => "'alias' keyword",
             TokenKind::IfKeyword => "'if' keyword",
             TokenKind::ElseKeyword => "'else' keyword",
             TokenKind::ElifKeyword => "'elif' keyword",
@@ -248,6 +250,7 @@ impl TokenKind {
             | TokenKind::StructKeyword
             | TokenKind::UnionKeyword
             | TokenKind::EnumKeyword
+            | TokenKind::AliasKeyword
             | TokenKind::IfKeyword
             | TokenKind::ElseKeyword
             | TokenKind::ElifKeyword

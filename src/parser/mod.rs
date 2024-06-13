@@ -10,7 +10,7 @@ use self::{
 };
 use crate::{
     ast::{
-        self, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
+        self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
         BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind,
         Field, File, FileIdentifier, FixedArray, Function, Global, Integer, Parameter, Parameters,
         ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
@@ -107,6 +107,7 @@ where
             TokenKind::StructKeyword => {
                 ast_file.structures.push(self.parse_structure(annotations)?)
             }
+            TokenKind::AliasKeyword => ast_file.aliases.push(self.parse_alias(annotations)?),
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
                 if annotations.len() > 0 {
@@ -275,6 +276,34 @@ where
             fields,
             is_packed,
             prefer_pod: false,
+        })
+    }
+
+    fn parse_alias(&mut self, annotations: Vec<Annotation>) -> Result<Alias, ParseError> {
+        self.input.advance();
+
+        let name = self.parse_identifier(Some("for alias name after 'alias' keyword"))?;
+        self.ignore_newlines();
+
+        for annotation in annotations {
+            match annotation.kind {
+                _ => {
+                    return Err(self.unexpected_annotation(
+                        annotation.kind.to_string(),
+                        annotation.location,
+                        Some("for alias"),
+                    ))
+                }
+            }
+        }
+
+        self.parse_token(TokenKind::Assign, Some("after alias name"))?;
+
+        let ast_type = self.parse_type(None::<&str>, Some("for alias"))?;
+
+        Ok(Alias {
+            name,
+            value: ast_type,
         })
     }
 
