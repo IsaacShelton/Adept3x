@@ -107,7 +107,16 @@ where
             TokenKind::StructKeyword => {
                 ast_file.structures.push(self.parse_structure(annotations)?)
             }
-            TokenKind::AliasKeyword => ast_file.aliases.push(self.parse_alias(annotations)?),
+            TokenKind::AliasKeyword => {
+                let alias = self.parse_alias(annotations)?;
+
+                if let Some(previous) = ast_file.aliases.insert(alias.name.clone(), alias) {
+                    return Err(ParseErrorKind::TypeAliasHasMultipleDefinitions {
+                        name: previous.name,
+                    }
+                    .at(previous.source));
+                }
+            }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
                 if annotations.len() > 0 {
@@ -282,6 +291,7 @@ where
     }
 
     fn parse_alias(&mut self, annotations: Vec<Annotation>) -> Result<Alias, ParseError> {
+        let source = self.source_here();
         self.input.advance();
 
         let name = self.parse_identifier(Some("for alias name after 'alias' keyword"))?;
@@ -306,6 +316,7 @@ where
         Ok(Alias {
             name,
             value: ast_type,
+            source,
         })
     }
 

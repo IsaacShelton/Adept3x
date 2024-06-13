@@ -122,6 +122,9 @@ pub enum ResolveErrorKind {
     MultipleDefinitionsOfTypeNamed {
         name: String,
     },
+    RecursiveTypeAlias {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -327,7 +330,10 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::MultipleDefinitionsOfTypeNamed { name } => {
                 write!(f, "Multiple definitions of type named '{}'", name)?;
-            },
+            }
+            ResolveErrorKind::RecursiveTypeAlias { name } => {
+                write!(f, "Recursive type alias '{}'", name)?;
+            }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }

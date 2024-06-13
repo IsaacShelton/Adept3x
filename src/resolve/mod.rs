@@ -28,7 +28,7 @@ use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 enum Job {
     Regular(FileIdentifier, usize, resolved::FunctionRef),
@@ -47,10 +47,27 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     let source_file_cache = ast.source_file_cache;
     let mut resolved_ast = resolved::Ast::new(source_file_cache);
 
+    let mut aliases: IndexMap<String, &'a ast::Alias> = IndexMap::new();
+
+    // Unify type aliases into single map
+    for (_, file) in ast.files.iter() {
+        for alias in file.aliases.values() {
+            if aliases.insert(alias.name.clone(), alias).is_some() {
+                return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
+                    name: alias.name.clone(),
+                }
+                .at(alias.source));
+            }
+        }
+    }
+
     let type_search_ctx = ctx
         .type_search_ctxs
         .entry(ast.primary_filename.clone())
-        .or_insert_with(|| TypeSearchCtx::new(source_file_cache));
+        .or_insert_with(|| TypeSearchCtx::new(source_file_cache, aliases));
+
+    // Temporarily used stack to keep track of used type aliases
+    let mut used_aliases = HashSet::<String>::new();
 
     // Precompute resolved struct types
     for (_, file) in ast.files.iter() {
@@ -65,6 +82,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                             type_search_ctx,
                             source_file_cache,
                             &field.ast_type,
+                            &mut used_aliases,
                         )?,
                         privacy: field.privacy,
                     },
@@ -93,9 +111,18 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
         }
     }
 
-    // Resolve aliases
+    // Resolve type aliases
     for (_, file) in ast.files.iter() {
-        todo!("resolve aliases");
+        for alias in file.aliases.values() {
+            let resolved_type = resolve_type(
+                type_search_ctx,
+                source_file_cache,
+                &alias.value,
+                &mut used_aliases,
+            )?;
+
+            type_search_ctx.put(alias.name.clone(), resolved_type.kind, alias.source)?;
+        }
     }
 
     let global_search_context = ctx
@@ -106,7 +133,12 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     // Resolve global variables
     for (_, file) in ast.files.iter() {
         for global in file.globals.iter() {
-            let resolved_type = resolve_type(type_search_ctx, source_file_cache, &global.ast_type)?;
+            let resolved_type = resolve_type(
+                type_search_ctx,
+                source_file_cache,
+                &global.ast_type,
+                &mut Default::default(),
+            )?;
 
             let global_ref = resolved_ast.globals.insert(resolved::Global {
                 name: global.name.clone(),
@@ -134,6 +166,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     type_search_ctx,
                     source_file_cache,
                     &function.return_type,
+                    &mut Default::default(),
                 )?,
                 stmts: vec![],
                 is_foreign: function.is_foreign,
@@ -207,8 +240,12 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                         .unwrap();
 
                     for parameter in ast_function.parameters.required.iter() {
-                        let resolved_type =
-                            resolve_type(type_search_ctx, source_file_cache, &parameter.ast_type)?;
+                        let resolved_type = resolve_type(
+                            type_search_ctx,
+                            source_file_cache,
+                            &parameter.ast_type,
+                            &mut Default::default(),
+                        )?;
                         let key = function.variables.add_parameter(resolved_type.clone());
 
                         variable_search_ctx.put(parameter.name.clone(), resolved_type, key);
@@ -592,10 +629,11 @@ enum Initialized {
     AllowUninitialized,
 }
 
-fn resolve_type(
-    type_search_ctx: &TypeSearchCtx<'_>,
+fn resolve_type<'a>(
+    type_search_ctx: &'a TypeSearchCtx<'_>,
     source_file_cache: &SourceFileCache,
-    ast_type: &ast::Type,
+    ast_type: &'a ast::Type,
+    used_aliases_stack: &mut HashSet<String>,
 ) -> Result<resolved::Type, ResolveError> {
     match &ast_type.kind {
         ast::TypeKind::Boolean => Ok(resolved::TypeKind::Boolean),
@@ -604,7 +642,12 @@ fn resolve_type(
             sign: *sign,
         }),
         ast::TypeKind::Pointer(inner) => {
-            let inner = match resolve_type(type_search_ctx, source_file_cache, &inner) {
+            let inner = match resolve_type(
+                type_search_ctx,
+                source_file_cache,
+                &inner,
+                used_aliases_stack,
+            ) {
                 Ok(inner) => inner,
                 Err(_) if inner.kind.allow_undeclared() => {
                     resolved::TypeKind::Void.at(inner.source)
@@ -615,9 +658,36 @@ fn resolve_type(
             Ok(resolved::TypeKind::Pointer(Box::new(inner)))
         }
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
-        ast::TypeKind::Named(name) => type_search_ctx
-            .find_type_or_error(&name, ast_type.source)
-            .cloned(),
+        ast::TypeKind::Named(name) => {
+            let search = type_search_ctx
+                .find_type_or_error(&name, ast_type.source)
+                .cloned();
+
+            match search {
+                Ok(found) => Ok(found),
+                Err(err) => {
+                    if let Some(definition) = type_search_ctx.find_alias(name) {
+                        if used_aliases_stack.insert(name.clone()) {
+                            let inner = resolve_type(
+                                type_search_ctx,
+                                source_file_cache,
+                                &definition.value,
+                                used_aliases_stack,
+                            );
+                            used_aliases_stack.remove(name.as_str());
+                            inner.map(|ty| ty.kind)
+                        } else {
+                            Err(ResolveErrorKind::RecursiveTypeAlias {
+                                name: definition.name.clone(),
+                            }
+                            .at(definition.source))
+                        }
+                    } else {
+                        Err(err)
+                    }
+                }
+            }
+        }
         ast::TypeKind::PlainOldData(inner) => match &inner.kind {
             ast::TypeKind::Named(name) => {
                 let resolved_inner_kind = type_search_ctx
@@ -656,6 +726,7 @@ fn resolve_type(
                         type_search_ctx,
                         source_file_cache,
                         &fixed_array.ast_type,
+                        used_aliases_stack,
                     )?;
 
                     Ok(resolved::TypeKind::FixedArray(Box::new(
@@ -672,8 +743,12 @@ fn resolve_type(
             let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
 
             for parameter in function_pointer.parameters.iter() {
-                let resolved_type =
-                    resolve_type(type_search_ctx, source_file_cache, &parameter.ast_type)?;
+                let resolved_type = resolve_type(
+                    type_search_ctx,
+                    source_file_cache,
+                    &parameter.ast_type,
+                    used_aliases_stack,
+                )?;
 
                 parameters.push(resolved::Parameter {
                     name: parameter.name.clone(),
@@ -685,6 +760,7 @@ fn resolve_type(
                 type_search_ctx,
                 source_file_cache,
                 &function_pointer.return_type,
+                used_aliases_stack,
             )?);
 
             Ok(resolved::TypeKind::FunctionPointer(
@@ -713,6 +789,7 @@ fn resolve_parameters(
                 type_search_ctx,
                 source_file_cache,
                 &parameter.ast_type,
+                &mut Default::default(),
             )?,
         });
     }

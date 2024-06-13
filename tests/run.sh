@@ -19,6 +19,7 @@ function expect_fail_compile() {
 
 pushd "$self" > /dev/null
 cargo build
+compile aliases
 compile and_or
 compile annotation_groups
 compile array_access
@@ -65,6 +66,7 @@ echo "[!] RUNNING CASES WITH EXPECTED FAILURE"
 
 expect_fail_compile _should_fail/mismatching_yielded_types
 expect_fail_compile _should_fail/partial_initialization
+expect_fail_compile _should_fail/recursive_type_alias
 expect_fail_compile _should_fail/uninitialized_member
 expect_fail_compile _should_fail/uninitialized_simple
 popd > /dev/null

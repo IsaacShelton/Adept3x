@@ -1,0 +1,7 @@
+
+alias Type1 = Type2
+alias Type2 = Type3
+alias Type3 = Type1
+
+func main {}
+

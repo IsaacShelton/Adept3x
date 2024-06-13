@@ -72,7 +72,7 @@ pub enum FileIdentifier {
 pub struct File {
     pub functions: Vec<Function>,
     pub structures: Vec<Structure>,
-    pub aliases: Vec<Alias>,
+    pub aliases: IndexMap<String, Alias>,
     pub globals: Vec<Global>,
 }
 
@@ -81,7 +81,7 @@ impl File {
         File {
             functions: vec![],
             structures: vec![],
-            aliases: vec![],
+            aliases: IndexMap::default(),
             globals: vec![],
         }
     }
@@ -153,6 +153,7 @@ pub struct Field {
 pub struct Alias {
     pub name: String,
     pub value: Type,
+    pub source: Source,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Hash)]

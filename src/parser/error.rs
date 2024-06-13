@@ -39,6 +39,9 @@ pub enum ParseErrorKind {
     ExpectedCommaInTypeParameters,
     ExpectedTypeParameters,
     ExpectedTypeName,
+    TypeAliasHasMultipleDefinitions {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -132,6 +135,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::ExpectedTypeName => {
                 write!(f, "Expected type name")?;
+            }
+            ParseErrorKind::TypeAliasHasMultipleDefinitions { name } => {
+                write!(f, "Type alias '{}' has multiple definitions", name)?;
             }
             ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

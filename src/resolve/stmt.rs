@@ -88,6 +88,7 @@ pub fn resolve_stmt<'a>(
                 ctx.type_search_ctx,
                 ctx.resolved_ast.source_file_cache,
                 &declaration.ast_type,
+                &mut Default::default(),
             )?;
 
             let value = declaration
