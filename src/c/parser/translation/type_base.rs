@@ -377,6 +377,7 @@ pub fn make_composite(
                     fields,
                     is_packed,
                     prefer_pod: true,
+                    source: composite.source,
                 });
 
                 Ok(TypeKind::Named(name))

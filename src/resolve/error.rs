@@ -119,6 +119,9 @@ pub enum ResolveErrorKind {
         got: String,
     },
     ArraySizeTooLarge,
+    MultipleDefinitionsOfTypeNamed {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -322,6 +325,9 @@ impl Display for ResolveErrorKind {
             ResolveErrorKind::ArraySizeTooLarge => {
                 write!(f, "Array size is too large")?;
             }
+            ResolveErrorKind::MultipleDefinitionsOfTypeNamed { name } => {
+                write!(f, "Multiple definitions of type named '{}'", name)?;
+            },
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }

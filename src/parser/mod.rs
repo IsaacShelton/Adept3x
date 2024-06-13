@@ -224,6 +224,7 @@ where
     }
 
     fn parse_structure(&mut self, annotations: Vec<Annotation>) -> Result<Structure, ParseError> {
+        let source = self.source_here();
         self.input.advance();
 
         let name = self.parse_identifier(Some("for struct name after 'struct' keyword"))?;
@@ -276,6 +277,7 @@ where
             fields,
             is_packed,
             prefer_pod: false,
+            source,
         })
     }
 

@@ -37,7 +37,7 @@ enum Job {
 #[derive(Default)]
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
-    pub type_search_contexts: HashMap<String, TypeSearchCtx<'a>>,
+    pub type_search_ctxs: HashMap<String, TypeSearchCtx<'a>>,
     pub function_search_contexts: HashMap<String, FunctionSearchCtx<'a>>,
     pub global_search_contexts: HashMap<String, GlobalSearchCtx<'a>>,
 }
@@ -48,7 +48,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     let mut resolved_ast = resolved::Ast::new(source_file_cache);
 
     let type_search_ctx = ctx
-        .type_search_contexts
+        .type_search_ctxs
         .entry(ast.primary_filename.clone())
         .or_insert_with(|| TypeSearchCtx::new(source_file_cache));
 
@@ -81,14 +81,21 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 type_search_ctx.put(
                     structure.name.clone(),
                     resolved::TypeKind::PlainOldData(structure.name.clone(), structure_key),
-                );
+                    structure.source,
+                )?;
             } else {
                 type_search_ctx.put(
                     structure.name.clone(),
                     resolved::TypeKind::ManagedStructure(structure.name.clone(), structure_key),
-                );
+                    structure.source,
+                )?;
             }
         }
+    }
+
+    // Resolve aliases
+    for (_, file) in ast.files.iter() {
+        todo!("resolve aliases");
     }
 
     let global_search_context = ctx
@@ -172,7 +179,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                     .expect("function search context to exist for file");
 
                 let type_search_ctx = ctx
-                    .type_search_contexts
+                    .type_search_ctxs
                     .get(&ast.primary_filename)
                     .expect("type search context to exist for file");
 
@@ -586,7 +593,7 @@ enum Initialized {
 }
 
 fn resolve_type(
-    type_search_context: &TypeSearchCtx<'_>,
+    type_search_ctx: &TypeSearchCtx<'_>,
     source_file_cache: &SourceFileCache,
     ast_type: &ast::Type,
 ) -> Result<resolved::Type, ResolveError> {
@@ -597,7 +604,7 @@ fn resolve_type(
             sign: *sign,
         }),
         ast::TypeKind::Pointer(inner) => {
-            let inner = match resolve_type(type_search_context, source_file_cache, &inner) {
+            let inner = match resolve_type(type_search_ctx, source_file_cache, &inner) {
                 Ok(inner) => inner,
                 Err(_) if inner.kind.allow_undeclared() => {
                     resolved::TypeKind::Void.at(inner.source)
@@ -608,12 +615,12 @@ fn resolve_type(
             Ok(resolved::TypeKind::Pointer(Box::new(inner)))
         }
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
-        ast::TypeKind::Named(name) => type_search_context
+        ast::TypeKind::Named(name) => type_search_ctx
             .find_type_or_error(&name, ast_type.source)
             .cloned(),
         ast::TypeKind::PlainOldData(inner) => match &inner.kind {
             ast::TypeKind::Named(name) => {
-                let resolved_inner_kind = type_search_context
+                let resolved_inner_kind = type_search_ctx
                     .find_type_or_error(&name, ast_type.source)
                     .cloned()?;
 
@@ -646,7 +653,7 @@ fn resolve_type(
             if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
                 if let Ok(size) = integer.value().try_into() {
                     let inner = resolve_type(
-                        type_search_context,
+                        type_search_ctx,
                         source_file_cache,
                         &fixed_array.ast_type,
                     )?;
@@ -666,7 +673,7 @@ fn resolve_type(
 
             for parameter in function_pointer.parameters.iter() {
                 let resolved_type =
-                    resolve_type(type_search_context, source_file_cache, &parameter.ast_type)?;
+                    resolve_type(type_search_ctx, source_file_cache, &parameter.ast_type)?;
 
                 parameters.push(resolved::Parameter {
                     name: parameter.name.clone(),
@@ -675,7 +682,7 @@ fn resolve_type(
             }
 
             let return_type = Box::new(resolve_type(
-                type_search_context,
+                type_search_ctx,
                 source_file_cache,
                 &function_pointer.return_type,
             )?);
@@ -693,7 +700,7 @@ fn resolve_type(
 }
 
 fn resolve_parameters(
-    type_search_context: &TypeSearchCtx<'_>,
+    type_search_ctx: &TypeSearchCtx<'_>,
     source_file_cache: &SourceFileCache,
     parameters: &ast::Parameters,
 ) -> Result<resolved::Parameters, ResolveError> {
@@ -703,7 +710,7 @@ fn resolve_parameters(
         required.push(resolved::Parameter {
             name: parameter.name.clone(),
             resolved_type: resolve_type(
-                type_search_context,
+                type_search_ctx,
                 source_file_cache,
                 &parameter.ast_type,
             )?,

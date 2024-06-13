@@ -34,7 +34,19 @@ impl<'a> TypeSearchCtx<'a> {
         self.types.get(name)
     }
 
-    pub fn put(&mut self, name: impl ToString, value: resolved::TypeKind) {
-        self.types.insert(name.to_string(), value);
+    pub fn put(
+        &mut self,
+        name: impl ToString,
+        value: resolved::TypeKind,
+        source: Source,
+    ) -> Result<(), ResolveError> {
+        if self.types.insert(name.to_string(), value).is_none() {
+            Ok(())
+        } else {
+            Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
+                name: name.to_string(),
+            }
+            .at(source))
+        }
     }
 }

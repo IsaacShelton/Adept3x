@@ -133,6 +133,7 @@ pub struct Structure {
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
     pub prefer_pod: bool,
+    pub source: Source,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
