@@ -114,7 +114,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     // Resolve type aliases
     for (_, file) in ast.files.iter() {
         for alias in file.aliases.values() {
-            let resolved_type = resolve_type(
+            let resolved_type = resolve_type_or_undeclared(
                 type_search_ctx,
                 source_file_cache,
                 &alias.value,
@@ -629,6 +629,26 @@ enum Initialized {
     AllowUninitialized,
 }
 
+fn resolve_type_or_undeclared<'a>(
+    type_search_ctx: &'a TypeSearchCtx<'_>,
+    source_file_cache: &SourceFileCache,
+    ast_type: &'a ast::Type,
+    used_aliases_stack: &mut HashSet<String>,
+) -> Result<resolved::Type, ResolveError> {
+    match resolve_type(
+        type_search_ctx,
+        source_file_cache,
+        ast_type,
+        used_aliases_stack,
+    ) {
+        Ok(inner) => Ok(inner),
+        Err(_) if ast_type.kind.allow_undeclared() => {
+            Ok(resolved::TypeKind::Void.at(ast_type.source))
+        }
+        Err(err) => Err(err),
+    }
+}
+
 fn resolve_type<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
     source_file_cache: &SourceFileCache,
@@ -642,18 +662,12 @@ fn resolve_type<'a>(
             sign: *sign,
         }),
         ast::TypeKind::Pointer(inner) => {
-            let inner = match resolve_type(
+            let inner = resolve_type_or_undeclared(
                 type_search_ctx,
                 source_file_cache,
                 &inner,
                 used_aliases_stack,
-            ) {
-                Ok(inner) => inner,
-                Err(_) if inner.kind.allow_undeclared() => {
-                    resolved::TypeKind::Void.at(inner.source)
-                }
-                Err(err) => return Err(err),
-            };
+            )?;
 
             Ok(resolved::TypeKind::Pointer(Box::new(inner)))
         }

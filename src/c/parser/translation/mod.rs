@@ -19,11 +19,25 @@ pub fn declare_named(
     declaration_specifiers: &DeclarationSpecifiers,
     typedefs: &mut HashMap<String, CTypedef>,
 ) -> Result<(), ParseError> {
-    let (name, ast_type, is_typedef) =
-        get_name_and_type(ast_file, typedefs, declarator, declaration_specifiers, false)?;
+    let (name, ast_type, is_typedef) = get_name_and_type(
+        ast_file,
+        typedefs,
+        declarator,
+        declaration_specifiers,
+        false,
+    )?;
 
     if is_typedef {
-        typedefs.insert(name.to_string(), CTypedef { ast_type });
+        ast_file.aliases.insert(
+            name.to_string(),
+            ast::Alias {
+                name: name.clone(),
+                value: ast_type.clone(),
+                source: declarator.source,
+            },
+        );
+
+        typedefs.insert(name, CTypedef { ast_type });
         Ok(())
     } else {
         todo!(
@@ -68,16 +82,25 @@ pub fn declare_function(
     parameter_type_list: &ParameterTypeList,
 ) -> Result<(), ParseError> {
     let source = declarator.source;
-    let (name, return_type, is_typedef) =
-        get_name_and_type(ast_file, typedefs, declarator, declaration_specifiers, false)?;
+    let (name, return_type, is_typedef) = get_name_and_type(
+        ast_file,
+        typedefs,
+        declarator,
+        declaration_specifiers,
+        false,
+    )?;
     let mut required = vec![];
 
     if has_parameters(&parameter_type_list) {
         for param in parameter_type_list.parameter_declarations.iter() {
             let (name, ast_type, is_typedef) = match &param.core {
-                ParameterDeclarationCore::Declarator(declarator) => {
-                    get_name_and_type(ast_file, typedefs, declarator, &param.declaration_specifiers, true)?
-                }
+                ParameterDeclarationCore::Declarator(declarator) => get_name_and_type(
+                    ast_file,
+                    typedefs,
+                    declarator,
+                    &param.declaration_specifiers,
+                    true,
+                )?,
                 ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
                 ParameterDeclarationCore::Nothing => todo!(),
             };
