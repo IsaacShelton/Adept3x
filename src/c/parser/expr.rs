@@ -327,7 +327,7 @@ impl<'a> Parser<'a> {
         }
 
         // Is cast?
-        if let Ok(caster) = speculate!(self.input, self.parse_caster()) {
+        if let Ok(_caster) = speculate!(self.input, self.parse_caster()) {
             if self.eat_punctuator(Punctuator::OpenCurly) {
                 // Compound literal
                 return todo!();

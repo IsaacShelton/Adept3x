@@ -1166,8 +1166,8 @@ impl<'a> Parser<'a> {
     fn parse_constant_expression(&mut self) -> Result<ConstExpr, ParseError> {
         let value = self.parse_expr_singular()?;
 
-        eprintln!("warning: constant expressions are not validated to not contain '='");
-
+        // NOTE: We won't check if the constant expression is actually constant
+        // unless we actually need to evaluate it
         Ok(ConstExpr { value })
     }
 

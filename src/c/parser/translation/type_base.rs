@@ -352,6 +352,13 @@ pub fn make_composite(
                                         false,
                                     )?;
 
+                                    if is_typedef {
+                                        return Err(ParseErrorKind::Misc(
+                                            "Cannot typedef a composite's member",
+                                        )
+                                        .at(declarator.source));
+                                    }
+
                                     fields.insert(
                                         name.clone(),
                                         Field {
