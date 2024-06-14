@@ -358,6 +358,9 @@ fn lower_type(
         resolved::TypeKind::AnonymousUnion() => {
             todo!("lower anonymous union")
         }
+        resolved::TypeKind::AnonymousEnum(anonymous_enum) => {
+            lower_type(&anonymous_enum.resolved_type, resolved_ast)
+        },
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
             let inner = lower_type(&fixed_array.inner, resolved_ast)?;
@@ -936,7 +939,6 @@ fn lower_expr(
             };
 
             Ok(match ir_type {
-                // ir::Type::Boolean => todo!(),
                 ir::Type::S8 => {
                     ir::Value::Literal(Literal::Signed8(value.try_into().map_err(make_error)?))
                 }

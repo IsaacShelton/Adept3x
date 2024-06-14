@@ -175,7 +175,7 @@ pub unsafe fn llvm_backend(
     }
 
     // Link resulting object file to create executable
-    Command::new("gcc")
+    let mut command = Command::new("gcc")
         .args([
             output_object_filepath.as_os_str(),
             OsStr::new("-o"),
@@ -183,6 +183,22 @@ pub unsafe fn llvm_backend(
         ])
         .spawn()
         .expect("Failed to link");
+
+    match command.wait() {
+        Ok(status) => {
+            if !status.success() {
+                return Err(BackendError {
+                    message: "Failed to link".into(),
+                });
+            }
+        }
+        Err(_) => {
+            return Err(BackendError {
+                message: "Failed to spawn linker".into(),
+            });
+        }
+    }
+
     Ok(())
 }
 

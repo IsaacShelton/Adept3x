@@ -276,7 +276,7 @@ pub enum TypeKind {
     Void,
     Named(String),
     AnonymousStruct(AnonymousStruct),
-    AnonymousUnion(),
+    AnonymousUnion(AnoymousUnion),
     AnonymousEnum(AnonymousEnum),
     FunctionPointer(FunctionPointer),
 }
@@ -305,11 +305,15 @@ pub struct AnonymousStruct {
 }
 
 #[derive(Clone, Debug)]
-pub struct AnonymousEnum {
-    pub members: IndexMap<String, EnumMember>,
-}
+pub struct AnoymousUnion {}
 
 #[derive(Clone, Debug)]
+pub struct AnonymousEnum {
+    pub members: IndexMap<String, EnumMember>,
+    pub backing_type: Option<Box<Type>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct EnumMember {
     pub value: BigInt,
     pub explicit_value: bool,

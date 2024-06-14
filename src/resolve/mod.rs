@@ -19,7 +19,7 @@ use self::{
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
-    ast::{self, Ast, FileIdentifier, Source},
+    ast::{self, Ast, FileIdentifier, Source, Type},
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
 };
@@ -28,7 +28,10 @@ use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet, VecDeque},
+};
 
 enum Job {
     Regular(FileIdentifier, usize, resolved::FunctionRef),
@@ -72,20 +75,13 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     // Pre-compute resolved enum types
     for (_, file) in ast.files.iter() {
         for enum_definition in file.enums.values() {
-            let resolved_type = if let Some(backing_type) = &enum_definition.backing_type {
-                resolve_type(
-                    type_search_ctx,
-                    source_file_cache,
-                    backing_type,
-                    &mut used_aliases,
-                )?
-            } else {
-                resolved::TypeKind::Integer {
-                    bits: IntegerBits::Bits64,
-                    sign: IntegerSign::Unsigned,
-                }
-                .at(enum_definition.source)
-            };
+            let resolved_type = resolve_enum_backing_type(
+                type_search_ctx,
+                source_file_cache,
+                enum_definition.backing_type.as_ref(),
+                &mut used_aliases,
+                enum_definition.source,
+            )?;
 
             let members = enum_definition.members.clone();
 
@@ -770,7 +766,23 @@ fn resolve_type<'a>(
         ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Float(*size)),
         ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
-        ast::TypeKind::AnonymousEnum(..) => todo!("resolve anonymous enum type"),
+        ast::TypeKind::AnonymousEnum(anonymous_enum) => {
+            let resolved_type = Box::new(resolve_enum_backing_type(
+                type_search_ctx,
+                source_file_cache,
+                anonymous_enum.backing_type.as_deref(),
+                &mut Default::default(),
+                ast_type.source,
+            )?);
+
+            let members = anonymous_enum.members.clone();
+
+            Ok(resolved::TypeKind::AnonymousEnum(resolved::AnonymousEnum {
+                resolved_type,
+                source: ast_type.source,
+                members,
+            }))
+        }
         ast::TypeKind::FixedArray(fixed_array) => {
             if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
                 if let Ok(size) = integer.value().try_into() {
@@ -868,5 +880,28 @@ fn ensure_initialized(
             _ => ResolveErrorKind::CannotUseUninitializedValue,
         }
         .at(subject.source))
+    }
+}
+
+fn resolve_enum_backing_type(
+    type_search_ctx: &TypeSearchCtx,
+    source_file_cache: &SourceFileCache,
+    backing_type: Option<impl Borrow<Type>>,
+    used_aliases: &mut HashSet<String>,
+    source: Source,
+) -> Result<resolved::Type, ResolveError> {
+    if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {
+        resolve_type(
+            type_search_ctx,
+            source_file_cache,
+            backing_type,
+            used_aliases,
+        )
+    } else {
+        Ok(resolved::TypeKind::Integer {
+            bits: IntegerBits::Bits64,
+            sign: IntegerSign::Unsigned,
+        }
+        .at(source))
     }
 }

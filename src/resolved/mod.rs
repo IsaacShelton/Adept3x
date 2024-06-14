@@ -153,9 +153,25 @@ pub enum TypeKind {
     ManagedStructure(String, StructureRef),
     AnonymousStruct(),
     AnonymousUnion(),
+    AnonymousEnum(AnonymousEnum),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
     Enum(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct AnonymousEnum {
+    pub resolved_type: Box<Type>,
+    pub source: Source,
+    pub members: IndexMap<String, EnumMember>,
+}
+
+impl PartialEq for AnonymousEnum {
+    fn eq(&self, other: &Self) -> bool {
+        self.resolved_type.kind.eq(&other.resolved_type.kind)
+            && self.source.eq(&other.source)
+            && self.members.eq(&other.members)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -196,6 +212,7 @@ impl TypeKind {
             TypeKind::FixedArray(..) => None,
             TypeKind::FunctionPointer(..) => None,
             TypeKind::Enum(_) => None,
+            TypeKind::AnonymousEnum(_) => None,
         }
     }
 
@@ -246,6 +263,7 @@ impl Display for TypeKind {
             TypeKind::ManagedStructure(name, _) => f.write_str(name)?,
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
+            TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }

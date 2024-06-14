@@ -285,11 +285,16 @@ pub fn make_anonymous_enum(enumeration: &Enumeration) -> Result<TypeKind, ParseE
                 }
             }
 
-            if definition.enum_type_specifier.is_some() {
+            let backing_type = if definition.enum_type_specifier.is_some() {
                 todo!("anonymous enum type specifiers not supported yet");
-            }
+            } else {
+                None
+            };
 
-            Ok(TypeKind::AnonymousEnum(AnonymousEnum { members }))
+            Ok(TypeKind::AnonymousEnum(AnonymousEnum {
+                members,
+                backing_type,
+            }))
         }
         Enumeration::Named(named) => {
             if named.enum_type_specifier.is_some() {
