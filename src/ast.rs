@@ -74,6 +74,7 @@ pub struct File {
     pub structures: Vec<Structure>,
     pub aliases: IndexMap<String, Alias>,
     pub globals: Vec<Global>,
+    pub enums: IndexMap<String, Enum>,
 }
 
 impl File {
@@ -83,6 +84,7 @@ impl File {
             structures: vec![],
             aliases: IndexMap::default(),
             globals: vec![],
+            enums: IndexMap::default(),
         }
     }
 }
@@ -154,6 +156,14 @@ pub struct Alias {
     pub name: String,
     pub value: Type,
     pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct Enum {
+    pub name: String,
+    pub backing_type: Option<Type>,
+    pub source: Source,
+    pub members: IndexMap<String, EnumMember>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Hash)]
@@ -416,6 +426,11 @@ pub struct Expr {
     pub source: Source,
 }
 
+#[derive(Clone, Debug)]
+pub struct ConstExpr {
+    pub value: Expr,
+}
+
 impl Expr {
     pub fn new(kind: ExprKind, source: Source) -> Self {
         Self { kind, source }
@@ -440,6 +455,7 @@ pub enum ExprKind {
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
+    EnumMemberLiteral(EnumMemberLiteral),
 }
 
 impl ExprKind {
@@ -644,4 +660,11 @@ pub struct Call {
 pub struct DeclareAssign {
     pub name: String,
     pub value: Box<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumMemberLiteral {
+    pub enum_name: String,
+    pub variant_name: String,
+    pub source: Source,
 }

@@ -13,6 +13,8 @@ use std::{
 use thin_vec::ThinVec;
 
 pub use self::variable_storage::VariableStorageKey;
+pub use crate::ast::EnumMember;
+pub use crate::ast::EnumMemberLiteral;
 pub use crate::ast::ShortCircuitingBinaryOperator;
 pub use crate::ast::UnaryOperator;
 pub use crate::ast::{FloatSize, IntegerBits, IntegerSign};
@@ -31,6 +33,7 @@ pub struct Ast<'a> {
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalRef, Global>,
+    pub enums: IndexMap<String, Enum>,
 }
 
 impl<'a> Ast<'a> {
@@ -41,8 +44,17 @@ impl<'a> Ast<'a> {
             functions: SlotMap::with_key(),
             structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
+            enums: IndexMap::new(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Enum {
+    pub name: String,
+    pub resolved_type: Type,
+    pub source: Source,
+    pub members: IndexMap<String, EnumMember>,
 }
 
 #[derive(Clone, Debug)]
@@ -143,6 +155,7 @@ pub enum TypeKind {
     AnonymousUnion(),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
+    Enum(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -182,6 +195,7 @@ impl TypeKind {
             TypeKind::AnonymousUnion(..) => None,
             TypeKind::FixedArray(..) => None,
             TypeKind::FunctionPointer(..) => None,
+            TypeKind::Enum(_) => None,
         }
     }
 
@@ -236,6 +250,7 @@ impl Display for TypeKind {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
             TypeKind::FunctionPointer(..) => f.write_str("(function pointer type)")?,
+            TypeKind::Enum(enum_name) => write!(f, "(enum) {}", enum_name)?,
         }
 
         Ok(())
@@ -382,6 +397,7 @@ pub enum ExprKind {
     Conditional(Conditional),
     While(While),
     ArrayAccess(Box<ArrayAccess>),
+    EnumMemberLiteral(EnumMemberLiteral),
 }
 
 impl ExprKind {

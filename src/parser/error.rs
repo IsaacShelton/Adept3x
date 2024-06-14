@@ -42,6 +42,8 @@ pub enum ParseErrorKind {
     TypeAliasHasMultipleDefinitions {
         name: String,
     },
+    ExpectedEnumName,
+    ExpectedEnumMemberName,
     Other {
         message: String,
     },
@@ -138,6 +140,12 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::TypeAliasHasMultipleDefinitions { name } => {
                 write!(f, "Type alias '{}' has multiple definitions", name)?;
+            }
+            ParseErrorKind::ExpectedEnumName => {
+                write!(f, "Expected enum name")?;
+            }
+            ParseErrorKind::ExpectedEnumMemberName => {
+                write!(f, "Expected enum member name")?;
             }
             ParseErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

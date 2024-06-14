@@ -27,7 +27,14 @@ pub enum LowerErrorKind {
     CannotFit {
         value: String,
         expected_type: String,
-    }
+    },
+    NoSuchEnumMember {
+        enum_name: String,
+        variant_name: String,
+    },
+    EnumBackingTypeMustBeInteger {
+        enum_name: String,
+    },
 }
 
 impl LowerErrorKind {
@@ -72,8 +79,20 @@ impl Display for LowerErrorKind {
             LowerErrorKind::CannotLowerUnspecializedFloatLiteral { value } => {
                 write!(f, "Cannot lower unspecialized float literal {}", value)
             }
-            LowerErrorKind::CannotFit { value, expected_type } => {
+            LowerErrorKind::CannotFit {
+                value,
+                expected_type,
+            } => {
                 write!(f, "Cannot fit {} into {}", value, expected_type)
+            }
+            LowerErrorKind::NoSuchEnumMember {
+                enum_name,
+                variant_name,
+            } => {
+                write!(f, "No member '{}' of enum '{}'", variant_name, enum_name)
+            }
+            LowerErrorKind::EnumBackingTypeMustBeInteger { enum_name } => {
+                write!(f, "Backing type must be integer for enum '{}'", enum_name)
             }
         }
     }

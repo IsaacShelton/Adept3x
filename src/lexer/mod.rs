@@ -280,6 +280,10 @@ where
                     self.characters.next();
                     Has(Token::new(TokenKind::DeclareAssign, location))
                 }
+                ':' if self.characters.peek().is_character(':') => {
+                    self.characters.next();
+                    Has(Token::new(TokenKind::Namespace, location))
+                }
                 ':' => Has(Token::new(TokenKind::Colon, location)),
                 '#' => Has(Token::new(TokenKind::Hash, location)),
                 '\"' => {

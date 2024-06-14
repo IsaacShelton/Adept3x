@@ -331,7 +331,7 @@ pub enum MemberDeclaration {
 
 #[derive(Clone, Debug)]
 pub struct StaticAssertDeclaration {
-    pub condition: ConstantExpression,
+    pub condition: ConstExpr,
     pub message: Option<String>,
 }
 
@@ -345,7 +345,7 @@ pub struct Member {
 #[derive(Clone, Debug)]
 pub enum MemberDeclarator {
     Declarator(Declarator),
-    BitField(Option<Declarator>, ConstantExpression),
+    BitField(Option<Declarator>, ConstExpr),
 }
 
 #[derive(Clone, Debug)]
@@ -372,7 +372,7 @@ pub struct CommonDeclaration {
 pub struct FunctionDefinition {}
 
 #[derive(Clone, Debug)]
-pub struct ConstantExpression {
+pub struct ConstExpr {
     pub value: Expr,
 }
 
@@ -400,7 +400,7 @@ pub struct EnumTypeSpecifier {
 pub struct Enumerator {
     pub name: String,
     pub attributes: Vec<()>,
-    pub value: Option<ConstantExpression>,
+    pub value: Option<ConstExpr>,
     pub source: Source,
 }
 
@@ -1163,12 +1163,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_constant_expression(&mut self) -> Result<ConstantExpression, ParseError> {
+    fn parse_constant_expression(&mut self) -> Result<ConstExpr, ParseError> {
         let value = self.parse_expr_singular()?;
 
         eprintln!("warning: constant expressions are not validated to not contain '='");
 
-        Ok(ConstantExpression { value })
+        Ok(ConstExpr { value })
     }
 
     fn parse_specifier_qualifier_list(&mut self) -> Result<SpecifierQualifierList, ParseError> {

@@ -310,6 +310,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
             ));
             mini_scope.union_with(&insert_drops_for_expr(ctx.clone(), &mut array_access.index));
         }
+        ExprKind::EnumMemberLiteral(_enum_member_literal) => (),
     }
 
     mini_scope
@@ -420,7 +421,8 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         | ExprKind::Integer { .. }
         | ExprKind::Float(..)
         | ExprKind::String(_)
-        | ExprKind::NullTerminatedString(_) => (),
+        | ExprKind::NullTerminatedString(_)
+        | ExprKind::EnumMemberLiteral(_) => (),
         ExprKind::Call(call) => {
             for argument in call.arguments.iter_mut() {
                 integrate_active_set_for_expr(argument, active_set);

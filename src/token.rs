@@ -109,6 +109,7 @@ pub enum TokenKind {
     LogicalRightShift,
     Increment,
     Decrement,
+    Namespace,
 }
 
 impl Display for TokenKind {
@@ -184,6 +185,7 @@ impl Display for TokenKind {
             TokenKind::LogicalRightShift => "'>>>'",
             TokenKind::Increment => "'++'",
             TokenKind::Decrement => "'--'",
+            TokenKind::Namespace => "'::'",
         })
     }
 }
@@ -261,7 +263,8 @@ impl TokenKind {
             | TokenKind::Comma
             | TokenKind::Colon
             | TokenKind::Hash
-            | TokenKind::Ellipsis => 0,
+            | TokenKind::Ellipsis
+            | TokenKind::Namespace => 0,
         }
     }
 

@@ -16,15 +16,15 @@ pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, LowerError> {
     let mut ir_module = ir::Module::new();
 
     for (structure_ref, structure) in ast.structures.iter() {
-        lower_structure(&mut ir_module, structure_ref, structure)?;
+        lower_structure(&mut ir_module, structure_ref, structure, ast)?;
     }
 
     for (global_ref, global) in ast.globals.iter() {
-        lower_global(&mut ir_module, global_ref, global)?;
+        lower_global(&mut ir_module, global_ref, global, ast)?;
     }
 
     for (function_ref, function) in ast.functions.iter() {
-        lower_function(&mut ir_module, function_ref, function)?;
+        lower_function(&mut ir_module, function_ref, function, ast)?;
     }
 
     Ok(ir_module)
@@ -34,11 +34,12 @@ fn lower_structure(
     ir_module: &mut ir::Module,
     structure_ref: resolved::StructureRef,
     structure: &resolved::Structure,
+    resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     for field in structure.fields.values() {
-        fields.push(lower_type(&field.resolved_type)?);
+        fields.push(lower_type(&field.resolved_type, resolved_ast)?);
     }
 
     ir_module.structures.insert(
@@ -56,12 +57,13 @@ fn lower_global(
     ir_module: &mut ir::Module,
     global_ref: resolved::GlobalRef,
     global: &resolved::Global,
+    resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
     ir_module.globals.insert(
         global_ref,
         Global {
             mangled_name: global.name.to_string(),
-            ir_type: lower_type(&global.resolved_type)?,
+            ir_type: lower_type(&global.resolved_type, resolved_ast)?,
             is_foreign: global.is_foreign,
             is_thread_local: global.is_thread_local,
         },
@@ -74,6 +76,7 @@ fn lower_function(
     ir_module: &mut ir::Module,
     function_ref: resolved::FunctionRef,
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
     let basicblocks = if !function.is_foreign {
         let mut builder = Builder::new();
@@ -87,6 +90,7 @@ fn lower_function(
             .map(|instance| {
                 Ok(builder.push(ir::Instruction::Alloca(lower_type(
                     &instance.resolved_type,
+                    resolved_ast,
                 )?)))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -100,6 +104,7 @@ fn lower_function(
         {
             builder.push(ir::Instruction::Alloca(lower_type(
                 &variable_instance.resolved_type,
+                resolved_ast,
             )?));
         }
 
@@ -112,7 +117,13 @@ fn lower_function(
             }));
         }
 
-        lower_stmts(&mut builder, ir_module, &function.stmts, function)?;
+        lower_stmts(
+            &mut builder,
+            ir_module,
+            &function.stmts,
+            function,
+            resolved_ast,
+        )?;
 
         if !builder.is_block_terminated() {
             if function.return_type.kind.is_void() {
@@ -139,10 +150,10 @@ fn lower_function(
 
     let mut parameters = vec![];
     for parameter in function.parameters.required.iter() {
-        parameters.push(lower_type(&parameter.resolved_type)?);
+        parameters.push(lower_type(&parameter.resolved_type, resolved_ast)?);
     }
 
-    let mut return_type = lower_type(&function.return_type)?;
+    let mut return_type = lower_type(&function.return_type, resolved_ast)?;
 
     if function.name == "main" {
         if let ir::Type::Void = return_type {
@@ -172,6 +183,7 @@ fn lower_stmts(
     ir_module: &ir::Module,
     stmts: &[resolved::Stmt],
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<Value, LowerError> {
     let mut result = Value::Literal(Literal::Void);
 
@@ -179,11 +191,17 @@ fn lower_stmts(
         result = match &stmt.kind {
             StmtKind::Return(expr, drops) => {
                 for variable_key in drops.drops.iter() {
-                    lower_drop(builder, *variable_key, function)?;
+                    lower_drop(builder, *variable_key, function, resolved_ast)?;
                 }
 
                 let instruction = ir::Instruction::Return(if let Some(expr) = expr {
-                    Some(lower_expr(builder, ir_module, expr, function)?)
+                    Some(lower_expr(
+                        builder,
+                        ir_module,
+                        expr,
+                        function,
+                        resolved_ast,
+                    )?)
                 } else if function.name == "main" {
                     Some(ir::Value::Literal(Literal::Signed32(0)))
                 } else {
@@ -193,7 +211,9 @@ fn lower_stmts(
                 builder.push(instruction);
                 Value::Literal(Literal::Void)
             }
-            StmtKind::Expr(expr) => lower_expr(builder, ir_module, &expr.expr, function)?,
+            StmtKind::Expr(expr) => {
+                lower_expr(builder, ir_module, &expr.expr, function, resolved_ast)?
+            }
             StmtKind::Declaration(declaration) => {
                 let destination = Value::Reference(ValueReference {
                     basicblock_id: 0,
@@ -201,7 +221,7 @@ fn lower_stmts(
                 });
 
                 if let Some(value) = &declaration.value {
-                    let source = lower_expr(builder, ir_module, value, function)?;
+                    let source = lower_expr(builder, ir_module, value, function, resolved_ast)?;
 
                     builder.push(ir::Instruction::Store(ir::Store {
                         new_value: source,
@@ -212,13 +232,25 @@ fn lower_stmts(
                 Value::Literal(Literal::Void)
             }
             StmtKind::Assignment(assignment) => {
-                let destination =
-                    lower_destination(builder, ir_module, &assignment.destination, function)?;
+                let destination = lower_destination(
+                    builder,
+                    ir_module,
+                    &assignment.destination,
+                    function,
+                    resolved_ast,
+                )?;
 
-                let new_value = lower_expr(builder, ir_module, &assignment.value, function)?;
+                let new_value = lower_expr(
+                    builder,
+                    ir_module,
+                    &assignment.value,
+                    function,
+                    resolved_ast,
+                )?;
 
                 let new_value = if let Some(operator) = &assignment.operator {
-                    let destination_type = lower_type(&assignment.destination.resolved_type)?;
+                    let destination_type =
+                        lower_type(&assignment.destination.resolved_type, resolved_ast)?;
 
                     let existing_value = builder.push(ir::Instruction::Load((
                         destination.clone(),
@@ -244,7 +276,7 @@ fn lower_stmts(
         };
 
         for variable_key in stmt.drops.iter() {
-            lower_drop(builder, *variable_key, function)?;
+            lower_drop(builder, *variable_key, function, resolved_ast)?;
         }
     }
 
@@ -255,6 +287,7 @@ fn lower_drop(
     builder: &mut Builder,
     variable_key: VariableStorageKey,
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
     let variable = function
         .variables
@@ -263,7 +296,7 @@ fn lower_drop(
 
     if variable.resolved_type.kind.is_managed_structure() {
         let variable_pointer = lower_variable_to_value(variable_key);
-        let variable_type = lower_type(&variable.resolved_type)?;
+        let variable_type = lower_type(&variable.resolved_type, resolved_ast)?;
         let heap_pointer = builder.push(ir::Instruction::Load((variable_pointer, variable_type)));
         builder.push(ir::Instruction::Free(heap_pointer));
     }
@@ -271,7 +304,10 @@ fn lower_drop(
     Ok(())
 }
 
-fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
+fn lower_type(
+    resolved_type: &resolved::Type,
+    resolved_ast: &resolved::Ast,
+) -> Result<ir::Type, LowerError> {
     use resolved::{IntegerBits as Bits, IntegerSign as Sign};
 
     match &resolved_type.kind {
@@ -305,7 +341,10 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
             FloatSize::Bits32 => ir::Type::F32,
             FloatSize::Bits64 => ir::Type::F64,
         }),
-        resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(inner)?))),
+        resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
+            inner,
+            resolved_ast,
+        )?))),
         resolved::TypeKind::Void => Ok(ir::Type::Void),
         resolved::TypeKind::ManagedStructure(_, structure_ref) => {
             Ok(ir::Type::Structure(*structure_ref).reference_counted_pointer())
@@ -321,7 +360,7 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
         }
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
-            let inner = lower_type(&fixed_array.inner)?;
+            let inner = lower_type(&fixed_array.inner, resolved_ast)?;
 
             Ok(ir::Type::FixedArray(Box::new(ir::FixedArray {
                 size,
@@ -332,16 +371,24 @@ fn lower_type(resolved_type: &resolved::Type) -> Result<ir::Type, LowerError> {
             let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
 
             for parameter in function_pointer.parameters.iter() {
-                parameters.push(lower_type(&parameter.resolved_type)?);
+                parameters.push(lower_type(&parameter.resolved_type, resolved_ast)?);
             }
 
-            let return_type = Box::new(lower_type(&function_pointer.return_type)?);
+            let return_type = Box::new(lower_type(&function_pointer.return_type, resolved_ast)?);
 
             Ok(ir::Type::Function(ir::TypeFunction {
                 parameters,
                 return_type,
                 is_cstyle_variadic: function_pointer.is_cstyle_variadic,
             }))
+        }
+        resolved::TypeKind::Enum(enum_name) => {
+            let enum_definition = resolved_ast
+                .enums
+                .get(enum_name)
+                .expect("referenced enum to exist");
+
+            lower_type(&enum_definition.resolved_type, resolved_ast)
         }
     }
 }
@@ -358,6 +405,7 @@ fn lower_destination(
     ir_module: &ir::Module,
     destination: &Destination,
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<ir::Value, LowerError> {
     match &destination.kind {
         DestinationKind::Variable(variable) => Ok(lower_variable_to_value(variable.key)),
@@ -372,7 +420,8 @@ fn lower_destination(
             memory_management,
             ..
         } => {
-            let subject_pointer = lower_destination(builder, ir_module, subject, function)?;
+            let subject_pointer =
+                lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
             let subject_pointer = match memory_management {
                 resolved::MemoryManagement::None => subject_pointer,
@@ -402,9 +451,21 @@ fn lower_destination(
             }))
         }
         DestinationKind::ArrayAccess(array_access) => {
-            let subject_pointer = lower_expr(builder, ir_module, &array_access.subject, function)?;
-            let index = lower_expr(builder, ir_module, &array_access.index, function)?;
-            let item_type = lower_type(&array_access.item_type)?;
+            let subject_pointer = lower_expr(
+                builder,
+                ir_module,
+                &array_access.subject,
+                function,
+                resolved_ast,
+            )?;
+            let index = lower_expr(
+                builder,
+                ir_module,
+                &array_access.index,
+                function,
+                resolved_ast,
+            )?;
+            let item_type = lower_type(&array_access.item_type, resolved_ast)?;
 
             Ok(builder.push(ir::Instruction::ArrayAccess {
                 item_type,
@@ -420,6 +481,7 @@ fn lower_expr(
     ir_module: &ir::Module,
     expr: &Expr,
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<ir::Value, LowerError> {
     match &expr.kind {
         ExprKind::IntegerLiteral(value) => {
@@ -513,7 +575,13 @@ fn lower_expr(
             let mut arguments = vec![];
 
             for argument in call.arguments.iter() {
-                arguments.push(lower_expr(builder, ir_module, argument, function)?);
+                arguments.push(lower_expr(
+                    builder,
+                    ir_module,
+                    argument,
+                    function,
+                    resolved_ast,
+                )?);
             }
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
@@ -523,16 +591,22 @@ fn lower_expr(
         }
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
-            let variable_type = lower_type(&variable.resolved_type)?;
+            let variable_type = lower_type(&variable.resolved_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((pointer_to_variable, variable_type))))
         }
         ExprKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
-            let ir_type = lower_type(&global_variable.resolved_type)?;
+            let ir_type = lower_type(&global_variable.resolved_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
         ExprKind::DeclareAssign(declare_assign) => {
-            let initial_value = lower_expr(builder, ir_module, &declare_assign.value, function)?;
+            let initial_value = lower_expr(
+                builder,
+                ir_module,
+                &declare_assign.value,
+                function,
+                resolved_ast,
+            )?;
 
             let destination = Value::Reference(ValueReference {
                 basicblock_id: 0,
@@ -544,12 +618,24 @@ fn lower_expr(
                 destination: destination.clone(),
             }));
 
-            let ir_type = lower_type(&declare_assign.resolved_type)?;
+            let ir_type = lower_type(&declare_assign.resolved_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
         ExprKind::BasicBinaryOperation(operation) => {
-            let left = lower_expr(builder, ir_module, &operation.left.expr, function)?;
-            let right = lower_expr(builder, ir_module, &operation.right.expr, function)?;
+            let left = lower_expr(
+                builder,
+                ir_module,
+                &operation.left.expr,
+                function,
+                resolved_ast,
+            )?;
+            let right = lower_expr(
+                builder,
+                ir_module,
+                &operation.right.expr,
+                function,
+                resolved_ast,
+            )?;
 
             lower_basic_binary_operation(
                 builder,
@@ -558,11 +644,17 @@ fn lower_expr(
             )
         }
         ExprKind::ShortCircuitingBinaryOperation(operation) => {
-            lower_short_circuiting_binary_operation(builder, ir_module, operation, function)
+            lower_short_circuiting_binary_operation(
+                builder,
+                ir_module,
+                operation,
+                function,
+                resolved_ast,
+            )
         }
         ExprKind::IntegerExtend(value, resolved_type) => {
-            let value = lower_expr(builder, ir_module, value, function)?;
-            let ir_type = lower_type(resolved_type)?;
+            let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
+            let ir_type = lower_type(resolved_type, resolved_ast)?;
 
             Ok(builder.push(
                 match resolved_type
@@ -576,8 +668,8 @@ fn lower_expr(
             ))
         }
         ExprKind::FloatExtend(value, resolved_type) => {
-            let value = lower_expr(builder, ir_module, value, function)?;
-            let ir_type = lower_type(resolved_type)?;
+            let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
+            let ir_type = lower_type(resolved_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
         ExprKind::Member {
@@ -587,7 +679,8 @@ fn lower_expr(
             field_type: resolved_field_type,
             memory_management,
         } => {
-            let subject_pointer = lower_destination(builder, ir_module, subject, function)?;
+            let subject_pointer =
+                lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
             let subject_pointer = match memory_management {
                 resolved::MemoryManagement::None => subject_pointer,
@@ -620,13 +713,25 @@ fn lower_expr(
                 index: *index,
             });
 
-            let ir_type = lower_type(resolved_field_type)?;
+            let ir_type = lower_type(resolved_field_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {
-            let subject = lower_expr(builder, ir_module, &array_access.subject, function)?;
-            let index = lower_expr(builder, ir_module, &array_access.index, function)?;
-            let item_type = lower_type(&array_access.item_type)?;
+            let subject = lower_expr(
+                builder,
+                ir_module,
+                &array_access.subject,
+                function,
+                resolved_ast,
+            )?;
+            let index = lower_expr(
+                builder,
+                ir_module,
+                &array_access.index,
+                function,
+                resolved_ast,
+            )?;
+            let item_type = lower_type(&array_access.item_type, resolved_ast)?;
 
             let item = builder.push(ir::Instruction::ArrayAccess {
                 item_type: item_type.clone(),
@@ -641,12 +746,12 @@ fn lower_expr(
             fields,
             memory_management,
         } => {
-            let result_ir_type = lower_type(structure_type)?;
+            let result_ir_type = lower_type(structure_type, resolved_ast)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
             for (expr, index) in fields.values() {
-                let ir_value = lower_expr(builder, ir_module, expr, function)?;
+                let ir_value = lower_expr(builder, ir_module, expr, function, resolved_ast)?;
                 values.push((index, ir_value));
             }
 
@@ -700,7 +805,13 @@ fn lower_expr(
             }
         }
         ExprKind::UnaryOperation(unary_operation) => {
-            let inner = lower_expr(builder, ir_module, &unary_operation.inner.expr, function)?;
+            let inner = lower_expr(
+                builder,
+                ir_module,
+                &unary_operation.inner.expr,
+                function,
+                resolved_ast,
+            )?;
 
             Ok(builder.push(match unary_operation.operator {
                 resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
@@ -714,7 +825,8 @@ fn lower_expr(
             let mut incoming = vec![];
 
             for resolved::Branch { condition, block } in conditional.branches.iter() {
-                let condition = lower_expr(builder, ir_module, &condition.expr, function)?;
+                let condition =
+                    lower_expr(builder, ir_module, &condition.expr, function, resolved_ast)?;
 
                 let true_basicblock_id = builder.new_block();
                 let false_basicblock_id = builder.new_block();
@@ -728,7 +840,7 @@ fn lower_expr(
                 ));
 
                 builder.use_block(true_basicblock_id);
-                let value = lower_stmts(builder, ir_module, &block.stmts, function)?;
+                let value = lower_stmts(builder, ir_module, &block.stmts, function, resolved_ast)?;
 
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
@@ -740,7 +852,7 @@ fn lower_expr(
             }
 
             if let Some(block) = &conditional.otherwise {
-                let value = lower_stmts(builder, ir_module, &block.stmts, function)?;
+                let value = lower_stmts(builder, ir_module, &block.stmts, function, resolved_ast)?;
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
                     value,
@@ -751,7 +863,7 @@ fn lower_expr(
             builder.use_block(resume_basicblock_id);
 
             if conditional.otherwise.is_some() {
-                let ir_type = lower_type(&conditional.result_type)?;
+                let ir_type = lower_type(&conditional.result_type, resolved_ast)?;
                 Ok(builder.push(ir::Instruction::Phi(ir::Phi { ir_type, incoming })))
             } else {
                 Ok(Value::Literal(Literal::Void))
@@ -766,7 +878,13 @@ fn lower_expr(
             builder.continues_to(evaluate_basicblock_id);
             builder.use_block(evaluate_basicblock_id);
 
-            let condition = lower_expr(builder, ir_module, &while_loop.condition, function)?;
+            let condition = lower_expr(
+                builder,
+                ir_module,
+                &while_loop.condition,
+                function,
+                resolved_ast,
+            )?;
 
             builder.push(ir::Instruction::ConditionalBreak(
                 condition,
@@ -777,11 +895,78 @@ fn lower_expr(
             ));
 
             builder.use_block(true_basicblock_id);
-            lower_stmts(builder, ir_module, &while_loop.block.stmts, function)?;
+            lower_stmts(
+                builder,
+                ir_module,
+                &while_loop.block.stmts,
+                function,
+                resolved_ast,
+            )?;
             builder.continues_to(evaluate_basicblock_id);
 
             builder.use_block(false_basicblock_id);
             Ok(Value::Literal(Literal::Void))
+        }
+        ExprKind::EnumMemberLiteral(enum_member_literal) => {
+            let enum_definition = resolved_ast
+                .enums
+                .get(&enum_member_literal.enum_name)
+                .expect("referenced enum to exist for enum member literal");
+
+            let member = enum_definition
+                .members
+                .get(&enum_member_literal.variant_name)
+                .ok_or_else(|| {
+                    LowerErrorKind::NoSuchEnumMember {
+                        enum_name: enum_member_literal.enum_name.clone(),
+                        variant_name: enum_member_literal.variant_name.clone(),
+                    }
+                    .at(enum_member_literal.source)
+                })?;
+
+            let ir_type = lower_type(&enum_definition.resolved_type, resolved_ast)?;
+            let value = &member.value;
+
+            let make_error = |_| {
+                LowerErrorKind::CannotFit {
+                    value: value.to_string(),
+                    expected_type: enum_definition.name.clone(),
+                }
+                .at(enum_definition.source)
+            };
+
+            Ok(match ir_type {
+                // ir::Type::Boolean => todo!(),
+                ir::Type::S8 => {
+                    ir::Value::Literal(Literal::Signed8(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::S16 => {
+                    ir::Value::Literal(Literal::Signed16(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::S32 => {
+                    ir::Value::Literal(Literal::Signed32(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::S64 => {
+                    ir::Value::Literal(Literal::Signed64(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::U8 => {
+                    ir::Value::Literal(Literal::Unsigned8(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::U16 => {
+                    ir::Value::Literal(Literal::Unsigned16(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::U32 => {
+                    ir::Value::Literal(Literal::Unsigned32(value.try_into().map_err(make_error)?))
+                }
+                ir::Type::U64 => {
+                    ir::Value::Literal(Literal::Unsigned64(value.try_into().map_err(make_error)?))
+                }
+                _ => {
+                    return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
+                        enum_name: enum_definition.name.clone(),
+                    }.at(enum_definition.source))
+                }
+            })
         }
     }
 }
@@ -888,8 +1073,10 @@ pub fn lower_short_circuiting_binary_operation(
     ir_module: &ir::Module,
     operation: &resolved::ShortCircuitingBinaryOperation,
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<Value, LowerError> {
-    let short_circuit = lower_pre_short_circuit(builder, ir_module, operation, function)?;
+    let short_circuit =
+        lower_pre_short_circuit(builder, ir_module, operation, function, resolved_ast)?;
     let merge_block_id = builder.new_block();
     builder.continues_to(merge_block_id);
     builder.use_block(short_circuit.left_done_block_id);
@@ -937,14 +1124,27 @@ fn lower_pre_short_circuit(
     ir_module: &ir::Module,
     operation: &resolved::ShortCircuitingBinaryOperation,
     function: &resolved::Function,
+    resolved_ast: &resolved::Ast,
 ) -> Result<BinaryShortCircuit, LowerError> {
-    let left = lower_expr(builder, ir_module, &operation.left.expr, function)?;
+    let left = lower_expr(
+        builder,
+        ir_module,
+        &operation.left.expr,
+        function,
+        resolved_ast,
+    )?;
 
     let left_done_block_id = builder.current_block_id();
     let evaluate_right_block_id = builder.new_block();
     builder.use_block(evaluate_right_block_id);
 
-    let right = lower_expr(builder, ir_module, &operation.right.expr, function)?;
+    let right = lower_expr(
+        builder,
+        ir_module,
+        &operation.right.expr,
+        function,
+        resolved_ast,
+    )?;
     let right_done_block_id = builder.current_block_id();
 
     Ok(BinaryShortCircuit {

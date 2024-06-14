@@ -20,7 +20,7 @@ use self::{
 };
 use crate::{
     ast::{self, Ast, FileIdentifier, Source},
-    resolved::{self, TypedExpr, VariableStorage},
+    resolved::{self, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
@@ -68,6 +68,44 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Temporarily used stack to keep track of used type aliases
     let mut used_aliases = HashSet::<String>::new();
+
+    // Pre-compute resolved enum types
+    for (_, file) in ast.files.iter() {
+        for enum_definition in file.enums.values() {
+            let resolved_type = if let Some(backing_type) = &enum_definition.backing_type {
+                resolve_type(
+                    type_search_ctx,
+                    source_file_cache,
+                    backing_type,
+                    &mut used_aliases,
+                )?
+            } else {
+                resolved::TypeKind::Integer {
+                    bits: IntegerBits::Bits64,
+                    sign: IntegerSign::Unsigned,
+                }
+                .at(enum_definition.source)
+            };
+
+            let members = enum_definition.members.clone();
+
+            resolved_ast.enums.insert(
+                enum_definition.name.clone(),
+                Enum {
+                    name: enum_definition.name.clone(),
+                    resolved_type,
+                    source: enum_definition.source,
+                    members,
+                },
+            );
+
+            type_search_ctx.put(
+                enum_definition.name.clone(),
+                resolved::TypeKind::Enum(enum_definition.name.clone()),
+                enum_definition.source,
+            )?;
+        }
+    }
 
     // Precompute resolved struct types
     for (_, file) in ast.files.iter() {

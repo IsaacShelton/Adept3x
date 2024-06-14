@@ -227,6 +227,19 @@ pub fn resolve_expr(
             resolved::TypeKind::Boolean.at(source),
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
+        ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
+            let resolved_type =
+                resolved::TypeKind::Enum(enum_member_literal.enum_name.clone())
+                    .at(ast_expr.source);
+
+            Ok(TypedExpr::new(
+                resolved_type,
+                resolved::Expr::new(
+                    resolved::ExprKind::EnumMemberLiteral(enum_member_literal.clone()),
+                    source,
+                ),
+            ))
+        }
     }?;
 
     match initialized {

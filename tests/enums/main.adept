@@ -1,0 +1,15 @@
+
+enum Color (Red, Green, Blue)
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+func main {
+    red := Color::Red
+    green := Color::Green
+    blue := Color::Blue
+
+    // WARNING: This temporary way of proving it works is not very sound
+    printf(c"red=%lld green=%lld blue=%lld\n", red, green, blue)
+}
+

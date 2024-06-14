@@ -11,10 +11,11 @@ use self::{
 use crate::{
     ast::{
         self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
-        BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Expr, ExprKind,
-        Field, File, FileIdentifier, FixedArray, Function, Global, Integer, Parameter, Parameters,
-        ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
-        Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
+        BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Enum,
+        EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FixedArray, Function,
+        Global, Integer, Parameter, Parameters, ShortCircuitingBinaryOperation,
+        ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind,
+        UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -24,6 +25,8 @@ use ast::FloatSize;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lazy_format::lazy_format;
+use num_bigint::BigInt;
+use num_traits::Zero;
 use std::{borrow::Borrow, ffi::CString};
 
 struct Parser<'a, I>
@@ -111,6 +114,19 @@ where
                 let alias = self.parse_alias(annotations)?;
 
                 if let Some(previous) = ast_file.aliases.insert(alias.name.clone(), alias) {
+                    return Err(ParseErrorKind::TypeAliasHasMultipleDefinitions {
+                        name: previous.name,
+                    }
+                    .at(previous.source));
+                }
+            }
+            TokenKind::EnumKeyword => {
+                let enum_definition = self.parse_enum(annotations)?;
+
+                if let Some(previous) = ast_file
+                    .enums
+                    .insert(enum_definition.name.clone(), enum_definition)
+                {
                     return Err(ParseErrorKind::TypeAliasHasMultipleDefinitions {
                         name: previous.name,
                     }
@@ -316,6 +332,60 @@ where
         Ok(Alias {
             name,
             value: ast_type,
+            source,
+        })
+    }
+
+    fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Enum, ParseError> {
+        let source = self.source_here();
+        self.input.advance();
+
+        let name = self.parse_identifier(Some("for enum name after 'enum' keyword"))?;
+        self.ignore_newlines();
+
+        for annotation in annotations {
+            match annotation.kind {
+                _ => {
+                    return Err(self.unexpected_annotation(
+                        annotation.kind.to_string(),
+                        annotation.location,
+                        Some("for enum"),
+                    ))
+                }
+            }
+        }
+
+        let mut members = IndexMap::new();
+
+        self.parse_token(TokenKind::OpenParen, Some("after enum name"))?;
+        let mut next_value = BigInt::zero();
+
+        while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
+            let member_name = self.parse_identifier(Some("for enum member"))?;
+
+            let value = next_value.clone();
+            next_value += 1;
+
+            members.insert(
+                member_name,
+                ast::EnumMember {
+                    value,
+                    explicit_value: false,
+                },
+            );
+
+            if !self.input.eat(TokenKind::Comma) && !self.input.peek_is(TokenKind::CloseParen) {
+                let got = self.input.advance();
+                return Err(self.expected_token(TokenKind::Comma, Some("after enum member"), got));
+            }
+        }
+
+        self.parse_token(TokenKind::CloseParen, Some("to close enum body"))?;
+
+        Ok(Enum {
+            name,
+            backing_type: None,
+            members,
             source,
         })
     }
@@ -652,6 +722,7 @@ where
                 self.parse_structure_literal()
             }
             TokenKind::Identifier(_) => match self.input.peek_nth(1).kind {
+                TokenKind::Namespace => self.parse_enum_member_literal(),
                 TokenKind::OpenAngle => self.parse_structure_literal(),
                 TokenKind::OpenCurly => {
                     let next_three = self
@@ -845,6 +916,32 @@ where
             ExprKind::StructureLiteral(ast_type, fields),
             source,
         ))
+    }
+
+    fn parse_enum_member_literal(&mut self) -> Result<Expr, ParseError> {
+        // EnumName::EnumVariant
+        //    ^
+
+        let source = self.source_here();
+        let enum_name = self
+            .input
+            .eat_identifier()
+            .ok_or_else(|| ParseErrorKind::ExpectedEnumName.at(source))?;
+
+        self.parse_token(TokenKind::Namespace, Some("for enum member literal"))?;
+
+        let variant_source = self.source_here();
+        let variant_name = self
+            .input
+            .eat_identifier()
+            .ok_or_else(|| ParseErrorKind::ExpectedEnumName.at(variant_source))?;
+
+        Ok(ExprKind::EnumMemberLiteral(EnumMemberLiteral {
+            enum_name,
+            variant_name,
+            source,
+        })
+        .at(source))
     }
 
     fn parse_call(&mut self) -> Result<Expr, ParseError> {
