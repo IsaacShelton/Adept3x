@@ -65,6 +65,7 @@ pub enum TokenKind {
     WhileKeyword,
     TrueKeyword,
     FalseKeyword,
+    DefineKeyword,
     Member,
     Add,
     Subtract,
@@ -141,6 +142,7 @@ impl Display for TokenKind {
             TokenKind::WhileKeyword => f.write_str("'while' keyword"),
             TokenKind::TrueKeyword => f.write_str("'true'"),
             TokenKind::FalseKeyword => f.write_str("'false'"),
+            TokenKind::DefineKeyword => f.write_str("'define'"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -259,6 +261,7 @@ impl TokenKind {
             | TokenKind::WhileKeyword
             | TokenKind::TrueKeyword
             | TokenKind::FalseKeyword
+            | TokenKind::DefineKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

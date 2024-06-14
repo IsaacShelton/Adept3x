@@ -31,7 +31,6 @@ pub fn declare_named(
         ast_file.aliases.insert(
             name.to_string(),
             ast::Alias {
-                name: name.clone(),
                 value: ast_type.clone(),
                 source: declarator.source,
             },

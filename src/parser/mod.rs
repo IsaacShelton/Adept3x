@@ -10,12 +10,7 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
-        BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Enum,
-        EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FixedArray, Function,
-        Global, Integer, Parameter, Parameters, ShortCircuitingBinaryOperation,
-        ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind,
-        UnaryOperation, UnaryOperator, While,
+        self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FixedArray, Function, Global, Integer, NamedAlias, NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -27,7 +22,7 @@ use itertools::Itertools;
 use lazy_format::lazy_format;
 use num_bigint::BigInt;
 use num_traits::Zero;
-use std::{borrow::Borrow, ffi::CString};
+use std::{borrow::Borrow, ffi::CString, hash::BuildHasher};
 
 struct Parser<'a, I>
 where
@@ -111,27 +106,34 @@ where
                 ast_file.structures.push(self.parse_structure(annotations)?)
             }
             TokenKind::AliasKeyword => {
-                let alias = self.parse_alias(annotations)?;
+                let NamedAlias { name, alias } = self.parse_alias(annotations)?;
+                let source = alias.source;
 
-                if let Some(previous) = ast_file.aliases.insert(alias.name.clone(), alias) {
-                    return Err(ParseErrorKind::TypeAliasHasMultipleDefinitions {
-                        name: previous.name,
-                    }
-                    .at(previous.source));
-                }
+                try_insert_into_index_map(&mut ast_file.aliases, name, alias, |name| {
+                    ParseErrorKind::TypeAliasHasMultipleDefinitions { name }.at(source)
+                })?;
             }
             TokenKind::EnumKeyword => {
-                let enum_definition = self.parse_enum(annotations)?;
+                let NamedEnum {
+                    name,
+                    enum_definition,
+                } = self.parse_enum(annotations)?;
+                let source = enum_definition.source;
 
-                if let Some(previous) = ast_file
-                    .enums
-                    .insert(enum_definition.name.clone(), enum_definition)
-                {
-                    return Err(ParseErrorKind::TypeAliasHasMultipleDefinitions {
-                        name: previous.name,
-                    }
-                    .at(previous.source));
-                }
+                try_insert_into_index_map(&mut ast_file.enums, name, enum_definition, |name| {
+                    ParseErrorKind::EnumHasMultipleDefinitions { name }.at(source)
+                })?;
+            }
+            TokenKind::DefineKeyword => {
+                let NamedDefine {
+                    name,
+                    define,
+                } = self.parse_define(annotations)?;
+                let source = define.source;
+
+                try_insert_into_index_map(&mut ast_file.defines, name, define, |name| {
+                    ParseErrorKind::DefineHasMultipleDefinitions { name }.at(source)
+                })?;
             }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
@@ -306,7 +308,7 @@ where
         })
     }
 
-    fn parse_alias(&mut self, annotations: Vec<Annotation>) -> Result<Alias, ParseError> {
+    fn parse_alias(&mut self, annotations: Vec<Annotation>) -> Result<NamedAlias, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -329,14 +331,16 @@ where
 
         let ast_type = self.parse_type(None::<&str>, Some("for alias"))?;
 
-        Ok(Alias {
+        Ok(NamedAlias {
             name,
-            value: ast_type,
-            source,
+            alias: Alias {
+                value: ast_type,
+                source,
+            },
         })
     }
 
-    fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Enum, ParseError> {
+    fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<NamedEnum, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -382,11 +386,45 @@ where
 
         self.parse_token(TokenKind::CloseParen, Some("to close enum body"))?;
 
-        Ok(Enum {
+        Ok(NamedEnum {
             name,
-            backing_type: None,
-            members,
-            source,
+            enum_definition: Enum {
+                backing_type: None,
+                members,
+                source,
+            },
+        })
+    }
+
+    fn parse_define(&mut self, annotations: Vec<Annotation>) -> Result<NamedDefine, ParseError> {
+        let source = self.source_here();
+        self.input.advance();
+
+        let name = self.parse_identifier(Some("for define name after 'define' keyword"))?;
+        self.ignore_newlines();
+
+        self.parse_token(TokenKind::Assign, Some("after name of define"))?;
+
+        for annotation in annotations {
+            match annotation.kind {
+                _ => {
+                    return Err(self.unexpected_annotation(
+                        annotation.kind.to_string(),
+                        annotation.location,
+                        Some("for define"),
+                    ))
+                }
+            }
+        }
+
+        let value = self.parse_expr()?;
+
+        Ok(NamedDefine {
+            name,
+            define: Define {
+                value,
+                source,
+            },
         })
     }
 
@@ -1319,5 +1357,26 @@ fn is_right_associative(kind: &TokenKind) -> bool {
     match kind {
         TokenKind::DeclareAssign => true,
         _ => false,
+    }
+}
+
+fn try_insert_into_index_map<
+    K: indexmap::Equivalent<K> + std::hash::Hash + std::cmp::Eq,
+    V,
+    S: BuildHasher,
+    E,
+>(
+    index_map: &mut IndexMap<K, V, S>,
+    key: K,
+    value: V,
+    or_else: impl Fn(K) -> E,
+) -> Result<(), E> {
+    // Unfortantely there isn't an API provided to do this without having
+    // to do the lookup twice or cloning the key, so we will prefer the double lookup.
+    if index_map.contains_key(&key) {
+        Err(or_else(key))
+    } else {
+        assert!(index_map.insert(key, value).is_none());
+        Ok(())
     }
 }

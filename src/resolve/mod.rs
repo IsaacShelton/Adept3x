@@ -54,10 +54,10 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Unify type aliases into single map
     for (_, file) in ast.files.iter() {
-        for alias in file.aliases.values() {
-            if aliases.insert(alias.name.clone(), alias).is_some() {
+        for (alias_name, alias) in file.aliases.iter() {
+            if aliases.insert(alias_name.clone(), alias).is_some() {
                 return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
-                    name: alias.name.clone(),
+                    name: alias_name.clone(),
                 }
                 .at(alias.source));
             }
@@ -74,7 +74,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Pre-compute resolved enum types
     for (_, file) in ast.files.iter() {
-        for enum_definition in file.enums.values() {
+        for (enum_name, enum_definition) in file.enums.iter() {
             let resolved_type = resolve_enum_backing_type(
                 type_search_ctx,
                 source_file_cache,
@@ -86,9 +86,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             let members = enum_definition.members.clone();
 
             resolved_ast.enums.insert(
-                enum_definition.name.clone(),
+                enum_name.clone(),
                 Enum {
-                    name: enum_definition.name.clone(),
                     resolved_type,
                     source: enum_definition.source,
                     members,
@@ -96,8 +95,8 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
             );
 
             type_search_ctx.put(
-                enum_definition.name.clone(),
-                resolved::TypeKind::Enum(enum_definition.name.clone()),
+                enum_name.clone(),
+                resolved::TypeKind::Enum(enum_name.clone()),
                 enum_definition.source,
             )?;
         }
@@ -147,7 +146,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
 
     // Resolve type aliases
     for (_, file) in ast.files.iter() {
-        for alias in file.aliases.values() {
+        for (alias_name, alias) in file.aliases.iter() {
             let resolved_type = resolve_type_or_undeclared(
                 type_search_ctx,
                 source_file_cache,
@@ -155,7 +154,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 &mut used_aliases,
             )?;
 
-            type_search_ctx.put(alias.name.clone(), resolved_type.kind, alias.source)?;
+            type_search_ctx.put(alias_name.clone(), resolved_type.kind, alias.source)?;
         }
     }
 
@@ -726,7 +725,7 @@ fn resolve_type<'a>(
                             inner.map(|ty| ty.kind)
                         } else {
                             Err(ResolveErrorKind::RecursiveTypeAlias {
-                                name: definition.name.clone(),
+                                name: name.clone(),
                             }
                             .at(definition.source))
                         }

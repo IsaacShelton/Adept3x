@@ -933,7 +933,7 @@ fn lower_expr(
             let make_error = |_| {
                 LowerErrorKind::CannotFit {
                     value: value.to_string(),
-                    expected_type: enum_definition.name.clone(),
+                    expected_type: enum_member_literal.enum_name.clone(),
                 }
                 .at(enum_definition.source)
             };
@@ -965,7 +965,7 @@ fn lower_expr(
                 }
                 _ => {
                     return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
-                        enum_name: enum_definition.name.clone(),
+                        enum_name: enum_member_literal.enum_name.clone(),
                     }.at(enum_definition.source))
                 }
             })

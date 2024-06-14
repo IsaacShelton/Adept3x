@@ -51,7 +51,6 @@ impl<'a> Ast<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Enum {
-    pub name: String,
     pub resolved_type: Type,
     pub source: Source,
     pub members: IndexMap<String, EnumMember>,

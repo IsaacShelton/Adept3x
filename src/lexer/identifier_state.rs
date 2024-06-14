@@ -26,6 +26,7 @@ impl IdentifierState {
                 "while" => TokenKind::WhileKeyword,
                 "true" => TokenKind::TrueKeyword,
                 "false" => TokenKind::FalseKeyword,
+                "define" => TokenKind::DefineKeyword,
                 _ => TokenKind::Identifier(identifier),
             },
             self.start_location,

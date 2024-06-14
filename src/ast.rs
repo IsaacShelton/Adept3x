@@ -75,6 +75,7 @@ pub struct File {
     pub aliases: IndexMap<String, Alias>,
     pub globals: Vec<Global>,
     pub enums: IndexMap<String, Enum>,
+    pub defines: IndexMap<String, Define>,
 }
 
 impl File {
@@ -85,6 +86,7 @@ impl File {
             aliases: IndexMap::default(),
             globals: vec![],
             enums: IndexMap::default(),
+            defines: IndexMap::default(),
         }
     }
 }
@@ -153,17 +155,39 @@ pub struct Field {
 
 #[derive(Clone, Debug)]
 pub struct Alias {
-    pub name: String,
     pub value: Type,
     pub source: Source,
 }
 
 #[derive(Clone, Debug)]
-pub struct Enum {
+pub struct NamedAlias {
     pub name: String,
+    pub alias: Alias,
+}
+
+#[derive(Clone, Debug)]
+pub struct Enum {
     pub backing_type: Option<Type>,
     pub source: Source,
     pub members: IndexMap<String, EnumMember>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NamedEnum {
+    pub name: String,
+    pub enum_definition: Enum,
+}
+
+#[derive(Clone, Debug)]
+pub struct Define {
+    pub value: Expr,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct NamedDefine {
+    pub name: String,
+    pub define: Define,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Hash)]
