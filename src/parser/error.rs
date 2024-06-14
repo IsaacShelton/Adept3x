@@ -44,6 +44,9 @@ pub enum ParseErrorKind {
     },
     ExpectedEnumName,
     ExpectedEnumMemberName,
+    Lexical {
+        message: String,
+    },
     Other {
         message: String,
     },
@@ -147,7 +150,7 @@ impl Display for ParseErrorKind {
             ParseErrorKind::ExpectedEnumMemberName => {
                 write!(f, "Expected enum member name")?;
             }
-            ParseErrorKind::Other { message } => {
+            ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;
             }
         }

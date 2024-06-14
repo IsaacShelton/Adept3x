@@ -2,7 +2,10 @@ use super::{
     error::{ParseError, ParseErrorKind},
     Parser,
 };
-use crate::{line_column::Location, token::Token};
+use crate::{
+    line_column::Location,
+    token::{Token, TokenKind},
+};
 
 impl<I> Parser<'_, I>
 where
@@ -15,8 +18,14 @@ where
 
     pub fn unexpected_token(&self, token: &Token) -> ParseError {
         ParseError {
-            kind: ParseErrorKind::UnexpectedToken {
-                unexpected: token.kind.to_string(),
+            kind: match &token.kind {
+                TokenKind::Error(message) => ParseErrorKind::Lexical {
+                    message: message.into(),
+                },
+                _ => {
+                    let unexpected = token.to_string();
+                    ParseErrorKind::UnexpectedToken { unexpected }
+                }
             },
             source: self.source(token.location),
         }
@@ -29,10 +38,15 @@ where
         token: Token,
     ) -> ParseError {
         ParseError {
-            kind: ParseErrorKind::Expected {
-                expected: expected.to_string(),
-                for_reason: for_reason.map(|reason| reason.to_string()),
-                got: token.kind.to_string(),
+            kind: match &token.kind {
+                TokenKind::Error(message) => ParseErrorKind::Lexical {
+                    message: message.into(),
+                },
+                _ => ParseErrorKind::Expected {
+                    expected: expected.to_string(),
+                    for_reason: for_reason.map(|reason| reason.to_string()),
+                    got: token.kind.to_string(),
+                },
             },
             source: self.source(token.location),
         }

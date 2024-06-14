@@ -85,6 +85,33 @@ where
                 ')' => Has(Token::new(TokenKind::CloseParen, location)),
                 '[' => Has(Token::new(TokenKind::OpenBracket, location)),
                 ']' => Has(Token::new(TokenKind::CloseBracket, location)),
+                '/' if self.characters.peek().is_character('*') => {
+                    // Multi-line comment
+
+                    let start_location = location;
+                    self.characters.next();
+
+                    loop {
+                        if self.characters.peek().is_character('*')
+                            && self.characters.peek_nth(1).is_character('/')
+                        {
+                            self.characters.next();
+                            self.characters.next();
+                            break;
+                        }
+
+                        if self.characters.peek().is_none() {
+                            return Has(Token::new(
+                                TokenKind::Error("Unterminated line comment".into()),
+                                start_location,
+                            ));
+                        }
+
+                        self.characters.next();
+                    }
+
+                    Done
+                }
                 '/' if self.characters.peek().is_character('/') => {
                     // Comment
 

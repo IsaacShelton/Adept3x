@@ -817,13 +817,18 @@ where
                     self.source(location),
                 ))
             }
-            unexpected => {
-                let unexpected = unexpected.to_string();
-                Err(ParseError {
-                    kind: ParseErrorKind::UnexpectedToken { unexpected },
-                    source: self.source(location),
-                })
-            }
+            unexpected => Err(ParseError {
+                kind: match unexpected {
+                    TokenKind::Error(message) => ParseErrorKind::Lexical {
+                        message: message.into(),
+                    },
+                    _ => {
+                        let unexpected = unexpected.to_string();
+                        ParseErrorKind::UnexpectedToken { unexpected }
+                    }
+                },
+                source: self.source(location),
+            }),
         }
     }
 
