@@ -6,11 +6,13 @@ mod expr;
 mod include;
 mod region;
 
+use std::collections::HashMap;
+
 use self::{control_line::expand_control_line, expr::ExprParser, region::expand_region};
 use super::{
     ast::{
-        ElifGroup, Group, IfDefKind, IfDefLike, IfGroup, IfLike, IfSection, PreprocessorAst,
-        TextLine,
+        Define, DefineKind, ElifGroup, Group, IfDefKind, IfDefLike, IfGroup, IfLike, IfSection,
+        PreprocessorAst, TextLine,
     },
     pre_token::PreToken,
     PreprocessorError,
@@ -28,12 +30,33 @@ pub enum Token {
 pub fn expand_ast(
     ast: &PreprocessorAst,
     environment: Environment,
-) -> Result<Vec<PreToken>, PreprocessorError> {
+) -> Result<(Vec<PreToken>, HashMap<String, Define>), PreprocessorError> {
     let mut environment = environment;
     let mut depleted = Depleted::new();
     let pre_tokens = expand_group(&ast.group, &mut environment, &mut depleted)?;
 
-    expand_region(&pre_tokens, &environment, &mut depleted)
+    let document = expand_region(&pre_tokens, &environment, &mut depleted)?;
+
+    // Assemble preprocessed #define object macros
+    let mut defines = HashMap::<String, Define>::with_capacity(environment.defines.len());
+    for (define_name, define) in environment.defines.iter() {
+        match &define.kind {
+            DefineKind::ObjectMacro(replacement, placeholder_affinity) => {
+                let expanded = expand_region(replacement, &environment, &mut depleted)?;
+                defines.insert(
+                    define_name.clone(),
+                    Define {
+                        name: define_name.clone(),
+                        kind: DefineKind::ObjectMacro(expanded, placeholder_affinity.clone()),
+                        source: define.source,
+                    },
+                );
+            }
+            _ => continue,
+        };
+    }
+
+    Ok((document, defines))
 }
 
 fn expand_group(

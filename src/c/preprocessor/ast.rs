@@ -230,6 +230,7 @@ impl ControlLineKind {
 pub struct Define {
     pub kind: DefineKind,
     pub name: String,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug, Hash, IsVariant)]

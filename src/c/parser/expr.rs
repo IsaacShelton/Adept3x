@@ -330,10 +330,10 @@ impl<'a> Parser<'a> {
         if let Ok(_caster) = speculate!(self.input, self.parse_caster()) {
             if self.eat_punctuator(Punctuator::OpenCurly) {
                 // Compound literal
-                return todo!();
+                return todo!("compound literal");
             } else {
                 // Cast
-                return todo!();
+                return todo!("cast");
             }
         }
 

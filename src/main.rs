@@ -21,10 +21,14 @@ mod text;
 mod token;
 mod try_insert_index_map;
 
-use crate::c::preprocessor::{PreToken, PreTokenKind};
+use crate::c::parser::{Input, Parser};
+use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind};
+use crate::c::translate_expr;
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
 use crate::source_file_cache::SourceFileCache;
 use crate::text::IntoText;
+use ast::Source;
+use c::token::CToken;
 use cli::{BuildCommand, NewCommand};
 use indoc::indoc;
 use lexer::Lexer;
@@ -144,30 +148,56 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
                 ));
             }
         } else {
-            let (preprocessed, eof_source) = exit_unless(
+            let (preprocessed, defines, eof_source) = exit_unless(
                 c::preprocessor::preprocess(content.chars().into_text(key)),
                 source_file_cache,
             );
 
-            let mut lexer = c::Lexer::new(
-                preprocessed
-                    .into_iter()
-                    .into_inflow_stream(PreToken::new(PreTokenKind::EndOfSequence, eof_source))
-                    .into_inflow(),
-            );
+            let lexed = lex(preprocessed, eof_source);
 
-            let lexed = lexer.collect_vec(true);
-
-            if let Some(ast) = &mut ast {
-                exit_unless(
-                    c::parse_into(lexed, &source_file_cache, key, ast, filename.to_string()),
-                    source_file_cache,
-                );
+            let (file_id, mut parser) = if let Some(ast) = &mut ast {
+                let mut parser = Parser::new(Input::new(lexed, source_file_cache, key));
+                (
+                    exit_unless(parser.parse_into(ast, filename), source_file_cache),
+                    parser,
+                )
             } else {
-                ast = Some(exit_unless(
-                    c::parse(lexed, &source_file_cache, key),
-                    source_file_cache,
-                ));
+                let mut parser = Parser::new(Input::new(lexed, source_file_cache, key));
+                let (new_ast, file_id) = exit_unless(parser.parse(), source_file_cache);
+                ast = Some(new_ast);
+                (file_id, parser)
+            };
+
+            // Translate preprocessor #define object macros
+            let ast_file = ast
+                .as_mut()
+                .expect("ast to exist")
+                .files
+                .get_mut(&file_id)
+                .expect("recently added file to exist");
+
+            for (define_name, define) in defines.iter() {
+                match &define.kind {
+                    DefineKind::ObjectMacro(expanded_replacement, _placeholder_affinity) => {
+                        let lexed_replacement =
+                            lex(expanded_replacement.clone(), Source::internal());
+                        parser.switch_input(lexed_replacement);
+
+                        if let Ok(value) = parser
+                            .parse_expr_singular()
+                            .and_then(|expr| translate_expr(&expr))
+                        {
+                            ast_file.defines.insert(
+                                define_name.clone(),
+                                ast::Define {
+                                    value,
+                                    source: define.source,
+                                },
+                            );
+                        }
+                    }
+                    DefineKind::FunctionMacro(_) => (),
+                }
             }
         }
     }
@@ -261,4 +291,14 @@ fn is_hidden(entry: &DirEntry) -> bool {
         .to_str()
         .map(|s| s.starts_with("."))
         .unwrap_or(false)
+}
+
+fn lex(preprocessed: Vec<PreToken>, eof_source: Source) -> Vec<CToken> {
+    let mut lexer = c::Lexer::new(
+        preprocessed
+            .into_iter()
+            .into_inflow_stream(PreToken::new(PreTokenKind::EndOfSequence, eof_source))
+            .into_inflow(),
+    );
+    lexer.collect_vec(true)
 }

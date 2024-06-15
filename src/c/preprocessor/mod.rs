@@ -10,11 +10,11 @@ use crate::show::Show;
 use crate::source_file_cache::SourceFileCache;
 use crate::text::Text;
 
-use self::ast::{Define, DefineKind};
 use self::expand::{expand_ast, Environment};
 use self::lexer::Lexer;
 use self::parser::{parse, ParseError, ParseErrorKind};
 use crate::inflow::IntoInflow;
+use std::collections::HashMap;
 use std::fmt::Display;
 
 /*
@@ -30,6 +30,7 @@ use std::fmt::Display;
    - etc.
 */
 
+pub use self::ast::{Define, DefineKind};
 pub use self::pre_token::{PreToken, PreTokenKind};
 
 #[derive(Clone, Debug)]
@@ -121,15 +122,17 @@ impl Display for PreprocessorErrorKind {
     }
 }
 
-pub fn preprocess(text: impl Text) -> Result<(Vec<PreToken>, Source), PreprocessorError> {
+pub fn preprocess(
+    text: impl Text,
+) -> Result<(Vec<PreToken>, HashMap<String, Define>, Source), PreprocessorError> {
     let lexer = Lexer::new(text);
 
     let ast = match parse(lexer.into_inflow()) {
         Ok(ast) => ast,
         Err(err) => return Err(err.into()),
     };
-
-    Ok((expand_ast(&ast, stdc())?, ast.eof))
+    let (document, defines) = expand_ast(&ast, stdc())?;
+    Ok((document, defines, ast.eof))
 }
 
 fn stdc() -> Environment {
@@ -138,6 +141,7 @@ fn stdc() -> Environment {
     stdc.add_define(Define {
         kind: DefineKind::ObjectMacro(vec![], ast::PlaceholderAffinity::Discard),
         name: "__STDC__".into(),
+        source: Source::internal(),
     });
 
     stdc.add_define(Define {
@@ -149,6 +153,7 @@ fn stdc() -> Environment {
             ast::PlaceholderAffinity::Discard,
         ),
         name: "__STDC_VERSION__".into(),
+        source: Source::internal(),
     });
 
     stdc

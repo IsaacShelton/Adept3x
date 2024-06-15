@@ -26,7 +26,7 @@ pub fn translate_expr(expr: &Expr) -> Result<ast::Expr, ParseError> {
         ExprKind::Field(_) => todo!(),
         ExprKind::PostIncrement(_) => todo!(),
         ExprKind::PostDecrement(_) => todo!(),
-        ExprKind::Identifier(_) => todo!(),
+        ExprKind::Identifier(name) => todo!("translate C idenifier {}", name),
         ExprKind::EnumConstant(_, _) => todo!(),
     })
 }

@@ -46,6 +46,7 @@ pub enum ParseErrorKind {
     ExpectedMemberDeclarator,
     DuplicateEnumMember(String),
     MustBeConstantInteger,
+    EnumMemberNameConflictsWithExistingSymbol { name: String },
     Misc(&'static str),
 }
 
@@ -70,6 +71,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::MustBeConstantInteger => {
                 write!(f, "Must be constant integer expression")
+            }
+            ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol { name } => {
+                write!(f, "Enum member name conflicts with existing symbol '{}'", name)
             }
             ParseErrorKind::Misc(message) => f.write_str(message),
         }

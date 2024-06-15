@@ -13,6 +13,7 @@ use crate::{
         ParameterDeclarationCore, ParseError, Pointer, TypeQualifierKind, TypeSpecifierKind,
         TypeSpecifierQualifier,
     },
+    try_insert_index_map::try_insert_into_index_map,
 };
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -219,7 +220,7 @@ pub fn get_type_base(
                     TypeSpecifierKind::Composite(composite) => builder
                         .concrete(make_composite(ast_file, typedefs, composite)?, ts.source)?,
                     TypeSpecifierKind::Enumeration(enumeration) => {
-                        builder.concrete(make_anonymous_enum(enumeration)?, ts.source)?
+                        builder.concrete(make_anonymous_enum(ast_file, enumeration)?, ts.source)?
                     }
                     TypeSpecifierKind::TypedefName(typedef_name) => {
                         let ast_type = typedefs
@@ -248,7 +249,10 @@ pub fn get_type_base(
     builder.build()
 }
 
-pub fn make_anonymous_enum(enumeration: &Enumeration) -> Result<TypeKind, ParseError> {
+pub fn make_anonymous_enum(
+    ast_file: &mut ast::File,
+    enumeration: &Enumeration,
+) -> Result<TypeKind, ParseError> {
     match enumeration {
         Enumeration::Definition(definition) => {
             if !definition.attributes.is_empty() {
@@ -282,6 +286,30 @@ pub fn make_anonymous_enum(enumeration: &Enumeration) -> Result<TypeKind, ParseE
                 {
                     return Err(ParseErrorKind::DuplicateEnumMember(enumerator.name.clone())
                         .at(enumerator.source));
+                }
+
+                // TODO: Add way to use enums that don't have a definition name
+                // Should they just be normal defines? Or anonymous enum values? (which don't exist yet)
+                if let Some(definition_name) = &definition.name {
+                    let aka_value = ast::ExprKind::EnumMemberLiteral(ast::EnumMemberLiteral {
+                        enum_name: format!("enum<{}>", definition_name),
+                        variant_name: enumerator.name.clone(),
+                        source: enumerator.source,
+                    })
+                    .at(enumerator.source);
+
+                    try_insert_into_index_map(
+                        &mut ast_file.defines,
+                        enumerator.name.clone(),
+                        ast::Define {
+                            value: aka_value,
+                            source: enumerator.source,
+                        },
+                        |name| {
+                            ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol { name }
+                                .at(enumerator.source)
+                        },
+                    )?;
                 }
             }
 

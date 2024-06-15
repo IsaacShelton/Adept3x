@@ -222,6 +222,11 @@ impl<T: Inflow<LexedLine>> Parser<T> {
         let name = eat_identifier(&mut tokens)
             .ok_or_else(|| ParseErrorKind::ExpectedDefinitionName.at(start_of_line))?;
 
+        let source = entire_line
+            .get(2)
+            .expect("definition name to be specifier")
+            .source;
+
         match tokens.next() {
             Some(PreToken {
                 kind: PreTokenKind::Punctuator(Punctuator::OpenParen { .. }),
@@ -285,6 +290,7 @@ impl<T: Inflow<LexedLine>> Parser<T> {
                 body: tokens.cloned().collect_vec(),
             }),
             name: name.to_string(),
+            source,
         })
     }
 
@@ -294,11 +300,11 @@ impl<T: Inflow<LexedLine>> Parser<T> {
     ) -> Result<Define, PreprocessorError> {
         // # define NAME REPLACEMENT_TOKENS...
 
-        let name = match line.get(2) {
+        let (name, source) = match line.get(2) {
             Some(PreToken {
                 kind: PreTokenKind::Identifier(name),
-                ..
-            }) => name.to_string(),
+                source,
+            }) => (name.to_string(), *source),
             _ => {
                 return Err(ParseErrorKind::ExpectedDefinitionName
                     .at(start_of_line)
@@ -311,6 +317,7 @@ impl<T: Inflow<LexedLine>> Parser<T> {
         Ok(Define {
             kind: DefineKind::ObjectMacro(replacement_tokens, PlaceholderAffinity::Discard),
             name,
+            source,
         })
     }
 

@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 
 use crate::{
+    ast::Source,
     c::token::{CToken, CTokenKind},
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
@@ -26,6 +27,18 @@ impl<'a> Input<'a> {
             key,
             stack: vec![0],
         }
+    }
+
+    pub fn switch_input(&mut self, mut tokens: Vec<CToken>) {
+        if !tokens.last().map_or(false, |token| token.is_end_of_file()) {
+            tokens.push(CTokenKind::EndOfFile.at(Source::internal()));
+        }
+
+        self.tokens = tokens;
+
+        // Reset stack
+        self.stack.clear();
+        self.stack.push(0);
     }
 
     pub fn filename(&self) -> &str {

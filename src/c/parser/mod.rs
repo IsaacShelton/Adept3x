@@ -4,7 +4,7 @@ mod error;
 mod expr;
 mod input;
 mod speculate;
-mod translation;
+pub mod translation;
 
 use self::speculate::speculate;
 use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
@@ -17,7 +17,6 @@ use crate::ast::{Parameter, Type, TypeKind};
 use crate::{
     ast::{Ast, FileIdentifier, Source},
     c::parser::translation::declare_function,
-    source_file_cache::{SourceFileCache, SourceFileCacheKey},
 };
 use derive_more::IsVariant;
 use itertools::Itertools;
@@ -457,7 +456,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Result<Ast<'a>, ParseError> {
+    pub fn switch_input(&mut self, tokens: Vec<CToken>) {
+        self.input.switch_input(tokens);
+    }
+
+    pub fn parse(&mut self) -> Result<(Ast<'a>, FileIdentifier), ParseError> {
         // Get primary filename
         let filename = self.input.filename();
 
@@ -465,15 +468,20 @@ impl<'a> Parser<'a> {
         let mut ast = Ast::new(filename.into(), self.input.source_file_cache());
 
         // Parse primary file
-        self.parse_into(&mut ast, filename.into())?;
+        let file_id = self.parse_into(&mut ast, filename.into())?;
 
         // Return global ast
-        Ok(ast)
+        Ok((ast, file_id))
     }
 
-    pub fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<(), ParseError> {
+    pub fn parse_into(
+        &mut self,
+        ast: &mut Ast,
+        filename: String,
+    ) -> Result<FileIdentifier, ParseError> {
         // Create ast file
-        let ast_file = ast.new_file(FileIdentifier::Local(filename));
+        let file_id = FileIdentifier::Local(filename);
+        let ast_file = ast.new_file(file_id.clone());
 
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
@@ -512,7 +520,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(())
+        Ok(file_id)
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
@@ -1554,22 +1562,4 @@ impl<'a> Parser<'a> {
 
         source
     }
-}
-
-pub fn parse(
-    tokens: Vec<CToken>,
-    source_file_cache: &SourceFileCache,
-    key: SourceFileCacheKey,
-) -> Result<Ast, ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse()
-}
-
-pub fn parse_into(
-    tokens: Vec<CToken>,
-    source_file_cache: &SourceFileCache,
-    key: SourceFileCacheKey,
-    ast: &mut Ast,
-    filename: String,
-) -> Result<(), ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast, filename)
 }

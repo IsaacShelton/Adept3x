@@ -12,6 +12,8 @@ use crate::{
 };
 use std::collections::HashMap;
 
+pub use self::expr::translate_expr;
+
 pub fn declare_named(
     ast_file: &mut File,
     declarator: &Declarator,

@@ -70,6 +70,10 @@ pub enum CTokenKind {
 }
 
 impl CTokenKind {
+    pub fn at(self, source: Source) -> CToken {
+        CToken { kind: self, source }
+    }
+
     pub fn is_open_paren(&self) -> bool {
         match self {
             CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => true,

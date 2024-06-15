@@ -6,4 +6,4 @@ pub mod punctuator;
 pub mod token;
 
 pub use lexer::Lexer;
-pub use parser::{parse, parse_into};
+pub use parser::translation::translate_expr;
