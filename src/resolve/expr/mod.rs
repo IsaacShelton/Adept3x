@@ -37,6 +37,7 @@ use crate::{
 use ast::{FloatSize, IntegerBits, IntegerSign};
 
 pub use basic_binary_operation::resolve_basic_binary_operator;
+use indexmap::IndexMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
@@ -45,6 +46,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub global_search_ctx: &'b GlobalSearchCtx<'a>,
     pub variable_search_ctx: VariableSearchCtx<'a>,
     pub resolved_function_ref: resolved::FunctionRef,
+    pub defines: &'b IndexMap<String, &'a ast::Define>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -109,7 +111,9 @@ pub fn resolve_expr(
     let source = ast_expr.source;
 
     let resolved_expr = match &ast_expr.kind {
-        ast::ExprKind::Variable(name) => resolve_variable_expr(ctx, name, source),
+        ast::ExprKind::Variable(name) => {
+            resolve_variable_expr(ctx, name, preferred_type, initialized, source)
+        }
         ast::ExprKind::Integer(value) => {
             let (resolved_type, expr) = match value {
                 ast::Integer::Known(bits, sign, value) => (
@@ -229,8 +233,7 @@ pub fn resolve_expr(
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let resolved_type =
-                resolved::TypeKind::Enum(enum_member_literal.enum_name.clone())
-                    .at(ast_expr.source);
+                resolved::TypeKind::Enum(enum_member_literal.enum_name.clone()).at(ast_expr.source);
 
             Ok(TypedExpr::new(
                 resolved_type,

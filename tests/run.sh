@@ -26,6 +26,7 @@ compile array_access
 compile bitwise_operators
 compile c_printf
 compile comparison_operators
+compile defines
 compile enums
 compile float_literal
 compile function_parameters

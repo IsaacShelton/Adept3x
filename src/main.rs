@@ -19,6 +19,7 @@ mod show;
 mod source_file_cache;
 mod text;
 mod token;
+mod try_insert_index_map;
 
 use crate::c::preprocessor::{PreToken, PreTokenKind};
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};

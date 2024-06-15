@@ -10,11 +10,17 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FixedArray, Function, Global, Integer, NamedAlias, NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While
+        self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
+        BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Define, Enum,
+        EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FixedArray, Function,
+        Global, Integer, NamedAlias, NamedDefine, NamedEnum, Parameter, Parameters,
+        ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
+        Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{StringLiteral, StringModifier, Token, TokenKind},
+    try_insert_index_map::try_insert_into_index_map,
 };
 use ast::FloatSize;
 use indexmap::IndexMap;
@@ -22,7 +28,7 @@ use itertools::Itertools;
 use lazy_format::lazy_format;
 use num_bigint::BigInt;
 use num_traits::Zero;
-use std::{borrow::Borrow, ffi::CString, hash::BuildHasher};
+use std::{borrow::Borrow, ffi::CString};
 
 struct Parser<'a, I>
 where
@@ -125,10 +131,7 @@ where
                 })?;
             }
             TokenKind::DefineKeyword => {
-                let NamedDefine {
-                    name,
-                    define,
-                } = self.parse_define(annotations)?;
+                let NamedDefine { name, define } = self.parse_define(annotations)?;
                 let source = define.source;
 
                 try_insert_into_index_map(&mut ast_file.defines, name, define, |name| {
@@ -421,10 +424,7 @@ where
 
         Ok(NamedDefine {
             name,
-            define: Define {
-                value,
-                source,
-            },
+            define: Define { value, source },
         })
     }
 
@@ -1357,26 +1357,5 @@ fn is_right_associative(kind: &TokenKind) -> bool {
     match kind {
         TokenKind::DeclareAssign => true,
         _ => false,
-    }
-}
-
-fn try_insert_into_index_map<
-    K: indexmap::Equivalent<K> + std::hash::Hash + std::cmp::Eq,
-    V,
-    S: BuildHasher,
-    E,
->(
-    index_map: &mut IndexMap<K, V, S>,
-    key: K,
-    value: V,
-    or_else: impl Fn(K) -> E,
-) -> Result<(), E> {
-    // Unfortantely there isn't an API provided to do this without having
-    // to do the lookup twice or cloning the key, so we will prefer the double lookup.
-    if index_map.contains_key(&key) {
-        Err(or_else(key))
-    } else {
-        assert!(index_map.insert(key, value).is_none());
-        Ok(())
     }
 }

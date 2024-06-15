@@ -22,6 +22,7 @@ use crate::{
     ast::{self, Ast, FileIdentifier, Source, Type},
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
+    try_insert_index_map::try_insert_into_index_map,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
 use function_search_ctx::FunctionSearchCtx;
@@ -37,16 +38,39 @@ enum Job {
     Regular(FileIdentifier, usize, resolved::FunctionRef),
 }
 
-#[derive(Default)]
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
     pub type_search_ctxs: HashMap<String, TypeSearchCtx<'a>>,
     pub function_search_contexts: HashMap<String, FunctionSearchCtx<'a>>,
     pub global_search_contexts: HashMap<String, GlobalSearchCtx<'a>>,
+    pub defines: IndexMap<String, &'a ast::Define>,
+}
+
+impl<'a> ResolveCtx<'a> {
+    fn new(defines: IndexMap<String, &'a ast::Define>) -> Self {
+        Self {
+            jobs: Default::default(),
+            type_search_ctxs: Default::default(),
+            function_search_contexts: Default::default(),
+            global_search_contexts: Default::default(),
+            defines,
+        }
+    }
 }
 
 pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
-    let mut ctx = ResolveCtx::default();
+    let mut defines = IndexMap::new();
+
+    // Unify defines into single map
+    for (_, file) in ast.files.iter() {
+        for (define_name, define) in file.defines.iter() {
+            try_insert_into_index_map(&mut defines, define_name.clone(), define, |define_name| {
+                ResolveErrorKind::MultipleDefinesOfSameName { name: define_name }.at(define.source)
+            })?;
+        }
+    }
+
+    let mut ctx = ResolveCtx::new(defines);
     let source_file_cache = ast.source_file_cache;
     let mut resolved_ast = resolved::Ast::new(source_file_cache);
 
@@ -55,12 +79,10 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     // Unify type aliases into single map
     for (_, file) in ast.files.iter() {
         for (alias_name, alias) in file.aliases.iter() {
-            if aliases.insert(alias_name.clone(), alias).is_some() {
-                return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
-                    name: alias_name.clone(),
-                }
-                .at(alias.source));
-            }
+            try_insert_into_index_map(&mut aliases, alias_name.clone(), alias, |alias_name| {
+                ResolveErrorKind::MultipleDefinitionsOfTypeNamed { name: alias_name }
+                    .at(alias.source)
+            })?;
         }
     }
 
@@ -293,6 +315,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                         global_search_ctx,
                         variable_search_ctx,
                         resolved_function_ref,
+                        defines: &ctx.defines,
                     };
 
                     resolve_stmts(&mut ctx, &ast_function.stmts)?
@@ -657,6 +680,7 @@ fn conform_integer_literal(
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 enum Initialized {
     Require,
     AllowUninitialized,
@@ -724,10 +748,8 @@ fn resolve_type<'a>(
                             used_aliases_stack.remove(name.as_str());
                             inner.map(|ty| ty.kind)
                         } else {
-                            Err(ResolveErrorKind::RecursiveTypeAlias {
-                                name: name.clone(),
-                            }
-                            .at(definition.source))
+                            Err(ResolveErrorKind::RecursiveTypeAlias { name: name.clone() }
+                                .at(definition.source))
                         }
                     } else {
                         Err(err)

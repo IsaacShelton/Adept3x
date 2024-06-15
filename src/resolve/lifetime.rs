@@ -261,7 +261,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         }
         ExprKind::Member { subject, .. } => {
             mini_scope.union_with(&insert_drops_for_destination(ctx, subject));
-        },
+        }
         ExprKind::StructureLiteral { .. } => (),
         ExprKind::UnaryOperation(operation) => {
             mini_scope.union_with(&insert_drops_for_expr(
@@ -271,10 +271,8 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         }
         ExprKind::Conditional(conditional) => {
             if let Some(branch) = conditional.branches.first_mut() {
-                let condition_scope = insert_drops_for_expr(
-                    ctx.clone(),
-                    &mut branch.condition.expr,
-                );
+                let condition_scope =
+                    insert_drops_for_expr(ctx.clone(), &mut branch.condition.expr);
 
                 mini_scope.union_with(&condition_scope);
             }
@@ -311,6 +309,9 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
             mini_scope.union_with(&insert_drops_for_expr(ctx.clone(), &mut array_access.index));
         }
         ExprKind::EnumMemberLiteral(_enum_member_literal) => (),
+        ExprKind::ResolvedNameExpression(_name, resolved_expr) => {
+            mini_scope = insert_drops_for_expr(ctx, resolved_expr);
+        }
     }
 
     mini_scope
@@ -470,6 +471,9 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         ExprKind::ArrayAccess(array_access) => {
             integrate_active_set_for_expr(&mut array_access.subject, active_set);
             integrate_active_set_for_expr(&mut array_access.index, active_set);
+        }
+        ExprKind::ResolvedNameExpression(_name, resolved_expr) => {
+            integrate_active_set_for_expr(resolved_expr.as_mut(), active_set);
         }
     }
 }

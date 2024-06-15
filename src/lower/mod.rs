@@ -360,7 +360,7 @@ fn lower_type(
         }
         resolved::TypeKind::AnonymousEnum(anonymous_enum) => {
             lower_type(&anonymous_enum.resolved_type, resolved_ast)
-        },
+        }
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
             let inner = lower_type(&fixed_array.inner, resolved_ast)?;
@@ -966,9 +966,13 @@ fn lower_expr(
                 _ => {
                     return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
                         enum_name: enum_member_literal.enum_name.clone(),
-                    }.at(enum_definition.source))
+                    }
+                    .at(enum_definition.source))
                 }
             })
+        }
+        ExprKind::ResolvedNameExpression(_name, resolved_expr) => {
+            lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
         }
     }
 }

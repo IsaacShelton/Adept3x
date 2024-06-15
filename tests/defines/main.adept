@@ -1,0 +1,10 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+define FAVORITE_NUMBER = 12345
+
+func main {
+    printf(c"X = %lld\n", FAVORITE_NUMBER)
+}
+

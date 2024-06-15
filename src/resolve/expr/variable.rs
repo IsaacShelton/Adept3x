@@ -1,13 +1,19 @@
-use super::ResolveExprCtx;
+use super::{PreferredType, ResolveExprCtx};
 use crate::{
     ast::Source,
-    resolve::error::ResolveError,
+    resolve::{
+        error::{ResolveError, ResolveErrorKind},
+        expr::resolve_expr,
+        Initialized,
+    },
     resolved::{self, TypedExpr},
 };
 
 pub fn resolve_variable_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     name: &str,
+    preferred_type: Option<PreferredType>,
+    initialized: Initialized,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     if let Some(variable) = ctx.variable_search_ctx.find_variable(name) {
@@ -34,10 +40,7 @@ pub fn resolve_variable_expr(
             ),
             is_initialized,
         ))
-    } else {
-        let (resolved_type, reference) =
-            ctx.global_search_ctx.find_global_or_error(name, source)?;
-
+    } else if let Some((resolved_type, reference)) = ctx.global_search_ctx.find_global(name) {
         Ok(TypedExpr::new(
             resolved_type.clone(),
             resolved::Expr::new(
@@ -48,5 +51,25 @@ pub fn resolve_variable_expr(
                 source,
             ),
         ))
+    } else if let Some(define) = ctx.defines.get(name) {
+        let TypedExpr {
+            resolved_type,
+            expr,
+            is_initialized,
+        } = resolve_expr(ctx, &define.value, preferred_type, initialized)?;
+
+        Ok(TypedExpr::new_maybe_initialized(
+            resolved_type,
+            resolved::Expr::new(
+                resolved::ExprKind::ResolvedNameExpression(name.to_string(), Box::new(expr)),
+                source,
+            ),
+            is_initialized,
+        ))
+    } else {
+        Err(ResolveErrorKind::UndeclaredVariable {
+            name: name.to_string(),
+        }
+        .at(source))
     }
 }
