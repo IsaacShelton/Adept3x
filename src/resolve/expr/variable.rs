@@ -61,7 +61,7 @@ pub fn resolve_variable_expr(
         Ok(TypedExpr::new_maybe_initialized(
             resolved_type,
             resolved::Expr::new(
-                resolved::ExprKind::ResolvedNameExpression(name.to_string(), Box::new(expr)),
+                resolved::ExprKind::ResolvedNamedExpression(name.to_string(), Box::new(expr)),
                 source,
             ),
             is_initialized,

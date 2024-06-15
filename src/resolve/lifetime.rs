@@ -309,7 +309,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
             mini_scope.union_with(&insert_drops_for_expr(ctx.clone(), &mut array_access.index));
         }
         ExprKind::EnumMemberLiteral(_enum_member_literal) => (),
-        ExprKind::ResolvedNameExpression(_name, resolved_expr) => {
+        ExprKind::ResolvedNamedExpression(_name, resolved_expr) => {
             mini_scope = insert_drops_for_expr(ctx, resolved_expr);
         }
     }
@@ -472,7 +472,7 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
             integrate_active_set_for_expr(&mut array_access.subject, active_set);
             integrate_active_set_for_expr(&mut array_access.index, active_set);
         }
-        ExprKind::ResolvedNameExpression(_name, resolved_expr) => {
+        ExprKind::ResolvedNamedExpression(_name, resolved_expr) => {
             integrate_active_set_for_expr(resolved_expr.as_mut(), active_set);
         }
     }

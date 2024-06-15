@@ -65,7 +65,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
     for (_, file) in ast.files.iter() {
         for (define_name, define) in file.defines.iter() {
             try_insert_into_index_map(&mut defines, define_name.clone(), define, |define_name| {
-                ResolveErrorKind::MultipleDefinesOfSameName { name: define_name }.at(define.source)
+                ResolveErrorKind::MultipleDefinesNamed { name: define_name }.at(define.source)
             })?;
         }
     }

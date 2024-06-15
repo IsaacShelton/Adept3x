@@ -971,7 +971,7 @@ fn lower_expr(
                 }
             })
         }
-        ExprKind::ResolvedNameExpression(_name, resolved_expr) => {
+        ExprKind::ResolvedNamedExpression(_name, resolved_expr) => {
             lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
         }
     }
