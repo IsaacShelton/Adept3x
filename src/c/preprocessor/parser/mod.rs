@@ -224,7 +224,7 @@ impl<T: Inflow<LexedLine>> Parser<T> {
 
         let source = entire_line
             .get(2)
-            .expect("definition name to be specifier")
+            .expect("definition name to be specified")
             .source;
 
         match tokens.next() {

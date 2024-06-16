@@ -12,6 +12,11 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
+pub struct ConstExpr {
+    pub value: Expr,
+}
+
+#[derive(Clone, Debug)]
 pub struct Expr {
     pub kind: ExprKind,
     pub source: Source,
@@ -35,6 +40,7 @@ pub enum ExprKind {
     PostDecrement(Box<Expr>),
     Identifier(String),
     EnumConstant(String, Integer),
+    CompoundLiteral(Box<CompoundLiteral>),
 }
 
 impl ExprKind {
@@ -117,6 +123,40 @@ pub struct Caster {
     pub specializer_qualifiers: SpecifierQualifierList,
     pub abstract_declarator: Option<AbstractDeclarator>,
     pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct CompoundLiteral {
+    pub caster: Caster,
+    pub braced_initializer: BracedInitializer,
+}
+
+#[derive(Clone, Debug)]
+pub struct BracedInitializer {
+    pub designated_initializers: Vec<DesignatedInitializer>,
+}
+
+#[derive(Clone, Debug)]
+pub struct DesignatedInitializer {
+    pub designation: Option<Designation>,
+    pub initializer: Initializer,
+}
+
+#[derive(Clone, Debug)]
+pub enum Initializer {
+    AssignmentExpression(Expr),
+    BracedInitializer(BracedInitializer),
+}
+
+#[derive(Clone, Debug)]
+pub struct Designation {
+    pub path: Vec<Designator>,
+}
+
+#[derive(Clone, Debug)]
+pub enum Designator {
+    Subscript(ConstExpr),
+    Field(String),
 }
 
 // Implements expression parsing for the C parser
@@ -327,10 +367,21 @@ impl<'a> Parser<'a> {
         }
 
         // Is cast?
-        if let Ok(_caster) = speculate!(self.input, self.parse_caster()) {
-            if self.eat_punctuator(Punctuator::OpenCurly) {
-                // Compound literal
-                return todo!("compound literal");
+        if let Ok(caster) = speculate!(self.input, self.parse_caster()) {
+            if self
+                .input
+                .peek_is(CTokenKind::Punctuator(Punctuator::OpenCurly))
+            {
+                let source = caster.source;
+
+                // TODO: Storage-class specifiers not supported for compound literals yet
+                let braced_initializer = self.parse_braced_initializer()?;
+
+                return Ok(ExprKind::CompoundLiteral(Box::new(CompoundLiteral {
+                    caster,
+                    braced_initializer,
+                }))
+                .at(source));
             } else {
                 // Cast
                 return todo!("cast");

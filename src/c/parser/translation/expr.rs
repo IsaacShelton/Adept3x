@@ -2,6 +2,7 @@ use crate::{
     ast::{self, IntegerSign, Source},
     c::{
         parser::{
+            error::ParseErrorKind,
             expr::{Expr, ExprKind},
             ParseError,
         },
@@ -26,8 +27,11 @@ pub fn translate_expr(expr: &Expr) -> Result<ast::Expr, ParseError> {
         ExprKind::Field(_) => todo!(),
         ExprKind::PostIncrement(_) => todo!(),
         ExprKind::PostDecrement(_) => todo!(),
-        ExprKind::Identifier(name) => todo!("translate C idenifier {}", name),
+        ExprKind::Identifier(name) => {
+            return Err(ParseErrorKind::UndefinedVariable(name.into()).at(expr.source));
+        }
         ExprKind::EnumConstant(_, _) => todo!(),
+        ExprKind::CompoundLiteral(_) => todo!(),
     })
 }
 

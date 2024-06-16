@@ -47,6 +47,7 @@ pub enum ParseErrorKind {
     DuplicateEnumMember(String),
     MustBeConstantInteger,
     EnumMemberNameConflictsWithExistingSymbol { name: String },
+    UndefinedVariable(String),
     Misc(&'static str),
 }
 
@@ -73,8 +74,13 @@ impl Display for ParseErrorKind {
                 write!(f, "Must be constant integer expression")
             }
             ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol { name } => {
-                write!(f, "Enum member name conflicts with existing symbol '{}'", name)
+                write!(
+                    f,
+                    "Enum member name conflicts with existing symbol '{}'",
+                    name
+                )
             }
+            ParseErrorKind::UndefinedVariable(name) => write!(f, "Undefined variable '{}'", name),
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }

@@ -294,11 +294,11 @@ fn is_hidden(entry: &DirEntry) -> bool {
 }
 
 fn lex(preprocessed: Vec<PreToken>, eof_source: Source) -> Vec<CToken> {
-    let mut lexer = c::Lexer::new(
+    c::Lexer::new(
         preprocessed
             .into_iter()
             .into_inflow_stream(PreToken::new(PreTokenKind::EndOfSequence, eof_source))
             .into_inflow(),
-    );
-    lexer.collect_vec(true)
+    )
+    .collect_vec(true)
 }

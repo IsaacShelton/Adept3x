@@ -6,6 +6,7 @@ mod input;
 mod speculate;
 pub mod translation;
 
+use self::expr::BracedInitializer;
 use self::speculate::speculate;
 use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
 use super::token::Integer;
@@ -1437,7 +1438,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_braced_initializer(&mut self) -> Result<(), ParseError> {
+    fn parse_braced_initializer(&mut self) -> Result<BracedInitializer, ParseError> {
         if !self.eat_punctuator(Punctuator::OpenCurly) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '{' to begin braced initializer"),
@@ -1445,7 +1446,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        todo!();
+        todo!("parse inside braced initializer");
 
         if !self.eat_punctuator(Punctuator::CloseCurly) {
             return Err(ParseError::new(
@@ -1454,8 +1455,9 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        todo!();
-        Ok(())
+        Ok(BracedInitializer {
+            designated_initializers: todo!(),
+        })
     }
 
     fn parse_function_body(&mut self) -> Result<(), ParseError> {
