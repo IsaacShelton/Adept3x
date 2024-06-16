@@ -188,8 +188,8 @@ pub fn resolve_expr(
         ast::ExprKind::ArrayAccess(array_access) => {
             resolve_array_access_expr(ctx, array_access, source)
         }
-        ast::ExprKind::StructureLiteral(ast_type, fields) => {
-            resolve_struct_literal_expr(ctx, ast_type, fields, source)
+        ast::ExprKind::StructureLiteral(ast_type, fields, fill_behavior) => {
+            resolve_struct_literal_expr(ctx, ast_type, fields, *fill_behavior, source)
         }
         ast::ExprKind::UnaryOperation(unary_operation) => {
             resolve_unary_operation_expr(ctx, unary_operation, preferred_type, source)

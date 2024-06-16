@@ -416,6 +416,7 @@ pub enum ExprKind {
     ArrayAccess(Box<ArrayAccess>),
     EnumMemberLiteral(EnumMemberLiteral),
     ResolvedNamedExpression(String, Box<Expr>),
+    Zeroed(Type),
 }
 
 impl ExprKind {

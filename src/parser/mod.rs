@@ -12,8 +12,8 @@ use crate::{
     ast::{
         self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
         BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Define, Enum,
-        EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FixedArray, Function,
-        Global, Integer, NamedAlias, NamedDefine, NamedEnum, Parameter, Parameters,
+        EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FillBehavior, FixedArray,
+        Function, Global, Integer, NamedAlias, NamedDefine, NamedEnum, Parameter, Parameters,
         ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
         Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
     },
@@ -763,23 +763,27 @@ where
                 TokenKind::Namespace => self.parse_enum_member_literal(),
                 TokenKind::OpenAngle => self.parse_structure_literal(),
                 TokenKind::OpenCurly => {
-                    let next_three = self
-                        .input
-                        .peek_n(5)
-                        .iter()
-                        .skip(2)
-                        .map(|token| &token.kind)
-                        .collect_vec();
+                    if self.input.peek_nth(2).kind.is_extend() {
+                        self.parse_structure_literal()
+                    } else {
+                        let next_three = self
+                            .input
+                            .peek_n(5)
+                            .iter()
+                            .skip(2)
+                            .map(|token| &token.kind)
+                            .collect_vec();
 
-                    match &next_three[..] {
-                        [TokenKind::Identifier(_), TokenKind::Colon, ..]
-                        | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
-                            self.parse_structure_literal()
+                        match &next_three[..] {
+                            [TokenKind::Identifier(_), TokenKind::Colon, ..]
+                            | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
+                                self.parse_structure_literal()
+                            }
+                            _ => Ok(Expr::new(
+                                ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
+                                self.source(location),
+                            )),
                         }
-                        _ => Ok(Expr::new(
-                            ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
-                            self.source(location),
-                        )),
                     }
                 }
                 TokenKind::OpenParen => self.parse_call(),
@@ -925,27 +929,34 @@ where
         self.parse_token(TokenKind::OpenCurly, Some("to begin struct literal"))?;
         self.ignore_newlines();
 
+        let mut fill_behavior = FillBehavior::Forbid;
         let mut fields = IndexMap::new();
 
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-            let (field_name, field_location) =
-                self.parse_identifier_keep_location(Some("for field name in struct literal"))?;
-            self.ignore_newlines();
+            if self.input.eat(TokenKind::Extend) {
+                if self.input.eat(TokenKind::ZeroedKeyword) {
+                    fill_behavior = FillBehavior::Zeroed;
+                }
+            } else {
+                let (field_name, field_location) =
+                    self.parse_identifier_keep_location(Some("for field name in struct literal"))?;
+                self.ignore_newlines();
 
-            self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
-            self.ignore_newlines();
+                self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
+                self.ignore_newlines();
 
-            let field_value = self.parse_expr()?;
-            self.ignore_newlines();
+                let field_value = self.parse_expr()?;
+                self.ignore_newlines();
 
-            if fields.get(&field_name).is_some() {
-                return Err(ParseError {
-                    kind: ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name },
-                    source: self.source(field_location),
-                });
+                if fields.get(&field_name).is_some() {
+                    return Err(ParseError {
+                        kind: ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name },
+                        source: self.source(field_location),
+                    });
+                }
+
+                fields.insert(field_name, field_value);
             }
-
-            fields.insert(field_name, field_value);
 
             self.ignore_newlines();
             if !self.input.peek_is(TokenKind::CloseCurly) {
@@ -956,7 +967,7 @@ where
 
         self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
         Ok(Expr::new(
-            ExprKind::StructureLiteral(ast_type, fields),
+            ExprKind::StructureLiteral(ast_type, fields, fill_behavior),
             source,
         ))
     }

@@ -66,6 +66,7 @@ pub enum TokenKind {
     TrueKeyword,
     FalseKeyword,
     DefineKeyword,
+    ZeroedKeyword,
     Member,
     Add,
     Subtract,
@@ -111,6 +112,7 @@ pub enum TokenKind {
     Increment,
     Decrement,
     Namespace,
+    Extend,
 }
 
 impl Display for TokenKind {
@@ -143,6 +145,7 @@ impl Display for TokenKind {
             TokenKind::TrueKeyword => f.write_str("'true'"),
             TokenKind::FalseKeyword => f.write_str("'false'"),
             TokenKind::DefineKeyword => f.write_str("'define'"),
+            TokenKind::ZeroedKeyword => f.write_str("'zeroed'"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -188,6 +191,7 @@ impl Display for TokenKind {
             TokenKind::Increment => f.write_str("'++'"),
             TokenKind::Decrement => f.write_str("'--'"),
             TokenKind::Namespace => f.write_str("'::'"),
+            TokenKind::Extend => f.write_str("'..'"),
         }
     }
 }
@@ -262,12 +266,14 @@ impl TokenKind {
             | TokenKind::TrueKeyword
             | TokenKind::FalseKeyword
             | TokenKind::DefineKeyword
+            | TokenKind::ZeroedKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon
             | TokenKind::Hash
             | TokenKind::Ellipsis
-            | TokenKind::Namespace => 0,
+            | TokenKind::Namespace
+            | TokenKind::Extend => 0,
         }
     }
 

@@ -144,7 +144,7 @@ pub struct DesignatedInitializer {
 
 #[derive(Clone, Debug)]
 pub enum Initializer {
-    AssignmentExpression(Expr),
+    Expression(Expr),
     BracedInitializer(BracedInitializer),
 }
 

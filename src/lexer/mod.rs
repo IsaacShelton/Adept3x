@@ -184,6 +184,9 @@ where
                         self.characters.next();
                         self.characters.next();
                         Has(Token::new(TokenKind::Ellipsis, location))
+                    } else if self.characters.peek_nth(0).is_character('.') {
+                        self.characters.next();
+                        Has(Token::new(TokenKind::Extend, location))
                     } else {
                         Has(Token::new(TokenKind::Member, location))
                     }

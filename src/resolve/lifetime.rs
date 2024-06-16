@@ -312,6 +312,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         ExprKind::ResolvedNamedExpression(_name, resolved_expr) => {
             mini_scope = insert_drops_for_expr(ctx, resolved_expr);
         }
+        ExprKind::Zeroed(_resolved_type) => (),
     }
 
     mini_scope
@@ -475,6 +476,7 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         ExprKind::ResolvedNamedExpression(_name, resolved_expr) => {
             integrate_active_set_for_expr(resolved_expr.as_mut(), active_set);
         }
+        ExprKind::Zeroed(_resolved_type) => (),
     }
 }
 

@@ -270,6 +270,7 @@ pub enum Literal {
     Float32(f32),
     Float64(f64),
     NullTerminatedString(CString),
+    Zeroed(Type),
 }
 
 #[derive(Clone, Debug)]

@@ -1,9 +1,12 @@
+use indexmap::IndexMap;
+
 use crate::{
-    ast::{self, IntegerSign, Source},
+    ast::{self, FillBehavior, IntegerSign, Source},
     c::{
+        encoding::Encoding,
         parser::{
             error::ParseErrorKind,
-            expr::{Expr, ExprKind},
+            expr::{CompoundLiteral, Expr, ExprKind},
             ParseError,
         },
         token::Integer,
@@ -15,8 +18,10 @@ pub fn translate_expr(expr: &Expr) -> Result<ast::Expr, ParseError> {
     Ok(match &expr.kind {
         ExprKind::Integer(integer) => translate_expr_integer(integer, expr.source)?,
         ExprKind::Float(_, _) => todo!(),
-        ExprKind::StringLiteral(_, _) => todo!(),
-        ExprKind::Boolean(_) => todo!(),
+        ExprKind::StringLiteral(encoding, content) => {
+            translate_expr_string(encoding, content, expr.source)?
+        }
+        ExprKind::Boolean(x) => ast::ExprKind::Boolean(*x).at(expr.source),
         ExprKind::Nullptr => todo!(),
         ExprKind::Character(_, _) => todo!(),
         ExprKind::Compound(_) => todo!(),
@@ -31,33 +36,48 @@ pub fn translate_expr(expr: &Expr) -> Result<ast::Expr, ParseError> {
             return Err(ParseErrorKind::UndefinedVariable(name.into()).at(expr.source));
         }
         ExprKind::EnumConstant(_, _) => todo!(),
-        ExprKind::CompoundLiteral(_) => todo!(),
+        ExprKind::CompoundLiteral(compound_literal) => {
+            translate_compound_literal(compound_literal, expr.source)?
+        }
     })
 }
 
+fn translate_compound_literal(
+    compound_literal: &CompoundLiteral,
+    source: Source,
+) -> Result<ast::Expr, ParseError> {
+    let ty = ast::TypeKind::Named("struct<Color>".into()).at(compound_literal.caster.source);
+    let fields = IndexMap::new();
+
+    eprintln!("translate compound literal {:#?}", compound_literal);
+
+    Ok(ast::ExprKind::StructureLiteral(ty, fields, FillBehavior::Zeroed).at(source))
+}
+
 fn translate_expr_integer(integer: &Integer, source: Source) -> Result<ast::Expr, ParseError> {
+    use IntegerLiteralBits::{Bits32, Bits64};
+    use IntegerSign::{Signed, Unsigned};
+
     let ast_integer = match integer {
-        Integer::Int(value) => ast::Integer::Known(
-            IntegerLiteralBits::Bits32,
-            IntegerSign::Signed,
-            (*value).into(),
-        ),
-        Integer::UnsignedInt(value) => ast::Integer::Known(
-            IntegerLiteralBits::Bits32,
-            IntegerSign::Unsigned,
-            (*value).into(),
-        ),
-        Integer::Long(value) | Integer::LongLong(value) => ast::Integer::Known(
-            IntegerLiteralBits::Bits64,
-            IntegerSign::Signed,
-            (*value).into(),
-        ),
-        Integer::UnsignedLong(value) | Integer::UnsignedLongLong(value) => ast::Integer::Known(
-            IntegerLiteralBits::Bits64,
-            IntegerSign::Unsigned,
-            (*value).into(),
-        ),
+        Integer::Int(x) => ast::Integer::Known(Bits32, Signed, (*x).into()),
+        Integer::UnsignedInt(x) => ast::Integer::Known(Bits32, Unsigned, (*x).into()),
+        Integer::Long(x) | Integer::LongLong(x) => ast::Integer::Known(Bits64, Signed, (*x).into()),
+        Integer::UnsignedLong(x) | Integer::UnsignedLongLong(x) => {
+            ast::Integer::Known(Bits64, Unsigned, (*x).into())
+        }
     };
 
     Ok(ast::ExprKind::Integer(ast_integer).at(source))
+}
+
+fn translate_expr_string(
+    encoding: &Encoding,
+    content: &str,
+    source: Source,
+) -> Result<ast::Expr, ParseError> {
+    if let Encoding::Default = encoding {
+        Ok(ast::ExprKind::String(content.into()).at(source))
+    } else {
+        todo!("translate non-default encoding C string")
+    }
 }

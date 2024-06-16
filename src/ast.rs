@@ -479,11 +479,17 @@ pub enum ExprKind {
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     Member(Box<Expr>, String),
     ArrayAccess(Box<ArrayAccess>),
-    StructureLiteral(Type, IndexMap<String, Expr>),
+    StructureLiteral(Type, IndexMap<String, Expr>, FillBehavior),
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
     EnumMemberLiteral(EnumMemberLiteral),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FillBehavior {
+    Forbid,
+    Zeroed,
 }
 
 impl ExprKind {

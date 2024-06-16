@@ -63,6 +63,7 @@ compile variables
 compile variables_override
 compile variables_typed
 compile while
+compile zeroed
 
 echo "[!] RUNNING CASES WITH EXPECTED FAILURE"
 

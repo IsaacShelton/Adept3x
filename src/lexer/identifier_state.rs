@@ -27,6 +27,7 @@ impl IdentifierState {
                 "true" => TokenKind::TrueKeyword,
                 "false" => TokenKind::FalseKeyword,
                 "define" => TokenKind::DefineKeyword,
+                "zeroed" => TokenKind::ZeroedKeyword,
                 _ => TokenKind::Identifier(identifier),
             },
             self.start_location,

@@ -37,11 +37,12 @@ use llvm_sys::{
         LLVMBuildIsNull, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMalloc, LLVMBuildMul,
         LLVMBuildNeg, LLVMBuildNot, LLVMBuildOr, LLVMBuildPhi, LLVMBuildRet, LLVMBuildSDiv,
         LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem,
-        LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstReal, LLVMDisposeMessage,
-        LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam, LLVMGetUndef, LLVMInt16Type,
-        LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
-        LLVMPositionBuilderAtEnd, LLVMSetExternallyInitialized, LLVMSetFunctionCallConv,
-        LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal, LLVMStructType, LLVMVoidType,
+        LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt, LLVMConstNull, LLVMConstReal,
+        LLVMDisposeMessage, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetParam,
+        LLVMGetUndef, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type,
+        LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMSetExternallyInitialized,
+        LLVMSetFunctionCallConv, LLVMSetInitializer, LLVMSetLinkage, LLVMSetThreadLocal,
+        LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBool, LLVMTypeRef, LLVMValueRef},
     target::{
@@ -342,12 +343,7 @@ unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), Backend
 
                     let mut backend_block = *backend_block;
 
-                    let mut value = build_value(
-                        ctx.backend_module,
-                        &value_catalog,
-                        &builder,
-                        &incoming.value,
-                    );
+                    let mut value = build_value(ctx, &value_catalog, &builder, &incoming.value)?;
 
                     LLVMAddIncoming(relocation.phi_node, &mut value, &mut backend_block, 1);
                 }
@@ -380,9 +376,9 @@ unsafe fn create_function_block(
                 let _ = LLVMBuildRet(
                     builder.get(),
                     value.as_ref().map_or_else(
-                        || null_mut(),
-                        |value| build_value(ctx.backend_module, value_catalog, &builder, value),
-                    ),
+                        || Ok(null_mut()),
+                        |value| build_value(ctx, value_catalog, &builder, value),
+                    )?,
                 );
                 None
             }
@@ -401,7 +397,7 @@ unsafe fn create_function_block(
             }
             Instruction::MallocArray(ir_type, count) => {
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
-                let count = build_value(ctx.backend_module, value_catalog, builder, count);
+                let count = build_value(ctx, value_catalog, builder, count)?;
                 Some(LLVMBuildArrayMalloc(
                     builder.get(),
                     backend_type,
@@ -410,7 +406,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::Free(value) => {
-                let backend_value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let backend_value = build_value(ctx, value_catalog, builder, value)?;
                 Some(LLVMBuildFree(builder.get(), backend_value))
             }
             Instruction::SizeOf(ir_type) => {
@@ -425,19 +421,18 @@ unsafe fn create_function_block(
                     .expect("referenced global to exist"),
             ),
             Instruction::Store(store) => {
-                let source =
-                    build_value(ctx.backend_module, value_catalog, builder, &store.new_value);
+                let source = build_value(ctx, value_catalog, builder, &store.new_value)?;
                 let destination = build_value(
-                    ctx.backend_module,
+                    ctx,
                     value_catalog,
                     builder,
                     &store.destination,
-                );
+                )?;
                 let _ = LLVMBuildStore(builder.get(), source, destination);
                 None
             }
             Instruction::Load((value, ir_type)) => {
-                let pointer = build_value(ctx.backend_module, value_catalog, builder, value);
+                let pointer = build_value(ctx, value_catalog, builder, value)?;
                 let llvm_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildLoad2(
                     builder.get(),
@@ -463,10 +458,8 @@ unsafe fn create_function_block(
                 let mut arguments = call
                     .arguments
                     .iter()
-                    .map(|argument| {
-                        build_value(ctx.backend_module, value_catalog, builder, argument)
-                    })
-                    .collect::<Vec<_>>();
+                    .map(|argument| build_value(ctx, value_catalog, builder, argument))
+                    .collect::<Result<Vec<LLVMValueRef>, _>>()?;
 
                 Some(LLVMBuildCall2(
                     builder.get(),
@@ -478,8 +471,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::Add(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrInteger::Integer => {
@@ -491,8 +483,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::Checked(operation, operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 let (expect_i1_fn, expect_i1_fn_type) = ctx.intrinsics.expect_i1();
                 let (overflow_panic_fn, overflow_panic_fn_type) = ctx.intrinsics.on_overflow();
@@ -563,8 +554,7 @@ unsafe fn create_function_block(
                 Some(result)
             }
             Instruction::Subtract(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrInteger::Integer => {
@@ -576,8 +566,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::Multiply(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrInteger::Integer => {
@@ -589,8 +578,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::Divide(operands, sign) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match sign {
                     FloatOrSign::Integer(IntegerSign::Signed) => {
@@ -605,8 +593,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::Modulus(operands, sign) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match sign {
                     FloatOrSign::Integer(IntegerSign::Signed) => {
@@ -621,8 +608,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::Equals(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrInteger::Integer => {
@@ -634,8 +620,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::NotEquals(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrInteger::Integer => {
@@ -647,8 +632,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::LessThan(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrSign::Integer(sign) => LLVMBuildICmp(
@@ -667,8 +651,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::LessThanEq(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrSign::Integer(sign) => LLVMBuildICmp(
@@ -687,8 +670,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::GreaterThan(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrSign::Integer(sign) => LLVMBuildICmp(
@@ -707,8 +689,7 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::GreaterThanEq(operands, mode) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(match mode {
                     FloatOrSign::Integer(sign) => LLVMBuildICmp(
@@ -727,32 +708,27 @@ unsafe fn create_function_block(
                 })
             }
             Instruction::And(operands) | Instruction::BitwiseAnd(operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildAnd(builder.get(), left, right, cstr!("").as_ptr()))
             }
             Instruction::Or(operands) | Instruction::BitwiseOr(operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildOr(builder.get(), left, right, cstr!("").as_ptr()))
             }
             Instruction::BitwiseXor(operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildXor(builder.get(), left, right, cstr!("").as_ptr()))
             }
             Instruction::LeftShift(operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildShl(builder.get(), left, right, cstr!("").as_ptr()))
             }
             Instruction::RightShift(operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildAShr(
                     builder.get(),
@@ -762,8 +738,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::LogicalRightShift(operands) => {
-                let (left, right) =
-                    build_binary_operands(ctx.backend_module, value_catalog, builder, operands);
+                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildLShr(
                     builder.get(),
@@ -773,7 +748,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::Bitcast(value, ir_type) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildBitCast(
                     builder.get(),
@@ -783,7 +758,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::ZeroExtend(value, ir_type) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildZExt(
                     builder.get(),
@@ -793,7 +768,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::SignExtend(value, ir_type) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildSExt(
                     builder.get(),
@@ -803,7 +778,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::FloatExtend(value, ir_type) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildFPExt(
                     builder.get(),
@@ -813,7 +788,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::Truncate(value, ir_type) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildTrunc(
                     builder.get(),
@@ -823,7 +798,7 @@ unsafe fn create_function_block(
                 ))
             }
             Instruction::TruncateFloat(value, ir_type) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, value);
+                let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx, ir_type, &mut visited)?;
                 Some(LLVMBuildFPTrunc(
                     builder.get(),
@@ -837,8 +812,7 @@ unsafe fn create_function_block(
                 struct_type: ir_struct_type,
                 index,
             } => {
-                let pointer =
-                    build_value(ctx.backend_module, value_catalog, builder, subject_pointer);
+                let pointer = build_value(ctx, value_catalog, builder, subject_pointer)?;
 
                 let backend_struct_type = match ir_struct_type {
                     ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
@@ -866,10 +840,8 @@ unsafe fn create_function_block(
                 item_type: ir_item_type,
                 index,
             } => {
-                let pointer =
-                    build_value(ctx.backend_module, value_catalog, builder, subject_pointer);
-
-                let index_value = build_value(ctx.backend_module, value_catalog, builder, index);
+                let pointer = build_value(ctx, value_catalog, builder, subject_pointer)?;
+                let index_value = build_value(ctx, value_catalog, builder, index)?;
 
                 let backend_item_type = to_backend_type(ctx, ir_item_type, &mut visited)?;
                 let mut indices = [index_value];
@@ -888,8 +860,7 @@ unsafe fn create_function_block(
                 let mut literal = LLVMGetUndef(backend_type);
 
                 for (index, value) in values.iter().enumerate() {
-                    let backend_value =
-                        build_value(ctx.backend_module, value_catalog, builder, value);
+                    let backend_value = build_value(ctx, value_catalog, builder, value)?;
 
                     literal = LLVMBuildInsertValue(
                         builder.get(),
@@ -903,23 +874,23 @@ unsafe fn create_function_block(
                 Some(literal)
             }
             Instruction::IsZero(inner) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildIsNull(builder.get(), value, cstr!("").as_ptr()))
             }
             Instruction::IsNotZero(inner) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildIsNotNull(builder.get(), value, cstr!("").as_ptr()))
             }
             Instruction::Negate(inner) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildNeg(builder.get(), value, cstr!("").as_ptr()))
             }
             Instruction::NegateFloat(inner) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildFNeg(builder.get(), value, cstr!("").as_ptr()))
             }
             Instruction::BitComplement(inner) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, inner);
+                let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildNot(builder.get(), value, cstr!("").as_ptr()))
             }
             Instruction::Break(break_info) => {
@@ -929,7 +900,7 @@ unsafe fn create_function_block(
                 Some(LLVMBuildBr(builder.get(), *backend_block))
             }
             Instruction::ConditionalBreak(condition, break_info) => {
-                let value = build_value(ctx.backend_module, value_catalog, builder, condition);
+                let value = build_value(ctx, value_catalog, builder, condition)?;
 
                 let (_, _, true_backend_block) = basicblocks
                     .get(break_info.true_basicblock_id)
@@ -983,23 +954,23 @@ unsafe fn get_function_type(
 }
 
 unsafe fn build_binary_operands(
-    backend_module: &BackendModule,
+    ctx: &BackendContext<'_>,
     value_catalog: &ValueCatalog,
     builder: &Builder,
     operands: &ir::BinaryOperands,
-) -> (LLVMValueRef, LLVMValueRef) {
-    let left = build_value(backend_module, value_catalog, builder, &operands.left);
-    let right = build_value(backend_module, value_catalog, builder, &operands.right);
-    (left, right)
+) -> Result<(LLVMValueRef, LLVMValueRef), BackendError> {
+    let left = build_value(ctx, value_catalog, builder, &operands.left)?;
+    let right = build_value(ctx, value_catalog, builder, &operands.right)?;
+    Ok((left, right))
 }
 
 unsafe fn build_value(
-    backend_module: &BackendModule,
+    ctx: &BackendContext<'_>,
     value_catalog: &ValueCatalog,
     _builder: &Builder,
     value: &ir::Value,
-) -> LLVMValueRef {
-    match value {
+) -> Result<LLVMValueRef, BackendError> {
+    Ok(match value {
         ir::Value::Literal(literal) => match literal {
             ir::Literal::Boolean(value) => {
                 LLVMConstInt(LLVMInt1Type(), *value as c_ulonglong, false as LLVMBool)
@@ -1031,14 +1002,18 @@ unsafe fn build_value(
             ir::Literal::Float32(value) => LLVMConstReal(LLVMFloatType(), *value as c_double),
             ir::Literal::Float64(value) => LLVMConstReal(LLVMDoubleType(), *value as c_double),
             ir::Literal::NullTerminatedString(value) => {
-                build_literal_cstring(backend_module.get(), value)
+                build_literal_cstring(ctx.backend_module.get(), value)
             }
             ir::Literal::Void => LLVMGetUndef(LLVMVoidType()),
+            ir::Literal::Zeroed(ir_type) => {
+                let backend_type = to_backend_type(ctx, ir_type, &mut HashSet::new())?;
+                LLVMConstNull(backend_type)
+            }
         },
         ir::Value::Reference(reference) => value_catalog
             .get(reference)
             .expect("referenced value exists"),
-    }
+    })
 }
 
 unsafe fn to_backend_type(

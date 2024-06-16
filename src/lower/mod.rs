@@ -974,6 +974,10 @@ fn lower_expr(
         ExprKind::ResolvedNamedExpression(_name, resolved_expr) => {
             lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
         }
+        ExprKind::Zeroed(resolved_type) => {
+            let ir_type = lower_type(resolved_type, resolved_ast)?;
+            Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
+        }
     }
 }
 

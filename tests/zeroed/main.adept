@@ -1,0 +1,26 @@
+
+#[foreign]
+func printf(format ptr<u8>, ...) i32
+
+struct Vector3i (x i32, y i32, z i32)
+
+func main {
+    a := Vector3i { ..zeroed }
+    b := Vector3i { x: 3, ..zeroed }
+    c := Vector3i { x: 3, y: 5, ..zeroed }
+    d := Vector3i { x: 3, y: 5, z: 7, ..zeroed }
+    e := Vector3i { z: 7, ..zeroed }
+    f := Vector3i { y: 5, ..zeroed, x: 3}
+
+    print_vector(a)
+    print_vector(b)
+    print_vector(c)
+    print_vector(d)
+    print_vector(e)
+    print_vector(f)
+}
+
+func print_vector(v Vector3i) {
+    printf(c"x=%d, y=%d, z=%d\n", v.x, v.y, v.z)
+}
+

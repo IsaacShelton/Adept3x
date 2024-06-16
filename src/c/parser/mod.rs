@@ -6,7 +6,7 @@ mod input;
 mod speculate;
 pub mod translation;
 
-use self::expr::BracedInitializer;
+use self::expr::{BracedInitializer, DesignatedInitializer, Designation, Initializer};
 use self::speculate::speculate;
 use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
 use super::token::Integer;
@@ -175,7 +175,7 @@ pub struct Pointer {
 #[derive(Clone, Debug)]
 pub struct InitDeclarator {
     pub declarator: Declarator,
-    pub initializer: Option<()>,
+    pub initializer: Option<Initializer>,
 }
 
 #[derive(Clone, Debug)]
@@ -1421,21 +1421,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_initializer(&mut self) -> Result<(), ParseError> {
-        if let Ok(..) = speculate!(self.input, self.parse_braced_initializer()) {
-            todo!();
-            return Ok(());
+    fn parse_initializer(&mut self) -> Result<Initializer, ParseError> {
+        if let Ok(braced_initializer) = speculate!(self.input, self.parse_braced_initializer()) {
+            return Ok(Initializer::BracedInitializer(braced_initializer));
         }
 
-        if let Ok(..) = speculate!(self.input, self.parse_expr_singular()) {
-            todo!();
-            return Ok(());
+        if let Ok(expr) = speculate!(self.input, self.parse_expr_singular()) {
+            return Ok(Initializer::Expression(expr));
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse initializer"),
-            self.input.peek().source,
-        ))
+        Err(ParseErrorKind::Misc("Expected initializer").at(self.input.peek().source))
     }
 
     fn parse_braced_initializer(&mut self) -> Result<BracedInitializer, ParseError> {
@@ -1446,7 +1441,25 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        todo!("parse inside braced initializer");
+        let mut designated_initializers = Vec::new();
+
+        while !self
+            .input
+            .peek_is_or_eof(CTokenKind::Punctuator(Punctuator::CloseCurly))
+        {
+            designated_initializers.push(self.parse_designated_initializer()?);
+
+            if !self.eat_punctuator(Punctuator::Comma)
+                && !self
+                    .input
+                    .peek_is(CTokenKind::Punctuator(Punctuator::CloseCurly))
+            {
+                return Err(ParseError::new(
+                    ParseErrorKind::Misc("Expected ',' or '}' after designated initializer"),
+                    self.input.peek().source,
+                ));
+            }
+        }
 
         if !self.eat_punctuator(Punctuator::CloseCurly) {
             return Err(ParseError::new(
@@ -1456,8 +1469,52 @@ impl<'a> Parser<'a> {
         }
 
         Ok(BracedInitializer {
-            designated_initializers: todo!(),
+            designated_initializers,
         })
+    }
+
+    fn parse_designated_initializer(&mut self) -> Result<DesignatedInitializer, ParseError> {
+        let designated = matches!(
+            self.input.peek().kind,
+            CTokenKind::Punctuator(Punctuator::Dot | Punctuator::OpenBracket)
+        );
+
+        let designation = if designated {
+            Some(self.parse_designation()?)
+        } else {
+            None
+        };
+
+        let initializer = self.parse_initializer()?;
+
+        Ok(DesignatedInitializer {
+            designation,
+            initializer,
+        })
+    }
+
+    fn parse_designation(&mut self) -> Result<Designation, ParseError> {
+        let path = Vec::new();
+
+        loop {
+            if self.eat_punctuator(Punctuator::OpenBracket) {
+                todo!("subscript designator");
+                continue;
+            }
+
+            if self.eat_punctuator(Punctuator::Dot) {
+                todo!("field designator");
+                continue;
+            }
+
+            break;
+        }
+
+        if path.is_empty() {
+            return Err(ParseErrorKind::Misc("Expected designation").at(self.input.peek().source));
+        }
+
+        Ok(Designation { path })
     }
 
     fn parse_function_body(&mut self) -> Result<(), ParseError> {
