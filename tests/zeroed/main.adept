@@ -10,7 +10,7 @@ func main {
     c := Vector3i { x: 3, y: 5, ..zeroed }
     d := Vector3i { x: 3, y: 5, z: 7, ..zeroed }
     e := Vector3i { z: 7, ..zeroed }
-    f := Vector3i { y: 5, ..zeroed, x: 3}
+    f := Vector3i { y: 5, ..zeroed, x: 3 }
 
     print_vector(a)
     print_vector(b)

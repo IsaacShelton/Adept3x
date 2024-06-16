@@ -766,7 +766,9 @@ where
                 TokenKind::Namespace => self.parse_enum_member_literal(),
                 TokenKind::OpenAngle => self.parse_structure_literal(),
                 TokenKind::OpenCurly => {
-                    if self.input.peek_nth(2).kind.is_extend() {
+                    let peek = &self.input.peek_nth(2).kind;
+
+                    if peek.is_extend() || peek.is_colon() {
                         self.parse_structure_literal()
                     } else {
                         let next_three = self
@@ -923,7 +925,7 @@ where
     }
 
     fn parse_structure_literal(&mut self) -> Result<Expr, ParseError> {
-        // Type { x: VALUE, b: VALUE, c: VALUE }
+        // Type { x: VALUE, b: VALUE, c: VALUE, :d, :e, ..SPECIFIER }
         //  ^
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of struct literal"))?;
@@ -941,15 +943,21 @@ where
                     fill_behavior = FillBehavior::Zeroed;
                 }
             } else {
+                let dupe = self.input.eat(TokenKind::Colon);
+
                 let (field_name, field_location) =
                     self.parse_identifier_keep_location(Some("for field name in struct literal"))?;
                 self.ignore_newlines();
 
-                self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
-                self.ignore_newlines();
-
-                let field_value = self.parse_expr()?;
-                self.ignore_newlines();
+                let field_value = if dupe {
+                    ExprKind::Variable(field_name.clone()).at(self.source(field_location))
+                } else {
+                    self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
+                    self.ignore_newlines();
+                    let value = self.parse_expr()?;
+                    self.ignore_newlines();
+                    value
+                };
 
                 if fields.get(&field_name).is_some() {
                     return Err(ParseError {

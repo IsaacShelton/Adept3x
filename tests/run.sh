@@ -57,6 +57,7 @@ compile return_message
 compile signed_unsigned_promotion
 compile structure_definitions
 compile structure_literals
+compile structure_literals_abbr
 compile structure_pod
 compile unary_operators
 compile variables
