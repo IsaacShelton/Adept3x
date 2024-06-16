@@ -245,7 +245,7 @@ impl<'a> Parser<'a> {
         }
 
         // Grouped Expression
-        if self.input.peek().is_open_paren() {
+        if self.eat_open_paren() {
             let inner = self.parse_expr_multiple()?;
 
             if !self.eat_punctuator(Punctuator::CloseParen) {
