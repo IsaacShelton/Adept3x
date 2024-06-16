@@ -5,6 +5,7 @@ pub enum AnnotationKind {
     Foreign,
     ThreadLocal,
     Packed,
+    Pod,
 }
 
 #[derive(Clone, Debug)]
@@ -25,6 +26,7 @@ impl ToString for AnnotationKind {
             Self::Foreign => "foreign",
             Self::ThreadLocal => "thread_local",
             Self::Packed => "packed",
+            Self::Pod => "pod",
         }
         .into()
     }

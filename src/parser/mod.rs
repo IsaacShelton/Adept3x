@@ -210,6 +210,7 @@ where
             "foreign" => Ok(Annotation::new(AnnotationKind::Foreign, location)),
             "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, location)),
             "packed" => Ok(Annotation::new(AnnotationKind::Packed, location)),
+            "pod" => Ok(Annotation::new(AnnotationKind::Pod, location)),
             _ => Err(ParseError {
                 kind: ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,
@@ -261,10 +262,12 @@ where
         self.ignore_newlines();
 
         let mut is_packed = false;
+        let mut prefer_pod = false;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Packed => is_packed = true,
+                AnnotationKind::Pod => prefer_pod = true,
                 _ => {
                     return Err(self.unexpected_annotation(
                         annotation.kind.to_string(),
@@ -306,7 +309,7 @@ where
             name,
             fields,
             is_packed,
-            prefer_pod: false,
+            prefer_pod,
             source,
         })
     }
