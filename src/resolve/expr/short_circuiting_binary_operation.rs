@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast::{self, ConformBehavior, Source},
     resolve::{
         conform_expr,
         error::{ResolveError, ResolveErrorKind},
@@ -24,16 +24,22 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         Initialized::Require,
     )?;
 
-    let left =
-        conform_expr(&left, &local_bool_type, ConformMode::Normal, source).ok_or_else(|| {
-            ResolveErrorKind::ExpectedTypeForSide {
-                side: "left-hand side".to_string(),
-                operator: binary_operation.operator.to_string(),
-                expected: resolved::TypeKind::Boolean.to_string(),
-                got: left.resolved_type.to_string(),
-            }
-            .at(source)
-        })?;
+    let left = conform_expr(
+        &left,
+        &local_bool_type,
+        ConformMode::Normal,
+        ConformBehavior::Adept,
+        source,
+    )
+    .ok_or_else(|| {
+        ResolveErrorKind::ExpectedTypeForSide {
+            side: "left-hand side".to_string(),
+            operator: binary_operation.operator.to_string(),
+            expected: resolved::TypeKind::Boolean.to_string(),
+            got: left.resolved_type.to_string(),
+        }
+        .at(source)
+    })?;
 
     ctx.variable_search_ctx.begin_scope();
 
@@ -44,16 +50,22 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         Initialized::Require,
     )?;
 
-    let right =
-        conform_expr(&right, &local_bool_type, ConformMode::Normal, source).ok_or_else(|| {
-            ResolveErrorKind::ExpectedTypeForSide {
-                side: "right-hand side".to_string(),
-                operator: binary_operation.operator.to_string(),
-                expected: resolved::TypeKind::Boolean.to_string(),
-                got: right.resolved_type.to_string(),
-            }
-            .at(source)
-        })?;
+    let right = conform_expr(
+        &right,
+        &local_bool_type,
+        ConformMode::Normal,
+        ConformBehavior::Adept,
+        source,
+    )
+    .ok_or_else(|| {
+        ResolveErrorKind::ExpectedTypeForSide {
+            side: "right-hand side".to_string(),
+            operator: binary_operation.operator.to_string(),
+            expected: resolved::TypeKind::Boolean.to_string(),
+            got: right.resolved_type.to_string(),
+        }
+        .at(source)
+    })?;
 
     ctx.variable_search_ctx.end_scope();
 

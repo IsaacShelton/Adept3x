@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast::{self, ConformBehavior, Source},
     resolve::{
         conform_expr, conform_expr_to_default,
         error::{ResolveError, ResolveErrorKind},
@@ -54,6 +54,7 @@ pub fn resolve_call_expr(
                 &argument,
                 preferred_type,
                 ConformMode::ParameterPassing,
+                ConformBehavior::Adept,
                 source,
             ) {
                 argument = conformed_argument;

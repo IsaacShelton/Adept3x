@@ -19,7 +19,7 @@ use self::{
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
-    ast::{self, Ast, FileIdentifier, Source, Type},
+    ast::{self, Ast, ConformBehavior, FileIdentifier, Source, Type},
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
     try_insert_index_map::try_insert_into_index_map,
@@ -340,9 +340,10 @@ fn conform_expr_or_error(
     expr: &TypedExpr,
     target_type: &resolved::Type,
     mode: ConformMode,
+    behavior: ConformBehavior,
     conform_source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    if let Some(expr) = conform_expr(expr, target_type, mode, conform_source) {
+    if let Some(expr) = conform_expr(expr, target_type, mode, behavior, conform_source) {
         Ok(expr)
     } else {
         Err(ResolveErrorKind::TypeMismatch {
@@ -375,6 +376,7 @@ fn conform_expr(
     expr: &TypedExpr,
     to_type: &resolved::Type,
     mode: ConformMode,
+    conform_behavior: ConformBehavior,
     conform_source: Source,
 ) -> Option<TypedExpr> {
     if expr.resolved_type == *to_type {
@@ -392,14 +394,24 @@ fn conform_expr(
         } => {
             // Integer Conversion
             match &to_type.kind {
-                resolved::TypeKind::Integer { bits, sign } => conform_integer_value(
-                    &expr.expr,
-                    *from_bits,
-                    *from_sign,
-                    *bits,
-                    *sign,
-                    to_type.source,
-                ),
+                resolved::TypeKind::Integer { bits, sign } => match conform_behavior {
+                    ConformBehavior::Adept => conform_integer_value(
+                        &expr.expr,
+                        *from_bits,
+                        *from_sign,
+                        *bits,
+                        *sign,
+                        to_type.source,
+                    ),
+                    ConformBehavior::C => conform_integer_value_c(
+                        &expr.expr,
+                        *from_bits,
+                        *from_sign,
+                        *bits,
+                        *sign,
+                        to_type.source,
+                    ),
+                },
                 _ => None,
             }
         }
@@ -511,6 +523,17 @@ fn conform_integer_value(
             source: expr.source,
         },
     ))
+}
+
+fn conform_integer_value_c(
+    _expr: &resolved::Expr,
+    _from_bits: IntegerBits,
+    _from_sign: IntegerSign,
+    __to_bits: IntegerBits,
+    _to_sign: IntegerSign,
+    _type_source: Source,
+) -> Option<TypedExpr> {
+    todo!("conform_integer_value_c");
 }
 
 fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {

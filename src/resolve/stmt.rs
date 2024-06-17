@@ -6,7 +6,7 @@ use super::{
     resolve_type, ConformMode, Initialized,
 };
 use crate::{
-    ast,
+    ast::{self, ConformBehavior},
     resolved::{self, Drops},
 };
 
@@ -46,9 +46,13 @@ pub fn resolve_stmt<'a>(
                     .unwrap()
                     .return_type;
 
-                if let Some(result) =
-                    conform_expr(&result, &return_type, ConformMode::Normal, source)
-                {
+                if let Some(result) = conform_expr(
+                    &result,
+                    &return_type,
+                    ConformMode::Normal,
+                    ConformBehavior::Adept,
+                    source,
+                ) {
                     Some(result.expr)
                 } else {
                     return Err(ResolveErrorKind::CannotReturnValueOfType {
@@ -105,7 +109,13 @@ pub fn resolve_stmt<'a>(
                 .transpose()?
                 .as_ref()
                 .map(|value| {
-                    match conform_expr(value, &resolved_type, ConformMode::Normal, source) {
+                    match conform_expr(
+                        value,
+                        &resolved_type,
+                        ConformMode::Normal,
+                        ConformBehavior::Adept,
+                        source,
+                    ) {
                         Some(value) => Ok(value.expr),
                         None => Err(ResolveErrorKind::CannotAssignValueOfType {
                             from: value.resolved_type.to_string(),
@@ -153,6 +163,7 @@ pub fn resolve_stmt<'a>(
                 &value,
                 &destination_expr.resolved_type,
                 ConformMode::Normal,
+                ConformBehavior::Adept,
                 source,
             )
             .ok_or_else(|| {
@@ -189,11 +200,7 @@ pub fn resolve_stmt<'a>(
                 .operator
                 .as_ref()
                 .map(|ast_operator| {
-                    resolve_basic_binary_operator(
-                        ast_operator,
-                        &destination.resolved_type,
-                        source,
-                    )
+                    resolve_basic_binary_operator(ast_operator, &destination.resolved_type, source)
                 })
                 .transpose()?;
 

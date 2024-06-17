@@ -1,6 +1,6 @@
 use super::{conform_expr, ConformMode};
 use crate::{
-    ast::Source,
+    ast::{ConformBehavior, Source},
     resolved::{self, FloatSize, IntegerBits, IntegerSign, TypedExpr},
 };
 use itertools::Itertools;
@@ -17,8 +17,13 @@ pub fn unify_types(
 
     if let Some(unified_type) = &unified_type {
         for expr in exprs.iter_mut() {
-            **expr = match conform_expr(&**expr, unified_type, ConformMode::Normal, conform_source)
-            {
+            **expr = match conform_expr(
+                &**expr,
+                unified_type,
+                ConformMode::Normal,
+                ConformBehavior::Adept,
+                conform_source,
+            ) {
                 Some(conformed) => conformed,
                 None => {
                     panic!(

@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast::{self, ConformBehavior, Source},
     resolve::{
         conform_expr_or_error,
         error::{ResolveError, ResolveErrorKind},
@@ -35,6 +35,7 @@ pub fn resolve_conditional_expr(
             &condition,
             &resolved::TypeKind::Boolean.at(source),
             ConformMode::Normal,
+            ConformBehavior::Adept,
             source,
         )?;
 

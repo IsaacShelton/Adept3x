@@ -33,9 +33,6 @@ pub enum ParseErrorKind {
         name: String,
         for_reason: Option<String>,
     },
-    FieldSpecifiedMoreThanOnce {
-        field_name: String,
-    },
     ExpectedCommaInTypeParameters,
     ExpectedTypeParameters,
     ExpectedTypeName,
@@ -134,9 +131,6 @@ impl Display for ParseErrorKind {
                 if let Some(for_reason) = for_reason {
                     write!(f, " {}", for_reason)?;
                 }
-            }
-            ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name } => {
-                write!(f, "Field '{}' specified more than more", field_name)?;
             }
             ParseErrorKind::ExpectedCommaInTypeParameters => {
                 write!(f, "Expected ',' during type parameters")?;

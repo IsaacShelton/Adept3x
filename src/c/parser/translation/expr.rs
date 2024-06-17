@@ -1,12 +1,10 @@
-use indexmap::IndexMap;
-
 use crate::{
-    ast::{self, FillBehavior, IntegerSign, Source},
+    ast::{self, ConformBehavior, FillBehavior, IntegerSign, Source},
     c::{
         encoding::Encoding,
         parser::{
             error::ParseErrorKind,
-            expr::{CompoundLiteral, Expr, ExprKind},
+            expr::{CompoundLiteral, Expr, ExprKind, Initializer},
             ParseError,
         },
         token::Integer,
@@ -46,12 +44,37 @@ fn translate_compound_literal(
     compound_literal: &CompoundLiteral,
     source: Source,
 ) -> Result<ast::Expr, ParseError> {
+    eprintln!(
+        "translate compound literal (needs type) {:#?}",
+        compound_literal
+    );
+
     let ty = ast::TypeKind::Named("struct<Color>".into()).at(compound_literal.caster.source);
-    let fields = IndexMap::new();
+    let mut fields = Vec::new();
 
-    eprintln!("translate compound literal {:#?}", compound_literal);
+    for init in compound_literal
+        .braced_initializer
+        .designated_initializers
+        .iter()
+    {
+        if init.designation.is_some() {
+            todo!("designated initializer translation");
+        }
 
-    Ok(ast::ExprKind::StructureLiteral(ty, fields, FillBehavior::Zeroed).at(source))
+        let value = match &init.initializer {
+            Initializer::Expression(expr) => translate_expr(expr)?,
+            Initializer::BracedInitializer(_) => {
+                todo!("nested brace initializer for translate_compound_literal")
+            }
+        };
+
+        fields.push(ast::FieldInitializer { name: None, value });
+    }
+
+    Ok(
+        ast::ExprKind::StructureLiteral(ty, fields, FillBehavior::Zeroed, ConformBehavior::C)
+            .at(source),
+    )
 }
 
 fn translate_expr_integer(integer: &Integer, source: Source) -> Result<ast::Expr, ParseError> {

@@ -128,6 +128,11 @@ pub enum ResolveErrorKind {
     RecursiveTypeAlias {
         name: String,
     },
+    OutOfFields,
+    FieldSpecifiedMoreThanMore {
+        struct_name: String,
+        field_name: String,
+    },
     Other {
         message: String,
     },
@@ -339,6 +344,19 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::RecursiveTypeAlias { name } => {
                 write!(f, "Recursive type alias '{}'", name)?;
+            }
+            ResolveErrorKind::OutOfFields => {
+                write!(f, "Out of fields to populate for struct literal")?;
+            }
+            ResolveErrorKind::FieldSpecifiedMoreThanMore {
+                struct_name,
+                field_name,
+            } => {
+                write!(
+                    f,
+                    "Field '{}' specified more than once for '{}' literal",
+                    field_name, struct_name
+                )?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

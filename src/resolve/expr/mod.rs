@@ -20,7 +20,7 @@ use super::{
     variable_search_ctx::VariableSearchCtx, ConformMode, Initialized,
 };
 use crate::{
-    ast::{self},
+    ast::{self, ConformBehavior},
     resolve::{
         conform_expr_or_error, ensure_initialized,
         error::ResolveErrorKind,
@@ -188,8 +188,15 @@ pub fn resolve_expr(
         ast::ExprKind::ArrayAccess(array_access) => {
             resolve_array_access_expr(ctx, array_access, source)
         }
-        ast::ExprKind::StructureLiteral(ast_type, fields, fill_behavior) => {
-            resolve_struct_literal_expr(ctx, ast_type, fields, *fill_behavior, source)
+        ast::ExprKind::StructureLiteral(ast_type, fields, fill_behavior, conform_behavior) => {
+            resolve_struct_literal_expr(
+                ctx,
+                ast_type,
+                fields,
+                *fill_behavior,
+                *conform_behavior,
+                source,
+            )
         }
         ast::ExprKind::UnaryOperation(unary_operation) => {
             resolve_unary_operation_expr(ctx, unary_operation, preferred_type, source)
@@ -209,6 +216,7 @@ pub fn resolve_expr(
                 )?,
                 &resolved::TypeKind::Boolean.at(source),
                 ConformMode::Normal,
+                ConformBehavior::Adept,
                 source,
             )?
             .expr;

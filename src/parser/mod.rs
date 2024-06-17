@@ -11,11 +11,12 @@ use self::{
 use crate::{
     ast::{
         self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
-        BinaryOperator, Block, Call, Conditional, Declaration, DeclareAssign, Define, Enum,
-        EnumMemberLiteral, Expr, ExprKind, Field, File, FileIdentifier, FillBehavior, FixedArray,
-        Function, Global, Integer, NamedAlias, NamedDefine, NamedEnum, Parameter, Parameters,
-        ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Source, Stmt, StmtKind,
-        Structure, Type, TypeKind, UnaryOperation, UnaryOperator, While,
+        BinaryOperator, Block, Call, Conditional, ConformBehavior, Declaration, DeclareAssign,
+        Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field, FieldInitializer, File,
+        FileIdentifier, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
+        NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation,
+        ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind,
+        UnaryOperation, UnaryOperator, While,
     },
     line_column::Location,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -935,7 +936,7 @@ where
         self.ignore_newlines();
 
         let mut fill_behavior = FillBehavior::Forbid;
-        let mut fields = IndexMap::new();
+        let mut fields = Vec::new();
 
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
             if self.input.eat(TokenKind::Extend) {
@@ -959,14 +960,10 @@ where
                     value
                 };
 
-                if fields.get(&field_name).is_some() {
-                    return Err(ParseError {
-                        kind: ParseErrorKind::FieldSpecifiedMoreThanOnce { field_name },
-                        source: self.source(field_location),
-                    });
-                }
-
-                fields.insert(field_name, field_value);
+                fields.push(FieldInitializer {
+                    name: Some(field_name),
+                    value: field_value,
+                });
             }
 
             self.ignore_newlines();
@@ -978,7 +975,7 @@ where
 
         self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
         Ok(Expr::new(
-            ExprKind::StructureLiteral(ast_type, fields, fill_behavior),
+            ExprKind::StructureLiteral(ast_type, fields, fill_behavior, ConformBehavior::Adept),
             source,
         ))
     }

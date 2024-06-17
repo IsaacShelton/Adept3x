@@ -479,17 +479,29 @@ pub enum ExprKind {
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     Member(Box<Expr>, String),
     ArrayAccess(Box<ArrayAccess>),
-    StructureLiteral(Type, IndexMap<String, Expr>, FillBehavior),
+    StructureLiteral(Type, Vec<FieldInitializer>, FillBehavior, ConformBehavior),
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(While),
     EnumMemberLiteral(EnumMemberLiteral),
 }
 
+#[derive(Clone, Debug)]
+pub struct FieldInitializer {
+    pub name: Option<String>,
+    pub value: Expr,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum FillBehavior {
     Forbid,
     Zeroed,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ConformBehavior {
+    Adept,
+    C,
 }
 
 impl ExprKind {
