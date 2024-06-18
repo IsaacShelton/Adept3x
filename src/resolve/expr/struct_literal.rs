@@ -97,10 +97,15 @@ pub fn resolve_struct_literal_expr(
         // Lookup additional details required for resolution
         let (index, field) = get_field_info(ctx, structure_ref, &field_name);
 
+        let mode = match conform_behavior {
+            ConformBehavior::Adept => ConformMode::Normal,
+            ConformBehavior::C => ConformMode::Explicit,
+        };
+
         let resolved_expr = conform_expr(
             &resolved_expr,
             &field.resolved_type,
-            ConformMode::Normal,
+            mode,
             conform_behavior,
             source,
         )

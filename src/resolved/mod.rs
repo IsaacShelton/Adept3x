@@ -397,6 +397,7 @@ pub enum ExprKind {
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     IntegerExtend(Box<Expr>, Type),
+    IntegerTruncate(Box<Expr>, Type),
     FloatExtend(Box<Expr>, Type),
     Member {
         subject: Destination,

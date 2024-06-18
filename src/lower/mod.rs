@@ -670,6 +670,11 @@ fn lower_expr(
                 },
             ))
         }
+        ExprKind::IntegerTruncate(value, resolved_type) => {
+            let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
+            let ir_type = lower_type(resolved_type, resolved_ast)?;
+            Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
+        }
         ExprKind::FloatExtend(value, resolved_type) => {
             let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
             let ir_type = lower_type(resolved_type, resolved_ast)?;

@@ -370,6 +370,13 @@ impl ConformMode {
             Self::Explicit => true,
         }
     }
+
+    pub fn allow_lossy_integer(&self) -> bool {
+        match self {
+            Self::Explicit => true,
+            _ => false,
+        }
+    }
 }
 
 fn conform_expr(
@@ -405,6 +412,7 @@ fn conform_expr(
                     ),
                     ConformBehavior::C => conform_integer_value_c(
                         &expr.expr,
+                        mode,
                         *from_bits,
                         *from_sign,
                         *bits,
@@ -526,14 +534,42 @@ fn conform_integer_value(
 }
 
 fn conform_integer_value_c(
-    _expr: &resolved::Expr,
-    _from_bits: IntegerBits,
-    _from_sign: IntegerSign,
-    __to_bits: IntegerBits,
-    _to_sign: IntegerSign,
-    _type_source: Source,
+    expr: &resolved::Expr,
+    conform_mode: ConformMode,
+    from_bits: IntegerBits,
+    from_sign: IntegerSign,
+    to_bits: IntegerBits,
+    to_sign: IntegerSign,
+    type_source: Source,
 ) -> Option<TypedExpr> {
-    todo!("conform_integer_value_c");
+    let result_type = resolved::TypeKind::Integer {
+        bits: to_bits,
+        sign: to_sign,
+    }
+    .at(type_source);
+
+    if from_bits == to_bits && from_sign == to_sign {
+        return Some(TypedExpr::new(result_type, expr.clone()));
+    }
+
+    if conform_mode.allow_lossy_integer() {
+        let kind = if from_bits < to_bits {
+            resolved::ExprKind::IntegerExtend(Box::new(expr.clone()), result_type.clone())
+        } else {
+            resolved::ExprKind::IntegerTruncate(Box::new(expr.clone()), result_type.clone())
+        };
+
+        return Some(TypedExpr::new(
+            result_type,
+            resolved::Expr {
+                kind,
+                source: expr.source,
+            },
+        ));
+    }
+
+    todo!("conform_integer_value_c {:?}", conform_mode);
+    None
 }
 
 fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {

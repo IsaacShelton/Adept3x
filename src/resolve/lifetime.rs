@@ -253,7 +253,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
 
             mini_scope.used.or(&hidden_scope.used);
         }
-        ExprKind::IntegerExtend(value, _) => {
+        ExprKind::IntegerExtend(value, _) | ExprKind::IntegerTruncate(value, _) => {
             mini_scope.union_with(&insert_drops_for_expr(ctx, value));
         }
         ExprKind::FloatExtend(value, _) => {
@@ -443,7 +443,9 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
             integrate_active_set_for_expr(&mut operation.right.expr, active_set);
             active_set.deactivate_drops(&operation.drops);
         }
-        ExprKind::IntegerExtend(..) | ExprKind::FloatExtend(..) => (),
+        ExprKind::IntegerExtend(..) | ExprKind::IntegerTruncate(..) | ExprKind::FloatExtend(..) => {
+            ()
+        }
         ExprKind::Member { subject, .. } => {
             integrate_active_set_for_destination(subject, active_set);
         }

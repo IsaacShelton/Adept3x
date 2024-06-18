@@ -105,6 +105,7 @@ pub fn resolve_conditional_expr(
         unify_types(
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
             &mut last_exprs[..],
+            ConformBehavior::Adept,
             source,
         )
         .ok_or_else(|| {

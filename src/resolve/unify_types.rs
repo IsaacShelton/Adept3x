@@ -11,9 +11,10 @@ use std::borrow::Borrow;
 pub fn unify_types(
     preferred_type: Option<&resolved::Type>,
     exprs: &mut [&mut TypedExpr],
+    conform_behavior: ConformBehavior,
     conform_source: Source,
 ) -> Option<resolved::Type> {
-    let unified_type = unifying_type_for(preferred_type, exprs, conform_source);
+    let unified_type = unifying_type_for(preferred_type, exprs, conform_behavior, conform_source);
 
     if let Some(unified_type) = &unified_type {
         for expr in exprs.iter_mut() {
@@ -152,6 +153,7 @@ fn do_integer_literal_types_fit_in_integer(
 fn unifying_type_for(
     preferred_type: Option<&resolved::Type>,
     exprs: &[impl Borrow<TypedExpr>],
+    _conform_behavior: ConformBehavior,
     source: Source,
 ) -> Option<resolved::Type> {
     let types = exprs
