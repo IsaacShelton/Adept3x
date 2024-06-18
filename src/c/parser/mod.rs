@@ -1,24 +1,21 @@
 #![allow(unreachable_code)]
 
-mod error;
-mod expr;
+pub mod error;
+pub mod expr;
 mod input;
 mod speculate;
-pub mod translation;
 
 use self::expr::{BracedInitializer, DesignatedInitializer, Designation, Initializer};
 use self::speculate::speculate;
-use self::{error::ParseErrorKind, expr::Expr, translation::declare_named};
+use self::{error::ParseErrorKind, expr::Expr};
 use super::token::Integer;
+use super::translation::{declare_function, declare_named_declaration};
 use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
 };
+use crate::ast::{Ast, FileIdentifier, Source};
 use crate::ast::{Parameter, Type, TypeKind};
-use crate::{
-    ast::{Ast, FileIdentifier, Source},
-    c::parser::translation::declare_function,
-};
 use derive_more::IsVariant;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -33,13 +30,13 @@ pub struct Parser<'a> {
 
 #[derive(Clone, Debug)]
 pub struct CTypedef {
-    ast_type: Type,
+    pub ast_type: Type,
 }
 
 #[derive(Clone, Debug)]
 pub struct TypedefName {
-    name: String,
-    source: Source,
+    pub name: String,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -151,11 +148,11 @@ impl Decorators {
 
 #[derive(Clone, Debug)]
 pub struct ArrayQualifier {
-    expression: Option<Expr>,
-    type_qualifiers: Vec<TypeQualifier>,
-    is_static: bool,
-    is_param_vla: bool,
-    source: Source,
+    pub expression: Option<Expr>,
+    pub type_qualifiers: Vec<TypeQualifier>,
+    pub is_static: bool,
+    pub is_param_vla: bool,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -180,8 +177,8 @@ pub struct InitDeclarator {
 
 #[derive(Clone, Debug)]
 pub struct DeclarationSpecifier {
-    kind: DeclarationSpecifierKind,
-    source: Source,
+    pub kind: DeclarationSpecifierKind,
+    pub source: Source,
 }
 
 impl From<TypeSpecifierQualifier> for DeclarationSpecifier {
@@ -255,8 +252,8 @@ pub struct SpecifierQualifierList {
 
 #[derive(Clone, Debug)]
 pub struct TypeSpecifier {
-    kind: TypeSpecifierKind,
-    source: Source,
+    pub kind: TypeSpecifierKind,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug, IsVariant)]
@@ -494,7 +491,7 @@ impl<'a> Parser<'a> {
                             match &init_declarator.declarator.kind {
                                 DeclaratorKind::Named(..)
                                 | DeclaratorKind::Pointer(..)
-                                | DeclaratorKind::Array(..) => declare_named(
+                                | DeclaratorKind::Array(..) => declare_named_declaration(
                                     ast_file,
                                     &init_declarator.declarator,
                                     &declaration.attribute_specifiers[..],

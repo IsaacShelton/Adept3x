@@ -4,6 +4,7 @@ pub mod parser;
 pub mod preprocessor;
 pub mod punctuator;
 pub mod token;
+pub mod translation;
 
-pub use lexer::Lexer;
-pub use parser::translation::translate_expr;
+pub use self::lexer::Lexer;
+pub use self::translation::translate_expr;

@@ -19,7 +19,7 @@ func main {
     fgets(name, 1024, __stdinp)
 
     if strcmp(name, c"Isaac\n") == 0 {
-        printf(c"I know you\n", name)
+        printf(c"I know you %s\n", name)
     } else {
         printf(c"I don't recognize you\n")
     }
