@@ -185,7 +185,7 @@ fn compile_project(source_file_cache: &SourceFileCache, filepath: &Path) {
 
                         if let Ok(value) = parser
                             .parse_expr_singular()
-                            .and_then(|expr| translate_expr(&expr))
+                            .and_then(|expr| translate_expr(ast_file, parser.typedefs(), &expr))
                         {
                             ast_file.defines.insert(
                                 define_name.clone(),

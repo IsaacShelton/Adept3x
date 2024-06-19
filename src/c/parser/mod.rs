@@ -28,6 +28,12 @@ pub struct Parser<'a> {
     enum_constants: HashMap<String, Integer>,
 }
 
+impl Parser<'_> {
+    pub fn typedefs(&self) -> &HashMap<String, CTypedef> {
+        &self.typedefs
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct CTypedef {
     pub ast_type: Type,

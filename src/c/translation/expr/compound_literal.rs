@@ -1,15 +1,20 @@
+use std::collections::HashMap;
+
 use crate::{
     ast::{self, ConformBehavior, FillBehavior, Source},
     c::{
         parser::{
             expr::{CompoundLiteral, Initializer},
-            ParseError,
+            CTypedef, ParseError,
         },
         translate_expr,
+        translation::expr::caster::get_caster_type,
     },
 };
 
 pub fn translate_compound_literal(
+    ast_file: &mut ast::File,
+    typedefs: &HashMap<String, CTypedef>,
     compound_literal: &CompoundLiteral,
     source: Source,
 ) -> Result<ast::Expr, ParseError> {
@@ -18,7 +23,7 @@ pub fn translate_compound_literal(
         compound_literal
     );
 
-    let ty = ast::TypeKind::Named("struct<Color>".into()).at(compound_literal.caster.source);
+    let ty = get_caster_type(ast_file, typedefs, &compound_literal.caster)?;
     let mut fields = Vec::new();
 
     for init in compound_literal
@@ -31,7 +36,7 @@ pub fn translate_compound_literal(
         }
 
         let value = match &init.initializer {
-            Initializer::Expression(expr) => translate_expr(expr)?,
+            Initializer::Expression(expr) => translate_expr(ast_file, typedefs, expr)?,
             Initializer::BracedInitializer(_) => {
                 todo!("nested brace initializer for translate_compound_literal")
             }

@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::{
-    ast::{FixedArray, FunctionPointer, Source, Type, TypeKind},
+    ast::{self, FixedArray, FunctionPointer, Source, Type, TypeKind},
     c::{
-        parser::{ArrayQualifier, FunctionQualifier, ParseError, Pointer},
+        parser::{ArrayQualifier, CTypedef, FunctionQualifier, ParseError, Pointer},
         translate_expr,
     },
 };
@@ -19,6 +21,8 @@ pub fn decorate_pointer(
 }
 
 pub fn decorate_array(
+    ast_file: &mut ast::File,
+    typedefs: &HashMap<String, CTypedef>,
     ast_type: Type,
     array: &ArrayQualifier,
     for_parameter: bool,
@@ -43,7 +47,7 @@ pub fn decorate_array(
             Ok(Type::new(
                 TypeKind::FixedArray(Box::new(FixedArray {
                     ast_type,
-                    count: translate_expr(count)?,
+                    count: translate_expr(ast_file, typedefs, count)?,
                 })),
                 source,
             ))

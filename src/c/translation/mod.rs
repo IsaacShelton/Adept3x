@@ -4,14 +4,13 @@ mod function;
 mod parameters;
 mod types;
 
+use self::types::get_name_and_type;
 use crate::ast::{self, File};
 use crate::c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError};
 use std::collections::HashMap;
 
 pub use self::expr::translate_expr;
 pub use self::function::declare_function;
-
-use self::types::get_name_and_type;
 
 pub fn declare_named_declaration(
     ast_file: &mut File,

@@ -207,7 +207,14 @@ pub fn get_name_and_type(
                 ast_type = decorate_pointer(ast_type, pointer, decorator.source())?;
             }
             Decorator::Array(array) => {
-                ast_type = decorate_array(ast_type, array, for_parameter, decorator.source())?;
+                ast_type = decorate_array(
+                    ast_file,
+                    typedefs,
+                    ast_type,
+                    array,
+                    for_parameter,
+                    decorator.source(),
+                )?;
             }
             Decorator::Function(function) => {
                 ast_type = decorate_function(ast_type, function, decorator.source())?;

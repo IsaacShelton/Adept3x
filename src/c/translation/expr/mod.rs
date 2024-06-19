@@ -1,3 +1,4 @@
+mod caster;
 mod compound_literal;
 mod integer;
 mod string;
@@ -11,11 +12,16 @@ use crate::{
     c::parser::{
         error::ParseErrorKind,
         expr::{Expr, ExprKind},
-        ParseError,
+        CTypedef, ParseError,
     },
 };
+use std::collections::HashMap;
 
-pub fn translate_expr(expr: &Expr) -> Result<ast::Expr, ParseError> {
+pub fn translate_expr(
+    ast_file: &mut ast::File,
+    typedefs: &HashMap<String, CTypedef>,
+    expr: &Expr,
+) -> Result<ast::Expr, ParseError> {
     Ok(match &expr.kind {
         ExprKind::Integer(integer) => translate_expr_integer(integer, expr.source)?,
         ExprKind::Float(_, _) => todo!(),
@@ -38,7 +44,7 @@ pub fn translate_expr(expr: &Expr) -> Result<ast::Expr, ParseError> {
         }
         ExprKind::EnumConstant(_, _) => todo!(),
         ExprKind::CompoundLiteral(compound_literal) => {
-            translate_compound_literal(compound_literal, expr.source)?
+            translate_compound_literal(ast_file, typedefs, compound_literal, expr.source)?
         }
     })
 }
