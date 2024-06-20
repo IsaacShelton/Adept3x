@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     ast::{self, ConformBehavior, FillBehavior, Source},
     c::{
@@ -11,6 +9,7 @@ use crate::{
         translation::expr::caster::get_caster_type,
     },
 };
+use std::collections::HashMap;
 
 pub fn translate_compound_literal(
     ast_file: &mut ast::File,
@@ -18,11 +17,6 @@ pub fn translate_compound_literal(
     compound_literal: &CompoundLiteral,
     source: Source,
 ) -> Result<ast::Expr, ParseError> {
-    eprintln!(
-        "translate compound literal (needs type) {:#?}",
-        compound_literal
-    );
-
     let ty = get_caster_type(ast_file, typedefs, &compound_literal.caster)?;
     let mut fields = Vec::new();
 
