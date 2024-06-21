@@ -370,20 +370,8 @@ fn lower_type(
                 inner,
             })))
         }
-        resolved::TypeKind::FunctionPointer(function_pointer) => {
-            let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
-
-            for parameter in function_pointer.parameters.iter() {
-                parameters.push(lower_type(&parameter.resolved_type, resolved_ast)?);
-            }
-
-            let return_type = Box::new(lower_type(&function_pointer.return_type, resolved_ast)?);
-
-            Ok(ir::Type::Function(ir::TypeFunction {
-                parameters,
-                return_type,
-                is_cstyle_variadic: function_pointer.is_cstyle_variadic,
-            }))
+        resolved::TypeKind::FunctionPointer(_function_pointer) => {
+            Ok(ir::Type::FunctionPointer)
         }
         resolved::TypeKind::Enum(enum_name) => {
             let enum_definition = resolved_ast

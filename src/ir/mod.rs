@@ -192,7 +192,7 @@ pub enum Type {
     Void,
     Structure(StructureRef),
     AnonymousComposite(TypeComposite),
-    Function(TypeFunction),
+    FunctionPointer,
     UntypedEnum(TypeUntypedEnum),
     FixedArray(Box<FixedArray>),
 }
