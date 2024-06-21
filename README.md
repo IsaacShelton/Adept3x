@@ -17,7 +17,13 @@ Adept 3.x will have:
 - New module and import system
 - Improved and simplified value management semantics
 - First-class support for C headers and source files
+- Full support for platform-specific C ABIs
 - Full support for UTF-8 and Unicode
+- Pattern matching and sum types
+- Support for lambdas/closures
+- Abbreviated lambda syntax for common use cases
+- Ability to use if/elif/else and other constructs as values
+- New chaining operators for abbreviating long conjunctions/disjunctions
 - Enhanced standard library
 - Even better cross compilation
 - Improved compile time safety
