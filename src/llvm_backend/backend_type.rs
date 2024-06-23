@@ -25,7 +25,6 @@ pub unsafe fn to_backend_type(
         ir::Type::F32 => LLVMFloatType(),
         ir::Type::F64 => LLVMDoubleType(),
         ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to, visited)?, 0),
-        ir::Type::UntypedEnum(_) => panic!("Cannot convert untyped enum to backend type"),
         ir::Type::AnonymousComposite(composite) => {
             let mut subtypes = to_backend_types(ctx, &composite.subtypes, visited)?;
 

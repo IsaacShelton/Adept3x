@@ -193,7 +193,6 @@ pub enum Type {
     Structure(StructureRef),
     AnonymousComposite(TypeComposite),
     FunctionPointer,
-    UntypedEnum(TypeUntypedEnum),
     FixedArray(Box<FixedArray>),
 }
 
@@ -229,6 +228,29 @@ impl Type {
             is_packed: false,
         })
     }
+
+    pub fn is_integer_like(&self) -> bool {
+        match self {
+            Type::Boolean
+            | Type::S8
+            | Type::S16
+            | Type::S32
+            | Type::S64
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_signed(&self) -> Option<bool> {
+        match self {
+            Type::S8 | Type::S16 | Type::S32 | Type::S64 => Some(true),
+            Type::Boolean | Type::U8 | Type::U16 | Type::U32 | Type::U64 => Some(false),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -242,11 +264,6 @@ pub struct TypeFunction {
     pub parameters: Vec<Type>,
     pub return_type: Box<Type>,
     pub is_cstyle_variadic: bool,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeUntypedEnum {
-    pub member: String,
 }
 
 #[derive(Clone, Debug)]

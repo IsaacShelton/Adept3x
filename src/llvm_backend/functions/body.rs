@@ -1,3 +1,4 @@
+use super::block::create_function_block;
 use crate::llvm_backend::{
     builder::Builder, ctx::BackendContext, error::BackendError, value_catalog::ValueCatalog,
     values::build_value,
@@ -8,8 +9,6 @@ use llvm_sys::{
     prelude::LLVMBasicBlockRef,
 };
 use std::cell::OnceCell;
-
-use super::block::create_function_block;
 
 pub unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), BackendError> {
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
