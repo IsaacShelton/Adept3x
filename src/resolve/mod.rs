@@ -777,6 +777,12 @@ fn resolve_type<'a>(
             bits: *bits,
             sign: *sign,
         }),
+        ast::TypeKind::CInteger { integer, sign } => Ok(
+            resolved::TypeKind::CInteger {
+                integer: *integer,
+                sign: *sign,
+            }
+        ),
         ast::TypeKind::Pointer(inner) => {
             let inner = resolve_type_or_undeclared(
                 type_search_ctx,

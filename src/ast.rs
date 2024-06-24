@@ -286,12 +286,37 @@ impl Type {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CInteger {
+    Char,
+    Short,
+    Int,
+    Long,
+    LongLong,
+}
+
+impl CInteger {
+    pub fn min_bits(&self) -> IntegerBits {
+        match self {
+            Self::Char => IntegerBits::Bits8,
+            Self::Short => IntegerBits::Bits16,
+            Self::Int => IntegerBits::Bits16,
+            Self::Long => IntegerBits::Bits32,
+            Self::LongLong => IntegerBits::Bits64,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum TypeKind {
     Boolean,
     Integer {
         bits: IntegerBits,
         sign: IntegerSign,
+    },
+    CInteger {
+        integer: CInteger,
+        sign: Option<IntegerSign>,
     },
     Float(FloatSize),
     Pointer(Box<Type>),
@@ -381,6 +406,9 @@ impl Display for &TypeKind {
                     (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
                     (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
                 })?;
+            }
+            TypeKind::CInteger { integer, sign } => {
+                fmt_c_integer(f, integer, *sign)?;
             }
             TypeKind::Pointer(inner) => {
                 write!(f, "ptr<{}>", inner)?;
@@ -713,4 +741,26 @@ pub struct EnumMemberLiteral {
     pub enum_name: String,
     pub variant_name: String,
     pub source: Source,
+}
+
+pub fn fmt_c_integer(
+    f: &mut std::fmt::Formatter<'_>,
+    integer: &CInteger,
+    sign: Option<IntegerSign>,
+) -> std::fmt::Result {
+    match sign {
+        Some(IntegerSign::Signed) => f.write_str("signed ")?,
+        Some(IntegerSign::Unsigned) => f.write_str("unsigned ")?,
+        None => (),
+    }
+
+    f.write_str(match integer {
+        CInteger::Char => "char",
+        CInteger::Short => "short",
+        CInteger::Int => "int",
+        CInteger::Long => "long",
+        CInteger::LongLong => "long long",
+    })?;
+
+    Ok(())
 }

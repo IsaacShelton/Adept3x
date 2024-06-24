@@ -1,19 +1,21 @@
 mod builder;
 mod error;
 
+use self::error::{LowerError, LowerErrorKind};
 use crate::{
+    ast::CInteger,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
         NumericMode, StmtKind, VariableStorageKey,
     },
+    target_info::TargetInfo,
 };
 use builder::Builder;
+use resolved::IntegerSign;
 
-use self::error::{LowerError, LowerErrorKind};
-
-pub fn lower(ast: &resolved::Ast) -> Result<ir::Module, LowerError> {
-    let mut ir_module = ir::Module::new();
+pub fn lower(ast: &resolved::Ast, target_info: TargetInfo) -> Result<ir::Module, LowerError> {
+    let mut ir_module = ir::Module::new(target_info);
 
     for (structure_ref, structure) in ast.structures.iter() {
         lower_structure(&mut ir_module, structure_ref, structure, ast)?;
@@ -39,7 +41,11 @@ fn lower_structure(
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     for field in structure.fields.values() {
-        fields.push(lower_type(&field.resolved_type, resolved_ast)?);
+        fields.push(lower_type(
+            &ir_module.target_info,
+            &field.resolved_type,
+            resolved_ast,
+        )?);
     }
 
     ir_module.structures.insert(
@@ -63,7 +69,7 @@ fn lower_global(
         global_ref,
         Global {
             mangled_name: global.name.to_string(),
-            ir_type: lower_type(&global.resolved_type, resolved_ast)?,
+            ir_type: lower_type(&ir_module.target_info, &global.resolved_type, resolved_ast)?,
             is_foreign: global.is_foreign,
             is_thread_local: global.is_thread_local,
         },
@@ -89,6 +95,7 @@ fn lower_function(
             .take(function.variables.num_parameters)
             .map(|instance| {
                 Ok(builder.push(ir::Instruction::Alloca(lower_type(
+                    &ir_module.target_info,
                     &instance.resolved_type,
                     resolved_ast,
                 )?)))
@@ -103,6 +110,7 @@ fn lower_function(
             .skip(function.variables.num_parameters)
         {
             builder.push(ir::Instruction::Alloca(lower_type(
+                &ir_module.target_info,
                 &variable_instance.resolved_type,
                 resolved_ast,
             )?));
@@ -150,10 +158,14 @@ fn lower_function(
 
     let mut parameters = vec![];
     for parameter in function.parameters.required.iter() {
-        parameters.push(lower_type(&parameter.resolved_type, resolved_ast)?);
+        parameters.push(lower_type(
+            &ir_module.target_info,
+            &parameter.resolved_type,
+            resolved_ast,
+        )?);
     }
 
-    let mut return_type = lower_type(&function.return_type, resolved_ast)?;
+    let mut return_type = lower_type(&ir_module.target_info, &function.return_type, resolved_ast)?;
 
     if function.name == "main" {
         if let ir::Type::Void = return_type {
@@ -191,7 +203,13 @@ fn lower_stmts(
         result = match &stmt.kind {
             StmtKind::Return(expr, drops) => {
                 for variable_key in drops.drops.iter() {
-                    lower_drop(builder, *variable_key, function, resolved_ast)?;
+                    lower_drop(
+                        builder,
+                        &ir_module.target_info,
+                        *variable_key,
+                        function,
+                        resolved_ast,
+                    )?;
                 }
 
                 let instruction = ir::Instruction::Return(if let Some(expr) = expr {
@@ -249,8 +267,11 @@ fn lower_stmts(
                 )?;
 
                 let new_value = if let Some(operator) = &assignment.operator {
-                    let destination_type =
-                        lower_type(&assignment.destination.resolved_type, resolved_ast)?;
+                    let destination_type = lower_type(
+                        &ir_module.target_info,
+                        &assignment.destination.resolved_type,
+                        resolved_ast,
+                    )?;
 
                     let existing_value = builder.push(ir::Instruction::Load((
                         destination.clone(),
@@ -276,7 +297,13 @@ fn lower_stmts(
         };
 
         for variable_key in stmt.drops.iter() {
-            lower_drop(builder, *variable_key, function, resolved_ast)?;
+            lower_drop(
+                builder,
+                &ir_module.target_info,
+                *variable_key,
+                function,
+                resolved_ast,
+            )?;
         }
     }
 
@@ -285,6 +312,7 @@ fn lower_stmts(
 
 fn lower_drop(
     builder: &mut Builder,
+    target_info: &TargetInfo,
     variable_key: VariableStorageKey,
     function: &resolved::Function,
     resolved_ast: &resolved::Ast,
@@ -296,7 +324,7 @@ fn lower_drop(
 
     if variable.resolved_type.kind.is_managed_structure() {
         let variable_pointer = lower_variable_to_value(variable_key);
-        let variable_type = lower_type(&variable.resolved_type, resolved_ast)?;
+        let variable_type = lower_type(target_info, &variable.resolved_type, resolved_ast)?;
         let heap_pointer = builder.push(ir::Instruction::Load((variable_pointer, variable_type)));
         builder.push(ir::Instruction::Free(heap_pointer));
     }
@@ -305,6 +333,7 @@ fn lower_drop(
 }
 
 fn lower_type(
+    target_info: &TargetInfo,
     resolved_type: &resolved::Type,
     resolved_ast: &resolved::Ast,
 ) -> Result<ir::Type, LowerError> {
@@ -324,6 +353,9 @@ fn lower_type(
             (Bits::Bits64, Sign::Signed) => ir::Type::S64,
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
+        resolved::TypeKind::CInteger { integer, sign } => {
+            Ok(lower_c_integer(target_info, *integer, *sign))
+        }
         resolved::TypeKind::IntegerLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
                 value: value.to_string(),
@@ -342,6 +374,7 @@ fn lower_type(
             FloatSize::Bits64 => ir::Type::F64,
         }),
         resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
+            target_info,
             inner,
             resolved_ast,
         )?))),
@@ -359,27 +392,25 @@ fn lower_type(
             todo!("lower anonymous union")
         }
         resolved::TypeKind::AnonymousEnum(anonymous_enum) => {
-            lower_type(&anonymous_enum.resolved_type, resolved_ast)
+            lower_type(target_info, &anonymous_enum.resolved_type, resolved_ast)
         }
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
-            let inner = lower_type(&fixed_array.inner, resolved_ast)?;
+            let inner = lower_type(target_info, &fixed_array.inner, resolved_ast)?;
 
             Ok(ir::Type::FixedArray(Box::new(ir::FixedArray {
                 size,
                 inner,
             })))
         }
-        resolved::TypeKind::FunctionPointer(_function_pointer) => {
-            Ok(ir::Type::FunctionPointer)
-        }
+        resolved::TypeKind::FunctionPointer(_function_pointer) => Ok(ir::Type::FunctionPointer),
         resolved::TypeKind::Enum(enum_name) => {
             let enum_definition = resolved_ast
                 .enums
                 .get(enum_name)
                 .expect("referenced enum to exist");
 
-            lower_type(&enum_definition.resolved_type, resolved_ast)
+            lower_type(target_info, &enum_definition.resolved_type, resolved_ast)
         }
     }
 }
@@ -456,7 +487,11 @@ fn lower_destination(
                 function,
                 resolved_ast,
             )?;
-            let item_type = lower_type(&array_access.item_type, resolved_ast)?;
+            let item_type = lower_type(
+                &ir_module.target_info,
+                &array_access.item_type,
+                resolved_ast,
+            )?;
 
             Ok(builder.push(ir::Instruction::ArrayAccess {
                 item_type,
@@ -582,12 +617,20 @@ fn lower_expr(
         }
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
-            let variable_type = lower_type(&variable.resolved_type, resolved_ast)?;
+            let variable_type = lower_type(
+                &ir_module.target_info,
+                &variable.resolved_type,
+                resolved_ast,
+            )?;
             Ok(builder.push(ir::Instruction::Load((pointer_to_variable, variable_type))))
         }
         ExprKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
-            let ir_type = lower_type(&global_variable.resolved_type, resolved_ast)?;
+            let ir_type = lower_type(
+                &ir_module.target_info,
+                &global_variable.resolved_type,
+                resolved_ast,
+            )?;
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
         ExprKind::DeclareAssign(declare_assign) => {
@@ -609,7 +652,11 @@ fn lower_expr(
                 destination: destination.clone(),
             }));
 
-            let ir_type = lower_type(&declare_assign.resolved_type, resolved_ast)?;
+            let ir_type = lower_type(
+                &ir_module.target_info,
+                &declare_assign.resolved_type,
+                resolved_ast,
+            )?;
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
         ExprKind::BasicBinaryOperation(operation) => {
@@ -645,12 +692,12 @@ fn lower_expr(
         }
         ExprKind::IntegerExtend(value, resolved_type) => {
             let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
-            let ir_type = lower_type(resolved_type, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
 
             Ok(builder.push(
                 match resolved_type
                     .kind
-                    .sign()
+                    .sign(Some(&ir_module.target_info))
                     .expect("integer extend result type to be an integer type")
                 {
                     resolved::IntegerSign::Signed => ir::Instruction::SignExtend(value, ir_type),
@@ -660,12 +707,12 @@ fn lower_expr(
         }
         ExprKind::IntegerTruncate(value, resolved_type) => {
             let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
-            let ir_type = lower_type(resolved_type, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
         }
         ExprKind::FloatExtend(value, resolved_type) => {
             let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
-            let ir_type = lower_type(resolved_type, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
         ExprKind::Member {
@@ -709,7 +756,7 @@ fn lower_expr(
                 index: *index,
             });
 
-            let ir_type = lower_type(resolved_field_type, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, resolved_field_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {
@@ -727,7 +774,11 @@ fn lower_expr(
                 function,
                 resolved_ast,
             )?;
-            let item_type = lower_type(&array_access.item_type, resolved_ast)?;
+            let item_type = lower_type(
+                &ir_module.target_info,
+                &array_access.item_type,
+                resolved_ast,
+            )?;
 
             let item = builder.push(ir::Instruction::ArrayAccess {
                 item_type: item_type.clone(),
@@ -742,7 +793,7 @@ fn lower_expr(
             fields,
             memory_management,
         } => {
-            let result_ir_type = lower_type(structure_type, resolved_ast)?;
+            let result_ir_type = lower_type(&ir_module.target_info, structure_type, resolved_ast)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
@@ -859,7 +910,11 @@ fn lower_expr(
             builder.use_block(resume_basicblock_id);
 
             if conditional.otherwise.is_some() {
-                let ir_type = lower_type(&conditional.result_type, resolved_ast)?;
+                let ir_type = lower_type(
+                    &ir_module.target_info,
+                    &conditional.result_type,
+                    resolved_ast,
+                )?;
                 Ok(builder.push(ir::Instruction::Phi(ir::Phi { ir_type, incoming })))
             } else {
                 Ok(Value::Literal(Literal::Void))
@@ -920,7 +975,12 @@ fn lower_expr(
                     .at(enum_member_literal.source)
                 })?;
 
-            let ir_type = lower_type(&enum_definition.resolved_type, resolved_ast)?;
+            let ir_type = lower_type(
+                &ir_module.target_info,
+                &enum_definition.resolved_type,
+                resolved_ast,
+            )?;
+
             let value = &member.value;
 
             let make_error = |_| {
@@ -968,7 +1028,7 @@ fn lower_expr(
             lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
         }
         ExprKind::Zeroed(resolved_type) => {
-            let ir_type = lower_type(resolved_type, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
         }
     }
@@ -1157,4 +1217,37 @@ fn lower_pre_short_circuit(
         right_done_block_id,
         evaluate_right_block_id,
     })
+}
+
+pub fn lower_c_integer(
+    target_info: &TargetInfo,
+    integer: CInteger,
+    sign: Option<IntegerSign>,
+) -> ir::Type {
+    let sign = sign.unwrap_or_else(|| target_info.default_c_integer_sign(integer));
+
+    match (integer, sign) {
+        (CInteger::Char, IntegerSign::Signed) => ir::Type::S8,
+        (CInteger::Char, IntegerSign::Unsigned) => ir::Type::U8,
+        (CInteger::Short, IntegerSign::Signed) => ir::Type::S16,
+        (CInteger::Short, IntegerSign::Unsigned) => ir::Type::U16,
+        (CInteger::Int, IntegerSign::Signed) => ir::Type::S32,
+        (CInteger::Int, IntegerSign::Unsigned) => ir::Type::U32,
+        (CInteger::Long, IntegerSign::Signed) => {
+            if target_info.msabi {
+                ir::Type::S32
+            } else {
+                ir::Type::S64
+            }
+        }
+        (CInteger::Long, IntegerSign::Unsigned) => {
+            if target_info.msabi {
+                ir::Type::U32
+            } else {
+                ir::Type::U64
+            }
+        }
+        (CInteger::LongLong, IntegerSign::Signed) => ir::Type::S64,
+        (CInteger::LongLong, IntegerSign::Unsigned) => ir::Type::U64,
+    }
 }

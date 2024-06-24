@@ -236,8 +236,7 @@ impl ABIType {
             LLVMTypeKind::LLVMStructTypeKind
         );
 
-        let is_unpadded_struct =
-            unsafe { LLVMGetTypeKind(unpadded_coerce_to_type) } == LLVMTypeKind::LLVMStructTypeKind;
+        let is_unpadded_struct = is_struct_type(unpadded_coerce_to_type);
 
         assert!(
             is_unpadded_struct
@@ -283,6 +282,162 @@ impl ABIType {
             padding_in_register: false,
         }
     }
+
+    pub fn coerce_to_type(&self) -> Option<Option<LLVMTypeRef>> {
+        match &self.kind {
+            ABITypeKind::Direct(direct) => Some(direct.coerce_to_type),
+            ABITypeKind::Extend(extend) => Some(extend.coerce_to_type),
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                Some(Some(coerce_and_expand.coerce_to_type))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get_direct_offset_align(&self) -> Option<OffsetAlign> {
+        match &self.kind {
+            ABITypeKind::Direct(direct) => Some(direct.offset_align),
+            ABITypeKind::Extend(extend) => Some(extend.offset_align),
+            _ => None,
+        }
+    }
+
+    pub fn get_direct_offset(&self) -> Option<u32> {
+        self.get_direct_offset_align().map(|info| info.offset)
+    }
+
+    pub fn get_direct_align(&self) -> Option<u32> {
+        self.get_direct_offset_align().map(|info| info.align)
+    }
+
+    pub fn is_sign_extend(&self) -> bool {
+        match &self.kind {
+            ABITypeKind::Extend(extend) => extend.signext,
+            _ => false,
+        }
+    }
+
+    pub fn padding_type(&self) -> Option<Option<LLVMTypeRef>> {
+        match &self.kind {
+            ABITypeKind::Direct(direct) => Some(direct.padding),
+            ABITypeKind::Extend(extend) => Some(extend.padding),
+            ABITypeKind::Indirect(indirect) => Some(indirect.padding),
+            ABITypeKind::IndirectAliased(indirect_aliased) => Some(indirect_aliased.padding),
+            ABITypeKind::Expand(expand) => Some(expand.padding),
+            _ => None,
+        }
+    }
+
+    pub fn padding_in_register(&self) -> bool {
+        self.padding_in_register
+    }
+
+    pub fn coerce_and_expand_type(&self) -> Option<LLVMTypeRef> {
+        match &self.kind {
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                Some(coerce_and_expand.coerce_to_type)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn unpadded_coerce_and_expand_type(&self) -> Option<LLVMTypeRef> {
+        match &self.kind {
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                Some(coerce_and_expand.unpadded_coerce_and_expand_type)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn coerce_and_expand_type_sequence(&self) -> Vec<LLVMTypeRef> {
+        match &self.kind {
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                let unpadded = coerce_and_expand.unpadded_coerce_and_expand_type;
+
+                if is_struct_type(unpadded) {
+                    get_struct_field_types(unpadded)
+                } else {
+                    vec![unpadded]
+                }
+            }
+            _ => panic!("invalid call to coerce_and_expand_type_sequence"),
+        }
+    }
+
+    pub fn in_register(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::Direct(direct) => Some(direct.in_register),
+            ABITypeKind::Extend(extend) => Some(extend.in_register),
+            ABITypeKind::Indirect(indirect) => Some(indirect.in_register),
+            _ => None,
+        }
+    }
+
+    pub fn indirect_align(&self) -> Option<ByteCount> {
+        match &self.kind {
+            ABITypeKind::Indirect(indirect) => Some(indirect.align),
+            ABITypeKind::IndirectAliased(indirect_aliased) => Some(indirect_aliased.align),
+            _ => None,
+        }
+    }
+
+    pub fn indirect_byval(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::Indirect(indirect) => Some(indirect.byval),
+            _ => None,
+        }
+    }
+
+    pub fn indirect_address_space(&self) -> Option<u32> {
+        match &self.kind {
+            ABITypeKind::IndirectAliased(indirect_aliased) => Some(indirect_aliased.address_space),
+            _ => None,
+        }
+    }
+
+    pub fn indirect_realign(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::Indirect(indirect) => Some(indirect.realign),
+            ABITypeKind::IndirectAliased(indirect_aliased) => Some(indirect_aliased.realign),
+            _ => None,
+        }
+    }
+
+    pub fn is_sret_after_this(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::Indirect(indirect) => Some(indirect.sret_after_this),
+            _ => None,
+        }
+    }
+
+    pub fn alloca_field_index(&self) -> Option<u32> {
+        match &self.kind {
+            ABITypeKind::InAlloca(in_alloca) => Some(in_alloca.alloca_field_index),
+            _ => None,
+        }
+    }
+
+    pub fn in_alloca_indirect(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::InAlloca(in_alloca) => Some(in_alloca.indirect),
+            _ => None,
+        }
+    }
+
+    pub fn in_alloca_sret(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::InAlloca(in_alloca) => Some(in_alloca.sret),
+            _ => None,
+        }
+    }
+
+    pub fn can_be_flattened(&self) -> Option<bool> {
+        match &self.kind {
+            ABITypeKind::Direct(direct) => Some(direct.can_be_flattened),
+            _ => None,
+        }
+    }
 }
 
 fn is_padding_for_coerce_expand(ty: LLVMTypeRef) -> bool {
@@ -305,3 +460,8 @@ fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
     }
     elements
 }
+
+fn is_struct_type(ty: LLVMTypeRef) -> bool {
+    return unsafe { LLVMGetTypeKind(ty) } == LLVMTypeKind::LLVMStructTypeKind;
+}
+

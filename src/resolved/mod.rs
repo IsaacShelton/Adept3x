@@ -1,6 +1,10 @@
 mod variable_storage;
 
-use crate::{ast::Source, source_file_cache::SourceFileCache};
+use crate::{
+    ast::{fmt_c_integer, Source},
+    source_file_cache::SourceFileCache,
+    target_info::TargetInfo,
+};
 use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -17,7 +21,7 @@ pub use crate::ast::EnumMember;
 pub use crate::ast::EnumMemberLiteral;
 pub use crate::ast::ShortCircuitingBinaryOperator;
 pub use crate::ast::UnaryOperator;
-pub use crate::ast::{FloatSize, IntegerBits, IntegerSign};
+pub use crate::ast::{CInteger, FloatSize, IntegerBits, IntegerSign};
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -143,6 +147,10 @@ pub enum TypeKind {
         bits: IntegerBits,
         sign: IntegerSign,
     },
+    CInteger {
+        integer: CInteger,
+        sign: Option<IntegerSign>,
+    },
     IntegerLiteral(BigInt),
     FloatLiteral(f64),
     Float(FloatSize),
@@ -191,7 +199,7 @@ impl TypeKind {
         Type { kind: self, source }
     }
 
-    pub fn sign(&self) -> Option<IntegerSign> {
+    pub fn sign(&self, target_info: Option<&TargetInfo>) -> Option<IntegerSign> {
         match self {
             TypeKind::Boolean => None,
             TypeKind::Integer { sign, .. } => Some(*sign),
@@ -200,6 +208,15 @@ impl TypeKind {
             } else {
                 IntegerSign::Signed
             }),
+            TypeKind::CInteger { integer, sign } => {
+                if let Some(sign) = sign {
+                    Some(*sign)
+                } else if let Some(target_info) = target_info {
+                    Some(target_info.default_c_integer_sign(*integer))
+                } else {
+                    None
+                }
+            }
             TypeKind::Float(_) => None,
             TypeKind::FloatLiteral(_) => None,
             TypeKind::Pointer(_) => None,
@@ -242,6 +259,9 @@ impl Display for TypeKind {
                     (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
                     (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
                 })?;
+            }
+            TypeKind::CInteger { integer, sign } => {
+                fmt_c_integer(f, integer, *sign)?;
             }
             TypeKind::IntegerLiteral(value) => {
                 write!(f, "integer {}", value)?;

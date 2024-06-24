@@ -1,4 +1,5 @@
 use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
+use crate::target_info::TargetInfo;
 use derive_more::{Deref, DerefMut, IsVariant};
 use std::{collections::HashMap, ffi::CString};
 
@@ -7,6 +8,7 @@ pub use crate::resolved::{FunctionRef, GlobalRef};
 
 #[derive(Clone)]
 pub struct Module {
+    pub target_info: TargetInfo,
     pub functions: HashMap<FunctionRef, Function>,
     pub structures: HashMap<StructureRef, Structure>,
     pub globals: HashMap<GlobalRef, Global>,
@@ -175,7 +177,7 @@ pub struct Store {
     pub destination: Value,
 }
 
-#[derive(Clone, Debug, PartialEq, IsVariant)]
+#[derive(Clone, Debug, PartialEq, Eq, IsVariant, Hash)]
 pub enum Type {
     Pointer(Box<Type>),
     Boolean,
@@ -196,7 +198,7 @@ pub enum Type {
     FixedArray(Box<FixedArray>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FixedArray {
     pub size: u64,
     pub inner: Type,
@@ -253,13 +255,13 @@ impl Type {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeComposite {
     pub subtypes: Vec<Type>,
     pub is_packed: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeFunction {
     pub parameters: Vec<Type>,
     pub return_type: Box<Type>,
@@ -297,8 +299,9 @@ pub struct ValueReference {
 }
 
 impl Module {
-    pub fn new() -> Self {
+    pub fn new(target_info: TargetInfo) -> Self {
         Self {
+            target_info,
             functions: HashMap::new(),
             structures: HashMap::new(),
             globals: HashMap::new(),
