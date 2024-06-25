@@ -17,6 +17,10 @@ mod values;
 mod variable_stack;
 
 use self::{
+    abi::{
+        abi_function::ABIFunction,
+        arch::{aarch64, Arch},
+    },
     ctx::BackendContext,
     error::BackendError,
     functions::{body::create_function_bodies, head::create_function_heads},
@@ -26,7 +30,7 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::ir;
+use crate::{ir, target_info::type_info::TypeInfoManager};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -80,6 +84,21 @@ pub unsafe fn llvm_backend(
     create_globals(&mut ctx)?;
     create_function_heads(&mut ctx)?;
     create_function_bodies(&mut ctx)?;
+
+    // TODO: Use abi translations for declaring/calling functions
+    if false {
+        let _abi_function = ABIFunction::new(
+            Arch::AARCH64(aarch64::AARCH64 {
+                variant: aarch64::Variant::DarwinPCS,
+                target_info: &ir_module.target_info,
+                type_info_manager: &TypeInfoManager::new(),
+                ir_module,
+            }),
+            &vec![],
+            &ir::Type::S8,
+            false,
+        );
+    }
 
     let mut llvm_emit_error_message: *mut c_char = null_mut();
 

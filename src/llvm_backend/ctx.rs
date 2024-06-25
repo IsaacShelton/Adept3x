@@ -19,6 +19,11 @@ pub struct StaticVariable {
     pub ty: LLVMTypeRef,
 }
 
+#[derive(Debug, Default)]
+pub struct StructureCache {
+    pub cache: OnceMap<StructureRef, LLVMTypeRef>,
+}
+
 pub struct BackendContext<'a> {
     pub backend_module: &'a BackendModule,
     pub ir_module: ir::Module,
@@ -30,7 +35,7 @@ pub struct BackendContext<'a> {
     pub intrinsics: Intrinsics,
     pub relocations: Vec<Phi2Relocation>,
     pub static_variables: Vec<StaticVariable>,
-    pub structure_cache: OnceMap<StructureRef, LLVMTypeRef>,
+    pub structure_cache: StructureCache,
 }
 
 impl<'a> BackendContext<'a> {

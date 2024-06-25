@@ -17,7 +17,13 @@ pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {
     }
 }
 
-impl Itanium<'_> {
+impl<'a> Itanium<'a> {
+    pub fn new(type_info_manager: &'a TypeInfoManager, target_info: &'a TargetInfo) -> Self {
+        Self {
+            type_info_manager,
+            target_info,
+        }
+    }
     pub fn classify_return_type(&self, return_type: &ir::Type) -> Option<ABIType> {
         if let Some(false) = can_pass_in_registers_composite(return_type) {
             // NOTE: For returning types that aren't C++ copiable, we
@@ -28,7 +34,6 @@ impl Itanium<'_> {
             let align = self
                 .type_info_manager
                 .get_type_info(return_type, self.target_info)
-                .expect("valid type info")
                 .align_bytes;
 
             Some(ABIType::new_indirect(
@@ -43,4 +48,3 @@ impl Itanium<'_> {
         }
     }
 }
-

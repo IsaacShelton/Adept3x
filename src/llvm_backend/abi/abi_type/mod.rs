@@ -3,9 +3,8 @@ mod indirect;
 mod kinds;
 mod offset_align;
 
+pub use self::{extend::ExtendOptions, indirect::IndirectOptions};
 use self::{
-    extend::ExtendOptions,
-    indirect::IndirectOptions,
     kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased},
     offset_align::{ByteCount, OffsetAlign},
 };
@@ -464,4 +463,3 @@ fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
 fn is_struct_type(ty: LLVMTypeRef) -> bool {
     return unsafe { LLVMGetTypeKind(ty) } == LLVMTypeKind::LLVMStructTypeKind;
 }
-

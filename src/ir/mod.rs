@@ -196,12 +196,26 @@ pub enum Type {
     AnonymousComposite(TypeComposite),
     FunctionPointer,
     FixedArray(Box<FixedArray>),
+    Vector(Box<Vector>),
+    Complex(Box<Complex>),
+    Atomic(Box<Type>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FixedArray {
     pub size: u64,
     pub inner: Type,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Vector {
+    pub element_type: Type,
+    pub num_elements: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Complex {
+    pub element_type: Type,
 }
 
 impl Type {

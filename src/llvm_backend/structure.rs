@@ -17,21 +17,23 @@ pub unsafe fn to_backend_struct_type(
     }
 
     // Get cached type or insert computed type
-    ctx.structure_cache.try_insert_cloned(*structure_key, |_| {
-        let ir_structure = ctx
-            .ir_module
-            .structures
-            .get(structure_key)
-            .expect("referenced IR structure to exist");
+    ctx.structure_cache
+        .cache
+        .try_insert_cloned(*structure_key, |_| {
+            let ir_structure = ctx
+                .ir_module
+                .structures
+                .get(structure_key)
+                .expect("referenced IR structure to exist");
 
-        visited.insert(*structure_key);
-        let mut subtypes = to_backend_types(ctx, &ir_structure.fields, visited)?;
-        visited.remove(structure_key);
+            visited.insert(*structure_key);
+            let mut subtypes = to_backend_types(ctx, &ir_structure.fields, visited)?;
+            visited.remove(structure_key);
 
-        Ok(LLVMStructType(
-            subtypes.as_mut_ptr(),
-            subtypes.len().try_into().unwrap(),
-            ir_structure.is_packed.into(),
-        ))
-    })
+            Ok(LLVMStructType(
+                subtypes.as_mut_ptr(),
+                subtypes.len().try_into().unwrap(),
+                ir_structure.is_packed.into(),
+            ))
+        })
 }

@@ -1,4 +1,4 @@
-use super::{structure::to_backend_struct_type, ctx::BackendContext, BackendError};
+use super::{ctx::BackendContext, structure::to_backend_struct_type, BackendError};
 use crate::{ir, resolved::StructureRef};
 use llvm_sys::{
     core::{
@@ -39,6 +39,15 @@ pub unsafe fn to_backend_type(
         ir::Type::FixedArray(fixed_array) => {
             let element_type = to_backend_type(ctx, &fixed_array.inner, visited)?;
             LLVMArrayType2(element_type, fixed_array.size)
+        }
+        ir::Type::Vector(_) => {
+            todo!("to_backend_type for ir::Type::Vector")
+        }
+        ir::Type::Complex(_) => {
+            todo!("to_backend_type for ir::Type::Complex")
+        }
+        ir::Type::Atomic(_) => {
+            todo!("to_backend_type for ir::Type::Atomic")
         }
     })
 }

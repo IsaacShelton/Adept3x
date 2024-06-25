@@ -1,16 +1,29 @@
 use crate::{
     ir,
-    llvm_backend::abi::{abi_function::ABIFunction, abi_type::ABIType},
+    llvm_backend::abi::{
+        abi_function::ABIFunction,
+        abi_type::{ABIType, ExtendOptions, IndirectOptions},
+        cxx::Itanium,
+        empty::{is_empty_record, IsEmptyRecordOptions},
+    },
+    target_info::{type_info::TypeInfoManager, TargetInfo},
 };
 use derive_more::IsVariant;
-use llvm_sys::{prelude::LLVMTypeRef, LLVMCallConv};
+use llvm_sys::{
+    core::{LLVMArrayType2, LLVMInt16Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type},
+    prelude::LLVMTypeRef,
+    LLVMCallConv,
+};
 
 #[derive(Clone, Debug)]
-pub struct AARCH64 {
+pub struct AARCH64<'a> {
     pub variant: Variant,
+    pub target_info: &'a TargetInfo,
+    pub type_info_manager: &'a TypeInfoManager,
+    pub ir_module: &'a ir::Module,
 }
 
-#[derive(Clone, Debug, IsVariant)]
+#[derive(Copy, Clone, Debug, IsVariant)]
 pub enum Variant {
     DarwinPCS,
     Win64,
@@ -19,20 +32,19 @@ pub enum Variant {
 }
 
 #[allow(unused)]
-impl AARCH64 {
-    pub fn function(
+impl AARCH64<'_> {
+    pub fn compute_info(
         &self,
-        original_parameter_types: &[LLVMTypeRef],
-        original_return_type: Option<LLVMTypeRef>,
+        abi: Itanium<'_>,
+        _original_parameter_types: &[&ir::Type],
+        original_return_type: &ir::Type,
+        is_variadic: bool,
     ) -> ABIFunction {
-        Self::compute_info(original_parameter_types, original_return_type)
-    }
+        let return_type = abi
+            .classify_return_type(original_return_type)
+            .unwrap_or_else(|| self.classify_return_type(original_return_type, is_variadic));
 
-    fn compute_info(
-        _original_parameter_types: &[LLVMTypeRef],
-        _original_return_type: Option<LLVMTypeRef>,
-    ) -> ABIFunction {
-        todo!("compute_info")
+        todo!("compute info aarch64 - return_type is {:?}", return_type);
     }
 
     fn is_soft(&self) -> bool {
@@ -40,7 +52,89 @@ impl AARCH64 {
     }
 
     fn classify_return_type(&self, return_type: &ir::Type, is_variadic: bool) -> ABIType {
-        todo!("classify_return_type")
+        if return_type.is_void() {
+            return ABIType::new_ignore();
+        }
+
+        if return_type.is_vector() {
+            todo!("classify_return_type for ir::Type::Vector");
+        }
+
+        if !is_aggregate_type_for_abi(return_type) {
+            return if is_promotable_integer_type_for_abi(return_type)
+                && self.variant.is_darwin_pcs()
+            {
+                ABIType::new_extend(return_type, None, ExtendOptions::default())
+            } else {
+                ABIType::new_direct(None, None, None, None, None)
+            };
+        }
+
+        let type_info = self
+            .type_info_manager
+            .get_type_info(return_type, self.target_info);
+
+        let num_bytes = type_info.width_bytes;
+        let alignment_bytes = type_info.align_bytes;
+
+        if num_bytes == 0
+            || is_empty_record(
+                return_type,
+                self.ir_module,
+                IsEmptyRecordOptions {
+                    allow_arrays: true,
+                    ..Default::default()
+                },
+            )
+        {
+            return ABIType::new_ignore();
+        }
+
+        if let Some(..) = is_aarch64_homo_aggregate(
+            self.variant,
+            return_type,
+            self.ir_module,
+            None,
+            self.type_info_manager,
+            self.target_info,
+        ) {
+            if !is_variadic
+            /* || !is_aarch64_32_target_triple (not supported) */
+            {
+                return ABIType::new_direct(None, None, None, None, None);
+            }
+        }
+
+        // Small aggregates are returned directly via registers or stack
+        if num_bytes <= 16 {
+            if num_bytes <= 8 && self.target_info.is_little_endian() {
+                let ty = match num_bytes {
+                    1 => unsafe { LLVMInt8Type() },
+                    2 => unsafe { LLVMInt16Type() },
+                    3..=4 => unsafe { LLVMInt32Type() },
+                    5..=8 => unsafe { LLVMInt64Type() },
+                    _ => panic!("expected aggregate to be register sized"),
+                };
+
+                return ABIType::new_direct(Some(ty), None, None, None, None);
+            }
+        }
+
+        let size = align_to(num_bytes, 8);
+
+        if alignment_bytes < 16 && size == 128 {
+            let base_type = unsafe { LLVMInt64Type() };
+            let num_elements = size / 8;
+            let array_type = unsafe { LLVMArrayType2(base_type, num_elements) };
+            return ABIType::new_direct(Some(array_type), None, None, None, None);
+        }
+
+        get_natural_align_indirect(
+            return_type,
+            self.type_info_manager,
+            self.target_info,
+            NaturalAlignIndirectOptions::default(),
+        )
     }
 
     fn classify_argument_type(
@@ -71,4 +165,312 @@ impl AARCH64 {
     fn is_illegal_vector_type(&self, ty: &ir::Type) -> bool {
         todo!("is_illegal_vector_type")
     }
+}
+
+fn is_aggregate_type_for_abi(ty: &ir::Type) -> bool {
+    !has_scalar_evaluation_kind(ty) || ty.is_function_pointer()
+}
+
+fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
+    match ty {
+        ir::Type::Pointer(_)
+        | ir::Type::Boolean
+        | ir::Type::S8
+        | ir::Type::S16
+        | ir::Type::S32
+        | ir::Type::S64
+        | ir::Type::U8
+        | ir::Type::U16
+        | ir::Type::U32
+        | ir::Type::U64
+        | ir::Type::F32
+        | ir::Type::F64
+        | ir::Type::Vector(_) => true,
+        ir::Type::Atomic(inner) => has_scalar_evaluation_kind(inner),
+        ir::Type::Complex(_) | _ => false,
+    }
+}
+
+fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
+    // NOTE: Arbitrary sized integer also should be, but we don't support those yet
+    match ty {
+        ir::Type::Boolean
+        | ir::Type::S8
+        | ir::Type::S16
+        | ir::Type::S32
+        | ir::Type::S64
+        | ir::Type::U8
+        | ir::Type::U16
+        | ir::Type::U32
+        | ir::Type::U64
+        | ir::Type::F32
+        | ir::Type::F64 => true,
+        ir::Type::Pointer(_)
+        | ir::Type::Void
+        | ir::Type::Structure(_)
+        | ir::Type::AnonymousComposite(_)
+        | ir::Type::FunctionPointer
+        | ir::Type::FixedArray(_)
+        | ir::Type::Vector(_)
+        | ir::Type::Complex(_)
+        | ir::Type::Atomic(_) => false,
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct HomoAggregate<'a> {
+    base: &'a ir::Type,
+    num_members: u64,
+}
+
+fn is_aarch64_homo_aggregate<'a>(
+    variant: Variant,
+    ty: &'a ir::Type,
+    ir_module: &'a ir::Module,
+    existing_base: Option<&'a ir::Type>,
+    type_info_manager: &TypeInfoManager,
+    target_info: &TargetInfo,
+) -> Option<HomoAggregate<'a>> {
+    let homo_aggregate: Option<HomoAggregate<'a>> = if let ir::Type::FixedArray(fixed_array) = ty {
+        if fixed_array.size == 0 {
+            return None;
+        }
+
+        is_aarch64_homo_aggregate(
+            variant,
+            &fixed_array.inner,
+            ir_module,
+            existing_base,
+            type_info_manager,
+            target_info,
+        )
+        .map(|homo_aggregate| HomoAggregate {
+            base: homo_aggregate.base,
+            num_members: homo_aggregate.num_members * fixed_array.size,
+        })
+    } else if let ir::Type::Structure(structure_ref) = ty {
+        let structure = ir_module
+            .structures
+            .get(structure_ref)
+            .expect("referenced structure to exist");
+        is_aarch64_homo_aggregate_record(
+            variant,
+            ty,
+            ir_module,
+            &structure.fields[..],
+            existing_base,
+            type_info_manager,
+            target_info,
+        )
+    } else if let ir::Type::AnonymousComposite(anonymous_composite) = ty {
+        is_aarch64_homo_aggregate_record(
+            variant,
+            ty,
+            ir_module,
+            &anonymous_composite.subtypes[..],
+            existing_base,
+            type_info_manager,
+            target_info,
+        )
+    } else {
+        let (ty, num_members) = if let ir::Type::Complex(complex) = ty {
+            (&complex.element_type, 2)
+        } else {
+            (ty, 1)
+        };
+
+        if !is_aarch64_aggregate_base_type(ty, type_info_manager, target_info, variant) {
+            return None;
+        }
+
+        let base = &ty;
+
+        if existing_base.is_none() {
+            if let ir::Type::Vector(vector) = base {
+                let element_type = &vector.element_type;
+                let num_elements = vector.num_elements;
+
+                assert_eq!(
+                    num_elements,
+                    type_info_manager
+                        .get_type_info(base, target_info)
+                        .width_bytes
+                        / type_info_manager
+                            .get_type_info(element_type, target_info)
+                            .width_bytes,
+                );
+            }
+
+            if base.is_vector() != ty.is_vector()
+                || type_info_manager.get_type_info(ty, target_info).width_bytes
+                    != type_info_manager
+                        .get_type_info(base, target_info)
+                        .width_bytes
+            {
+                return None;
+            }
+        }
+
+        Some(HomoAggregate { base, num_members })
+    };
+
+    homo_aggregate.filter(|homo_aggregate| {
+        homo_aggregate.num_members > 0 && is_aarch64_homo_aggregate_small_enough(homo_aggregate)
+    })
+}
+
+fn is_aarch64_homo_aggregate_record<'a>(
+    variant: Variant,
+    ty: &'a ir::Type,
+    ir_module: &'a ir::Module,
+    fields: &'a [ir::Type],
+    existing_base: Option<&'a ir::Type>,
+    type_info_manager: &TypeInfoManager,
+    target_info: &TargetInfo,
+) -> Option<HomoAggregate<'a>> {
+    /*
+    // NOTE: We don't support flexible array members yet
+    if has_flexible_array_member() {
+        return None;
+    }
+    */
+
+    let mut base = existing_base;
+    let mut num_combined_members = 0;
+
+    // NOTE: We would need to check the bases as well if this was a C++ record type,
+    // but we don't support those yet.
+
+    for field in fields.iter() {
+        let mut field = field;
+
+        // Ignore non-zero arrays of empty records
+        while let ir::Type::FixedArray(fixed_array) = field {
+            if fixed_array.size == 0 {
+                return None;
+            }
+
+            field = &fixed_array.inner;
+        }
+
+        if is_empty_record(
+            field,
+            ir_module,
+            IsEmptyRecordOptions {
+                allow_arrays: true,
+                ..Default::default()
+            },
+        ) {
+            continue;
+        }
+
+        /*
+        // NOTE: We don't support bit fields yet, otherwise we'd need something like
+        if is_zero_length_bitfield_allowed_in_homo_aggregrate() && is_zero_length_bitfield(field) {
+            continue;
+        }
+        */
+
+        if let Some(inner) = is_aarch64_homo_aggregate(
+            variant,
+            field,
+            ir_module,
+            base,
+            type_info_manager,
+            target_info,
+        ) {
+            // NOTE: We don't support union types yet
+            let is_union = false;
+            base = Some(&inner.base);
+
+            num_combined_members = if is_union {
+                num_combined_members.max(inner.num_members)
+            } else {
+                num_combined_members + inner.num_members
+            };
+        } else {
+            return None;
+        }
+    }
+
+    let base = base?;
+
+    if type_info_manager
+        .get_type_info(base, target_info)
+        .width_bytes
+        * num_combined_members
+        != type_info_manager.get_type_info(ty, target_info).width_bytes
+    {
+        return None;
+    }
+
+    Some(HomoAggregate {
+        base,
+        num_members: num_combined_members,
+    })
+}
+
+fn align_to(width_bytes: u64, align_bytes: u64) -> u64 {
+    assert_ne!(align_bytes, 0);
+    (width_bytes + align_bytes - 1) & !(align_bytes - 1)
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct NaturalAlignIndirectOptions {
+    pub byval: bool,
+    pub realign: bool,
+    pub padding: Option<LLVMTypeRef>,
+}
+
+impl Default for NaturalAlignIndirectOptions {
+    fn default() -> Self {
+        Self {
+            byval: true,
+            realign: false,
+            padding: None,
+        }
+    }
+}
+
+fn get_natural_align_indirect(
+    ir_type: &ir::Type,
+    type_info_manager: &TypeInfoManager,
+    target_info: &TargetInfo,
+    options: NaturalAlignIndirectOptions,
+) -> ABIType {
+    let alignment = type_info_manager
+        .get_type_info(ir_type, target_info)
+        .align_bytes;
+
+    ABIType::new_indirect(
+        alignment,
+        Some(options.byval),
+        Some(options.realign),
+        options.padding,
+        IndirectOptions::default(),
+    )
+}
+
+fn is_aarch64_aggregate_base_type(
+    ty: &ir::Type,
+    type_info_manager: &TypeInfoManager,
+    target_info: &TargetInfo,
+    variant: Variant,
+) -> bool {
+    if variant.is_aapcs_soft() {
+        return false;
+    }
+
+    match ty {
+        ir::Type::F32 | ir::Type::F64 => true,
+        ir::Type::Vector(_) => {
+            let size = type_info_manager.get_type_info(ty, target_info).width_bytes;
+            size == 8 || size == 16
+        }
+        _ => false,
+    }
+}
+
+fn is_aarch64_homo_aggregate_small_enough(homo_aggregate: &HomoAggregate<'_>) -> bool {
+    homo_aggregate.num_members <= 4
 }

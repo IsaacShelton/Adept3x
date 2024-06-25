@@ -1234,14 +1234,14 @@ pub fn lower_c_integer(
         (CInteger::Int, IntegerSign::Signed) => ir::Type::S32,
         (CInteger::Int, IntegerSign::Unsigned) => ir::Type::U32,
         (CInteger::Long, IntegerSign::Signed) => {
-            if target_info.msabi {
+            if target_info.ms_abi {
                 ir::Type::S32
             } else {
                 ir::Type::S64
             }
         }
         (CInteger::Long, IntegerSign::Unsigned) => {
-            if target_info.msabi {
+            if target_info.ms_abi {
                 ir::Type::U32
             } else {
                 ir::Type::U64

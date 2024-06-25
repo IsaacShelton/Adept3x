@@ -1,5 +1,6 @@
-use super::{abi_type::ABIType, arch::Arch};
-use llvm_sys::prelude::LLVMTypeRef;
+use crate::ir;
+
+use super::{abi_type::ABIType, arch::Arch, cxx::Itanium};
 
 #[derive(Clone)]
 pub struct ABIFunction {
@@ -10,12 +11,23 @@ pub struct ABIFunction {
 impl ABIFunction {
     pub fn new(
         arch: Arch,
-        parameter_types: &[LLVMTypeRef],
-        return_type: Option<LLVMTypeRef>,
+        parameter_types: &[&ir::Type],
+        return_type: &ir::Type,
+        is_variadic: bool,
     ) -> Self {
+        let info = arch.core_info();
+
         match arch {
-            Arch::X86_64(abi) => abi.function(parameter_types, return_type),
-            Arch::AARCH64(abi) => abi.function(parameter_types, return_type),
+            Arch::X86_64(_abi) => todo!(),
+            Arch::AARCH64(abi) => {
+                let itanium = Itanium {
+                    target_info: info.target_info,
+                    type_info_manager: info.type_info_manager,
+                };
+
+                abi.compute_info(itanium, parameter_types, return_type, is_variadic)
+            }
         }
     }
 }
+

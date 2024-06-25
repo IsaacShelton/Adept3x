@@ -1,13 +1,36 @@
 use super::offset_align::{ByteCount, OffsetAlign};
-use llvm_sys::prelude::LLVMTypeRef;
+use core::fmt::Debug;
+use llvm_sys::{core::LLVMPrintTypeToString, prelude::LLVMTypeRef};
+use std::ffi::CString;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Direct {
     pub offset_align: OffsetAlign,
     pub coerce_to_type: Option<LLVMTypeRef>,
     pub padding: Option<LLVMTypeRef>,
     pub in_register: bool,
     pub can_be_flattened: bool,
+}
+
+struct ShowLLVMType(LLVMTypeRef);
+
+impl Debug for ShowLLVMType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let representation = unsafe { CString::from_raw(LLVMPrintTypeToString(self.0)) };
+        write!(f, "LLVMTypeRef::{}", representation.to_str().unwrap())
+    }
+}
+
+impl Debug for Direct {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Direct")
+            .field("offset_align", &self.offset_align)
+            .field("coerce_to_type", &self.coerce_to_type.map(ShowLLVMType))
+            .field("padding", &self.padding.map(ShowLLVMType))
+            .field("in_register", &self.in_register)
+            .field("can_be_flattened", &self.can_be_flattened)
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug)]

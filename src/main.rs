@@ -38,12 +38,12 @@ use lower::lower;
 use parser::{parse, parse_into};
 use resolve::resolve;
 use show::Show;
-use target_info::TargetInfo;
 use std::fmt;
 use std::io;
 use std::path::Path;
 use std::process::exit;
 use std::{ffi::OsStr, fs::metadata};
+use target_info::TargetInfo;
 use walkdir::{DirEntry, WalkDir};
 
 fn main() {
@@ -66,7 +66,8 @@ fn build_project(build_command: BuildCommand) {
     // TODO: Determine this based on triple
     let target_info = TargetInfo {
         kind: target_info::TargetInfoKind::AARCH64,
-        msabi: false,
+        ms_abi: false,
+        is_darwin: true,
     };
 
     match metadata(filepath) {
@@ -226,7 +227,12 @@ fn compile_project(target_info: TargetInfo, source_file_cache: &SourceFileCache,
     );
 }
 
-fn compile(target_info: TargetInfo, source_file_cache: &SourceFileCache, project_folder: &Path, filename: &str) {
+fn compile(
+    target_info: TargetInfo,
+    source_file_cache: &SourceFileCache,
+    project_folder: &Path,
+    filename: &str,
+) {
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");
 
