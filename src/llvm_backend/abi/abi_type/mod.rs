@@ -2,6 +2,7 @@ mod extend;
 mod indirect;
 mod kinds;
 mod offset_align;
+mod show_llvm_type;
 
 pub use self::{extend::ExtendOptions, indirect::IndirectOptions};
 use self::{

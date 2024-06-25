@@ -1,7 +1,9 @@
-use super::offset_align::{ByteCount, OffsetAlign};
+use super::{
+    offset_align::{ByteCount, OffsetAlign},
+    show_llvm_type::ShowLLVMType,
+};
 use core::fmt::Debug;
-use llvm_sys::{core::LLVMPrintTypeToString, prelude::LLVMTypeRef};
-use std::ffi::CString;
+use llvm_sys::prelude::LLVMTypeRef;
 
 #[derive(Clone)]
 pub struct Direct {
@@ -10,15 +12,6 @@ pub struct Direct {
     pub padding: Option<LLVMTypeRef>,
     pub in_register: bool,
     pub can_be_flattened: bool,
-}
-
-struct ShowLLVMType(LLVMTypeRef);
-
-impl Debug for ShowLLVMType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let representation = unsafe { CString::from_raw(LLVMPrintTypeToString(self.0)) };
-        write!(f, "LLVMTypeRef::{}", representation.to_str().unwrap())
-    }
 }
 
 impl Debug for Direct {
@@ -33,7 +26,7 @@ impl Debug for Direct {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Extend {
     pub offset_align: OffsetAlign,
     pub coerce_to_type: Option<LLVMTypeRef>,
@@ -42,7 +35,19 @@ pub struct Extend {
     pub signext: bool,
 }
 
-#[derive(Clone, Debug)]
+impl Debug for Extend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Extend")
+            .field("offset_align", &self.offset_align)
+            .field("coerce_to_type", &self.coerce_to_type.map(ShowLLVMType))
+            .field("padding", &self.padding.map(ShowLLVMType))
+            .field("in_register", &self.in_register)
+            .field("signext", &self.signext)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct Indirect {
     pub padding: Option<LLVMTypeRef>,
     pub align: ByteCount,
@@ -52,7 +57,20 @@ pub struct Indirect {
     pub in_register: bool,
 }
 
-#[derive(Clone, Debug)]
+impl Debug for Indirect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Indirect")
+            .field("padding", &self.padding.map(ShowLLVMType))
+            .field("align", &self.align)
+            .field("byval", &self.byval)
+            .field("realign", &self.realign)
+            .field("sret_after_this", &self.sret_after_this)
+            .field("in_register", &self.in_register)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct IndirectAliased {
     pub padding: Option<LLVMTypeRef>,
     pub align: ByteCount,
@@ -60,9 +78,28 @@ pub struct IndirectAliased {
     pub address_space: u32,
 }
 
-#[derive(Clone, Debug)]
+impl Debug for IndirectAliased {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndirectAliased")
+            .field("padding", &self.padding.map(ShowLLVMType))
+            .field("align", &self.align)
+            .field("realign", &self.realign)
+            .field("address_space", &self.address_space)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct Expand {
     pub padding: Option<LLVMTypeRef>,
+}
+
+impl Debug for Expand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Expand")
+            .field("padding", &self.padding.map(ShowLLVMType))
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -72,8 +109,20 @@ pub struct InAlloca {
     pub indirect: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct CoerceAndExpand {
     pub coerce_to_type: LLVMTypeRef,
     pub unpadded_coerce_and_expand_type: LLVMTypeRef,
+}
+
+impl Debug for CoerceAndExpand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CoerceAndExpand")
+            .field("coerce_to_type", &ShowLLVMType(self.coerce_to_type))
+            .field(
+                "unpadded_coerce_and_expand_type",
+                &ShowLLVMType(self.unpadded_coerce_and_expand_type),
+            )
+            .finish()
+    }
 }
