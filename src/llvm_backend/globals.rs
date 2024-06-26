@@ -1,4 +1,4 @@
-use super::{backend_type::to_backend_type, ctx::BackendContext, BackendError};
+use super::{backend_type::to_backend_type, ctx::BackendCtx, BackendError};
 use llvm_sys::{
     core::{
         LLVMAddGlobal, LLVMGetUndef, LLVMSetExternallyInitialized, LLVMSetInitializer,
@@ -8,7 +8,7 @@ use llvm_sys::{
 };
 use std::{collections::HashSet, ffi::CString};
 
-pub unsafe fn create_globals(ctx: &mut BackendContext) -> Result<(), BackendError> {
+pub unsafe fn create_globals(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (global_ref, global) in ctx.ir_module.globals.iter() {
         let backend_type = to_backend_type(ctx, &global.ir_type, &mut HashSet::default())?;
 

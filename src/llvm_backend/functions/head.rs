@@ -1,6 +1,6 @@
 use crate::llvm_backend::{
     backend_type::{to_backend_type, to_backend_types},
-    ctx::BackendContext,
+    ctx::BackendCtx,
     error::BackendError,
 };
 use llvm_sys::{
@@ -9,7 +9,7 @@ use llvm_sys::{
 };
 use std::{collections::HashSet, ffi::CString};
 
-pub unsafe fn create_function_heads(ctx: &mut BackendContext) -> Result<(), BackendError> {
+pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
         let mut parameters = to_backend_types(ctx, &function.parameters, &mut HashSet::default())?;
         let return_type = to_backend_type(ctx, &function.return_type, &mut HashSet::default())?;

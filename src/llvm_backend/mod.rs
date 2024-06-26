@@ -21,7 +21,7 @@ use self::{
         abi_function::ABIFunction,
         arch::{aarch64, Arch},
     },
-    ctx::BackendContext,
+    ctx::BackendCtx,
     error::BackendError,
     functions::{body::create_function_bodies, head::create_function_heads},
     globals::{create_globals, create_static_variables},
@@ -78,7 +78,7 @@ pub unsafe fn llvm_backend(
     let target_data = TargetData::new(&target_machine);
     LLVMSetModuleDataLayout(backend_module.get(), target_data.get());
 
-    let mut ctx = BackendContext::new(ir_module, &backend_module, &target_data);
+    let mut ctx = BackendCtx::new(ir_module, &backend_module, &target_data);
 
     create_static_variables()?;
     create_globals(&mut ctx)?;
@@ -86,18 +86,22 @@ pub unsafe fn llvm_backend(
     create_function_bodies(&mut ctx)?;
 
     // TODO: Use abi translations for declaring/calling functions
-    if false {
-        let _abi_function = ABIFunction::new(
+    if true {
+        let abi_function = ABIFunction::new(
+            &ctx,
             Arch::AARCH64(aarch64::AARCH64 {
                 variant: aarch64::Variant::DarwinPCS,
                 target_info: &ir_module.target_info,
                 type_info_manager: &TypeInfoManager::new(),
                 ir_module,
+                is_cxx_mode: false,
             }),
-            &vec![],
+            &vec![&ir::Type::S32, &ir::Type::S32],
             &ir::Type::S8,
             false,
         );
+
+        todo!("got abi function - {:#?}", abi_function);
     }
 
     let mut llvm_emit_error_message: *mut c_char = null_mut();

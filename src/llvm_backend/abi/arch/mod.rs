@@ -1,9 +1,8 @@
 pub mod aarch64;
 pub mod x86_64;
 
-use crate::target_info::{type_info::TypeInfoManager, TargetInfo};
-
 use self::{aarch64::AARCH64, x86_64::X86_64};
+use crate::target_info::{type_info::TypeInfoManager, TargetInfo};
 
 #[derive(Clone, Debug)]
 pub enum Arch<'a> {

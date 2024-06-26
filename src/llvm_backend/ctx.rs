@@ -24,7 +24,7 @@ pub struct StructureCache {
     pub cache: OnceMap<StructureRef, LLVMTypeRef>,
 }
 
-pub struct BackendContext<'a> {
+pub struct BackendCtx<'a> {
     pub backend_module: &'a BackendModule,
     pub ir_module: ir::Module,
     pub builder: Option<Builder>,
@@ -38,7 +38,7 @@ pub struct BackendContext<'a> {
     pub structure_cache: StructureCache,
 }
 
-impl<'a> BackendContext<'a> {
+impl<'a> BackendCtx<'a> {
     pub unsafe fn new(
         ir_module: &'a ir::Module,
         backend_module: &'a BackendModule,

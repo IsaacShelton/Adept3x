@@ -64,7 +64,6 @@ fn is_empty_field(field: &ir::Type, ir_module: &ir::Module, options: IsEmptyReco
 
     // NOTE: According to the Itanium ABI, C++ record fields are never empty,
     // unless they are also marked as [[no_unique_address]]
-
     if was_array || (!options.as_if_no_unique_addr && !has_no_unique_address) {
         return false;
     }

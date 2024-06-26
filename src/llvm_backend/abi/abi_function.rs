@@ -1,8 +1,10 @@
-use crate::ir;
-
 use super::{abi_type::ABIType, arch::Arch, cxx::Itanium};
+use crate::{
+    ir,
+    llvm_backend::{ctx::BackendCtx, error::BackendError},
+};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ABIFunction {
     pub parameter_types: Vec<ABIType>,
     pub return_type: ABIType,
@@ -10,11 +12,12 @@ pub struct ABIFunction {
 
 impl ABIFunction {
     pub fn new(
+        backend_ctx: &BackendCtx<'_>,
         arch: Arch,
         parameter_types: &[&ir::Type],
         return_type: &ir::Type,
         is_variadic: bool,
-    ) -> Self {
+    ) -> Result<Self, BackendError> {
         let info = arch.core_info();
 
         match arch {
@@ -25,9 +28,14 @@ impl ABIFunction {
                     type_info_manager: info.type_info_manager,
                 };
 
-                abi.compute_info(itanium, parameter_types, return_type, is_variadic)
+                abi.compute_info(
+                    backend_ctx,
+                    itanium,
+                    parameter_types,
+                    return_type,
+                    is_variadic,
+                )
             }
         }
     }
 }
-

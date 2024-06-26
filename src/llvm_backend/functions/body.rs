@@ -1,6 +1,6 @@
 use super::block::create_function_block;
 use crate::llvm_backend::{
-    builder::Builder, ctx::BackendContext, error::BackendError, value_catalog::ValueCatalog,
+    builder::Builder, ctx::BackendCtx, error::BackendError, value_catalog::ValueCatalog,
     values::build_value,
 };
 use cstr::cstr;
@@ -10,7 +10,7 @@ use llvm_sys::{
 };
 use std::cell::OnceCell;
 
-pub unsafe fn create_function_bodies(ctx: &mut BackendContext) -> Result<(), BackendError> {
+pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
         if let Some(ir_function) = ctx.ir_module.functions.get(ir_function_ref) {
             let mut builder = Builder::new();

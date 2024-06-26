@@ -1,5 +1,5 @@
 use super::{
-    backend_type::to_backend_type, builder::Builder, ctx::BackendContext, error::BackendError,
+    backend_type::to_backend_type, builder::Builder, ctx::BackendCtx, error::BackendError,
     null_terminated_string::build_literal_cstring, value_catalog::ValueCatalog,
 };
 use crate::ir;
@@ -13,7 +13,7 @@ use std::{
 };
 
 pub unsafe fn build_value(
-    ctx: &BackendContext<'_>,
+    ctx: &BackendCtx<'_>,
     value_catalog: &ValueCatalog,
     _builder: &Builder,
     value: &ir::Value,

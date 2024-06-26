@@ -6,6 +6,7 @@ use once_map::unsync::OnceMap;
 pub struct TypeInfo {
     pub width_bytes: u64,
     pub align_bytes: u32,
+    pub unadjusted_align_bytes: u32,
 }
 
 impl TypeInfo {
@@ -13,6 +14,7 @@ impl TypeInfo {
         Self {
             width_bytes: bytes.into(),
             align_bytes: bytes,
+            unadjusted_align_bytes: bytes,
         }
     }
 }
@@ -51,12 +53,14 @@ impl TypeInfoManager {
             ir::Type::Void => TypeInfo {
                 width_bytes: 0,
                 align_bytes: 1,
+                unadjusted_align_bytes: 1,
             },
             ir::Type::Structure(_structure_ref) => {
                 /*
                 let record_layout = RecordLayout::new(structure_ref);
                 Ok(record_layout.type_info)
                 */
+
                 todo!("get_type_info_impl for ir::Type::Structure")
             }
             ir::Type::AnonymousComposite(_type_composite) => {
@@ -72,6 +76,7 @@ impl TypeInfoManager {
                 TypeInfo {
                     width_bytes: fixed_array.size * element_info.width_bytes,
                     align_bytes: element_info.align_bytes,
+                    unadjusted_align_bytes: element_info.align_bytes,
                 }
             }
             ir::Type::Vector(_) => todo!("get_type_info_impl for ir::Type::Vector"),

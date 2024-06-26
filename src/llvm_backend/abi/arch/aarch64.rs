@@ -1,16 +1,25 @@
+use std::collections::HashSet;
+
 use crate::{
     ir,
-    llvm_backend::abi::{
-        abi_function::ABIFunction,
-        abi_type::{ABIType, ExtendOptions, IndirectOptions},
-        cxx::Itanium,
-        empty::{is_empty_record, IsEmptyRecordOptions},
+    llvm_backend::{
+        abi::{
+            abi_function::ABIFunction,
+            abi_type::{ABIType, ExtendOptions, IndirectOptions},
+            cxx::Itanium,
+            empty::{is_empty_record, IsEmptyRecordOptions},
+        },
+        backend_type::to_backend_type,
+        ctx::BackendCtx,
+        error::BackendError,
     },
     target_info::{type_info::TypeInfoManager, TargetInfo},
 };
 use derive_more::IsVariant;
 use llvm_sys::{
-    core::{LLVMArrayType2, LLVMInt16Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type},
+    core::{
+        LLVMArrayType2, LLVMInt16Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMIntType,
+    },
     prelude::LLVMTypeRef,
     LLVMCallConv,
 };
@@ -21,6 +30,7 @@ pub struct AARCH64<'a> {
     pub target_info: &'a TargetInfo,
     pub type_info_manager: &'a TypeInfoManager,
     pub ir_module: &'a ir::Module,
+    pub is_cxx_mode: bool,
 }
 
 #[derive(Copy, Clone, Debug, IsVariant)]
@@ -35,16 +45,31 @@ pub enum Variant {
 impl AARCH64<'_> {
     pub fn compute_info(
         &self,
+        backend_ctx: &BackendCtx<'_>,
         abi: Itanium<'_>,
-        _original_parameter_types: &[&ir::Type],
+        original_parameter_types: &[&ir::Type],
         original_return_type: &ir::Type,
         is_variadic: bool,
-    ) -> ABIFunction {
+    ) -> Result<ABIFunction, BackendError> {
         let return_type = abi
             .classify_return_type(original_return_type)
             .unwrap_or_else(|| self.classify_return_type(original_return_type, is_variadic));
 
-        todo!("compute info aarch64 - return_type is {:?}", return_type);
+        let mut parameter_types = Vec::new();
+
+        for parameter in original_parameter_types.iter() {
+            parameter_types.push(self.classify_argument_type(
+                backend_ctx,
+                parameter,
+                is_variadic,
+                LLVMCallConv::LLVMCCallConv,
+            )?);
+        }
+
+        Ok(ABIFunction {
+            parameter_types,
+            return_type,
+        })
     }
 
     fn is_soft(&self) -> bool {
@@ -89,6 +114,8 @@ impl AARCH64<'_> {
         {
             return ABIType::new_ignore();
         }
+
+        let whatever = 0;
 
         if let Some(..) = is_aarch64_homo_aggregate(
             self.variant,
@@ -139,11 +166,142 @@ impl AARCH64<'_> {
 
     fn classify_argument_type(
         &self,
-        return_type: &ir::Type,
-        ir_variadic: bool,
+        backend_ctx: &BackendCtx<'_>,
+        ty: &ir::Type,
+        is_variadic: bool,
         calling_convention: LLVMCallConv,
-    ) -> ABIType {
-        todo!("classify_argument_type")
+    ) -> Result<ABIType, BackendError> {
+        let ty = use_first_field_if_transparent_union(ty);
+
+        if self.is_illegal_vector_type(ty) {
+            return Ok(self.coerce_illegal_vector(ty));
+        }
+
+        if !is_aggregate_type_for_abi(ty) {
+            // NOTE: We don't support arbitrarily sized integers,
+            // but if we did we would have to compensate for them here.
+
+            return if is_promotable_integer_type_for_abi(ty) && self.variant.is_darwin_pcs() {
+                Ok(ABIType::new_extend(ty, None, ExtendOptions::default()))
+            } else {
+                Ok(ABIType::new_direct(None, None, None, None, None))
+            };
+        }
+
+        let size_bytes = self
+            .type_info_manager
+            .get_type_info(ty, self.target_info)
+            .width_bytes;
+
+        let is_empty_record = is_empty_record(
+            ty,
+            self.ir_module,
+            IsEmptyRecordOptions {
+                allow_arrays: true,
+                ..Default::default()
+            },
+        );
+
+        // NOTE: C++ records with non-trivial destructors/copy-constructors
+        // would need to be passed as indirect, but we don't support those yet.
+
+        // Empty records are ignored in Darwin for C, but not C++.
+        if is_empty_record || size_bytes == 0 {
+            if !self.is_cxx_mode || self.variant.is_darwin_pcs() {
+                return Ok(ABIType::new_ignore());
+            }
+
+            if is_empty_record && size_bytes == 0 {
+                return Ok(ABIType::new_ignore());
+            }
+
+            return Ok(ABIType::new_direct(
+                Some(unsafe { LLVMInt8Type() }),
+                None,
+                None,
+                None,
+                None,
+            ));
+        }
+
+        let is_win64 =
+            self.variant.is_win_64() || calling_convention == LLVMCallConv::LLVMWin64CallConv;
+
+        let is_win64_variadic = is_win64 && is_variadic;
+
+        // For variadic functions on Windows, all composites are treated the same,
+        // so no special treatment for homogenous aggregates.
+        if !is_win64_variadic {
+            if let Some(homo_aggregate) = is_aarch64_homo_aggregate(
+                self.variant,
+                ty,
+                self.ir_module,
+                None,
+                self.type_info_manager,
+                self.target_info,
+            ) {
+                if !self.variant.is_aapcs() {
+                    let base = unsafe {
+                        to_backend_type(backend_ctx, homo_aggregate.base, &mut HashSet::new())?
+                    };
+                    return Ok(ABIType::new_direct(
+                        Some(unsafe { LLVMArrayType2(base, homo_aggregate.num_members) }),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ));
+                }
+            }
+        }
+
+        if size_bytes <= 16 {
+            let alignment_bytes = if self.variant.is_aapcs() {
+                let unadjusted_alignment = self
+                    .type_info_manager
+                    .get_type_info(ty, self.target_info)
+                    .unadjusted_align_bytes;
+
+                if unadjusted_alignment < 16 {
+                    8
+                } else {
+                    16
+                }
+            } else {
+                let pointer_width = 8;
+                self.type_info_manager
+                    .get_type_info(ty, self.target_info)
+                    .align_bytes
+                    .max(pointer_width)
+            };
+
+            let size_bytes = align_to(size_bytes, alignment_bytes.into());
+            let base_type = unsafe { LLVMIntType(alignment_bytes * 8) };
+
+            let coerce_to_type = if size_bytes == alignment_bytes.into() {
+                base_type
+            } else {
+                unsafe { LLVMArrayType2(base_type, size_bytes / alignment_bytes as u64) }
+            };
+
+            return Ok(ABIType::new_direct(
+                Some(coerce_to_type),
+                None,
+                None,
+                None,
+                None,
+            ));
+        }
+
+        Ok(get_natural_align_indirect(
+            ty,
+            self.type_info_manager,
+            self.target_info,
+            NaturalAlignIndirectOptions {
+                byval: false,
+                ..Default::default()
+            },
+        ))
     }
 
     fn coerce_illegal_vector(&self, ty: &ir::Type) -> ABIType {
@@ -163,7 +321,10 @@ impl AARCH64<'_> {
     }
 
     fn is_illegal_vector_type(&self, ty: &ir::Type) -> bool {
-        todo!("is_illegal_vector_type")
+        if ty.is_vector() {
+            todo!("is_illegal_vector_type")
+        }
+        false
     }
 }
 
@@ -192,20 +353,17 @@ fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
 }
 
 fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
-    // NOTE: Arbitrary sized integer also should be, but we don't support those yet
+    // NOTE: Arbitrarily sized integers and `char32` should be, but we don't support those yet
+
     match ty {
-        ir::Type::Boolean
-        | ir::Type::S8
-        | ir::Type::S16
-        | ir::Type::S32
+        ir::Type::Boolean | ir::Type::S8 | ir::Type::S16 | ir::Type::U8 | ir::Type::U16 => true,
+        ir::Type::S32
         | ir::Type::S64
-        | ir::Type::U8
-        | ir::Type::U16
         | ir::Type::U32
         | ir::Type::U64
         | ir::Type::F32
-        | ir::Type::F64 => true,
-        ir::Type::Pointer(_)
+        | ir::Type::F64
+        | ir::Type::Pointer(_)
         | ir::Type::Void
         | ir::Type::Structure(_)
         | ir::Type::AnonymousComposite(_)
@@ -473,4 +631,9 @@ fn is_aarch64_aggregate_base_type(
 
 fn is_aarch64_homo_aggregate_small_enough(homo_aggregate: &HomoAggregate<'_>) -> bool {
     homo_aggregate.num_members <= 4
+}
+
+fn use_first_field_if_transparent_union(ty: &ir::Type) -> &ir::Type {
+    // NOTE: We don't support transparent unions yet
+    ty
 }

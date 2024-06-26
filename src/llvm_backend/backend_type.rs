@@ -1,4 +1,4 @@
-use super::{ctx::BackendContext, structure::to_backend_struct_type, BackendError};
+use super::{ctx::BackendCtx, structure::to_backend_struct_type, BackendError};
 use crate::{ir, resolved::StructureRef};
 use llvm_sys::{
     core::{
@@ -11,7 +11,7 @@ use llvm_sys::{
 use std::collections::HashSet;
 
 pub unsafe fn to_backend_type(
-    ctx: &BackendContext,
+    ctx: &BackendCtx,
     ir_type: &ir::Type,
     visited: &mut HashSet<StructureRef>,
 ) -> Result<LLVMTypeRef, BackendError> {
@@ -53,7 +53,7 @@ pub unsafe fn to_backend_type(
 }
 
 pub unsafe fn to_backend_types(
-    ctx: &BackendContext,
+    ctx: &BackendCtx,
     ir_types: &[ir::Type],
     visited: &mut HashSet<StructureRef>,
 ) -> Result<Vec<LLVMTypeRef>, BackendError> {
@@ -67,7 +67,7 @@ pub unsafe fn to_backend_types(
 }
 
 pub unsafe fn get_function_type(
-    ctx: &BackendContext,
+    ctx: &BackendCtx,
     function: &ir::Function,
 ) -> Result<LLVMTypeRef, BackendError> {
     get_function_pointer_type(
@@ -79,7 +79,7 @@ pub unsafe fn get_function_type(
 }
 
 pub unsafe fn get_function_pointer_type(
-    ctx: &BackendContext,
+    ctx: &BackendCtx,
     parameters: &[ir::Type],
     return_type: &ir::Type,
     is_cstyle_variadic: bool,

@@ -3,7 +3,7 @@ use crate::{
     llvm_backend::{
         backend_type::{get_function_type, to_backend_type},
         builder::{Builder, PhiRelocation},
-        ctx::BackendContext,
+        ctx::BackendCtx,
         error::BackendError,
         value_catalog::ValueCatalog,
         values::build_value,
@@ -21,7 +21,7 @@ use llvm_sys::{
 use std::{cell::OnceCell, collections::HashSet, ptr::null_mut};
 
 pub unsafe fn create_function_block(
-    ctx: &BackendContext,
+    ctx: &BackendCtx,
     value_catalog: &mut ValueCatalog,
     overflow_basicblock: &OnceCell<LLVMBasicBlockRef>,
     builder: &Builder,
@@ -598,7 +598,7 @@ pub unsafe fn create_function_block(
 }
 
 unsafe fn build_binary_operands(
-    ctx: &BackendContext<'_>,
+    ctx: &BackendCtx<'_>,
     value_catalog: &ValueCatalog,
     builder: &Builder,
     operands: &ir::BinaryOperands,

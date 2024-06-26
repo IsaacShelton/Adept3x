@@ -1,10 +1,10 @@
-use super::{backend_type::to_backend_types, ctx::BackendContext, BackendError};
+use super::{backend_type::to_backend_types, ctx::BackendCtx, BackendError};
 use crate::resolved::StructureRef;
 use llvm_sys::{core::LLVMStructType, prelude::LLVMTypeRef};
 use std::collections::HashSet;
 
 pub unsafe fn to_backend_struct_type(
-    ctx: &BackendContext,
+    ctx: &BackendCtx,
     structure_key: &StructureRef,
     visited: &mut HashSet<StructureRef>,
 ) -> Result<LLVMTypeRef, BackendError> {
