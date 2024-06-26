@@ -7,12 +7,12 @@ use llvm_sys::{
     core::{LLVMAddFunction, LLVMFunctionType, LLVMSetFunctionCallConv, LLVMSetLinkage},
     LLVMCallConv, LLVMLinkage,
 };
-use std::{collections::HashSet, ffi::CString};
+use std::ffi::CString;
 
 pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
-        let mut parameters = to_backend_types(ctx, &function.parameters, &mut HashSet::default())?;
-        let return_type = to_backend_type(ctx, &function.return_type, &mut HashSet::default())?;
+        let mut parameters = to_backend_types(ctx.for_making_type(), &function.parameters)?;
+        let return_type = to_backend_type(ctx.for_making_type(), &function.return_type)?;
 
         let name = CString::new(function.mangled_name.as_bytes()).unwrap();
 

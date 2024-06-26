@@ -1,5 +1,5 @@
-use super::{ctx::BackendCtx, structure::to_backend_struct_type, BackendError};
-use crate::{ir, resolved::StructureRef};
+use super::{ctx::ToBackendTypeCtx, structure::to_backend_struct_type, BackendError};
+use crate::ir;
 use llvm_sys::{
     core::{
         LLVMArrayType2, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMInt16Type,
@@ -8,13 +8,14 @@ use llvm_sys::{
     },
     prelude::LLVMTypeRef,
 };
-use std::collections::HashSet;
+use std::borrow::Borrow;
 
-pub unsafe fn to_backend_type(
-    ctx: &BackendCtx,
+pub unsafe fn to_backend_type<'a>(
+    ctx: impl Borrow<ToBackendTypeCtx<'a>>,
     ir_type: &ir::Type,
-    visited: &mut HashSet<StructureRef>,
 ) -> Result<LLVMTypeRef, BackendError> {
+    let ctx = ctx.borrow();
+
     Ok(match ir_type {
         ir::Type::Void => LLVMVoidType(),
         ir::Type::Boolean => LLVMInt1Type(),
@@ -24,9 +25,9 @@ pub unsafe fn to_backend_type(
         ir::Type::S64 | ir::Type::U64 => LLVMInt64Type(),
         ir::Type::F32 => LLVMFloatType(),
         ir::Type::F64 => LLVMDoubleType(),
-        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to, visited)?, 0),
+        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to)?, 0),
         ir::Type::AnonymousComposite(composite) => {
-            let mut subtypes = to_backend_types(ctx, &composite.subtypes, visited)?;
+            let mut subtypes = to_backend_types(ctx, &composite.subtypes)?;
 
             LLVMStructType(
                 subtypes.as_mut_ptr(),
@@ -34,10 +35,10 @@ pub unsafe fn to_backend_type(
                 composite.is_packed.into(),
             )
         }
-        ir::Type::Structure(structure_ref) => to_backend_struct_type(ctx, structure_ref, visited)?,
+        ir::Type::Structure(structure_ref) => to_backend_struct_type(ctx, structure_ref)?,
         ir::Type::FunctionPointer => LLVMPointerType(LLVMInt8Type(), 0),
         ir::Type::FixedArray(fixed_array) => {
-            let element_type = to_backend_type(ctx, &fixed_array.inner, visited)?;
+            let element_type = to_backend_type(ctx, &fixed_array.inner)?;
             LLVMArrayType2(element_type, fixed_array.size)
         }
         ir::Type::Vector(_) => {
@@ -52,41 +53,40 @@ pub unsafe fn to_backend_type(
     })
 }
 
-pub unsafe fn to_backend_types(
-    ctx: &BackendCtx,
+pub unsafe fn to_backend_types<'a>(
+    ctx: impl Borrow<ToBackendTypeCtx<'a>>,
     ir_types: &[ir::Type],
-    visited: &mut HashSet<StructureRef>,
 ) -> Result<Vec<LLVMTypeRef>, BackendError> {
     let mut results = Vec::with_capacity(ir_types.len());
 
     for ir_type in ir_types.iter() {
-        results.push(to_backend_type(ctx, ir_type, visited)?);
+        results.push(to_backend_type(ctx.borrow(), ir_type)?);
     }
 
     Ok(results)
 }
 
-pub unsafe fn get_function_type(
-    ctx: &BackendCtx,
+pub unsafe fn get_function_type<'a>(
+    ctx: impl Borrow<ToBackendTypeCtx<'a>>,
     function: &ir::Function,
 ) -> Result<LLVMTypeRef, BackendError> {
     get_function_pointer_type(
-        ctx,
+        ctx.borrow(),
         &function.parameters[..],
         &function.return_type,
         function.is_cstyle_variadic,
     )
 }
 
-pub unsafe fn get_function_pointer_type(
-    ctx: &BackendCtx,
+pub unsafe fn get_function_pointer_type<'a>(
+    ctx: impl Borrow<ToBackendTypeCtx<'a>>,
     parameters: &[ir::Type],
     return_type: &ir::Type,
     is_cstyle_variadic: bool,
 ) -> Result<LLVMTypeRef, BackendError> {
-    let mut visited = HashSet::default();
-    let return_type = to_backend_type(ctx, &return_type, &mut visited)?;
-    let mut parameters = to_backend_types(ctx, &parameters, &mut visited)?;
+    let ctx = ctx.borrow();
+    let return_type = to_backend_type(ctx, &return_type)?;
+    let mut parameters = to_backend_types(ctx, &parameters)?;
     let is_vararg = if is_cstyle_variadic { 1 } else { 0 };
 
     Ok(LLVMFunctionType(

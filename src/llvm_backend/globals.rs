@@ -6,11 +6,11 @@ use llvm_sys::{
     },
     LLVMLinkage,
 };
-use std::{collections::HashSet, ffi::CString};
+use std::ffi::CString;
 
 pub unsafe fn create_globals(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (global_ref, global) in ctx.ir_module.globals.iter() {
-        let backend_type = to_backend_type(ctx, &global.ir_type, &mut HashSet::default())?;
+        let backend_type = to_backend_type(ctx.for_making_type(), &global.ir_type)?;
 
         let name = CString::new(global.mangled_name.as_bytes()).unwrap();
         let backend_global = LLVMAddGlobal(ctx.backend_module.get(), backend_type, name.as_ptr());

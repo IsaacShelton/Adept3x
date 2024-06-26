@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     ir,
     llvm_backend::{
@@ -10,7 +8,7 @@ use crate::{
             empty::{is_empty_record, IsEmptyRecordOptions},
         },
         backend_type::to_backend_type,
-        ctx::BackendCtx,
+        ctx::ToBackendTypeCtx,
         error::BackendError,
     },
     target_info::{type_info::TypeInfoManager, TargetInfo},
@@ -45,7 +43,7 @@ pub enum Variant {
 impl AARCH64<'_> {
     pub fn compute_info(
         &self,
-        backend_ctx: &BackendCtx<'_>,
+        ctx: &ToBackendTypeCtx<'_>,
         abi: Itanium<'_>,
         original_parameter_types: &[&ir::Type],
         original_return_type: &ir::Type,
@@ -59,7 +57,7 @@ impl AARCH64<'_> {
 
         for parameter in original_parameter_types.iter() {
             parameter_types.push(self.classify_argument_type(
-                backend_ctx,
+                ctx,
                 parameter,
                 is_variadic,
                 LLVMCallConv::LLVMCCallConv,
@@ -171,7 +169,7 @@ impl AARCH64<'_> {
 
     fn classify_argument_type(
         &self,
-        backend_ctx: &BackendCtx<'_>,
+        ctx: &ToBackendTypeCtx<'_>,
         ty: &ir::Type,
         is_variadic: bool,
         calling_convention: LLVMCallConv,
@@ -243,9 +241,7 @@ impl AARCH64<'_> {
                 self.target_info,
             ) {
                 if !self.variant.is_aapcs() {
-                    let base = unsafe {
-                        to_backend_type(backend_ctx, homo_aggregate.base, &mut HashSet::new())?
-                    };
+                    let base = unsafe { to_backend_type(ctx, homo_aggregate.base)? };
                     return Ok(ABIType::new_direct(DirectOptions {
                         coerce_to_type: Some(unsafe {
                             LLVMArrayType2(base, homo_aggregate.num_members)

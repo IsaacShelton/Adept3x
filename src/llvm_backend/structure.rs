@@ -1,15 +1,13 @@
-use super::{backend_type::to_backend_types, ctx::BackendCtx, BackendError};
+use super::{backend_type::to_backend_types, ctx::ToBackendTypeCtx, BackendError};
 use crate::resolved::StructureRef;
 use llvm_sys::{core::LLVMStructType, prelude::LLVMTypeRef};
-use std::collections::HashSet;
 
 pub unsafe fn to_backend_struct_type(
-    ctx: &BackendCtx,
+    ctx: &ToBackendTypeCtx<'_>,
     structure_key: &StructureRef,
-    visited: &mut HashSet<StructureRef>,
 ) -> Result<LLVMTypeRef, BackendError> {
     // Ensure not infinite size
-    if visited.contains(structure_key) {
+    if ctx.visited.borrow().contains(structure_key) {
         // TODO: Improve error message
         return Err(BackendError {
             message: "Recursive data structure".into(),
@@ -26,9 +24,9 @@ pub unsafe fn to_backend_struct_type(
                 .get(structure_key)
                 .expect("referenced IR structure to exist");
 
-            visited.insert(*structure_key);
-            let mut subtypes = to_backend_types(ctx, &ir_structure.fields, visited)?;
-            visited.remove(structure_key);
+            ctx.visited.borrow_mut().insert(*structure_key);
+            let mut subtypes = to_backend_types(ctx, &ir_structure.fields)?;
+            ctx.visited.borrow_mut().remove(structure_key);
 
             Ok(LLVMStructType(
                 subtypes.as_mut_ptr(),

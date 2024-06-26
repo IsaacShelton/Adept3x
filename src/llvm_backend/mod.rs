@@ -88,7 +88,7 @@ pub unsafe fn llvm_backend(
     // TODO: Use abi translations for declaring/calling functions
     if true {
         let abi_function = ABIFunction::new(
-            &ctx,
+            ctx.for_making_type(),
             Arch::AARCH64(aarch64::AARCH64 {
                 variant: aarch64::Variant::DarwinPCS,
                 target_info: &ir_module.target_info,

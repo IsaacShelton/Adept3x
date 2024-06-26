@@ -1,8 +1,9 @@
 use super::{abi_type::ABIType, arch::Arch, cxx::Itanium};
 use crate::{
     ir,
-    llvm_backend::{ctx::BackendCtx, error::BackendError},
+    llvm_backend::{ctx::ToBackendTypeCtx, error::BackendError},
 };
+use std::borrow::Borrow;
 
 #[derive(Clone, Debug)]
 pub struct ABIFunction {
@@ -11,8 +12,8 @@ pub struct ABIFunction {
 }
 
 impl ABIFunction {
-    pub fn new(
-        backend_ctx: &BackendCtx<'_>,
+    pub fn new<'a>(
+        ctx: impl Borrow<ToBackendTypeCtx<'a>>,
         arch: Arch,
         parameter_types: &[&ir::Type],
         return_type: &ir::Type,
@@ -29,7 +30,7 @@ impl ABIFunction {
                 };
 
                 abi.compute_info(
-                    backend_ctx,
+                    ctx.borrow(),
                     itanium,
                     parameter_types,
                     return_type,

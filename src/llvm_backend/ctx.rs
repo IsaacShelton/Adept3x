@@ -4,7 +4,10 @@ use super::{
 use crate::{ir, resolved::StructureRef};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use once_map::unsync::OnceMap;
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+};
 
 pub struct Phi2Relocation {
     pub phi: LLVMValueRef,
@@ -22,6 +25,19 @@ pub struct StaticVariable {
 #[derive(Debug, Default)]
 pub struct StructureCache {
     pub cache: OnceMap<StructureRef, LLVMTypeRef>,
+}
+
+#[derive(Debug)]
+pub struct ToBackendTypeCtx<'a> {
+    pub structure_cache: &'a StructureCache,
+    pub ir_module: &'a ir::Module,
+    pub visited: RefCell<HashSet<StructureRef>>,
+}
+
+impl<'a> From<&'a BackendCtx<'a>> for ToBackendTypeCtx<'a> {
+    fn from(value: &'a BackendCtx<'a>) -> Self {
+        value.for_making_type()
+    }
 }
 
 pub struct BackendCtx<'a> {
@@ -56,6 +72,14 @@ impl<'a> BackendCtx<'a> {
             relocations: Vec::new(),
             static_variables: Vec::new(),
             structure_cache: Default::default(),
+        }
+    }
+
+    pub fn for_making_type(&'a self) -> ToBackendTypeCtx<'a> {
+        ToBackendTypeCtx {
+            structure_cache: &self.structure_cache,
+            ir_module: &self.ir_module,
+            visited: RefCell::new(HashSet::default()),
         }
     }
 }

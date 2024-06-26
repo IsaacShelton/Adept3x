@@ -7,10 +7,7 @@ use llvm_sys::{
     core::*,
     prelude::{LLVMBool, LLVMValueRef},
 };
-use std::{
-    collections::HashSet,
-    ffi::{c_double, c_ulonglong},
-};
+use std::ffi::{c_double, c_ulonglong};
 
 pub unsafe fn build_value(
     ctx: &BackendCtx<'_>,
@@ -54,7 +51,7 @@ pub unsafe fn build_value(
             }
             ir::Literal::Void => LLVMGetUndef(LLVMVoidType()),
             ir::Literal::Zeroed(ir_type) => {
-                let backend_type = to_backend_type(ctx, ir_type, &mut HashSet::new())?;
+                let backend_type = to_backend_type(&ctx.for_making_type(), ir_type)?;
                 LLVMConstNull(backend_type)
             }
         },
