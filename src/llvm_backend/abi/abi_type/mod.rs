@@ -1,10 +1,11 @@
+mod direct;
 mod extend;
 mod indirect;
 mod kinds;
 mod offset_align;
 mod show_llvm_type;
 
-pub use self::{extend::ExtendOptions, indirect::IndirectOptions};
+pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
 use self::{
     kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased},
     offset_align::{ByteCount, OffsetAlign},
@@ -41,23 +42,17 @@ pub enum ABITypeKind {
 }
 
 impl ABIType {
-    pub fn new_direct(
-        coerce_to_type: Option<LLVMTypeRef>,
-        offset: Option<u32>,
-        padding: Option<LLVMTypeRef>,
-        can_be_flattened: Option<bool>,
-        align: Option<u32>,
-    ) -> Self {
+    pub fn new_direct(options: DirectOptions) -> Self {
         Self {
             kind: ABITypeKind::Direct(Direct {
                 offset_align: OffsetAlign {
-                    offset: offset.unwrap_or(0),
-                    align: align.unwrap_or(0),
+                    offset: options.offset,
+                    align: options.align_bytes,
                 },
-                coerce_to_type,
-                padding,
+                coerce_to_type: options.coerce_to_type,
+                padding: options.padding,
                 in_register: false,
-                can_be_flattened: can_be_flattened.unwrap_or(true),
+                can_be_flattened: options.can_be_flattened,
             }),
             padding_in_register: false,
         }

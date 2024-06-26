@@ -5,7 +5,7 @@ use crate::{
     llvm_backend::{
         abi::{
             abi_function::ABIFunction,
-            abi_type::{ABIType, ExtendOptions, IndirectOptions},
+            abi_type::{ABIType, DirectOptions, ExtendOptions, IndirectOptions},
             cxx::Itanium,
             empty::{is_empty_record, IsEmptyRecordOptions},
         },
@@ -91,7 +91,7 @@ impl AARCH64<'_> {
             {
                 ABIType::new_extend(return_type, None, ExtendOptions::default())
             } else {
-                ABIType::new_direct(None, None, None, None, None)
+                ABIType::new_direct(DirectOptions::default())
             };
         }
 
@@ -115,8 +115,6 @@ impl AARCH64<'_> {
             return ABIType::new_ignore();
         }
 
-        let whatever = 0;
-
         if let Some(..) = is_aarch64_homo_aggregate(
             self.variant,
             return_type,
@@ -128,7 +126,7 @@ impl AARCH64<'_> {
             if !is_variadic
             /* || !is_aarch64_32_target_triple (not supported) */
             {
-                return ABIType::new_direct(None, None, None, None, None);
+                return ABIType::new_direct(DirectOptions::default());
             }
         }
 
@@ -143,7 +141,10 @@ impl AARCH64<'_> {
                     _ => panic!("expected aggregate to be register sized"),
                 };
 
-                return ABIType::new_direct(Some(ty), None, None, None, None);
+                return ABIType::new_direct(DirectOptions {
+                    coerce_to_type: Some(ty),
+                    ..Default::default()
+                });
             }
         }
 
@@ -153,7 +154,11 @@ impl AARCH64<'_> {
             let base_type = unsafe { LLVMInt64Type() };
             let num_elements = size / 8;
             let array_type = unsafe { LLVMArrayType2(base_type, num_elements) };
-            return ABIType::new_direct(Some(array_type), None, None, None, None);
+
+            return ABIType::new_direct(DirectOptions {
+                coerce_to_type: Some(array_type),
+                ..Default::default()
+            });
         }
 
         get_natural_align_indirect(
@@ -184,7 +189,7 @@ impl AARCH64<'_> {
             return if is_promotable_integer_type_for_abi(ty) && self.variant.is_darwin_pcs() {
                 Ok(ABIType::new_extend(ty, None, ExtendOptions::default()))
             } else {
-                Ok(ABIType::new_direct(None, None, None, None, None))
+                Ok(ABIType::new_direct(DirectOptions::default()))
             };
         }
 
@@ -215,13 +220,10 @@ impl AARCH64<'_> {
                 return Ok(ABIType::new_ignore());
             }
 
-            return Ok(ABIType::new_direct(
-                Some(unsafe { LLVMInt8Type() }),
-                None,
-                None,
-                None,
-                None,
-            ));
+            return Ok(ABIType::new_direct(DirectOptions {
+                coerce_to_type: Some(unsafe { LLVMInt8Type() }),
+                ..Default::default()
+            }));
         }
 
         let is_win64 =
@@ -244,13 +246,12 @@ impl AARCH64<'_> {
                     let base = unsafe {
                         to_backend_type(backend_ctx, homo_aggregate.base, &mut HashSet::new())?
                     };
-                    return Ok(ABIType::new_direct(
-                        Some(unsafe { LLVMArrayType2(base, homo_aggregate.num_members) }),
-                        None,
-                        None,
-                        None,
-                        None,
-                    ));
+                    return Ok(ABIType::new_direct(DirectOptions {
+                        coerce_to_type: Some(unsafe {
+                            LLVMArrayType2(base, homo_aggregate.num_members)
+                        }),
+                        ..Default::default()
+                    }));
                 }
             }
         }
@@ -284,13 +285,10 @@ impl AARCH64<'_> {
                 unsafe { LLVMArrayType2(base_type, size_bytes / alignment_bytes as u64) }
             };
 
-            return Ok(ABIType::new_direct(
-                Some(coerce_to_type),
-                None,
-                None,
-                None,
-                None,
-            ));
+            return Ok(ABIType::new_direct(DirectOptions {
+                coerce_to_type: Some(coerce_to_type),
+                ..Default::default()
+            }));
         }
 
         Ok(get_natural_align_indirect(
