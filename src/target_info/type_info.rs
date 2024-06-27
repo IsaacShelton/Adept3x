@@ -59,6 +59,12 @@ impl TypeInfoManager {
                 /*
                 let record_layout = RecordLayout::new(structure_ref);
                 Ok(record_layout.type_info)
+
+                let record_layout = get_record_layout();
+
+                let width_bytes = 0;
+                let align_bytes = 0;
+                let align_requirement = if false { Some(RequiredByRecord) } else { None };
                 */
 
                 todo!("get_type_info_impl for ir::Type::Structure")

@@ -1,3 +1,4 @@
+pub mod record_layout;
 pub mod type_info;
 
 use crate::ast::{CInteger, IntegerSign};
