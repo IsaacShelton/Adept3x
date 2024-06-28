@@ -7,7 +7,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Itanium<'a> {
     pub target_info: &'a TargetInfo,
-    pub type_info_manager: &'a TypeInfoManager,
+    pub type_info_manager: &'a TypeInfoManager<'a>,
 }
 
 pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {

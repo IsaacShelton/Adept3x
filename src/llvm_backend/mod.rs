@@ -92,11 +92,17 @@ pub unsafe fn llvm_backend(
             Arch::AARCH64(aarch64::AARCH64 {
                 variant: aarch64::Variant::DarwinPCS,
                 target_info: &ir_module.target_info,
-                type_info_manager: &TypeInfoManager::new(),
+                type_info_manager: &TypeInfoManager::new(&ir_module.structures),
                 ir_module,
                 is_cxx_mode: false,
             }),
-            &vec![&ir::Type::S32, &ir::Type::S32],
+            &vec![&ir::Type::AnonymousComposite(ir::TypeComposite {
+                fields: vec![
+                    ir::Field::basic(ir::Type::F32),
+                    ir::Field::basic(ir::Type::F32),
+                ],
+                is_packed: false,
+            })],
             &ir::Type::S8,
             false,
         );

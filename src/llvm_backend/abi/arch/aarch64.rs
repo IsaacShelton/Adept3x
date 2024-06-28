@@ -26,7 +26,7 @@ use llvm_sys::{
 pub struct AARCH64<'a> {
     pub variant: Variant,
     pub target_info: &'a TargetInfo,
-    pub type_info_manager: &'a TypeInfoManager,
+    pub type_info_manager: &'a TypeInfoManager<'a>,
     pub ir_module: &'a ir::Module,
     pub is_cxx_mode: bool,
 }
@@ -419,7 +419,7 @@ fn is_aarch64_homo_aggregate<'a>(
             variant,
             ty,
             ir_module,
-            &anonymous_composite.subtypes[..],
+            &anonymous_composite.fields[..],
             existing_base,
             type_info_manager,
             target_info,
@@ -475,7 +475,7 @@ fn is_aarch64_homo_aggregate_record<'a>(
     variant: Variant,
     ty: &'a ir::Type,
     ir_module: &'a ir::Module,
-    fields: &'a [ir::Type],
+    fields: &'a [ir::Field],
     existing_base: Option<&'a ir::Type>,
     type_info_manager: &TypeInfoManager,
     target_info: &TargetInfo,
@@ -494,7 +494,7 @@ fn is_aarch64_homo_aggregate_record<'a>(
     // but we don't support those yet.
 
     for field in fields.iter() {
-        let mut field = field;
+        let mut field = &field.ir_type;
 
         // Ignore non-zero arrays of empty records
         while let ir::Type::FixedArray(fixed_array) = field {

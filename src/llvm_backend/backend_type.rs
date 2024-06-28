@@ -27,7 +27,8 @@ pub unsafe fn to_backend_type<'a>(
         ir::Type::F64 => LLVMDoubleType(),
         ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to)?, 0),
         ir::Type::AnonymousComposite(composite) => {
-            let mut subtypes = to_backend_types(ctx, &composite.subtypes)?;
+            let mut subtypes =
+                to_backend_types(ctx, composite.fields.iter().map(ir::Field::ir_type))?;
 
             LLVMStructType(
                 subtypes.as_mut_ptr(),
@@ -53,13 +54,14 @@ pub unsafe fn to_backend_type<'a>(
     })
 }
 
-pub unsafe fn to_backend_types<'a>(
+pub unsafe fn to_backend_types<'a, 't>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
-    ir_types: &[ir::Type],
+    ir_types: impl Iterator<Item = &'t ir::Type>,
 ) -> Result<Vec<LLVMTypeRef>, BackendError> {
-    let mut results = Vec::with_capacity(ir_types.len());
+    let estimated_count = ir_types.size_hint().0;
+    let mut results = Vec::with_capacity(estimated_count);
 
-    for ir_type in ir_types.iter() {
+    for ir_type in ir_types {
         results.push(to_backend_type(ctx.borrow(), ir_type)?);
     }
 
@@ -86,7 +88,7 @@ pub unsafe fn get_function_pointer_type<'a>(
 ) -> Result<LLVMTypeRef, BackendError> {
     let ctx = ctx.borrow();
     let return_type = to_backend_type(ctx, &return_type)?;
-    let mut parameters = to_backend_types(ctx, &parameters)?;
+    let mut parameters = to_backend_types(ctx, parameters.iter())?;
     let is_vararg = if is_cstyle_variadic { 1 } else { 0 };
 
     Ok(LLVMFunctionType(

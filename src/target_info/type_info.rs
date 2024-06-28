@@ -1,5 +1,5 @@
 use super::TargetInfo;
-use crate::ir;
+use crate::{ir, target_info::record_layout::record_info};
 use once_map::unsync::OnceMap;
 
 #[derive(Copy, Clone, Debug)]
@@ -20,14 +20,16 @@ impl TypeInfo {
 }
 
 #[derive(Debug)]
-pub struct TypeInfoManager {
+pub struct TypeInfoManager<'a> {
     memo: OnceMap<ir::Type, TypeInfo>,
+    structures: &'a ir::Structures,
 }
 
-impl TypeInfoManager {
-    pub fn new() -> Self {
+impl<'a> TypeInfoManager<'a> {
+    pub fn new(structures: &'a ir::Structures) -> Self {
         Self {
             memo: OnceMap::new(),
+            structures,
         }
     }
 
@@ -55,7 +57,14 @@ impl TypeInfoManager {
                 align_bytes: 1,
                 unadjusted_align_bytes: 1,
             },
-            ir::Type::Structure(_structure_ref) => {
+            ir::Type::Structure(structure_ref) => {
+                let structure = self
+                    .structures
+                    .get(structure_ref)
+                    .expect("referenced structure to exist");
+
+                let _info = record_info::info_from_structure(structure);
+
                 /*
                 let record_layout = RecordLayout::new(structure_ref);
                 Ok(record_layout.type_info)
@@ -69,7 +78,9 @@ impl TypeInfoManager {
 
                 todo!("get_type_info_impl for ir::Type::Structure")
             }
-            ir::Type::AnonymousComposite(_type_composite) => {
+            ir::Type::AnonymousComposite(type_composite) => {
+                let _info = record_info::info_from_composite(type_composite);
+
                 /*
                 let record_layout = RecordLayout::new(structure_ref);
                 Ok(record_layout.type_info)

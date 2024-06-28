@@ -122,6 +122,12 @@ pub struct Field {
     pub privacy: Privacy,
 }
 
+impl Field {
+    pub fn resolved_type(&self) -> &Type {
+        &self.resolved_type
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Type {
     pub kind: TypeKind,

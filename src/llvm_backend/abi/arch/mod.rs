@@ -11,7 +11,7 @@ pub enum Arch<'a> {
 }
 
 pub struct CoreInfo<'a> {
-    pub type_info_manager: &'a TypeInfoManager,
+    pub type_info_manager: &'a TypeInfoManager<'a>,
     pub target_info: &'a TargetInfo,
 }
 

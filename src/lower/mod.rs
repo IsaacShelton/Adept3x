@@ -41,11 +41,10 @@ fn lower_structure(
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     for field in structure.fields.values() {
-        fields.push(lower_type(
-            &ir_module.target_info,
-            &field.resolved_type,
-            resolved_ast,
-        )?);
+        fields.push(ir::Field {
+            ir_type: lower_type(&ir_module.target_info, &field.resolved_type, resolved_ast)?,
+            properties: ir::FieldProperties::default(),
+        });
     }
 
     ir_module.structures.insert(

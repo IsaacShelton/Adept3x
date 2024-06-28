@@ -1,5 +1,5 @@
 use super::{backend_type::to_backend_types, ctx::ToBackendTypeCtx, BackendError};
-use crate::resolved::StructureRef;
+use crate::{ir, resolved::StructureRef};
 use llvm_sys::{core::LLVMStructType, prelude::LLVMTypeRef};
 
 pub unsafe fn to_backend_struct_type(
@@ -25,7 +25,8 @@ pub unsafe fn to_backend_struct_type(
                 .expect("referenced IR structure to exist");
 
             ctx.visited.borrow_mut().insert(*structure_key);
-            let mut subtypes = to_backend_types(ctx, &ir_structure.fields)?;
+            let mut subtypes =
+                to_backend_types(ctx, ir_structure.fields.iter().map(ir::Field::ir_type))?;
             ctx.visited.borrow_mut().remove(structure_key);
 
             Ok(LLVMStructType(

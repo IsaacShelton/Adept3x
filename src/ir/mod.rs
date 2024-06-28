@@ -6,11 +6,13 @@ use std::{collections::HashMap, ffi::CString};
 pub use crate::resolved::{FloatOrSign, IntegerSign};
 pub use crate::resolved::{FunctionRef, GlobalRef};
 
+pub type Structures = HashMap<StructureRef, Structure>;
+
 #[derive(Clone)]
 pub struct Module {
     pub target_info: TargetInfo,
     pub functions: HashMap<FunctionRef, Function>,
-    pub structures: HashMap<StructureRef, Structure>,
+    pub structures: Structures,
     pub globals: HashMap<GlobalRef, Global>,
 }
 
@@ -47,7 +49,7 @@ pub struct Function {
 
 #[derive(Clone, Debug)]
 pub struct Structure {
-    pub fields: Vec<Type>,
+    pub fields: Vec<Field>,
     pub is_packed: bool,
 }
 
@@ -177,6 +179,40 @@ pub struct Store {
     pub destination: Value,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Field {
+    pub ir_type: Type,
+    pub properties: FieldProperties,
+}
+
+impl Field {
+    pub fn basic(ir_type: Type) -> Self {
+        Self {
+            ir_type,
+            properties: FieldProperties::default(),
+        }
+    }
+
+    pub fn ir_type(&self) -> &Type {
+        &self.ir_type
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FieldProperties {
+    pub is_no_unique_addr: bool,
+    pub is_cxx: bool,
+}
+
+impl Default for FieldProperties {
+    fn default() -> Self {
+        Self {
+            is_no_unique_addr: false,
+            is_cxx: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, IsVariant, Hash)]
 pub enum Type {
     Pointer(Box<Type>),
@@ -234,13 +270,13 @@ impl Type {
     pub fn reference_counted_no_pointer(&self) -> Self {
         let subtypes = vec![
             // Reference count
-            Type::U64,
+            Field::basic(Type::U64),
             // Value
-            self.clone(),
+            Field::basic(self.clone()),
         ];
 
         Type::AnonymousComposite(TypeComposite {
-            subtypes,
+            fields: subtypes,
             is_packed: false,
         })
     }
@@ -271,7 +307,7 @@ impl Type {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeComposite {
-    pub subtypes: Vec<Type>,
+    pub fields: Vec<Field>,
     pub is_packed: bool,
 }
 

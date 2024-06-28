@@ -1,4 +1,5 @@
 pub mod itanium;
+pub mod record_info;
 
 #[derive(Clone, Debug)]
 #[repr(transparent)]

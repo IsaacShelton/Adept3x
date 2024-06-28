@@ -20,12 +20,12 @@ pub fn is_empty_record(
 
             &structure.fields[..]
         }
-        ir::Type::AnonymousComposite(type_composite) => &type_composite.subtypes[..],
+        ir::Type::AnonymousComposite(type_composite) => &type_composite.fields[..],
         _ => return false,
     };
 
     for field in fields.iter() {
-        let occupied = !is_empty_field(field, ir_module, options);
+        let occupied = !is_empty_field(&field.ir_type, ir_module, options);
 
         if occupied {
             return false;

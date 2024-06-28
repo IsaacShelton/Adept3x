@@ -569,7 +569,6 @@ fn conform_integer_value_c(
     }
 
     todo!("conform_integer_value_c {:?}", conform_mode);
-    None
 }
 
 fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {
@@ -777,12 +776,10 @@ fn resolve_type<'a>(
             bits: *bits,
             sign: *sign,
         }),
-        ast::TypeKind::CInteger { integer, sign } => Ok(
-            resolved::TypeKind::CInteger {
-                integer: *integer,
-                sign: *sign,
-            }
-        ),
+        ast::TypeKind::CInteger { integer, sign } => Ok(resolved::TypeKind::CInteger {
+            integer: *integer,
+            sign: *sign,
+        }),
         ast::TypeKind::Pointer(inner) => {
             let inner = resolve_type_or_undeclared(
                 type_search_ctx,

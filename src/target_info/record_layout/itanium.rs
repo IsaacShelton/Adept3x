@@ -1,12 +1,15 @@
-use super::FieldOffset;
+use super::{
+    record_info::{FieldsIter, RecordInfo},
+    FieldOffset,
+};
 use crate::{
-    resolved,
+    ir, resolved,
     target_info::{type_info::TypeInfoManager, TargetInfo},
 };
 
 #[derive(Clone, Debug)]
 pub struct ItaniumRecordLayoutBuilder<'a> {
-    pub type_info_manager: &'a TypeInfoManager,
+    pub type_info_manager: &'a TypeInfoManager<'a>,
     pub target_info: &'a TargetInfo,
     pub size_bytes: u64,
     pub align_bytes: u64,
@@ -33,7 +36,7 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
 }
 
 impl<'a> ItaniumRecordLayoutBuilder<'a> {
-    pub fn layout(&mut self, record: &resolved::Structure) {
+    pub fn layout<'t, F: FieldsIter<'t>>(&mut self, record: &'t RecordInfo<'t, F>) {
         // NOTE: This only works for C types
         self.init_layout();
         self.layout_fields(record);
@@ -44,12 +47,12 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         todo!()
     }
 
-    pub fn layout_fields(&mut self, record: &resolved::Structure) {
+    pub fn layout_fields<'t, F: FieldsIter<'t>>(&mut self, record: &'t RecordInfo<'t, F>) {
         let insert_extra_padding = record.may_insert_extra_padding(true);
         let has_flexible_array_member = false; // NOTE: We don't support flexible array members yet
 
-        for (i, field) in record.fields.values().enumerate() {
-            let has_next = i + 1 < record.fields.len();
+        for (i, field) in record.iter().enumerate() {
+            let has_next = i + 1 < record.len();
             let insert_extra_padding_here =
                 insert_extra_padding && (has_next || !has_flexible_array_member);
 
@@ -57,17 +60,17 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
     }
 
-    pub fn layout_field(&mut self, field: &resolved::Field, insert_extra_padding: bool) {
+    pub fn layout_field(&mut self, _field: &ir::Field, _insert_extra_padding: bool) {
         todo!()
     }
 
-    pub fn finish_layout(&mut self, _record: &resolved::Structure) {
+    pub fn finish_layout<'t, F: FieldsIter<'t>>(&mut self, _record: &'t RecordInfo<'t, F>) {
         todo!()
     }
 }
 
 impl resolved::Structure {
-    pub fn may_insert_extra_padding(&self, emit_remark: bool) -> bool {
+    pub fn may_insert_extra_padding(&self, _emit_remark: bool) -> bool {
         todo!()
     }
 }
