@@ -3,6 +3,7 @@
 mod ast;
 mod c;
 mod cli;
+mod data_units;
 mod inflow;
 mod ir;
 mod lexer;

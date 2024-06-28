@@ -1,20 +1,20 @@
 use super::TargetInfo;
-use crate::{ir, target_info::record_layout::record_info};
+use crate::{data_units::ByteUnits, ir, target_info::record_layout::record_info};
 use once_map::unsync::OnceMap;
 
 #[derive(Copy, Clone, Debug)]
 pub struct TypeInfo {
-    pub width_bytes: u64,
-    pub align_bytes: u32,
-    pub unadjusted_align_bytes: u32,
+    pub width: ByteUnits,
+    pub alignment: ByteUnits,
+    pub unadjusted_alignment: ByteUnits,
 }
 
 impl TypeInfo {
-    pub fn basic(bytes: u32) -> Self {
+    pub fn basic(size: ByteUnits) -> Self {
         Self {
-            width_bytes: bytes.into(),
-            align_bytes: bytes,
-            unadjusted_align_bytes: bytes,
+            width: size.into(),
+            alignment: size,
+            unadjusted_alignment: size,
         }
     }
 }
@@ -46,16 +46,16 @@ impl<'a> TypeInfoManager<'a> {
         match ir_type {
             ir::Type::Pointer(_) | ir::Type::FunctionPointer => target_info.pointer_layout(),
             ir::Type::Boolean => target_info.bool_layout(),
-            ir::Type::S8 | ir::Type::U8 => TypeInfo::basic(1),
-            ir::Type::S16 | ir::Type::U16 => TypeInfo::basic(2),
-            ir::Type::S32 | ir::Type::U32 => TypeInfo::basic(4),
-            ir::Type::S64 | ir::Type::U64 => TypeInfo::basic(8),
-            ir::Type::F32 => TypeInfo::basic(4),
-            ir::Type::F64 => TypeInfo::basic(8),
+            ir::Type::S8 | ir::Type::U8 => TypeInfo::basic(ByteUnits::of(1)),
+            ir::Type::S16 | ir::Type::U16 => TypeInfo::basic(ByteUnits::of(2)),
+            ir::Type::S32 | ir::Type::U32 => TypeInfo::basic(ByteUnits::of(4)),
+            ir::Type::S64 | ir::Type::U64 => TypeInfo::basic(ByteUnits::of(8)),
+            ir::Type::F32 => TypeInfo::basic(ByteUnits::of(4)),
+            ir::Type::F64 => TypeInfo::basic(ByteUnits::of(8)),
             ir::Type::Void => TypeInfo {
-                width_bytes: 0,
-                align_bytes: 1,
-                unadjusted_align_bytes: 1,
+                width: ByteUnits::of(0),
+                alignment: ByteUnits::of(0),
+                unadjusted_alignment: ByteUnits::of(1),
             },
             ir::Type::Structure(structure_ref) => {
                 let structure = self
@@ -91,9 +91,9 @@ impl<'a> TypeInfoManager<'a> {
                 let element_info = self.get_type_info(&fixed_array.inner, target_info);
 
                 TypeInfo {
-                    width_bytes: fixed_array.size * element_info.width_bytes,
-                    align_bytes: element_info.align_bytes,
-                    unadjusted_align_bytes: element_info.align_bytes,
+                    width: element_info.width * fixed_array.size,
+                    alignment: element_info.alignment,
+                    unadjusted_alignment: element_info.alignment,
                 }
             }
             ir::Type::Vector(_) => todo!("get_type_info_impl for ir::Type::Vector"),

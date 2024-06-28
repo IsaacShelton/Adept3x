@@ -34,7 +34,7 @@ impl<'a> Itanium<'a> {
             let align = self
                 .type_info_manager
                 .get_type_info(return_type, self.target_info)
-                .align_bytes;
+                .alignment;
 
             Some(ABIType::new_indirect(
                 align,

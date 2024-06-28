@@ -1,7 +1,10 @@
 pub mod record_layout;
 pub mod type_info;
 
-use crate::ast::{CInteger, IntegerSign};
+use crate::{
+    ast::{CInteger, IntegerSign},
+    data_units::ByteUnits,
+};
 use type_info::TypeInfo;
 
 #[derive(Clone, Debug)]
@@ -39,38 +42,38 @@ impl TargetInfo {
     }
 
     pub fn pointer_layout(&self) -> TypeInfo {
-        TypeInfo::basic(8)
+        TypeInfo::basic(ByteUnits::of(8))
     }
 
     pub fn bool_layout(&self) -> TypeInfo {
-        TypeInfo::basic(1)
+        TypeInfo::basic(ByteUnits::of(1))
     }
 
     pub fn char_layout(&self) -> TypeInfo {
-        TypeInfo::basic(1)
+        TypeInfo::basic(ByteUnits::of(1))
     }
 
     pub fn short_layout(&self) -> TypeInfo {
-        TypeInfo::basic(2)
+        TypeInfo::basic(ByteUnits::of(2))
     }
 
     pub fn long_layout(&self) -> TypeInfo {
         if self.ms_abi {
-            TypeInfo::basic(4)
+            TypeInfo::basic(ByteUnits::of(4))
         } else {
-            TypeInfo::basic(8)
+            TypeInfo::basic(ByteUnits::of(8))
         }
     }
 
     pub fn longlong_layout(&self) -> TypeInfo {
-        TypeInfo::basic(8)
+        TypeInfo::basic(ByteUnits::of(8))
     }
 
     pub fn float_layout(&self) -> TypeInfo {
-        TypeInfo::basic(4)
+        TypeInfo::basic(ByteUnits::of(4))
     }
 
     pub fn double_layout(&self) -> TypeInfo {
-        TypeInfo::basic(8)
+        TypeInfo::basic(ByteUnits::of(8))
     }
 }

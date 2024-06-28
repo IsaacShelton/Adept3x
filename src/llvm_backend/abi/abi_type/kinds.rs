@@ -1,7 +1,6 @@
-use super::{
-    offset_align::{ByteCount, OffsetAlign},
-    show_llvm_type::ShowLLVMType,
-};
+use crate::data_units::ByteUnits;
+
+use super::{offset_align::OffsetAlign, show_llvm_type::ShowLLVMType};
 use core::fmt::Debug;
 use llvm_sys::prelude::LLVMTypeRef;
 
@@ -50,7 +49,7 @@ impl Debug for Extend {
 #[derive(Clone)]
 pub struct Indirect {
     pub padding: Option<LLVMTypeRef>,
-    pub align: ByteCount,
+    pub align: ByteUnits,
     pub byval: bool,
     pub realign: bool,
     pub sret_after_this: bool,
@@ -73,7 +72,7 @@ impl Debug for Indirect {
 #[derive(Clone)]
 pub struct IndirectAliased {
     pub padding: Option<LLVMTypeRef>,
-    pub align: ByteCount,
+    pub align: ByteUnits,
     pub realign: bool,
     pub address_space: u32,
 }

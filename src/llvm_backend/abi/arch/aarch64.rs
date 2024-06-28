@@ -1,4 +1,5 @@
 use crate::{
+    data_units::{BitUnits, ByteUnits},
     ir,
     llvm_backend::{
         abi::{
@@ -97,10 +98,10 @@ impl AARCH64<'_> {
             .type_info_manager
             .get_type_info(return_type, self.target_info);
 
-        let num_bytes = type_info.width_bytes;
-        let alignment_bytes = type_info.align_bytes;
+        let size = type_info.width;
+        let alignment = type_info.alignment;
 
-        if num_bytes == 0
+        if size.is_zero()
             || is_empty_record(
                 return_type,
                 self.ir_module,
@@ -129,9 +130,9 @@ impl AARCH64<'_> {
         }
 
         // Small aggregates are returned directly via registers or stack
-        if num_bytes <= 16 {
-            if num_bytes <= 8 && self.target_info.is_little_endian() {
-                let ty = match num_bytes {
+        if size <= ByteUnits::of(16) {
+            if size <= ByteUnits::of(8) && self.target_info.is_little_endian() {
+                let ty = match size.bytes() {
                     1 => unsafe { LLVMInt8Type() },
                     2 => unsafe { LLVMInt16Type() },
                     3..=4 => unsafe { LLVMInt32Type() },
@@ -146,11 +147,11 @@ impl AARCH64<'_> {
             }
         }
 
-        let size = align_to(num_bytes, 8);
+        let size = align_to(size, ByteUnits::of(8));
 
-        if alignment_bytes < 16 && size == 128 {
+        if alignment < ByteUnits::of(16) && size == ByteUnits::of(16) {
             let base_type = unsafe { LLVMInt64Type() };
-            let num_elements = size / 8;
+            let num_elements = size / ByteUnits::of(8);
             let array_type = unsafe { LLVMArrayType2(base_type, num_elements) };
 
             return ABIType::new_direct(DirectOptions {
@@ -194,7 +195,7 @@ impl AARCH64<'_> {
         let size_bytes = self
             .type_info_manager
             .get_type_info(ty, self.target_info)
-            .width_bytes;
+            .width;
 
         let is_empty_record = is_empty_record(
             ty,
@@ -209,12 +210,12 @@ impl AARCH64<'_> {
         // would need to be passed as indirect, but we don't support those yet.
 
         // Empty records are ignored in Darwin for C, but not C++.
-        if is_empty_record || size_bytes == 0 {
+        if is_empty_record || size_bytes.is_zero() {
             if !self.is_cxx_mode || self.variant.is_darwin_pcs() {
                 return Ok(ABIType::new_ignore());
             }
 
-            if is_empty_record && size_bytes == 0 {
+            if is_empty_record && size_bytes.is_zero() {
                 return Ok(ABIType::new_ignore());
             }
 
@@ -252,33 +253,40 @@ impl AARCH64<'_> {
             }
         }
 
-        if size_bytes <= 16 {
+        if size_bytes <= ByteUnits::of(16) {
             let alignment_bytes = if self.variant.is_aapcs() {
                 let unadjusted_alignment = self
                     .type_info_manager
                     .get_type_info(ty, self.target_info)
-                    .unadjusted_align_bytes;
+                    .unadjusted_alignment;
 
-                if unadjusted_alignment < 16 {
-                    8
+                if unadjusted_alignment < ByteUnits::of(16) {
+                    ByteUnits::of(8)
                 } else {
-                    16
+                    ByteUnits::of(16)
                 }
             } else {
-                let pointer_width = 8;
+                let pointer_width = ByteUnits::of(8);
                 self.type_info_manager
                     .get_type_info(ty, self.target_info)
-                    .align_bytes
+                    .alignment
                     .max(pointer_width)
             };
 
             let size_bytes = align_to(size_bytes, alignment_bytes.into());
-            let base_type = unsafe { LLVMIntType(alignment_bytes * 8) };
+            let base_type = unsafe {
+                LLVMIntType(
+                    BitUnits::from(alignment_bytes)
+                        .bits()
+                        .try_into()
+                        .expect("small enough for int type"),
+                )
+            };
 
             let coerce_to_type = if size_bytes == alignment_bytes.into() {
                 base_type
             } else {
-                unsafe { LLVMArrayType2(base_type, size_bytes / alignment_bytes as u64) }
+                unsafe { LLVMArrayType2(base_type, size_bytes / alignment_bytes) }
             };
 
             return Ok(ABIType::new_direct(DirectOptions {
@@ -431,7 +439,7 @@ fn is_aarch64_homo_aggregate<'a>(
             (ty, 1)
         };
 
-        if !is_aarch64_aggregate_base_type(ty, type_info_manager, target_info, variant) {
+        if !is_aarch64_homo_aggregate_base_type(ty, type_info_manager, target_info, variant) {
             return None;
         }
 
@@ -444,20 +452,16 @@ fn is_aarch64_homo_aggregate<'a>(
 
                 assert_eq!(
                     num_elements,
-                    type_info_manager
-                        .get_type_info(base, target_info)
-                        .width_bytes
+                    type_info_manager.get_type_info(base, target_info).width
                         / type_info_manager
                             .get_type_info(element_type, target_info)
-                            .width_bytes,
+                            .width,
                 );
             }
 
             if base.is_vector() != ty.is_vector()
-                || type_info_manager.get_type_info(ty, target_info).width_bytes
-                    != type_info_manager
-                        .get_type_info(base, target_info)
-                        .width_bytes
+                || type_info_manager.get_type_info(ty, target_info).width
+                    != type_info_manager.get_type_info(base, target_info).width
             {
                 return None;
             }
@@ -547,11 +551,8 @@ fn is_aarch64_homo_aggregate_record<'a>(
 
     let base = base?;
 
-    if type_info_manager
-        .get_type_info(base, target_info)
-        .width_bytes
-        * num_combined_members
-        != type_info_manager.get_type_info(ty, target_info).width_bytes
+    if type_info_manager.get_type_info(base, target_info).width * num_combined_members
+        != type_info_manager.get_type_info(ty, target_info).width
     {
         return None;
     }
@@ -562,9 +563,12 @@ fn is_aarch64_homo_aggregate_record<'a>(
     })
 }
 
-fn align_to(width_bytes: u64, align_bytes: u64) -> u64 {
+fn align_to(width_bytes: ByteUnits, align_bytes: ByteUnits) -> ByteUnits {
+    let width_bytes = width_bytes.bytes();
+    let align_bytes = align_bytes.bytes();
+
     assert_ne!(align_bytes, 0);
-    (width_bytes + align_bytes - 1) & !(align_bytes - 1)
+    ByteUnits::of((width_bytes + align_bytes - 1) & !(align_bytes - 1))
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -592,7 +596,7 @@ fn get_natural_align_indirect(
 ) -> ABIType {
     let alignment = type_info_manager
         .get_type_info(ir_type, target_info)
-        .align_bytes;
+        .alignment;
 
     ABIType::new_indirect(
         alignment,
@@ -603,7 +607,7 @@ fn get_natural_align_indirect(
     )
 }
 
-fn is_aarch64_aggregate_base_type(
+fn is_aarch64_homo_aggregate_base_type(
     ty: &ir::Type,
     type_info_manager: &TypeInfoManager,
     target_info: &TargetInfo,
@@ -616,8 +620,8 @@ fn is_aarch64_aggregate_base_type(
     match ty {
         ir::Type::F32 | ir::Type::F64 => true,
         ir::Type::Vector(_) => {
-            let size = type_info_manager.get_type_info(ty, target_info).width_bytes;
-            size == 8 || size == 16
+            let size = type_info_manager.get_type_info(ty, target_info).width;
+            size == ByteUnits::of(8) || size == ByteUnits::of(16)
         }
         _ => false,
     }

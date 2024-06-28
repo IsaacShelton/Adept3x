@@ -196,20 +196,39 @@ impl Field {
     pub fn ir_type(&self) -> &Type {
         &self.ir_type
     }
+
+    pub fn is_cxx_record(&self) -> bool {
+        false
+    }
+
+    pub fn as_cxx_record(&self) -> Option<CXXRecord> {
+        None
+    }
+
+    pub fn is_bitfield(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FieldProperties {
     pub is_no_unique_addr: bool,
-    pub is_cxx: bool,
 }
 
 impl Default for FieldProperties {
     fn default() -> Self {
         Self {
             is_no_unique_addr: false,
-            is_cxx: false,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CXXRecord {}
+
+impl CXXRecord {
+    pub fn is_empty(&self) -> bool {
+        todo!("is_empty for c++ records not supported yet")
     }
 }
 

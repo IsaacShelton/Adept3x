@@ -8,9 +8,9 @@ mod show_llvm_type;
 pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
 use self::{
     kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased},
-    offset_align::{ByteCount, OffsetAlign},
+    offset_align::OffsetAlign,
 };
-use crate::ir;
+use crate::{data_units::ByteUnits, ir};
 use derive_more::{Deref, IsVariant};
 use llvm_sys::{
     core::{
@@ -47,7 +47,7 @@ impl ABIType {
             kind: ABITypeKind::Direct(Direct {
                 offset_align: OffsetAlign {
                     offset: options.offset,
-                    align: options.align_bytes,
+                    align: options.alignment,
                 },
                 coerce_to_type: options.coerce_to_type,
                 padding: options.padding,
@@ -140,7 +140,7 @@ impl ABIType {
     }
 
     pub fn new_indirect(
-        alignment: ByteCount,
+        alignment: ByteUnits,
         byval: Option<bool>,
         realign: Option<bool>,
         padding: Option<LLVMTypeRef>,
@@ -160,7 +160,7 @@ impl ABIType {
     }
 
     pub fn new_indirect_aliased(
-        alignment: ByteCount,
+        alignment: ByteUnits,
         address_space: u32,
         realign: Option<bool>,
         padding: Option<LLVMTypeRef>,
@@ -177,7 +177,7 @@ impl ABIType {
     }
 
     pub fn new_indirect_in_register(
-        alignment: ByteCount,
+        alignment: ByteUnits,
         byval: Option<bool>,
         realign: Option<bool>,
         padding: Option<LLVMTypeRef>,
@@ -297,11 +297,11 @@ impl ABIType {
         }
     }
 
-    pub fn get_direct_offset(&self) -> Option<u32> {
+    pub fn get_direct_offset(&self) -> Option<ByteUnits> {
         self.get_direct_offset_align().map(|info| info.offset)
     }
 
-    pub fn get_direct_align(&self) -> Option<u32> {
+    pub fn get_direct_align(&self) -> Option<ByteUnits> {
         self.get_direct_offset_align().map(|info| info.align)
     }
 
@@ -369,7 +369,7 @@ impl ABIType {
         }
     }
 
-    pub fn indirect_align(&self) -> Option<ByteCount> {
+    pub fn indirect_align(&self) -> Option<ByteUnits> {
         match &self.kind {
             ABITypeKind::Indirect(indirect) => Some(indirect.align),
             ABITypeKind::IndirectAliased(indirect_aliased) => Some(indirect_aliased.align),
