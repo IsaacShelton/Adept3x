@@ -2,11 +2,21 @@ use super::TargetInfo;
 use crate::{data_units::ByteUnits, ir, target_info::record_layout::record_info};
 use once_map::unsync::OnceMap;
 
+#[derive(Copy, Clone, Debug, Default)]
+pub enum AlignmentRequirement {
+    #[default]
+    None,
+    RequiredByTypedefAttribute,
+    RequiredByRecordAttribute,
+    RequiredByEnumAttribute,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct TypeInfo {
     pub width: ByteUnits,
     pub alignment: ByteUnits,
     pub unadjusted_alignment: ByteUnits,
+    pub alignment_requirement: AlignmentRequirement,
 }
 
 impl TypeInfo {
@@ -15,6 +25,7 @@ impl TypeInfo {
             width: size.into(),
             alignment: size,
             unadjusted_alignment: size,
+            alignment_requirement: AlignmentRequirement::None,
         }
     }
 }
@@ -56,6 +67,7 @@ impl<'a> TypeInfoManager<'a> {
                 width: ByteUnits::of(0),
                 alignment: ByteUnits::of(0),
                 unadjusted_alignment: ByteUnits::of(1),
+                alignment_requirement: AlignmentRequirement::None,
             },
             ir::Type::Structure(structure_ref) => {
                 let structure = self
@@ -94,11 +106,15 @@ impl<'a> TypeInfoManager<'a> {
                     width: element_info.width * fixed_array.size,
                     alignment: element_info.alignment,
                     unadjusted_alignment: element_info.alignment,
+                    alignment_requirement: element_info.alignment_requirement,
                 }
             }
             ir::Type::Vector(_) => todo!("get_type_info_impl for ir::Type::Vector"),
             ir::Type::Complex(_) => todo!("get_type_info_impl for ir::Type::Complex"),
             ir::Type::Atomic(_) => todo!("get_type_info_impl for ir::Type::Atomic"),
+            ir::Type::IncompleteArray(_) => {
+                todo!("get_type_info_impl for ir::Type::IncompleteArray")
+            }
         }
     }
 }

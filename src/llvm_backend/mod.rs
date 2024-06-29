@@ -30,7 +30,7 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::{ir, target_info::type_info::TypeInfoManager};
+use crate::{ast::Source, ir, target_info::type_info::TypeInfoManager};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -98,8 +98,8 @@ pub unsafe fn llvm_backend(
             }),
             &vec![&ir::Type::AnonymousComposite(ir::TypeComposite {
                 fields: vec![
-                    ir::Field::basic(ir::Type::F32),
-                    ir::Field::basic(ir::Type::F32),
+                    ir::Field::basic(ir::Type::F32, Source::internal()),
+                    ir::Field::basic(ir::Type::F32, Source::internal()),
                 ],
                 is_packed: false,
             })],

@@ -290,7 +290,9 @@ where
                 self.ignore_newlines();
             }
 
+            let source = self.source_here();
             let field_name = self.parse_identifier(Some("for field name"))?;
+
             self.ignore_newlines();
             let field_type = self.parse_type(None::<&str>, Some("for field type"))?;
             self.ignore_newlines();
@@ -300,6 +302,7 @@ where
                 Field {
                     ast_type: field_type,
                     privacy: Default::default(),
+                    source,
                 },
             );
         }

@@ -51,6 +51,9 @@ pub unsafe fn to_backend_type<'a>(
         ir::Type::Atomic(_) => {
             todo!("to_backend_type for ir::Type::Atomic")
         }
+        ir::Type::IncompleteArray(_) => {
+            todo!("to_backend_type for ir::Type::IncompleteArray")
+        }
     })
 }
 

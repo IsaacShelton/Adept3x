@@ -67,6 +67,7 @@ pub fn make_composite(
                                         Field {
                                             ast_type,
                                             privacy: Privacy::Public,
+                                            source: declarator.source,
                                         },
                                     );
                                 }

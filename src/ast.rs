@@ -151,6 +151,7 @@ pub enum Privacy {
 pub struct Field {
     pub ast_type: Type,
     pub privacy: Privacy,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]

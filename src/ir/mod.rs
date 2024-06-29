@@ -1,3 +1,5 @@
+use crate::ast::Source;
+use crate::data_units::ByteUnits;
 use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
 use crate::target_info::TargetInfo;
 use derive_more::{Deref, DerefMut, IsVariant};
@@ -179,17 +181,27 @@ pub struct Store {
     pub destination: Value,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Hash)]
 pub struct Field {
     pub ir_type: Type,
     pub properties: FieldProperties,
+    pub source: Source,
 }
 
+impl PartialEq for Field {
+    fn eq(&self, other: &Self) -> bool {
+        self.ir_type.eq(&other.ir_type) && self.properties.eq(&other.properties)
+    }
+}
+
+impl Eq for Field {}
+
 impl Field {
-    pub fn basic(ir_type: Type) -> Self {
+    pub fn basic(ir_type: Type, source: Source) -> Self {
         Self {
             ir_type,
             properties: FieldProperties::default(),
+            source,
         }
     }
 
@@ -208,17 +220,27 @@ impl Field {
     pub fn is_bitfield(&self) -> bool {
         false
     }
+
+    /// Returns the maximum alignment applied to the field (or 0 if unmodified)
+    pub fn get_max_alignment(&self) -> ByteUnits {
+        // NOTE: We don't support using `alignas` / `_Alignas` / GNU `aligned` / MSVC declspec `align`
+        // on fields yet.
+        // When we do, we will need to take the maximum value assigned, and return it here.
+        ByteUnits::of(0)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FieldProperties {
     pub is_no_unique_addr: bool,
+    pub is_force_packed: bool,
 }
 
 impl Default for FieldProperties {
     fn default() -> Self {
         Self {
             is_no_unique_addr: false,
+            is_force_packed: false,
         }
     }
 }
@@ -229,6 +251,14 @@ pub struct CXXRecord {}
 impl CXXRecord {
     pub fn is_empty(&self) -> bool {
         todo!("is_empty for c++ records not supported yet")
+    }
+
+    pub fn is_cxx_pod(&self) -> bool {
+        todo!("is_cxx_pod for c++ records not supported yet")
+    }
+
+    pub fn is_packed(&self) -> bool {
+        todo!("is_cxx_pod for c++ records not supported yet")
     }
 }
 
@@ -254,6 +284,7 @@ pub enum Type {
     Vector(Box<Vector>),
     Complex(Box<Complex>),
     Atomic(Box<Type>),
+    IncompleteArray(Box<Type>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -289,9 +320,9 @@ impl Type {
     pub fn reference_counted_no_pointer(&self) -> Self {
         let subtypes = vec![
             // Reference count
-            Field::basic(Type::U64),
+            Field::basic(Type::U64, Source::internal()),
             // Value
-            Field::basic(self.clone()),
+            Field::basic(self.clone(), Source::internal()),
         ];
 
         Type::AnonymousComposite(TypeComposite {

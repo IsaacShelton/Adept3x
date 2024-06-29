@@ -140,6 +140,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                             &mut used_aliases,
                         )?,
                         privacy: field.privacy,
+                        source: field.source,
                     },
                 );
             }

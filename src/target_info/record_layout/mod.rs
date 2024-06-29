@@ -1,11 +1,7 @@
-use crate::data_units::ByteUnits;
+use crate::data_units::{BitUnits, ByteUnits};
 
 pub mod itanium;
 pub mod record_info;
-
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-pub struct FieldOffset(u32);
 
 #[derive(Clone, Debug)]
 pub struct RecordLayout {
@@ -17,5 +13,5 @@ pub struct RecordLayout {
     /// Size without tail padding
     pub data_size: ByteUnits,
 
-    pub field_offsets: Vec<FieldOffset>,
+    pub field_offsets: Vec<BitUnits>,
 }

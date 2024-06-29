@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Rem, Sub, SubAssign};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ByteUnits {
@@ -55,7 +55,7 @@ impl_units_from!(BitUnits, u64);
 impl From<BitUnits> for ByteUnits {
     fn from(value: BitUnits) -> Self {
         Self {
-            units: value.bits() / 8,
+            units: (value.bits() + 7) / 8,
         }
     }
 }
@@ -74,6 +74,18 @@ macro_rules! impl_math_for {
             pub fn is_zero(&self) -> bool {
                 self.units == 0
             }
+
+            pub fn align_to(&self, align: $units) -> $units {
+                let width = self.units;
+                let align = align.units;
+
+                assert_ne!(align, 0);
+                Self::of((width + align - 1) & !(align - 1))
+            }
+
+            pub fn is_power_of_2(&self) -> bool {
+                (self.units & (self.units - 1)) == 0
+            }
         }
 
         impl Add<$units> for $units {
@@ -86,6 +98,12 @@ macro_rules! impl_math_for {
             }
         }
 
+        impl AddAssign<$units> for $units {
+            fn add_assign(&mut self, rhs: $units) {
+                self.units += rhs.units
+            }
+        }
+
         impl Sub<$units> for $units {
             type Output = $units;
 
@@ -93,6 +111,12 @@ macro_rules! impl_math_for {
                 Self {
                     units: self.units - rhs.units,
                 }
+            }
+        }
+
+        impl SubAssign<$units> for $units {
+            fn sub_assign(&mut self, rhs: $units) {
+                self.units -= rhs.units
             }
         }
 
@@ -121,6 +145,16 @@ macro_rules! impl_math_for {
 
             fn div(self, rhs: $units) -> Self::Output {
                 self.units / rhs.units
+            }
+        }
+
+        impl Rem<$units> for $units {
+            type Output = $units;
+
+            fn rem(self, rhs: $units) -> Self::Output {
+                Self {
+                    units: self.units % rhs.units,
+                }
             }
         }
     };

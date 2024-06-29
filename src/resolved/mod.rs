@@ -120,6 +120,7 @@ pub use crate::ast::Privacy;
 pub struct Field {
     pub resolved_type: Type,
     pub privacy: Privacy,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]

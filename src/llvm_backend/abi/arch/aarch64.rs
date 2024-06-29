@@ -147,7 +147,7 @@ impl AARCH64<'_> {
             }
         }
 
-        let size = align_to(size, ByteUnits::of(8));
+        let size = size.align_to(ByteUnits::of(8));
 
         if alignment < ByteUnits::of(16) && size == ByteUnits::of(16) {
             let base_type = unsafe { LLVMInt64Type() };
@@ -273,7 +273,8 @@ impl AARCH64<'_> {
                     .max(pointer_width)
             };
 
-            let size_bytes = align_to(size_bytes, alignment_bytes.into());
+            let size_bytes = size_bytes.align_to(alignment_bytes.into());
+
             let base_type = unsafe {
                 LLVMIntType(
                     BitUnits::from(alignment_bytes)
@@ -373,7 +374,8 @@ fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
         | ir::Type::FixedArray(_)
         | ir::Type::Vector(_)
         | ir::Type::Complex(_)
-        | ir::Type::Atomic(_) => false,
+        | ir::Type::Atomic(_)
+        | ir::Type::IncompleteArray(_) => false,
     }
 }
 
@@ -561,14 +563,6 @@ fn is_aarch64_homo_aggregate_record<'a>(
         base,
         num_members: num_combined_members,
     })
-}
-
-fn align_to(width_bytes: ByteUnits, align_bytes: ByteUnits) -> ByteUnits {
-    let width_bytes = width_bytes.bytes();
-    let align_bytes = align_bytes.bytes();
-
-    assert_ne!(align_bytes, 0);
-    ByteUnits::of((width_bytes + align_bytes - 1) & !(align_bytes - 1))
 }
 
 #[derive(Copy, Clone, Debug)]
