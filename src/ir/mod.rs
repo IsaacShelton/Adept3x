@@ -258,7 +258,7 @@ impl CXXRecord {
     }
 
     pub fn is_packed(&self) -> bool {
-        todo!("is_cxx_pod for c++ records not supported yet")
+        todo!("is_packed for c++ records not supported yet")
     }
 }
 

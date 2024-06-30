@@ -52,10 +52,16 @@ impl_units_from!(BitUnits, u16);
 impl_units_from!(BitUnits, u32);
 impl_units_from!(BitUnits, u64);
 
-impl From<BitUnits> for ByteUnits {
-    fn from(value: BitUnits) -> Self {
-        Self {
-            units: (value.bits() + 7) / 8,
+impl TryFrom<BitUnits> for ByteUnits {
+    type Error = ();
+
+    fn try_from(value: BitUnits) -> Result<Self, ()> {
+        if value.bits() % 8 == 0 {
+            Ok(Self {
+                units: value.bits() / 8,
+            })
+        } else {
+            Err(())
         }
     }
 }

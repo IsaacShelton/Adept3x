@@ -98,8 +98,11 @@ pub unsafe fn llvm_backend(
             }),
             &vec![&ir::Type::AnonymousComposite(ir::TypeComposite {
                 fields: vec![
-                    ir::Field::basic(ir::Type::F32, Source::internal()),
-                    ir::Field::basic(ir::Type::F32, Source::internal()),
+                    ir::Field::basic(ir::Type::S16, Source::internal()),
+                    ir::Field::basic(ir::Type::S16, Source::internal()),
+                    ir::Field::basic(ir::Type::S16, Source::internal()),
+                    ir::Field::basic(ir::Type::S16, Source::internal()),
+                    ir::Field::basic(ir::Type::S16, Source::internal()),
                 ],
                 is_packed: false,
             })],

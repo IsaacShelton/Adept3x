@@ -28,6 +28,10 @@ impl Source {
             location: Location { line: 1, column: 1 },
         }
     }
+
+    pub fn is_internal(&self) -> bool {
+        self.key == SourceFileCache::INTERNAL_KEY
+    }
 }
 
 #[derive(Clone, Debug)]

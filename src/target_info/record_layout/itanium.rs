@@ -1,4 +1,4 @@
-use super::record_info::{FieldsIter, RecordInfo};
+use super::record_info::RecordInfo;
 use crate::{
     data_units::{BitUnits, ByteUnits},
     ir, resolved,
@@ -94,18 +94,29 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
     }
 
-    pub fn layout<'t, F: FieldsIter<'t>>(&mut self, record: &'t RecordInfo<'t, F>) {
+    pub fn layout<'t>(&mut self, record: &RecordInfo<'t>) {
         // NOTE: This only works for C types
-        self.init_layout();
+        self.init_layout(record);
         self.layout_fields(record);
         self.finish_layout(record);
     }
 
-    pub fn init_layout(&mut self) {
-        todo!()
+    pub fn init_layout<'t>(&mut self, record: &RecordInfo<'t>) {
+        self.is_union = record.is_union;
+        self.is_ms_struct = false;
+        self.packed = record.is_packed;
+
+        if record.is_natural_align {
+            self.is_natural_align = true;
+        }
+
+        // NOTE: We don't allow alignment attributes on records yet,
+        // it would require extra alignment work here.
+
+        // We don't really care about anything else for now...
     }
 
-    pub fn layout_fields<'t, F: FieldsIter<'t>>(&mut self, record: &'t RecordInfo<'t, F>) {
+    pub fn layout_fields<'t>(&mut self, record: &RecordInfo<'t>) {
         let insert_extra_padding = record.may_insert_extra_padding(true);
         let has_flexible_array_member = false; // NOTE: We don't support flexible array members yet
 
@@ -230,7 +241,6 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
                 BitUnits::from(field_offset),
                 unpadded_field_offset,
                 BitUnits::from(unpacked_field_offset),
-                BitUnits::from(unpacked_field_alignment),
                 field_packed,
                 field,
             );
@@ -285,8 +295,44 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
     }
 
-    pub fn finish_layout<'t, F: FieldsIter<'t>>(&mut self, _record: &'t RecordInfo<'t, F>) {
-        todo!()
+    pub fn finish_layout<'t>(&mut self, record: &RecordInfo<'t>) {
+        // NOTE: Records in C++ cannot be zero-sized
+        if record.cxx_info.is_some() && self.size.is_zero() {
+            todo!("zero-sized c++ records are not supported yet")
+        }
+
+        // Include final field's tail padding in total size
+        self.size = self.size.max(self.padded_field_size);
+
+        // Round size of record up to its alignment
+        let unpadded_size = self.size - self.unfilled_bits_in_last_unit;
+        let unpacked_size = self.size.align_to(BitUnits::from(self.unpacked_alignment));
+
+        let rounded_size = self.size.align_to(BitUnits::from(self.preferred_alignment));
+
+        assert!(
+            !self.use_external_layout,
+            "external layout not supported yet"
+        );
+
+        self.size = rounded_size;
+
+        if self.size > unpadded_size {
+            let pad_size = self.size - unpadded_size;
+
+            eprintln!(
+                "warning - padded record with {} bits to alignment boundary",
+                pad_size.bits()
+            );
+        }
+
+        if self.packed
+            && self.unpacked_alignment < self.alignment
+            && unpacked_size == self.size
+            && !self.has_packed_field
+        {
+            eprintln!("warning - unnecessarily packed record");
+        }
     }
 
     pub fn update_alignment(
@@ -317,19 +363,30 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
     fn check_field_padding(
         &mut self,
-        _field_offset: BitUnits,
-        _unpadded_field_offset: BitUnits,
-        _unpacked_field_offset: BitUnits,
-        _unpacked_field_alignment: BitUnits,
-        _field_packed: bool,
-        _field: &ir::Field,
+        field_offset: BitUnits,
+        unpadded_field_offset: BitUnits,
+        unpacked_field_offset: BitUnits,
+        field_packed: bool,
+        field: &ir::Field,
     ) {
-        eprintln!("warning - check_field_padding not implemented yet");
-    }
-}
+        // Ignore fields not from user code
+        if field.source.is_internal() {
+            return;
+        }
 
-impl resolved::Structure {
-    pub fn may_insert_extra_padding(&self, _emit_remark: bool) -> bool {
-        todo!()
+        if !self.is_union && field_offset > unpadded_field_offset {
+            // TODO: Improve warning messages
+            if field.is_bitfield() {
+                eprintln!("warning - padded struct bitfield");
+            } else {
+                eprintln!("warning - padded struct field");
+            }
+        }
+
+        eprintln!("warning - check_field_padding not implemented yet");
+
+        if field_packed && field_offset != unpacked_field_offset {
+            self.has_packed_field = true;
+        }
     }
 }

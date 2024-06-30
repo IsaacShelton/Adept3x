@@ -273,7 +273,7 @@ impl AARCH64<'_> {
                     .max(pointer_width)
             };
 
-            let size_bytes = size_bytes.align_to(alignment_bytes.into());
+            let size_bytes = size_bytes.align_to(alignment_bytes);
 
             let base_type = unsafe {
                 LLVMIntType(
