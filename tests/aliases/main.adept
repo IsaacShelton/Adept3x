@@ -2,6 +2,7 @@
 #[foreign]
 func printf(format ptr<u8>, ...) i32
 
+#[pod]
 struct Integer (value s32)
 
 alias s32 = i32
@@ -9,6 +10,6 @@ alias s32 = i32
 func main {
     integer := Integer { value: 12345 }
 
-    printf(c"value = %d\n", integer.value)
+    // printf(c"value = %d\n", integer.value)
 }
 

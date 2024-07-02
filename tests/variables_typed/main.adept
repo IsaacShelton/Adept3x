@@ -3,7 +3,7 @@
 func printf(format ptr<u8>, ...) i32
 
 func main {
-    x i32
+    x i32 = 0
     x = 50
 
     y i32 = 100

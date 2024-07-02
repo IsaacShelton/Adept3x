@@ -10,7 +10,7 @@ pub struct VariableStorage {
 #[derive(Clone, Debug)]
 pub struct VariableInstance {
     pub resolved_type: Type,
-    initialized: OnceCell<()>,
+    pub initialized: OnceCell<()>,
 }
 
 impl VariableInstance {

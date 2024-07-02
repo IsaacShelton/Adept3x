@@ -133,6 +133,9 @@ pub enum ResolveErrorKind {
         struct_name: String,
         field_name: String,
     },
+    MustInitializeVariable {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -357,6 +360,9 @@ impl Display for ResolveErrorKind {
                     "'{}' is specified more than once for '{}' literal",
                     field_name, struct_name
                 )?;
+            }
+            ResolveErrorKind::MustInitializeVariable { name } => {
+                write!(f, "Must provide initial value for variable '{}'", name)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
