@@ -26,10 +26,11 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::ir;
+use crate::{cli::BuildOptions, ir};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
+    core::LLVMPrintModuleToString,
     target::{
         LLVMSetModuleDataLayout, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters,
         LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
@@ -37,13 +38,14 @@ use llvm_sys::{
     target_machine::{LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMRelocMode},
 };
 use std::{
-    ffi::{c_char, CString, OsStr},
+    ffi::{c_char, CStr, CString, OsStr},
     path::Path,
     process::Command,
     ptr::null_mut,
 };
 
 pub unsafe fn llvm_backend(
+    options: &BuildOptions,
     ir_module: &ir::Module,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
@@ -84,7 +86,20 @@ pub unsafe fn llvm_backend(
     let mut llvm_emit_error_message: *mut c_char = null_mut();
 
     // Print generated LLVM IR?
-    // println!("{}", CStr::from_ptr(LLVMPrintModuleToString(backend_module.get())).to_string_lossy());
+    if options.emit_llvm_ir {
+        use std::{fs::File, io::Write};
+
+        let mut f = File::create("out.ll").expect("failed to emit llvm ir to file");
+
+        writeln!(
+            &mut f,
+            "{}",
+            CStr::from_ptr(LLVMPrintModuleToString(backend_module.get()))
+                .to_str()
+                .expect("valid utf-8 llvm ir")
+        )
+        .expect("failed to write llvm ir to file");
+    }
 
     let output_object_filename =
         CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();

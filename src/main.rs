@@ -31,7 +31,7 @@ use crate::source_file_cache::SourceFileCache;
 use crate::text::IntoText;
 use ast::Source;
 use c::token::CToken;
-use cli::{BuildCommand, NewCommand};
+use cli::{BuildCommand, BuildOptions, NewCommand};
 use indoc::indoc;
 use lexer::Lexer;
 use llvm_backend::llvm_backend;
@@ -60,8 +60,8 @@ fn main() {
 }
 
 fn build_project(build_command: BuildCommand) {
+    let BuildCommand { filename, options } = build_command;
     let source_file_cache = SourceFileCache::new();
-    let filename = build_command.filename;
     let filepath = Path::new(&filename);
 
     // TODO: Determine this based on triple
@@ -73,7 +73,7 @@ fn build_project(build_command: BuildCommand) {
 
     match metadata(filepath) {
         Ok(metadata) if metadata.is_dir() => {
-            compile_project(target_info, &source_file_cache, filepath);
+            compile_project(&options, target_info, &source_file_cache, filepath);
         }
         _ => {
             if !filepath.is_file() {
@@ -91,7 +91,13 @@ fn build_project(build_command: BuildCommand) {
             }
 
             let project_folder = filepath.parent().unwrap();
-            compile(target_info, &source_file_cache, project_folder, &filename);
+            compile(
+                &options,
+                target_info,
+                &source_file_cache,
+                project_folder,
+                &filename,
+            );
         }
     }
 }
@@ -119,7 +125,12 @@ fn exit_unless<T, E: Show>(result: Result<T, E>, source_file_cache: &SourceFileC
     }
 }
 
-fn compile_project(target_info: TargetInfo, source_file_cache: &SourceFileCache, filepath: &Path) {
+fn compile_project(
+    options: &BuildOptions,
+    target_info: TargetInfo,
+    source_file_cache: &SourceFileCache,
+    filepath: &Path,
+) {
     let folder_path = filepath;
     let walker = WalkDir::new(filepath).min_depth(1).into_iter();
     let mut ast = None;
@@ -223,12 +234,20 @@ fn compile_project(target_info: TargetInfo, source_file_cache: &SourceFileCache,
     let ir_module = exit_unless(lower(&resolved_ast, target_info), source_file_cache);
 
     exit_unless(
-        unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) },
+        unsafe {
+            llvm_backend(
+                options,
+                &ir_module,
+                &output_object_filepath,
+                &output_binary_filepath,
+            )
+        },
         source_file_cache,
     );
 }
 
 fn compile(
+    options: &BuildOptions,
     target_info: TargetInfo,
     source_file_cache: &SourceFileCache,
     project_folder: &Path,
@@ -256,7 +275,14 @@ fn compile(
     let ir_module = exit_unless(lower(&resolved_ast, target_info), source_file_cache);
 
     exit_unless(
-        unsafe { llvm_backend(&ir_module, &output_object_filepath, &output_binary_filepath) },
+        unsafe {
+            llvm_backend(
+                options,
+                &ir_module,
+                &output_object_filepath,
+                &output_binary_filepath,
+            )
+        },
         source_file_cache,
     );
 }

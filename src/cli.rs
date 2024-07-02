@@ -9,7 +9,7 @@ impl Command {
         let mut args = std::env::args().skip(1).peekable();
 
         match args.peek().map(|string| string.as_str()) {
-            None | Some("-h") | Some ("--help") => {
+            None | Some("-h") | Some("--help") => {
                 show_help();
                 exit(0);
             }
@@ -18,14 +18,27 @@ impl Command {
         }
     }
 
+    fn parse_build_project(args: impl Iterator<Item = String>) -> Result<Self, ()> {
+        let mut filename = None;
+        let mut options = BuildOptions::default();
 
-    fn parse_build_project(mut args: impl Iterator<Item = String>) -> Result<Self, ()> {
-        let filename = args.next().expect("filename to be specified");
+        for option in args {
+            if option == "--emit-llvm-ir" {
+                options.emit_llvm_ir = true;
+            } else if filename.is_some() {
+                // TODO: Implement proper error handling and improve error message
+                eprintln!("error: Multiple paths specified");
+                return Err(());
+            } else {
+                filename = Some(option);
+            }
+        }
+
+        // TODO: Implement proper error handling and improve error message
+        let filename = filename.expect("filename to be specified");
 
         Ok(Self {
-            kind: CommandKind::Build(BuildCommand {
-                filename,
-            })
+            kind: CommandKind::Build(BuildCommand { filename, options }),
         })
     }
 
@@ -37,27 +50,34 @@ impl Command {
             Some(project_name) => project_name,
             None => {
                 println!("adept new <PROJECT_NAME>");
-                return Err(())
-            },
+                return Err(());
+            }
         };
 
         Ok(Self {
-            kind: CommandKind::New(NewCommand {
-                project_name
-            }),
+            kind: CommandKind::New(NewCommand { project_name }),
         })
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum CommandKind {
     Build(BuildCommand),
     New(NewCommand),
 }
 
+#[derive(Clone, Debug)]
 pub struct BuildCommand {
     pub filename: String,
+    pub options: BuildOptions,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct BuildOptions {
+    pub emit_llvm_ir: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct NewCommand {
     pub project_name: String,
 }
