@@ -2,7 +2,7 @@ pub mod aarch64;
 pub mod x86_64;
 
 use self::{aarch64::AARCH64, x86_64::X86_64};
-use crate::target_info::{type_info::TypeInfoManager, TargetInfo};
+use crate::target_info::{type_layout::TypeLayoutCache, TargetInfo};
 
 #[derive(Clone, Debug)]
 pub enum Arch<'a> {
@@ -11,7 +11,7 @@ pub enum Arch<'a> {
 }
 
 pub struct CoreInfo<'a> {
-    pub type_info_manager: &'a TypeInfoManager<'a>,
+    pub type_layout_cache: &'a TypeLayoutCache<'a>,
     pub target_info: &'a TargetInfo,
 }
 
@@ -20,7 +20,7 @@ impl<'a> Arch<'a> {
         match self {
             Arch::X86_64(_arch) => todo!(),
             Arch::AARCH64(arch) => CoreInfo {
-                type_info_manager: &arch.type_info_manager,
+                type_layout_cache: &arch.type_layout_cache,
                 target_info: &arch.target_info,
             },
         }

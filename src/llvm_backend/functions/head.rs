@@ -8,7 +8,7 @@ use crate::{
         ctx::BackendCtx,
         error::BackendError,
     },
-    target_info::type_info::TypeInfoManager,
+    target_info::type_layout::TypeLayoutCache,
 };
 use llvm_sys::{
     core::{LLVMAddFunction, LLVMFunctionType, LLVMSetFunctionCallConv, LLVMSetLinkage},
@@ -25,7 +25,10 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
                 Arch::AARCH64(aarch64::AARCH64 {
                     variant: aarch64::Variant::DarwinPCS,
                     target_info: &ctx.ir_module.target_info,
-                    type_info_manager: &TypeInfoManager::new(&ctx.ir_module.structures),
+                    type_layout_cache: &TypeLayoutCache::new(
+                        &ctx.ir_module.target_info,
+                        &ctx.ir_module.structures,
+                    ),
                     ir_module: &ctx.ir_module,
                     is_cxx_mode: false,
                 }),

@@ -1,11 +1,11 @@
 pub mod record_layout;
-pub mod type_info;
+pub mod type_layout;
 
 use crate::{
     ast::{CInteger, IntegerSign},
     data_units::ByteUnits,
 };
-use type_info::TypeInfo;
+use type_layout::TypeLayout;
 
 #[derive(Clone, Debug)]
 pub struct TargetInfo {
@@ -41,39 +41,39 @@ impl TargetInfo {
         }
     }
 
-    pub fn pointer_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(8))
+    pub fn pointer_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(8))
     }
 
-    pub fn bool_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(1))
+    pub fn bool_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(1))
     }
 
-    pub fn char_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(1))
+    pub fn char_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(1))
     }
 
-    pub fn short_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(2))
+    pub fn short_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(2))
     }
 
-    pub fn long_layout(&self) -> TypeInfo {
+    pub fn long_layout(&self) -> TypeLayout {
         if self.ms_abi {
-            TypeInfo::basic(ByteUnits::of(4))
+            TypeLayout::basic(ByteUnits::of(4))
         } else {
-            TypeInfo::basic(ByteUnits::of(8))
+            TypeLayout::basic(ByteUnits::of(8))
         }
     }
 
-    pub fn longlong_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(8))
+    pub fn longlong_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(8))
     }
 
-    pub fn float_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(4))
+    pub fn float_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(4))
     }
 
-    pub fn double_layout(&self) -> TypeInfo {
-        TypeInfo::basic(ByteUnits::of(8))
+    pub fn double_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(8))
     }
 }

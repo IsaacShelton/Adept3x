@@ -26,7 +26,7 @@ impl ABIFunction {
             Arch::AARCH64(abi) => {
                 let itanium = Itanium {
                     target_info: info.target_info,
-                    type_info_manager: info.type_info_manager,
+                    type_layout_cache: info.type_layout_cache,
                 };
 
                 abi.compute_info(

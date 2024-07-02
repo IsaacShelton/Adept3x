@@ -1,13 +1,13 @@
 use super::super::abi_type::ABIType;
 use crate::{
     ir,
-    target_info::{type_info::TypeInfoManager, TargetInfo},
+    target_info::{type_layout::TypeLayoutCache, TargetInfo},
 };
 
 #[derive(Clone, Debug)]
 pub struct Itanium<'a> {
     pub target_info: &'a TargetInfo,
-    pub type_info_manager: &'a TypeInfoManager<'a>,
+    pub type_layout_cache: &'a TypeLayoutCache<'a>,
 }
 
 pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {
@@ -18,9 +18,9 @@ pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {
 }
 
 impl<'a> Itanium<'a> {
-    pub fn new(type_info_manager: &'a TypeInfoManager, target_info: &'a TargetInfo) -> Self {
+    pub fn new(type_layout_cache: &'a TypeLayoutCache, target_info: &'a TargetInfo) -> Self {
         Self {
-            type_info_manager,
+            type_layout_cache,
             target_info,
         }
     }
@@ -31,10 +31,7 @@ impl<'a> Itanium<'a> {
 
             // This doesn't apply to any of our types yet.
 
-            let align = self
-                .type_info_manager
-                .get_type_info(return_type, self.target_info)
-                .alignment;
+            let align = self.type_layout_cache.get(return_type).alignment;
 
             Some(ABIType::new_indirect(
                 align,

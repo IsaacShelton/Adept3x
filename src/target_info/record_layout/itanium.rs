@@ -2,23 +2,12 @@ use super::record_info::RecordInfo;
 use crate::{
     data_units::{BitUnits, ByteUnits},
     ir, resolved,
-    target_info::{type_info::TypeInfoManager, TargetInfo},
+    target_info::type_layout::TypeLayoutCache,
 };
-
-/// Keeps track of the offsets of different empty subobjects for C++ (but not C) record layouts
-#[derive(Debug)]
-pub struct EmptySubobjects {}
-
-impl EmptySubobjects {
-    pub fn can_place_field_at_offset(&mut self, _field: &ir::Field, _offset: BitUnits) -> bool {
-        todo!("can_place_field_at_offset for C++ records not implemented yet")
-    }
-}
 
 #[derive(Debug)]
 pub struct ItaniumRecordLayoutBuilder<'a> {
-    pub type_info_manager: &'a TypeInfoManager<'a>,
-    pub target_info: &'a TargetInfo,
+    pub type_layout_cache: &'a TypeLayoutCache<'a>,
     pub empty_subobjects: Option<&'a mut EmptySubobjects>,
     pub size: BitUnits,
     pub alignment: ByteUnits,
@@ -55,19 +44,13 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
     pub infer_alignment: bool,
 }
 
-fn is_potentially_overlapping(field: &ir::Field) -> bool {
-    field.properties.is_no_unique_addr && field.is_cxx_record()
-}
-
 impl<'a> ItaniumRecordLayoutBuilder<'a> {
     pub fn new(
-        type_info_manager: &'a TypeInfoManager,
-        target_info: &'a TargetInfo,
+        type_layout_cache: &'a TypeLayoutCache,
         empty_subobjects: Option<&'a mut EmptySubobjects>,
     ) -> Self {
         Self {
-            type_info_manager,
-            target_info,
+            type_layout_cache,
             empty_subobjects,
             size: BitUnits::of(0),
             alignment: ByteUnits::of(1),
@@ -148,16 +131,13 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         self.unfilled_bits_in_last_unit = BitUnits::of(0);
         self.last_bitfield_storage_unit_size = BitUnits::of(0);
 
-        let type_info = self
-            .type_info_manager
-            .get_type_info(&field.ir_type, self.target_info);
-
-        let mut field_alignment = type_info.alignment;
+        let type_layout = self.type_layout_cache.get(&field.ir_type);
+        let mut field_alignment = type_layout.alignment;
 
         let mut field_size = if field.ir_type.is_incomplete_array() {
             ByteUnits::of(0)
         } else {
-            type_info.width
+            type_layout.width
         };
 
         let mut effective_field_size = field_size;
@@ -184,7 +164,9 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
         let field_packed = (self.packed
             && (field_class.as_ref().map_or(true, |field_class| {
-                field_class.is_cxx_pod() || field_class.is_packed() || self.target_info.is_darwin
+                field_class.is_cxx_pod()
+                    || field_class.is_packed()
+                    || self.type_layout_cache.target_info.is_darwin
             })))
             || field.properties.is_force_packed;
 
@@ -388,5 +370,19 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         if field_packed && field_offset != unpacked_field_offset {
             self.has_packed_field = true;
         }
+    }
+}
+
+fn is_potentially_overlapping(field: &ir::Field) -> bool {
+    field.properties.is_no_unique_addr && field.is_cxx_record()
+}
+
+/// Keeps track of the offsets of different empty subobjects for C++ (but not C) record layouts
+#[derive(Debug)]
+pub struct EmptySubobjects {}
+
+impl EmptySubobjects {
+    pub fn can_place_field_at_offset(&mut self, _field: &ir::Field, _offset: BitUnits) -> bool {
+        todo!("can_place_field_at_offset for C++ records not implemented yet")
     }
 }
