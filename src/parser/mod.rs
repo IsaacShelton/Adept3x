@@ -440,10 +440,12 @@ where
         //   ^
 
         let mut is_foreign = false;
+        let mut abide_abi = false;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
+                AnnotationKind::AbideAbi => abide_abi = true,
                 _ => {
                     return Err(self.unexpected_annotation(
                         annotation.kind.to_string(),
@@ -487,6 +489,7 @@ where
             stmts,
             is_foreign,
             source,
+            abide_abi,
         })
     }
 

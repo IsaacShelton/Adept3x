@@ -78,6 +78,7 @@ pub struct Function {
     pub is_foreign: bool,
     pub variables: VariableStorage,
     pub source: Source,
+    pub abide_abi: bool,
 }
 
 #[derive(Clone, Debug)]

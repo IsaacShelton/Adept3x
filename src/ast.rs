@@ -112,6 +112,7 @@ pub struct Function {
     pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
     pub source: Source,
+    pub abide_abi: bool,
 }
 
 #[derive(Clone, Debug)]

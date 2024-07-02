@@ -47,6 +47,7 @@ pub struct Function {
     pub is_foreign: bool,
     pub is_exposed: bool,
     pub variables: Vec<Value>,
+    pub abide_abi: bool,
 }
 
 #[derive(Clone, Debug)]

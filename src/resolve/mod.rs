@@ -228,6 +228,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 is_foreign: function.is_foreign,
                 variables: VariableStorage::new(),
                 source: function.source,
+                abide_abi: function.abide_abi,
             });
 
             ctx.jobs

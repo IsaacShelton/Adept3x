@@ -184,6 +184,7 @@ fn lower_function(
             is_foreign: true,
             is_exposed: true,
             variables: vec![],
+            abide_abi: function.abide_abi,
         },
     );
 
