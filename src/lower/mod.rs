@@ -4,6 +4,7 @@ mod error;
 use self::error::{LowerError, LowerErrorKind};
 use crate::{
     ast::CInteger,
+    cli::BuildOptions,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
@@ -14,7 +15,11 @@ use crate::{
 use builder::Builder;
 use resolved::IntegerSign;
 
-pub fn lower(ast: &resolved::Ast, target_info: TargetInfo) -> Result<ir::Module, LowerError> {
+pub fn lower(
+    options: &BuildOptions,
+    ast: &resolved::Ast,
+    target_info: TargetInfo,
+) -> Result<ir::Module, LowerError> {
     let mut ir_module = ir::Module::new(target_info);
 
     for (structure_ref, structure) in ast.structures.iter() {
@@ -27,6 +32,12 @@ pub fn lower(ast: &resolved::Ast, target_info: TargetInfo) -> Result<ir::Module,
 
     for (function_ref, function) in ast.functions.iter() {
         lower_function(&mut ir_module, function_ref, function, ast)?;
+    }
+
+    if options.emit_ir {
+        use std::{fs::File, io::Write};
+        let mut f = File::create("out.ir").expect("failed to emit ir to file");
+        writeln!(&mut f, "{:#?}", ir_module).expect("failed to write ir to file");
     }
 
     Ok(ir_module)
@@ -832,16 +843,16 @@ fn lower_expr(
                         index: 0,
                     });
 
+                    builder.push(ir::Instruction::Store(ir::Store {
+                        new_value: ir::Value::Literal(Literal::Unsigned64(1)),
+                        destination: at_reference_count,
+                    }));
+
                     let at_value = builder.push(ir::Instruction::Member {
                         subject_pointer: heap_memory.clone(),
                         struct_type: wrapper_struct_type.clone(),
                         index: 1,
                     });
-
-                    builder.push(ir::Instruction::Store(ir::Store {
-                        new_value: flat.clone(),
-                        destination: at_reference_count,
-                    }));
 
                     builder.push(ir::Instruction::Store(ir::Store {
                         new_value: flat,

@@ -83,9 +83,6 @@ pub unsafe fn llvm_backend(
     create_function_heads(&mut ctx)?;
     create_function_bodies(&mut ctx)?;
 
-    let mut llvm_emit_error_message: *mut c_char = null_mut();
-
-    // Print generated LLVM IR?
     if options.emit_llvm_ir {
         use std::{fs::File, io::Write};
 
@@ -110,6 +107,8 @@ pub unsafe fn llvm_backend(
             "\n---- WARNING: llvm module verification failed! ----".yellow()
         );
     }
+
+    let mut llvm_emit_error_message: *mut c_char = null_mut();
 
     llvm_sys::target_machine::LLVMTargetMachineEmitToFile(
         target_machine.get(),

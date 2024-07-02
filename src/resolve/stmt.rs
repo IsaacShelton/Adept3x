@@ -129,7 +129,7 @@ pub fn resolve_stmt<'a>(
             // NOTE: Eventually, we could allow declaring variables without an initializer,
             // but doing so would require tracking initialization for all possible paths,
             // which is not pretty. For the time being, we will simply disallow this.
-            // The real question is whether being able to is worth all complexity that it brings.
+            // The real question is whether being able to is worth all of the complexity that it brings.
             if value.is_none() {
                 return Err(ResolveErrorKind::MustInitializeVariable {
                     name: declaration.name.clone(),

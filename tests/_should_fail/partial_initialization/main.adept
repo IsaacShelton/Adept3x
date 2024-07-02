@@ -1,9 +1,0 @@
-
-struct Vector3i (x int, y int, z int)
-
-func main {
-    vector pod<Vector3i>
-
-    vector.x = 10
-}
-

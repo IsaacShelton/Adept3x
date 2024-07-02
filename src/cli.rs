@@ -25,6 +25,8 @@ impl Command {
         for option in args {
             if option == "--emit-llvm-ir" {
                 options.emit_llvm_ir = true;
+            } else if option == "--emit-ir" {
+                options.emit_ir = true;
             } else if filename.is_some() {
                 // TODO: Implement proper error handling and improve error message
                 eprintln!("error: Multiple paths specified");
@@ -75,6 +77,7 @@ pub struct BuildCommand {
 #[derive(Clone, Debug, Default)]
 pub struct BuildOptions {
     pub emit_llvm_ir: bool,
+    pub emit_ir: bool,
 }
 
 #[derive(Clone, Debug)]
