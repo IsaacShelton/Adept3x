@@ -15,7 +15,7 @@ impl ABIFunction {
     pub fn new<'a>(
         ctx: impl Borrow<ToBackendTypeCtx<'a>>,
         arch: Arch,
-        parameter_types: &[&ir::Type],
+        parameter_types: &[ir::Type],
         return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<Self, BackendError> {

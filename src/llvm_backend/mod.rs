@@ -17,10 +17,6 @@ mod values;
 mod variable_stack;
 
 use self::{
-    abi::{
-        abi_function::ABIFunction,
-        arch::{aarch64, Arch},
-    },
     ctx::BackendCtx,
     error::BackendError,
     functions::{body::create_function_bodies, head::create_function_heads},
@@ -30,7 +26,7 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::{ast::Source, ir, target_info::type_info::TypeInfoManager};
+use crate::ir;
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -84,34 +80,6 @@ pub unsafe fn llvm_backend(
     create_globals(&mut ctx)?;
     create_function_heads(&mut ctx)?;
     create_function_bodies(&mut ctx)?;
-
-    // TODO: Use abi translations for declaring/calling functions
-    if true {
-        let abi_function = ABIFunction::new(
-            ctx.for_making_type(),
-            Arch::AARCH64(aarch64::AARCH64 {
-                variant: aarch64::Variant::DarwinPCS,
-                target_info: &ir_module.target_info,
-                type_info_manager: &TypeInfoManager::new(&ir_module.structures),
-                ir_module,
-                is_cxx_mode: false,
-            }),
-            &vec![&ir::Type::AnonymousComposite(ir::TypeComposite {
-                fields: vec![
-                    ir::Field::basic(ir::Type::S16, Source::internal()),
-                    ir::Field::basic(ir::Type::S16, Source::internal()),
-                    ir::Field::basic(ir::Type::S16, Source::internal()),
-                    ir::Field::basic(ir::Type::S16, Source::internal()),
-                    ir::Field::basic(ir::Type::S16, Source::internal()),
-                ],
-                is_packed: false,
-            })],
-            &ir::Type::S8,
-            false,
-        );
-
-        todo!("got abi function - {:#?}", abi_function);
-    }
 
     let mut llvm_emit_error_message: *mut c_char = null_mut();
 

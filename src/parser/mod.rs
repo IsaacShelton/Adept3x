@@ -212,6 +212,7 @@ where
             "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, location)),
             "packed" => Ok(Annotation::new(AnnotationKind::Packed, location)),
             "pod" => Ok(Annotation::new(AnnotationKind::Pod, location)),
+            "abide_abi" => Ok(Annotation::new(AnnotationKind::AbideAbi, location)),
             _ => Err(ParseError {
                 kind: ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,

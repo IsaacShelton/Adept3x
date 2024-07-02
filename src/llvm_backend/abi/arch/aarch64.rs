@@ -46,7 +46,7 @@ impl AARCH64<'_> {
         &self,
         ctx: &ToBackendTypeCtx<'_>,
         abi: Itanium<'_>,
-        original_parameter_types: &[&ir::Type],
+        original_parameter_types: &[ir::Type],
         original_return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<ABIFunction, BackendError> {

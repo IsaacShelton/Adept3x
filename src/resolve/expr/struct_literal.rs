@@ -122,7 +122,7 @@ pub fn resolve_struct_literal_expr(
             .insert(field_name.to_string(), (resolved_expr.expr, index))
             .is_some()
         {
-            return Err(ResolveErrorKind::FieldSpecifiedMoreThanMore {
+            return Err(ResolveErrorKind::FieldSpecifiedMoreThanOnce {
                 struct_name: struct_name.to_string(),
                 field_name: field_name.to_string(),
             }

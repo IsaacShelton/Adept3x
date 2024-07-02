@@ -129,7 +129,7 @@ pub enum ResolveErrorKind {
         name: String,
     },
     OutOfFields,
-    FieldSpecifiedMoreThanMore {
+    FieldSpecifiedMoreThanOnce {
         struct_name: String,
         field_name: String,
     },
@@ -348,13 +348,13 @@ impl Display for ResolveErrorKind {
             ResolveErrorKind::OutOfFields => {
                 write!(f, "Out of fields to populate for struct literal")?;
             }
-            ResolveErrorKind::FieldSpecifiedMoreThanMore {
+            ResolveErrorKind::FieldSpecifiedMoreThanOnce {
                 struct_name,
                 field_name,
             } => {
                 write!(
                     f,
-                    "Field '{}' specified more than once for '{}' literal",
+                    "'{}' is specified more than once for '{}' literal",
                     field_name, struct_name
                 )?;
             }

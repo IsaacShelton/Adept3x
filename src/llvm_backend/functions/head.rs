@@ -1,7 +1,14 @@
-use crate::llvm_backend::{
-    backend_type::{to_backend_type, to_backend_types},
-    ctx::BackendCtx,
-    error::BackendError,
+use crate::{
+    llvm_backend::{
+        abi::{
+            abi_function::ABIFunction,
+            arch::{aarch64, Arch},
+        },
+        backend_type::{to_backend_type, to_backend_types},
+        ctx::BackendCtx,
+        error::BackendError,
+    },
+    target_info::type_info::TypeInfoManager,
 };
 use llvm_sys::{
     core::{LLVMAddFunction, LLVMFunctionType, LLVMSetFunctionCallConv, LLVMSetLinkage},
@@ -11,6 +18,25 @@ use std::ffi::CString;
 
 pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
+        if function.abide_abi {
+            // TODO: Use abi translations for declaring/calling functions
+            let abi_function = ABIFunction::new(
+                ctx.for_making_type(),
+                Arch::AARCH64(aarch64::AARCH64 {
+                    variant: aarch64::Variant::DarwinPCS,
+                    target_info: &ctx.ir_module.target_info,
+                    type_info_manager: &TypeInfoManager::new(&ctx.ir_module.structures),
+                    ir_module: &ctx.ir_module,
+                    is_cxx_mode: false,
+                }),
+                &function.parameters[..],
+                &function.return_type,
+                function.is_cstyle_variadic,
+            );
+
+            todo!("got abi function - {:#?}", abi_function);
+        }
+
         let mut parameters = to_backend_types(ctx.for_making_type(), function.parameters.iter())?;
         let return_type = to_backend_type(ctx.for_making_type(), &function.return_type)?;
 
