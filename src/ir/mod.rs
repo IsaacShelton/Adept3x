@@ -46,7 +46,6 @@ pub struct Function {
     pub is_cstyle_variadic: bool,
     pub is_foreign: bool,
     pub is_exposed: bool,
-    pub variables: Vec<Value>,
     pub abide_abi: bool,
 }
 
@@ -426,7 +425,7 @@ impl BasicBlock {
 
     pub fn push(&mut self, instruction: Instruction) {
         if self.is_terminated() {
-            panic!("Cannot push instruction onto basicblock when basicblock is already terminated");
+            panic!("Cannot push instruction onto basicblock when basicblock is already terminated, has already: {:#?}", self.instructions);
         } else {
             self.instructions.push(instruction);
         }

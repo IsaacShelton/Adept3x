@@ -96,7 +96,7 @@ fn lower_function(
     resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
     let basicblocks = if !function.is_foreign {
-        let mut builder = Builder::new();
+        let mut builder = Builder::new_with_starting_block();
 
         // Allocate parameters
         let parameter_variables = function
@@ -194,7 +194,6 @@ fn lower_function(
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
             is_foreign: true,
             is_exposed: true,
-            variables: vec![],
             abide_abi: function.abide_abi,
         },
     );

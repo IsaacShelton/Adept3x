@@ -5,6 +5,7 @@ mod c;
 mod cli;
 mod data_units;
 mod inflow;
+mod interpreter;
 mod ir;
 mod lexer;
 mod lexical_utils;
@@ -33,6 +34,7 @@ use ast::Source;
 use c::token::CToken;
 use cli::{BuildCommand, BuildOptions, NewCommand};
 use indoc::indoc;
+use interpreter::Interpreter;
 use lexer::Lexer;
 use llvm_backend::llvm_backend;
 use lower::lower;
@@ -280,6 +282,12 @@ fn compile(
         lower(options, &resolved_ast, target_info),
         source_file_cache,
     );
+
+    if options.interpret {
+        let mut interpreter = Interpreter::new(&ir_module, Some(1_000_000));
+        let _ = dbg!(interpreter.start_main("main"));
+        return;
+    }
 
     exit_unless(
         unsafe {

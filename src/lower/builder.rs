@@ -6,9 +6,12 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new() -> Self {
+    pub fn new_with_starting_block() -> Self {
+        let mut basicblocks = BasicBlocks::new();
+        basicblocks.push(BasicBlock::new());
+
         Self {
-            basicblocks: BasicBlocks::new(),
+            basicblocks,
             current_basicblock_id: 0,
         }
     }
@@ -59,16 +62,12 @@ impl Builder {
     }
 
     pub fn push(&mut self, instruction: Instruction) -> ir::Value {
-        let current_block =
-            if let Some(current_block) = self.basicblocks.get_mut(self.current_basicblock_id) {
-                current_block.push(instruction);
-                &*current_block
-            } else {
-                let mut first_block = BasicBlock::new();
-                first_block.push(instruction);
-                self.basicblocks.push(first_block);
-                self.basicblocks.last().unwrap()
-            };
+        let current_block = self
+            .basicblocks
+            .get_mut(self.current_basicblock_id)
+            .expect("at least one basicblock");
+
+        current_block.push(instruction);
 
         ir::Value::Reference(ValueReference {
             basicblock_id: self.current_basicblock_id,
