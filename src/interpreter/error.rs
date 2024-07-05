@@ -5,4 +5,6 @@ pub enum InterpreterError {
     MissingMainFunction,
     SegfaultWrite,
     SegfaultRead,
+    DivideByZero,
+    RemainderByZero,
 }

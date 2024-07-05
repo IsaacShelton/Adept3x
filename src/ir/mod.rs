@@ -2,7 +2,7 @@ use crate::ast::Source;
 use crate::data_units::ByteUnits;
 use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
 use crate::target_info::TargetInfo;
-use derive_more::{Deref, DerefMut, IsVariant};
+use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
 use std::{collections::HashMap, ffi::CString};
 
 pub use crate::resolved::{FloatOrSign, IntegerSign};
@@ -374,7 +374,7 @@ pub enum Value {
     Reference(ValueReference),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Unwrap)]
 pub enum Literal {
     Void,
     Boolean(bool),

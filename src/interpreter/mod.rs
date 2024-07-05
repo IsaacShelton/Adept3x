@@ -1,6 +1,7 @@
 mod error;
 mod ip;
 mod memory;
+mod ops;
 mod size_of;
 mod value;
 
@@ -137,12 +138,22 @@ impl<'a> Interpreter<'a> {
                 ir::Instruction::GlobalVariable(global_ref) => {
                     Value::Literal(self.global_addresses.get(global_ref).unwrap().clone())
                 }
-                ir::Instruction::Add(_, _) => todo!(),
+                ir::Instruction::Add(operands, _float_or_int) => {
+                    self.add(&operands, &block_registers)
+                }
                 ir::Instruction::Checked(_, _) => todo!(),
-                ir::Instruction::Subtract(_, _) => todo!(),
-                ir::Instruction::Multiply(_, _) => todo!(),
-                ir::Instruction::Divide(_, _) => todo!(),
-                ir::Instruction::Modulus(_, _) => todo!(),
+                ir::Instruction::Subtract(operands, _float_or_int) => {
+                    self.sub(&operands, &block_registers)
+                }
+                ir::Instruction::Multiply(operands, _float_or_int) => {
+                    self.mul(&operands, &block_registers)
+                }
+                ir::Instruction::Divide(operands, _float_or_sign) => {
+                    self.div(&operands, &block_registers)?
+                }
+                ir::Instruction::Modulus(operands, _float_or_sign) => {
+                    self.rem(&operands, &block_registers)?
+                }
                 ir::Instruction::Equals(_, _) => todo!(),
                 ir::Instruction::NotEquals(_, _) => todo!(),
                 ir::Instruction::LessThan(_, _) => todo!(),

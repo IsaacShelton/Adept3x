@@ -47,7 +47,7 @@ impl Memory {
     }
 
     pub fn alloc_stack(&mut self, bytes: u64) -> Result<ir::Literal, InterpreterError> {
-        let raw_address = Self::STACK_OFFSET + u64::try_from(self.heap.len()).unwrap();
+        let raw_address = Self::STACK_OFFSET + u64::try_from(self.stack.len()).unwrap();
 
         if self.is_heap_address(raw_address + bytes - 1) {
             return Err(InterpreterError::StackOverflow);
