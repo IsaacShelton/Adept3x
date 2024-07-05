@@ -20,8 +20,10 @@ use self::{
 };
 use crate::{
     ast::{self, Ast, ConformBehavior, FileIdentifier, Source, Type},
+    cli::BuildOptions,
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
+    tag::Tag,
     try_insert_index_map::try_insert_into_index_map,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
@@ -58,7 +60,10 @@ impl<'a> ResolveCtx<'a> {
     }
 }
 
-pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
+pub fn resolve<'a>(
+    ast: &'a Ast,
+    options: &BuildOptions,
+) -> Result<resolved::Ast<'a>, ResolveError> {
     let mut defines = IndexMap::new();
 
     // Unify defines into single map
@@ -229,7 +234,13 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 variables: VariableStorage::new(),
                 source: function.source,
                 abide_abi: function.abide_abi,
-                tag: function.tag,
+                tag: function.tag.or_else(|| {
+                    if options.coerce_main_signature && function.name == "main" {
+                        Some(Tag::Main)
+                    } else {
+                        None
+                    }
+                }),
             });
 
             ctx.jobs

@@ -234,7 +234,7 @@ fn compile_project(
         exit(1);
     };
 
-    let resolved_ast = exit_unless(resolve(&ast), source_file_cache);
+    let resolved_ast = exit_unless(resolve(&ast, options), source_file_cache);
 
     let ir_module = exit_unless(
         lower(options, &resolved_ast, target_info),
@@ -305,7 +305,7 @@ fn compile(
         });
     }
 
-    let resolved_ast = exit_unless(resolve(&ast), source_file_cache);
+    let resolved_ast = exit_unless(resolve(&ast, options), source_file_cache);
 
     let ir_module = exit_unless(
         lower(options, &resolved_ast, target_info),

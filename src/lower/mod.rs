@@ -10,6 +10,7 @@ use crate::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
         NumericMode, StmtKind, VariableStorageKey,
     },
+    tag::Tag,
     target_info::TargetInfo,
 };
 use builder::Builder;
@@ -31,7 +32,7 @@ pub fn lower(
     }
 
     for (function_ref, function) in ast.functions.iter() {
-        lower_function(&mut ir_module, options, function_ref, function, ast)?;
+        lower_function(&mut ir_module, function_ref, function, ast)?;
     }
 
     if options.emit_ir {
@@ -91,7 +92,6 @@ fn lower_global(
 
 fn lower_function(
     ir_module: &mut ir::Module,
-    options: &BuildOptions,
     function_ref: resolved::FunctionRef,
     function: &resolved::Function,
     resolved_ast: &resolved::Ast,
@@ -147,10 +147,7 @@ fn lower_function(
 
         if !builder.is_block_terminated() {
             if function.return_type.kind.is_void() {
-                if options.coerce_main_signature
-                    && function.name == "main"
-                    && !builder.is_block_terminated()
-                {
+                if function.tag == Some(Tag::Main) && !builder.is_block_terminated() {
                     builder.push(ir::Instruction::Return(Some(ir::Value::Literal(
                         Literal::Signed32(0),
                     ))));
@@ -182,7 +179,7 @@ fn lower_function(
 
     let mut return_type = lower_type(&ir_module.target_info, &function.return_type, resolved_ast)?;
 
-    if function.name == "main" {
+    if function.tag == Some(Tag::Main) {
         if let ir::Type::Void = return_type {
             return_type = ir::Type::S32;
         }
@@ -235,7 +232,7 @@ fn lower_stmts(
                         function,
                         resolved_ast,
                     )?)
-                } else if function.name == "main" {
+                } else if function.tag == Some(Tag::Main) {
                     Some(ir::Value::Literal(Literal::Signed32(0)))
                 } else {
                     None
