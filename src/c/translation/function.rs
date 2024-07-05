@@ -75,6 +75,7 @@ pub fn declare_function(
         is_foreign: true,
         source,
         abide_abi: false,
+        tag: None,
     });
 
     Ok(())

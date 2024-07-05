@@ -4,7 +4,7 @@ use crate::{
     resolve::{
         conform_expr, conform_expr_to_default,
         error::{ResolveError, ResolveErrorKind},
-        ConformMode, Initialized,
+        resolve_type, ConformMode, Initialized,
     },
     resolved::{self, TypedExpr},
 };
@@ -20,6 +20,23 @@ pub fn resolve_call_expr(
 
     let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
     let return_type = function.return_type.clone();
+
+    if let Some(required_ty) = &call.expected_to_return {
+        let resolved_required_ty = resolve_type(
+            ctx.type_search_ctx,
+            ctx.resolved_ast.source_file_cache,
+            required_ty,
+            &mut Default::default(),
+        )?;
+
+        if resolved_required_ty != return_type {
+            return Err(ResolveErrorKind::FunctionMustReturnType {
+                of: required_ty.to_string(),
+                function_name: function.name.clone(),
+            }
+            .at(function.return_type.source));
+        }
+    }
 
     if call.arguments.len() < function.parameters.required.len() {
         return Err(ResolveErrorKind::NotEnoughArgumentsToFunction {

@@ -229,6 +229,7 @@ pub fn resolve<'a>(ast: &'a Ast) -> Result<resolved::Ast<'a>, ResolveError> {
                 variables: VariableStorage::new(),
                 source: function.source,
                 abide_abi: function.abide_abi,
+                tag: function.tag,
             });
 
             ctx.jobs

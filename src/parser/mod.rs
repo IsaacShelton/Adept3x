@@ -491,6 +491,7 @@ where
             is_foreign,
             source,
             abide_abi,
+            tag: None,
         })
     }
 
@@ -1041,6 +1042,7 @@ where
             ExprKind::Call(Call {
                 function_name,
                 arguments,
+                expected_to_return: None,
             }),
             source,
         ))

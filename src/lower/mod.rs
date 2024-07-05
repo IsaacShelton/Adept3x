@@ -31,7 +31,7 @@ pub fn lower(
     }
 
     for (function_ref, function) in ast.functions.iter() {
-        lower_function(&mut ir_module, function_ref, function, ast)?;
+        lower_function(&mut ir_module, options, function_ref, function, ast)?;
     }
 
     if options.emit_ir {
@@ -91,6 +91,7 @@ fn lower_global(
 
 fn lower_function(
     ir_module: &mut ir::Module,
+    options: &BuildOptions,
     function_ref: resolved::FunctionRef,
     function: &resolved::Function,
     resolved_ast: &resolved::Ast,
@@ -146,7 +147,10 @@ fn lower_function(
 
         if !builder.is_block_terminated() {
             if function.return_type.kind.is_void() {
-                if function.name == "main" && !builder.is_block_terminated() {
+                if options.coerce_main_signature
+                    && function.name == "main"
+                    && !builder.is_block_terminated()
+                {
                     builder.push(ir::Instruction::Return(Some(ir::Value::Literal(
                         Literal::Signed32(0),
                     ))));

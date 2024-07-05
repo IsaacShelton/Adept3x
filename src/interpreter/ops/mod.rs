@@ -8,13 +8,9 @@ macro_rules! impl_op_basic {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            block_registers: &Vec<Vec<Value>>,
+            registers: &Vec<Vec<Value>>,
         ) -> Value {
-            let left = self.eval(&block_registers, &operands.left).unwrap_literal();
-
-            let right = self
-                .eval(&block_registers, &operands.right)
-                .unwrap_literal();
+            let (left, right) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
                 ir::Literal::Void => ir::Literal::Void,
@@ -65,13 +61,9 @@ macro_rules! impl_op_divmod {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            block_registers: &Vec<Vec<Value>>,
+            registers: &Vec<Vec<Value>>,
         ) -> Result<Value, InterpreterError> {
-            let left = self.eval(&block_registers, &operands.left).unwrap_literal();
-
-            let right = self
-                .eval(&block_registers, &operands.right)
-                .unwrap_literal();
+            let (left, right) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
                 ir::Literal::Void => ir::Literal::Void,
@@ -137,10 +129,83 @@ macro_rules! impl_op_divmod {
     };
 }
 
+macro_rules! impl_op_cmp {
+    ($name:ident, $op:tt) => {
+        pub fn $name(
+            &mut self,
+            operands: &BinaryOperands,
+            registers: &Vec<Vec<Value>>,
+        ) -> Value {
+            let (left, right) = self.eval_binary_ops(operands, registers);
+
+            let value = match left {
+                ir::Literal::Void => false,
+                ir::Literal::Boolean(left) => {
+                    left $op right.clone().unwrap_boolean()
+                }
+                ir::Literal::Signed8(left) => {
+                    left $op right.clone().unwrap_signed_8()
+                }
+                ir::Literal::Signed16(left) => {
+                    left $op right.clone().unwrap_signed_16()
+                }
+                ir::Literal::Signed32(left) => {
+                    left $op right.clone().unwrap_signed_32()
+                }
+                ir::Literal::Signed64(left) => {
+                    left $op right.clone().unwrap_signed_64()
+                }
+                ir::Literal::Unsigned8(left) => {
+                    left $op right.clone().unwrap_unsigned_8()
+                }
+                ir::Literal::Unsigned16(left) => {
+                    left $op right.clone().unwrap_unsigned_16()
+                }
+                ir::Literal::Unsigned32(left) => {
+                    left $op right.clone().unwrap_unsigned_32()
+                }
+                ir::Literal::Unsigned64(left) => {
+                    left $op right.clone().unwrap_unsigned_64()
+                }
+                ir::Literal::Float32(left) => {
+                    left $op right.clone().unwrap_float_32()
+                }
+                ir::Literal::Float64(left) => {
+                    left $op right.clone().unwrap_float_64()
+                }
+                ir::Literal::NullTerminatedString(_) => false,
+                ir::Literal::Zeroed(_) => true,
+            };
+
+            Value::Literal(ir::Literal::Boolean(value))
+        }
+    };
+}
+
 impl<'a> Interpreter<'a> {
+    fn eval_into_literal(&self, registers: &Vec<Vec<Value>>, value: &ir::Value) -> ir::Literal {
+        self.eval(&registers, value).unwrap_literal()
+    }
+
+    fn eval_binary_ops(
+        &self,
+        operands: &BinaryOperands,
+        registers: &Vec<Vec<Value>>,
+    ) -> (ir::Literal, ir::Literal) {
+        let left = self.eval_into_literal(registers, &operands.left);
+        let right = self.eval_into_literal(registers, &operands.right);
+        (left, right)
+    }
+
     impl_op_basic!(add, wrapping_add, +, |);
     impl_op_basic!(sub, wrapping_sub, -, ^);
     impl_op_basic!(mul, wrapping_mul, *, &);
     impl_op_divmod!(div, checked_div, /, DivideByZero);
     impl_op_divmod!(rem, checked_rem, %, RemainderByZero);
+    impl_op_cmp!(eq, ==);
+    impl_op_cmp!(neq, !=);
+    impl_op_cmp!(lt, <);
+    impl_op_cmp!(lte, <=);
+    impl_op_cmp!(gt, >);
+    impl_op_cmp!(gte, >=);
 }

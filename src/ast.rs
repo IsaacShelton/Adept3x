@@ -2,6 +2,7 @@ use crate::{
     line_column::Location,
     resolved::IntegerLiteralBits,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
+    tag::Tag,
 };
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -113,21 +114,13 @@ pub struct Function {
     pub is_foreign: bool,
     pub source: Source,
     pub abide_abi: bool,
+    pub tag: Option<Tag>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Parameters {
     pub required: Vec<Parameter>,
     pub is_cstyle_vararg: bool,
-}
-
-impl Default for Parameters {
-    fn default() -> Self {
-        Self {
-            required: vec![],
-            is_cstyle_vararg: false,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -468,6 +461,12 @@ pub enum StmtKind {
     Assignment(Assignment),
 }
 
+impl StmtKind {
+    pub fn at(self, source: Source) -> Stmt {
+        Stmt { kind: self, source }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Declaration {
     pub name: String,
@@ -734,6 +733,7 @@ impl BasicBinaryOperator {
 pub struct Call {
     pub function_name: String,
     pub arguments: Vec<Expr>,
+    pub expected_to_return: Option<Type>,
 }
 
 #[derive(Clone, Debug)]

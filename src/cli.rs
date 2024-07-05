@@ -29,6 +29,7 @@ impl Command {
                 options.emit_ir = true;
             } else if option == "--interpret" {
                 options.interpret = true;
+                options.coerce_main_signature = false;
             } else if filename.is_some() {
                 // TODO: Implement proper error handling and improve error message
                 eprintln!("error: Multiple paths specified");
@@ -76,11 +77,23 @@ pub struct BuildCommand {
     pub options: BuildOptions,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct BuildOptions {
     pub emit_llvm_ir: bool,
     pub emit_ir: bool,
     pub interpret: bool,
+    pub coerce_main_signature: bool,
+}
+
+impl Default for BuildOptions {
+    fn default() -> Self {
+        Self {
+            emit_llvm_ir: false,
+            emit_ir: false,
+            interpret: false,
+            coerce_main_signature: true,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -37,20 +37,15 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn start_main(&mut self, main_fn_name: &str) -> Result<Value, InterpreterError> {
-        // TODO: We probably should've cached this so we don't have to do
-        // this slow search here
-        let main_function = match self
-            .ir_module
-            .functions
-            .iter()
-            .find(|(_, f)| f.mangled_name == main_fn_name)
-        {
-            Some((f_ref, _)) => *f_ref,
-            None => return Err(InterpreterError::MissingMainFunction),
-        };
-
-        self.call(main_function, vec![])
+    pub fn run(
+        &mut self,
+        interpreter_entry_point: ir::FunctionRef,
+    ) -> Result<Value, InterpreterError> {
+        // The entry point for the interpreter always takes zero arguments
+        // and can return anything. It is up to the producer of the ir::Module
+        // to create an interpreter entry point that calls the actual function(s)
+        // they care about, and return the value they want.
+        self.call(interpreter_entry_point, vec![])
     }
 
     pub fn call(
@@ -61,16 +56,16 @@ impl<'a> Interpreter<'a> {
         let function = self.ir_module.functions.get(&function_ref).unwrap();
 
         if function.is_cstyle_variadic {
-            todo!();
+            todo!("c-style variadic functions are not supported in interpreter yet");
         }
 
         assert_eq!(function.parameters.len(), args.len());
 
-        let mut block_registers = Vec::new();
+        let mut registers = Vec::new();
         for block in function.basicblocks.iter() {
-            let registers =
+            let registers_for_block =
                 Vec::from_iter(std::iter::repeat(Value::Undefined).take(block.instructions.len()));
-            block_registers.push(registers);
+            registers.push(registers_for_block);
         }
 
         let mut ip = InstructionPointer {
@@ -98,22 +93,27 @@ impl<'a> Interpreter<'a> {
                 ir::Instruction::Return(value) => {
                     break value;
                 }
-                ir::Instruction::Call(_) => todo!(),
+                ir::Instruction::Call(call) => {
+                    let mut arguments = Vec::with_capacity(call.arguments.len());
+
+                    for argument in call.arguments.iter() {
+                        arguments.push(self.eval(&registers, argument));
+                    }
+
+                    self.call(call.function, arguments)?
+                }
                 ir::Instruction::Alloca(ty) => {
                     Value::Literal(self.memory.alloc_stack(self.size_of(ty))?)
                 }
                 ir::Instruction::Store(store) => {
-                    let new_value = self.eval(&block_registers, &store.new_value);
-                    let destination = self
-                        .eval(&block_registers, &store.destination)
-                        .as_u64()
-                        .unwrap();
+                    let new_value = self.eval(&registers, &store.new_value);
+                    let dest = self.eval(&registers, &store.destination).as_u64().unwrap();
 
-                    self.memory.write(destination, new_value, self.ir_module)?;
+                    self.memory.write(dest, new_value, self.ir_module)?;
                     Value::Undefined
                 }
                 ir::Instruction::Load((value, ty)) => {
-                    let address = self.eval(&block_registers, value).as_u64().unwrap();
+                    let address = self.eval(&registers, value).as_u64().unwrap();
                     self.memory.read(address, ty, self.ir_module)?
                 }
                 ir::Instruction::Malloc(ir_type) => {
@@ -121,13 +121,13 @@ impl<'a> Interpreter<'a> {
                     Value::Literal(self.memory.alloc_heap(bytes))
                 }
                 ir::Instruction::MallocArray(ir_type, count) => {
-                    let count = self.eval(&block_registers, count);
+                    let count = self.eval(&registers, count);
                     let count = count.as_u64().unwrap();
                     let bytes = self.size_of(ir_type);
                     Value::Literal(self.memory.alloc_heap(bytes * count))
                 }
                 ir::Instruction::Free(value) => {
-                    let value = self.eval(&block_registers, value).unwrap_literal();
+                    let value = self.eval(&registers, value).unwrap_literal();
                     self.memory.free_heap(value);
                     Value::Literal(ir::Literal::Void)
                 }
@@ -138,28 +138,18 @@ impl<'a> Interpreter<'a> {
                 ir::Instruction::GlobalVariable(global_ref) => {
                     Value::Literal(self.global_addresses.get(global_ref).unwrap().clone())
                 }
-                ir::Instruction::Add(operands, _float_or_int) => {
-                    self.add(&operands, &block_registers)
-                }
+                ir::Instruction::Add(ops, _f_or_i) => self.add(&ops, &registers),
                 ir::Instruction::Checked(_, _) => todo!(),
-                ir::Instruction::Subtract(operands, _float_or_int) => {
-                    self.sub(&operands, &block_registers)
-                }
-                ir::Instruction::Multiply(operands, _float_or_int) => {
-                    self.mul(&operands, &block_registers)
-                }
-                ir::Instruction::Divide(operands, _float_or_sign) => {
-                    self.div(&operands, &block_registers)?
-                }
-                ir::Instruction::Modulus(operands, _float_or_sign) => {
-                    self.rem(&operands, &block_registers)?
-                }
-                ir::Instruction::Equals(_, _) => todo!(),
-                ir::Instruction::NotEquals(_, _) => todo!(),
-                ir::Instruction::LessThan(_, _) => todo!(),
-                ir::Instruction::LessThanEq(_, _) => todo!(),
-                ir::Instruction::GreaterThan(_, _) => todo!(),
-                ir::Instruction::GreaterThanEq(_, _) => todo!(),
+                ir::Instruction::Subtract(ops, _f_or_i) => self.sub(&ops, &registers),
+                ir::Instruction::Multiply(ops, _f_or_i) => self.mul(&ops, &registers),
+                ir::Instruction::Divide(ops, _f_or_sign) => self.div(&ops, &registers)?,
+                ir::Instruction::Modulus(ops, _f_or_sign) => self.rem(&ops, &registers)?,
+                ir::Instruction::Equals(ops, _f_or_i) => self.eq(&ops, &registers),
+                ir::Instruction::NotEquals(ops, _f_or_i) => self.neq(&ops, &registers),
+                ir::Instruction::LessThan(ops, _f_or_i) => self.lt(&ops, &registers),
+                ir::Instruction::LessThanEq(ops, _f_or_i) => self.lte(&ops, &registers),
+                ir::Instruction::GreaterThan(ops, _f_or_i) => self.gt(&ops, &registers),
+                ir::Instruction::GreaterThanEq(ops, _f_or_i) => self.gte(&ops, &registers),
                 ir::Instruction::And(_) => todo!(),
                 ir::Instruction::Or(_) => todo!(),
                 ir::Instruction::BitwiseAnd(_) => todo!(),
@@ -190,7 +180,7 @@ impl<'a> Interpreter<'a> {
                     Value::Undefined
                 }
                 ir::Instruction::ConditionalBreak(value, break_info) => {
-                    let value = self.eval(&block_registers, value);
+                    let value = self.eval(&registers, value);
 
                     let should = match value {
                         Value::Literal(literal) => match literal {
@@ -216,7 +206,7 @@ impl<'a> Interpreter<'a> {
 
                     for incoming in phi.incoming.iter() {
                         if incoming.basicblock_id == came_from_block {
-                            found = Some(self.eval(&block_registers, &incoming.value));
+                            found = Some(self.eval(&registers, &incoming.value));
                             break;
                         }
                     }
@@ -225,7 +215,7 @@ impl<'a> Interpreter<'a> {
                 }
             };
 
-            block_registers[ip.basicblock_id][ip.instruction_id] = result;
+            registers[ip.basicblock_id][ip.instruction_id] = result;
 
             if new_ip.is_some() {
                 came_from_block = ip.basicblock_id;
@@ -240,15 +230,15 @@ impl<'a> Interpreter<'a> {
         self.memory.stack_restore(fp);
         Ok(return_value
             .as_ref()
-            .map(|value| self.eval(&block_registers, value))
+            .map(|value| self.eval(&registers, value))
             .unwrap_or(Value::Literal(ir::Literal::Void)))
     }
 
-    pub fn eval(&self, block_registers: &Vec<Vec<Value>>, value: &ir::Value) -> Value {
+    pub fn eval(&self, registers: &Vec<Vec<Value>>, value: &ir::Value) -> Value {
         match value {
             ir::Value::Literal(literal) => Value::Literal(literal.clone()),
             ir::Value::Reference(reference) => {
-                block_registers[reference.basicblock_id][reference.instruction_id].clone()
+                registers[reference.basicblock_id][reference.instruction_id].clone()
             }
         }
     }

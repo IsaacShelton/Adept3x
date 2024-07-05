@@ -19,6 +19,7 @@ mod resolve;
 mod resolved;
 mod show;
 mod source_file_cache;
+mod tag;
 mod target_info;
 mod text;
 mod token;
@@ -29,6 +30,7 @@ use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind};
 use crate::c::translate_expr;
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
 use crate::source_file_cache::SourceFileCache;
+use crate::tag::Tag;
 use crate::text::IntoText;
 use ast::Source;
 use c::token::CToken;
@@ -272,10 +274,37 @@ fn compile(
 
     let content = source_file_cache.get(key).content();
 
-    let ast = exit_unless(
+    let mut ast = exit_unless(
         parse(Lexer::new(content.chars()), &source_file_cache, key),
         source_file_cache,
     );
+
+    if options.interpret {
+        // We assume only working with single file for now
+        assert_eq!(ast.files.len(), 1);
+
+        // Call to function we actually care about
+        let call = ast::ExprKind::Call(ast::Call {
+            function_name: "main".into(),
+            arguments: vec![],
+            expected_to_return: Some(ast::TypeKind::Void.at(Source::internal())),
+        })
+        .at(Source::internal());
+
+        // Create entry point for interpreter which will make the call
+        let (_, file) = ast.files.iter_mut().next().unwrap();
+        file.functions.push(ast::Function {
+            name: "<interpreter entry point>".into(),
+            parameters: ast::Parameters::default(),
+            return_type: ast::TypeKind::Void.at(Source::internal()),
+            stmts: vec![ast::StmtKind::Return(Some(call)).at(Source::internal())],
+            is_foreign: false,
+            source: Source::internal(),
+            abide_abi: false,
+            tag: Some(Tag::InterpreterEntryPoint),
+        });
+    }
+
     let resolved_ast = exit_unless(resolve(&ast), source_file_cache);
 
     let ir_module = exit_unless(
@@ -284,8 +313,14 @@ fn compile(
     );
 
     if options.interpret {
+        let (interpreter_entry_point, _fn) = resolved_ast
+            .functions
+            .iter()
+            .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))
+            .unwrap();
+
         let mut interpreter = Interpreter::new(&ir_module, Some(1_000_000));
-        let _ = dbg!(interpreter.start_main("main"));
+        let _ = dbg!(interpreter.run(interpreter_entry_point));
         return;
     }
 

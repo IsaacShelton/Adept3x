@@ -2,7 +2,7 @@
 pub enum InterpreterError {
     TimedOut,
     StackOverflow,
-    MissingMainFunction,
+    MissingEntryPoint,
     SegfaultWrite,
     SegfaultRead,
     DivideByZero,

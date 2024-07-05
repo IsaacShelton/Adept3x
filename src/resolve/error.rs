@@ -136,6 +136,10 @@ pub enum ResolveErrorKind {
     MustInitializeVariable {
         name: String,
     },
+    FunctionMustReturnType {
+        of: String,
+        function_name: String,
+    },
     Other {
         message: String,
     },
@@ -363,6 +367,10 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::MustInitializeVariable { name } => {
                 write!(f, "Must provide initial value for variable '{}'", name)?;
+            }
+
+            ResolveErrorKind::FunctionMustReturnType { of, function_name } => {
+                write!(f, "Function '{}' must return '{}'", function_name, of)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

@@ -3,6 +3,7 @@ mod variable_storage;
 use crate::{
     ast::{fmt_c_integer, Source},
     source_file_cache::SourceFileCache,
+    tag::Tag,
     target_info::TargetInfo,
 };
 use derive_more::{IsVariant, Unwrap};
@@ -79,6 +80,7 @@ pub struct Function {
     pub variables: VariableStorage,
     pub source: Source,
     pub abide_abi: bool,
+    pub tag: Option<Tag>,
 }
 
 #[derive(Clone, Debug)]
