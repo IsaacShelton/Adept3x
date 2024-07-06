@@ -30,7 +30,7 @@ use crate::{
             struct_literal::resolve_struct_literal_expr,
             unary_operation::resolve_unary_operation_expr, variable::resolve_variable_expr,
         },
-        resolve_stmts,
+        resolve_stmts, resolve_type,
     },
     resolved::{self, FunctionRef, StructureRef, TypedExpr},
 };
@@ -247,6 +247,43 @@ pub fn resolve_expr(
                 resolved_type,
                 resolved::Expr::new(
                     resolved::ExprKind::EnumMemberLiteral(enum_member_literal.clone()),
+                    source,
+                ),
+            ))
+        }
+        ast::ExprKind::InterpreterSyscall(syscall, args, result_type) => {
+            let resolved_type = resolve_type(
+                ctx.type_search_ctx,
+                ctx.resolved_ast.source_file_cache,
+                result_type,
+                &mut Default::default(),
+            )?;
+
+            let mut resolved_args = Vec::with_capacity(args.len());
+
+            for (expected_arg_type, arg) in args {
+                let preferred_type = resolve_type(
+                    ctx.type_search_ctx,
+                    ctx.resolved_ast.source_file_cache,
+                    expected_arg_type,
+                    &mut Default::default(),
+                )?;
+
+                resolved_args.push(
+                    resolve_expr(
+                        ctx,
+                        arg,
+                        Some(PreferredType::Reference(&preferred_type)),
+                        Initialized::Require,
+                    )?
+                    .expr,
+                );
+            }
+
+            Ok(TypedExpr::new(
+                resolved_type,
+                resolved::Expr::new(
+                    resolved::ExprKind::InterpreterSyscall(*syscall, resolved_args),
                     source,
                 ),
             ))

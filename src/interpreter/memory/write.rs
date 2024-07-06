@@ -16,7 +16,7 @@ impl Memory {
         match &value {
             Value::Undefined => Ok(()),
             Value::Literal(literal) => self.write_literal(destination, literal, ir_module),
-            Value::Record => todo!("write record"),
+            Value::StructLiteral(_) => todo!("write struct literal"),
         }
     }
 

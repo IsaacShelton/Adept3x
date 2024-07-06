@@ -1,11 +1,16 @@
 use crate::ir;
-use derive_more::Unwrap;
+use derive_more::{IsVariant, Unwrap};
 
-#[derive(Clone, Debug, Unwrap)]
+#[derive(Clone, Debug, Unwrap, IsVariant)]
 pub enum Value {
     Undefined,
     Literal(ir::Literal),
-    Record,
+    StructLiteral(StructLiteral),
+}
+
+#[derive(Clone, Debug)]
+pub struct StructLiteral {
+    values: Vec<Value>,
 }
 
 impl Value {

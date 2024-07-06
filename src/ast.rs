@@ -1,4 +1,5 @@
 use crate::{
+    ir::InterpreterSyscall,
     line_column::Location,
     resolved::IntegerLiteralBits,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -127,6 +128,12 @@ pub struct Parameters {
 pub struct Parameter {
     pub name: String,
     pub ast_type: Type,
+}
+
+impl Parameter {
+    pub fn new(name: String, ast_type: Type) -> Self {
+        Self { name, ast_type }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -517,6 +524,7 @@ pub enum ExprKind {
     Conditional(Conditional),
     While(While),
     EnumMemberLiteral(EnumMemberLiteral),
+    InterpreterSyscall(InterpreterSyscall, Vec<(Type, Expr)>, Type),
 }
 
 #[derive(Clone, Debug)]

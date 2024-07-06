@@ -5,11 +5,11 @@ mod ops;
 mod size_of;
 mod value;
 
-use self::{
-    error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of, value::Value,
-};
+use self::{error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of};
 use crate::ir;
 use std::collections::HashMap;
+
+pub use value::Value;
 
 #[derive(Debug)]
 pub struct Interpreter<'a> {
@@ -212,6 +212,34 @@ impl<'a> Interpreter<'a> {
                     }
 
                     found.unwrap_or(Value::Undefined)
+                }
+                ir::Instruction::InterpreterSyscall(syscall, supplied_args) => {
+                    let mut args = Vec::with_capacity(args.len());
+
+                    for supplied_arg in supplied_args.iter() {
+                        args.push(self.eval(&registers, supplied_arg));
+                    }
+
+                    match syscall {
+                        ir::InterpreterSyscall::Println => {
+                            assert_eq!(args.len(), 1);
+                            let cstring = args[0].as_u64().unwrap();
+                            let mut message = String::new();
+                            let mut address = cstring;
+
+                            loop {
+                                let c = self.memory.read_u8(address).as_u64().unwrap() as u8;
+                                if c == 0 {
+                                    break;
+                                }
+                                message.push(c as char);
+                                address += 1;
+                            }
+
+                            println!("{}", message);
+                            Value::Literal(ir::Literal::Void)
+                        }
+                    }
                 }
             };
 

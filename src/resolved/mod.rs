@@ -2,6 +2,7 @@ mod variable_storage;
 
 use crate::{
     ast::{fmt_c_integer, Source},
+    ir::InterpreterSyscall,
     source_file_cache::SourceFileCache,
     tag::Tag,
     target_info::TargetInfo,
@@ -442,6 +443,7 @@ pub enum ExprKind {
     EnumMemberLiteral(EnumMemberLiteral),
     ResolvedNamedExpression(String, Box<Expr>),
     Zeroed(Type),
+    InterpreterSyscall(InterpreterSyscall, Vec<Expr>),
 }
 
 impl ExprKind {

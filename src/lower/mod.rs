@@ -1043,6 +1043,15 @@ fn lower_expr(
             let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
         }
+        ExprKind::InterpreterSyscall(syscall, args) => {
+            let mut values = Vec::with_capacity(args.len());
+
+            for arg in args {
+                values.push(lower_expr(builder, ir_module, arg, function, resolved_ast)?);
+            }
+
+            Ok(builder.push(ir::Instruction::InterpreterSyscall(*syscall, values)))
+        }
     }
 }
 

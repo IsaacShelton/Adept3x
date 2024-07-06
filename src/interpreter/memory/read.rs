@@ -55,7 +55,7 @@ impl Memory {
         Value::Literal(Literal::Boolean(bytes[0] != 0))
     }
 
-    fn read_u8(&mut self, from: u64) -> Value {
+    pub fn read_u8(&mut self, from: u64) -> Value {
         let bytes = self.read_bytes(from, 1);
         Value::Literal(Literal::Unsigned8(u8::from_le_bytes(
             bytes.try_into().unwrap(),

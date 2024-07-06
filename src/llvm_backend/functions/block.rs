@@ -586,6 +586,11 @@ pub unsafe fn create_function_block(
 
                 Some(phi_node)
             }
+            Instruction::InterpreterSyscall(..) => {
+                return Err(BackendError {
+                    message: "Cannot use interpreter syscalls in native code".into(),
+                })
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);

@@ -313,6 +313,11 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
             mini_scope = insert_drops_for_expr(ctx, resolved_expr);
         }
         ExprKind::Zeroed(_resolved_type) => (),
+        ExprKind::InterpreterSyscall(_syscall, args) => {
+            for argument in args.iter_mut() {
+                mini_scope.union_with(&insert_drops_for_expr(ctx.clone(), argument));
+            }
+        }
     }
 
     mini_scope
@@ -479,6 +484,11 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
             integrate_active_set_for_expr(resolved_expr.as_mut(), active_set);
         }
         ExprKind::Zeroed(_resolved_type) => (),
+        ExprKind::InterpreterSyscall(_syscall, args) => {
+            for argument in args.iter_mut() {
+                integrate_active_set_for_expr(argument, active_set);
+            }
+        }
     }
 }
 

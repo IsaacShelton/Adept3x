@@ -29,6 +29,7 @@ use crate::c::parser::{Input, Parser};
 use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind};
 use crate::c::translate_expr;
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
+use crate::ir::InterpreterSyscall;
 use crate::source_file_cache::SourceFileCache;
 use crate::tag::Tag;
 use crate::text::IntoText;
@@ -283,11 +284,22 @@ fn compile(
         // We assume only working with single file for now
         assert_eq!(ast.files.len(), 1);
 
+        let source = Source::internal();
+        let void = ast::TypeKind::Void.at(Source::internal());
+        let ptr_u8 = ast::TypeKind::Pointer(Box::new(
+            ast::TypeKind::Integer {
+                bits: ast::IntegerBits::Bits8,
+                sign: ast::IntegerSign::Unsigned,
+            }
+            .at(source),
+        ))
+        .at(source);
+
         // Call to function we actually care about
         let call = ast::ExprKind::Call(ast::Call {
             function_name: "main".into(),
             arguments: vec![],
-            expected_to_return: Some(ast::TypeKind::Void.at(Source::internal())),
+            expected_to_return: Some(void.clone()),
         })
         .at(Source::internal());
 
@@ -296,13 +308,38 @@ fn compile(
         file.functions.push(ast::Function {
             name: "<interpreter entry point>".into(),
             parameters: ast::Parameters::default(),
-            return_type: ast::TypeKind::Void.at(Source::internal()),
+            return_type: void.clone(),
             stmts: vec![ast::StmtKind::Return(Some(call)).at(Source::internal())],
             is_foreign: false,
-            source: Source::internal(),
+            source,
             abide_abi: false,
             tag: Some(Tag::InterpreterEntryPoint),
         });
+
+        file.functions.push(ast::Function {
+            name: "println".into(),
+            parameters: ast::Parameters {
+                required: vec![ast::Parameter::new("message".into(), ptr_u8.clone())],
+                is_cstyle_vararg: false,
+            },
+            return_type: void.clone(),
+            stmts: vec![ast::StmtKind::Expr(
+                ast::ExprKind::InterpreterSyscall(
+                    InterpreterSyscall::Println,
+                    vec![(
+                        ptr_u8.clone(),
+                        ast::ExprKind::Variable("message".into()).at(source),
+                    )],
+                    void.clone(),
+                )
+                .at(source),
+            )
+            .at(source)],
+            abide_abi: false,
+            is_foreign: false,
+            source,
+            tag: None,
+        })
     }
 
     let resolved_ast = exit_unless(resolve(&ast, options), source_file_cache);
@@ -320,7 +357,11 @@ fn compile(
             .unwrap();
 
         let mut interpreter = Interpreter::new(&ir_module, Some(1_000_000));
-        let _ = dbg!(interpreter.run(interpreter_entry_point));
+
+        match interpreter.run(interpreter_entry_point) {
+            Ok(result) => assert!(result.is_literal() && result.unwrap_literal().is_void()),
+            Err(err) => eprintln!("interpreter error: {:?}", err),
+        }
         return;
     }
 

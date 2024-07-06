@@ -132,6 +132,12 @@ pub enum Instruction {
     Break(Break),
     ConditionalBreak(Value, ConditionalBreak),
     Phi(Phi),
+    InterpreterSyscall(InterpreterSyscall, Vec<Value>),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum InterpreterSyscall {
+    Println,
 }
 
 #[derive(Clone, Debug)]
@@ -374,7 +380,7 @@ pub enum Value {
     Reference(ValueReference),
 }
 
-#[derive(Clone, Debug, Unwrap)]
+#[derive(Clone, Debug, Unwrap, IsVariant)]
 pub enum Literal {
     Void,
     Boolean(bool),
@@ -508,6 +514,7 @@ impl Instruction {
             Self::Break(..) => true,
             Self::ConditionalBreak(..) => true,
             Self::Phi(..) => false,
+            Self::InterpreterSyscall(_, _) => false,
         }
     }
 }
