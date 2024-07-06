@@ -1,34 +1,54 @@
 use super::super::{error::InterpreterError, size_of::size_of, value::Value};
 use super::Memory;
+use crate::interpreter::value::StructLiteral;
 use crate::ir;
 
 impl Memory {
     pub fn write(
         &mut self,
         destination: u64,
-        value: Value,
+        value: Value<'_>,
         ir_module: &ir::Module,
     ) -> Result<(), InterpreterError> {
         if self.is_reserved_address(destination) {
             return Err(InterpreterError::SegfaultWrite);
         }
 
-        match &value {
+        match value {
             Value::Undefined => Ok(()),
             Value::Literal(literal) => self.write_literal(destination, literal, ir_module),
-            Value::StructLiteral(_) => todo!("write struct literal"),
+            Value::StructLiteral(literal) => {
+                self.write_struct_literal(destination, literal, ir_module)
+            }
         }
+    }
+
+    fn write_struct_literal(
+        &mut self,
+        destination: u64,
+        literal: StructLiteral,
+        ir_module: &ir::Module,
+    ) -> Result<(), InterpreterError> {
+        let mut offset = destination;
+
+        for (field, value) in literal.fields.iter().zip(literal.values.iter()) {
+            let size = size_of(&field.ir_type, ir_module);
+            self.write(offset, value.clone(), ir_module)?;
+            offset += size;
+        }
+
+        Ok(())
     }
 
     fn write_literal(
         &mut self,
         destination: u64,
-        literal: &ir::Literal,
+        literal: ir::Literal,
         ir_module: &ir::Module,
     ) -> Result<(), InterpreterError> {
         match literal {
             ir::Literal::Void => (),
-            ir::Literal::Boolean(x) => self.write_bytes(destination, &[(*x).into()]),
+            ir::Literal::Boolean(x) => self.write_bytes(destination, &[x.into()]),
             ir::Literal::Signed8(x) => self.write_bytes(destination, &x.to_le_bytes()),
             ir::Literal::Unsigned8(x) => self.write_bytes(destination, &x.to_le_bytes()),
             ir::Literal::Signed16(x) => self.write_bytes(destination, &x.to_le_bytes()),
@@ -46,7 +66,7 @@ impl Memory {
                 self.write_bytes(destination, &alloced.to_le_bytes());
             }
             ir::Literal::Zeroed(ty) => {
-                let size = size_of(ty, ir_module);
+                let size = size_of(&ty, ir_module);
 
                 if self.is_heap_address(destination) {
                     for i in 0..size {

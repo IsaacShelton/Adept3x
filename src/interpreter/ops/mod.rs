@@ -10,8 +10,8 @@ macro_rules! impl_op_basic {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            registers: &Registers,
-        ) -> Value {
+            registers: &Registers<'a>,
+        ) -> Value<'a> {
             let (left, right) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
@@ -63,8 +63,8 @@ macro_rules! impl_op_divmod {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            registers: &Registers,
-        ) -> Result<Value, InterpreterError> {
+            registers: &Registers<'a>,
+        ) -> Result<Value<'a>, InterpreterError> {
             let (left, right) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
@@ -136,8 +136,8 @@ macro_rules! impl_op_cmp {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            registers: &Registers,
-        ) -> Value {
+            registers: &Registers<'a>,
+        ) -> Value<'a> {
             let (left, right) = self.eval_binary_ops(operands, registers);
 
             let value = match left {
@@ -185,14 +185,14 @@ macro_rules! impl_op_cmp {
 }
 
 impl<'a> Interpreter<'a> {
-    fn eval_into_literal(&self, registers: &Registers, value: &ir::Value) -> ir::Literal {
+    fn eval_into_literal(&self, registers: &Registers<'a>, value: &ir::Value) -> ir::Literal {
         self.eval(&registers, value).unwrap_literal()
     }
 
     fn eval_binary_ops(
         &self,
         operands: &BinaryOperands,
-        registers: &Registers,
+        registers: &Registers<'a>,
     ) -> (ir::Literal, ir::Literal) {
         let left = self.eval_into_literal(registers, &operands.left);
         let right = self.eval_into_literal(registers, &operands.right);

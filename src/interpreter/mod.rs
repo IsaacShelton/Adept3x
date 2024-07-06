@@ -7,7 +7,10 @@ mod size_of;
 mod value;
 
 use self::{error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of};
-use crate::{interpreter::registers::Registers, ir};
+use crate::{
+    interpreter::{registers::Registers, value::StructLiteral},
+    ir,
+};
 use std::collections::HashMap;
 
 pub use value::Value;
@@ -41,7 +44,7 @@ impl<'a> Interpreter<'a> {
     pub fn run(
         &mut self,
         interpreter_entry_point: ir::FunctionRef,
-    ) -> Result<Value, InterpreterError> {
+    ) -> Result<Value<'a>, InterpreterError> {
         // The entry point for the interpreter always takes zero arguments
         // and can return anything. It is up to the producer of the ir::Module
         // to create an interpreter entry point that calls the actual function(s)
@@ -52,8 +55,8 @@ impl<'a> Interpreter<'a> {
     pub fn call(
         &mut self,
         function_ref: ir::FunctionRef,
-        args: Vec<Value>,
-    ) -> Result<Value, InterpreterError> {
+        args: Vec<Value<'a>>,
+    ) -> Result<Value<'a>, InterpreterError> {
         let function = self.ir_module.functions.get(&function_ref).unwrap();
 
         if function.is_cstyle_variadic {
@@ -62,7 +65,7 @@ impl<'a> Interpreter<'a> {
 
         assert_eq!(function.parameters.len(), args.len());
 
-        let mut registers = Registers::new(&function.basicblocks);
+        let mut registers = Registers::<'a>::new(&function.basicblocks);
         let mut ip = InstructionPointer::default();
 
         let fp = self.memory.stack_save();
@@ -156,9 +159,34 @@ impl<'a> Interpreter<'a> {
                 ir::Instruction::FloatExtend(_, _) => todo!(),
                 ir::Instruction::Truncate(_, _) => todo!(),
                 ir::Instruction::TruncateFloat(_, _) => todo!(),
-                ir::Instruction::Member { .. } => todo!(),
+                ir::Instruction::Member {
+                    struct_type,
+                    subject_pointer,
+                    index,
+                } => {
+                    let fields = struct_type.fields(self.ir_module).unwrap();
+
+                    let offset = fields
+                        .iter()
+                        .take(*index)
+                        .fold(0, |acc, f| acc + self.size_of(&f.ir_type));
+
+                    let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
+                    Value::Literal(ir::Literal::Unsigned64(subject_pointer + offset))
+                }
                 ir::Instruction::ArrayAccess { .. } => todo!(),
-                ir::Instruction::StructureLiteral(_, _) => todo!(),
+                ir::Instruction::StructureLiteral(ty, values) => {
+                    let mut field_values = Vec::with_capacity(values.len());
+
+                    for value in values {
+                        field_values.push(self.eval(&registers, value));
+                    }
+
+                    Value::StructLiteral(StructLiteral {
+                        values: field_values,
+                        fields: ty.fields(self.ir_module).unwrap(),
+                    })
+                }
                 ir::Instruction::IsZero(_) => todo!(),
                 ir::Instruction::IsNotZero(_) => todo!(),
                 ir::Instruction::Negate(_) => todo!(),
@@ -254,7 +282,7 @@ impl<'a> Interpreter<'a> {
             .unwrap_or(Value::Literal(ir::Literal::Void)))
     }
 
-    pub fn eval(&self, registers: &Registers, value: &ir::Value) -> Value {
+    pub fn eval(&self, registers: &Registers<'a>, value: &ir::Value) -> Value<'a> {
         match value {
             ir::Value::Literal(literal) => Value::Literal(literal.clone()),
             ir::Value::Reference(reference) => registers.get(reference).clone(),

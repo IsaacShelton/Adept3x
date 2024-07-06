@@ -27,7 +27,13 @@ pub fn size_of(ir_type: &ir::Type, ir_module: &ir::Module) -> u64 {
                 .iter()
                 .fold(0, |acc, field| acc + size_of(&field.ir_type, ir_module))
         }
-        ir::Type::AnonymousComposite(_) => todo!(),
+        ir::Type::AnonymousComposite(composite) => {
+            // NOTE: We don't do alignment in the interpreter
+            composite
+                .fields
+                .iter()
+                .fold(0, |acc, field| acc + size_of(&field.ir_type, ir_module))
+        }
         ir::Type::FunctionPointer => todo!(),
         ir::Type::FixedArray(_) => todo!(),
         ir::Type::Vector(_) => todo!("interpreting vector types not supported yet"),

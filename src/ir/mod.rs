@@ -359,6 +359,21 @@ impl Type {
             _ => None,
         }
     }
+
+    pub fn fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
+        match self {
+            Type::Structure(structure_ref) => {
+                let structure = ir_module
+                    .structures
+                    .get(structure_ref)
+                    .expect("referenced structure to exist");
+
+                Some(&structure.fields[..])
+            }
+            Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

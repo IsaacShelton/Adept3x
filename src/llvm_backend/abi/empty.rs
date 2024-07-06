@@ -11,17 +11,9 @@ pub fn is_empty_record(
     ir_module: &ir::Module,
     options: IsEmptyRecordOptions,
 ) -> bool {
-    let fields = match ty {
-        ir::Type::Structure(structure_ref) => {
-            let structure = ir_module
-                .structures
-                .get(structure_ref)
-                .expect("referenced structure to exist");
-
-            &structure.fields[..]
-        }
-        ir::Type::AnonymousComposite(type_composite) => &type_composite.fields[..],
-        _ => return false,
+    let fields = match ty.fields(ir_module) {
+        Some(fields) => fields,
+        None => return false,
     };
 
     for field in fields.iter() {

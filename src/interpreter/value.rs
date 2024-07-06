@@ -2,18 +2,19 @@ use crate::ir;
 use derive_more::{IsVariant, Unwrap};
 
 #[derive(Clone, Debug, Unwrap, IsVariant)]
-pub enum Value {
+pub enum Value<'a> {
     Undefined,
     Literal(ir::Literal),
-    StructLiteral(StructLiteral),
+    StructLiteral(StructLiteral<'a>),
 }
 
 #[derive(Clone, Debug)]
-pub struct StructLiteral {
-    values: Vec<Value>,
+pub struct StructLiteral<'a> {
+    pub values: Vec<Value<'a>>,
+    pub fields: &'a [ir::Field],
 }
 
-impl Value {
+impl<'a> Value<'a> {
     pub fn as_u64(&self) -> Option<u64> {
         match self {
             Value::Literal(literal) => match literal {
