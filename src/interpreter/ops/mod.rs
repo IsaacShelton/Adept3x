@@ -3,12 +3,14 @@ use crate::{
     ir::{self, BinaryOperands},
 };
 
+use super::Registers;
+
 macro_rules! impl_op_basic {
     ($name:ident, $wrapping_name:ident, $op:tt, $bool_op:tt) => {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            registers: &Vec<Vec<Value>>,
+            registers: &Registers,
         ) -> Value {
             let (left, right) = self.eval_binary_ops(operands, registers);
 
@@ -61,7 +63,7 @@ macro_rules! impl_op_divmod {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            registers: &Vec<Vec<Value>>,
+            registers: &Registers,
         ) -> Result<Value, InterpreterError> {
             let (left, right) = self.eval_binary_ops(operands, registers);
 
@@ -134,7 +136,7 @@ macro_rules! impl_op_cmp {
         pub fn $name(
             &mut self,
             operands: &BinaryOperands,
-            registers: &Vec<Vec<Value>>,
+            registers: &Registers,
         ) -> Value {
             let (left, right) = self.eval_binary_ops(operands, registers);
 
@@ -183,14 +185,14 @@ macro_rules! impl_op_cmp {
 }
 
 impl<'a> Interpreter<'a> {
-    fn eval_into_literal(&self, registers: &Vec<Vec<Value>>, value: &ir::Value) -> ir::Literal {
+    fn eval_into_literal(&self, registers: &Registers, value: &ir::Value) -> ir::Literal {
         self.eval(&registers, value).unwrap_literal()
     }
 
     fn eval_binary_ops(
         &self,
         operands: &BinaryOperands,
-        registers: &Vec<Vec<Value>>,
+        registers: &Registers,
     ) -> (ir::Literal, ir::Literal) {
         let left = self.eval_into_literal(registers, &operands.left);
         let right = self.eval_into_literal(registers, &operands.right);

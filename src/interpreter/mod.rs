@@ -2,11 +2,12 @@ mod error;
 mod ip;
 mod memory;
 mod ops;
+mod registers;
 mod size_of;
 mod value;
 
 use self::{error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of};
-use crate::ir;
+use crate::{interpreter::registers::Registers, ir};
 use std::collections::HashMap;
 
 pub use value::Value;
@@ -61,17 +62,8 @@ impl<'a> Interpreter<'a> {
 
         assert_eq!(function.parameters.len(), args.len());
 
-        let mut registers = Vec::new();
-        for block in function.basicblocks.iter() {
-            let registers_for_block =
-                Vec::from_iter(std::iter::repeat(Value::Undefined).take(block.instructions.len()));
-            registers.push(registers_for_block);
-        }
-
-        let mut ip = InstructionPointer {
-            basicblock_id: 0,
-            instruction_id: 0,
-        };
+        let mut registers = Registers::new(&function.basicblocks);
+        let mut ip = InstructionPointer::default();
 
         let fp = self.memory.stack_save();
         let mut came_from_block = 0;
@@ -221,7 +213,7 @@ impl<'a> Interpreter<'a> {
                     }
 
                     match syscall {
-                        ir::InterpreterSyscall::Println => {
+                        ir::InterpreterSyscallKind::Println => {
                             assert_eq!(args.len(), 1);
                             let cstring = args[0].as_u64().unwrap();
                             let mut message = String::new();
@@ -243,7 +235,7 @@ impl<'a> Interpreter<'a> {
                 }
             };
 
-            registers[ip.basicblock_id][ip.instruction_id] = result;
+            registers.set(&ip, result);
 
             if new_ip.is_some() {
                 came_from_block = ip.basicblock_id;
@@ -262,12 +254,10 @@ impl<'a> Interpreter<'a> {
             .unwrap_or(Value::Literal(ir::Literal::Void)))
     }
 
-    pub fn eval(&self, registers: &Vec<Vec<Value>>, value: &ir::Value) -> Value {
+    pub fn eval(&self, registers: &Registers, value: &ir::Value) -> Value {
         match value {
             ir::Value::Literal(literal) => Value::Literal(literal.clone()),
-            ir::Value::Reference(reference) => {
-                registers[reference.basicblock_id][reference.instruction_id].clone()
-            }
+            ir::Value::Reference(reference) => registers.get(reference).clone(),
         }
     }
 

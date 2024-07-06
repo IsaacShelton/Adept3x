@@ -132,11 +132,11 @@ pub enum Instruction {
     Break(Break),
     ConditionalBreak(Value, ConditionalBreak),
     Phi(Phi),
-    InterpreterSyscall(InterpreterSyscall, Vec<Value>),
+    InterpreterSyscall(InterpreterSyscallKind, Vec<Value>),
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum InterpreterSyscall {
+pub enum InterpreterSyscallKind {
     Println,
 }
 

@@ -257,8 +257,8 @@ pub fn resolve_expr(
             ))
         }
         ast::ExprKind::InterpreterSyscall(info) => {
-            let ast::InterpreterSyscallInvocation {
-                kind: syscall,
+            let ast::InterpreterSyscall {
+                kind,
                 args,
                 result_type,
             } = &**info;
@@ -294,7 +294,7 @@ pub fn resolve_expr(
             Ok(TypedExpr::new(
                 resolved_type,
                 resolved::Expr::new(
-                    resolved::ExprKind::InterpreterSyscall(*syscall, resolved_args),
+                    resolved::ExprKind::InterpreterSyscall(*kind, resolved_args),
                     source,
                 ),
             ))

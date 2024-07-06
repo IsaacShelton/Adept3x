@@ -1,5 +1,5 @@
 use crate::{
-    ir::InterpreterSyscall,
+    ir::InterpreterSyscallKind,
     line_column::Location,
     resolved::IntegerLiteralBits,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
@@ -524,12 +524,12 @@ pub enum ExprKind {
     Conditional(Conditional),
     While(Box<While>),
     EnumMemberLiteral(Box<EnumMemberLiteral>),
-    InterpreterSyscall(Box<InterpreterSyscallInvocation>),
+    InterpreterSyscall(Box<InterpreterSyscall>),
 }
 
 #[derive(Clone, Debug)]
-pub struct InterpreterSyscallInvocation {
-    pub kind: InterpreterSyscall,
+pub struct InterpreterSyscall {
+    pub kind: InterpreterSyscallKind,
     pub args: Vec<(Type, Expr)>,
     pub result_type: Type,
 }

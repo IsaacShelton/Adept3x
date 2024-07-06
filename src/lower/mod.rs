@@ -735,7 +735,7 @@ fn lower_expr(
                 subject,
                 structure_ref,
                 index,
-                field_type: resolved_field_type,
+                field_type,
                 memory_management,
             } = &**member;
 
@@ -773,7 +773,7 @@ fn lower_expr(
                 index: *index,
             });
 
-            let ir_type = lower_type(&ir_module.target_info, resolved_field_type, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, field_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {

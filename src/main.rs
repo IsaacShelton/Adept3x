@@ -29,7 +29,7 @@ use crate::c::parser::{Input, Parser};
 use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind};
 use crate::c::translate_expr;
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
-use crate::ir::InterpreterSyscall;
+use crate::ir::InterpreterSyscallKind;
 use crate::source_file_cache::SourceFileCache;
 use crate::tag::Tag;
 use crate::text::IntoText;
@@ -324,8 +324,8 @@ fn compile(
             },
             return_type: void.clone(),
             stmts: vec![ast::StmtKind::Expr(
-                ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscallInvocation {
-                    kind: InterpreterSyscall::Println,
+                ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+                    kind: InterpreterSyscallKind::Println,
                     args: vec![(
                         ptr_u8.clone(),
                         ast::ExprKind::Variable("message".into()).at(source),
