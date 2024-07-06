@@ -38,6 +38,7 @@ use ast::{FloatSize, IntegerBits, IntegerSign};
 
 pub use basic_binary_operation::resolve_basic_binary_operator;
 use indexmap::IndexMap;
+use resolved::IntegerKnown;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
@@ -116,17 +117,17 @@ pub fn resolve_expr(
         }
         ast::ExprKind::Integer(value) => {
             let (resolved_type, expr) = match value {
-                ast::Integer::Known(bits, sign, value) => (
+                ast::Integer::Known(known) => (
                     resolved::TypeKind::Integer {
-                        bits: IntegerBits::from(*bits),
-                        sign: *sign,
+                        bits: IntegerBits::from(known.bits),
+                        sign: known.sign,
                     }
                     .at(source),
-                    resolved::ExprKind::Integer {
-                        value: value.clone(),
-                        bits: *bits,
-                        sign: *sign,
-                    }
+                    resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                        value: known.value.clone(),
+                        bits: known.bits,
+                        sign: known.sign,
+                    }))
                     .at(source),
                 ),
                 ast::Integer::Generic(value) => (
@@ -188,7 +189,14 @@ pub fn resolve_expr(
         ast::ExprKind::ArrayAccess(array_access) => {
             resolve_array_access_expr(ctx, array_access, source)
         }
-        ast::ExprKind::StructureLiteral(ast_type, fields, fill_behavior, conform_behavior) => {
+        ast::ExprKind::StructureLiteral(literal) => {
+            let ast::StructureLiteral {
+                ast_type,
+                fields,
+                fill_behavior,
+                conform_behavior,
+            } = &**literal;
+
             resolve_struct_literal_expr(
                 ctx,
                 ast_type,
@@ -227,10 +235,7 @@ pub fn resolve_expr(
             Ok(TypedExpr::new(
                 resolved::TypeKind::Void.at(source),
                 resolved::Expr::new(
-                    resolved::ExprKind::While(resolved::While {
-                        condition: Box::new(condition),
-                        block,
-                    }),
+                    resolved::ExprKind::While(Box::new(resolved::While { condition, block })),
                     source,
                 ),
             ))
@@ -251,7 +256,13 @@ pub fn resolve_expr(
                 ),
             ))
         }
-        ast::ExprKind::InterpreterSyscall(syscall, args, result_type) => {
+        ast::ExprKind::InterpreterSyscall(info) => {
+            let ast::InterpreterSyscallInvocation {
+                kind: syscall,
+                args,
+                result_type,
+            } = &**info;
+
             let resolved_type = resolve_type(
                 ctx.type_search_ctx,
                 ctx.resolved_ast.source_file_cache,

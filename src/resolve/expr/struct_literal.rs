@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         resolve_type, ConformMode, Initialized,
     },
-    resolved::{self, StructureRef, TypedExpr},
+    resolved::{self, StructureLiteral, StructureRef, TypedExpr},
 };
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -156,7 +156,8 @@ pub fn resolve_struct_literal_expr(
             FillBehavior::Zeroed => {
                 for field_name in missing.iter() {
                     let (index, field) = get_field_info(ctx, structure_ref, field_name);
-                    let zeroed = resolved::ExprKind::Zeroed(field.resolved_type.clone()).at(source);
+                    let zeroed = resolved::ExprKind::Zeroed(Box::new(field.resolved_type.clone()))
+                        .at(source);
                     resolved_fields.insert(field_name.to_string(), (zeroed, index));
                 }
             }
@@ -168,11 +169,11 @@ pub fn resolve_struct_literal_expr(
     Ok(TypedExpr::new(
         resolved_type.clone(),
         resolved::Expr::new(
-            resolved::ExprKind::StructureLiteral {
+            resolved::ExprKind::StructureLiteral(Box::new(StructureLiteral {
                 structure_type,
                 fields: resolved_fields,
                 memory_management,
-            },
+            })),
             ast_type.source,
         ),
     ))

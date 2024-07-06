@@ -97,10 +97,10 @@ pub fn resolve_call_expr(
     Ok(TypedExpr::new(
         return_type,
         resolved::Expr::new(
-            resolved::ExprKind::Call(resolved::Call {
+            resolved::ExprKind::Call(Box::new(resolved::Call {
                 function: function_ref,
                 arguments,
-            }),
+            })),
             source,
         ),
     ))

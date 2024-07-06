@@ -8,13 +8,13 @@ use crate::{
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
-        NumericMode, StmtKind, VariableStorageKey,
+        Member, NumericMode, StmtKind, StructureLiteral, VariableStorageKey,
     },
     tag::Tag,
     target_info::TargetInfo,
 };
 use builder::Builder;
-use resolved::IntegerSign;
+use resolved::{IntegerKnown, IntegerSign};
 
 pub fn lower(
     options: &BuildOptions,
@@ -528,8 +528,10 @@ fn lower_expr(
             }
             .at(expr.source))
         }
-        ExprKind::Integer { value, bits, sign } => {
+        ExprKind::IntegerKnown(integer) => {
             use resolved::{IntegerLiteralBits as Bits, IntegerSign as Sign};
+
+            let IntegerKnown { value, bits, sign } = &**integer;
 
             match (bits, sign) {
                 (Bits::Bits8, Sign::Signed) => {
@@ -702,12 +704,13 @@ fn lower_expr(
                 resolved_ast,
             )
         }
-        ExprKind::IntegerExtend(value, resolved_type) => {
-            let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
-            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
+        ExprKind::IntegerExtend(cast) => {
+            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, &cast.target_type, resolved_ast)?;
 
             Ok(builder.push(
-                match resolved_type
+                match cast
+                    .target_type
                     .kind
                     .sign(Some(&ir_module.target_info))
                     .expect("integer extend result type to be an integer type")
@@ -717,23 +720,25 @@ fn lower_expr(
                 },
             ))
         }
-        ExprKind::IntegerTruncate(value, resolved_type) => {
-            let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
-            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
+        ExprKind::IntegerTruncate(cast) => {
+            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, &cast.target_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
         }
-        ExprKind::FloatExtend(value, resolved_type) => {
-            let value = lower_expr(builder, ir_module, value, function, resolved_ast)?;
-            let ir_type = lower_type(&ir_module.target_info, resolved_type, resolved_ast)?;
+        ExprKind::FloatExtend(cast) => {
+            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target_info, &cast.target_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
-        ExprKind::Member {
-            subject,
-            structure_ref,
-            index,
-            field_type: resolved_field_type,
-            memory_management,
-        } => {
+        ExprKind::Member(member) => {
+            let Member {
+                subject,
+                structure_ref,
+                index,
+                field_type: resolved_field_type,
+                memory_management,
+            } = &**member;
+
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
@@ -800,11 +805,13 @@ fn lower_expr(
 
             Ok(builder.push(ir::Instruction::Load((item, item_type))))
         }
-        ExprKind::StructureLiteral {
-            structure_type,
-            fields,
-            memory_management,
-        } => {
+        ExprKind::StructureLiteral(structure_literal) => {
+            let StructureLiteral {
+                structure_type,
+                fields,
+                memory_management,
+            } = &**structure_literal;
+
             let result_ir_type = lower_type(&ir_module.target_info, structure_type, resolved_ast)?;
             let mut values = Vec::with_capacity(fields.len());
 

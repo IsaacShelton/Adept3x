@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, TypedExpr},
+    resolved::{self, Member, TypedExpr},
 };
 
 pub fn resolve_member_expr(
@@ -52,13 +52,13 @@ pub fn resolve_member_expr(
     Ok(TypedExpr::new(
         found_field.resolved_type.clone(),
         resolved::Expr::new(
-            resolved::ExprKind::Member {
+            resolved::ExprKind::Member(Box::new(Member {
                 subject: subject_destination,
                 structure_ref,
                 index,
                 field_type: found_field.resolved_type.clone(),
                 memory_management,
-            },
+            })),
             source,
         ),
     ))

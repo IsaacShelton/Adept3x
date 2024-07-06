@@ -53,12 +53,13 @@ pub fn make_anonymous_enum(
                 // TODO: Add way to use enums that don't have a definition name
                 // Should they just be normal defines? Or anonymous enum values? (which don't exist yet)
                 if let Some(definition_name) = &definition.name {
-                    let aka_value = ast::ExprKind::EnumMemberLiteral(ast::EnumMemberLiteral {
-                        enum_name: format!("enum<{}>", definition_name),
-                        variant_name: enumerator.name.clone(),
-                        source: enumerator.source,
-                    })
-                    .at(enumerator.source);
+                    let aka_value =
+                        ast::ExprKind::EnumMemberLiteral(Box::new(ast::EnumMemberLiteral {
+                            enum_name: format!("enum<{}>", definition_name),
+                            variant_name: enumerator.name.clone(),
+                            source: enumerator.source,
+                        }))
+                        .at(enumerator.source);
 
                     try_insert_into_index_map(
                         &mut ast_file.defines,

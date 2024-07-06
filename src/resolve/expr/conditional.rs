@@ -120,11 +120,11 @@ pub fn resolve_conditional_expr(
     }?;
 
     let expr = resolved::Expr::new(
-        resolved::ExprKind::Conditional(resolved::Conditional {
+        resolved::ExprKind::Conditional(Box::new(resolved::Conditional {
             result_type: result_type.clone(),
             branches: branches_without_else,
             otherwise,
-        }),
+        })),
         source,
     );
 

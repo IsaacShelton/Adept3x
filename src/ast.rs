@@ -464,8 +464,8 @@ impl Stmt {
 pub enum StmtKind {
     Return(Option<Expr>),
     Expr(Expr),
-    Declaration(Declaration),
-    Assignment(Assignment),
+    Declaration(Box<Declaration>),
+    Assignment(Box<Assignment>),
 }
 
 impl StmtKind {
@@ -513,18 +513,33 @@ pub enum ExprKind {
     Float(f64),
     String(String),
     NullTerminatedString(CString),
-    Call(Call),
-    DeclareAssign(DeclareAssign),
+    Call(Box<Call>),
+    DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     Member(Box<Expr>, String),
     ArrayAccess(Box<ArrayAccess>),
-    StructureLiteral(Type, Vec<FieldInitializer>, FillBehavior, ConformBehavior),
+    StructureLiteral(Box<StructureLiteral>),
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
-    While(While),
-    EnumMemberLiteral(EnumMemberLiteral),
-    InterpreterSyscall(InterpreterSyscall, Vec<(Type, Expr)>, Type),
+    While(Box<While>),
+    EnumMemberLiteral(Box<EnumMemberLiteral>),
+    InterpreterSyscall(Box<InterpreterSyscallInvocation>),
+}
+
+#[derive(Clone, Debug)]
+pub struct InterpreterSyscallInvocation {
+    pub kind: InterpreterSyscall,
+    pub args: Vec<(Type, Expr)>,
+    pub result_type: Type,
+}
+
+#[derive(Clone, Debug)]
+pub struct StructureLiteral {
+    pub ast_type: Type,
+    pub fields: Vec<FieldInitializer>,
+    pub fill_behavior: FillBehavior,
+    pub conform_behavior: ConformBehavior,
 }
 
 #[derive(Clone, Debug)]
@@ -545,6 +560,9 @@ pub enum ConformBehavior {
     C,
 }
 
+// Make sure ExprKind doesn't accidentally become huge
+const _: () = assert!(std::mem::size_of::<ExprKind>() <= 48);
+
 impl ExprKind {
     pub fn at(self, source: Source) -> Expr {
         Expr::new(self, source)
@@ -553,14 +571,21 @@ impl ExprKind {
 
 #[derive(Clone, Debug)]
 pub enum Integer {
-    Known(IntegerLiteralBits, IntegerSign, BigInt),
+    Known(Box<IntegerKnown>),
     Generic(BigInt),
+}
+
+#[derive(Clone, Debug)]
+pub struct IntegerKnown {
+    pub bits: IntegerLiteralBits,
+    pub sign: IntegerSign,
+    pub value: BigInt,
 }
 
 impl Integer {
     pub fn value(&self) -> &BigInt {
         match self {
-            Integer::Known(_, _, value) => value,
+            Integer::Known(known) => &known.value,
             Integer::Generic(value) => value,
         }
     }
@@ -580,7 +605,7 @@ pub struct Conditional {
 
 #[derive(Clone, Debug)]
 pub struct While {
-    pub condition: Box<Expr>,
+    pub condition: Expr,
     pub block: Block,
 }
 
@@ -747,7 +772,7 @@ pub struct Call {
 #[derive(Clone, Debug)]
 pub struct DeclareAssign {
     pub name: String,
-    pub value: Box<Expr>,
+    pub value: Expr,
 }
 
 #[derive(Clone, Debug)]

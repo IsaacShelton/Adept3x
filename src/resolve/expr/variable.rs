@@ -32,10 +32,10 @@ pub fn resolve_variable_expr(
         Ok(TypedExpr::new_maybe_initialized(
             variable.resolved_type.clone(),
             resolved::Expr::new(
-                resolved::ExprKind::Variable(resolved::Variable {
+                resolved::ExprKind::Variable(Box::new(resolved::Variable {
                     key: variable.key,
                     resolved_type: variable.resolved_type.clone(),
-                }),
+                })),
                 source,
             ),
             is_initialized,
@@ -44,10 +44,10 @@ pub fn resolve_variable_expr(
         Ok(TypedExpr::new(
             resolved_type.clone(),
             resolved::Expr::new(
-                resolved::ExprKind::GlobalVariable(resolved::GlobalVariable {
+                resolved::ExprKind::GlobalVariable(Box::new(resolved::GlobalVariable {
                     reference: *reference,
                     resolved_type: resolved_type.clone(),
-                }),
+                })),
                 source,
             ),
         ))

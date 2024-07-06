@@ -21,6 +21,7 @@ use thin_vec::ThinVec;
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::EnumMember;
 pub use crate::ast::EnumMemberLiteral;
+pub use crate::ast::IntegerKnown;
 pub use crate::ast::ShortCircuitingBinaryOperator;
 pub use crate::ast::UnaryOperator;
 pub use crate::ast::{CInteger, FloatSize, IntegerBits, IntegerSign};
@@ -405,46 +406,57 @@ pub enum MemoryManagement {
 
 #[derive(Clone, Debug)]
 pub enum ExprKind {
-    Variable(Variable),
-    GlobalVariable(GlobalVariable),
+    Variable(Box<Variable>),
+    GlobalVariable(Box<GlobalVariable>),
     BooleanLiteral(bool),
     IntegerLiteral(BigInt),
-    Integer {
-        value: BigInt,
-        bits: IntegerLiteralBits,
-        sign: IntegerSign,
-    },
+    IntegerKnown(Box<IntegerKnown>),
     Float(FloatSize, f64),
     String(String),
     NullTerminatedString(CString),
-    Call(Call),
-    DeclareAssign(DeclareAssign),
+    Call(Box<Call>),
+    DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
-    IntegerExtend(Box<Expr>, Type),
-    IntegerTruncate(Box<Expr>, Type),
-    FloatExtend(Box<Expr>, Type),
-    Member {
-        subject: Destination,
-        structure_ref: StructureRef,
-        index: usize,
-        memory_management: MemoryManagement,
-        field_type: Type,
-    },
-    StructureLiteral {
-        structure_type: Type,
-        fields: IndexMap<String, (Expr, usize)>,
-        memory_management: MemoryManagement,
-    },
+    IntegerExtend(Box<Cast>),
+    IntegerTruncate(Box<Cast>),
+    FloatExtend(Box<Cast>),
+    Member(Box<Member>),
+    StructureLiteral(Box<StructureLiteral>),
     UnaryOperation(Box<UnaryOperation>),
-    Conditional(Conditional),
-    While(While),
+    Conditional(Box<Conditional>),
+    While(Box<While>),
     ArrayAccess(Box<ArrayAccess>),
-    EnumMemberLiteral(EnumMemberLiteral),
+    EnumMemberLiteral(Box<EnumMemberLiteral>),
     ResolvedNamedExpression(String, Box<Expr>),
-    Zeroed(Type),
+    Zeroed(Box<Type>),
     InterpreterSyscall(InterpreterSyscall, Vec<Expr>),
 }
+
+#[derive(Clone, Debug)]
+pub struct Cast {
+    pub target_type: Type,
+    pub value: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct Member {
+    pub subject: Destination,
+    pub structure_ref: StructureRef,
+    pub index: usize,
+    pub memory_management: MemoryManagement,
+    pub field_type: Type,
+}
+
+#[derive(Clone, Debug)]
+pub struct StructureLiteral {
+    pub structure_type: Type,
+    pub fields: IndexMap<String, (Expr, usize)>,
+    pub memory_management: MemoryManagement,
+}
+
+// Make sure ExprKind doesn't accidentally become huge
+const _: () = assert!(std::mem::size_of::<ExprKind>() <= 40);
 
 impl ExprKind {
     pub fn at(self, source: Source) -> Expr {
@@ -474,7 +486,7 @@ pub struct Conditional {
 
 #[derive(Clone, Debug)]
 pub struct While {
-    pub condition: Box<Expr>,
+    pub condition: Expr,
     pub block: Block,
 }
 
@@ -626,6 +638,6 @@ pub struct Call {
 #[derive(Clone, Debug)]
 pub struct DeclareAssign {
     pub key: VariableStorageKey,
-    pub value: Box<Expr>,
+    pub value: Expr,
     pub resolved_type: Type,
 }

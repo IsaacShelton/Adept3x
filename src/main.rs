@@ -296,11 +296,11 @@ fn compile(
         .at(source);
 
         // Call to function we actually care about
-        let call = ast::ExprKind::Call(ast::Call {
+        let call = ast::ExprKind::Call(Box::new(ast::Call {
             function_name: "main".into(),
             arguments: vec![],
             expected_to_return: Some(void.clone()),
-        })
+        }))
         .at(Source::internal());
 
         // Create entry point for interpreter which will make the call
@@ -324,14 +324,14 @@ fn compile(
             },
             return_type: void.clone(),
             stmts: vec![ast::StmtKind::Expr(
-                ast::ExprKind::InterpreterSyscall(
-                    InterpreterSyscall::Println,
-                    vec![(
+                ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscallInvocation {
+                    kind: InterpreterSyscall::Println,
+                    args: vec![(
                         ptr_u8.clone(),
                         ast::ExprKind::Variable("message".into()).at(source),
                     )],
-                    void.clone(),
-                )
+                    result_type: void.clone(),
+                }))
                 .at(source),
             )
             .at(source)],

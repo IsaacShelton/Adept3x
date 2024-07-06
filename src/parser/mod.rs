@@ -605,11 +605,11 @@ where
             self.ignore_newlines();
 
             Ok(Stmt::new(
-                StmtKind::Declaration(Declaration {
+                StmtKind::Declaration(Box::new(Declaration {
                     name,
                     ast_type,
                     value,
-                }),
+                })),
                 self.source(location),
             ))
         }
@@ -647,11 +647,11 @@ where
         let value = self.parse_expr()?;
 
         Ok(Stmt::new(
-            StmtKind::Assignment(Assignment {
+            StmtKind::Assignment(Box::new(Assignment {
                 destination,
                 value,
                 operator,
-            }),
+            })),
             self.source(location),
         ))
     }
@@ -866,10 +866,10 @@ where
                 let stmts = self.parse_block("'while'")?;
 
                 Ok(Expr::new(
-                    ExprKind::While(While {
-                        condition: Box::new(condition),
+                    ExprKind::While(Box::new(While {
+                        condition,
                         block: Block::new(stmts),
-                    }),
+                    })),
                     self.source(location),
                 ))
             }
@@ -983,7 +983,12 @@ where
 
         self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
         Ok(Expr::new(
-            ExprKind::StructureLiteral(ast_type, fields, fill_behavior, ConformBehavior::Adept),
+            ExprKind::StructureLiteral(Box::new(ast::StructureLiteral {
+                ast_type,
+                fields,
+                fill_behavior,
+                conform_behavior: ConformBehavior::Adept,
+            })),
             source,
         ))
     }
@@ -1006,11 +1011,11 @@ where
             .eat_identifier()
             .ok_or_else(|| ParseErrorKind::ExpectedEnumName.at(variant_source))?;
 
-        Ok(ExprKind::EnumMemberLiteral(EnumMemberLiteral {
+        Ok(ExprKind::EnumMemberLiteral(Box::new(EnumMemberLiteral {
             enum_name,
             variant_name,
             source,
-        })
+        }))
         .at(source))
     }
 
@@ -1039,11 +1044,11 @@ where
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
         Ok(Expr::new(
-            ExprKind::Call(Call {
+            ExprKind::Call(Box::new(Call {
                 function_name,
                 arguments,
                 expected_to_return: None,
-            }),
+            })),
             source,
         ))
     }
@@ -1113,10 +1118,10 @@ where
         let value = self.parse_expr()?;
 
         Ok(Expr::new(
-            ExprKind::DeclareAssign(DeclareAssign {
+            ExprKind::DeclareAssign(Box::new(DeclareAssign {
                 name: variable_name,
-                value: Box::new(value),
-            }),
+                value,
+            })),
             source,
         ))
     }

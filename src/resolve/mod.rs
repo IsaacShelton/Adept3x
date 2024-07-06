@@ -21,7 +21,7 @@ use self::{
 use crate::{
     ast::{self, Ast, ConformBehavior, FileIdentifier, Source, Type},
     cli::BuildOptions,
-    resolved::{self, Enum, TypedExpr, VariableStorage},
+    resolved::{self, Cast, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
     tag::Tag,
     try_insert_index_map::try_insert_into_index_map,
@@ -31,6 +31,7 @@ use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use resolved::IntegerKnown;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet, VecDeque},
@@ -490,20 +491,23 @@ fn conform_float_value(
     to_size: FloatSize,
     type_source: Source,
 ) -> Option<TypedExpr> {
-    let result_type = resolved::TypeKind::Float(to_size).at(type_source);
+    let target_type = resolved::TypeKind::Float(to_size).at(type_source);
 
     let from_bits = from_size.bits();
     let to_bits = to_size.bits();
 
     if from_bits == to_bits {
-        return Some(TypedExpr::new(result_type, expr.clone()));
+        return Some(TypedExpr::new(target_type, expr.clone()));
     }
 
     if from_bits < to_bits {
         return Some(TypedExpr::new(
-            result_type.clone(),
+            target_type.clone(),
             resolved::Expr {
-                kind: resolved::ExprKind::FloatExtend(Box::new(expr.clone()), result_type),
+                kind: resolved::ExprKind::FloatExtend(Box::new(Cast {
+                    value: expr.clone(),
+                    target_type,
+                })),
                 source: expr.source,
             },
         ));
@@ -528,20 +532,23 @@ fn conform_integer_value(
         return None;
     }
 
-    let result_type = resolved::TypeKind::Integer {
+    let target_type = resolved::TypeKind::Integer {
         bits: to_bits,
         sign: to_sign,
     }
     .at(type_source);
 
     if from_sign == to_sign && to_bits == from_bits {
-        return Some(TypedExpr::new(result_type, expr.clone()));
+        return Some(TypedExpr::new(target_type, expr.clone()));
     }
 
     Some(TypedExpr::new(
-        result_type.clone(),
+        target_type.clone(),
         resolved::Expr {
-            kind: resolved::ExprKind::IntegerExtend(Box::new(expr.clone()), result_type),
+            kind: resolved::ExprKind::IntegerExtend(Box::new(Cast {
+                value: expr.clone(),
+                target_type,
+            })),
             source: expr.source,
         },
     ))
@@ -556,25 +563,30 @@ fn conform_integer_value_c(
     to_sign: IntegerSign,
     type_source: Source,
 ) -> Option<TypedExpr> {
-    let result_type = resolved::TypeKind::Integer {
+    let target_type = resolved::TypeKind::Integer {
         bits: to_bits,
         sign: to_sign,
     }
     .at(type_source);
 
     if from_bits == to_bits && from_sign == to_sign {
-        return Some(TypedExpr::new(result_type, expr.clone()));
+        return Some(TypedExpr::new(target_type, expr.clone()));
     }
 
     if conform_mode.allow_lossy_integer() {
+        let cast = Cast {
+            value: expr.clone(),
+            target_type: target_type.clone(),
+        };
+
         let kind = if from_bits < to_bits {
-            resolved::ExprKind::IntegerExtend(Box::new(expr.clone()), result_type.clone())
+            resolved::ExprKind::IntegerExtend(Box::new(cast))
         } else {
-            resolved::ExprKind::IntegerTruncate(Box::new(expr.clone()), result_type.clone())
+            resolved::ExprKind::IntegerTruncate(Box::new(cast))
         };
 
         return Some(TypedExpr::new(
-            result_type,
+            target_type,
             resolved::Expr {
                 kind,
                 source: expr.source,
@@ -665,11 +677,11 @@ fn conform_integer_literal(
                     }
                     .at(source),
                     resolved::Expr::new(
-                        resolved::ExprKind::Integer {
+                        resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                             value: value.clone(),
                             bits: integer_literal_bits,
                             sign: *sign,
-                        },
+                        })),
                         source,
                     ),
                 ))

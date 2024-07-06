@@ -17,7 +17,7 @@ pub fn translate_compound_literal(
     compound_literal: &CompoundLiteral,
     source: Source,
 ) -> Result<ast::Expr, ParseError> {
-    let ty = get_caster_type(ast_file, typedefs, &compound_literal.caster)?;
+    let ast_type = get_caster_type(ast_file, typedefs, &compound_literal.caster)?;
     let mut fields = Vec::new();
 
     for init in compound_literal
@@ -40,7 +40,12 @@ pub fn translate_compound_literal(
     }
 
     Ok(
-        ast::ExprKind::StructureLiteral(ty, fields, FillBehavior::Zeroed, ConformBehavior::C)
-            .at(source),
+        ast::ExprKind::StructureLiteral(Box::new(ast::StructureLiteral {
+            ast_type,
+            fields,
+            fill_behavior: FillBehavior::Zeroed,
+            conform_behavior: ConformBehavior::C,
+        }))
+        .at(source),
     )
 }

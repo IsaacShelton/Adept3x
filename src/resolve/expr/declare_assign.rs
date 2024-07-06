@@ -33,11 +33,11 @@ pub fn resolve_declare_assign_expr(
     Ok(TypedExpr::new(
         value.resolved_type.clone(),
         resolved::Expr::new(
-            resolved::ExprKind::DeclareAssign(resolved::DeclareAssign {
+            resolved::ExprKind::DeclareAssign(Box::new(resolved::DeclareAssign {
                 key,
-                value: Box::new(value.expr),
+                value: value.expr,
                 resolved_type: value.resolved_type,
-            }),
+            })),
             source,
         ),
     ))

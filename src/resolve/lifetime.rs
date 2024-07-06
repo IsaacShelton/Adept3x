@@ -197,7 +197,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         ExprKind::GlobalVariable(..) => (),
         ExprKind::BooleanLiteral(..)
         | ExprKind::IntegerLiteral(..)
-        | ExprKind::Integer { .. }
+        | ExprKind::IntegerKnown(_)
         | ExprKind::Float(..)
         | ExprKind::String(..)
         | ExprKind::NullTerminatedString(..) => (),
@@ -253,14 +253,13 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
 
             mini_scope.used.or(&hidden_scope.used);
         }
-        ExprKind::IntegerExtend(value, _) | ExprKind::IntegerTruncate(value, _) => {
-            mini_scope.union_with(&insert_drops_for_expr(ctx, value));
+        ExprKind::IntegerExtend(cast)
+        | ExprKind::IntegerTruncate(cast)
+        | ExprKind::FloatExtend(cast) => {
+            mini_scope.union_with(&insert_drops_for_expr(ctx, &mut cast.value));
         }
-        ExprKind::FloatExtend(value, _) => {
-            mini_scope.union_with(&insert_drops_for_expr(ctx, value));
-        }
-        ExprKind::Member { subject, .. } => {
-            mini_scope.union_with(&insert_drops_for_destination(ctx, subject));
+        ExprKind::Member(member) => {
+            mini_scope.union_with(&insert_drops_for_destination(ctx, &mut member.subject));
         }
         ExprKind::StructureLiteral { .. } => (),
         ExprKind::UnaryOperation(operation) => {
@@ -425,7 +424,7 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         | ExprKind::GlobalVariable(_)
         | ExprKind::BooleanLiteral(_)
         | ExprKind::IntegerLiteral(_)
-        | ExprKind::Integer { .. }
+        | ExprKind::IntegerKnown(_)
         | ExprKind::Float(..)
         | ExprKind::String(_)
         | ExprKind::NullTerminatedString(_)
@@ -451,11 +450,11 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         ExprKind::IntegerExtend(..) | ExprKind::IntegerTruncate(..) | ExprKind::FloatExtend(..) => {
             ()
         }
-        ExprKind::Member { subject, .. } => {
-            integrate_active_set_for_destination(subject, active_set);
+        ExprKind::Member(member) => {
+            integrate_active_set_for_destination(&mut member.subject, active_set);
         }
-        ExprKind::StructureLiteral { fields, .. } => {
-            for (_name, (expr, _index)) in fields.iter_mut() {
+        ExprKind::StructureLiteral(structure_literal) => {
+            for (_name, (expr, _index)) in structure_literal.fields.iter_mut() {
                 integrate_active_set_for_expr(expr, active_set);
             }
         }
