@@ -1,9 +1,8 @@
+use super::{Registers, SyscallHandler};
 use crate::{
     interpreter::{error::InterpreterError, value::Value, Interpreter},
     ir::{self, BinaryOperands},
 };
-
-use super::Registers;
 
 macro_rules! impl_op_basic {
     ($name:ident, $wrapping_name:ident, $op:tt, $bool_op:tt) => {
@@ -184,7 +183,7 @@ macro_rules! impl_op_cmp {
     };
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a, S: SyscallHandler> Interpreter<'a, S> {
     fn eval_into_literal(&self, registers: &Registers<'a>, value: &ir::Value) -> ir::Literal {
         self.eval(&registers, value).unwrap_literal()
     }

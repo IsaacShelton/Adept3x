@@ -25,17 +25,20 @@ mod text;
 mod token;
 mod try_insert_index_map;
 
+use crate::ast::Ast;
 use crate::c::parser::{Input, Parser};
 use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind};
 use crate::c::translate_expr;
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
+use crate::interpreter::syscall_handler::{BuildSystemSyscallHandler, ProjectKind};
 use crate::ir::InterpreterSyscallKind;
 use crate::source_file_cache::SourceFileCache;
 use crate::tag::Tag;
 use crate::text::IntoText;
-use ast::Source;
+use ast::{IntegerBits, IntegerSign, Source};
 use c::token::CToken;
 use cli::{BuildCommand, BuildOptions, NewCommand};
+use indexmap::IndexMap;
 use indoc::indoc;
 use interpreter::Interpreter;
 use lexer::Lexer;
@@ -281,65 +284,7 @@ fn compile(
     );
 
     if options.interpret {
-        // We assume only working with single file for now
-        assert_eq!(ast.files.len(), 1);
-
-        let source = Source::internal();
-        let void = ast::TypeKind::Void.at(Source::internal());
-        let ptr_u8 = ast::TypeKind::Pointer(Box::new(
-            ast::TypeKind::Integer {
-                bits: ast::IntegerBits::Bits8,
-                sign: ast::IntegerSign::Unsigned,
-            }
-            .at(source),
-        ))
-        .at(source);
-
-        // Call to function we actually care about
-        let call = ast::ExprKind::Call(Box::new(ast::Call {
-            function_name: "main".into(),
-            arguments: vec![],
-            expected_to_return: Some(void.clone()),
-        }))
-        .at(Source::internal());
-
-        // Create entry point for interpreter which will make the call
-        let (_, file) = ast.files.iter_mut().next().unwrap();
-        file.functions.push(ast::Function {
-            name: "<interpreter entry point>".into(),
-            parameters: ast::Parameters::default(),
-            return_type: void.clone(),
-            stmts: vec![ast::StmtKind::Return(Some(call)).at(Source::internal())],
-            is_foreign: false,
-            source,
-            abide_abi: false,
-            tag: Some(Tag::InterpreterEntryPoint),
-        });
-
-        file.functions.push(ast::Function {
-            name: "println".into(),
-            parameters: ast::Parameters {
-                required: vec![ast::Parameter::new("message".into(), ptr_u8.clone())],
-                is_cstyle_vararg: false,
-            },
-            return_type: void.clone(),
-            stmts: vec![ast::StmtKind::Expr(
-                ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
-                    kind: InterpreterSyscallKind::Println,
-                    args: vec![(
-                        ptr_u8.clone(),
-                        ast::ExprKind::Variable("message".into()).at(source),
-                    )],
-                    result_type: void.clone(),
-                }))
-                .at(source),
-            )
-            .at(source)],
-            abide_abi: false,
-            is_foreign: false,
-            source,
-            tag: None,
-        })
+        setup_build_system_interpreter_symbols(&mut ast);
     }
 
     let resolved_ast = exit_unless(resolve(&ast, options), source_file_cache);
@@ -350,32 +295,20 @@ fn compile(
     );
 
     if options.interpret {
-        let (interpreter_entry_point, _fn) = resolved_ast
-            .functions
-            .iter()
-            .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))
-            .unwrap();
-
-        let mut interpreter = Interpreter::new(&ir_module, Some(1_000_000));
-
-        match interpreter.run(interpreter_entry_point) {
-            Ok(result) => assert!(result.is_literal() && result.unwrap_literal().is_void()),
-            Err(err) => eprintln!("interpreter error: {:?}", err),
-        }
-        return;
+        run_build_system_interpreter(&resolved_ast, &ir_module);
+    } else {
+        exit_unless(
+            unsafe {
+                llvm_backend(
+                    options,
+                    &ir_module,
+                    &output_object_filepath,
+                    &output_binary_filepath,
+                )
+            },
+            source_file_cache,
+        );
     }
-
-    exit_unless(
-        unsafe {
-            llvm_backend(
-                options,
-                &ir_module,
-                &output_object_filepath,
-                &output_binary_filepath,
-            )
-        },
-        source_file_cache,
-    );
 }
 
 fn new_project(new_command: NewCommand) {
@@ -433,4 +366,174 @@ fn lex(preprocessed: Vec<PreToken>, eof_source: Source) -> Vec<CToken> {
             .into_inflow(),
     )
     .collect_vec(true)
+}
+
+fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
+    // We assume only working with single file for now
+    assert_eq!(ast.files.len(), 1);
+
+    let source = Source::internal();
+    let void = ast::TypeKind::Void.at(Source::internal());
+    let ptr_u8 = ast::TypeKind::Pointer(Box::new(
+        ast::TypeKind::Integer {
+            bits: IntegerBits::Bits8,
+            sign: IntegerSign::Unsigned,
+        }
+        .at(source),
+    ))
+    .at(source);
+
+    // Call to function we actually care about
+    let call = ast::ExprKind::Call(Box::new(ast::Call {
+        function_name: "main".into(),
+        arguments: vec![],
+        expected_to_return: Some(void.clone()),
+    }))
+    .at(Source::internal());
+
+    // Create entry point for interpreter which will make the call
+    let (_, file) = ast.files.iter_mut().next().unwrap();
+    file.functions.push(ast::Function {
+        name: "<interpreter entry point>".into(),
+        parameters: ast::Parameters::default(),
+        return_type: void.clone(),
+        stmts: vec![ast::StmtKind::Return(Some(call)).at(Source::internal())],
+        is_foreign: false,
+        source,
+        abide_abi: false,
+        tag: Some(Tag::InterpreterEntryPoint),
+    });
+
+    file.enums.insert(
+        "ProjectKind".into(),
+        ast::Enum {
+            backing_type: Some(
+                ast::TypeKind::Integer {
+                    bits: IntegerBits::Bits64,
+                    sign: IntegerSign::Unsigned,
+                }
+                .at(source),
+            ),
+            source,
+            members: IndexMap::from_iter([
+                (
+                    "ConsoleApp".into(),
+                    ast::EnumMember {
+                        value: (ProjectKind::ConsoleApp as u64).into(),
+                        explicit_value: true,
+                    },
+                ),
+                (
+                    "WindowedApp".into(),
+                    ast::EnumMember {
+                        value: (ProjectKind::WindowedApp as u64).into(),
+                        explicit_value: true,
+                    },
+                ),
+            ]),
+        },
+    );
+
+    file.structures.push(ast::Structure {
+        name: "Project".into(),
+        fields: IndexMap::from_iter([(
+            "kind".into(),
+            ast::Field {
+                ast_type: ast::TypeKind::Named("ProjectKind".into()).at(source),
+                privacy: ast::Privacy::Public,
+                source,
+            },
+        )]),
+        is_packed: false,
+        prefer_pod: false,
+        source,
+    });
+
+    file.functions.push(ast::Function {
+        name: "println".into(),
+        parameters: ast::Parameters {
+            required: vec![ast::Parameter::new("message".into(), ptr_u8.clone())],
+            is_cstyle_vararg: false,
+        },
+        return_type: void.clone(),
+        stmts: vec![ast::StmtKind::Expr(
+            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+                kind: InterpreterSyscallKind::Println,
+                args: vec![(
+                    ptr_u8.clone(),
+                    ast::ExprKind::Variable("message".into()).at(source),
+                )],
+                result_type: void.clone(),
+            }))
+            .at(source),
+        )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+    });
+
+    file.functions.push(ast::Function {
+        name: "project".into(),
+        parameters: ast::Parameters {
+            required: vec![
+                ast::Parameter::new("name".into(), ptr_u8.clone()),
+                ast::Parameter::new(
+                    "project".into(),
+                    ast::TypeKind::Named("Project".into()).at(source),
+                ),
+            ],
+            is_cstyle_vararg: false,
+        },
+        return_type: void.clone(),
+        stmts: vec![ast::StmtKind::Expr(
+            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+                kind: InterpreterSyscallKind::BuildAddProject,
+                args: vec![
+                    (
+                        ptr_u8.clone(),
+                        ast::ExprKind::Variable("name".into()).at(source),
+                    ),
+                    (
+                        ast::TypeKind::Named("ProjectKind".into()).at(source),
+                        ast::ExprKind::Member(
+                            Box::new(ast::ExprKind::Variable("project".into()).at(source)),
+                            "kind".into(),
+                        )
+                        .at(source),
+                    ),
+                ],
+                result_type: void.clone(),
+            }))
+            .at(source),
+        )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+    })
+}
+
+fn run_build_system_interpreter(resolved_ast: &resolved::Ast<'_>, ir_module: &ir::Module) {
+    let (interpreter_entry_point, _fn) = resolved_ast
+        .functions
+        .iter()
+        .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))
+        .unwrap();
+
+    let max_steps = Some(1_000_000);
+    let handler = BuildSystemSyscallHandler::default();
+    let mut interpreter = Interpreter::new(handler, &ir_module, max_steps);
+
+    match interpreter.run(interpreter_entry_point) {
+        Ok(result) => assert!(result.is_literal() && result.unwrap_literal().is_void()),
+        Err(err) => {
+            eprintln!("build script error: {}", err);
+            return;
+        }
+    }
+
+    println!("Building:\n{:#?}", interpreter.syscall_handler.projects);
 }

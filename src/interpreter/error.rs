@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Clone, Debug)]
 pub enum InterpreterError {
     TimedOut,
@@ -6,4 +8,23 @@ pub enum InterpreterError {
     SegfaultRead,
     DivideByZero,
     RemainderByZero,
+}
+
+impl Display for InterpreterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            InterpreterError::TimedOut => "exceeded max computation time",
+            InterpreterError::StackOverflow => "stack overflow",
+            InterpreterError::SegfaultWrite => {
+                "write segfault - tried to write to null or reserved address"
+            }
+            InterpreterError::SegfaultRead => {
+                "read segfault - tried to read from null or reserved address"
+            }
+            InterpreterError::DivideByZero => "divide by zero",
+            InterpreterError::RemainderByZero => "remainder by zero",
+        };
+
+        f.write_str(message)
+    }
 }

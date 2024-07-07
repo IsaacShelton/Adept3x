@@ -23,4 +23,6 @@ bit-vec = "0.6.3"
 thin-vec = "0.2.13"
 walkdir = "2.5.0"
 once_map = "0.4.18"
+num = "0.4.3"
+num-derive = "0.4.2"
 

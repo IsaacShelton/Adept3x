@@ -40,7 +40,7 @@ impl Memory {
         })
     }
 
-    fn read_bytes(&mut self, from: u64, count: usize) -> &[u8] {
+    pub fn read_bytes(&self, from: u64, count: usize) -> &[u8] {
         if self.is_heap_address(from) {
             let start = (from - Self::HEAP_OFFSET) as usize;
             &self.heap[start..start + count]
@@ -50,75 +50,75 @@ impl Memory {
         }
     }
 
-    fn read_u1<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_u1<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 1);
         Value::Literal(Literal::Boolean(bytes[0] != 0))
     }
 
-    pub fn read_u8<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_u8<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 1);
         Value::Literal(Literal::Unsigned8(u8::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_u16<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_u16<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 2);
         Value::Literal(Literal::Unsigned16(u16::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_u32<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_u32<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 4);
         Value::Literal(Literal::Unsigned32(u32::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_u64<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_u64<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 8);
         Value::Literal(Literal::Unsigned64(u64::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_s8<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_s8<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 1);
         Value::Literal(Literal::Signed8(i8::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_s16<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_s16<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 2);
         Value::Literal(Literal::Signed16(i16::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_s32<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_s32<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 4);
         Value::Literal(Literal::Signed32(i32::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_s64<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_s64<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 8);
         Value::Literal(Literal::Signed64(i64::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_f32<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_f32<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 4);
         Value::Literal(Literal::Float32(f32::from_le_bytes(
             bytes.try_into().unwrap(),
         )))
     }
 
-    fn read_f64<'a>(&mut self, from: u64) -> Value<'a> {
+    pub fn read_f64<'a>(&self, from: u64) -> Value<'a> {
         let bytes = self.read_bytes(from, 8);
         Value::Literal(Literal::Float64(f64::from_le_bytes(
             bytes.try_into().unwrap(),

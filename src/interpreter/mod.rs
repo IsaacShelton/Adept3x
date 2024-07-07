@@ -4,9 +4,13 @@ mod memory;
 mod ops;
 mod registers;
 mod size_of;
+pub mod syscall_handler;
 mod value;
 
-use self::{error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of};
+use self::{
+    error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of,
+    syscall_handler::SyscallHandler,
+};
 use crate::{
     interpreter::{registers::Registers, value::StructLiteral},
     ir,
@@ -16,15 +20,16 @@ use std::collections::HashMap;
 pub use value::Value;
 
 #[derive(Debug)]
-pub struct Interpreter<'a> {
+pub struct Interpreter<'a, S: SyscallHandler> {
+    pub syscall_handler: S,
     max_steps_left: Option<u64>,
     ir_module: &'a ir::Module,
     memory: Memory,
     global_addresses: HashMap<ir::GlobalRef, ir::Literal>,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new(ir_module: &'a ir::Module, max_steps_left: Option<u64>) -> Self {
+impl<'a, S: SyscallHandler> Interpreter<'a, S> {
+    pub fn new(syscall_handler: S, ir_module: &'a ir::Module, max_steps_left: Option<u64>) -> Self {
         let mut memory = Memory::new();
 
         let mut global_addresses = HashMap::new();
@@ -38,6 +43,7 @@ impl<'a> Interpreter<'a> {
             ir_module,
             memory,
             global_addresses,
+            syscall_handler,
         }
     }
 
@@ -240,26 +246,8 @@ impl<'a> Interpreter<'a> {
                         args.push(self.eval(&registers, supplied_arg));
                     }
 
-                    match syscall {
-                        ir::InterpreterSyscallKind::Println => {
-                            assert_eq!(args.len(), 1);
-                            let cstring = args[0].as_u64().unwrap();
-                            let mut message = String::new();
-                            let mut address = cstring;
-
-                            loop {
-                                let c = self.memory.read_u8(address).as_u64().unwrap() as u8;
-                                if c == 0 {
-                                    break;
-                                }
-                                message.push(c as char);
-                                address += 1;
-                            }
-
-                            println!("{}", message);
-                            Value::Literal(ir::Literal::Void)
-                        }
-                    }
+                    self.syscall_handler
+                        .syscall(&mut self.memory, *syscall, args)
                 }
             };
 

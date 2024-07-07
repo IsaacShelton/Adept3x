@@ -138,6 +138,7 @@ pub enum Instruction {
 #[derive(Copy, Clone, Debug)]
 pub enum InterpreterSyscallKind {
     Println,
+    BuildAddProject,
 }
 
 #[derive(Clone, Debug)]
