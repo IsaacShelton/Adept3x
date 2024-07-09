@@ -12,14 +12,14 @@ use crate::{
 };
 use llvm_sys::{
     core::{LLVMAddFunction, LLVMFunctionType, LLVMSetFunctionCallConv, LLVMSetLinkage},
+    prelude::LLVMTypeRef,
     LLVMCallConv, LLVMLinkage,
 };
 use std::ffi::CString;
 
 pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
-        if function.abide_abi {
-            // TODO: Use abi translations for declaring/calling functions
+        let (mut parameters, return_type) = if function.abide_abi {
             let abi_function = ABIFunction::new(
                 ctx.for_making_type(),
                 Arch::AARCH64(aarch64::AARCH64 {
@@ -35,13 +35,14 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
                 &function.parameters[..],
                 &function.return_type,
                 function.is_cstyle_variadic,
-            );
+            )?;
 
-            todo!("got abi function - {:#?}", abi_function);
-        }
-
-        let mut parameters = to_backend_types(ctx.for_making_type(), function.parameters.iter())?;
-        let return_type = to_backend_type(ctx.for_making_type(), &function.return_type)?;
+            emit_prologue(&abi_function)
+        } else {
+            let parameters = to_backend_types(ctx.for_making_type(), function.parameters.iter())?;
+            let return_type = to_backend_type(ctx.for_making_type(), &function.return_type)?;
+            (parameters, return_type)
+        };
 
         let name = CString::new(function.mangled_name.as_bytes()).unwrap();
 
@@ -63,4 +64,8 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
     }
 
     Ok(())
+}
+
+fn emit_prologue(abi_function: &ABIFunction) -> (Vec<LLVMTypeRef>, LLVMTypeRef) {
+    todo!("emit_prologue - {:#?}", abi_function);
 }

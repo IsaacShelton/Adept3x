@@ -24,8 +24,6 @@ pub enum ProjectKind {
     WindowedApp = 1,
 }
 
-impl ProjectKind {}
-
 #[derive(Debug, Default)]
 pub struct BuildSystemSyscallHandler {
     pub projects: Vec<Project>,

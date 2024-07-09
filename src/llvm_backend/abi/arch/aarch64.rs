@@ -68,6 +68,7 @@ impl AARCH64<'_> {
         Ok(ABIFunction {
             parameter_types,
             return_type,
+            inalloca_combined_struct: None,
         })
     }
 

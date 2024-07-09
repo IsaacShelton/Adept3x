@@ -3,12 +3,14 @@ use crate::{
     ir,
     llvm_backend::{ctx::ToBackendTypeCtx, error::BackendError},
 };
+use llvm_sys::prelude::LLVMTypeRef;
 use std::borrow::Borrow;
 
 #[derive(Clone, Debug)]
 pub struct ABIFunction {
     pub parameter_types: Vec<ABIType>,
     pub return_type: ABIType,
+    pub inalloca_combined_struct: Option<LLVMTypeRef>,
 }
 
 impl ABIFunction {
