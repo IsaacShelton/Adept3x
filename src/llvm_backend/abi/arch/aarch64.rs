@@ -3,7 +3,7 @@ use crate::{
     ir,
     llvm_backend::{
         abi::{
-            abi_function::ABIFunction,
+            abi_function::{ABIFunction, ABIParam},
             abi_type::{ABIType, DirectOptions, ExtendOptions, IndirectOptions},
             cxx::Itanium,
             empty::{is_empty_record, IsEmptyRecordOptions},
@@ -57,12 +57,15 @@ impl AARCH64<'_> {
         let mut parameter_types = Vec::new();
 
         for parameter in original_parameter_types.iter() {
-            parameter_types.push(self.classify_argument_type(
-                ctx,
-                parameter,
-                is_variadic,
-                LLVMCallConv::LLVMCCallConv,
-            )?);
+            parameter_types.push(ABIParam {
+                abi_type: self.classify_argument_type(
+                    ctx,
+                    parameter,
+                    is_variadic,
+                    LLVMCallConv::LLVMCCallConv,
+                )?,
+                ir_type: parameter.clone(),
+            });
         }
 
         Ok(ABIFunction {
@@ -356,6 +359,7 @@ fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
         | ir::Type::F64
         | ir::Type::Pointer(_)
         | ir::Type::Void
+        | ir::Type::Union(_)
         | ir::Type::Structure(_)
         | ir::Type::AnonymousComposite(_)
         | ir::Type::FunctionPointer

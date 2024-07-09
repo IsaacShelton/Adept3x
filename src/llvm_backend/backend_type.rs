@@ -26,6 +26,7 @@ pub unsafe fn to_backend_type<'a>(
         ir::Type::F32 => LLVMFloatType(),
         ir::Type::F64 => LLVMDoubleType(),
         ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to)?, 0),
+        ir::Type::Union(_) => todo!("to_backend_type for ir::Type::Union"),
         ir::Type::AnonymousComposite(composite) => {
             let mut subtypes =
                 to_backend_types(ctx, composite.fields.iter().map(ir::Field::ir_type))?;

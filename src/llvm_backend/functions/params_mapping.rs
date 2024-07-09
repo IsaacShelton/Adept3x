@@ -1,4 +1,5 @@
 use crate::{
+    ir,
     llvm_backend::abi::{abi_function::ABIFunction, abi_type::ABITypeKind},
     target_info::type_layout::TypeLayoutCache,
 };
@@ -16,15 +17,19 @@ struct Param {
 
 // Maps IR parameters to LLVM-IR parameters
 #[derive(Debug)]
-pub struct ParamMapping {
+pub struct ParamsMapping {
     inalloc_index: Option<usize>,
     sret_index: Option<usize>,
     llvm_arity: usize,
     params: Vec<Param>,
 }
 
-impl ParamMapping {
-    pub fn new(_type_layout_cache: &TypeLayoutCache, abi_function: &ABIFunction) -> Self {
+impl ParamsMapping {
+    pub fn new(
+        type_layout_cache: &TypeLayoutCache,
+        abi_function: &ABIFunction,
+        ir_module: &ir::Module,
+    ) -> Self {
         let mut llvm_param_index = 0 as usize;
         let mut params = Vec::with_capacity(abi_function.parameter_types.len());
         let mut swap_this_with_sret = false;
@@ -43,7 +48,9 @@ impl ParamMapping {
         }
 
         for abi_param in abi_function.parameter_types.iter() {
-            let padding_index = if abi_param.padding_type().flatten().is_some() {
+            let abi_type = &abi_param.abi_type;
+
+            let padding_index = if abi_type.padding_type().flatten().is_some() {
                 let index = llvm_param_index;
                 llvm_param_index += 1;
                 Some(index)
@@ -51,7 +58,7 @@ impl ParamMapping {
                 None
             };
 
-            let num_subparams = match &abi_param.kind {
+            let num_subparams = match &abi_type.kind {
                 ABITypeKind::Direct(direct) => {
                     let struct_type = direct.coerce_to_type.filter(|llvm_type| {
                         return unsafe { LLVMGetTypeKind(*llvm_type) }
@@ -74,8 +81,12 @@ impl ParamMapping {
                 ABITypeKind::Indirect(_) => 1,
                 ABITypeKind::IndirectAliased(_) => 1,
                 ABITypeKind::Ignore => 0,
-                ABITypeKind::Expand(_) => todo!("param mapping for expand"),
-                ABITypeKind::CoerceAndExpand(_) => todo!("param mapping for coerce and expand"),
+                ABITypeKind::Expand(expand) => {
+                    expand.expanded_size(&abi_param.ir_type, type_layout_cache, ir_module)
+                }
+                ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                    coerce_and_expand.expanded_type_sequence_len()
+                }
                 ABITypeKind::InAlloca(_) => 0,
             };
 

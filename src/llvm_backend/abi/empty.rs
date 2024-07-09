@@ -11,7 +11,7 @@ pub fn is_empty_record(
     ir_module: &ir::Module,
     options: IsEmptyRecordOptions,
 ) -> bool {
-    let fields = match ty.fields(ir_module) {
+    let fields = match ty.struct_fields(ir_module) {
         Some(fields) => fields,
         None => return false,
     };

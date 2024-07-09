@@ -228,6 +228,12 @@ impl Field {
         false
     }
 
+    pub fn is_zero_length_bitfield(&self) -> bool {
+        // We don't support bitfields yet, but this will need to change
+        // once we do
+        self.is_bitfield() && todo!("is_zero_length_bitfield")
+    }
+
     /// Returns the maximum alignment applied to the field (or 0 if unmodified)
     pub fn get_max_alignment(&self) -> ByteUnits {
         // NOTE: We don't support using `alignas` / `_Alignas` / GNU `aligned` / MSVC declspec `align`
@@ -284,6 +290,7 @@ pub enum Type {
     F32,
     F64,
     Void,
+    Union(()),
     Structure(StructureRef),
     AnonymousComposite(TypeComposite),
     FunctionPointer,
@@ -361,7 +368,7 @@ impl Type {
         }
     }
 
-    pub fn fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
+    pub fn struct_fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
         match self {
             Type::Structure(structure_ref) => {
                 let structure = ir_module

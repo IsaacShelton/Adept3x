@@ -85,6 +85,7 @@ impl<'a> TypeLayoutCache<'a> {
                 unadjusted_alignment: ByteUnits::of(1),
                 alignment_requirement: AlignmentRequirement::None,
             },
+            ir::Type::Union(_) => todo!("get_impl for ir::Type::Union"),
             ir::Type::Structure(structure_ref) => {
                 let structure = self
                     .structures

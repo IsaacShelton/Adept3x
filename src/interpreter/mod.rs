@@ -170,7 +170,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     subject_pointer,
                     index,
                 } => {
-                    let fields = struct_type.fields(self.ir_module).unwrap();
+                    let fields = struct_type.struct_fields(self.ir_module).unwrap();
 
                     let offset = fields
                         .iter()
@@ -190,7 +190,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
 
                     Value::StructLiteral(StructLiteral {
                         values: field_values,
-                        fields: ty.fields(self.ir_module).unwrap(),
+                        fields: ty.struct_fields(self.ir_module).unwrap(),
                     })
                 }
                 ir::Instruction::IsZero(_) => todo!(),

@@ -8,9 +8,15 @@ use std::borrow::Borrow;
 
 #[derive(Clone, Debug)]
 pub struct ABIFunction {
-    pub parameter_types: Vec<ABIType>,
+    pub parameter_types: Vec<ABIParam>,
     pub return_type: ABIType,
     pub inalloca_combined_struct: Option<LLVMTypeRef>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ABIParam {
+    pub abi_type: ABIType,
+    pub ir_type: ir::Type,
 }
 
 impl ABIFunction {

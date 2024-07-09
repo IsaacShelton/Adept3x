@@ -15,6 +15,7 @@ pub fn size_of(ir_type: &ir::Type, ir_module: &ir::Module) -> u64 {
         ir::Type::F32 => 4,
         ir::Type::F64 => 8,
         ir::Type::Void => 0,
+        ir::Type::Union(_) => todo!("interpreter write union"),
         ir::Type::Structure(structure_ref) => {
             let structure = ir_module
                 .structures

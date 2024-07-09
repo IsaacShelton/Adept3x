@@ -29,6 +29,7 @@ impl Memory {
             ir::Type::F32 => self.read_f32(from),
             ir::Type::F64 => self.read_f64(from),
             ir::Type::Void => Value::Literal(Literal::Void),
+            ir::Type::Union(_) => todo!("interpreter read union"),
             ir::Type::Structure(_) => todo!("interpreter read structure"),
             ir::Type::AnonymousComposite(_) => todo!("interpreter read anonymous composite"),
             ir::Type::FunctionPointer => self.read_u64(from),
