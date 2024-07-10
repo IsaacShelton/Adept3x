@@ -1,7 +1,7 @@
 use super::{
     builder::Builder, intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
 };
-use crate::{ir, resolved::StructureRef};
+use crate::{ir, resolved::StructureRef, target_info::type_layout::TypeLayoutCache};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use once_map::unsync::OnceMap;
 use std::{
@@ -42,7 +42,7 @@ impl<'a> From<&'a BackendCtx<'a>> for ToBackendTypeCtx<'a> {
 
 pub struct BackendCtx<'a> {
     pub backend_module: &'a BackendModule,
-    pub ir_module: ir::Module,
+    pub ir_module: &'a ir::Module,
     pub builder: Option<Builder>,
     pub func_skeletons: HashMap<ir::FunctionRef, LLVMValueRef>,
     pub globals: HashMap<ir::GlobalRef, LLVMValueRef>,
@@ -52,6 +52,7 @@ pub struct BackendCtx<'a> {
     pub relocations: Vec<Phi2Relocation>,
     pub static_variables: Vec<StaticVariable>,
     pub structure_cache: StructureCache,
+    pub type_layout_cache: TypeLayoutCache<'a>,
 }
 
 impl<'a> BackendCtx<'a> {
@@ -60,8 +61,10 @@ impl<'a> BackendCtx<'a> {
         backend_module: &'a BackendModule,
         target_data: &'a TargetData,
     ) -> Self {
+        let type_layout_cache = TypeLayoutCache::new(&ir_module.target_info, &ir_module.structures);
+
         Self {
-            ir_module: ir_module.clone(),
+            ir_module,
             backend_module,
             builder: None,
             func_skeletons: HashMap::new(),
@@ -72,6 +75,7 @@ impl<'a> BackendCtx<'a> {
             relocations: Vec::new(),
             static_variables: Vec::new(),
             structure_cache: Default::default(),
+            type_layout_cache,
         }
     }
 

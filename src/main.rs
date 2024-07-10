@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod ast;
+mod borrow;
 mod c;
 mod cli;
 mod data_units;
