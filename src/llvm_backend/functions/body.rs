@@ -1,4 +1,5 @@
 use super::block::create_function_block;
+use super::prologue::emit_prologue;
 use crate::llvm_backend::{
     builder::Builder, ctx::BackendCtx, error::BackendError, value_catalog::ValueCatalog,
     values::build_value,
@@ -24,18 +25,17 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                     (
                         id,
                         ir_basicblock,
-                        LLVMAppendBasicBlock(*skeleton, cstr!("").as_ptr()),
+                        LLVMAppendBasicBlock(skeleton.function, cstr!("").as_ptr()),
                     )
                 })
                 .collect::<Vec<_>>();
 
             let overflow_basicblock: OnceCell<LLVMBasicBlockRef> = OnceCell::new();
 
-            if let Some(_first_block) = basicblocks
-                .first()
-                .map(|(_, _, backend_block)| backend_block)
-            {
-                // TODO: Emit prologue
+            if ir_function.abide_abi {
+                if let Some((_, _, llvm_entry_basicblock)) = basicblocks.first() {
+                    emit_prologue(ctx, skeleton, &builder, *llvm_entry_basicblock);
+                }
             }
 
             for (ir_basicblock_id, ir_basicblock, llvm_basicblock) in basicblocks.iter() {
@@ -47,7 +47,7 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                     *ir_basicblock_id,
                     ir_basicblock,
                     *llvm_basicblock,
-                    *skeleton,
+                    skeleton.function,
                     &basicblocks,
                 )?;
             }

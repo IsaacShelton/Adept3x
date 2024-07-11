@@ -108,10 +108,11 @@ pub unsafe fn create_function_block(
                         .expect("callee to exist"),
                 )?;
 
-                let function_value = *ctx
+                let function_value = ctx
                     .func_skeletons
                     .get(&call.function)
-                    .expect("ir function to exist");
+                    .expect("ir function to exist")
+                    .function;
 
                 let mut arguments = call
                     .arguments

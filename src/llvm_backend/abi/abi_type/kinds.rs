@@ -65,6 +65,16 @@ pub struct Indirect {
     pub in_register: bool,
 }
 
+impl Indirect {
+    pub fn sret_position(&self) -> u8 {
+        if self.sret_after_this {
+            1
+        } else {
+            0
+        }
+    }
+}
+
 impl Debug for Indirect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Indirect")

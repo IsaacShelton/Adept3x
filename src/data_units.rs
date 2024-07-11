@@ -6,6 +6,8 @@ pub struct ByteUnits {
 }
 
 impl ByteUnits {
+    pub const ZERO: Self = Self { units: 0 };
+
     pub const fn of(value: u64) -> Self {
         Self { units: value }
     }
