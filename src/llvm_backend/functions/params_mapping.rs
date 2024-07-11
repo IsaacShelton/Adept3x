@@ -9,10 +9,20 @@ use llvm_sys::{
 };
 
 #[derive(Debug)]
-struct Param {
+pub struct Param {
     padding_index: Option<usize>,
     begin_index: usize,
     num_subparams: usize,
+}
+
+impl Param {
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.begin_index..(self.begin_index + self.num_subparams)
+    }
+
+    pub fn padding_index(&self) -> Option<usize> {
+        self.padding_index
+    }
 }
 
 // Maps IR parameters to LLVM-IR parameters
@@ -37,7 +47,7 @@ impl ParamsMapping {
         let mut sret_index = None;
         let return_info = &abi_function.return_type;
 
-        if let ABITypeKind::Indirect(indirect) = &return_info.kind {
+        if let ABITypeKind::Indirect(indirect) = &return_info.abi_type.kind {
             swap_this_with_sret = indirect.sret_after_this;
             sret_index = if swap_this_with_sret {
                 Some(1)
@@ -118,7 +128,7 @@ impl ParamsMapping {
         }
     }
 
-    pub fn inalloca(&self) -> Option<usize> {
+    pub fn inalloca_index(&self) -> Option<usize> {
         self.inalloc_index
     }
 
@@ -126,9 +136,8 @@ impl ParamsMapping {
         self.sret_index
     }
 
-    pub fn llvm_args(&self, ir_param_index: usize) -> std::ops::Range<usize> {
-        let param = &self.params[ir_param_index];
-        param.begin_index..(param.begin_index + param.num_subparams)
+    pub fn params(&self) -> &[Param] {
+        &self.params[..]
     }
 
     pub fn llvm_arity(&self) -> usize {

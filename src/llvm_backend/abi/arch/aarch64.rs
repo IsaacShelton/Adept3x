@@ -50,9 +50,12 @@ impl AARCH64<'_> {
         original_return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<ABIFunction, BackendError> {
-        let return_type = abi
-            .classify_return_type(original_return_type)
-            .unwrap_or_else(|| self.classify_return_type(original_return_type, is_variadic));
+        let return_type = ABIParam {
+            ir_type: original_return_type.clone(),
+            abi_type: abi
+                .classify_return_type(original_return_type)
+                .unwrap_or_else(|| self.classify_return_type(original_return_type, is_variadic)),
+        };
 
         let mut parameter_types = Vec::new();
 

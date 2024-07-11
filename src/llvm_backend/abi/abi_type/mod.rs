@@ -1,15 +1,11 @@
 mod direct;
 mod extend;
 mod indirect;
-mod kinds;
+pub mod kinds;
 mod offset_align;
 mod show_llvm_type;
 
-pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
-use self::{
-    kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased},
-    offset_align::OffsetAlign,
-};
+use self::offset_align::OffsetAlign;
 use crate::{data_units::ByteUnits, ir};
 use derive_more::{Deref, IsVariant};
 use llvm_sys::{
@@ -21,6 +17,9 @@ use llvm_sys::{
     LLVMType, LLVMTypeKind,
 };
 use std::ptr::null_mut;
+
+pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
+pub use kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased};
 
 #[derive(Clone, Debug, Deref)]
 pub struct ABIType {
@@ -289,6 +288,25 @@ impl ABIType {
         }
     }
 
+    pub fn coerce_to_type_if_missing<E>(
+        &mut self,
+        make_type: impl Fn() -> Result<LLVMTypeRef, E>,
+    ) -> Result<(), E> {
+        match &mut self.kind {
+            ABITypeKind::Direct(direct) if direct.coerce_to_type.is_none() => {
+                direct.coerce_to_type = Some(make_type()?);
+            }
+            ABITypeKind::Extend(extend) if extend.coerce_to_type.is_none() => {
+                extend.coerce_to_type = Some(make_type()?);
+            }
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                assert_ne!(coerce_and_expand.coerce_to_type, null_mut());
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+
     pub fn get_direct_offset_align(&self) -> Option<OffsetAlign> {
         match &self.kind {
             ABITypeKind::Direct(direct) => Some(direct.offset_align),
@@ -444,7 +462,7 @@ fn is_padding_for_coerce_expand(ty: LLVMTypeRef) -> bool {
     }
 }
 
-fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
+pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
     assert!(unsafe { LLVMGetTypeKind(struct_type) } == LLVMTypeKind::LLVMStructTypeKind);
 
     let num_elements = unsafe { LLVMCountStructElementTypes(struct_type) } as usize;

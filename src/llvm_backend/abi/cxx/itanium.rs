@@ -24,6 +24,7 @@ impl<'a> Itanium<'a> {
             target_info,
         }
     }
+
     pub fn classify_return_type(&self, return_type: &ir::Type) -> Option<ABIType> {
         if let Some(false) = can_pass_in_registers_composite(return_type) {
             // NOTE: For returning types that aren't C++ copiable, we

@@ -1,5 +1,10 @@
-use super::{offset_align::OffsetAlign, show_llvm_type::ShowLLVMType};
-use crate::{data_units::ByteUnits, ir, target_info::type_layout::TypeLayoutCache};
+use super::{get_struct_field_types, offset_align::OffsetAlign, show_llvm_type::ShowLLVMType};
+use crate::{
+    data_units::ByteUnits,
+    ir,
+    llvm_backend::{backend_type::to_backend_type, ctx::BackendCtx, error::BackendError},
+    target_info::type_layout::TypeLayoutCache,
+};
 use core::fmt::Debug;
 use itertools::Itertools;
 use llvm_sys::{
@@ -95,6 +100,45 @@ impl Debug for IndirectAliased {
 #[derive(Clone)]
 pub struct Expand {
     pub padding: Option<LLVMTypeRef>,
+}
+
+impl Expand {
+    pub fn expand(ctx: &BackendCtx, ir_type: &ir::Type) -> Result<Vec<LLVMTypeRef>, BackendError> {
+        let expansion = get_type_expansion(ir_type, &ctx.type_layout_cache, ctx.ir_module);
+
+        match expansion {
+            TypeExpansion::FixedArray(fixed_array) => {
+                let expanded_element = Self::expand(ctx, &fixed_array.inner)?;
+
+                Ok(expanded_element
+                    .iter()
+                    .copied()
+                    .cycle()
+                    .take(expanded_element.len() * usize::try_from(fixed_array.size).unwrap())
+                    .collect())
+            }
+            TypeExpansion::Record(fields) => fields
+                .iter()
+                .map(|field| Self::expand(ctx, &field.ir_type))
+                .fold_ok(vec![], |mut acc, expanded| {
+                    acc.extend(expanded.into_iter());
+                    acc
+                }),
+            TypeExpansion::Complex(inner) => {
+                let expanded_element = Self::expand(ctx, &inner)?;
+
+                Ok(expanded_element
+                    .iter()
+                    .copied()
+                    .cycle()
+                    .take(expanded_element.len() * 2)
+                    .collect())
+            }
+            TypeExpansion::None => Ok(vec![unsafe {
+                to_backend_type(ctx.for_making_type(), ir_type)?
+            }]),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -196,6 +240,19 @@ pub struct CoerceAndExpand {
 }
 
 impl CoerceAndExpand {
+    pub fn expanded_type_sequence(&self) -> Vec<LLVMTypeRef> {
+        let is_struct = unsafe {
+            LLVMGetTypeKind(self.unpadded_coerce_and_expand_type)
+                == LLVMTypeKind::LLVMStructTypeKind
+        };
+
+        if is_struct {
+            get_struct_field_types(self.unpadded_coerce_and_expand_type)
+        } else {
+            vec![self.unpadded_coerce_and_expand_type]
+        }
+    }
+
     pub fn expanded_type_sequence_len(&self) -> usize {
         if unsafe { LLVMGetTypeKind(self.coerce_to_type) } == LLVMTypeKind::LLVMStructTypeKind {
             unsafe { LLVMCountStructElementTypes(self.coerce_to_type) }
