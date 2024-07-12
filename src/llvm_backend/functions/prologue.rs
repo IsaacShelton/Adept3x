@@ -1,23 +1,11 @@
-use cstr::cstr;
-use llvm_sys::{
-    core::{
-        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMBuildBitCast, LLVMBuildStore, LLVMDumpModule,
-        LLVMGetInsertBlock, LLVMGetParam, LLVMGetTypeKind, LLVMGetUndef, LLVMInt32Type,
-        LLVMPositionBuilderAtEnd, LLVMPositionBuilderBefore, LLVMSetAlignment,
-    },
-    prelude::{LLVMBasicBlockRef, LLVMTypeRef, LLVMValueRef},
-    target::LLVMPreferredAlignmentOfType,
-    LLVMTypeKind,
-};
-use std::ffi::CStr;
-
 use crate::{
     data_units::ByteUnits,
     ir,
     llvm_backend::{
         abi::{
-            abi_function::ABIFunction,
-            abi_type::{ABITypeKind, Indirect},
+            abi_function::{ABIFunction, ABIParam},
+            abi_type::{ABITypeKind, InAlloca, Indirect},
+            has_scalar_evaluation_kind,
         },
         builder::Builder,
         ctx::{Address, BackendCtx, FunctionSkeleton, RawAddress},
@@ -25,6 +13,19 @@ use crate::{
     },
     target_info::type_layout::TypeLayoutCache,
 };
+use cstr::cstr;
+use llvm_sys::{
+    core::{
+        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMBuildBitCast, LLVMBuildLoad2, LLVMBuildStore,
+        LLVMBuildStructGEP2, LLVMDumpModule, LLVMGetInsertBlock, LLVMGetLastParam, LLVMGetParam,
+        LLVMGetTypeKind, LLVMGetUndef, LLVMInt32Type, LLVMPositionBuilderAtEnd,
+        LLVMPositionBuilderBefore, LLVMSetAlignment,
+    },
+    prelude::{LLVMBasicBlockRef, LLVMTypeRef, LLVMValueRef},
+    target::LLVMPreferredAlignmentOfType,
+    LLVMTypeKind,
+};
+use std::ffi::CStr;
 
 pub struct BackendFnCtx {
     pub return_location: Option<ReturnLocation>,
@@ -45,7 +46,7 @@ impl ReturnLocation {
         indirect: &Indirect,
         alloca_insertion_point: LLVMValueRef,
         return_type: LLVMTypeRef,
-    ) -> Option<ReturnLocation> {
+    ) -> Self {
         let sret_argument = unsafe { LLVMGetParam(function, indirect.sret_position().into()) };
 
         let value = make_natural_address_for_pointer(
@@ -57,45 +58,157 @@ impl ReturnLocation {
 
         let pointer = (!indirect.byval).then(|| {
             let pointer = create_default_align_tmp_alloca(
-                builder,
                 target_data,
+                builder,
+                alloca_insertion_point,
                 return_type,
                 cstr!("result.ptr"),
-                alloca_insertion_point,
             );
             unsafe { LLVMBuildStore(builder.get(), value.base_pointer(), pointer.base_pointer()) };
             pointer
         });
 
-        Some(ReturnLocation {
+        ReturnLocation {
             return_value_address: value,
             return_value_address_pointer: pointer.map(Into::into),
-        })
+        }
+    }
+
+    pub fn inalloca(
+        builder: &Builder,
+        ctx: &BackendCtx,
+        skeleton: &FunctionSkeleton,
+        inalloca: &InAlloca,
+        abi_return_info: &ABIParam,
+    ) -> Self {
+        let last_argument = unsafe { LLVMGetLastParam(skeleton.function) };
+
+        let inalloca_combined_struct = skeleton
+            .abi_function
+            .as_ref()
+            .unwrap()
+            .inalloca_combined_struct
+            .unwrap();
+
+        let address = unsafe {
+            LLVMBuildStructGEP2(
+                builder.get(),
+                inalloca_combined_struct,
+                last_argument,
+                inalloca.alloca_field_index,
+                cstr!("").as_ptr(),
+            )
+        };
+
+        let pointer = Address {
+            base: RawAddress {
+                base: address,
+                nullable: false,
+                alignment: ctx.target_data.pointer_alignment(),
+            },
+            offset: None,
+        };
+
+        let addr = unsafe {
+            let load = LLVMBuildLoad2(
+                builder.get(),
+                inalloca_combined_struct,
+                address,
+                cstr!("agg.result").as_ptr(),
+            );
+
+            LLVMSetAlignment(
+                load,
+                ctx.target_data
+                    .pointer_alignment()
+                    .bytes()
+                    .try_into()
+                    .unwrap(),
+            );
+
+            load
+        };
+
+        let value = Address {
+            base: RawAddress {
+                base: addr,
+                nullable: false,
+                alignment: get_natural_type_alignment(
+                    &ctx.type_layout_cache,
+                    &abi_return_info.ir_type,
+                ),
+            },
+            offset: None,
+        };
+
+        ReturnLocation {
+            return_value_address: value,
+            return_value_address_pointer: Some(pointer),
+        }
+    }
+
+    pub fn normal(
+        builder: &Builder,
+        type_layout_cache: &TypeLayoutCache,
+        alloca_insertion_point: LLVMValueRef,
+        return_ir_type: &ir::Type,
+        return_type: LLVMTypeRef,
+    ) -> Self {
+        ReturnLocation {
+            return_value_address: create_ir_tmp(
+                builder,
+                type_layout_cache,
+                alloca_insertion_point,
+                return_ir_type,
+                return_type,
+                Some(cstr!("retval")),
+            )
+            .into(),
+            return_value_address_pointer: None,
+        }
     }
 }
 
 fn create_default_align_tmp_alloca(
-    builder: &Builder,
     target_data: &TargetData,
+    builder: &Builder,
+    alloca_insertion_point: LLVMValueRef,
     ty: LLVMTypeRef,
     name: &CStr,
-    alloca_insertion_point: LLVMValueRef,
 ) -> RawAddress {
-    let align = ByteUnits::from(unsafe { LLVMPreferredAlignmentOfType(target_data.get(), ty) });
+    let alignment = ByteUnits::from(unsafe { LLVMPreferredAlignmentOfType(target_data.get(), ty) });
+    create_tmp_alloca_address(builder, alloca_insertion_point, ty, alignment, name, None)
+}
 
-    create_tmp_alloca_address(builder, ty, align, name, None, alloca_insertion_point)
+fn create_ir_tmp(
+    builder: &Builder,
+    type_layout_cache: &TypeLayoutCache,
+    alloca_insertion_point: LLVMValueRef,
+    ir_type: &ir::Type,
+    ty: LLVMTypeRef,
+    name: Option<&CStr>,
+) -> RawAddress {
+    let alignment = type_layout_cache.get(ir_type).alignment;
+
+    create_tmp_alloca_address(
+        builder,
+        alloca_insertion_point,
+        ty,
+        alignment,
+        name.unwrap_or_else(|| cstr!("tmp")),
+        None,
+    )
 }
 
 fn create_tmp_alloca_address(
     builder: &Builder,
+    alloca_insertion_point: LLVMValueRef,
     ty: LLVMTypeRef,
     alignment: ByteUnits,
     name: &CStr,
     array_size: Option<LLVMValueRef>,
-    alloca_insertion_point: LLVMValueRef,
 ) -> RawAddress {
     let alloca = create_tmp_alloca_inst(builder, ty, name, array_size, alloca_insertion_point);
-
     unsafe { LLVMSetAlignment(alloca, alignment.bytes().try_into().unwrap()) };
 
     RawAddress {
@@ -113,14 +226,14 @@ fn create_tmp_alloca_inst(
     alloca_insertion_point: LLVMValueRef,
 ) -> LLVMValueRef {
     let alloca = if let Some(array_size) = array_size {
-        let current_block = unsafe { LLVMGetInsertBlock(builder.get()) };
+        unsafe {
+            let current_block = LLVMGetInsertBlock(builder.get());
+            LLVMPositionBuilderBefore(builder.get(), alloca_insertion_point);
 
-        unsafe { LLVMPositionBuilderBefore(builder.get(), alloca_insertion_point) };
-        let inserted =
-            unsafe { LLVMBuildArrayAlloca(builder.get(), ty, array_size, name.as_ptr()) };
-        unsafe { LLVMPositionBuilderAtEnd(builder.get(), current_block) };
-
-        inserted
+            let inserted = LLVMBuildArrayAlloca(builder.get(), ty, array_size, name.as_ptr());
+            LLVMPositionBuilderAtEnd(builder.get(), current_block);
+            inserted
+        }
     } else {
         unsafe { LLVMBuildAlloca(builder.get(), ty, name.as_ptr()) }
     };
@@ -180,8 +293,6 @@ pub fn emit_prologue(
     };
 
     let return_location = (!is_return_void).then(|| match &abi_return_info.abi_type.kind {
-        ABITypeKind::Direct(_) => todo!(),
-        ABITypeKind::Extend(_) => todo!(),
         ABITypeKind::Indirect(indirect) => ReturnLocation::indirect(
             builder,
             &ctx.target_data,
@@ -192,11 +303,18 @@ pub fn emit_prologue(
             alloca_insertion_point,
             return_type,
         ),
-        ABITypeKind::IndirectAliased(_) => todo!(),
-        ABITypeKind::Ignore => todo!(),
-        ABITypeKind::Expand(_) => todo!(),
-        ABITypeKind::CoerceAndExpand(_) => todo!(),
-        ABITypeKind::InAlloca(_) => todo!(),
+        ABITypeKind::InAlloca(inalloca)
+            if !has_scalar_evaluation_kind(&abi_return_info.ir_type) =>
+        {
+            ReturnLocation::inalloca(builder, ctx, skeleton, inalloca, abi_return_info)
+        }
+        _ => ReturnLocation::normal(
+            builder,
+            &ctx.type_layout_cache,
+            alloca_insertion_point,
+            &abi_return_info.ir_type,
+            return_type,
+        ),
     });
 
     unsafe { LLVMDumpModule(ctx.backend_module.get()) };

@@ -7,6 +7,7 @@ use crate::{
             abi_type::{ABIType, DirectOptions, ExtendOptions, IndirectOptions},
             cxx::Itanium,
             empty::{is_empty_record, IsEmptyRecordOptions},
+            has_scalar_evaluation_kind,
         },
         backend_type::to_backend_type,
         ctx::ToBackendTypeCtx,
@@ -327,26 +328,6 @@ impl AARCH64<'_> {
 
 fn is_aggregate_type_for_abi(ty: &ir::Type) -> bool {
     !has_scalar_evaluation_kind(ty) || ty.is_function_pointer()
-}
-
-fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
-    match ty {
-        ir::Type::Pointer(_)
-        | ir::Type::Boolean
-        | ir::Type::S8
-        | ir::Type::S16
-        | ir::Type::S32
-        | ir::Type::S64
-        | ir::Type::U8
-        | ir::Type::U16
-        | ir::Type::U32
-        | ir::Type::U64
-        | ir::Type::F32
-        | ir::Type::F64
-        | ir::Type::Vector(_) => true,
-        ir::Type::Atomic(inner) => has_scalar_evaluation_kind(inner),
-        ir::Type::Complex(_) | _ => false,
-    }
 }
 
 fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
