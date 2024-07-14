@@ -399,8 +399,7 @@ impl<'a> Parser<'a> {
             let next_precedence = operator.kind.precedence();
 
             if is_terminating_token(&operator.kind)
-                || (next_precedence + usize::from(is_right_associative(&operator.kind)))
-                    < precedence
+                || (next_precedence + is_right_associative(&operator.kind) as usize) < precedence
             {
                 return Ok(lhs);
             }

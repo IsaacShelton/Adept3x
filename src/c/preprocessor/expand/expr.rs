@@ -146,12 +146,14 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
     fn parse_number(number: &str, source: Source) -> Result<ConstExpr, PreprocessorError> {
         // Remove trailing 'L' if present
-
-        let number = number.strip_suffix("L").unwrap_or(number);
         let number = number.strip_suffix("L").unwrap_or(number);
 
-        if number.starts_with("0x") || number.starts_with("0X") {
-            Self::parse_number_radix(&number[..2], 16)
+        // Parse number depending on prefix
+        if let Some(hex_digits) = number
+            .strip_prefix("0x")
+            .or_else(|| number.strip_prefix("0X"))
+        {
+            Self::parse_number_radix(hex_digits, 16)
         } else if number.starts_with("0") {
             Self::parse_number_radix(number, 8)
         } else {
