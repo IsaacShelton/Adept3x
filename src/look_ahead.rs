@@ -32,15 +32,15 @@ where
         }
     }
 
-    pub fn peek<'a>(&'a mut self) -> Option<&'a I::Item> {
+    pub fn peek(&mut self) -> Option<&I::Item> {
         self.peek_nth(0)
     }
 
-    pub fn peek_mut<'a>(&'a mut self) -> Option<&'a mut I::Item> {
+    pub fn peek_mut(&mut self) -> Option<&mut I::Item> {
         self.peek_nth_mut(0)
     }
 
-    pub fn peek_n<'a>(&'a mut self, count: usize) -> &'a [I::Item] {
+    pub fn peek_n(&mut self, count: usize) -> &[I::Item] {
         while self.buffer.len() <= count {
             if let Some(value) = self.iterator.next() {
                 self.buffer.push_back(value);
@@ -54,11 +54,11 @@ where
         &contiguous[..contiguous.len().max(count)]
     }
 
-    pub fn peek_nth<'a>(&'a mut self, index: usize) -> Option<&'a I::Item> {
+    pub fn peek_nth(&mut self, index: usize) -> Option<&I::Item> {
         self.peek_nth_mut(index).map(|reference| &*reference)
     }
 
-    pub fn peek_nth_mut<'a>(&'a mut self, index: usize) -> Option<&'a mut I::Item> {
+    pub fn peek_nth_mut(&mut self, index: usize) -> Option<&mut I::Item> {
         while self.buffer.len() <= index {
             if let Some(value) = self.iterator.next() {
                 self.buffer.push_back(value);

@@ -24,14 +24,12 @@ impl NumberState {
     }
 
     pub fn to_token(&self) -> Token {
-        match self.value.parse::<BigInt>() {
-            Ok(value) => return Token::new(TokenKind::Integer(value), self.start_location),
-            _ => (),
+        if let Ok(value) = self.value.parse::<BigInt>() {
+            return Token::new(TokenKind::Integer(value), self.start_location);
         }
 
-        match self.value.parse::<f64>() {
-            Ok(value) => return Token::new(TokenKind::Float(value), self.start_location),
-            _ => (),
+        if let Ok(value) = self.value.parse::<f64>() {
+            return Token::new(TokenKind::Float(value), self.start_location);
         }
 
         Token::new(

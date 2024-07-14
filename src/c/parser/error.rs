@@ -68,7 +68,7 @@ impl Display for ParseErrorKind {
             ParseErrorKind::ExpectedSemicolon => f.write_str("Expected ';'"),
             ParseErrorKind::ExpectedMemberDeclarator => f.write_str("Expected member declarator"),
             ParseErrorKind::DuplicateEnumMember(name) => {
-                write!(f, "Duplicate enum member '{}'", name)
+                write!(f, "Duplicate enum member '{name}'")
             }
             ParseErrorKind::MustBeConstantInteger => {
                 write!(f, "Must be constant integer expression")
@@ -76,11 +76,10 @@ impl Display for ParseErrorKind {
             ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol { name } => {
                 write!(
                     f,
-                    "Enum member name conflicts with existing symbol '{}'",
-                    name
+                    "Enum member name conflicts with existing symbol '{name}'",
                 )
             }
-            ParseErrorKind::UndefinedVariable(name) => write!(f, "Undefined variable '{}'", name),
+            ParseErrorKind::UndefinedVariable(name) => write!(f, "Undefined variable '{name}'"),
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }

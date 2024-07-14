@@ -9,7 +9,7 @@ pub struct RecordInfo<'t> {
     pub cxx_info: Option<()>,
 }
 
-pub fn info_from_structure<'t>(structure: &'t ir::Structure) -> RecordInfo<'t> {
+pub fn info_from_structure(structure: &ir::Structure) -> RecordInfo {
     RecordInfo {
         fields: &structure.fields[..],
         is_packed: structure.is_packed,
@@ -19,7 +19,7 @@ pub fn info_from_structure<'t>(structure: &'t ir::Structure) -> RecordInfo<'t> {
     }
 }
 
-pub fn info_from_composite<'t>(composite: &'t ir::TypeComposite) -> RecordInfo<'t> {
+pub fn info_from_composite(composite: &ir::TypeComposite) -> RecordInfo {
     RecordInfo {
         fields: &composite.fields[..],
         is_packed: composite.is_packed,

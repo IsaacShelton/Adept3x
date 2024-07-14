@@ -60,5 +60,5 @@ fn is_empty_field(field: &ir::Type, ir_module: &ir::Module, options: IsEmptyReco
         return false;
     }
 
-    return is_empty_record(field, ir_module, options);
+    is_empty_record(field, ir_module, options)
 }

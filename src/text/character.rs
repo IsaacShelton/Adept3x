@@ -50,10 +50,7 @@ impl Character {
 
     #[inline]
     pub fn is_sign(&self) -> bool {
-        match self {
-            Character::At('+' | '-', _) => true,
-            _ => false,
-        }
+        matches!(self, Character::At('+' | '-', _))
     }
 
     #[inline]

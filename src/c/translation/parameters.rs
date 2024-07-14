@@ -18,5 +18,5 @@ pub fn has_parameters(parameter_type_list: &ParameterTypeList) -> bool {
         }
     }
 
-    parameter_type_list.parameter_declarations.len() != 0
+    !parameter_type_list.parameter_declarations.is_empty()
 }

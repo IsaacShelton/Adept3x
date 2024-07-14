@@ -34,7 +34,7 @@ pub unsafe fn create_globals(ctx: &mut BackendCtx) -> Result<(), BackendError> {
             LLVMSetInitializer(backend_global, LLVMGetUndef(backend_type));
         }
 
-        ctx.globals.insert(global_ref.clone(), backend_global);
+        ctx.globals.insert(*global_ref, backend_global);
     }
 
     Ok(())

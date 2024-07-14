@@ -387,10 +387,7 @@ impl ConformMode {
     }
 
     pub fn allow_lossy_integer(&self) -> bool {
-        match self {
-            Self::Explicit => true,
-            _ => false,
-        }
+        matches!(self, Self::Explicit)
     }
 }
 
@@ -524,7 +521,7 @@ fn conform_integer_value(
     to_sign: IntegerSign,
     type_source: Source,
 ) -> Option<TypedExpr> {
-    if from_sign != to_sign && !(to_bits > from_bits) {
+    if from_sign != to_sign && to_bits <= from_bits {
         return None;
     }
 
@@ -600,7 +597,7 @@ fn conform_integer_value_c(
 fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {
     match &expr.resolved_type.kind {
         resolved::TypeKind::IntegerLiteral(value) => {
-            conform_integer_to_default_or_error(&value, expr.expr.source)
+            conform_integer_to_default_or_error(value, expr.expr.source)
         }
         resolved::TypeKind::FloatLiteral(value) => {
             Ok(conform_float_to_default(*value, expr.expr.source))
@@ -620,7 +617,7 @@ fn conform_integer_to_default_or_error(
     value: &BigInt,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    match conform_integer_to_default(&value, source) {
+    match conform_integer_to_default(value, source) {
         Some(resolved) => Ok(resolved),
         None => Err(ResolveErrorKind::UnrepresentableInteger {
             value: value.to_string(),
@@ -651,7 +648,7 @@ fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExp
         }
     }
 
-    return None;
+    None
 }
 
 fn conform_integer_literal(
@@ -810,7 +807,7 @@ fn resolve_type<'a>(
             let inner = resolve_type_or_undeclared(
                 type_search_ctx,
                 source_file_cache,
-                &inner,
+                inner,
                 used_aliases_stack,
             )?;
 
@@ -819,7 +816,7 @@ fn resolve_type<'a>(
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
         ast::TypeKind::Named(name) => {
             let search = type_search_ctx
-                .find_type_or_error(&name, ast_type.source)
+                .find_type_or_error(name, ast_type.source)
                 .cloned();
 
             match search {
@@ -848,7 +845,7 @@ fn resolve_type<'a>(
         ast::TypeKind::PlainOldData(inner) => match &inner.kind {
             ast::TypeKind::Named(name) => {
                 let resolved_inner_kind = type_search_ctx
-                    .find_type_or_error(&name, ast_type.source)
+                    .find_type_or_error(name, ast_type.source)
                     .cloned()?;
 
                 let structure_ref = match resolved_inner_kind {

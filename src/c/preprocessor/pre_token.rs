@@ -50,13 +50,10 @@ pub enum PreTokenKind {
 
 impl PreToken {
     pub fn is_hash(&self) -> bool {
-        match self.kind {
-            PreTokenKind::Punctuator(Punctuator::Hash) => true,
-            _ => false,
-        }
+        matches!(self.kind, PreTokenKind::Punctuator(Punctuator::Hash))
     }
 
-    pub fn identifier<'a>(&'a self) -> Option<&'a str> {
+    pub fn identifier(&self) -> Option<&str> {
         match &self.kind {
             PreTokenKind::Identifier(identifier) => Some(identifier),
             _ => None,
@@ -64,10 +61,7 @@ impl PreToken {
     }
 
     pub fn is_identifier(&self, content: &str) -> bool {
-        match &self.kind {
-            PreTokenKind::Identifier(identifier) if content == identifier => true,
-            _ => false,
-        }
+        matches!(&self.kind, PreTokenKind::Identifier(identifier) if content == identifier)
     }
 
     pub fn get_identifier(&self) -> Option<&str> {
@@ -78,10 +72,7 @@ impl PreToken {
     }
 
     pub fn is_open_paren_disregard_whitespace(&self) -> bool {
-        match self.kind {
-            PreTokenKind::Punctuator(Punctuator::OpenParen { .. }) => true,
-            _ => false,
-        }
+        matches!(self.kind, PreTokenKind::Punctuator(Punctuator::OpenParen { .. }))
     }
 }
 
@@ -190,9 +181,6 @@ impl InflowEnd for PreToken {
 
 impl InflowEnd for PreTokenKind {
     fn is_inflow_end(&self) -> bool {
-        match self {
-            PreTokenKind::EndOfSequence => true,
-            _ => false,
-        }
+        matches!(self, PreTokenKind::EndOfSequence)
     }
 }

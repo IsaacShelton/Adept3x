@@ -95,8 +95,8 @@ fn expand_if_like(
 ) -> Result<Option<Vec<PreToken>>, PreprocessorError> {
     let condition = expand_region(&if_like.tokens, environment, depleted)?;
 
-    let expression = ExprParser::parse(condition.iter(), if_like.source)
-        .map_err(|err| PreprocessorError::from(err))?;
+    let expression =
+        ExprParser::parse(condition.iter(), if_like.source).map_err(PreprocessorError::from)?;
 
     if expression.is_true() {
         Ok(Some(expand_group(&if_like.group, environment, depleted)?))
@@ -148,7 +148,7 @@ fn expand_if_section(
     }
 
     if let Some(else_group) = &if_section.else_group {
-        expand_group(&else_group, environment, depleted)
+        expand_group(else_group, environment, depleted)
     } else {
         Ok(vec![])
     }

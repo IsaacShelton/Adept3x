@@ -9,7 +9,7 @@ use std::{
 };
 
 pub unsafe fn get_triple() -> CString {
-    return CString::from_raw(LLVMGetDefaultTargetTriple());
+    CString::from_raw(LLVMGetDefaultTargetTriple())
 }
 
 pub unsafe fn get_target_from_triple(triple: &CStr) -> Result<LLVMTargetRef, BackendError> {

@@ -36,7 +36,7 @@ pub struct TypeLayout {
 impl TypeLayout {
     pub fn basic(size: ByteUnits) -> Self {
         Self {
-            width: size.into(),
+            width: size,
             alignment: size,
             unadjusted_alignment: size,
             alignment_requirement: AlignmentRequirement::None,
@@ -118,7 +118,7 @@ impl<'a> TypeLayoutCache<'a> {
         }
     }
 
-    fn get_impl_record_layout<'t>(&self, info: &RecordInfo<'t>) -> TypeLayout {
+    fn get_impl_record_layout(&self, info: &RecordInfo) -> TypeLayout {
         // TODO: We should cache this
 
         let mut builder = ItaniumRecordLayoutBuilder::new(self, None);

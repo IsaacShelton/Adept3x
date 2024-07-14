@@ -51,8 +51,7 @@ pub fn resolve_conditional_expr(
         .as_ref()
         .map(|otherwise| {
             ctx.variable_search_ctx.begin_scope();
-            let maybe_block =
-                resolve_stmts(ctx, &otherwise.stmts).map(|stmts| resolved::Block::new(stmts));
+            let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(resolved::Block::new);
             ctx.variable_search_ctx.end_scope();
             maybe_block
         })

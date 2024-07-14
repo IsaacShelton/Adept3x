@@ -1,4 +1,4 @@
-mod helpers;
+pub mod helpers;
 mod return_location;
 use self::return_location::ReturnLocation;
 use crate::llvm_backend::{
@@ -88,14 +88,14 @@ pub fn emit_prologue(
             }
             _ => ReturnLocation::normal(
                 builder,
-                &ctx,
+                ctx,
                 alloca_insertion_point,
                 &ir_function.return_type,
             ),
         })
         .transpose()?;
 
-    let params_mapping = ParamsMapping::new(&ctx.type_layout_cache, abi_function, &ctx.ir_module);
+    let params_mapping = ParamsMapping::new(&ctx.type_layout_cache, abi_function, ctx.ir_module);
 
     assert_eq!(
         params_mapping.llvm_arity(),
@@ -158,7 +158,14 @@ pub fn emit_prologue(
         match &abi_param.abi_type.kind {
             ABITypeKind::Direct(_) => todo!(),
             ABITypeKind::Extend(_) => todo!(),
-            ABITypeKind::Indirect(_) => todo!(),
+            ABITypeKind::Indirect(indirect) => param_values.push_indirect(
+                builder,
+                ctx,
+                skeleton,
+                llvm_param_range,
+                ty,
+                indirect.align,
+            )?,
             ABITypeKind::IndirectAliased(_) => todo!(),
             ABITypeKind::Ignore => todo!(),
             ABITypeKind::Expand(_) => todo!(),

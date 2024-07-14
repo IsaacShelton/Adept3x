@@ -29,7 +29,7 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
                         variant: aarch64::Variant::DarwinPCS,
                         target_info: &ctx.ir_module.target_info,
                         type_layout_cache: &ctx.type_layout_cache,
-                        ir_module: &ctx.ir_module,
+                        ir_module: ctx.ir_module,
                         is_cxx_mode: false,
                     }),
                     &function.parameters[..],
@@ -77,7 +77,7 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
         }
 
         ctx.func_skeletons.insert(
-            function_ref.clone(),
+            *function_ref,
             FunctionSkeleton {
                 function: skeleton,
                 abi_function,

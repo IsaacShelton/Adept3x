@@ -19,7 +19,7 @@ pub fn unify_types(
     if let Some(unified_type) = &unified_type {
         for expr in exprs.iter_mut() {
             **expr = match conform_expr(
-                &**expr,
+                expr,
                 unified_type,
                 ConformMode::Normal,
                 ConformBehavior::Adept,
@@ -28,9 +28,8 @@ pub fn unify_types(
                 Some(conformed) => conformed,
                 None => {
                     panic!(
-                        "cannot conform to unified type {} for value of type {}",
-                        unified_type.to_string(),
-                        expr.resolved_type.to_string(),
+                        "cannot conform to unified type {unified_type} for value of type {}",
+                        expr.resolved_type,
                     );
                 }
             }
@@ -110,16 +109,17 @@ fn unify_integer_properties(
         _ => bits,
     });
 
-    bits_kind.map(|bits_kind| ((Some(bits_kind), sign_kind)))
+    bits_kind.map(|bits_kind| (Some(bits_kind), sign_kind))
 }
 
-fn bits_and_sign_for<'a>(
+fn bits_and_sign_for(
     types: &[&resolved::Type],
 ) -> Option<(Option<IntegerBits>, Option<IntegerSign>)> {
-    types.iter().fold(Some((None, None)), |acc, ty| match acc {
-        Some((maybe_bits, maybe_sign)) => unify_integer_properties(maybe_bits, maybe_sign, ty),
-        None => None,
-    })
+    types
+        .iter()
+        .try_fold((None, None), |(maybe_bits, maybe_sign), ty| {
+            unify_integer_properties(maybe_bits, maybe_sign, ty)
+        })
 }
 
 fn do_integer_literal_types_fit_in_integer(

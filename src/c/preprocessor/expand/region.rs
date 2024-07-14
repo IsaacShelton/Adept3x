@@ -192,10 +192,10 @@ fn expand_function_macro<'a>(
             ) => {
                 if paren_depth == 0 {
                     break;
-                } else {
-                    paren_depth -= 1;
-                    Some(token.clone())
                 }
+
+                paren_depth -= 1;
+                Some(token.clone())
             }
             Some(
                 token @ PreToken {
@@ -238,7 +238,7 @@ fn expand_function_macro<'a>(
     }
 
     // Allow "zero arguments" when calling function-macros that only take a single argument.
-    if args.len() == 0 && function_macro.parameters.len() == 1 {
+    if args.is_empty() && function_macro.parameters.len() == 1 {
         args.push(vec![]);
     }
 
@@ -261,13 +261,13 @@ fn expand_function_macro<'a>(
 
     // Expand the values for each argument
     for arg in args.iter_mut() {
-        *arg = expand_region(&arg, parent_environment, parent_depleted)?;
+        *arg = expand_region(arg, parent_environment, parent_depleted)?;
     }
 
     // Create environment to replace parameters with specified argument values
     let mut args_only_environment = Environment::default();
 
-    for i in 0..function_macro.parameters.len() {
+    for (i, parameter_name) in function_macro.parameters.iter().enumerate() {
         // Replace all empty arg values with placeholder token
         if args[i].is_empty() {
             args[i].push(PreToken::new(
@@ -278,7 +278,7 @@ fn expand_function_macro<'a>(
 
         args_only_environment.add_define(Define {
             kind: DefineKind::ObjectMacro(std::mem::take(&mut args[i]), PlaceholderAffinity::Keep),
-            name: function_macro.parameters[i].clone(),
+            name: parameter_name.clone(),
             source: Source::internal(),
         });
     }

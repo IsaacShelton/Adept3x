@@ -26,7 +26,7 @@ pub fn declare_function(
     )?;
     let mut required = vec![];
 
-    if has_parameters(&parameter_type_list) {
+    if has_parameters(parameter_type_list) {
         for param in parameter_type_list.parameter_declarations.iter() {
             let (name, ast_type, is_typedef) = match &param.core {
                 ParameterDeclarationCore::Declarator(declarator) => get_name_and_type(

@@ -45,21 +45,17 @@ impl<T: Inflow<LexedLine>> Parser<T> {
     pub fn parse_group(&mut self) -> Result<Group, PreprocessorError> {
         let mut parts = Vec::new();
 
-        loop {
-            match self.lines.try_peek()? {
-                PreTokenLine::Line(tokens, _) => {
-                    if is_group_terminator(tokens) {
-                        break;
-                    } else {
-                        match self.parse_group_part()? {
-                            GroupPart::TextLine(TextLine { content }) if content.len() == 0 => (),
-                            part => parts.push(part),
-                        }
-                    }
-                }
-                PreTokenLine::EndOfFile(_) => break,
+        while let PreTokenLine::Line(tokens, _) = self.lines.try_peek()? {
+            if is_group_terminator(tokens) {
+                break;
+            }
+
+            match self.parse_group_part()? {
+                GroupPart::TextLine(TextLine { content }) if content.is_empty() => (),
+                part => parts.push(part),
             }
         }
+
         Ok(Group { parts })
     }
 
@@ -481,7 +477,7 @@ impl<T: Inflow<LexedLine>> Parser<T> {
                             })
                             .and_then(|name| {
                                 eat_punctuator(&mut tokens, Punctuator::CloseParen, start_of_line)
-                                    .and_then(|_| Ok(PreTokenKind::IsDefined(name.to_string())))
+                                    .map(|_| PreTokenKind::IsDefined(name.to_string()))
                             }),
                         _ => Err(ParseErrorKind::ExpectedDefinitionName
                             .at(start_of_line)
@@ -537,10 +533,7 @@ fn first_tokens<const N: usize>(
 }
 
 fn is_group_terminator(line: &[PreToken]) -> bool {
-    match peek_directive_name(line) {
-        Some("elif" | "elifdef" | "elifndef" | "else" | "endif") => true,
-        _ => false,
-    }
+    matches!(peek_directive_name(line), Some("elif" | "elifdef" | "elifndef" | "else" | "endif"))
 }
 
 fn peek_directive_name(line: &(impl Borrow<[PreToken]> + ?Sized)) -> Option<&str> {

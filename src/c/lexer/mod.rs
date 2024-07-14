@@ -26,10 +26,7 @@ pub enum LexError {
 
 impl InflowEnd for CToken {
     fn is_inflow_end(&self) -> bool {
-        match &self.kind {
-            CTokenKind::EndOfFile => true,
-            _ => false,
-        }
+        matches!(&self.kind, CTokenKind::EndOfFile)
     }
 }
 
@@ -127,13 +124,13 @@ impl<I: Inflow<PreToken>> InflowStream for Lexer<I> {
 fn lex_number(number: &str) -> Result<CTokenKind, LexError> {
     // TODO: Cleanup this procedure
 
-    let number = number.replace("'", "");
+    let number = number.replace('\'', "");
 
     let (number, radix) = if number.starts_with("0x") || number.starts_with("0X") {
         (&number[2..], 16)
     } else if number.starts_with("0b") || number.starts_with("0B") {
         (&number[2..], 2)
-    } else if number.starts_with("0") {
+    } else if number.starts_with('0') {
         (&number[..], 8)
     } else {
         (&number[..], 10)
@@ -141,7 +138,7 @@ fn lex_number(number: &str) -> Result<CTokenKind, LexError> {
 
     // This part is ugly, but at least it's fast
 
-    let (number, is_unsigned) = if number.ends_with("U") || number.ends_with("u") {
+    let (number, is_unsigned) = if number.ends_with('U') || number.ends_with('u') {
         (&number[..number.len() - 1], true)
     } else {
         (number, false)
@@ -153,13 +150,13 @@ fn lex_number(number: &str) -> Result<CTokenKind, LexError> {
         (number, false)
     };
 
-    let (number, is_long) = if number.ends_with("L") || number.ends_with("l") {
+    let (number, is_long) = if number.ends_with('L') || number.ends_with('l') {
         (&number[..number.len() - 1], true)
     } else {
         (number, false)
     };
 
-    let (number, is_unsigned) = if !is_unsigned && (number.ends_with("U") || number.ends_with("u"))
+    let (number, is_unsigned) = if !is_unsigned && (number.ends_with('U') || number.ends_with('u'))
     {
         (&number[..number.len() - 1], true)
     } else {

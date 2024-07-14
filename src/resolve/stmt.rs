@@ -23,7 +23,7 @@ pub fn resolve_stmts(
     Ok(resolved_stmts)
 }
 
-pub fn resolve_stmt<'a>(
+pub fn resolve_stmt(
     ctx: &mut ResolveExprCtx<'_, '_>,
     ast_stmt: &ast::Stmt,
 ) -> Result<resolved::Stmt, ResolveError> {
@@ -48,7 +48,7 @@ pub fn resolve_stmt<'a>(
 
                 if let Some(result) = conform_expr(
                     &result,
-                    &return_type,
+                    return_type,
                     ConformMode::Normal,
                     ConformBehavior::Adept,
                     source,

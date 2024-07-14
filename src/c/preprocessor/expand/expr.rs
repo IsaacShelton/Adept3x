@@ -146,11 +146,9 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
     fn parse_number(number: &str, source: Source) -> Result<ConstExpr, PreprocessorError> {
         // Remove trailing 'L' if present
-        let number = if number.ends_with("L") {
-            &number[..number.len() - 1]
-        } else {
-            number
-        };
+
+        let number = number.strip_suffix("L").unwrap_or(number);
+        let number = number.strip_suffix("L").unwrap_or(number);
 
         if number.starts_with("0x") || number.starts_with("0X") {
             Self::parse_number_radix(&number[..2], 16)
@@ -274,8 +272,8 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 
         let next_precedence = next_operator.kind.precedence();
 
-        if !((next_precedence + is_right_associative(&next_operator.kind) as usize)
-            < operator_precedence)
+        if (next_precedence + is_right_associative(&next_operator.kind) as usize)
+            >= operator_precedence
         {
             self.parse_operator_expr(operator_precedence + 1, rhs)
         } else {
@@ -300,17 +298,12 @@ impl<'a, I: Iterator<Item = &'a PreToken>> ExprParser<'a, I> {
 }
 
 fn is_terminating_token(kind: &PreTokenKind) -> bool {
-    match kind {
-        PreTokenKind::Punctuator(
-            Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon,
-        ) => true,
-        _ => false,
-    }
+    matches!(
+        kind,
+        PreTokenKind::Punctuator(Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon,)
+    )
 }
 
 fn is_right_associative(kind: &PreTokenKind) -> bool {
-    match kind {
-        PreTokenKind::Punctuator(Punctuator::Ternary) => true,
-        _ => false,
-    }
+    matches!(kind, PreTokenKind::Punctuator(Punctuator::Ternary))
 }

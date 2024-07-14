@@ -278,32 +278,32 @@ impl TokenKind {
     }
 
     pub fn is_assignment_like(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::AddAssign
-            | Self::SubtractAssign
-            | Self::MultiplyAssign
-            | Self::DivideAssign
-            | Self::ModulusAssign
-            | Self::AmpersandAssign
-            | Self::PipeAssign
-            | Self::CaretAssign
-            | Self::LeftShiftAssign
-            | Self::RightShiftAssign
-            | Self::LogicalLeftShiftAssign
-            | Self::LogicalRightShiftAssign
-            | Self::Assign => true,
-            _ => false,
-        }
+                | Self::SubtractAssign
+                | Self::MultiplyAssign
+                | Self::DivideAssign
+                | Self::ModulusAssign
+                | Self::AmpersandAssign
+                | Self::PipeAssign
+                | Self::CaretAssign
+                | Self::LeftShiftAssign
+                | Self::RightShiftAssign
+                | Self::LogicalLeftShiftAssign
+                | Self::LogicalRightShiftAssign
+                | Self::Assign
+        )
     }
 
     pub fn could_start_type(&self) -> bool {
-        match self {
+        matches!(
+            self,
             TokenKind::Identifier(_)
-            | TokenKind::StructKeyword
-            | TokenKind::UnionKeyword
-            | TokenKind::EnumKeyword => true,
-            _ => false,
-        }
+                | TokenKind::StructKeyword
+                | TokenKind::UnionKeyword
+                | TokenKind::EnumKeyword
+        )
     }
 
     pub fn at(self, location: Location) -> Token {

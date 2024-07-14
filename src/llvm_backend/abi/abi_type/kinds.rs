@@ -131,7 +131,7 @@ impl Expand {
                 .iter()
                 .map(|field| Self::expand(ctx, &field.ir_type))
                 .fold_ok(vec![], |mut acc, expanded| {
-                    acc.extend(expanded.into_iter());
+                    acc.extend(expanded);
                     acc
                 }),
             TypeExpansion::Complex(inner) => {

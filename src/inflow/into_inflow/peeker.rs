@@ -24,7 +24,7 @@ impl<S: InflowStream> InflowStream for InflowPeeker<S> {
 }
 
 impl<T: InflowEnd, S: InflowStream<Item = T>> Inflow<T> for InflowPeeker<S> {
-    fn peek_nth_mut<'a>(&'a mut self, n: usize) -> &'a mut T {
+    fn peek_nth_mut(&mut self, n: usize) -> &mut T {
         while self.queue.len() <= n {
             let item = self.stream.next();
             self.queue.push_back(item);

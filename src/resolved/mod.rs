@@ -85,19 +85,10 @@ pub struct Function {
     pub tag: Option<Tag>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Parameters {
     pub required: Vec<Parameter>,
     pub is_cstyle_vararg: bool,
-}
-
-impl Default for Parameters {
-    fn default() -> Self {
-        Self {
-            required: vec![],
-            is_cstyle_vararg: false,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -217,32 +208,27 @@ impl TypeKind {
             TypeKind::CInteger { integer, sign } => {
                 if let Some(sign) = sign {
                     Some(*sign)
-                } else if let Some(target_info) = target_info {
-                    Some(target_info.default_c_integer_sign(*integer))
                 } else {
-                    None
+                    target_info.map(|target_info| target_info.default_c_integer_sign(*integer))
                 }
             }
-            TypeKind::Float(_) => None,
-            TypeKind::FloatLiteral(_) => None,
-            TypeKind::Pointer(_) => None,
-            TypeKind::PlainOldData(_, _) => None,
-            TypeKind::Void => None,
-            TypeKind::ManagedStructure(_, _) => None,
-            TypeKind::AnonymousStruct(..) => None,
-            TypeKind::AnonymousUnion(..) => None,
-            TypeKind::FixedArray(..) => None,
-            TypeKind::FunctionPointer(..) => None,
-            TypeKind::Enum(_) => None,
-            TypeKind::AnonymousEnum(_) => None,
+            TypeKind::Float(_)
+            | TypeKind::FloatLiteral(_)
+            | TypeKind::Pointer(_)
+            | TypeKind::PlainOldData(_, _)
+            | TypeKind::Void
+            | TypeKind::ManagedStructure(_, _)
+            | TypeKind::AnonymousStruct(..)
+            | TypeKind::AnonymousUnion(..)
+            | TypeKind::FixedArray(..)
+            | TypeKind::FunctionPointer(..)
+            | TypeKind::Enum(_)
+            | TypeKind::AnonymousEnum(_) => None,
         }
     }
 
     pub fn is_void_pointer(&self) -> bool {
-        match self {
-            TypeKind::Pointer(inner) if inner.kind.is_void() => true,
-            _ => false,
-        }
+        matches!(self, TypeKind::Pointer(inner) if inner.kind.is_void())
     }
 }
 
@@ -267,7 +253,7 @@ impl Display for TypeKind {
                 })?;
             }
             TypeKind::CInteger { integer, sign } => {
-                fmt_c_integer(f, integer, *sign)?;
+                fmt_c_integer(f, *integer, *sign)?;
             }
             TypeKind::IntegerLiteral(value) => {
                 write!(f, "integer {}", value)?;

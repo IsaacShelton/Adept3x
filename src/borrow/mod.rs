@@ -313,7 +313,7 @@ impl Point {
     // (These side effects occur due to some incoming branches having
     // moved their origin values while others haven't)
     pub fn join(points: &[Self]) -> JoinPoint {
-        if points.len() == 0 {
+        if points.is_empty() {
             return JoinPoint {
                 joined_point: Point {
                     origins: Box::new([]),
@@ -341,7 +341,7 @@ impl Point {
             let mut joined_state = OriginState::Dead;
             let mut join_state_conflict = false;
 
-            for incoming_point in points.iter() {
+            for incoming_point in points {
                 let incoming_point_origins = &incoming_point.origins;
                 assert_eq!(expected_origin_count, incoming_point_origins.len());
 
@@ -402,7 +402,7 @@ impl Point {
         referrer: ImmutableReferrerIdx,
     ) -> Result<(), ()> {
         for index in origin_range.start.0..origin_range.end_exclusive.0 {
-            self.origins[index].borrow_immutable(referrer)?
+            self.origins[index].borrow_immutable(referrer)?;
         }
         Ok(())
     }
@@ -413,7 +413,7 @@ impl Point {
         referrer: MutableReferrerIdx,
     ) -> Result<(), ()> {
         for index in origin_range.start.0..origin_range.end_exclusive.0 {
-            self.origins[index].borrow_mutable(referrer)?
+            self.origins[index].borrow_mutable(referrer)?;
         }
         Ok(())
     }

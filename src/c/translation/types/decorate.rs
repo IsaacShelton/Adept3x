@@ -40,6 +40,7 @@ pub fn decorate_array(
         todo!("array get_name_and_type VLA");
     }
 
+    #[allow(clippy::collapsible_else_if)]
     if for_parameter {
         todo!("array get_name_and_type for parameter");
     } else {

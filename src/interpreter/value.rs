@@ -26,7 +26,7 @@ impl<'a> Value<'a> {
                 ir::Literal::Unsigned8(value) => Some((*value).into()),
                 ir::Literal::Unsigned16(value) => Some((*value).into()),
                 ir::Literal::Unsigned32(value) => Some((*value).into()),
-                ir::Literal::Unsigned64(value) => Some((*value).into()),
+                ir::Literal::Unsigned64(value) => Some(*value),
                 ir::Literal::Zeroed(ty) if ty.is_integer_like() => Some(0),
                 _ => None,
             },

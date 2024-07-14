@@ -185,7 +185,7 @@ macro_rules! impl_op_cmp {
 
 impl<'a, S: SyscallHandler> Interpreter<'a, S> {
     fn eval_into_literal(&self, registers: &Registers<'a>, value: &ir::Value) -> ir::Literal {
-        self.eval(&registers, value).unwrap_literal()
+        self.eval(registers, value).unwrap_literal()
     }
 
     fn eval_binary_ops(

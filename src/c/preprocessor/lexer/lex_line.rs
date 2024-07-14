@@ -21,7 +21,7 @@ pub fn lex_line(
         tokens.push(PreToken::new(PreTokenKind::Punctuator(punctuator), source));
     }
 
-    fn prefer_header_name(tokens: &Vec<PreToken>) -> bool {
+    fn prefer_header_name(tokens: &[PreToken]) -> bool {
         if tokens.len() < 2 {
             return false;
         }
@@ -214,7 +214,7 @@ pub fn lex_line(
 }
 
 fn make_character(digits: &str, radix: u32, source: Source) -> Result<char, PreprocessorError> {
-    u32::from_str_radix(&digits, radix)
+    u32::from_str_radix(digits, radix)
         .ok()
         .and_then(char::from_u32)
         .ok_or_else(|| PreprocessorErrorKind::BadEscapedCodepoint.at(source))
@@ -241,9 +241,7 @@ fn escape_sequence(line: &mut impl Text, char_source: Source) -> Result<char, Pr
 
             for _ in 0..2 {
                 match line.peek() {
-                    Character::At(digit, _) if matches!(digit, '0'..='7') => {
-                        digits.push(line.next().unwrap().0)
-                    }
+                    Character::At('0'..='7', _) => digits.push(line.next().unwrap().0),
                     _ => break,
                 }
             }
@@ -296,5 +294,5 @@ fn is_identifier_continue(c: char) -> bool {
     // NOTE: We don't handle XID_Continue character and
     // universal character names of class
     // XID_Continue
-    return c.is_ascii_digit() || is_c_non_digit(c);
+    c.is_ascii_digit() || is_c_non_digit(c)
 }

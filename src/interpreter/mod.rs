@@ -115,7 +115,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 }
                 ir::Instruction::Load((value, ty)) => {
                     let address = self.eval(&registers, value).as_u64().unwrap();
-                    self.memory.read(address, ty, self.ir_module)?
+                    self.memory.read(address, ty)?
                 }
                 ir::Instruction::Malloc(ir_type) => {
                     let bytes = self.size_of(ir_type);
@@ -139,18 +139,18 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 ir::Instruction::GlobalVariable(global_ref) => {
                     Value::Literal(self.global_addresses.get(global_ref).unwrap().clone())
                 }
-                ir::Instruction::Add(ops, _f_or_i) => self.add(&ops, &registers),
+                ir::Instruction::Add(ops, _f_or_i) => self.add(ops, &registers),
                 ir::Instruction::Checked(_, _) => todo!(),
-                ir::Instruction::Subtract(ops, _f_or_i) => self.sub(&ops, &registers),
-                ir::Instruction::Multiply(ops, _f_or_i) => self.mul(&ops, &registers),
-                ir::Instruction::Divide(ops, _f_or_sign) => self.div(&ops, &registers)?,
-                ir::Instruction::Modulus(ops, _f_or_sign) => self.rem(&ops, &registers)?,
-                ir::Instruction::Equals(ops, _f_or_i) => self.eq(&ops, &registers),
-                ir::Instruction::NotEquals(ops, _f_or_i) => self.neq(&ops, &registers),
-                ir::Instruction::LessThan(ops, _f_or_i) => self.lt(&ops, &registers),
-                ir::Instruction::LessThanEq(ops, _f_or_i) => self.lte(&ops, &registers),
-                ir::Instruction::GreaterThan(ops, _f_or_i) => self.gt(&ops, &registers),
-                ir::Instruction::GreaterThanEq(ops, _f_or_i) => self.gte(&ops, &registers),
+                ir::Instruction::Subtract(ops, _f_or_i) => self.sub(ops, &registers),
+                ir::Instruction::Multiply(ops, _f_or_i) => self.mul(ops, &registers),
+                ir::Instruction::Divide(ops, _f_or_sign) => self.div(ops, &registers)?,
+                ir::Instruction::Modulus(ops, _f_or_sign) => self.rem(ops, &registers)?,
+                ir::Instruction::Equals(ops, _f_or_i) => self.eq(ops, &registers),
+                ir::Instruction::NotEquals(ops, _f_or_i) => self.neq(ops, &registers),
+                ir::Instruction::LessThan(ops, _f_or_i) => self.lt(ops, &registers),
+                ir::Instruction::LessThanEq(ops, _f_or_i) => self.lte(ops, &registers),
+                ir::Instruction::GreaterThan(ops, _f_or_i) => self.gt(ops, &registers),
+                ir::Instruction::GreaterThanEq(ops, _f_or_i) => self.gte(ops, &registers),
                 ir::Instruction::And(_) => todo!(),
                 ir::Instruction::Or(_) => todo!(),
                 ir::Instruction::BitwiseAnd(_) => todo!(),
@@ -209,10 +209,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     let value = self.eval(&registers, value);
 
                     let should = match value {
-                        Value::Literal(literal) => match literal {
-                            ir::Literal::Boolean(value) => value,
-                            _ => false,
-                        },
+                        Value::Literal(ir::Literal::Boolean(value)) => value,
                         _ => false,
                     };
 

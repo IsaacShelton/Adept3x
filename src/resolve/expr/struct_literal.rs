@@ -31,7 +31,7 @@ fn get_field_info<'a>(
 pub fn resolve_struct_literal_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     ast_type: &ast::Type,
-    fields: &Vec<FieldInitializer>,
+    fields: &[FieldInitializer],
     fill_behavior: FillBehavior,
     conform_behavior: ConformBehavior,
     source: Source,

@@ -8,6 +8,7 @@ use crate::{
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     ffi::CString,
     fmt::{Debug, Display},
@@ -53,7 +54,7 @@ impl<'a> Ast<'a> {
     }
 
     pub fn new_file(&mut self, identifier: FileIdentifier) -> &mut File {
-        self.files.entry(identifier).or_insert_with(|| File::new())
+        self.files.entry(identifier).or_insert_with(File::new)
     }
 }
 
@@ -204,7 +205,7 @@ pub enum FloatSize {
 }
 
 impl FloatSize {
-    pub fn bits(&self) -> u8 {
+    pub fn bits(self) -> u8 {
         match self {
             Self::Bits32 => 32,
             Self::Bits64 | Self::Normal => 64,
@@ -212,7 +213,7 @@ impl FloatSize {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IntegerBits {
     Bits8,
     Bits16,
@@ -247,7 +248,7 @@ impl IntegerBits {
         }
     }
 
-    pub fn successor(&self) -> Option<IntegerBits> {
+    pub fn successor(self) -> Option<IntegerBits> {
         match self {
             Self::Normal => Some(Self::Normal),
             Self::Bits8 => Some(Self::Bits16),
@@ -257,20 +258,25 @@ impl IntegerBits {
         }
     }
 
-    pub fn bits(&self) -> u8 {
+    pub fn bits(self) -> u8 {
         match self {
             IntegerBits::Bits8 => 8,
             IntegerBits::Bits16 => 16,
             IntegerBits::Bits32 => 32,
-            IntegerBits::Bits64 => 64,
-            IntegerBits::Normal => 64,
+            IntegerBits::Bits64 | IntegerBits::Normal => 64,
         }
     }
 }
 
+impl Ord for IntegerBits {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.bits().cmp(&other.bits())
+    }
+}
+
 impl PartialOrd for IntegerBits {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.bits().partial_cmp(&other.bits())
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -302,11 +308,10 @@ pub enum CInteger {
 }
 
 impl CInteger {
-    pub fn min_bits(&self) -> IntegerBits {
+    pub fn min_bits(self) -> IntegerBits {
         match self {
             Self::Char => IntegerBits::Bits8,
-            Self::Short => IntegerBits::Bits16,
-            Self::Int => IntegerBits::Bits16,
+            Self::Short | Self::Int => IntegerBits::Bits16,
             Self::Long => IntegerBits::Bits32,
             Self::LongLong => IntegerBits::Bits64,
         }
@@ -414,19 +419,19 @@ impl Display for &TypeKind {
                 })?;
             }
             TypeKind::CInteger { integer, sign } => {
-                fmt_c_integer(f, integer, *sign)?;
+                fmt_c_integer(f, *integer, *sign)?;
             }
             TypeKind::Pointer(inner) => {
-                write!(f, "ptr<{}>", inner)?;
+                write!(f, "ptr<{inner}>")?;
             }
             TypeKind::PlainOldData(inner) => {
-                write!(f, "pod<{}>", inner)?;
+                write!(f, "pod<{inner}>")?;
             }
             TypeKind::Void => {
                 write!(f, "void")?;
             }
             TypeKind::Named(name) => {
-                write!(f, "{}", name)?;
+                write!(f, "{name}")?;
             }
             TypeKind::Float(size) => f.write_str(match size {
                 FloatSize::Normal => "float",
@@ -437,7 +442,7 @@ impl Display for &TypeKind {
             TypeKind::AnonymousUnion(..) => f.write_str("(anonymous union)")?,
             TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
             TypeKind::FixedArray(fixed_array) => {
-                write!(f, "array<(amount), {}>", fixed_array.ast_type.to_string())?;
+                write!(f, "array<(amount), {}>", fixed_array.ast_type)?;
             }
             TypeKind::FunctionPointer(_function) => {
                 write!(f, "(function pointer type)")?;
@@ -740,24 +745,24 @@ impl Display for UnaryOperator {
 impl BasicBinaryOperator {
     pub fn returns_boolean(&self) -> bool {
         match self {
-            Self::Add => false,
-            Self::Subtract => false,
-            Self::Multiply => false,
-            Self::Divide => false,
-            Self::Modulus => false,
-            Self::Equals => true,
-            Self::NotEquals => true,
-            Self::LessThan => true,
-            Self::LessThanEq => true,
-            Self::GreaterThan => true,
-            Self::GreaterThanEq => true,
-            Self::BitwiseAnd => false,
-            Self::BitwiseOr => false,
-            Self::BitwiseXor => false,
-            Self::LeftShift => false,
-            Self::RightShift => false,
-            Self::LogicalLeftShift => false,
-            Self::LogicalRightShift => false,
+            Self::Equals
+            | Self::NotEquals
+            | Self::LessThan
+            | Self::LessThanEq
+            | Self::GreaterThan
+            | Self::GreaterThanEq => true,
+            Self::Add
+            | Self::Subtract
+            | Self::Multiply
+            | Self::Divide
+            | Self::Modulus
+            | Self::BitwiseAnd
+            | Self::BitwiseOr
+            | Self::BitwiseXor
+            | Self::LeftShift
+            | Self::RightShift
+            | Self::LogicalLeftShift
+            | Self::LogicalRightShift => false,
         }
     }
 }
@@ -784,7 +789,7 @@ pub struct EnumMemberLiteral {
 
 pub fn fmt_c_integer(
     f: &mut std::fmt::Formatter<'_>,
-    integer: &CInteger,
+    integer: CInteger,
     sign: Option<IntegerSign>,
 ) -> std::fmt::Result {
     match sign {

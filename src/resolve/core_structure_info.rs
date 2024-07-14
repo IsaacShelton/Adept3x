@@ -4,10 +4,10 @@ use crate::{
     resolved::{self, MemoryManagement, StructureRef},
 };
 
-pub fn get_core_structure_info<'a>(
-    resolved_type: &'a resolved::Type,
+pub fn get_core_structure_info(
+    resolved_type: &resolved::Type,
     source: Source,
-) -> Result<(&'a str, StructureRef, MemoryManagement), ResolveError> {
+) -> Result<(&str, StructureRef, MemoryManagement), ResolveError> {
     match &resolved_type.kind {
         resolved::TypeKind::PlainOldData(name, structure_ref) => {
             Ok((name, *structure_ref, resolved::MemoryManagement::None))

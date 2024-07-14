@@ -9,7 +9,6 @@ impl Memory {
         &mut self,
         from: u64,
         ir_type: &ir::Type,
-        ir_module: &ir::Module,
     ) -> Result<Value<'a>, InterpreterError> {
         if self.is_reserved_address(from) {
             return Err(InterpreterError::SegfaultRead);
@@ -36,7 +35,7 @@ impl Memory {
             ir::Type::FixedArray(_) => todo!("interpreter read fixed array"),
             ir::Type::Vector(_) => todo!("interpreter read vector"),
             ir::Type::Complex(_) => todo!("interpreter read complex number"),
-            ir::Type::Atomic(inner) => self.read(from, inner, ir_module)?,
+            ir::Type::Atomic(inner) => self.read(from, inner)?,
             ir::Type::IncompleteArray(_) => self.read_u64(from),
         })
     }

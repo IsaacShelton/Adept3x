@@ -77,14 +77,14 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
     }
 
-    pub fn layout<'t>(&mut self, record: &RecordInfo<'t>) {
+    pub fn layout(&mut self, record: &RecordInfo) {
         // NOTE: This only works for C types
         self.init_layout(record);
         self.layout_fields(record);
         self.finish_layout(record);
     }
 
-    pub fn init_layout<'t>(&mut self, record: &RecordInfo<'t>) {
+    pub fn init_layout(&mut self, record: &RecordInfo) {
         self.is_union = record.is_union;
         self.is_ms_struct = false;
         self.packed = record.is_packed;
@@ -99,7 +99,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         // We don't really care about anything else for now...
     }
 
-    pub fn layout_fields<'t>(&mut self, record: &RecordInfo<'t>) {
+    pub fn layout_fields(&mut self, record: &RecordInfo) {
         let insert_extra_padding = record.may_insert_extra_padding(true);
         let has_flexible_array_member = false; // NOTE: We don't support flexible array members yet
 
@@ -125,8 +125,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
         assert!(!field.is_bitfield(), "Bitfields not supported yet");
 
-        let unpadded_field_offset =
-            BitUnits::from(self.data_size) - self.unfilled_bits_in_last_unit;
+        let unpadded_field_offset = self.data_size - self.unfilled_bits_in_last_unit;
 
         self.unfilled_bits_in_last_unit = BitUnits::of(0);
         self.last_bitfield_storage_unit_size = BitUnits::of(0);
@@ -177,7 +176,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         let packed_field_alignment = ByteUnits::of(1);
 
         let unpacked_field_offset = field_offset;
-        let max_alignment = ByteUnits::from(field.get_max_alignment());
+        let max_alignment = field.get_max_alignment();
         let mut packed_field_alignment = packed_field_alignment.max(max_alignment);
         let mut preferred_alignment = preferred_alignment.max(max_alignment);
         let mut unpacked_field_alignment = unpacked_field_alignment.max(max_alignment);
@@ -216,13 +215,13 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
 
         // Place field at current location
-        self.field_offsets.push(BitUnits::from(field_offset));
+        self.field_offsets.push(field_offset);
 
         if !self.use_external_layout {
             self.check_field_padding(
-                BitUnits::from(field_offset),
+                field_offset,
                 unpadded_field_offset,
-                BitUnits::from(unpacked_field_offset),
+                unpacked_field_offset,
                 field_packed,
                 field,
             );
@@ -246,7 +245,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             if self.is_union {
                 self.data_size = self.data_size.max(effective_field_size_bits);
             } else {
-                self.data_size = BitUnits::from(field_offset) + effective_field_size_bits;
+                self.data_size = field_offset + effective_field_size_bits;
             }
 
             self.padded_field_size = self
@@ -255,7 +254,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
             self.size = self.size.max(self.data_size);
         } else {
-            self.size = self.size.max(BitUnits::from(field_offset + field_offset));
+            self.size = self.size.max(field_offset + field_offset);
         }
 
         self.unadjusted_alignment = self.unadjusted_alignment.max(field_alignment);
@@ -277,7 +276,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
     }
 
-    pub fn finish_layout<'t>(&mut self, record: &RecordInfo<'t>) {
+    pub fn finish_layout(&mut self, record: &RecordInfo) {
         // NOTE: Records in C++ cannot be zero-sized
         if record.cxx_info.is_some() && self.size.is_zero() {
             todo!("zero-sized c++ records are not supported yet")

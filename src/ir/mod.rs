@@ -55,7 +55,7 @@ pub struct Structure {
     pub is_packed: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
 }
@@ -188,6 +188,7 @@ pub struct Store {
     pub destination: Value,
 }
 
+#[allow(clippy::derived_hash_with_manual_eq)]
 #[derive(Clone, Debug, Hash)]
 pub struct Field {
     pub ir_type: Type,
@@ -249,6 +250,7 @@ pub struct FieldProperties {
     pub is_force_packed: bool,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for FieldProperties {
     fn default() -> Self {
         Self {
@@ -346,18 +348,18 @@ impl Type {
     }
 
     pub fn is_integer_like(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Type::Boolean
-            | Type::S8
-            | Type::S16
-            | Type::S32
-            | Type::S64
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64 => true,
-            _ => false,
-        }
+                | Type::S8
+                | Type::S16
+                | Type::S32
+                | Type::S64
+                | Type::U8
+                | Type::U16
+                | Type::U32
+                | Type::U64
+        )
     }
 
     pub fn is_signed(&self) -> Option<bool> {

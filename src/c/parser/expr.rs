@@ -191,7 +191,7 @@ impl<'a> Parser<'a> {
         }
 
         if let CTokenKind::Float(float, float_suffix) = &self.input.peek().kind {
-            let float = float.clone();
+            let float = *float;
             let float_suffix = float_suffix.clone();
             self.input.advance();
             return Ok(ExprKind::Float(float, float_suffix).at(source));
@@ -382,10 +382,10 @@ impl<'a> Parser<'a> {
                     braced_initializer,
                 }))
                 .at(source));
-            } else {
-                // Cast
-                return todo!("cast");
             }
+
+            // Cast
+            return todo!("cast");
         }
 
         self.parse_expr_atom()
@@ -399,7 +399,8 @@ impl<'a> Parser<'a> {
             let next_precedence = operator.kind.precedence();
 
             if is_terminating_token(&operator.kind)
-                || (next_precedence + is_right_associative(&operator.kind) as usize) < precedence
+                || (next_precedence + usize::from(is_right_associative(&operator.kind)))
+                    < precedence
             {
                 return Ok(lhs);
             }
@@ -481,8 +482,8 @@ impl<'a> Parser<'a> {
         let next_operator = self.input.peek();
         let next_precedence = next_operator.kind.precedence();
 
-        if !((next_precedence + is_right_associative(&next_operator.kind) as usize)
-            < operator_precedence)
+        if (next_precedence + usize::from(is_right_associative(&next_operator.kind)))
+            >= operator_precedence
         {
             self.parse_operator_expr(operator_precedence + 1, rhs)
         } else {
@@ -541,29 +542,31 @@ impl<'a> Parser<'a> {
 }
 
 fn is_terminating_token(kind: &CTokenKind) -> bool {
-    match kind {
+    matches!(
+        kind,
         CTokenKind::EndOfFile
-        | CTokenKind::Punctuator(Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon) => {
-            true
-        }
-        _ => false,
-    }
+            | CTokenKind::Punctuator(
+                Punctuator::Comma | Punctuator::CloseParen | Punctuator::Colon
+            )
+    )
 }
 
 fn is_right_associative(kind: &CTokenKind) -> bool {
-    match kind {
-        CTokenKind::Punctuator(Punctuator::Ternary)
-        | CTokenKind::Punctuator(Punctuator::Assign)
-        | CTokenKind::Punctuator(Punctuator::AddAssign)
-        | CTokenKind::Punctuator(Punctuator::SubtractAssign)
-        | CTokenKind::Punctuator(Punctuator::MultiplyAssign)
-        | CTokenKind::Punctuator(Punctuator::DivideAssign)
-        | CTokenKind::Punctuator(Punctuator::ModulusAssign)
-        | CTokenKind::Punctuator(Punctuator::LeftShiftAssign)
-        | CTokenKind::Punctuator(Punctuator::RightShiftAssign)
-        | CTokenKind::Punctuator(Punctuator::BitAndAssign)
-        | CTokenKind::Punctuator(Punctuator::BitXorAssign)
-        | CTokenKind::Punctuator(Punctuator::BitOrAssign) => true,
-        _ => false,
-    }
+    matches!(
+        kind,
+        CTokenKind::Punctuator(
+            Punctuator::Ternary
+                | Punctuator::Assign
+                | Punctuator::AddAssign
+                | Punctuator::SubtractAssign
+                | Punctuator::MultiplyAssign
+                | Punctuator::DivideAssign
+                | Punctuator::ModulusAssign
+                | Punctuator::LeftShiftAssign
+                | Punctuator::RightShiftAssign
+                | Punctuator::BitAndAssign
+                | Punctuator::BitXorAssign
+                | Punctuator::BitOrAssign,
+        )
+    )
 }

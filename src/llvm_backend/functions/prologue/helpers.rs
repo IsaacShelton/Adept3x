@@ -80,7 +80,7 @@ pub fn build_tmp_alloca_inst(
     array_size: Option<LLVMValueRef>,
     alloca_insertion_point: LLVMValueRef,
 ) -> LLVMValueRef {
-    let alloca = if let Some(array_size) = array_size {
+    if let Some(array_size) = array_size {
         unsafe {
             let current_block = LLVMGetInsertBlock(builder.get());
             LLVMPositionBuilderBefore(builder.get(), alloca_insertion_point);
@@ -91,9 +91,7 @@ pub fn build_tmp_alloca_inst(
         }
     } else {
         unsafe { LLVMBuildAlloca(builder.get(), ty, name.as_ptr()) }
-    };
-
-    alloca
+    }
 }
 
 pub fn make_natural_address_for_pointer(
@@ -101,7 +99,7 @@ pub fn make_natural_address_for_pointer(
     ptr: LLVMValueRef,
     ir_type: &ir::Type,
     alignment: Option<ByteUnits>,
-    is_bitfield: Option<bool>,
+    is_bitfield: bool,
 ) -> Result<Address, BackendError> {
     let alignment = match alignment {
         Some(ByteUnits::ZERO) | None => get_natural_type_alignment(&ctx.type_layout_cache, ir_type),
@@ -118,7 +116,7 @@ pub fn make_natural_address_for_pointer(
                     ctx.for_making_type(),
                     &ctx.type_layout_cache,
                     ir_type,
-                    is_bitfield.unwrap_or(false),
+                    is_bitfield,
                 )?
             },
         },

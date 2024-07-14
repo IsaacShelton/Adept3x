@@ -141,7 +141,7 @@ where
             }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
-                if annotations.len() > 0 {
+                if !annotations.is_empty() {
                     let token = self.input.advance();
                     return Err(self.expected_top_level_construct(&token));
                 }
@@ -286,7 +286,7 @@ where
         self.parse_token(TokenKind::OpenParen, Some("to begin struct fields"))?;
 
         while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
-            if fields.len() != 0 {
+            if !fields.is_empty() {
                 self.parse_token(TokenKind::Comma, Some("to separate struct fields"))?;
                 self.ignore_newlines();
             }
@@ -326,6 +326,7 @@ where
         let name = self.parse_identifier(Some("for alias name after 'alias' keyword"))?;
         self.ignore_newlines();
 
+        #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
                 _ => {
@@ -358,6 +359,7 @@ where
         let name = self.parse_identifier(Some("for enum name after 'enum' keyword"))?;
         self.ignore_newlines();
 
+        #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
                 _ => {
@@ -416,6 +418,7 @@ where
 
         self.parse_token(TokenKind::Assign, Some("after name of define"))?;
 
+        #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
                 _ => {
@@ -1093,8 +1096,7 @@ where
         let next_operator = self.input.peek();
         let next_precedence = next_operator.kind.precedence();
 
-        if !((next_precedence + is_right_associative(next_operator) as usize) < operator_precedence)
-        {
+        if (next_precedence + is_right_associative(next_operator) as usize) >= operator_precedence {
             self.parse_operator_expr(operator_precedence + 1, rhs)
         } else {
             Ok(rhs)
@@ -1377,18 +1379,12 @@ pub fn parse_into(
 }
 
 fn is_terminating_token(kind: &TokenKind) -> bool {
-    match kind {
-        TokenKind::Comma => true,
-        TokenKind::CloseParen => true,
-        TokenKind::CloseBracket => true,
-        TokenKind::CloseCurly => true,
-        _ => false,
-    }
+    matches!(
+        kind,
+        TokenKind::Comma | TokenKind::CloseParen | TokenKind::CloseBracket | TokenKind::CloseCurly
+    )
 }
 
 fn is_right_associative(kind: &TokenKind) -> bool {
-    match kind {
-        TokenKind::DeclareAssign => true,
-        _ => false,
-    }
+    matches!(kind, TokenKind::DeclareAssign)
 }

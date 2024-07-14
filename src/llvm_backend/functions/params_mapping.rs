@@ -40,7 +40,7 @@ impl ParamsMapping {
         abi_function: &ABIFunction,
         ir_module: &ir::Module,
     ) -> Self {
-        let mut llvm_param_index = 0 as usize;
+        let mut llvm_param_index = 0_usize;
         let mut params = Vec::with_capacity(abi_function.parameter_types.len());
         let mut swap_this_with_sret = false;
         let mut inalloc_index = None;
@@ -70,12 +70,11 @@ impl ParamsMapping {
 
             let num_subparams = match &abi_type.kind {
                 ABITypeKind::Direct(direct) => {
-                    let struct_type = direct.coerce_to_type.filter(|llvm_type| {
-                        return unsafe { LLVMGetTypeKind(*llvm_type) }
-                            == LLVMTypeKind::LLVMStructTypeKind;
+                    let struct_type = direct.coerce_to_type.filter(|llvm_type| unsafe {
+                        LLVMGetTypeKind(*llvm_type) == LLVMTypeKind::LLVMStructTypeKind
                     });
 
-                    let num_subparams = if let Some(struct_type) = struct_type {
+                    if let Some(struct_type) = struct_type {
                         if direct.can_be_flattened {
                             usize::try_from(unsafe { LLVMCountStructElementTypes(struct_type) })
                                 .unwrap()
@@ -84,8 +83,7 @@ impl ParamsMapping {
                         }
                     } else {
                         1
-                    };
-                    num_subparams
+                    }
                 }
                 ABITypeKind::Extend(_) => 1,
                 ABITypeKind::Indirect(_) => 1,

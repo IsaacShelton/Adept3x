@@ -49,7 +49,7 @@ impl SourceFileCache {
     }
 
     pub fn add_or_exit(&self, filename: &str) -> SourceFileCacheKey {
-        match self.add(&filename) {
+        match self.add(filename) {
             Ok(key) => key,
             Err(_) => {
                 eprintln!("Failed to open file {}", filename);

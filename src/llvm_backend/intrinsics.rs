@@ -89,7 +89,7 @@ impl Intrinsics {
         &self,
         operation: &OverflowOperation,
     ) -> (LLVMValueRef, LLVMTypeRef) {
-        *self.overflow_operations.get_or_insert(&operation, || {
+        *self.overflow_operations.get_or_insert(operation, || {
             let backend_type = match operation.bits {
                 IntegerBits::Bits8 => LLVMInt8Type(),
                 IntegerBits::Bits16 => LLVMInt16Type(),

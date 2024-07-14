@@ -20,8 +20,8 @@ impl<'a> Arch<'a> {
         match self {
             Arch::X86_64(_arch) => todo!(),
             Arch::AARCH64(arch) => CoreInfo {
-                type_layout_cache: &arch.type_layout_cache,
-                target_info: &arch.target_info,
+                type_layout_cache: arch.type_layout_cache,
+                target_info: arch.target_info,
             },
         }
     }

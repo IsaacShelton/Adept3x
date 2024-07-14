@@ -92,14 +92,14 @@ impl Memory {
     }
 
     fn write_bytes_heap(&mut self, destination: u64, bytes: &[u8]) {
-        for i in 0..bytes.len() {
-            self.heap[destination as usize - Self::HEAP_OFFSET as usize + i as usize] = bytes[i];
+        for (i, byte) in bytes.iter().enumerate() {
+            self.heap[destination as usize - Self::HEAP_OFFSET as usize + i] = *byte;
         }
     }
 
     fn write_bytes_stack(&mut self, destination: u64, bytes: &[u8]) {
-        for i in 0..bytes.len() {
-            self.stack[destination as usize - Self::STACK_OFFSET as usize + i as usize] = bytes[i];
+        for (i, byte) in bytes.iter().enumerate() {
+            self.stack[destination as usize - Self::STACK_OFFSET as usize + i] = *byte;
         }
     }
 }

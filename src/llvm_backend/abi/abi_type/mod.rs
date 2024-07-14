@@ -475,5 +475,5 @@ pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
 }
 
 fn is_struct_type(ty: LLVMTypeRef) -> bool {
-    return unsafe { LLVMGetTypeKind(ty) } == LLVMTypeKind::LLVMStructTypeKind;
+    unsafe { LLVMGetTypeKind(ty)  == LLVMTypeKind::LLVMStructTypeKind }
 }

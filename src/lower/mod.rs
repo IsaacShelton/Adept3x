@@ -292,7 +292,7 @@ fn lower_stmts(
 
                     lower_basic_binary_operation(
                         builder,
-                        &operator,
+                        operator,
                         ir::BinaryOperands::new(existing_value, new_value),
                     )?
                 } else {

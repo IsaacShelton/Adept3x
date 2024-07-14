@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![allow(clippy::diverging_sub_expression)]
+#![allow(clippy::module_name_repetitions)]
 
 mod ast;
 mod borrow;
@@ -57,9 +59,8 @@ use target_info::TargetInfo;
 use walkdir::{DirEntry, WalkDir};
 
 fn main() {
-    let args = match cli::Command::parse_env_args() {
-        Ok(args) => args,
-        Err(()) => exit(1),
+    let Ok(args) = cli::Command::parse_env_args() else {
+        exit(1)
     };
 
     match args.kind {
@@ -95,7 +96,7 @@ fn build_project(build_command: BuildCommand) {
                 let text = source_file_cache.get(key).content().chars().into_text(key);
                 let preprocessed =
                     exit_unless(c::preprocessor::preprocess(text), &source_file_cache);
-                println!("{:?}", preprocessed);
+                println!("{preprocessed:?}");
                 return;
             }
 
@@ -128,7 +129,7 @@ fn exit_unless<T, E: Show>(result: Result<T, E>, source_file_cache: &SourceFileC
             let mut message = String::new();
             err.show(&mut message, source_file_cache)
                 .expect("show error message");
-            eprintln!("{}", message);
+            eprintln!("{message}");
             exit(1);
         }
     }
@@ -158,7 +159,7 @@ fn compile_project(
         };
 
         let filename = entry.path().to_string_lossy().to_string();
-        println!("[=] {}", filename);
+        println!("[=] {filename}");
 
         let key = source_file_cache.add_or_exit(&filename);
         let content = source_file_cache.get(key).content();
@@ -168,12 +169,12 @@ fn compile_project(
 
             if let Some(ast) = &mut ast {
                 exit_unless(
-                    parse_into(lexer, &source_file_cache, key, ast, filename.to_string()),
+                    parse_into(lexer, source_file_cache, key, ast, filename.to_string()),
                     source_file_cache,
                 );
             } else {
                 ast = Some(exit_unless(
-                    parse(lexer, &source_file_cache, key),
+                    parse(lexer, source_file_cache, key),
                     source_file_cache,
                 ));
             }
@@ -206,7 +207,7 @@ fn compile_project(
                 .get_mut(&file_id)
                 .expect("recently added file to exist");
 
-            for (define_name, define) in defines.iter() {
+            for (define_name, define) in &defines {
                 match &define.kind {
                     DefineKind::ObjectMacro(expanded_replacement, _placeholder_affinity) => {
                         let lexed_replacement =
@@ -232,9 +233,7 @@ fn compile_project(
         }
     }
 
-    let ast = if let Some(ast) = ast {
-        ast
-    } else {
+    let Some(ast) = ast else {
         eprintln!("must have at least one adept file in directory in order to compile");
         exit(1);
     };
@@ -269,10 +268,10 @@ fn compile(
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");
 
-    let key = match source_file_cache.add(&filename) {
+    let key = match source_file_cache.add(filename) {
         Ok(key) => key,
         Err(_) => {
-            eprintln!("Failed to open file {}", filename);
+            eprintln!("Failed to open file {filename}");
             exit(1);
         }
     };
@@ -280,7 +279,7 @@ fn compile(
     let content = source_file_cache.get(key).content();
 
     let mut ast = exit_unless(
-        parse(Lexer::new(content.chars()), &source_file_cache, key),
+        parse(Lexer::new(content.chars()), source_file_cache, key),
         source_file_cache,
     );
 
@@ -313,7 +312,7 @@ fn compile(
 }
 
 fn new_project(new_command: NewCommand) {
-    if let Err(_) = std::fs::create_dir(&new_command.project_name) {
+    if std::fs::create_dir(&new_command.project_name).is_err() {
         eprintln!(
             "Failed to create project directory '{}'",
             &new_command.project_name
@@ -321,9 +320,9 @@ fn new_project(new_command: NewCommand) {
         exit(1);
     }
 
-    let imports = indoc! {r#"
+    let imports = indoc! {r"
         import std::prelude
-    "#};
+    "};
 
     let main = indoc! {r#"
 
@@ -332,9 +331,9 @@ fn new_project(new_command: NewCommand) {
         }
     "#};
 
-    let lock = indoc! {r#"
+    let lock = indoc! {r"
         std::prelude 1.0 731f4cbc9ba52451245d8f67961b640111e522972a6a4eff97c88f7ff07b0b59
-    "#};
+    "};
 
     put_file(&new_command.project_name, "_.imports", imports);
     put_file(&new_command.project_name, "_.lock", lock);
@@ -345,7 +344,7 @@ fn new_project(new_command: NewCommand) {
 fn put_file(directory_name: &str, filename: &str, content: &str) {
     let path = std::path::Path::new(directory_name).join(filename);
 
-    if let Err(_) = std::fs::write(&path, content) {
+    if std::fs::write(path, content).is_err() {
         eprintln!("Failed to create {} file", filename);
         exit(1);
     }
@@ -526,7 +525,7 @@ fn run_build_system_interpreter(resolved_ast: &resolved::Ast<'_>, ir_module: &ir
 
     let max_steps = Some(1_000_000);
     let handler = BuildSystemSyscallHandler::default();
-    let mut interpreter = Interpreter::new(handler, &ir_module, max_steps);
+    let mut interpreter = Interpreter::new(handler, ir_module, max_steps);
 
     match interpreter.run(interpreter_entry_point) {
         Ok(result) => assert!(result.is_literal() && result.unwrap_literal().is_void()),

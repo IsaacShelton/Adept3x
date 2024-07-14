@@ -91,7 +91,7 @@ pub unsafe fn get_function_pointer_type<'a>(
     is_cstyle_variadic: bool,
 ) -> Result<LLVMTypeRef, BackendError> {
     let ctx = ctx.borrow();
-    let return_type = to_backend_type(ctx, &return_type)?;
+    let return_type = to_backend_type(ctx, return_type)?;
     let mut parameters = to_backend_types(ctx, parameters.iter())?;
     let is_vararg = if is_cstyle_variadic { 1 } else { 0 };
 

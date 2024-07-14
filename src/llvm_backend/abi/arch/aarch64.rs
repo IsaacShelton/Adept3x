@@ -37,8 +37,8 @@ pub struct AARCH64<'a> {
 pub enum Variant {
     DarwinPCS,
     Win64,
-    AAPCS,
-    AAPCSSoft,
+    Aapcs,
+    AapcsSoft,
 }
 
 #[allow(unused)]
@@ -120,37 +120,34 @@ impl AARCH64<'_> {
             return ABIType::new_ignore();
         }
 
-        if let Some(..) = is_aarch64_homo_aggregate(
-            self.variant,
-            return_type,
-            self.ir_module,
-            None,
-            self.type_layout_cache,
-            self.target_info,
-        ) {
-            if !is_variadic
-            /* || !is_aarch64_32_target_triple (not supported) */
-            {
-                return ABIType::new_direct(DirectOptions::default());
-            }
+        if !is_variadic
+            && is_aarch64_homo_aggregate(
+                self.variant,
+                return_type,
+                self.ir_module,
+                None,
+                self.type_layout_cache,
+                self.target_info,
+            )
+            .is_some()
+        {
+            return ABIType::new_direct(DirectOptions::default());
         }
 
         // Small aggregates are returned directly via registers or stack
-        if size <= ByteUnits::of(16) {
-            if size <= ByteUnits::of(8) && self.target_info.is_little_endian() {
-                let ty = match size.bytes() {
-                    1 => unsafe { LLVMInt8Type() },
-                    2 => unsafe { LLVMInt16Type() },
-                    3..=4 => unsafe { LLVMInt32Type() },
-                    5..=8 => unsafe { LLVMInt64Type() },
-                    _ => panic!("expected aggregate to be register sized"),
-                };
+        if size <= ByteUnits::of(8) && self.target_info.is_little_endian() {
+            let ty = match size.bytes() {
+                1 => unsafe { LLVMInt8Type() },
+                2 => unsafe { LLVMInt16Type() },
+                3..=4 => unsafe { LLVMInt32Type() },
+                5..=8 => unsafe { LLVMInt64Type() },
+                _ => panic!("expected aggregate to be register sized"),
+            };
 
-                return ABIType::new_direct(DirectOptions {
-                    coerce_to_type: Some(ty),
-                    ..Default::default()
-                });
-            }
+            return ABIType::new_direct(DirectOptions {
+                coerce_to_type: Some(ty),
+                ..Default::default()
+            });
         }
 
         let size = size.align_to(ByteUnits::of(8));
@@ -280,7 +277,7 @@ impl AARCH64<'_> {
                 )
             };
 
-            let coerce_to_type = if size_bytes == alignment_bytes.into() {
+            let coerce_to_type = if size_bytes == alignment_bytes {
                 base_type
             } else {
                 unsafe { LLVMArrayType2(base_type, size_bytes / alignment_bytes) }
@@ -511,7 +508,7 @@ fn is_aarch64_homo_aggregate_record<'a>(
         ) {
             // NOTE: We don't support union types yet
             let is_union = false;
-            base = Some(&inner.base);
+            base = Some(inner.base);
 
             num_combined_members = if is_union {
                 num_combined_members.max(inner.num_members)

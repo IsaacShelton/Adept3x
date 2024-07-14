@@ -66,13 +66,8 @@ where
     fn drop(&mut self) {
         // We need to consume the rest of the line, since we share a text source and
         // the following line will need to start at its beginning.
-        loop {
-            match self.text {
-                LineSource::Text(_) => {
-                    let _ = self.next();
-                }
-                LineSource::End(_) => break,
-            }
+        while let LineSource::Text(_) = self.text {
+            let _ = self.next();
         }
     }
 }

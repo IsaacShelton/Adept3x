@@ -110,15 +110,15 @@ impl BinaryOperation {
                 (self
                     .left
                     .evaluate()
-                    .overflowing_shl(self.right.evaluate() as u32))
-                .0 as i64
+                    .overflowing_shl(self.right.evaluate().try_into().unwrap()))
+                .0
             }
             BinaryOperator::RightShift => {
                 (self
                     .left
                     .evaluate()
-                    .overflowing_shr(self.right.evaluate() as u32))
-                .0 as i64
+                    .overflowing_shr(self.right.evaluate().try_into().unwrap()))
+                .0
             }
             BinaryOperator::Add => self.left.evaluate().wrapping_add(self.right.evaluate()),
             BinaryOperator::Subtract => self.left.evaluate().wrapping_sub(self.right.evaluate()),

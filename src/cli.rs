@@ -9,7 +9,7 @@ impl Command {
         let mut args = std::env::args().skip(1).peekable();
 
         match args.peek().map(|string| string.as_str()) {
-            None | Some("-h") | Some("--help") => {
+            None | Some("-h" | "--help") => {
                 show_help();
                 exit(0);
             }

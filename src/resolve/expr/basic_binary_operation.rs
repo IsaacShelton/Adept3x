@@ -48,11 +48,11 @@ pub fn resolve_basic_binary_operation_expr(
     let operator =
         resolve_basic_binary_operator(&binary_operation.operator, &unified_type, source)?;
 
-    let result_type = binary_operation
-        .operator
-        .returns_boolean()
-        .then_some(resolved::TypeKind::Boolean.at(source))
-        .unwrap_or(unified_type);
+    let result_type = if binary_operation.operator.returns_boolean() {
+        resolved::TypeKind::Boolean.at(source)
+    } else {
+        unified_type
+    };
 
     Ok(TypedExpr::new(
         result_type,

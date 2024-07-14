@@ -126,11 +126,7 @@ pub fn preprocess(
     text: impl Text,
 ) -> Result<(Vec<PreToken>, HashMap<String, Define>, Source), PreprocessorError> {
     let lexer = Lexer::new(text);
-
-    let ast = match parse(lexer.into_inflow()) {
-        Ok(ast) => ast,
-        Err(err) => return Err(err.into()),
-    };
+    let ast = parse(lexer.into_inflow())?;
     let (document, defines) = expand_ast(&ast, stdc())?;
     Ok((document, defines, ast.eof))
 }

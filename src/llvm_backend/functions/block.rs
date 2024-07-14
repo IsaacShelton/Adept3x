@@ -40,7 +40,7 @@ pub unsafe fn create_function_block(
                     builder.get(),
                     value.as_ref().map_or_else(
                         || Ok(null_mut()),
-                        |value| build_value(ctx, value_catalog, &builder, value),
+                        |value| build_value(ctx, value_catalog, builder, value),
                     )?,
                 );
                 None
@@ -149,7 +149,7 @@ pub unsafe fn create_function_block(
 
                 let mut arguments = [left, right];
 
-                let (fn_value, fn_type) = ctx.intrinsics.overflow_operation(&operation);
+                let (fn_value, fn_type) = ctx.intrinsics.overflow_operation(operation);
 
                 let info = LLVMBuildCall2(
                     builder.get(),

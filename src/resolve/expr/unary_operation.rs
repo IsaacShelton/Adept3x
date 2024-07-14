@@ -26,7 +26,7 @@ pub fn resolve_unary_operation_expr(
         resolved::TypeKind::Boolean => resolved_expr,
         resolved::TypeKind::Integer { .. } => resolved_expr,
         resolved::TypeKind::IntegerLiteral(value) => {
-            conform_integer_to_default_or_error(&value, resolved_expr.expr.source)?
+            conform_integer_to_default_or_error(value, resolved_expr.expr.source)?
         }
         _ => {
             return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {

@@ -135,16 +135,16 @@ where
                         while let Some((c, location)) = self.characters.peek() {
                             if *c == '\n' {
                                 return Has(Token::new(TokenKind::DocComment(comment), *location));
-                            } else {
-                                comment.push(self.characters.next().unwrap().0);
                             }
+
+                            comment.push(self.characters.next().unwrap().0);
                         }
 
                         Has(Token::new(TokenKind::DocComment(comment), start_location))
                     } else {
                         // Regular line comment
 
-                        while let Some((c, _)) = self.characters.next() {
+                        for (c, _) in self.characters.by_ref() {
                             if c == '\n' {
                                 return Has(Token::new(TokenKind::Newline, start_location));
                             }
@@ -367,12 +367,12 @@ where
                 state.identifier.push(self.characters.next().unwrap().0);
                 Waiting
             } else {
-                let token = state.to_token();
+                let token = state.finalize();
                 self.state = State::Idle;
                 Has(token)
             }
         } else {
-            let token = state.to_token();
+            let token = state.finalize();
             self.state = State::Idle;
             Has(token)
         }
@@ -385,7 +385,7 @@ where
 
         if let Some((c, c_location)) = self.characters.next() {
             if c == state.closing_char {
-                let value = std::mem::replace(&mut state.value, String::default());
+                let value = std::mem::take(&mut state.value);
                 let modifier = state.modifier;
                 let start_location = state.start_location;
                 self.state = State::Idle;

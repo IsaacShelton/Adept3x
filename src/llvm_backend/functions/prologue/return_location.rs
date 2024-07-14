@@ -42,7 +42,7 @@ impl ReturnLocation {
             sret_argument,
             &ir_function.return_type,
             Some(indirect.align),
-            None,
+            false,
         )?;
 
         let pointer = (!indirect.byval).then(|| {
@@ -115,6 +115,7 @@ impl ReturnLocation {
             inalloca_combined_struct.ty,
             address,
             pointer_alignment,
+            false,
             cstr!("agg.result"),
         );
 

@@ -75,10 +75,7 @@ impl CTokenKind {
     }
 
     pub fn is_open_paren(&self) -> bool {
-        match self {
-            CTokenKind::Punctuator(Punctuator::OpenParen { .. }) => true,
-            _ => false,
-        }
+        matches!(self, CTokenKind::Punctuator(Punctuator::OpenParen { .. }))
     }
 
     pub fn precedence(&self) -> usize {
@@ -132,16 +129,16 @@ pub enum Integer {
     UnsignedLongLong(u64),
 }
 
-impl Into<BigInt> for &Integer {
-    fn into(self) -> BigInt {
-        return match self {
+impl From<&Integer> for BigInt {
+    fn from(val: &Integer) -> Self {
+        match val {
             Integer::Int(x) => BigInt::from(*x),
             Integer::UnsignedInt(x) => BigInt::from(*x),
             Integer::Long(x) => BigInt::from(*x),
             Integer::UnsignedLong(x) => BigInt::from(*x),
             Integer::LongLong(x) => BigInt::from(*x),
             Integer::UnsignedLongLong(x) => BigInt::from(*x),
-        };
+        }
     }
 }
 

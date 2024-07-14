@@ -69,7 +69,7 @@ pub unsafe fn to_backend_function_type(
         }
     };
 
-    let mapping = ParamsMapping::new(&ctx.type_layout_cache, &abi_function, ctx.ir_module);
+    let mapping = ParamsMapping::new(&ctx.type_layout_cache, abi_function, ctx.ir_module);
     let mut parameters = vec![null_mut(); mapping.llvm_arity()];
 
     if let Some(sret_index) = mapping.sret_index() {

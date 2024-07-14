@@ -34,7 +34,7 @@ impl<'a> FunctionSearchCtx<'a> {
     pub fn find_function(&self, name: &str) -> Option<resolved::FunctionRef> {
         self.available
             .get(name)
-            .and_then(|list| list.get(0))
+            .and_then(|list| list.first())
             .copied()
     }
 }

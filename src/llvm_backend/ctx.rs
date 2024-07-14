@@ -79,7 +79,7 @@ impl<'a> BackendCtx<'a> {
             globals: HashMap::new(),
             anon_global_variables: Vec::new(),
             target_data,
-            intrinsics: Intrinsics::new(&backend_module),
+            intrinsics: Intrinsics::new(backend_module),
             relocations: Vec::new(),
             static_variables: Vec::new(),
             structure_cache: Default::default(),
@@ -90,7 +90,7 @@ impl<'a> BackendCtx<'a> {
     pub fn for_making_type(&'a self) -> ToBackendTypeCtx<'a> {
         ToBackendTypeCtx {
             structure_cache: &self.structure_cache,
-            ir_module: &self.ir_module,
+            ir_module: self.ir_module,
             visited: RefCell::new(HashSet::default()),
         }
     }

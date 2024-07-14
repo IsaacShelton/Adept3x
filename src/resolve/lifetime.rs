@@ -39,15 +39,11 @@ impl VariableUsageSet {
         self.declared.or(&other.declared);
     }
 
-    pub fn iter_used(
-        &self,
-    ) -> impl Iterator<Item = bool> + DoubleEndedIterator + ExactSizeIterator + '_ {
+    pub fn iter_used(&self) -> impl ExactSizeIterator<Item = bool> + DoubleEndedIterator + '_ {
         self.used.iter()
     }
 
-    pub fn iter_declared(
-        &self,
-    ) -> impl Iterator<Item = bool> + DoubleEndedIterator + ExactSizeIterator + '_ {
+    pub fn iter_declared(&self) -> impl ExactSizeIterator<Item = bool> + DoubleEndedIterator + '_ {
         self.declared.iter()
     }
 }
@@ -118,8 +114,8 @@ pub fn insert_drops(function: &mut Function) {
     integrate_active_set_for_stmts(&mut function.stmts, &mut active_set);
 }
 
-fn insert_drops_for_stmts(ctx: InsertDropsCtx, stmts: &mut Vec<Stmt>) -> VariableUsageSet {
-    let mut last_use_in_this_scope = vec![0 as usize; ctx.variables_count];
+fn insert_drops_for_stmts(ctx: InsertDropsCtx, stmts: &mut [Stmt]) -> VariableUsageSet {
+    let mut last_use_in_this_scope = vec![0_usize; ctx.variables_count];
     let mut scope = VariableUsageSet::new(ctx.variables_count.try_into().unwrap());
 
     for (stmt_index, stmt) in stmts.iter_mut().enumerate() {
@@ -372,10 +368,10 @@ impl ActiveSet {
     }
 }
 
-fn integrate_active_set_for_stmts(stmts: &mut Vec<Stmt>, parent_active_set: &mut ActiveSet) {
+fn integrate_active_set_for_stmts(stmts: &mut [Stmt], parent_active_set: &mut ActiveSet) {
     let mut active_set = parent_active_set.clone();
 
-    for (_stmt_i, stmt) in stmts.iter_mut().enumerate() {
+    for stmt in stmts.iter_mut() {
         match &mut stmt.kind {
             StmtKind::Return(value, drops) => {
                 stmt.drops.drops.clear();
@@ -447,7 +443,9 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
             integrate_active_set_for_expr(&mut operation.right.expr, active_set);
             active_set.deactivate_drops(&operation.drops);
         }
-        ExprKind::IntegerExtend(..) | ExprKind::IntegerTruncate(..) | ExprKind::FloatExtend(..) => {
+        ExprKind::IntegerExtend(..) | ExprKind::IntegerTruncate(..) | ExprKind::FloatExtend(..) =>
+        {
+            #[allow(clippy::unused_unit)]
             ()
         }
         ExprKind::Member(member) => {

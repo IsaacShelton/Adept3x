@@ -51,7 +51,7 @@ pub struct ParameterTypeList {
     pub is_variadic: bool,
 }
 
-#[derive(Clone, Debug, IsVariant)]
+#[derive(Copy, Clone, Debug, IsVariant)]
 pub enum Abstraction {
     Normal,
     Abstract,
@@ -136,11 +136,11 @@ impl Decorator {
 
 impl Decorators {
     pub fn then_pointer(&mut self, pointer: Pointer) {
-        self.decorators.push(Decorator::Pointer(pointer))
+        self.decorators.push(Decorator::Pointer(pointer));
     }
 
     pub fn then_array(&mut self, array: ArrayQualifier) {
-        self.decorators.push(Decorator::Array(array))
+        self.decorators.push(Decorator::Array(array));
     }
 
     pub fn then_function(&mut self, function: FunctionQualifier) {
@@ -244,8 +244,8 @@ impl TypeSpecifierQualifier {
     pub fn is_void(&self) -> bool {
         match self {
             TypeSpecifierQualifier::TypeSpecifier(ts) => ts.kind.is_void(),
-            TypeSpecifierQualifier::TypeQualifier(_) => false,
-            TypeSpecifierQualifier::AlignmentSpecifier(_) => false,
+            TypeSpecifierQualifier::TypeQualifier(_)
+            | TypeSpecifierQualifier::AlignmentSpecifier(_) => false,
         }
     }
 }
@@ -493,7 +493,7 @@ impl<'a> Parser<'a> {
             match external_declaration {
                 ExternalDeclaration::Declaration(declaration) => match declaration {
                     Declaration::Common(declaration) => {
-                        for init_declarator in declaration.init_declarator_list.iter() {
+                        for init_declarator in &declaration.init_declarator_list {
                             match &init_declarator.declarator.kind {
                                 DeclaratorKind::Named(..)
                                 | DeclaratorKind::Pointer(..)
@@ -532,7 +532,7 @@ impl<'a> Parser<'a> {
             return Ok(todo!());
         }
 
-        return speculate!(self.input, self.parse_declaration());
+        speculate!(self.input, self.parse_declaration())
     }
 
     fn parse_function_definition(&mut self) -> Result<(), ParseError> {
@@ -558,11 +558,8 @@ impl<'a> Parser<'a> {
     fn parse_declaration_specifiers(&mut self) -> Result<DeclarationSpecifiers, ParseError> {
         let mut specifiers = vec![];
 
-        loop {
-            match speculate!(self.input, self.parse_declaration_specifier()) {
-                Ok(specifier) => specifiers.push(specifier),
-                _ => break,
-            }
+        while let Ok(specifier) = speculate!(self.input, self.parse_declaration_specifier()) {
+            specifiers.push(specifier);
         }
 
         let attributes = self.parse_attribute_specifier_sequence()?;
@@ -648,6 +645,7 @@ impl<'a> Parser<'a> {
 
         let source = self.input.peek().source;
 
+        #[allow(clippy::redundant_pattern_matching)]
         if let Ok(..) = speculate!(self.input, self.parse_atomic_type_specifier()) {
             return Ok(todo!());
         }
@@ -673,6 +671,7 @@ impl<'a> Parser<'a> {
             });
         }
 
+        #[allow(clippy::redundant_pattern_matching)]
         if let Ok(..) = speculate!(self.input, self.parse_typeof_specifier()) {
             return Ok(todo!());
         }
@@ -759,11 +758,8 @@ impl<'a> Parser<'a> {
     fn parse_type_qualifier_list(&mut self) -> Result<Vec<TypeQualifier>, ParseError> {
         let mut qualifiers = vec![];
 
-        loop {
-            match speculate!(self.input, self.parse_type_qualifier()) {
-                Ok(qualifier) => qualifiers.push(qualifier),
-                _ => break,
-            }
+        while let Ok(qualifier) = speculate!(self.input, self.parse_type_qualifier()) {
+            qualifiers.push(qualifier);
         }
 
         Ok(qualifiers)
@@ -1135,10 +1131,8 @@ impl<'a> Parser<'a> {
         let mut member_declarators = vec![];
 
         loop {
-            if member_declarators.len() != 0 {
-                if !self.eat_punctuator(Punctuator::Comma) {
-                    break;
-                }
+            if !member_declarators.is_empty() && !self.eat_punctuator(Punctuator::Comma) {
+                break;
             }
 
             match speculate!(self.input, self.parse_member_declarator()) {
@@ -1186,11 +1180,8 @@ impl<'a> Parser<'a> {
     fn parse_specifier_qualifier_list(&mut self) -> Result<SpecifierQualifierList, ParseError> {
         let mut type_specifier_qualifiers = vec![];
 
-        loop {
-            match speculate!(self.input, self.parse_type_specifier_qualifier()) {
-                Ok(qualifier) => type_specifier_qualifiers.push(qualifier),
-                _ => break,
-            }
+        while let Ok(qualifier) = speculate!(self.input, self.parse_type_specifier_qualifier()) {
+            type_specifier_qualifiers.push(qualifier);
         }
 
         let attributes = self.parse_attribute_specifier_sequence()?;
@@ -1203,7 +1194,7 @@ impl<'a> Parser<'a> {
 
     fn parse_typedef_name(&mut self) -> Result<TypedefName, ParseError> {
         if let CTokenKind::Identifier(name) = &self.input.peek().kind {
-            if self.typedefs.get(name).is_some() {
+            if self.typedefs.contains_key(name) {
                 let name = name.clone();
                 let source = self.input.advance().source;
                 return Ok(TypedefName { name, source });
@@ -1383,13 +1374,13 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        return Ok(ExternalDeclaration::Declaration(Declaration::Common(
+        Ok(ExternalDeclaration::Declaration(Declaration::Common(
             CommonDeclaration {
                 attribute_specifiers,
                 declaration_specifiers,
                 init_declarator_list,
             },
-        )));
+        )))
     }
 
     fn parse_init_declarator_list(&mut self) -> Result<Vec<InitDeclarator>, ParseError> {
@@ -1612,11 +1603,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let source = if expected.len() > 0 {
-            Some(self.input.peek().source)
-        } else {
-            None
-        };
+        let source = (!expected.is_empty()).then(|| self.input.peek().source);
 
         for _ in 0..expected.len() {
             self.input.advance();

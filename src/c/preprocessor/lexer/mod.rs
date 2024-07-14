@@ -44,9 +44,7 @@ impl<T: Text> InflowStream for Lexer<T> {
                 }
                 Err(end_of_file_source) => match self.state {
                     State::MultiLineComment(source) => {
-                        return Err(PreprocessorErrorKind::UnterminatedMultiLineComment
-                            .at(source)
-                            .into())
+                        return Err(PreprocessorErrorKind::UnterminatedMultiLineComment.at(source))
                     }
                     _ => return Ok(PreTokenLine::EndOfFile(end_of_file_source)),
                 },
