@@ -1,5 +1,6 @@
 use super::{abi_type::ABIType, arch::Arch, cxx::Itanium};
 use crate::{
+    data_units::ByteUnits,
     ir,
     llvm_backend::{ctx::ToBackendTypeCtx, error::BackendError},
 };
@@ -7,10 +8,16 @@ use llvm_sys::prelude::LLVMTypeRef;
 use std::borrow::Borrow;
 
 #[derive(Clone, Debug)]
+pub struct InAllocaStruct {
+    pub ty: LLVMTypeRef,
+    pub alignment: ByteUnits,
+}
+
+#[derive(Clone, Debug)]
 pub struct ABIFunction {
     pub parameter_types: Vec<ABIParam>,
     pub return_type: ABIParam,
-    pub inalloca_combined_struct: Option<LLVMTypeRef>,
+    pub inalloca_combined_struct: Option<InAllocaStruct>,
 }
 
 #[derive(Clone, Debug)]

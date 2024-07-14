@@ -1,4 +1,5 @@
 mod abi;
+mod address;
 mod backend_type;
 mod builder;
 mod ctx;
@@ -8,6 +9,7 @@ mod globals;
 mod intrinsics;
 mod module;
 mod null_terminated_string;
+mod raw_address;
 mod structure;
 mod target_data;
 mod target_machine;

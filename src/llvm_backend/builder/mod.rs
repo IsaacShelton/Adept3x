@@ -1,10 +1,16 @@
+mod build_load;
+mod build_struct_gep;
+mod phi_relocation;
+
 use append_only_vec::AppendOnlyVec;
 use llvm_sys::{
     core::{LLVMCreateBuilder, LLVMDisposeBuilder},
-    prelude::{LLVMBuilderRef, LLVMValueRef},
+    prelude::LLVMBuilderRef,
 };
 
-use crate::ir;
+pub use build_load::{build_aligned_load, build_load};
+pub use build_struct_gep::build_struct_gep;
+pub use phi_relocation::PhiRelocation;
 
 pub struct Builder {
     builder: LLVMBuilderRef,
@@ -42,9 +48,4 @@ impl From<Builder> for LLVMBuilderRef {
     fn from(value: Builder) -> Self {
         unsafe { value.get() }
     }
-}
-
-pub struct PhiRelocation {
-    pub phi_node: LLVMValueRef,
-    pub incoming: Vec<ir::PhiIncoming>,
 }

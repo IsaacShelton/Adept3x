@@ -1,4 +1,7 @@
-use super::function_type::{to_backend_function_type, FunctionType};
+use super::{
+    attribute::{add_func_attribute, create_enum_attribute},
+    function_type::{to_backend_function_type, FunctionType},
+};
 use crate::llvm_backend::{
     abi::{
         abi_function::ABIFunction,
@@ -8,6 +11,7 @@ use crate::llvm_backend::{
     ctx::{BackendCtx, FunctionSkeleton},
     error::BackendError,
 };
+use cstr::cstr;
 use llvm_sys::{
     core::{LLVMAddFunction, LLVMFunctionType, LLVMSetFunctionCallConv, LLVMSetLinkage},
     LLVMCallConv, LLVMLinkage,
@@ -65,6 +69,9 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
         );
         LLVMSetFunctionCallConv(skeleton, LLVMCallConv::LLVMCCallConv as u32);
 
+        let nounwind = create_enum_attribute(cstr!("nounwind"), 0);
+        add_func_attribute(skeleton, nounwind);
+
         if !function.is_foreign && !function.is_exposed {
             LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);
         }
@@ -75,6 +82,7 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
                 function: skeleton,
                 abi_function,
                 function_type,
+                ir_function_ref: *function_ref,
             },
         );
     }

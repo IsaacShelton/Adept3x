@@ -34,7 +34,7 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
 
             if ir_function.abide_abi {
                 if let Some((_, _, llvm_entry_basicblock)) = basicblocks.first() {
-                    emit_prologue(ctx, skeleton, &builder, *llvm_entry_basicblock);
+                    emit_prologue(ctx, skeleton, &builder, *llvm_entry_basicblock)?;
                 }
             }
 

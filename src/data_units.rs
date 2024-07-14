@@ -15,6 +15,12 @@ impl ByteUnits {
     pub const fn bytes(&self) -> u64 {
         self.units
     }
+
+    pub fn alignment_at_offset(&self, offset: &Self) -> Self {
+        // The largest power-of-2 common divisor of our alignment and the incoming offset
+        let bits_in_either = self.units | offset.units;
+        Self::of(bits_in_either & (!bits_in_either).wrapping_add(1))
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]

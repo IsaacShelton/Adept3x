@@ -2,9 +2,7 @@ use super::{
     abi::abi_function::ABIFunction, builder::Builder, functions::function_type::FunctionType,
     intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
 };
-use crate::{
-    data_units::ByteUnits, ir, resolved::StructureRef, target_info::type_layout::TypeLayoutCache,
-};
+use crate::{ir, resolved::StructureRef, target_info::type_layout::TypeLayoutCache};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use once_map::unsync::OnceMap;
 use std::{
@@ -43,39 +41,11 @@ impl<'a> From<&'a BackendCtx<'a>> for ToBackendTypeCtx<'a> {
     }
 }
 
-pub struct RawAddress {
-    pub base: LLVMValueRef,
-    pub nullable: bool,
-    pub alignment: ByteUnits,
-}
-
-impl RawAddress {
-    pub fn base_pointer(&self) -> LLVMValueRef {
-        self.base
-    }
-}
-
-pub struct Address {
-    pub base: RawAddress,
-    pub offset: Option<LLVMValueRef>,
-}
-
-impl Address {
-    pub fn base_pointer(&self) -> LLVMValueRef {
-        self.base.base_pointer()
-    }
-}
-
-impl From<RawAddress> for Address {
-    fn from(base: RawAddress) -> Self {
-        Self { base, offset: None }
-    }
-}
-
 pub struct FunctionSkeleton {
     pub function: LLVMValueRef,
     pub abi_function: Option<ABIFunction>,
     pub function_type: FunctionType,
+    pub ir_function_ref: ir::FunctionRef,
 }
 
 pub struct BackendCtx<'a> {

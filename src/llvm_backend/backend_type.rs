@@ -1,10 +1,10 @@
 use super::{ctx::ToBackendTypeCtx, structure::to_backend_struct_type, BackendError};
-use crate::ir;
+use crate::{data_units::BitUnits, ir, target_info::type_layout::TypeLayoutCache};
 use llvm_sys::{
     core::{
         LLVMArrayType2, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMInt16Type,
-        LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMStructType,
-        LLVMVoidType,
+        LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMIntType, LLVMPointerType,
+        LLVMStructType, LLVMVoidType,
     },
     prelude::LLVMTypeRef,
 };
@@ -101,4 +101,28 @@ pub unsafe fn get_function_pointer_type<'a>(
         parameters.len().try_into().unwrap(),
         is_vararg,
     ))
+}
+
+// `to_backend_mem_type` is similar to `to_backend_type`, except
+// that it generates the type for the backing memory, instead of
+// the passing representation.
+// e.g., booleans are i1, but stored as i8 or i32
+pub unsafe fn to_backend_mem_type<'a>(
+    ctx: impl Borrow<ToBackendTypeCtx<'a>>,
+    type_layout_cache: &TypeLayoutCache,
+    ir_type: &ir::Type,
+    is_bitfield: bool,
+) -> Result<LLVMTypeRef, BackendError> {
+    // NOTE: We don't support bitfields yet
+    assert!(!is_bitfield);
+
+    // NOTE: We don't support vector types yet
+    assert!(ir_type.is_vector());
+
+    if ir_type.is_boolean() {
+        let bits = BitUnits::from(type_layout_cache.get(ir_type).width).bits();
+        return Ok(unsafe { LLVMIntType(bits.try_into().unwrap()) });
+    }
+
+    to_backend_type(ctx, ir_type)
 }
