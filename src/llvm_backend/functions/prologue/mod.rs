@@ -51,7 +51,7 @@ pub fn emit_prologue(
     unsafe { LLVMPositionBuilderAtEnd(builder.get(), entry_basicblock) };
 
     let undef = unsafe { LLVMGetUndef(LLVMInt32Type()) };
-    let alloca_insertion_point = unsafe {
+    let alloca_point = unsafe {
         LLVMBuildBitCast(
             builder.get(),
             undef,
@@ -73,7 +73,7 @@ pub fn emit_prologue(
                 ir_function,
                 skeleton.function,
                 indirect,
-                alloca_insertion_point,
+                alloca_point,
             ),
             ABITypeKind::InAlloca(inalloca)
                 if !has_scalar_evaluation_kind(&abi_return_info.ir_type) =>
@@ -86,12 +86,7 @@ pub fn emit_prologue(
                     inalloca_subtypes.as_ref().unwrap().as_slice(),
                 )
             }
-            _ => ReturnLocation::normal(
-                builder,
-                ctx,
-                alloca_insertion_point,
-                &ir_function.return_type,
-            ),
+            _ => ReturnLocation::normal(builder, ctx, alloca_point, &ir_function.return_type),
         })
         .transpose()?;
 
@@ -167,7 +162,7 @@ pub fn emit_prologue(
                 indirect.align,
                 indirect.realign,
                 false,
-                alloca_insertion_point,
+                alloca_point,
             )?,
             ABITypeKind::IndirectAliased(indirect_aliased) => param_values.push_indirect(
                 builder,
@@ -178,15 +173,11 @@ pub fn emit_prologue(
                 indirect_aliased.align,
                 indirect_aliased.realign,
                 true,
-                alloca_insertion_point,
+                alloca_point,
             )?,
-            ABITypeKind::Ignore => param_values.push_ignore(
-                builder,
-                ctx,
-                llvm_param_range,
-                ty,
-                alloca_insertion_point,
-            )?,
+            ABITypeKind::Ignore => {
+                param_values.push_ignore(builder, ctx, llvm_param_range, ty, alloca_point)?
+            }
             ABITypeKind::Expand(_) => todo!(),
             ABITypeKind::CoerceAndExpand(_) => todo!(),
             ABITypeKind::InAlloca(inalloca) => param_values.push_inalloca(

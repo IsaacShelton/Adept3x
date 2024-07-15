@@ -5,8 +5,9 @@ use crate::{
         encoding::Encoding,
         preprocessor::{
             ast::{Define, DefineKind, FunctionMacro, PlaceholderAffinity},
+            error::PreprocessorErrorKind,
             pre_token::{PreToken, PreTokenKind, Punctuator},
-            ParseErrorKind, PreprocessorError, PreprocessorErrorKind,
+            ParseErrorKind, PreprocessorError,
         },
     },
     look_ahead::LookAhead,

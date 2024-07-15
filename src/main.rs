@@ -30,7 +30,7 @@ mod try_insert_index_map;
 
 use crate::ast::Ast;
 use crate::c::parser::{Input, Parser};
-use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind};
+use crate::c::preprocessor::{DefineKind, PreToken, PreTokenKind, Preprocessed};
 use crate::c::translate_expr;
 use crate::inflow::{InflowTools, IntoInflow, IntoInflowStream};
 use crate::interpreter::syscall_handler::{BuildSystemSyscallHandler, ProjectKind};
@@ -179,12 +179,16 @@ fn compile_project(
                 ));
             }
         } else {
-            let (preprocessed, defines, eof_source) = exit_unless(
+            let Preprocessed {
+                document,
+                defines,
+                end_of_file,
+            } = exit_unless(
                 c::preprocessor::preprocess(content.chars().into_text(key)),
                 source_file_cache,
             );
 
-            let lexed = lex(preprocessed, eof_source);
+            let lexed = lex(document, end_of_file);
 
             let (file_id, mut parser) = if let Some(ast) = &mut ast {
                 let mut parser = Parser::new(Input::new(lexed, source_file_cache, key));

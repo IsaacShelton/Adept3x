@@ -3,7 +3,8 @@ mod line;
 mod state;
 
 use self::{lex_line::lex_line, state::State};
-use super::{line_splice::LineSplicer, PreprocessorErrorKind};
+use super::error::PreprocessorErrorKind;
+use super::line_splice::LineSplicer;
 use crate::text::TextStream;
 use crate::{inflow::InflowStream, text::Text};
 

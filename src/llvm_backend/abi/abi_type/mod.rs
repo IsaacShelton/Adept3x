@@ -121,14 +121,7 @@ impl ABIType {
     }
 
     pub fn new_extend_in_register(ir_type: &ir::Type, coerce_to_type: Option<LLVMTypeRef>) -> Self {
-        Self::new_extend(
-            ir_type,
-            coerce_to_type,
-            ExtendOptions {
-                in_register: true,
-                ..Default::default()
-            },
-        )
+        Self::new_extend(ir_type, coerce_to_type, ExtendOptions { in_register: true })
     }
 
     pub fn new_ignore() -> Self {
@@ -186,10 +179,7 @@ impl ABIType {
             byval,
             realign,
             padding,
-            IndirectOptions {
-                in_register: true,
-                ..Default::default()
-            },
+            IndirectOptions { in_register: true },
         )
     }
 
@@ -475,5 +465,5 @@ pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
 }
 
 fn is_struct_type(ty: LLVMTypeRef) -> bool {
-    unsafe { LLVMGetTypeKind(ty)  == LLVMTypeKind::LLVMStructTypeKind }
+    unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMStructTypeKind }
 }

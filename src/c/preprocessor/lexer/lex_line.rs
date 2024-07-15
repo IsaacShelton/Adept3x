@@ -4,7 +4,8 @@ use crate::{
     c::{
         encoding::Encoding,
         preprocessor::{
-            pre_token::Punctuator, PreToken, PreTokenKind, PreprocessorError, PreprocessorErrorKind,
+            error::PreprocessorErrorKind, pre_token::Punctuator, PreToken, PreTokenKind,
+            PreprocessorError,
         },
     },
     text::{is_c_non_digit, Character, Text},

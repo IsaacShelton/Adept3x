@@ -32,7 +32,7 @@ impl ReturnLocation {
         ir_function: &ir::Function,
         function: LLVMValueRef,
         indirect: &Indirect,
-        alloca_insertion_point: LLVMValueRef,
+        alloca_point: LLVMValueRef,
     ) -> Result<Self, BackendError> {
         let target_data = &ctx.target_data;
         let sret_argument = unsafe { LLVMGetParam(function, indirect.sret_position().into()) };
@@ -49,7 +49,7 @@ impl ReturnLocation {
             let pointer = build_default_align_tmp_alloca(
                 target_data,
                 builder,
-                alloca_insertion_point,
+                alloca_point,
                 value.pointer_type(),
                 cstr!("result.ptr"),
             );
@@ -143,13 +143,13 @@ impl ReturnLocation {
     pub fn normal(
         builder: &Builder,
         ctx: &BackendCtx,
-        alloca_insertion_point: LLVMValueRef,
+        alloca_point: LLVMValueRef,
         return_ir_type: &ir::Type,
     ) -> Result<Self, BackendError> {
         let raw_address = build_tmp(
             builder,
             ctx,
-            alloca_insertion_point,
+            alloca_point,
             return_ir_type,
             Some(cstr!("retval")),
         )?;

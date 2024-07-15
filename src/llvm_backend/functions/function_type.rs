@@ -101,42 +101,42 @@ pub unsafe fn to_backend_function_type(
                     && unsafe { LLVMGetTypeKind(coerced) == LLVMTypeKind::LLVMStructTypeKind }
                 {
                     let field_types = get_struct_field_types(coerced);
-                    assert_eq!(range.clone().count(), field_types.len());
+                    assert_eq!(range.len(), field_types.len());
 
-                    for (field_i, param_i) in range.clone().enumerate() {
+                    for (field_i, param_i) in range.iter().enumerate() {
                         parameters[param_i] = field_types[field_i];
                     }
                 } else {
-                    assert_eq!(range.clone().count(), 1);
+                    assert_eq!(range.len(), 1);
                     parameters[range.start] = coerced;
                 }
             }
             ABITypeKind::Extend(Extend { coerce_to_type, .. }) => {
                 let coerced = coerce_to_type.unwrap();
-                assert_eq!(range.clone().count(), 1);
+                assert_eq!(range.len(), 1);
                 parameters[range.start] = coerced;
             }
             ABITypeKind::Indirect(_) | ABITypeKind::IndirectAliased(_) => {
-                assert_eq!(range.clone().count(), 1);
-                parameters[range.clone().start] = default_pointer_type;
+                assert_eq!(range.len(), 1);
+                parameters[range.start] = default_pointer_type;
             }
             ABITypeKind::Expand(_) => {
                 let expanded = Expand::expand(ctx, &abi_param.ir_type)?;
-                assert_eq!(expanded.len(), range.clone().count());
+                assert_eq!(expanded.len(), range.len());
 
-                for (param_i, element) in range.zip(expanded.iter().copied()) {
+                for (param_i, element) in range.iter().zip(expanded.iter().copied()) {
                     parameters[param_i] = element;
                 }
             }
             ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
                 let expanded = coerce_and_expand.expanded_type_sequence();
-                assert_eq!(expanded.len(), range.clone().count());
+                assert_eq!(expanded.len(), range.len());
 
-                for (param_i, element) in range.zip(expanded.iter().copied()) {
+                for (param_i, element) in range.iter().zip(expanded.iter().copied()) {
                     parameters[param_i] = element;
                 }
             }
-            ABITypeKind::Ignore | ABITypeKind::InAlloca(_) => assert_eq!(range.clone().count(), 0),
+            ABITypeKind::Ignore | ABITypeKind::InAlloca(_) => assert_eq!(range.len(), 0),
         }
     }
     let pointer = LLVMFunctionType(

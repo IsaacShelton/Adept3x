@@ -3,8 +3,9 @@ use crate::{
     ast::Source,
     c::preprocessor::{
         ast::{ControlLine, ControlLineKind, Define},
+        error::PreprocessorErrorKind,
         pre_token::PreToken,
-        PreprocessorError, PreprocessorErrorKind,
+        PreprocessorError,
     },
 };
 use itertools::Itertools;

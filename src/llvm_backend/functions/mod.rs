@@ -3,7 +3,6 @@ pub mod block;
 pub mod body;
 pub mod function_type;
 pub mod head;
-pub mod param_value;
 pub mod param_values;
 pub mod params_mapping;
 pub mod prologue;

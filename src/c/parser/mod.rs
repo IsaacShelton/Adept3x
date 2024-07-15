@@ -544,6 +544,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_attribute_specifier_sequence(&mut self) -> Result<Vec<()>, ParseError> {
+        #[allow(clippy::never_loop)]
         while self.eat_sequence(&[
             CTokenKind::Punctuator(Punctuator::OpenBracket),
             CTokenKind::Punctuator(Punctuator::OpenBracket),

@@ -116,7 +116,7 @@ pub fn insert_drops(function: &mut Function) {
 
 fn insert_drops_for_stmts(ctx: InsertDropsCtx, stmts: &mut [Stmt]) -> VariableUsageSet {
     let mut last_use_in_this_scope = vec![0_usize; ctx.variables_count];
-    let mut scope = VariableUsageSet::new(ctx.variables_count.try_into().unwrap());
+    let mut scope = VariableUsageSet::new(ctx.variables_count);
 
     for (stmt_index, stmt) in stmts.iter_mut().enumerate() {
         let mentioned = match &mut stmt.kind {

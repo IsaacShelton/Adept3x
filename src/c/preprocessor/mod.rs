@@ -1,21 +1,21 @@
 mod ast;
+mod error;
 mod expand;
 mod lexer;
 mod line_splice;
 mod parser;
 mod pre_token;
+mod stdc;
 
-use crate::ast::Source;
-use crate::show::Show;
-use crate::source_file_cache::SourceFileCache;
-use crate::text::Text;
-
-use self::expand::{expand_ast, Environment};
+use self::error::PreprocessorError;
+use self::expand::expand_ast;
 use self::lexer::Lexer;
-use self::parser::{parse, ParseError, ParseErrorKind};
+use self::parser::{parse, ParseErrorKind};
+use self::stdc::stdc;
+use crate::ast::Source;
 use crate::inflow::IntoInflow;
+use crate::text::Text;
 use std::collections::HashMap;
-use std::fmt::Display;
 
 /*
    Missing features:
@@ -34,123 +34,20 @@ pub use self::ast::{Define, DefineKind};
 pub use self::pre_token::{PreToken, PreTokenKind};
 
 #[derive(Clone, Debug)]
-pub struct PreprocessorError {
-    pub kind: PreprocessorErrorKind,
-    pub source: Source,
+pub struct Preprocessed {
+    pub document: Vec<PreToken>,
+    pub defines: HashMap<String, Define>,
+    pub end_of_file: Source,
 }
 
-impl PreprocessorError {
-    pub fn new(kind: PreprocessorErrorKind, source: Source) -> Self {
-        Self { kind, source }
-    }
-}
-
-impl From<ParseError> for PreprocessorError {
-    fn from(value: ParseError) -> Self {
-        Self {
-            kind: PreprocessorErrorKind::ParseError(value.kind),
-            source: value.source,
-        }
-    }
-}
-
-impl Show for PreprocessorError {
-    fn show(
-        &self,
-        w: &mut impl std::fmt::Write,
-        source_file_cache: &SourceFileCache,
-    ) -> std::fmt::Result {
-        write!(
-            w,
-            "{}:{}:{}: error: {}",
-            source_file_cache.get(self.source.key).filename(),
-            self.source.location.line,
-            self.source.location.column,
-            self.kind
-        )
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum PreprocessorErrorKind {
-    UnterminatedMultiLineComment,
-    UnterminatedCharacterConstant,
-    UnterminatedStringLiteral,
-    UnterminatedHeaderName,
-    BadEscapeSequence,
-    BadEscapedCodepoint,
-    ParseError(ParseErrorKind),
-    BadInclude,
-    ErrorDirective(String),
-    UnsupportedPragma,
-    CannotConcatTokens,
-    ExpectedEof,
-}
-
-impl PreprocessorErrorKind {
-    pub fn at(self, source: Source) -> PreprocessorError {
-        PreprocessorError::new(self, source)
-    }
-}
-
-impl Display for PreprocessorErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PreprocessorErrorKind::UnterminatedMultiLineComment => {
-                f.write_str("Unterminated multi-line comment")
-            }
-            PreprocessorErrorKind::UnterminatedCharacterConstant => {
-                f.write_str("Unterminated character constant")
-            }
-            PreprocessorErrorKind::UnterminatedStringLiteral => {
-                f.write_str("Unterminated string literal")
-            }
-            PreprocessorErrorKind::UnterminatedHeaderName => {
-                f.write_str("Unterminated header name")
-            }
-            PreprocessorErrorKind::BadEscapeSequence => f.write_str("Bad escape sequence"),
-            PreprocessorErrorKind::BadEscapedCodepoint => f.write_str("Bad escaped codepoint"),
-            PreprocessorErrorKind::ParseError(err) => err.fmt(f),
-            PreprocessorErrorKind::BadInclude => f.write_str("Bad #include"),
-            PreprocessorErrorKind::ErrorDirective(message) => write!(f, "{}", message),
-            PreprocessorErrorKind::UnsupportedPragma => f.write_str("Unsupported pragma"),
-            PreprocessorErrorKind::CannotConcatTokens => {
-                f.write_str("Cannot concatenate those preprocessor tokens")
-            }
-            PreprocessorErrorKind::ExpectedEof => f.write_str("Expected end-of-file"),
-        }
-    }
-}
-
-pub fn preprocess(
-    text: impl Text,
-) -> Result<(Vec<PreToken>, HashMap<String, Define>, Source), PreprocessorError> {
+pub fn preprocess(text: impl Text) -> Result<Preprocessed, PreprocessorError> {
     let lexer = Lexer::new(text);
     let ast = parse(lexer.into_inflow())?;
     let (document, defines) = expand_ast(&ast, stdc())?;
-    Ok((document, defines, ast.eof))
-}
 
-fn stdc() -> Environment {
-    let mut stdc = Environment::default();
-
-    stdc.add_define(Define {
-        kind: DefineKind::ObjectMacro(vec![], ast::PlaceholderAffinity::Discard),
-        name: "__STDC__".into(),
-        source: Source::internal(),
-    });
-
-    stdc.add_define(Define {
-        kind: DefineKind::ObjectMacro(
-            vec![PreToken::new(
-                PreTokenKind::Number("202311L".into()),
-                Source::internal(),
-            )],
-            ast::PlaceholderAffinity::Discard,
-        ),
-        name: "__STDC_VERSION__".into(),
-        source: Source::internal(),
-    });
-
-    stdc
+    Ok(Preprocessed {
+        document,
+        defines,
+        end_of_file: ast.eof,
+    })
 }

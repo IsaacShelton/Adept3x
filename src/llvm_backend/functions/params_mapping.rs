@@ -16,12 +16,35 @@ pub struct Param {
 }
 
 impl Param {
-    pub fn range(&self) -> std::ops::Range<usize> {
-        self.begin_index..(self.begin_index + self.num_subparams)
+    pub fn range(&self) -> ParamRange {
+        ParamRange::new_of_len(self.begin_index, self.num_subparams)
     }
 
     pub fn padding_index(&self) -> Option<usize> {
         self.padding_index
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ParamRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl ParamRange {
+    pub fn new_of_len(start: usize, len: usize) -> Self {
+        Self {
+            start,
+            end: start + len,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = usize> {
+        self.start..self.end
     }
 }
 

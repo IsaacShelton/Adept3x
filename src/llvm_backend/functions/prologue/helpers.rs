@@ -26,18 +26,18 @@ use std::ffi::CStr;
 pub fn build_default_align_tmp_alloca(
     target_data: &TargetData,
     builder: &Builder,
-    alloca_insertion_point: LLVMValueRef,
+    alloca_point: LLVMValueRef,
     ty: LLVMTypeRef,
     name: &CStr,
 ) -> RawAddress {
     let alignment = ByteUnits::from(unsafe { LLVMPreferredAlignmentOfType(target_data.get(), ty) });
-    build_tmp_alloca_address(builder, alloca_insertion_point, ty, alignment, name, None)
+    build_tmp_alloca_address(builder, alloca_point, ty, alignment, name, None)
 }
 
 pub fn build_tmp(
     builder: &Builder,
     ctx: &BackendCtx,
-    alloca_insertion_point: LLVMValueRef,
+    alloca_point: LLVMValueRef,
     ir_type: &ir::Type,
     name: Option<&CStr>,
 ) -> Result<RawAddress, BackendError> {
@@ -46,7 +46,7 @@ pub fn build_tmp(
 
     Ok(build_tmp_alloca_address(
         builder,
-        alloca_insertion_point,
+        alloca_point,
         unsafe { to_backend_type(ctx.for_making_type(), ir_type)? },
         alignment,
         name.unwrap_or_else(|| cstr!("tmp")),
@@ -56,13 +56,13 @@ pub fn build_tmp(
 
 pub fn build_tmp_alloca_address(
     builder: &Builder,
-    alloca_insertion_point: LLVMValueRef,
+    alloca_point: LLVMValueRef,
     ty: LLVMTypeRef,
     alignment: ByteUnits,
     name: &CStr,
     array_size: Option<LLVMValueRef>,
 ) -> RawAddress {
-    let alloca = build_tmp_alloca_inst(builder, ty, name, array_size, alloca_insertion_point);
+    let alloca = build_tmp_alloca_inst(builder, ty, name, array_size, alloca_point);
     unsafe { LLVMSetAlignment(alloca, alignment.bytes().try_into().unwrap()) };
 
     RawAddress {
@@ -78,12 +78,12 @@ pub fn build_tmp_alloca_inst(
     ty: LLVMTypeRef,
     name: &CStr,
     array_size: Option<LLVMValueRef>,
-    alloca_insertion_point: LLVMValueRef,
+    alloca_point: LLVMValueRef,
 ) -> LLVMValueRef {
     if let Some(array_size) = array_size {
         unsafe {
             let current_block = LLVMGetInsertBlock(builder.get());
-            LLVMPositionBuilderBefore(builder.get(), alloca_insertion_point);
+            LLVMPositionBuilderBefore(builder.get(), alloca_point);
 
             let inserted = LLVMBuildArrayAlloca(builder.get(), ty, array_size, name.as_ptr());
             LLVMPositionBuilderAtEnd(builder.get(), current_block);

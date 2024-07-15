@@ -5,6 +5,7 @@ use super::{
         ControlLine, ControlLineKind, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind,
         IfDefLike, IfGroup, IfLike, PlaceholderAffinity, PreprocessorAst, TextLine,
     },
+    error::PreprocessorErrorKind,
     lexer::{LexedLine, PreTokenLine},
     pre_token::{PreToken, PreTokenKind, Punctuator},
     PreprocessorError,
@@ -35,9 +36,7 @@ impl<T: Inflow<LexedLine>> Parser<T> {
 
     pub fn parse_eof(&mut self) -> Result<Source, PreprocessorError> {
         match self.lines.next()? {
-            PreTokenLine::Line(_, source) => {
-                Err(super::PreprocessorErrorKind::ExpectedEof.at(source))
-            }
+            PreTokenLine::Line(_, source) => Err(PreprocessorErrorKind::ExpectedEof.at(source)),
             PreTokenLine::EndOfFile(source) => Ok(source),
         }
     }
@@ -533,7 +532,10 @@ fn first_tokens<const N: usize>(
 }
 
 fn is_group_terminator(line: &[PreToken]) -> bool {
-    matches!(peek_directive_name(line), Some("elif" | "elifdef" | "elifndef" | "else" | "endif"))
+    matches!(
+        peek_directive_name(line),
+        Some("elif" | "elifdef" | "elifndef" | "else" | "endif")
+    )
 }
 
 fn peek_directive_name(line: &(impl Borrow<[PreToken]> + ?Sized)) -> Option<&str> {
