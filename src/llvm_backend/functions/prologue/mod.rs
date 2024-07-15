@@ -165,9 +165,28 @@ pub fn emit_prologue(
                 llvm_param_range,
                 ty,
                 indirect.align,
+                indirect.realign,
+                false,
+                alloca_insertion_point,
             )?,
-            ABITypeKind::IndirectAliased(_) => todo!(),
-            ABITypeKind::Ignore => todo!(),
+            ABITypeKind::IndirectAliased(indirect_aliased) => param_values.push_indirect(
+                builder,
+                ctx,
+                skeleton,
+                llvm_param_range,
+                ty,
+                indirect_aliased.align,
+                indirect_aliased.realign,
+                true,
+                alloca_insertion_point,
+            )?,
+            ABITypeKind::Ignore => param_values.push_ignore(
+                builder,
+                ctx,
+                llvm_param_range,
+                ty,
+                alloca_insertion_point,
+            )?,
             ABITypeKind::Expand(_) => todo!(),
             ABITypeKind::CoerceAndExpand(_) => todo!(),
             ABITypeKind::InAlloca(inalloca) => param_values.push_inalloca(
@@ -182,8 +201,6 @@ pub fn emit_prologue(
             )?,
         }
     }
-
-    // EMIT PARAM DECLS
 
     unsafe { LLVMDumpModule(ctx.backend_module.get()) };
     unimplemented!();
