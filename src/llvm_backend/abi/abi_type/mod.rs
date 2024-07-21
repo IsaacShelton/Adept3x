@@ -452,10 +452,15 @@ fn is_padding_for_coerce_expand(ty: LLVMTypeRef) -> bool {
     }
 }
 
-pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
-    assert!(unsafe { LLVMGetTypeKind(struct_type) } == LLVMTypeKind::LLVMStructTypeKind);
+pub fn get_struct_num_fields(struct_type: LLVMTypeRef) -> usize {
+    assert!(is_struct_type(struct_type));
+    unsafe { LLVMCountStructElementTypes(struct_type) as usize }
+}
 
-    let num_elements = unsafe { LLVMCountStructElementTypes(struct_type) } as usize;
+pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
+    assert!(is_struct_type(struct_type));
+
+    let num_elements = get_struct_num_fields(struct_type);
     let mut elements = vec![null_mut::<LLVMType>(); num_elements];
 
     unsafe {
@@ -464,6 +469,6 @@ pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
     elements
 }
 
-fn is_struct_type(ty: LLVMTypeRef) -> bool {
+pub fn is_struct_type(ty: LLVMTypeRef) -> bool {
     unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMStructTypeKind }
 }

@@ -1,6 +1,7 @@
 use super::target_machine::TargetMachine;
 use llvm_sys::{
-    target::{LLVMDisposeTargetData, LLVMTargetDataRef},
+    prelude::LLVMTypeRef,
+    target::{LLVMABISizeOfType, LLVMDisposeTargetData, LLVMIntPtrType, LLVMTargetDataRef},
     target_machine::LLVMCreateTargetDataLayout,
 };
 
@@ -15,8 +16,18 @@ impl TargetData {
         }
     }
 
+    // SAFETY: It is the caller's responsibility to not use the returned LLVMTargetDataRef
+    // after this goes out of scope
     pub unsafe fn get(&self) -> LLVMTargetDataRef {
         self.target_data
+    }
+
+    pub fn abi_size_of_type(&self, ty: LLVMTypeRef) -> usize {
+        unsafe { LLVMABISizeOfType(self.target_data, ty) as usize }
+    }
+
+    pub fn pointer_sized_int_type(&self) -> LLVMTypeRef {
+        unsafe { LLVMIntPtrType(self.get()) }
     }
 }
 

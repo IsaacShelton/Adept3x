@@ -4,7 +4,7 @@ use crate::{
     llvm_backend::{
         address::Address,
         backend_type::to_backend_type,
-        builder::{build_load, Builder},
+        builder::{Builder, Volatility},
         ctx::BackendCtx,
         error::BackendError,
         functions::prologue::helpers::build_tmp_alloca_address,
@@ -29,7 +29,7 @@ fn is_thread_local(value: LLVMValueRef) -> bool {
 pub fn emit_load_of_scalar(
     builder: &Builder,
     address: &Address,
-    is_volitile: bool,
+    volatility: Volatility,
     ir_type: &ir::Type,
 ) -> LLVMValueRef {
     let address = if is_thread_local(address.base_pointer()) {
@@ -44,7 +44,7 @@ pub fn emit_load_of_scalar(
         _ => (),
     }
 
-    let load = build_load(builder, address, is_volitile);
+    let load = builder.load(address, volatility);
     emit_from_mem(builder, load, ir_type)
 }
 
@@ -65,10 +65,10 @@ pub fn build_mem_tmp(
     name: &CStr,
 ) -> Result<RawAddress, BackendError> {
     let alignment = ctx.type_layout_cache.get(ir_type).alignment;
-    build_mem_tmp_ex(ctx, builder, alloca_point, ir_type, alignment, name)
+    build_mem_tmp_with_alignment(ctx, builder, alloca_point, ir_type, alignment, name)
 }
 
-pub fn build_mem_tmp_ex(
+pub fn build_mem_tmp_with_alignment(
     ctx: &BackendCtx,
     builder: &Builder,
     alloca_point: LLVMValueRef,

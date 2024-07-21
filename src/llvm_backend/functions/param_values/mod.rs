@@ -1,3 +1,4 @@
+mod direct;
 mod helpers;
 mod ignore;
 mod inalloca;

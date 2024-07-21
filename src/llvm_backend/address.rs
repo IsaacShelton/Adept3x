@@ -2,6 +2,7 @@ use super::raw_address::RawAddress;
 use crate::data_units::ByteUnits;
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 
+#[derive(Clone)]
 pub struct Address {
     pub base: RawAddress,
     pub offset: Option<LLVMValueRef>,
@@ -22,6 +23,22 @@ impl Address {
 
     pub fn alignment_at_offset(&self, offset: &ByteUnits) -> ByteUnits {
         self.base.alignment.alignment_at_offset(offset)
+    }
+
+    pub fn with_element_type(&self, element_type: LLVMTypeRef) -> Self {
+        if self.offset.is_some() {
+            let mut address = self.clone();
+            address.base.element_type = element_type;
+            address
+        } else {
+            RawAddress {
+                base: self.base_pointer(),
+                nullable: self.base.nullable,
+                alignment: self.base.alignment,
+                element_type,
+            }
+            .into()
+        }
     }
 }
 

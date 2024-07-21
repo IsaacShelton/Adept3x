@@ -303,6 +303,13 @@ pub enum Type {
     IncompleteArray(Box<Type>),
 }
 
+impl Type {
+    pub fn is_fixed_vector(&self) -> bool {
+        // NOTE: We don't support fixed vector types yet
+        false
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FixedArray {
     pub size: u64,

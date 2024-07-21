@@ -409,12 +409,7 @@ pub unsafe fn create_function_block(
             Instruction::Bitcast(value, ir_type) => {
                 let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
-                Some(LLVMBuildBitCast(
-                    builder.get(),
-                    value,
-                    backend_type,
-                    cstr!("").as_ptr(),
-                ))
+                Some(builder.bitcast(value, backend_type))
             }
             Instruction::ZeroExtend(value, ir_type) => {
                 let value = build_value(ctx, value_catalog, builder, value)?;

@@ -5,6 +5,7 @@ use llvm_sys::{
     LLVMTypeKind,
 };
 
+#[derive(Clone)]
 pub struct RawAddress {
     pub base: LLVMValueRef,
     pub nullable: bool,

@@ -22,17 +22,17 @@ impl ParamValues {
         builder: &Builder,
         ctx: &BackendCtx,
         param_range: ParamRange,
-        ty: &ir::Type,
+        ir_param_type: &ir::Type,
         alloca_point: LLVMValueRef,
     ) -> Result<(), BackendError> {
         assert_eq!(param_range.len(), 0);
 
-        if has_scalar_evaluation_kind(ty) {
-            let scalar_ty = unsafe { to_backend_type(ctx.for_making_type(), ty)? };
+        if has_scalar_evaluation_kind(ir_param_type) {
+            let scalar_ty = unsafe { to_backend_type(ctx.for_making_type(), ir_param_type)? };
             let undef = unsafe { LLVMGetUndef(scalar_ty) };
             self.values.push(ParamValue::Direct(undef));
         } else {
-            let tmp = build_mem_tmp(ctx, builder, alloca_point, ty, cstr!("tmp"))?;
+            let tmp = build_mem_tmp(ctx, builder, alloca_point, ir_param_type, cstr!("tmp"))?;
             self.values.push(ParamValue::Indirect(tmp.into()));
         }
 

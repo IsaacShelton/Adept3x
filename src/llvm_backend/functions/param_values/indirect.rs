@@ -4,7 +4,7 @@ use crate::{
     ir,
     llvm_backend::{
         abi::has_scalar_evaluation_kind,
-        builder::Builder,
+        builder::{Builder, Volatility},
         ctx::{BackendCtx, FunctionSkeleton},
         error::BackendError,
         functions::{
@@ -21,7 +21,6 @@ use cstr::cstr;
 use llvm_sys::{
     core::{LLVMBuildMemCpy, LLVMConstInt, LLVMGetParam},
     prelude::LLVMValueRef,
-    target::LLVMIntPtrType,
 };
 
 impl ParamValues {
@@ -32,7 +31,7 @@ impl ParamValues {
         ctx: &BackendCtx,
         skeleton: &FunctionSkeleton,
         param_range: ParamRange,
-        ty: &ir::Type,
+        ir_param_type: &ir::Type,
         indirect_alignment: ByteUnits,
         realign: bool,
         aliased: bool,
@@ -41,41 +40,56 @@ impl ParamValues {
         assert_eq!(param_range.len(), 1);
 
         let index = param_range.start.try_into().unwrap();
-        let argument = unsafe { LLVMGetParam(skeleton.function, index) };
+        let raw_argument_value = unsafe { LLVMGetParam(skeleton.function, index) };
 
-        let mut param_address =
-            make_natural_address_for_pointer(ctx, argument, ty, Some(indirect_alignment), false)?;
+        let mut indirect_pointer = make_natural_address_for_pointer(
+            ctx,
+            raw_argument_value,
+            ir_param_type,
+            Some(indirect_alignment),
+            false,
+        )?;
 
-        if has_scalar_evaluation_kind(ty) {
-            let value = emit_load_of_scalar(builder, &param_address, false, ty);
+        if has_scalar_evaluation_kind(ir_param_type) {
+            let value = emit_load_of_scalar(
+                builder,
+                &indirect_pointer,
+                Volatility::Normal,
+                ir_param_type,
+            );
             self.values.push(ParamValue::Direct(value));
             return Ok(());
         }
 
         if realign || aliased {
-            let aligned_tmp = build_mem_tmp(ctx, builder, alloca_point, ty, cstr!("coerce"))?;
-            let size = ctx.type_layout_cache.get(ty).width;
+            let aligned_on_stack =
+                build_mem_tmp(ctx, builder, alloca_point, ir_param_type, cstr!("coerce"))?;
 
-            let pointer_sized_int_ty = unsafe { LLVMIntPtrType(ctx.target_data.get()) };
+            let parameter_type_size = ctx.type_layout_cache.get(ir_param_type).width;
 
-            let num_bytes =
-                unsafe { LLVMConstInt(pointer_sized_int_ty, size.bytes(), false as i32) };
+            let num_bytes = unsafe {
+                LLVMConstInt(
+                    ctx.target_data.pointer_sized_int_type(),
+                    parameter_type_size.bytes(),
+                    false as i32,
+                )
+            };
 
             unsafe {
                 LLVMBuildMemCpy(
                     builder.get(),
-                    aligned_tmp.base_pointer(),
-                    aligned_tmp.alignment.bytes().try_into().unwrap(),
-                    param_address.base_pointer(),
-                    param_address.base.alignment.bytes().try_into().unwrap(),
+                    aligned_on_stack.base_pointer(),
+                    aligned_on_stack.alignment.bytes().try_into().unwrap(),
+                    indirect_pointer.base_pointer(),
+                    indirect_pointer.base.alignment.bytes().try_into().unwrap(),
                     num_bytes,
                 );
             }
 
-            param_address = aligned_tmp.into();
+            indirect_pointer = aligned_on_stack.into();
         }
 
-        self.values.push(ParamValue::Indirect(param_address));
+        self.values.push(ParamValue::Indirect(indirect_pointer));
         Ok(())
     }
 }

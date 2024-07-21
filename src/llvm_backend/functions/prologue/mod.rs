@@ -147,18 +147,25 @@ pub fn emit_prologue(
         .iter()
         .zip(params_mapping.params())
     {
-        let ty = &abi_param.ir_type;
+        let ir_param_type = &abi_param.ir_type;
         let llvm_param_range = mapped_param.range();
 
         match &abi_param.abi_type.kind {
-            ABITypeKind::Direct(_) => todo!(),
-            ABITypeKind::Extend(_) => todo!(),
+            ABITypeKind::Direct(_) | ABITypeKind::Extend(_) => param_values.push_direct_or_extend(
+                builder,
+                ctx,
+                skeleton,
+                llvm_param_range,
+                ir_param_type,
+                alloca_point,
+                abi_param,
+            )?,
             ABITypeKind::Indirect(indirect) => param_values.push_indirect(
                 builder,
                 ctx,
                 skeleton,
                 llvm_param_range,
-                ty,
+                ir_param_type,
                 indirect.align,
                 indirect.realign,
                 false,
@@ -169,15 +176,19 @@ pub fn emit_prologue(
                 ctx,
                 skeleton,
                 llvm_param_range,
-                ty,
+                ir_param_type,
                 indirect_aliased.align,
                 indirect_aliased.realign,
                 true,
                 alloca_point,
             )?,
-            ABITypeKind::Ignore => {
-                param_values.push_ignore(builder, ctx, llvm_param_range, ty, alloca_point)?
-            }
+            ABITypeKind::Ignore => param_values.push_ignore(
+                builder,
+                ctx,
+                llvm_param_range,
+                ir_param_type,
+                alloca_point,
+            )?,
             ABITypeKind::Expand(_) => todo!(),
             ABITypeKind::CoerceAndExpand(_) => todo!(),
             ABITypeKind::InAlloca(inalloca) => param_values.push_inalloca(
@@ -186,7 +197,7 @@ pub fn emit_prologue(
                 inalloca,
                 llvm_param_range,
                 arg_struct.as_ref().unwrap(),
-                ty,
+                ir_param_type,
                 &ctx.type_layout_cache,
                 inalloca_subtypes.as_ref().unwrap().as_slice(),
             )?,

@@ -1,15 +1,22 @@
-mod build_load;
-mod build_struct_gep;
+mod gep_in_bounds;
+mod gep_struct;
+mod int_cast;
+mod int_to_ptr;
+mod load;
+mod memcpy;
 mod phi_relocation;
+mod ptr_to_int;
+mod store;
+
+use std::ffi::CStr;
 
 use append_only_vec::AppendOnlyVec;
+use cstr::cstr;
 use llvm_sys::{
-    core::{LLVMCreateBuilder, LLVMDisposeBuilder},
-    prelude::LLVMBuilderRef,
+    core::{LLVMBuildBitCast, LLVMCreateBuilder, LLVMDisposeBuilder},
+    prelude::{LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
 };
-
-pub use build_load::{build_aligned_load, build_load};
-pub use build_struct_gep::build_struct_gep;
+pub use load::Volatility;
 pub use phi_relocation::PhiRelocation;
 
 pub struct Builder {
@@ -35,6 +42,19 @@ impl Builder {
 
     pub fn take_phi_relocations(&mut self) -> AppendOnlyVec<PhiRelocation> {
         std::mem::replace(&mut self.phi_relocations, AppendOnlyVec::new())
+    }
+
+    pub fn bitcast(&self, value: LLVMValueRef, new_type: LLVMTypeRef) -> LLVMValueRef {
+        self.bitcast_with_name(value, new_type, cstr!(""))
+    }
+
+    pub fn bitcast_with_name(
+        &self,
+        value: LLVMValueRef,
+        new_type: LLVMTypeRef,
+        name: &CStr,
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildBitCast(self.get(), value, new_type, name.as_ptr()) }
     }
 }
 

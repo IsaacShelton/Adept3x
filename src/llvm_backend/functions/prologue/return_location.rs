@@ -8,7 +8,7 @@ use crate::{
         abi::abi_type::{InAlloca, Indirect},
         address::Address,
         backend_type::to_backend_type,
-        builder::{build_aligned_load, Builder},
+        builder::{Builder, Volatility},
         ctx::{BackendCtx, FunctionSkeleton},
         error::BackendError,
         raw_address::RawAddress,
@@ -110,12 +110,11 @@ impl ReturnLocation {
             offset: None,
         };
 
-        let addr = build_aligned_load(
-            builder,
+        let addr = builder.load_aligned(
             inalloca_combined_struct.ty,
             address,
             pointer_alignment,
-            false,
+            Volatility::Normal,
             cstr!("agg.result"),
         );
 
