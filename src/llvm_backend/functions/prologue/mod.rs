@@ -12,7 +12,7 @@ use crate::llvm_backend::{
     error::BackendError,
     functions::{
         attribute::{add_param_attribute, create_enum_attribute},
-        param_values::ParamValues,
+        param_values::{ParamValueConstructionCtx, ParamValues},
         params_mapping::ParamsMapping,
     },
     raw_address::RawAddress,
@@ -20,8 +20,8 @@ use crate::llvm_backend::{
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildBitCast, LLVMDumpModule, LLVMGetParam, LLVMGetUndef, LLVMInt32Type,
-        LLVMPositionBuilderAtEnd, LLVMSetValueName2,
+        LLVMDumpModule, LLVMGetParam, LLVMGetUndef, LLVMInt32Type, LLVMPositionBuilderAtEnd,
+        LLVMSetValueName2,
     },
     prelude::LLVMBasicBlockRef,
 };
@@ -51,14 +51,8 @@ pub fn emit_prologue(
     unsafe { LLVMPositionBuilderAtEnd(builder.get(), entry_basicblock) };
 
     let undef = unsafe { LLVMGetUndef(LLVMInt32Type()) };
-    let alloca_point = unsafe {
-        LLVMBuildBitCast(
-            builder.get(),
-            undef,
-            LLVMInt32Type(),
-            cstr!("allocapt").as_ptr(),
-        )
-    };
+    let alloca_point =
+        builder.bitcast_with_name(undef, unsafe { LLVMInt32Type() }, cstr!("allocaapt"));
 
     let inalloca_subtypes = abi_function
         .inalloca_combined_struct
@@ -101,19 +95,16 @@ pub fn emit_prologue(
         let argument =
             unsafe { LLVMGetParam(skeleton.function, inalloca_index.try_into().unwrap()) };
 
-        Address {
-            base: RawAddress {
-                base: argument,
-                nullable: false,
-                alignment: abi_function
-                    .inalloca_combined_struct
-                    .as_ref()
-                    .unwrap()
-                    .alignment,
-                element_type: abi_function.inalloca_combined_struct.as_ref().unwrap().ty,
-            },
-            offset: None,
-        }
+        Address::from(RawAddress {
+            base: argument,
+            nullable: false,
+            alignment: abi_function
+                .inalloca_combined_struct
+                .as_ref()
+                .unwrap()
+                .alignment,
+            element_type: abi_function.inalloca_combined_struct.as_ref().unwrap().ty,
+        })
     });
 
     // Mark sret parameter as noalias and rename it for easy reading
@@ -147,67 +138,39 @@ pub fn emit_prologue(
         .iter()
         .zip(params_mapping.params())
     {
-        let ir_param_type = &abi_param.ir_type;
-        let llvm_param_range = mapped_param.range();
+        let construction_ctx = ParamValueConstructionCtx {
+            builder,
+            ctx,
+            skeleton,
+            param_range: mapped_param.range(),
+            ir_param_type: &abi_param.ir_type,
+            alloca_point,
+        };
 
         match &abi_param.abi_type.kind {
-            ABITypeKind::Direct(_) | ABITypeKind::Extend(_) => param_values.push_direct_or_extend(
-                builder,
-                ctx,
-                skeleton,
-                llvm_param_range,
-                ir_param_type,
-                alloca_point,
-                abi_param,
-            )?,
+            ABITypeKind::Direct(_) | ABITypeKind::Extend(_) => {
+                param_values.push_direct_or_extend(construction_ctx, abi_param)?
+            }
             ABITypeKind::Indirect(indirect) => param_values.push_indirect(
-                builder,
-                ctx,
-                skeleton,
-                llvm_param_range,
-                ir_param_type,
+                construction_ctx,
                 indirect.align,
                 indirect.realign,
                 false,
-                alloca_point,
             )?,
             ABITypeKind::IndirectAliased(indirect_aliased) => param_values.push_indirect(
-                builder,
-                ctx,
-                skeleton,
-                llvm_param_range,
-                ir_param_type,
+                construction_ctx,
                 indirect_aliased.align,
                 indirect_aliased.realign,
                 true,
-                alloca_point,
             )?,
-            ABITypeKind::Ignore => param_values.push_ignore(
-                builder,
-                ctx,
-                llvm_param_range,
-                ir_param_type,
-                alloca_point,
-            )?,
-            ABITypeKind::Expand(_) => todo!(),
+            ABITypeKind::Ignore => param_values.push_ignore(construction_ctx)?,
+            ABITypeKind::Expand(_) => param_values.push_expand(construction_ctx)?,
             ABITypeKind::CoerceAndExpand(coerce_and_expand) => param_values
-                .push_coerce_and_expand(
-                    builder,
-                    ctx,
-                    skeleton,
-                    llvm_param_range,
-                    ir_param_type,
-                    alloca_point,
-                    coerce_and_expand.coerce_to_type,
-                )?,
+                .push_coerce_and_expand(construction_ctx, coerce_and_expand.coerce_to_type)?,
             ABITypeKind::InAlloca(inalloca) => param_values.push_inalloca(
-                builder,
-                ctx,
+                construction_ctx,
                 inalloca,
-                llvm_param_range,
                 arg_struct.as_ref().unwrap(),
-                ir_param_type,
-                &ctx.type_layout_cache,
                 inalloca_subtypes.as_ref().unwrap().as_slice(),
             )?,
         }

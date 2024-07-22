@@ -1,30 +1,29 @@
 use super::ParamValues;
-use crate::{
-    ir,
-    llvm_backend::{
-        abi::has_scalar_evaluation_kind,
-        backend_type::to_backend_type,
-        builder::Builder,
-        ctx::BackendCtx,
-        error::BackendError,
-        functions::{
-            param_values::{helpers::build_mem_tmp, value::ParamValue},
-            params_mapping::ParamRange,
-        },
+use crate::llvm_backend::{
+    abi::has_scalar_evaluation_kind,
+    backend_type::to_backend_type,
+    error::BackendError,
+    functions::param_values::{
+        helpers::build_mem_tmp, value::ParamValue, ParamValueConstructionCtx,
     },
 };
 use cstr::cstr;
-use llvm_sys::{core::LLVMGetUndef, prelude::LLVMValueRef};
+use llvm_sys::core::LLVMGetUndef;
 
 impl ParamValues {
     pub fn push_ignore(
         &mut self,
-        builder: &Builder,
-        ctx: &BackendCtx,
-        param_range: ParamRange,
-        ir_param_type: &ir::Type,
-        alloca_point: LLVMValueRef,
+        construction_ctx: ParamValueConstructionCtx,
     ) -> Result<(), BackendError> {
+        let ParamValueConstructionCtx {
+            builder,
+            ctx,
+            param_range,
+            ir_param_type,
+            alloca_point,
+            ..
+        } = construction_ctx;
+
         assert_eq!(param_range.len(), 0);
 
         if has_scalar_evaluation_kind(ir_param_type) {

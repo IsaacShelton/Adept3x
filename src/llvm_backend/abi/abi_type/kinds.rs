@@ -124,7 +124,7 @@ impl Expand {
                     .iter()
                     .copied()
                     .cycle()
-                    .take(expanded_element.len() * usize::try_from(fixed_array.size).unwrap())
+                    .take(expanded_element.len() * usize::try_from(fixed_array.length).unwrap())
                     .collect())
             }
             TypeExpansion::Record(fields) => fields
@@ -179,7 +179,7 @@ fn get_type_expansion_size(
 
     match expansion {
         TypeExpansion::FixedArray(fixed_array) => {
-            usize::try_from(fixed_array.size).unwrap()
+            usize::try_from(fixed_array.length).unwrap()
                 * get_type_expansion_size(&fixed_array.inner, type_layout_cache, ir_module)
         }
         TypeExpansion::Record(fields) => fields
@@ -191,12 +191,17 @@ fn get_type_expansion_size(
     }
 }
 
-fn get_type_expansion(
+pub fn get_type_expansion(
     ir_type: &ir::Type,
     _type_layout_cache: &TypeLayoutCache,
     ir_module: &ir::Module,
 ) -> TypeExpansion {
     if let ir::Type::FixedArray(fixed_array) = ir_type {
+        assert!(
+            !fixed_array.inner.is_vector(),
+            "expanding vector types is not supported yet, see mention in ParamValues::push_expand"
+        );
+
         return TypeExpansion::FixedArray(fixed_array.clone());
     }
 
@@ -212,6 +217,11 @@ fn get_type_expansion(
                     false
                 } else {
                     assert!(!field.is_bitfield(), "can't expand bitfields members");
+
+                    assert!(
+                        !field.ir_type.is_vector(),
+                        "expanding vector types is not supported yet, see mention in ParamValues::push_expand"
+                    );
                     true
                 }
             })

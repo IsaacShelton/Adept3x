@@ -1,42 +1,40 @@
-use super::ParamValues;
+use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
     data_units::ByteUnits,
-    ir,
     llvm_backend::{
         abi::has_scalar_evaluation_kind,
-        builder::{Builder, Volatility},
-        ctx::{BackendCtx, FunctionSkeleton},
+        builder::Volatility,
         error::BackendError,
         functions::{
             param_values::{
                 helpers::{build_mem_tmp, emit_load_of_scalar},
                 value::ParamValue,
             },
-            params_mapping::ParamRange,
             prologue::helpers::make_natural_address_for_pointer,
         },
     },
 };
 use cstr::cstr;
-use llvm_sys::{
-    core::{LLVMBuildMemCpy, LLVMConstInt, LLVMGetParam},
-    prelude::LLVMValueRef,
-};
+use llvm_sys::core::{LLVMBuildMemCpy, LLVMConstInt, LLVMGetParam};
 
 impl ParamValues {
     #[allow(clippy::too_many_arguments)]
     pub fn push_indirect(
         &mut self,
-        builder: &Builder,
-        ctx: &BackendCtx,
-        skeleton: &FunctionSkeleton,
-        param_range: ParamRange,
-        ir_param_type: &ir::Type,
+        construction_ctx: ParamValueConstructionCtx,
         indirect_alignment: ByteUnits,
         realign: bool,
         aliased: bool,
-        alloca_point: LLVMValueRef,
     ) -> Result<(), BackendError> {
+        let ParamValueConstructionCtx {
+            builder,
+            ctx,
+            skeleton,
+            param_range,
+            ir_param_type,
+            alloca_point,
+        } = construction_ctx;
+
         assert_eq!(param_range.len(), 1);
 
         let index = param_range.start.try_into().unwrap();

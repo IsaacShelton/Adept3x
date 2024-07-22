@@ -1,3 +1,4 @@
+mod gep;
 mod gep_in_bounds;
 mod gep_struct;
 mod int_cast;

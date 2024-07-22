@@ -1,4 +1,4 @@
-use super::{helpers::emit_load_of_scalar, ParamValues};
+use super::{helpers::emit_load_of_scalar, ParamValueConstructionCtx, ParamValues};
 use crate::{
     data_units::ByteUnits,
     ir,
@@ -11,7 +11,6 @@ use crate::{
         address::Address,
         backend_type::to_backend_type,
         builder::{Builder, Volatility},
-        ctx::{BackendCtx, FunctionSkeleton},
         error::BackendError,
         functions::{
             param_values::{helpers::build_mem_tmp_with_alignment, value::ParamValue},
@@ -25,8 +24,8 @@ use crate::{
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildBitCast, LLVMConstInt, LLVMGetParam, LLVMGetPointerAddressSpace, LLVMGetTypeKind,
-        LLVMInt64Type, LLVMInt8Type, LLVMTypeOf,
+        LLVMConstInt, LLVMGetParam, LLVMGetPointerAddressSpace, LLVMGetTypeKind, LLVMInt64Type,
+        LLVMInt8Type, LLVMTypeOf,
     },
     prelude::{LLVMTypeRef, LLVMValueRef},
     target::{LLVMByteOrder, LLVMByteOrdering, LLVMPreferredAlignmentOfType, LLVMStoreSizeOfType},
@@ -49,18 +48,23 @@ impl ParamValues {
     #[allow(clippy::too_many_arguments)]
     pub fn push_direct_or_extend(
         &mut self,
-        builder: &Builder,
-        ctx: &BackendCtx,
-        skeleton: &FunctionSkeleton,
-        param_range: ParamRange,
-        ir_param_type: &ir::Type,
-        alloca_point: LLVMValueRef,
+        construction_ctx: ParamValueConstructionCtx,
         abi_param: &ABIParam,
     ) -> Result<(), BackendError> {
         assert!(abi_param.abi_type.kind.is_direct() || abi_param.abi_type.kind.is_extend());
 
+        let ParamValueConstructionCtx {
+            builder,
+            ctx,
+            skeleton,
+            param_range,
+            ir_param_type,
+            alloca_point,
+        } = construction_ctx;
+
         let argument =
             unsafe { LLVMGetParam(skeleton.function, param_range.start.try_into().unwrap()) };
+
         let desired_llvm_param_type =
             unsafe { to_backend_type(ctx.for_making_type(), ir_param_type)? };
 
@@ -89,7 +93,7 @@ impl ParamValues {
         }
 
         if ir_param_type.is_fixed_vector() {
-            todo!("fixed vector types are not supported yet");
+            todo!("direct/extend ABI pass mode for fixed vector types are not supported yet");
         }
 
         let is_struct = is_struct_type(coerce_to_type);
@@ -202,14 +206,7 @@ impl ParamValues {
         }
 
         if unsafe { LLVMTypeOf(value) } != desired_llvm_param_type {
-            value = unsafe {
-                LLVMBuildBitCast(
-                    builder.get(),
-                    value,
-                    desired_llvm_param_type,
-                    cstr!("").as_ptr(),
-                )
-            };
+            value = builder.bitcast(value, desired_llvm_param_type);
         }
 
         self.values.push(ParamValue::Direct(value));

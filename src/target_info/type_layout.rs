@@ -103,7 +103,7 @@ impl<'a> TypeLayoutCache<'a> {
                 let element_info = self.get(&fixed_array.inner);
 
                 TypeLayout {
-                    width: element_info.width * fixed_array.size,
+                    width: element_info.width * fixed_array.length,
                     alignment: element_info.alignment,
                     unadjusted_alignment: element_info.alignment,
                     alignment_requirement: element_info.alignment_requirement,

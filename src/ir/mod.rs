@@ -312,7 +312,7 @@ impl Type {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FixedArray {
-    pub size: u64,
+    pub length: u64,
     pub inner: Type,
 }
 

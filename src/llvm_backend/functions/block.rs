@@ -86,7 +86,7 @@ pub unsafe fn create_function_block(
             Instruction::Store(store) => {
                 let source = build_value(ctx, value_catalog, builder, &store.new_value)?;
                 let destination = build_value(ctx, value_catalog, builder, &store.destination)?;
-                let _ = LLVMBuildStore(builder.get(), source, destination);
+                LLVMBuildStore(builder.get(), source, destination);
                 None
             }
             Instruction::Load((value, ir_type)) => {

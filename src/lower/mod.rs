@@ -411,7 +411,7 @@ fn lower_type(
             let inner = lower_type(target_info, &fixed_array.inner, resolved_ast)?;
 
             Ok(ir::Type::FixedArray(Box::new(ir::FixedArray {
-                size,
+                length: size,
                 inner,
             })))
         }

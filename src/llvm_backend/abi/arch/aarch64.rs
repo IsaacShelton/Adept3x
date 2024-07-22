@@ -367,7 +367,7 @@ fn is_aarch64_homo_aggregate<'a>(
     target_info: &TargetInfo,
 ) -> Option<HomoAggregate<'a>> {
     let homo_aggregate: Option<HomoAggregate<'a>> = if let ir::Type::FixedArray(fixed_array) = ty {
-        if fixed_array.size == 0 {
+        if fixed_array.length == 0 {
             return None;
         }
 
@@ -381,7 +381,7 @@ fn is_aarch64_homo_aggregate<'a>(
         )
         .map(|homo_aggregate| HomoAggregate {
             base: homo_aggregate.base,
-            num_members: homo_aggregate.num_members * fixed_array.size,
+            num_members: homo_aggregate.num_members * fixed_array.length,
         })
     } else if let ir::Type::Structure(structure_ref) = ty {
         let structure = ir_module
@@ -473,7 +473,7 @@ fn is_aarch64_homo_aggregate_record<'a>(
 
         // Ignore non-zero arrays of empty records
         while let ir::Type::FixedArray(fixed_array) = field {
-            if fixed_array.size == 0 {
+            if fixed_array.length == 0 {
                 return None;
             }
 

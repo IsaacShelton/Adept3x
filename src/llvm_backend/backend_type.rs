@@ -41,7 +41,7 @@ pub unsafe fn to_backend_type<'a>(
         ir::Type::FunctionPointer => LLVMPointerType(LLVMInt8Type(), 0),
         ir::Type::FixedArray(fixed_array) => {
             let element_type = to_backend_type(ctx, &fixed_array.inner)?;
-            LLVMArrayType2(element_type, fixed_array.size)
+            LLVMArrayType2(element_type, fixed_array.length)
         }
         ir::Type::Vector(_) => {
             todo!("to_backend_type for ir::Type::Vector")

@@ -42,7 +42,7 @@ fn is_empty_field(field: &ir::Type, ir_module: &ir::Module, options: IsEmptyReco
     // Strip off arrays if applicable
     if options.allow_arrays {
         while let ir::Type::FixedArray(fixed_array) = field {
-            if fixed_array.size == 0 {
+            if fixed_array.length == 0 {
                 return true;
             }
             was_array = true;
