@@ -443,7 +443,7 @@ impl ABIType {
     }
 }
 
-fn is_padding_for_coerce_expand(ty: LLVMTypeRef) -> bool {
+pub fn is_padding_for_coerce_expand(ty: LLVMTypeRef) -> bool {
     if unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMArrayTypeKind } {
         assert_eq!(unsafe { LLVMGetElementType(ty) }, unsafe { LLVMInt8Type() });
         true

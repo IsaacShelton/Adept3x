@@ -190,7 +190,16 @@ pub fn emit_prologue(
                 alloca_point,
             )?,
             ABITypeKind::Expand(_) => todo!(),
-            ABITypeKind::CoerceAndExpand(_) => todo!(),
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => param_values
+                .push_coerce_and_expand(
+                    builder,
+                    ctx,
+                    skeleton,
+                    llvm_param_range,
+                    ir_param_type,
+                    alloca_point,
+                    coerce_and_expand.coerce_to_type,
+                )?,
             ABITypeKind::InAlloca(inalloca) => param_values.push_inalloca(
                 builder,
                 ctx,

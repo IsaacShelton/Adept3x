@@ -1,3 +1,4 @@
+mod coerce_and_expand;
 mod direct;
 mod helpers;
 mod ignore;
