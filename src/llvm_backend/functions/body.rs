@@ -49,12 +49,22 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                 _ => None,
             };
 
-            let epilogue = prologue.as_ref().map(|prologue| {
-                let epilogue_block =
-                    LLVMAppendBasicBlock(skeleton.function, cstr!("epilogue").as_ptr());
+            let epilogue = prologue
+                .as_ref()
+                .map(|prologue| {
+                    let epilogue_block =
+                        LLVMAppendBasicBlock(skeleton.function, cstr!("epilogue").as_ptr());
 
-                emit_epilogue(&builder, epilogue_block)
-            });
+                    emit_epilogue(
+                        ctx,
+                        &builder,
+                        skeleton,
+                        epilogue_block,
+                        prologue.return_location.as_ref(),
+                        prologue.alloca_point,
+                    )
+                })
+                .transpose()?;
 
             let fn_ctx = FnCtx {
                 prologue,

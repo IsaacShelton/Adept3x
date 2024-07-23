@@ -7,7 +7,7 @@ use crate::{
         builder::{Builder, Volatility},
         ctx::BackendCtx,
         error::BackendError,
-        functions::prologue::helpers::build_tmp_alloca_address,
+        functions::helpers::build_tmp_alloca_address,
         raw_address::RawAddress,
     },
 };

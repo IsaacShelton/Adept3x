@@ -6,11 +6,11 @@ use crate::{
         builder::Volatility,
         error::BackendError,
         functions::{
+            helpers::make_natural_address_for_pointer,
             param_values::{
                 helpers::{build_mem_tmp, emit_load_of_scalar},
                 value::ParamValue,
             },
-            prologue::helpers::make_natural_address_for_pointer,
         },
     },
 };
@@ -18,7 +18,6 @@ use cstr::cstr;
 use llvm_sys::core::{LLVMBuildMemCpy, LLVMConstInt, LLVMGetParam};
 
 impl ParamValues {
-    #[allow(clippy::too_many_arguments)]
     pub fn push_indirect(
         &mut self,
         construction_ctx: ParamValueConstructionCtx,

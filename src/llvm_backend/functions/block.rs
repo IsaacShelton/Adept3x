@@ -43,13 +43,31 @@ pub unsafe fn create_function_block(
     for instruction in ir_basicblock.iter() {
         let result = match instruction {
             Instruction::Return(value) => {
-                let _ = LLVMBuildRet(
-                    builder.get(),
-                    value.as_ref().map_or_else(
-                        || Ok(null_mut()),
-                        |value| build_value(ctx, value_catalog, builder, value),
-                    )?,
-                );
+                // If the function has an ABI prologue and epilogue, then return using them.
+                // Otherwise, return plainly.
+
+                if let Some((prologue, epilogue)) =
+                    fn_ctx.prologue.as_ref().zip(fn_ctx.epilogue.as_ref())
+                {
+                    if let Some(value) = value.as_ref() {
+                        let return_value = build_value(ctx, value_catalog, builder, value)?;
+
+                        if let Some(return_location) = &prologue.return_location {
+                            builder.store(return_value, &return_location.return_value_address);
+                        }
+                    }
+
+                    builder.br(epilogue.llvm_basicblock);
+                } else {
+                    LLVMBuildRet(
+                        builder.get(),
+                        value.as_ref().map_or_else(
+                            || Ok(null_mut()),
+                            |value| build_value(ctx, value_catalog, builder, value),
+                        )?,
+                    );
+                }
+
                 None
             }
             Instruction::Alloca(ir_type) => Some(LLVMBuildAlloca(
@@ -536,7 +554,7 @@ pub unsafe fn create_function_block(
             }
             Instruction::StructureLiteral(ir_type, values) => {
                 let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
-                let mut literal = LLVMGetUndef(backend_type);
+                let mut literal = LLVMGetPoison(backend_type);
 
                 for (index, value) in values.iter().enumerate() {
                     let backend_value = build_value(ctx, value_catalog, builder, value)?;

@@ -1,6 +1,5 @@
 use super::{helpers::emit_load_of_scalar, ParamValueConstructionCtx, ParamValues};
 use crate::{
-    data_units::ByteUnits,
     ir,
     llvm_backend::{
         abi::{
@@ -13,36 +12,22 @@ use crate::{
         builder::{Builder, Volatility},
         error::BackendError,
         functions::{
+            helpers::{
+                build_tmp_alloca_address, build_tmp_alloca_for_coerce, coerce_integer_likes,
+                emit_address_at_offset, enter_struct_pointer_for_coerced_access,
+                is_integer_or_pointer_type, is_pointer_type,
+            },
             param_values::{helpers::build_mem_tmp_with_alignment, value::ParamValue},
             params_mapping::ParamRange,
-            prologue::helpers::build_tmp_alloca_address,
         },
-        raw_address::RawAddress,
         target_data::TargetData,
     },
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::{
-        LLVMConstInt, LLVMGetParam, LLVMGetPointerAddressSpace, LLVMGetTypeKind, LLVMInt64Type,
-        LLVMInt8Type, LLVMTypeOf,
-    },
+    core::{LLVMConstInt, LLVMGetParam, LLVMGetPointerAddressSpace, LLVMInt64Type, LLVMTypeOf},
     prelude::{LLVMTypeRef, LLVMValueRef},
-    target::{LLVMByteOrder, LLVMByteOrdering, LLVMPreferredAlignmentOfType, LLVMStoreSizeOfType},
-    LLVMTypeKind,
 };
-
-fn is_pointer_type(ty: LLVMTypeRef) -> bool {
-    unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMPointerTypeKind }
-}
-
-fn is_integer_type(ty: LLVMTypeRef) -> bool {
-    unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMIntegerTypeKind }
-}
-
-fn is_integer_or_pointer_type(ty: LLVMTypeRef) -> bool {
-    is_integer_type(ty) || is_pointer_type(ty)
-}
 
 impl ParamValues {
     #[allow(clippy::too_many_arguments)]
@@ -99,17 +84,16 @@ impl ParamValues {
         let is_struct = is_struct_type(coerce_to_type);
         let user_specified_alignment = ctx.type_layout_cache.get(ir_param_type).alignment;
 
-        let alloca = build_mem_tmp_with_alignment(
+        let alloca = Address::from(build_mem_tmp_with_alignment(
             ctx,
             builder,
             alloca_point,
             ir_param_type,
             user_specified_alignment,
             cstr!(""),
-        )?;
+        )?);
 
-        let pointer =
-            emit_address_at_offset(builder, ctx.target_data, abi_param, alloca.clone().into());
+        let pointer = emit_address_at_offset(builder, ctx.target_data, abi_param, &alloca);
 
         // Flatten struct type if possible for better optimizations
         if abi_param.abi_type.can_be_flattened() == Some(true)
@@ -130,7 +114,7 @@ impl ParamValues {
                     builder,
                     alloca_point,
                     coerce_to_type,
-                    alloca.alignment,
+                    alloca.base.alignment,
                     cstr!("coerce"),
                     None,
                 )
@@ -178,12 +162,12 @@ impl ParamValues {
             .push(if has_scalar_evaluation_kind(ir_param_type) {
                 ParamValue::Direct(emit_load_of_scalar(
                     builder,
-                    &Address::from(alloca),
+                    &alloca,
                     Volatility::Normal,
                     ir_param_type,
                 ))
             } else {
-                ParamValue::Indirect(alloca.into())
+                ParamValue::Indirect(alloca)
             });
 
         Ok(())
@@ -233,24 +217,6 @@ fn apply_attributes(
         // TODO: Apply attributes
         // TODO: Apply restrict?
     }
-}
-
-fn emit_address_at_offset(
-    builder: &Builder,
-    target_data: &TargetData,
-    abi_param: &ABIParam,
-    mut address: Address,
-) -> Address {
-    if let Some(offset) = abi_param.abi_type.get_direct_offset() {
-        if !offset.is_zero() {
-            address = address.with_element_type(unsafe { LLVMInt8Type() });
-            address = builder.gep_in_bounds(target_data, &address, offset.bytes());
-            address =
-                address.with_element_type(abi_param.abi_type.coerce_to_type().flatten().unwrap());
-        }
-    }
-
-    address
 }
 
 fn build_coerced_store(
@@ -322,106 +288,4 @@ fn build_coerced_store(
     ));
     builder.store(source, &tmp);
     builder.memcpy(&destination, &tmp, size);
-}
-
-fn build_tmp_alloca_for_coerce(
-    builder: &Builder,
-    target_data: &TargetData,
-    ty: LLVMTypeRef,
-    min_alignment: ByteUnits,
-    alloca_point: LLVMValueRef,
-) -> RawAddress {
-    let preferred_alignment = unsafe { LLVMPreferredAlignmentOfType(target_data.get(), ty) };
-    let alignment = min_alignment.max(ByteUnits::of(preferred_alignment.into()));
-    build_tmp_alloca_address(builder, alloca_point, ty, alignment, cstr!(""), None)
-}
-
-fn coerce_integer_likes(
-    builder: &Builder,
-    target_data: &TargetData,
-    source: LLVMValueRef,
-    destination_type: LLVMTypeRef,
-) -> LLVMValueRef {
-    let mut source = source;
-    let source_type = unsafe { LLVMTypeOf(source) };
-
-    if source_type == destination_type {
-        return source;
-    }
-
-    if is_pointer_type(source_type) {
-        if is_pointer_type(destination_type) {
-            return builder.bitcast(source, destination_type);
-        }
-
-        let pointer_sized_int_type = target_data.pointer_sized_int_type();
-        source = builder.ptr_to_int(source, pointer_sized_int_type);
-    }
-
-    let destination_int_type = if is_pointer_type(destination_type) {
-        target_data.pointer_sized_int_type()
-    } else {
-        destination_type
-    };
-
-    if source_type != destination_int_type {
-        // NOTE: We don't support big-endian targets (at least yet) ...
-        // This is important, since we need to make sure treat the integer here
-        // as if it was from a memory cast on the target machine.
-        // This is trivial in the little-endian case, but less so for big-endian
-        assert_eq!(
-            unsafe { LLVMByteOrder(target_data.get()) },
-            LLVMByteOrdering::LLVMLittleEndian
-        );
-        source = builder.int_cast(source, destination_int_type, false);
-    }
-
-    // Re-cast to pointer if desired destination type
-    if is_pointer_type(destination_type) {
-        builder.int_to_ptr(source, destination_type)
-    } else {
-        source
-    }
-}
-
-fn enter_struct_pointer_for_coerced_access(
-    builder: &Builder,
-    target_data: &TargetData,
-    source_pointer: &Address,
-    source_struct_type: LLVMTypeRef,
-    destination_size: u64,
-) -> Address {
-    // Try to reduce the range of the pointer access while still having
-    // enough data to satisfy `destination_size`
-
-    let field_types = get_struct_field_types(source_struct_type);
-
-    let Some(first_field_type) = field_types.first() else {
-        return source_pointer.clone();
-    };
-
-    let first_field_size = unsafe { LLVMStoreSizeOfType(target_data.get(), *first_field_type) };
-    let source_size = unsafe { LLVMStoreSizeOfType(target_data.get(), source_struct_type) };
-
-    // Can't scale down anymore
-    if first_field_size < destination_size && first_field_size < source_size {
-        return source_pointer.clone();
-    }
-
-    // Otherwise, we only need data within the first element, so scale down
-    let source_pointer =
-        builder.gep_struct(target_data, source_pointer, 0, Some(field_types.as_slice()));
-
-    // Recursively descend
-    if is_struct_type(source_pointer.element_type()) {
-        enter_struct_pointer_for_coerced_access(
-            builder,
-            target_data,
-            &source_pointer,
-            source_struct_type,
-            destination_size,
-        )
-    } else {
-        source_pointer
-    }
 }

@@ -1,6 +1,4 @@
-pub mod helpers;
-mod return_location;
-use self::return_location::ReturnLocation;
+use super::return_location::ReturnLocation;
 use crate::llvm_backend::{
     abi::{
         abi_function::ABIFunction,
@@ -21,13 +19,14 @@ use crate::llvm_backend::{
 use cstr::cstr;
 use llvm_sys::{
     core::{LLVMGetParam, LLVMGetUndef, LLVMInt32Type, LLVMSetValueName2},
-    prelude::LLVMBasicBlockRef,
+    prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
 
 pub struct PrologueInfo {
     pub last_llvm_block: LLVMBasicBlockRef,
     pub param_values: ParamValues,
     pub return_location: Option<ReturnLocation>,
+    pub alloca_point: LLVMValueRef,
 }
 
 pub fn emit_prologue(
@@ -37,7 +36,7 @@ pub fn emit_prologue(
     abi_function: &ABIFunction,
     entry_basicblock: LLVMBasicBlockRef,
 ) -> Result<PrologueInfo, BackendError> {
-    let ir_function = &ctx
+    let ir_function = ctx
         .ir_module
         .functions
         .get(&skeleton.ir_function_ref)
@@ -178,5 +177,6 @@ pub fn emit_prologue(
         last_llvm_block: builder.current_block(),
         param_values,
         return_location,
+        alloca_point,
     })
 }
