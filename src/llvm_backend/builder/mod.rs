@@ -14,8 +14,11 @@ use std::ffi::CStr;
 use append_only_vec::AppendOnlyVec;
 use cstr::cstr;
 use llvm_sys::{
-    core::{LLVMBuildBitCast, LLVMCreateBuilder, LLVMDisposeBuilder},
-    prelude::{LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
+    core::{
+        LLVMBuildBitCast, LLVMBuildBr, LLVMCreateBuilder, LLVMDisposeBuilder, LLVMGetInsertBlock,
+        LLVMPositionBuilderAtEnd,
+    },
+    prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
 };
 pub use load::Volatility;
 pub use phi_relocation::PhiRelocation;
@@ -56,6 +59,18 @@ impl Builder {
         name: &CStr,
     ) -> LLVMValueRef {
         unsafe { LLVMBuildBitCast(self.get(), value, new_type, name.as_ptr()) }
+    }
+
+    pub fn current_block(&self) -> LLVMBasicBlockRef {
+        unsafe { LLVMGetInsertBlock(self.get()) }
+    }
+
+    pub fn position(&self, basicblock: LLVMBasicBlockRef) {
+        unsafe { LLVMPositionBuilderAtEnd(self.get(), basicblock) }
+    }
+
+    pub fn br(&self, basicblock: LLVMBasicBlockRef) -> LLVMValueRef {
+        unsafe { LLVMBuildBr(self.get(), basicblock) }
     }
 }
 

@@ -1,6 +1,7 @@
 pub mod attribute;
 pub mod block;
 pub mod body;
+pub mod epilogue;
 pub mod function_type;
 pub mod head;
 pub mod param_values;

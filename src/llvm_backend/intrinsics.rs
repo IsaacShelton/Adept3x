@@ -10,8 +10,7 @@ use llvm_sys::{
     core::{
         LLVMAddFunction, LLVMAppendBasicBlock, LLVMBuildCall2, LLVMBuildUnreachable,
         LLVMFunctionType, LLVMGetNamedFunction, LLVMInt16Type, LLVMInt1Type, LLVMInt32Type,
-        LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMStructType,
-        LLVMVoidType,
+        LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMStructType, LLVMVoidType,
     },
     prelude::{LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
 };
@@ -263,7 +262,7 @@ impl Intrinsics {
             let basicblock = LLVMAppendBasicBlock(fn_value, cstr!("").as_ptr());
 
             let builder = Builder::new();
-            LLVMPositionBuilderAtEnd(builder.get(), basicblock);
+            builder.position(basicblock);
 
             {
                 let (printf_fn, printf_fn_type) = self.printf();

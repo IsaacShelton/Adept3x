@@ -15,8 +15,8 @@ use crate::{
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMGetInsertBlock, LLVMPositionBuilderAtEnd,
-        LLVMPositionBuilderBefore, LLVMSetAlignment,
+        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMGetInsertBlock, LLVMPositionBuilderBefore,
+        LLVMSetAlignment,
     },
     prelude::{LLVMTypeRef, LLVMValueRef},
     target::LLVMPreferredAlignmentOfType,
@@ -86,7 +86,7 @@ pub fn build_tmp_alloca_inst(
             LLVMPositionBuilderBefore(builder.get(), alloca_point);
 
             let inserted = LLVMBuildArrayAlloca(builder.get(), ty, array_size, name.as_ptr());
-            LLVMPositionBuilderAtEnd(builder.get(), current_block);
+            builder.position(current_block);
             inserted
         }
     } else {

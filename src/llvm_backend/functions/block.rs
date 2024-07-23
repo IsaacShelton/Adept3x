@@ -1,8 +1,12 @@
+use super::{
+    body::{BasicBlockInfo, FnCtx},
+    param_values::ParamValue,
+};
 use crate::{
     ir::{self, FloatOrSign, Instruction, IntegerSign},
     llvm_backend::{
         backend_type::{get_function_type, to_backend_type},
-        builder::{Builder, PhiRelocation},
+        builder::{Builder, PhiRelocation, Volatility},
         ctx::BackendCtx,
         error::BackendError,
         value_catalog::ValueCatalog,
@@ -12,26 +16,29 @@ use crate::{
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::*,
-    prelude::{LLVMBasicBlockRef, LLVMValueRef},
-    target::LLVMABISizeOfType,
-    LLVMIntPredicate::*,
+    core::*, prelude::LLVMValueRef, target::LLVMABISizeOfType, LLVMIntPredicate::*,
     LLVMRealPredicate::*,
 };
-use std::{cell::OnceCell, ptr::null_mut};
+use std::ptr::null_mut;
 
 pub unsafe fn create_function_block(
     ctx: &BackendCtx,
-    value_catalog: &mut ValueCatalog,
-    overflow_basicblock: &OnceCell<LLVMBasicBlockRef>,
     builder: &Builder,
-    ir_basicblock_id: usize,
-    ir_basicblock: &ir::BasicBlock,
-    mut llvm_basicblock: LLVMBasicBlockRef,
+    basicblock: &BasicBlockInfo,
     function_skeleton: LLVMValueRef,
-    basicblocks: &[(usize, &ir::BasicBlock, LLVMBasicBlockRef)],
+    basicblocks: &[BasicBlockInfo],
+    fn_ctx: &FnCtx,
+    value_catalog: &mut ValueCatalog,
 ) -> Result<(), BackendError> {
-    LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
+    let BasicBlockInfo {
+        id: ir_basicblock_id,
+        ir_basicblock,
+        mut llvm_basicblock,
+    } = basicblock;
+
+    let ir_basicblock_id = *ir_basicblock_id;
+
+    builder.position(llvm_basicblock);
 
     for instruction in ir_basicblock.iter() {
         let result = match instruction {
@@ -77,7 +84,23 @@ pub unsafe fn create_function_block(
                 let size = LLVMABISizeOfType(ctx.target_data.get(), backend_type);
                 Some(LLVMConstInt(LLVMInt64Type(), size, false.into()))
             }
-            Instruction::Parameter(index) => Some(LLVMGetParam(function_skeleton, *index)),
+            Instruction::Parameter(index) => {
+                Some(if let Some(prologue) = fn_ctx.prologue.as_ref() {
+                    let value = prologue
+                        .param_values
+                        .get((*index).try_into().unwrap())
+                        .expect("parameter to exist");
+
+                    match value {
+                        ParamValue::Direct(direct) => *direct,
+                        ParamValue::Indirect(indirect) => {
+                            builder.load(indirect, Volatility::Normal)
+                        }
+                    }
+                } else {
+                    LLVMGetParam(function_skeleton, *index)
+                })
+            }
             Instruction::GlobalVariable(global_ref) => Some(
                 *ctx.globals
                     .get(global_ref)
@@ -179,12 +202,13 @@ pub unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 );
 
-                let overflow_basicblock = *overflow_basicblock.get_or_init(|| {
+                let overflow_basicblock = *fn_ctx.overflow_basicblock.get_or_init(|| {
                     let overflow_basicblock =
                         LLVMAppendBasicBlock(function_skeleton, cstr!("").as_ptr());
                     let mut args = [];
 
-                    LLVMPositionBuilderAtEnd(builder.get(), overflow_basicblock);
+                    builder.position(overflow_basicblock);
+
                     LLVMBuildCall2(
                         builder.get(),
                         overflow_panic_fn_type,
@@ -194,7 +218,8 @@ pub unsafe fn create_function_block(
                         cstr!("").as_ptr(),
                     );
                     LLVMBuildUnreachable(builder.get());
-                    LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
+
+                    builder.position(llvm_basicblock);
                     overflow_basicblock
                 });
 
@@ -208,8 +233,8 @@ pub unsafe fn create_function_block(
                 );
 
                 // Switch over to new continuation basicblock
+                builder.position(ok_basicblock);
                 llvm_basicblock = ok_basicblock;
-                LLVMPositionBuilderAtEnd(builder.get(), llvm_basicblock);
                 Some(result)
             }
             Instruction::Subtract(operands, mode) => {
@@ -548,27 +573,31 @@ pub unsafe fn create_function_block(
                 Some(LLVMBuildNot(builder.get(), value, cstr!("").as_ptr()))
             }
             Instruction::Break(break_info) => {
-                let (_, _, backend_block) = basicblocks
+                let backend_block = basicblocks
                     .get(break_info.basicblock_id)
-                    .expect("referenced basicblock to exist");
-                Some(LLVMBuildBr(builder.get(), *backend_block))
+                    .expect("referenced basicblock to exist")
+                    .llvm_basicblock;
+
+                Some(LLVMBuildBr(builder.get(), backend_block))
             }
             Instruction::ConditionalBreak(condition, break_info) => {
                 let value = build_value(ctx, value_catalog, builder, condition)?;
 
-                let (_, _, true_backend_block) = basicblocks
+                let true_backend_block = basicblocks
                     .get(break_info.true_basicblock_id)
-                    .expect("referenced basicblock to exist");
+                    .expect("referenced basicblock to exist")
+                    .llvm_basicblock;
 
-                let (_, _, false_backend_block) = basicblocks
+                let false_backend_block = basicblocks
                     .get(break_info.false_basicblock_id)
-                    .expect("referenced basicblock to exist");
+                    .expect("referenced basicblock to exist")
+                    .llvm_basicblock;
 
                 Some(LLVMBuildCondBr(
                     builder.get(),
                     value,
-                    *true_backend_block,
-                    *false_backend_block,
+                    true_backend_block,
+                    false_backend_block,
                 ))
             }
             Instruction::Phi(phi) => {

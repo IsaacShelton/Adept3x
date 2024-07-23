@@ -3,6 +3,7 @@ mod return_location;
 use self::return_location::ReturnLocation;
 use crate::llvm_backend::{
     abi::{
+        abi_function::ABIFunction,
         abi_type::{get_struct_field_types, ABITypeKind},
         has_scalar_evaluation_kind,
     },
@@ -19,36 +20,33 @@ use crate::llvm_backend::{
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::{
-        LLVMDumpModule, LLVMGetParam, LLVMGetUndef, LLVMInt32Type, LLVMPositionBuilderAtEnd,
-        LLVMSetValueName2,
-    },
+    core::{LLVMGetParam, LLVMGetUndef, LLVMInt32Type, LLVMSetValueName2},
     prelude::LLVMBasicBlockRef,
 };
 
-pub struct BackendFnCtx {
+pub struct PrologueInfo {
+    pub last_llvm_block: LLVMBasicBlockRef,
+    pub param_values: ParamValues,
     pub return_location: Option<ReturnLocation>,
 }
 
 pub fn emit_prologue(
     ctx: &BackendCtx,
-    skeleton: &FunctionSkeleton,
     builder: &Builder,
+    skeleton: &FunctionSkeleton,
+    abi_function: &ABIFunction,
     entry_basicblock: LLVMBasicBlockRef,
-) -> Result<Option<BackendFnCtx>, BackendError> {
-    let Some(abi_function) = skeleton.abi_function.as_ref() else {
-        return Ok(None);
-    };
-
-    let abi_return_info = &abi_function.return_type;
+) -> Result<PrologueInfo, BackendError> {
     let ir_function = &ctx
         .ir_module
         .functions
         .get(&skeleton.ir_function_ref)
         .unwrap();
+
+    let abi_return_info = &abi_function.return_type;
     let returns_ir_void = ir_function.return_type.is_void();
 
-    unsafe { LLVMPositionBuilderAtEnd(builder.get(), entry_basicblock) };
+    builder.position(entry_basicblock);
 
     let undef = unsafe { LLVMGetUndef(LLVMInt32Type()) };
     let alloca_point =
@@ -176,6 +174,9 @@ pub fn emit_prologue(
         }
     }
 
-    unsafe { LLVMDumpModule(ctx.backend_module.get()) };
-    unimplemented!();
+    Ok(PrologueInfo {
+        last_llvm_block: builder.current_block(),
+        param_values,
+        return_location,
+    })
 }

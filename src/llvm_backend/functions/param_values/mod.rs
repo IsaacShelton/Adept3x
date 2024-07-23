@@ -7,7 +7,6 @@ mod inalloca;
 mod indirect;
 mod value;
 
-use self::value::ParamValue;
 use super::params_mapping::ParamRange;
 use crate::{
     ir,
@@ -17,6 +16,8 @@ use crate::{
     },
 };
 use llvm_sys::prelude::LLVMValueRef;
+
+pub use self::value::ParamValue;
 
 pub struct ParamValues {
     values: Vec<ParamValue>,
@@ -35,6 +36,10 @@ impl ParamValues {
 
     pub fn iter(&self) -> impl Iterator<Item = &ParamValue> {
         self.values.iter()
+    }
+
+    pub fn get(&self, index: usize) -> Option<&ParamValue> {
+        self.values.get(index)
     }
 }
 
