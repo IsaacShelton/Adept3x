@@ -9,6 +9,8 @@ use crate::{
     },
 };
 use cstr::cstr;
+use llvm_sys::core::{LLVMGetUndef, LLVMInt32Type};
+use llvm_sys::prelude::LLVMValueRef;
 use llvm_sys::{
     core::{LLVMAddIncoming, LLVMAppendBasicBlock},
     prelude::LLVMBasicBlockRef,
@@ -25,6 +27,7 @@ pub struct FnCtx {
     pub prologue: Option<PrologueInfo>,
     pub epilogue: Option<EpilogueInfo>,
     pub overflow_basicblock: OnceCell<LLVMBasicBlockRef>,
+    pub alloca_point: Option<LLVMValueRef>,
 }
 
 pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), BackendError> {
@@ -33,16 +36,25 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
             let mut builder = Builder::new();
             let mut value_catalog = ValueCatalog::new(ir_function.basicblocks.len());
 
-            let prologue = match skeleton.abi_function.as_ref() {
-                Some(abi_function) if !ir_function.basicblocks.is_empty() => {
-                    let prologue_block =
-                        LLVMAppendBasicBlock(skeleton.function, cstr!("prologue").as_ptr());
+            let entry_basicblock = (!ir_function.basicblocks.is_empty())
+                .then(|| LLVMAppendBasicBlock(skeleton.function, cstr!("prologue").as_ptr()));
+
+            let alloca_point = entry_basicblock.map(|entry_basicblock| {
+                let undef = unsafe { LLVMGetUndef(LLVMInt32Type()) };
+                builder.position(entry_basicblock);
+                builder.bitcast_with_name(undef, unsafe { LLVMInt32Type() }, cstr!("allocaapt"))
+            });
+
+            let prologue = match skeleton.abi_function.as_ref().zip(alloca_point) {
+                Some((abi_function, alloca_point)) => {
+                    let prologue_block = entry_basicblock.unwrap();
 
                     Some(emit_prologue(
                         ctx,
                         &builder,
                         skeleton,
                         abi_function,
+                        alloca_point,
                         prologue_block,
                     )?)
                 }
@@ -70,6 +82,7 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                 prologue,
                 epilogue,
                 overflow_basicblock: OnceCell::new(),
+                alloca_point,
             };
 
             let basicblocks = ir_function

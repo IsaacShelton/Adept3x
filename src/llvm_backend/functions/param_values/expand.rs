@@ -1,4 +1,4 @@
-use super::{helpers::build_mem_tmp_with_alignment, ParamValueConstructionCtx, ParamValues};
+use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
     ir,
     llvm_backend::{
@@ -11,6 +11,7 @@ use crate::{
         builder::Builder,
         ctx::BackendCtx,
         error::BackendError,
+        functions::helpers::build_mem_tmp_with_alignment,
     },
 };
 use cstr::cstr;

@@ -1,25 +1,36 @@
 use super::{
     body::{BasicBlockInfo, FnCtx},
     param_values::ParamValue,
+    params_mapping::Param,
 };
 use crate::{
-    ir::{self, FloatOrSign, Instruction, IntegerSign},
+    ir::{self, Call, FloatOrSign, Instruction, IntegerSign},
     llvm_backend::{
+        abi::{
+            abi_function::{ABIFunction, ABIParam},
+            abi_type::ABITypeKind,
+        },
+        address::Address,
         backend_type::{get_function_type, to_backend_type},
         builder::{Builder, PhiRelocation, Volatility},
         ctx::BackendCtx,
         error::BackendError,
+        functions::{
+            helpers::{build_mem_tmp, build_mem_tmp_without_cast},
+            params_mapping::ParamsMapping,
+        },
         value_catalog::ValueCatalog,
         values::build_value,
     },
     resolved::FloatOrInteger,
 };
 use cstr::cstr;
+use itertools::izip;
 use llvm_sys::{
     core::*, prelude::LLVMValueRef, target::LLVMABISizeOfType, LLVMIntPredicate::*,
     LLVMRealPredicate::*,
 };
-use std::ptr::null_mut;
+use std::{borrow::Cow, ptr::null_mut};
 
 pub unsafe fn create_function_block(
     ctx: &BackendCtx,
@@ -140,36 +151,7 @@ pub unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::Call(call) => {
-                let function_type = get_function_type(
-                    ctx.for_making_type(),
-                    ctx.ir_module
-                        .functions
-                        .get(&call.function)
-                        .expect("callee to exist"),
-                )?;
-
-                let function_value = ctx
-                    .func_skeletons
-                    .get(&call.function)
-                    .expect("ir function to exist")
-                    .function;
-
-                let mut arguments = call
-                    .arguments
-                    .iter()
-                    .map(|argument| build_value(ctx, value_catalog, builder, argument))
-                    .collect::<Result<Vec<LLVMValueRef>, _>>()?;
-
-                Some(LLVMBuildCall2(
-                    builder.get(),
-                    function_type,
-                    function_value,
-                    arguments.as_mut_ptr(),
-                    arguments.len().try_into().unwrap(),
-                    cstr!("").as_ptr(),
-                ))
-            }
+            Instruction::Call(call) => Some(emit_call(ctx, builder, call, fn_ctx, value_catalog)?),
             Instruction::Add(operands, mode) => {
                 let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
@@ -651,4 +633,243 @@ unsafe fn build_binary_operands(
     let left = build_value(ctx, value_catalog, builder, &operands.left)?;
     let right = build_value(ctx, value_catalog, builder, &operands.right)?;
     Ok((left, right))
+}
+
+unsafe fn emit_call(
+    ctx: &BackendCtx,
+    builder: &Builder,
+    call: &Call,
+    fn_ctx: &FnCtx,
+    value_catalog: &mut ValueCatalog,
+) -> Result<LLVMValueRef, BackendError> {
+    let ir_function = ctx
+        .ir_module
+        .functions
+        .get(&call.function)
+        .expect("callee to exist");
+
+    let function_type = get_function_type(ctx.for_making_type(), ir_function)?;
+
+    let skeleton = ctx
+        .func_skeletons
+        .get(&call.function)
+        .expect("ir function to exist");
+
+    let function_value = skeleton.function;
+
+    let mut arguments = call
+        .arguments
+        .iter()
+        .map(|argument| build_value(ctx, value_catalog, builder, argument))
+        .collect::<Result<Vec<LLVMValueRef>, _>>()?;
+
+    if ir_function.abide_abi {
+        let abi_function = skeleton.abi_function.as_ref().expect("abi function");
+
+        let argument_types_iter = ir_function
+            .parameters
+            .iter()
+            .chain(call.variadic_argument_types.iter());
+
+        // If we're using variadic arguments, then we have to re-generate the ABI
+        // function signature for the way we're calling it
+        let abi_function = (abi_function.parameter_types.len() < arguments.len())
+            .then(|| {
+                ABIFunction::new(
+                    ctx,
+                    argument_types_iter.clone(),
+                    &ir_function.return_type,
+                    ir_function.is_cstyle_variadic,
+                )
+                .map(Cow::Owned)
+            })
+            .transpose()?
+            .unwrap_or(Cow::Borrowed(abi_function));
+
+        // After generating the function signature, we should have ABI parameter information for each argument
+        assert_eq!(abi_function.parameter_types.len(), arguments.len());
+
+        // NOTE: We shouldn't need inalloca, since we intend to target
+        // only x86_64 Windows GNU on Windows, as opposed to older MSVC ABIs.
+        // This may change in the future
+        assert!(skeleton
+            .abi_function
+            .as_ref()
+            .and_then(|abi_function| abi_function.inalloca_combined_struct.as_ref())
+            .is_none());
+
+        let params_mapping =
+            ParamsMapping::new(&ctx.type_layout_cache, &abi_function, ctx.ir_module);
+
+        let mut ir_call_args = vec![null_mut(); params_mapping.llvm_arity()];
+
+        // We can optionally choose to override the return destination if desired
+        let return_destination: Option<Address> = None;
+
+        let abi_return_info = &abi_function.return_type;
+        let ir_return_type = &ir_function.return_type;
+
+        let sret_pointer = match abi_return_info.abi_type.kind {
+            ABITypeKind::Indirect(_)
+            | ABITypeKind::CoerceAndExpand(_)
+            | ABITypeKind::InAlloca(_) => {
+                let sret_pointer = if let Some(return_destination) = return_destination {
+                    return_destination.clone()
+                } else {
+                    build_mem_tmp(
+                        ctx,
+                        builder,
+                        fn_ctx.alloca_point.expect("function has body"),
+                        ir_return_type,
+                        cstr!("tmp"),
+                    )?
+                    .into()
+                };
+
+                if let Some(sret_index) = params_mapping.sret_index() {
+                    ir_call_args[sret_index] = sret_pointer.base_pointer();
+                } else {
+                    assert!(
+                        !abi_return_info.abi_type.kind.is_in_alloca(),
+                        "we don't support inalloca here yet"
+                    );
+                }
+
+                Some(sret_pointer)
+            }
+            _ => None,
+        };
+
+        // NOTE: For initial simplicity, we will always save the stack pointer
+        // and then restore if after performing a C-ABI compliant function call.
+        // In some cases this isn't necessary
+
+        let alloca_point = fn_ctx.alloca_point.expect("has function body");
+        let saved_stack_pointer = builder.save_stack_pointer(ctx.backend_module);
+
+        for (argument, argument_type, abi_param, param_mapping) in zip4(
+            arguments.iter().copied(),
+            argument_types_iter,
+            abi_function.parameter_types.iter(),
+            params_mapping.params().iter(),
+        ) {
+            if let Some((padding_index, padding_type)) = param_mapping
+                .padding_index()
+                .zip(abi_param.abi_type.padding_type().flatten())
+            {
+                ir_call_args[padding_index] = unsafe { LLVMGetUndef(padding_type) };
+            }
+
+            match &abi_param.abi_type.kind {
+                ABITypeKind::Direct(_) | ABITypeKind::Extend(_) => direct_or_extend(
+                    builder,
+                    ctx,
+                    alloca_point,
+                    argument,
+                    argument_type,
+                    abi_param,
+                    param_mapping,
+                    &mut ir_call_args[..],
+                )?,
+                ABITypeKind::Indirect(_) | ABITypeKind::IndirectAliased(_) => indirect(
+                    builder,
+                    ctx,
+                    alloca_point,
+                    argument,
+                    argument_type,
+                    abi_param,
+                    param_mapping,
+                    &mut ir_call_args[..],
+                )?,
+                ABITypeKind::Ignore => assert_eq!(param_mapping.range().len(), 0),
+                ABITypeKind::Expand(_) => todo!(),
+                ABITypeKind::CoerceAndExpand(_) => todo!(),
+                ABITypeKind::InAlloca(_) => {
+                    unimplemented!("inalloca pass mode not supported at the moment")
+                }
+            }
+
+            todo!();
+        }
+
+        println!("{:?}", params_mapping);
+        todo!("call abi_abide function");
+        builder.restore_stack_pointer(ctx.backend_module, saved_stack_pointer);
+        todo!();
+    } else {
+        Ok(LLVMBuildCall2(
+            builder.get(),
+            function_type,
+            function_value,
+            arguments.as_mut_ptr(),
+            arguments.len().try_into().unwrap(),
+            cstr!("").as_ptr(),
+        ))
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn indirect(
+    builder: &Builder,
+    ctx: &BackendCtx,
+    alloca_point: LLVMValueRef,
+    argument: LLVMValueRef,
+    argument_type: &ir::Type,
+    abi_param: &ABIParam,
+    param_mapping: &Param,
+    ir_call_args: &mut [LLVMValueRef],
+) -> Result<(), BackendError> {
+    let param_range = param_mapping.range();
+    assert_eq!(param_range.len(), 1);
+
+    // NOTE: We shouldn't have to copy the value into an aligned temporary in all cases.
+    // TODO: Skip this when possible
+
+    let abi_argument = Address::from(build_mem_tmp_without_cast(
+        builder,
+        ctx,
+        alloca_point,
+        argument_type,
+        abi_param.abi_type.indirect_align().unwrap(),
+        cstr!("byval-tmp"),
+    )?);
+
+    builder.store(argument, &abi_argument);
+
+    ir_call_args[param_range.start] = abi_argument.base_pointer();
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn direct_or_extend(
+    _builder: &Builder,
+    _ctx: &BackendCtx,
+    _alloca_point: LLVMValueRef,
+    _argument: LLVMValueRef,
+    _argument_type: &ir::Type,
+    _abi_param: &ABIParam,
+    _param_mapping: &Param,
+    _ir_call_args: &mut [LLVMValueRef],
+) -> Result<(), BackendError> {
+    todo!("direct_or_extend")
+}
+
+// Since rust-analyzer struggles with `izip!` macro,
+// create an auxiliary function to help it determine the
+// correct types. <https://github.com/rust-lang/rust-analyzer/issues/11681>
+fn zip3<A, B, C>(
+    a: impl Iterator<Item = A>,
+    b: impl Iterator<Item = B>,
+    c: impl Iterator<Item = C>,
+) -> impl Iterator<Item = (A, B, C)> {
+    izip!(a, b, c)
+}
+
+fn zip4<A, B, C, D>(
+    a: impl Iterator<Item = A>,
+    b: impl Iterator<Item = B>,
+    c: impl Iterator<Item = C>,
+    d: impl Iterator<Item = D>,
+) -> impl Iterator<Item = (A, B, C, D)> {
+    izip!(a, b, c, d)
 }

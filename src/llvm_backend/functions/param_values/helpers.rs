@@ -1,14 +1,8 @@
 use crate::{
-    data_units::ByteUnits,
     ir,
     llvm_backend::{
         address::Address,
-        backend_type::to_backend_type,
         builder::{Builder, Volatility},
-        ctx::BackendCtx,
-        error::BackendError,
-        functions::helpers::build_tmp_alloca_address,
-        raw_address::RawAddress,
     },
 };
 use cstr::cstr;
@@ -17,7 +11,6 @@ use llvm_sys::{
     prelude::LLVMValueRef,
     LLVMValueKind,
 };
-use std::ffi::CStr;
 
 fn is_thread_local(value: LLVMValueRef) -> bool {
     unsafe {
@@ -55,35 +48,4 @@ pub fn emit_from_mem(builder: &Builder, value: LLVMValueRef, ir_type: &ir::Type)
         },
         _ => value,
     }
-}
-
-pub fn build_mem_tmp(
-    ctx: &BackendCtx,
-    builder: &Builder,
-    alloca_point: LLVMValueRef,
-    ir_type: &ir::Type,
-    name: &CStr,
-) -> Result<RawAddress, BackendError> {
-    let alignment = ctx.type_layout_cache.get(ir_type).alignment;
-    build_mem_tmp_with_alignment(ctx, builder, alloca_point, ir_type, alignment, name)
-}
-
-pub fn build_mem_tmp_with_alignment(
-    ctx: &BackendCtx,
-    builder: &Builder,
-    alloca_point: LLVMValueRef,
-    ir_type: &ir::Type,
-    alignment: ByteUnits,
-    name: &CStr,
-) -> Result<RawAddress, BackendError> {
-    let backend_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
-
-    Ok(build_tmp_alloca_address(
-        builder,
-        alloca_point,
-        backend_type,
-        alignment,
-        name,
-        None,
-    ))
 }

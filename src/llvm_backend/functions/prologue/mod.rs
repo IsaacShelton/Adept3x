@@ -18,7 +18,7 @@ use crate::llvm_backend::{
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::{LLVMGetParam, LLVMGetUndef, LLVMInt32Type, LLVMSetValueName2},
+    core::{LLVMGetParam, LLVMSetValueName2},
     prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
 
@@ -34,6 +34,7 @@ pub fn emit_prologue(
     builder: &Builder,
     skeleton: &FunctionSkeleton,
     abi_function: &ABIFunction,
+    alloca_point: LLVMValueRef,
     entry_basicblock: LLVMBasicBlockRef,
 ) -> Result<PrologueInfo, BackendError> {
     let ir_function = ctx
@@ -46,10 +47,6 @@ pub fn emit_prologue(
     let returns_ir_void = ir_function.return_type.is_void();
 
     builder.position(entry_basicblock);
-
-    let undef = unsafe { LLVMGetUndef(LLVMInt32Type()) };
-    let alloca_point =
-        builder.bitcast_with_name(undef, unsafe { LLVMInt32Type() }, cstr!("allocaapt"));
 
     let inalloca_subtypes = abi_function
         .inalloca_combined_struct

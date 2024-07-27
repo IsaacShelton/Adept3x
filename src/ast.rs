@@ -14,7 +14,10 @@ use std::{
     fmt::{Debug, Display},
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Hash)]
+// WARNING: Don't implement PartialEq, Eq, or Hash for this.
+// It's too easy to accidentally define constructs that are only equal
+// depending on source, which is usually not what we want.
+#[derive(Copy, Clone, Debug)]
 pub struct Source {
     pub key: SourceFileCacheKey,
     pub location: Location,

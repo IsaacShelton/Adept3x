@@ -13,11 +13,12 @@ use crate::{
         error::BackendError,
         functions::{
             helpers::{
-                build_tmp_alloca_address, build_tmp_alloca_for_coerce, coerce_integer_likes,
-                emit_address_at_offset, enter_struct_pointer_for_coerced_access,
-                is_integer_or_pointer_type, is_pointer_type,
+                build_mem_tmp_with_alignment, build_tmp_alloca_address,
+                build_tmp_alloca_for_coerce, coerce_integer_likes, emit_address_at_offset,
+                enter_struct_pointer_for_coerced_access, is_integer_or_pointer_type,
+                is_pointer_type,
             },
-            param_values::{helpers::build_mem_tmp_with_alignment, value::ParamValue},
+            param_values::value::ParamValue,
             params_mapping::ParamRange,
         },
         target_data::TargetData,

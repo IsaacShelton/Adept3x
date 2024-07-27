@@ -44,7 +44,7 @@ impl Depleted {
 
     pub fn hash_define(define: &Define) -> u64 {
         let mut hasher = DefaultHasher::new();
-        define.hash(&mut hasher);
+        define.name.hash(&mut hasher);
         hasher.finish()
     }
 }

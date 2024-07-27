@@ -1,4 +1,3 @@
-use crate::ast::Source;
 use crate::data_units::ByteUnits;
 use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
 use crate::target_info::TargetInfo;
@@ -179,7 +178,8 @@ impl BinaryOperands {
 #[derive(Clone, Debug)]
 pub struct Call {
     pub function: FunctionRef,
-    pub arguments: Vec<Value>,
+    pub arguments: Box<[Value]>,
+    pub variadic_argument_types: Box<[Type]>,
 }
 
 #[derive(Clone, Debug)]
@@ -188,28 +188,17 @@ pub struct Store {
     pub destination: Value,
 }
 
-#[allow(clippy::derived_hash_with_manual_eq)]
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Field {
     pub ir_type: Type,
     pub properties: FieldProperties,
-    pub source: Source,
 }
-
-impl PartialEq for Field {
-    fn eq(&self, other: &Self) -> bool {
-        self.ir_type.eq(&other.ir_type) && self.properties.eq(&other.properties)
-    }
-}
-
-impl Eq for Field {}
 
 impl Field {
-    pub fn basic(ir_type: Type, source: Source) -> Self {
+    pub fn basic(ir_type: Type) -> Self {
         Self {
             ir_type,
             properties: FieldProperties::default(),
-            source,
         }
     }
 
@@ -343,9 +332,9 @@ impl Type {
     pub fn reference_counted_no_pointer(&self) -> Self {
         let subtypes = vec![
             // Reference count
-            Field::basic(Type::U64, Source::internal()),
+            Field::basic(Type::U64),
             // Value
-            Field::basic(self.clone(), Source::internal()),
+            Field::basic(self.clone()),
         ];
 
         Type::AnonymousComposite(TypeComposite {

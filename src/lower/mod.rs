@@ -56,7 +56,6 @@ fn lower_structure(
         fields.push(ir::Field {
             ir_type: lower_type(&ir_module.target_info, &field.resolved_type, resolved_ast)?,
             properties: ir::FieldProperties::default(),
-            source: field.source,
         });
     }
 
@@ -612,21 +611,34 @@ fn lower_expr(
             )
         }
         ExprKind::Call(call) => {
-            let mut arguments = vec![];
+            let callee = resolved_ast
+                .functions
+                .get(call.function)
+                .expect("referenced function to exist");
 
-            for argument in call.arguments.iter() {
-                arguments.push(lower_expr(
-                    builder,
-                    ir_module,
-                    argument,
-                    function,
-                    resolved_ast,
-                )?);
-            }
+            let arguments = call
+                .arguments
+                .iter()
+                .map(|argument| {
+                    lower_expr(builder, ir_module, &argument.expr, function, resolved_ast)
+                })
+                .collect::<Result<Box<[_]>, _>>()?;
+
+            let variadic_argument_types = call.arguments[callee.parameters.required.len()..]
+                .iter()
+                .map(|argument| {
+                    lower_type(
+                        &ir_module.target_info,
+                        &argument.resolved_type,
+                        resolved_ast,
+                    )
+                })
+                .collect::<Result<Box<[_]>, _>>()?;
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
                 function: call.function,
                 arguments,
+                variadic_argument_types,
             })))
         }
         ExprKind::Variable(variable) => {

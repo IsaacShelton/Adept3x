@@ -91,7 +91,7 @@ pub fn resolve_call_expr(
             }
         }
 
-        arguments.push(argument.expr);
+        arguments.push(argument);
     }
 
     Ok(TypedExpr::new(

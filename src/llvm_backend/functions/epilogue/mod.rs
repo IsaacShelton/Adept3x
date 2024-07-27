@@ -240,6 +240,7 @@ fn build_coerced_load(
 
     let size =
         unsafe { LLVMConstInt(LLVMInt64Type(), source_size.try_into().unwrap(), false as _) };
+
     let tmp = Address::from(build_tmp_alloca_for_coerce(
         builder,
         ctx.target_data,
@@ -247,6 +248,7 @@ fn build_coerced_load(
         source.base.alignment,
         alloca_point,
     ));
+
     builder.memcpy(&tmp, &source, size);
     builder.load(&tmp, Volatility::Normal)
 }

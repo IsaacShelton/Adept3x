@@ -3,8 +3,9 @@ use crate::llvm_backend::{
     abi::has_scalar_evaluation_kind,
     backend_type::to_backend_type,
     error::BackendError,
-    functions::param_values::{
-        helpers::build_mem_tmp, value::ParamValue, ParamValueConstructionCtx,
+    functions::{
+        helpers::build_mem_tmp,
+        param_values::{value::ParamValue, ParamValueConstructionCtx},
     },
 };
 use cstr::cstr;

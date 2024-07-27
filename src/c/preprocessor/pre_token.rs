@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 pub use crate::c::punctuator::Punctuator;
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct PreToken {
     pub kind: PreTokenKind,
     pub source: Source,
@@ -72,7 +72,10 @@ impl PreToken {
     }
 
     pub fn is_open_paren_disregard_whitespace(&self) -> bool {
-        matches!(self.kind, PreTokenKind::Punctuator(Punctuator::OpenParen { .. }))
+        matches!(
+            self.kind,
+            PreTokenKind::Punctuator(Punctuator::OpenParen { .. })
+        )
     }
 }
 

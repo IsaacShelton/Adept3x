@@ -226,7 +226,7 @@ impl ControlLineKind {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct Define {
     pub kind: DefineKind,
     pub name: String,
@@ -239,13 +239,13 @@ pub enum PlaceholderAffinity {
     Discard,
 }
 
-#[derive(Clone, Debug, Hash, Unwrap, IsVariant)]
+#[derive(Clone, Debug, Unwrap, IsVariant)]
 pub enum DefineKind {
     ObjectMacro(Vec<PreToken>, PlaceholderAffinity),
     FunctionMacro(FunctionMacro),
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct FunctionMacro {
     pub affinity: PlaceholderAffinity,
     pub parameters: Vec<String>,

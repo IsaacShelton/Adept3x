@@ -3,10 +3,7 @@ use super::{
     function_type::{to_backend_function_type, FunctionType},
 };
 use crate::llvm_backend::{
-    abi::{
-        abi_function::ABIFunction,
-        arch::{aarch64, Arch},
-    },
+    abi::abi_function::ABIFunction,
     backend_type::{to_backend_type, to_backend_types},
     ctx::{BackendCtx, FunctionSkeleton},
     error::BackendError,
@@ -24,15 +21,8 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
             .abide_abi
             .then(|| {
                 ABIFunction::new(
-                    ctx.for_making_type(),
-                    Arch::AARCH64(aarch64::AARCH64 {
-                        variant: aarch64::Variant::DarwinPCS,
-                        target_info: &ctx.ir_module.target_info,
-                        type_layout_cache: &ctx.type_layout_cache,
-                        ir_module: ctx.ir_module,
-                        is_cxx_mode: false,
-                    }),
-                    &function.parameters[..],
+                    ctx,
+                    function.parameters.iter(),
                     &function.return_type,
                     function.is_cstyle_variadic,
                 )

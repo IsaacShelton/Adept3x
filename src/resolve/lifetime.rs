@@ -199,7 +199,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         | ExprKind::NullTerminatedString(..) => (),
         ExprKind::Call(call) => {
             for argument in call.arguments.iter_mut() {
-                mini_scope.union_with(&insert_drops_for_expr(ctx.clone(), argument));
+                mini_scope.union_with(&insert_drops_for_expr(ctx.clone(), &mut argument.expr));
             }
         }
         ExprKind::DeclareAssign(declare_assign) => {
@@ -427,7 +427,7 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         | ExprKind::EnumMemberLiteral(_) => (),
         ExprKind::Call(call) => {
             for argument in call.arguments.iter_mut() {
-                integrate_active_set_for_expr(argument, active_set);
+                integrate_active_set_for_expr(&mut argument.expr, active_set);
             }
         }
         ExprKind::DeclareAssign(declare_assign) => {

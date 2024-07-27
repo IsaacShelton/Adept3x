@@ -350,11 +350,6 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         field_packed: bool,
         field: &ir::Field,
     ) {
-        // Ignore fields not from user code
-        if field.source.is_internal() {
-            return;
-        }
-
         if !self.is_union && field_offset > unpadded_field_offset {
             // TODO: Improve warning messages
             if field.is_bitfield() {

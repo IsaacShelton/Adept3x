@@ -9,23 +9,32 @@ mod phi_relocation;
 mod ptr_to_int;
 mod store;
 
-use std::ffi::CStr;
-
+use super::module::BackendModule;
 use append_only_vec::AppendOnlyVec;
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildBitCast, LLVMBuildBr, LLVMCreateBuilder, LLVMDisposeBuilder, LLVMGetInsertBlock,
-        LLVMPositionBuilderAtEnd,
+        LLVMAddFunction, LLVMBuildBitCast, LLVMBuildBr, LLVMBuildCall2, LLVMCreateBuilder,
+        LLVMDisposeBuilder, LLVMFunctionType, LLVMGetInsertBlock, LLVMInt8Type, LLVMPointerType,
+        LLVMPositionBuilderAtEnd, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
 };
+use std::{cell::OnceCell, ffi::CStr, ptr::null_mut};
+
 pub use load::Volatility;
 pub use phi_relocation::PhiRelocation;
+
+#[derive(Debug, Default)]
+struct Intrinsics {
+    pub stacksave: OnceCell<LLVMValueRef>,
+    pub stackrestore: OnceCell<LLVMValueRef>,
+}
 
 pub struct Builder {
     builder: LLVMBuilderRef,
     phi_relocations: AppendOnlyVec<PhiRelocation>,
+    intrinsics: Intrinsics,
 }
 
 impl Builder {
@@ -33,6 +42,7 @@ impl Builder {
         Self {
             builder: LLVMCreateBuilder(),
             phi_relocations: AppendOnlyVec::new(),
+            intrinsics: Default::default(),
         }
     }
 
@@ -71,6 +81,73 @@ impl Builder {
 
     pub fn br(&self, basicblock: LLVMBasicBlockRef) -> LLVMValueRef {
         unsafe { LLVMBuildBr(self.get(), basicblock) }
+    }
+
+    pub fn save_stack_pointer(&self, backend_module: &BackendModule) -> LLVMValueRef {
+        let signature = unsafe {
+            LLVMFunctionType(
+                LLVMPointerType(LLVMInt8Type(), 0),
+                null_mut(),
+                0,
+                false as _,
+            )
+        };
+
+        let function = *self.intrinsics.stacksave.get_or_init(|| unsafe {
+            LLVMAddFunction(
+                backend_module.get(),
+                cstr!("llvm.stacksave.p0").as_ptr(),
+                signature,
+            )
+        });
+
+        unsafe {
+            LLVMBuildCall2(
+                self.get(),
+                signature,
+                function,
+                null_mut(),
+                0,
+                cstr!("").as_ptr(),
+            )
+        }
+    }
+
+    pub fn restore_stack_pointer(
+        &self,
+        backend_module: &BackendModule,
+        stack_pointer: LLVMValueRef,
+    ) {
+        let mut arg_types = [unsafe { LLVMPointerType(LLVMInt8Type(), 0) }];
+        let signature = unsafe {
+            LLVMFunctionType(
+                LLVMVoidType(),
+                arg_types.as_mut_ptr(),
+                arg_types.len() as _,
+                false as _,
+            )
+        };
+
+        let function = *self.intrinsics.stackrestore.get_or_init(|| unsafe {
+            LLVMAddFunction(
+                backend_module.get(),
+                cstr!("llvm.stackrestore.p0").as_ptr(),
+                signature,
+            )
+        });
+
+        let mut args = [stack_pointer];
+
+        unsafe {
+            LLVMBuildCall2(
+                self.get(),
+                signature,
+                function,
+                args.as_mut_ptr(),
+                args.len() as _,
+                cstr!("").as_ptr(),
+            );
+        }
     }
 }
 

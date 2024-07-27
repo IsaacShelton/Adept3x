@@ -1,6 +1,13 @@
 use super::{
-    abi::abi_function::ABIFunction, builder::Builder, functions::function_type::FunctionType,
-    intrinsics::Intrinsics, module::BackendModule, target_data::TargetData,
+    abi::{
+        abi_function::ABIFunction,
+        arch::{aarch64, Arch},
+    },
+    builder::Builder,
+    functions::function_type::FunctionType,
+    intrinsics::Intrinsics,
+    module::BackendModule,
+    target_data::TargetData,
 };
 use crate::{ir, resolved::StructureRef, target_info::type_layout::TypeLayoutCache};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
@@ -61,6 +68,7 @@ pub struct BackendCtx<'a> {
     pub static_variables: Vec<StaticVariable>,
     pub structure_cache: StructureCache,
     pub type_layout_cache: TypeLayoutCache<'a>,
+    pub arch: Arch,
 }
 
 impl<'a> BackendCtx<'a> {
@@ -84,6 +92,10 @@ impl<'a> BackendCtx<'a> {
             static_variables: Vec::new(),
             structure_cache: Default::default(),
             type_layout_cache,
+            arch: Arch::AARCH64(aarch64::AARCH64 {
+                variant: aarch64::Variant::DarwinPCS,
+                is_cxx_mode: false,
+            }),
         }
     }
 

@@ -99,6 +99,81 @@ pub fn build_tmp_alloca_inst(
     }
 }
 
+pub fn build_mem_tmp(
+    ctx: &BackendCtx,
+    builder: &Builder,
+    alloca_point: LLVMValueRef,
+    ir_type: &ir::Type,
+    name: &CStr,
+) -> Result<RawAddress, BackendError> {
+    let alignment = ctx.type_layout_cache.get(ir_type).alignment;
+    build_mem_tmp_with_alignment(ctx, builder, alloca_point, ir_type, alignment, name)
+}
+
+pub fn build_mem_tmp_with_alignment(
+    ctx: &BackendCtx,
+    builder: &Builder,
+    alloca_point: LLVMValueRef,
+    ir_type: &ir::Type,
+    alignment: ByteUnits,
+    name: &CStr,
+) -> Result<RawAddress, BackendError> {
+    let backend_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
+
+    Ok(build_tmp_alloca_address(
+        builder,
+        alloca_point,
+        backend_type,
+        alignment,
+        name,
+        None,
+    ))
+}
+
+pub fn build_mem_tmp_without_cast(
+    builder: &Builder,
+    ctx: &BackendCtx,
+    alloca_point: LLVMValueRef,
+    ir_type: &ir::Type,
+    alignment: ByteUnits,
+    name: &CStr,
+) -> Result<RawAddress, BackendError> {
+    Ok(build_tmp_alloca_without_cast(
+        builder,
+        alloca_point,
+        unsafe {
+            to_backend_mem_type(
+                ctx.for_making_type(),
+                &ctx.type_layout_cache,
+                ir_type,
+                false,
+            )?
+        },
+        alignment,
+        name,
+        None,
+    ))
+}
+
+pub fn build_tmp_alloca_without_cast(
+    builder: &Builder,
+    alloca_point: LLVMValueRef,
+    ty: LLVMTypeRef,
+    alignment: ByteUnits,
+    name: &CStr,
+    array_size: Option<LLVMValueRef>,
+) -> RawAddress {
+    let alloca = build_tmp_alloca_inst(builder, ty, name, array_size, alloca_point);
+    unsafe { LLVMSetAlignment(alloca, alignment.bytes().try_into().unwrap()) };
+
+    RawAddress {
+        base: alloca,
+        nullable: false,
+        alignment,
+        element_type: ty,
+    }
+}
+
 pub fn make_natural_address_for_pointer(
     ctx: &BackendCtx,
     ptr: LLVMValueRef,

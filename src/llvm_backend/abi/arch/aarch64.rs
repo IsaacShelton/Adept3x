@@ -10,10 +10,10 @@ use crate::{
             has_scalar_evaluation_kind,
         },
         backend_type::to_backend_type,
-        ctx::ToBackendTypeCtx,
+        ctx::BackendCtx,
         error::BackendError,
     },
-    target_info::{type_layout::TypeLayoutCache, TargetInfo},
+    target_info::type_layout::TypeLayoutCache,
 };
 use derive_more::IsVariant;
 use llvm_sys::{
@@ -25,11 +25,8 @@ use llvm_sys::{
 };
 
 #[derive(Clone, Debug)]
-pub struct AARCH64<'a> {
+pub struct AARCH64 {
     pub variant: Variant,
-    pub target_info: &'a TargetInfo,
-    pub type_layout_cache: &'a TypeLayoutCache<'a>,
-    pub ir_module: &'a ir::Module,
     pub is_cxx_mode: bool,
 }
 
@@ -41,13 +38,12 @@ pub enum Variant {
     AapcsSoft,
 }
 
-#[allow(unused)]
-impl AARCH64<'_> {
-    pub fn compute_info(
+impl AARCH64 {
+    pub fn compute_info<'a>(
         &self,
-        ctx: &ToBackendTypeCtx<'_>,
-        abi: Itanium<'_>,
-        original_parameter_types: &[ir::Type],
+        ctx: &BackendCtx,
+        abi: Itanium,
+        original_parameter_types: impl Iterator<Item = &'a ir::Type>,
         original_return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<ABIFunction, BackendError> {
@@ -55,12 +51,14 @@ impl AARCH64<'_> {
             ir_type: original_return_type.clone(),
             abi_type: abi
                 .classify_return_type(original_return_type)
-                .unwrap_or_else(|| self.classify_return_type(original_return_type, is_variadic)),
+                .unwrap_or_else(|| {
+                    self.classify_return_type(ctx, original_return_type, is_variadic)
+                }),
         };
 
         let mut parameter_types = Vec::new();
 
-        for parameter in original_parameter_types.iter() {
+        for parameter in original_parameter_types {
             parameter_types.push(ABIParam {
                 abi_type: self.classify_argument_type(
                     ctx,
@@ -83,7 +81,12 @@ impl AARCH64<'_> {
         self.variant.is_aapcs_soft()
     }
 
-    fn classify_return_type(&self, return_type: &ir::Type, is_variadic: bool) -> ABIType {
+    fn classify_return_type(
+        &self,
+        ctx: &BackendCtx,
+        return_type: &ir::Type,
+        is_variadic: bool,
+    ) -> ABIType {
         if return_type.is_void() {
             return ABIType::new_ignore();
         }
@@ -102,7 +105,7 @@ impl AARCH64<'_> {
             };
         }
 
-        let type_layout = self.type_layout_cache.get(return_type);
+        let type_layout = ctx.type_layout_cache.get(return_type);
 
         let size = type_layout.width;
         let alignment = type_layout.alignment;
@@ -110,7 +113,7 @@ impl AARCH64<'_> {
         if size.is_zero()
             || is_empty_record(
                 return_type,
-                self.ir_module,
+                ctx.ir_module,
                 IsEmptyRecordOptions {
                     allow_arrays: true,
                     ..Default::default()
@@ -124,10 +127,9 @@ impl AARCH64<'_> {
             && is_aarch64_homo_aggregate(
                 self.variant,
                 return_type,
-                self.ir_module,
+                ctx.ir_module,
                 None,
-                self.type_layout_cache,
-                self.target_info,
+                &ctx.type_layout_cache,
             )
             .is_some()
         {
@@ -135,7 +137,7 @@ impl AARCH64<'_> {
         }
 
         // Small aggregates are returned directly via registers or stack
-        if size <= ByteUnits::of(8) && self.target_info.is_little_endian() {
+        if size <= ByteUnits::of(8) && ctx.ir_module.target_info.is_little_endian() {
             let ty = match size.bytes() {
                 1 => unsafe { LLVMInt8Type() },
                 2 => unsafe { LLVMInt16Type() },
@@ -165,14 +167,14 @@ impl AARCH64<'_> {
 
         get_natural_align_indirect(
             return_type,
-            self.type_layout_cache,
+            &ctx.type_layout_cache,
             NaturalAlignIndirectOptions::default(),
         )
     }
 
     fn classify_argument_type(
         &self,
-        ctx: &ToBackendTypeCtx<'_>,
+        ctx: &BackendCtx,
         ty: &ir::Type,
         is_variadic: bool,
         calling_convention: LLVMCallConv,
@@ -194,11 +196,11 @@ impl AARCH64<'_> {
             };
         }
 
-        let size_bytes = self.type_layout_cache.get(ty).width;
+        let size_bytes = ctx.type_layout_cache.get(ty).width;
 
         let is_empty_record = is_empty_record(
             ty,
-            self.ir_module,
+            ctx.ir_module,
             IsEmptyRecordOptions {
                 allow_arrays: true,
                 ..Default::default()
@@ -235,13 +237,13 @@ impl AARCH64<'_> {
             if let Some(homo_aggregate) = is_aarch64_homo_aggregate(
                 self.variant,
                 ty,
-                self.ir_module,
+                ctx.ir_module,
                 None,
-                self.type_layout_cache,
-                self.target_info,
+                &ctx.type_layout_cache,
             ) {
                 if !self.variant.is_aapcs() {
-                    let base = unsafe { to_backend_type(ctx, homo_aggregate.base)? };
+                    let base =
+                        unsafe { to_backend_type(ctx.for_making_type(), homo_aggregate.base)? };
                     return Ok(ABIType::new_direct(DirectOptions {
                         coerce_to_type: Some(unsafe {
                             LLVMArrayType2(base, homo_aggregate.num_members)
@@ -254,7 +256,7 @@ impl AARCH64<'_> {
 
         if size_bytes <= ByteUnits::of(16) {
             let alignment_bytes = if self.variant.is_aapcs() {
-                let unadjusted_alignment = self.type_layout_cache.get(ty).unadjusted_alignment;
+                let unadjusted_alignment = ctx.type_layout_cache.get(ty).unadjusted_alignment;
 
                 if unadjusted_alignment < ByteUnits::of(16) {
                     ByteUnits::of(8)
@@ -263,7 +265,7 @@ impl AARCH64<'_> {
                 }
             } else {
                 let pointer_width = ByteUnits::of(8);
-                self.type_layout_cache.get(ty).alignment.max(pointer_width)
+                ctx.type_layout_cache.get(ty).alignment.max(pointer_width)
             };
 
             let size_bytes = size_bytes.align_to(alignment_bytes);
@@ -291,7 +293,7 @@ impl AARCH64<'_> {
 
         Ok(get_natural_align_indirect(
             ty,
-            self.type_layout_cache,
+            &ctx.type_layout_cache,
             NaturalAlignIndirectOptions {
                 byval: false,
                 ..Default::default()
@@ -299,20 +301,8 @@ impl AARCH64<'_> {
         ))
     }
 
-    fn coerce_illegal_vector(&self, ty: &ir::Type) -> ABIType {
+    fn coerce_illegal_vector(&self, _ty: &ir::Type) -> ABIType {
         todo!("coerce_illegal_vector")
-    }
-
-    fn is_homo_aggregate_base_type(&self, ty: &ir::Type) -> bool {
-        todo!("is_homo_aggregate_base_type")
-    }
-
-    fn is_homo_aggregate_small_enough(&self, ty: &ir::Type, members: u64) -> bool {
-        todo!("is_homo_aggregate_small_enough")
-    }
-
-    fn is_zero_length_bitfield_allowed_in_homo_aggregrate(&self) -> bool {
-        todo!("is_zero_length_bitfield_allowed_in_homo_aggregrate")
     }
 
     fn is_illegal_vector_type(&self, ty: &ir::Type) -> bool {
@@ -364,7 +354,6 @@ fn is_aarch64_homo_aggregate<'a>(
     ir_module: &'a ir::Module,
     existing_base: Option<&'a ir::Type>,
     type_layout_cache: &TypeLayoutCache,
-    target_info: &TargetInfo,
 ) -> Option<HomoAggregate<'a>> {
     let homo_aggregate: Option<HomoAggregate<'a>> = if let ir::Type::FixedArray(fixed_array) = ty {
         if fixed_array.length == 0 {
@@ -377,7 +366,6 @@ fn is_aarch64_homo_aggregate<'a>(
             ir_module,
             existing_base,
             type_layout_cache,
-            target_info,
         )
         .map(|homo_aggregate| HomoAggregate {
             base: homo_aggregate.base,
@@ -395,7 +383,6 @@ fn is_aarch64_homo_aggregate<'a>(
             &structure.fields[..],
             existing_base,
             type_layout_cache,
-            target_info,
         )
     } else if let ir::Type::AnonymousComposite(anonymous_composite) = ty {
         is_aarch64_homo_aggregate_record(
@@ -405,7 +392,6 @@ fn is_aarch64_homo_aggregate<'a>(
             &anonymous_composite.fields[..],
             existing_base,
             type_layout_cache,
-            target_info,
         )
     } else {
         let (ty, num_members) = if let ir::Type::Complex(complex) = ty {
@@ -453,7 +439,6 @@ fn is_aarch64_homo_aggregate_record<'a>(
     fields: &'a [ir::Field],
     existing_base: Option<&'a ir::Type>,
     type_layout_cache: &TypeLayoutCache,
-    target_info: &TargetInfo,
 ) -> Option<HomoAggregate<'a>> {
     /*
     // NOTE: We don't support flexible array members yet
@@ -498,14 +483,9 @@ fn is_aarch64_homo_aggregate_record<'a>(
         }
         */
 
-        if let Some(inner) = is_aarch64_homo_aggregate(
-            variant,
-            field,
-            ir_module,
-            base,
-            type_layout_cache,
-            target_info,
-        ) {
+        if let Some(inner) =
+            is_aarch64_homo_aggregate(variant, field, ir_module, base, type_layout_cache)
+        {
             // NOTE: We don't support union types yet
             let is_union = false;
             base = Some(inner.base);

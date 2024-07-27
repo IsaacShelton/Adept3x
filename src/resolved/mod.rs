@@ -172,9 +172,7 @@ pub struct AnonymousEnum {
 
 impl PartialEq for AnonymousEnum {
     fn eq(&self, other: &Self) -> bool {
-        self.resolved_type.kind.eq(&other.resolved_type.kind)
-            && self.source.eq(&other.source)
-            && self.members.eq(&other.members)
+        self.resolved_type.kind.eq(&other.resolved_type.kind) && self.members.eq(&other.members)
     }
 }
 
@@ -618,7 +616,7 @@ pub struct GlobalVariable {
 #[derive(Clone, Debug)]
 pub struct Call {
     pub function: FunctionRef,
-    pub arguments: Vec<Expr>,
+    pub arguments: Vec<TypedExpr>,
 }
 
 #[derive(Clone, Debug)]
