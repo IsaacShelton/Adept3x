@@ -4,7 +4,6 @@ use crate::llvm_backend::{
         abi_function::ABIFunction,
         abi_type::{get_struct_field_types, ABITypeKind, Expand},
     },
-    backend_type::to_backend_type,
     ctx::BackendCtx,
     error::BackendError,
 };
@@ -31,21 +30,6 @@ pub unsafe fn to_backend_function_type(
     is_cstyle_variadic: bool,
 ) -> Result<FunctionType, BackendError> {
     // TODO: This should be memoized
-
-    // Fill in default coerce type for return type
-    abi_function
-        .return_type
-        .abi_type
-        .coerce_to_type_if_missing(|| {
-            to_backend_type(ctx.for_making_type(), &abi_function.return_type.ir_type)
-        })?;
-
-    // Fill in default coerce types for parameters
-    for abi_param in abi_function.parameter_types.iter_mut() {
-        abi_param.abi_type.coerce_to_type_if_missing(|| {
-            to_backend_type(ctx.for_making_type(), &abi_param.ir_type)
-        })?;
-    }
 
     let default_pointer_type =
         unsafe { LLVMPointerTypeInContext(LLVMGetModuleContext(ctx.backend_module.get()), 0) };

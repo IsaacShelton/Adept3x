@@ -15,6 +15,7 @@ use llvm_sys::{
     prelude::{LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
 };
 use memo_map::MemoMap;
+use std::ptr::null_mut;
 use std::{
     cell::OnceCell,
     ffi::{c_uint, CStr, CString},
@@ -77,6 +78,43 @@ impl Intrinsics {
                 LLVMAddFunction(
                     self.module,
                     cstr!("llvm.memcpy.p0i8.p0i8.i64").as_ptr(),
+                    signature,
+                ),
+                signature,
+            )
+        })
+    }
+
+    pub fn stacksave(&self) -> (LLVMValueRef, LLVMTypeRef) {
+        *self.stacksave.get_or_init(|| unsafe {
+            let signature = LLVMFunctionType(
+                LLVMPointerType(LLVMInt8Type(), 0),
+                null_mut(),
+                0,
+                false as _,
+            );
+
+            (
+                LLVMAddFunction(self.module, cstr!("llvm.stacksave.p0").as_ptr(), signature),
+                signature,
+            )
+        })
+    }
+
+    pub fn stackrestore(&self) -> (LLVMValueRef, LLVMTypeRef) {
+        *self.stackrestore.get_or_init(|| unsafe {
+            let mut arg_types = [LLVMPointerType(LLVMInt8Type(), 0)];
+            let signature = LLVMFunctionType(
+                LLVMVoidType(),
+                arg_types.as_mut_ptr(),
+                arg_types.len() as _,
+                false as _,
+            );
+
+            (
+                LLVMAddFunction(
+                    self.module,
+                    cstr!("llvm.stackrestore.p0").as_ptr(),
                     signature,
                 ),
                 signature,

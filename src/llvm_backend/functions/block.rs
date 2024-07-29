@@ -747,17 +747,8 @@ unsafe fn emit_call(
         let variadic_argument_types = call
             .unpromoted_variadic_argument_types
             .iter()
-            .enumerate()
-            .map(|(i, argument_type)| {
-                if i >= ir_function.parameters.len() {
-                    promote_variadic_argument_type(
-                        builder,
-                        &ctx.ir_module.target_info,
-                        argument_type,
-                    )
-                } else {
-                    argument_type.clone()
-                }
+            .map(|argument_type| {
+                promote_variadic_argument_type(builder, &ctx.ir_module.target_info, argument_type)
             })
             .collect_vec();
 
@@ -768,7 +759,7 @@ unsafe fn emit_call(
 
         // If we're using variadic arguments, then we have to re-generate the ABI
         // function signature for the way we're calling it
-        let abi_function = (abi_function.parameter_types.len() < arguments.len())
+        let abi_function_approximation = (abi_function.parameter_types.len() < arguments.len())
             .then(|| {
                 ABIFunction::new(
                     ctx,
@@ -782,7 +773,10 @@ unsafe fn emit_call(
             .unwrap_or(Cow::Borrowed(abi_function));
 
         // After generating the function signature, we should have ABI parameter information for each argument
-        assert_eq!(abi_function.parameter_types.len(), arguments.len());
+        assert_eq!(
+            abi_function_approximation.parameter_types.len(),
+            arguments.len()
+        );
 
         // NOTE: We shouldn't need inalloca, since we intend to target
         // only x86_64 Windows GNU on Windows, as opposed to older MSVC ABIs.
@@ -793,15 +787,18 @@ unsafe fn emit_call(
             .and_then(|abi_function| abi_function.inalloca_combined_struct.as_ref())
             .is_none());
 
-        let params_mapping =
-            ParamsMapping::new(&ctx.type_layout_cache, &abi_function, ctx.ir_module);
+        let params_mapping = ParamsMapping::new(
+            &ctx.type_layout_cache,
+            &abi_function_approximation,
+            ctx.ir_module,
+        );
 
         let mut ir_call_args = vec![null_mut(); params_mapping.llvm_arity()].into_boxed_slice();
 
         // We can optionally choose to override the return destination if desired
         let return_destination: Option<Address> = None;
 
-        let abi_return_info = &abi_function.return_type;
+        let abi_return_info = &abi_function_approximation.return_type;
         let ir_return_type = &ir_function.return_type;
 
         let sret_pointer = match abi_return_info.abi_type.kind {
@@ -842,12 +839,12 @@ unsafe fn emit_call(
         // In some cases this isn't necessary
 
         let alloca_point = fn_ctx.alloca_point.expect("has function body");
-        let saved_stack_pointer = builder.save_stack_pointer(ctx.backend_module);
+        let saved_stack_pointer = builder.save_stack_pointer(ctx);
 
         for (argument, argument_type, abi_param, param_mapping) in zip4(
             arguments.iter().copied(),
             argument_types_iter,
-            abi_function.parameter_types.iter(),
+            abi_function_approximation.parameter_types.iter(),
             params_mapping.params().iter(),
         ) {
             if let Some((padding_index, padding_type)) = param_mapping
@@ -910,10 +907,33 @@ unsafe fn emit_call(
         }
 
         // NOTE: We don't support inalloca here yet
-        assert!(abi_function.inalloca_combined_struct.is_none());
+        assert!(abi_function_approximation
+            .inalloca_combined_struct
+            .is_none());
 
-        let function_type =
-            get_abi_function_type(ctx, ir_function, &abi_function, &params_mapping)?;
+        let actual_abi_function = ir_function
+            .is_cstyle_variadic
+            .then(|| {
+                ABIFunction::new(
+                    ctx,
+                    ir_function.parameters.iter(),
+                    &ir_function.return_type,
+                    ir_function.is_cstyle_variadic,
+                )
+            })
+            .transpose()?
+            .map(Cow::Owned::<ABIFunction>)
+            .unwrap_or_else(|| Cow::Borrowed(&abi_function_approximation));
+
+        let actual_params_mapping =
+            ParamsMapping::new(&ctx.type_layout_cache, &actual_abi_function, ctx.ir_module);
+
+        let function_type = get_abi_function_type(
+            ctx,
+            ir_function,
+            &actual_abi_function,
+            &actual_params_mapping,
+        )?;
 
         let returned = LLVMBuildCall2(
             builder.get(),
@@ -924,7 +944,7 @@ unsafe fn emit_call(
             cstr!("").as_ptr(),
         );
 
-        builder.restore_stack_pointer(ctx.backend_module, saved_stack_pointer);
+        builder.restore_stack_pointer(ctx, saved_stack_pointer);
 
         let abi_type = &abi_return_info.abi_type;
         let return_type = &ir_function.return_type;
@@ -1385,7 +1405,7 @@ fn trivial_direct_or_extend(
     let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
 
     if coerce_to_type != llvm_argument_type && is_integer_type(llvm_argument_type) {
-        argument = builder.zext(argument, coerce_to_type);
+        argument = builder.zext_with_name(argument, coerce_to_type, cstr!("up"));
         llvm_argument_type = unsafe { LLVMTypeOf(argument) };
     }
 

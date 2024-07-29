@@ -9,32 +9,24 @@ mod phi_relocation;
 mod ptr_to_int;
 mod store;
 
-use super::module::BackendModule;
+use super::ctx::BackendCtx;
 use append_only_vec::AppendOnlyVec;
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMAddFunction, LLVMBuildBitCast, LLVMBuildBr, LLVMBuildCall2, LLVMBuildZExt,
-        LLVMCreateBuilder, LLVMDisposeBuilder, LLVMFunctionType, LLVMGetInsertBlock, LLVMInt8Type,
-        LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMVoidType,
+        LLVMBuildBitCast, LLVMBuildBr, LLVMBuildCall2, LLVMBuildZExt, LLVMCreateBuilder,
+        LLVMDisposeBuilder, LLVMGetInsertBlock, LLVMPositionBuilderAtEnd,
     },
     prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
 };
-use std::{cell::OnceCell, ffi::CStr, ptr::null_mut};
+use std::{ffi::CStr, ptr::null_mut};
 
 pub use load::Volatility;
 pub use phi_relocation::PhiRelocation;
 
-#[derive(Debug, Default)]
-struct Intrinsics {
-    pub stacksave: OnceCell<LLVMValueRef>,
-    pub stackrestore: OnceCell<LLVMValueRef>,
-}
-
 pub struct Builder {
     builder: LLVMBuilderRef,
     phi_relocations: AppendOnlyVec<PhiRelocation>,
-    intrinsics: Intrinsics,
 }
 
 impl Builder {
@@ -42,7 +34,6 @@ impl Builder {
         Self {
             builder: LLVMCreateBuilder(),
             phi_relocations: AppendOnlyVec::new(),
-            intrinsics: Default::default(),
         }
     }
 
@@ -60,6 +51,15 @@ impl Builder {
 
     pub fn zext(&self, value: LLVMValueRef, new_type: LLVMTypeRef) -> LLVMValueRef {
         unsafe { LLVMBuildZExt(self.get(), value, new_type, cstr!("").as_ptr()) }
+    }
+
+    pub fn zext_with_name(
+        &self,
+        value: LLVMValueRef,
+        new_type: LLVMTypeRef,
+        name: &CStr,
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildZExt(self.get(), value, new_type, name.as_ptr()) }
     }
 
     pub fn bitcast(&self, value: LLVMValueRef, new_type: LLVMTypeRef) -> LLVMValueRef {
@@ -87,23 +87,8 @@ impl Builder {
         unsafe { LLVMBuildBr(self.get(), basicblock) }
     }
 
-    pub fn save_stack_pointer(&self, backend_module: &BackendModule) -> LLVMValueRef {
-        let signature = unsafe {
-            LLVMFunctionType(
-                LLVMPointerType(LLVMInt8Type(), 0),
-                null_mut(),
-                0,
-                false as _,
-            )
-        };
-
-        let function = *self.intrinsics.stacksave.get_or_init(|| unsafe {
-            LLVMAddFunction(
-                backend_module.get(),
-                cstr!("llvm.stacksave.p0").as_ptr(),
-                signature,
-            )
-        });
+    pub fn save_stack_pointer(&self, ctx: &BackendCtx) -> LLVMValueRef {
+        let (function, signature) = ctx.intrinsics.stacksave();
 
         unsafe {
             LLVMBuildCall2(
@@ -117,29 +102,8 @@ impl Builder {
         }
     }
 
-    pub fn restore_stack_pointer(
-        &self,
-        backend_module: &BackendModule,
-        stack_pointer: LLVMValueRef,
-    ) {
-        let mut arg_types = [unsafe { LLVMPointerType(LLVMInt8Type(), 0) }];
-        let signature = unsafe {
-            LLVMFunctionType(
-                LLVMVoidType(),
-                arg_types.as_mut_ptr(),
-                arg_types.len() as _,
-                false as _,
-            )
-        };
-
-        let function = *self.intrinsics.stackrestore.get_or_init(|| unsafe {
-            LLVMAddFunction(
-                backend_module.get(),
-                cstr!("llvm.stackrestore.p0").as_ptr(),
-                signature,
-            )
-        });
-
+    pub fn restore_stack_pointer(&self, ctx: &BackendCtx, stack_pointer: LLVMValueRef) {
+        let (function, signature) = ctx.intrinsics.stackrestore();
         let mut args = [stack_pointer];
 
         unsafe {

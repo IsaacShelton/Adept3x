@@ -460,6 +460,11 @@ where
             }
         }
 
+        // abide_abi is implied for all foreign functions
+        if is_foreign {
+            abide_abi = true;
+        }
+
         let location = self.input.advance().location;
         let source = self.source(location);
 

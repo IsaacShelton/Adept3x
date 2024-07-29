@@ -2,7 +2,7 @@ use super::{abi_type::ABIType, arch::Arch, cxx::Itanium};
 use crate::{
     data_units::ByteUnits,
     ir,
-    llvm_backend::{ctx::BackendCtx, error::BackendError},
+    llvm_backend::{backend_type::to_backend_type, ctx::BackendCtx, error::BackendError},
 };
 use llvm_sys::prelude::LLVMTypeRef;
 
@@ -27,6 +27,32 @@ pub struct ABIParam {
 
 impl ABIFunction {
     pub fn new<'a>(
+        ctx: &BackendCtx,
+        parameter_types: impl Iterator<Item = &'a ir::Type>,
+        return_type: &ir::Type,
+        is_variadic: bool,
+    ) -> Result<Self, BackendError> {
+        let mut abi_function = Self::new_agnostic(ctx, parameter_types, return_type, is_variadic)?;
+
+        // Fill in default coerce type for return type
+        abi_function
+            .return_type
+            .abi_type
+            .coerce_to_type_if_missing(|| unsafe {
+                to_backend_type(ctx.for_making_type(), &abi_function.return_type.ir_type)
+            })?;
+
+        // Fill in default coerce types for parameters
+        for abi_param in abi_function.parameter_types.iter_mut() {
+            abi_param.abi_type.coerce_to_type_if_missing(|| unsafe {
+                to_backend_type(ctx.for_making_type(), &abi_param.ir_type)
+            })?;
+        }
+
+        Ok(abi_function)
+    }
+
+    pub fn new_agnostic<'a>(
         ctx: &BackendCtx,
         parameter_types: impl Iterator<Item = &'a ir::Type>,
         return_type: &ir::Type,
