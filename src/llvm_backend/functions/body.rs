@@ -122,7 +122,6 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                     &mut value_catalog,
                 )?;
             }
-            unsafe { llvm_sys::core::LLVMDumpModule(ctx.backend_module.get()) };
 
             for relocation in builder.take_phi_relocations().iter() {
                 for incoming in relocation.incoming.iter() {

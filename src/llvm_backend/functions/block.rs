@@ -6,7 +6,7 @@ use super::{
     params_mapping::Param,
 };
 use crate::{
-    data_units::ByteUnits,
+    data_units::{BitUnits, ByteUnits},
     ir::{self, Call, FloatOrSign, Instruction, IntegerSign},
     llvm_backend::{
         abi::{
@@ -35,12 +35,13 @@ use crate::{
         values::build_value,
     },
     resolved::FloatOrInteger,
+    target_info::TargetInfo,
 };
 use cstr::cstr;
-use itertools::izip;
+use itertools::{izip, Itertools};
 use llvm_sys::{
     core::*, prelude::LLVMValueRef, target::LLVMABISizeOfType, LLVMIntPredicate::*,
-    LLVMRealPredicate::*,
+    LLVMRealPredicate::*, LLVMTypeKind,
 };
 use std::{borrow::Cow, ptr::null_mut};
 
@@ -647,6 +648,64 @@ unsafe fn build_binary_operands(
     Ok((left, right))
 }
 
+unsafe fn promote_variadic_argument(
+    builder: &Builder,
+    target_info: &TargetInfo,
+    value: LLVMValueRef,
+) -> LLVMValueRef {
+    let llvm_type = LLVMTypeOf(value);
+    let llvm_type_kind = LLVMGetTypeKind(llvm_type);
+
+    match llvm_type_kind {
+        LLVMTypeKind::LLVMFloatTypeKind => {
+            LLVMBuildFPExt(builder.get(), value, LLVMDoubleType(), cstr!("").as_ptr())
+        }
+        LLVMTypeKind::LLVMIntegerTypeKind => {
+            let c_int_bits =
+                u32::try_from(BitUnits::from(target_info.int_layout().width).bits()).unwrap();
+            let has_bits = LLVMGetIntTypeWidth(llvm_type);
+
+            if has_bits < c_int_bits {
+                builder.zext(value, LLVMIntType(c_int_bits))
+            } else {
+                value
+            }
+        }
+        _ => value,
+    }
+}
+
+fn promote_variadic_argument_type(
+    builder: &Builder,
+    target_info: &TargetInfo,
+    ir_type: &ir::Type,
+) -> ir::Type {
+    assert_eq!(
+        target_info.int_layout().width,
+        ByteUnits::of(4),
+        "we're assuming sizeof C int is 32 bits for now"
+    );
+
+    match ir_type {
+        // Promote integers to 32-bit
+        ir::Type::Boolean | ir::Type::S8 | ir::Type::S16 => ir::Type::S32,
+        ir::Type::U8 | ir::Type::U16 | ir::Type::U32 => ir::Type::U32,
+
+        // Promote floats to 64-bit
+        ir::Type::F32 => ir::Type::F64,
+
+        // Promote atomics based on what's inside
+        ir::Type::Atomic(inner_type) => ir::Type::Atomic(Box::new(promote_variadic_argument_type(
+            builder,
+            target_info,
+            inner_type,
+        ))),
+
+        // Otherwise, keep the same type
+        _ => ir_type.clone(),
+    }
+}
+
 unsafe fn emit_call(
     ctx: &BackendCtx,
     builder: &Builder,
@@ -670,16 +729,42 @@ unsafe fn emit_call(
     let mut arguments = call
         .arguments
         .iter()
-        .map(|argument| build_value(ctx, value_catalog, builder, argument))
+        .enumerate()
+        .map(|(i, argument)| {
+            build_value(ctx, value_catalog, builder, argument).map(|value| {
+                if i >= ir_function.parameters.len() {
+                    promote_variadic_argument(builder, &ctx.ir_module.target_info, value)
+                } else {
+                    value
+                }
+            })
+        })
         .collect::<Result<Vec<LLVMValueRef>, _>>()?;
 
     if ir_function.abide_abi {
         let abi_function = skeleton.abi_function.as_ref().expect("abi function");
 
+        let variadic_argument_types = call
+            .unpromoted_variadic_argument_types
+            .iter()
+            .enumerate()
+            .map(|(i, argument_type)| {
+                if i >= ir_function.parameters.len() {
+                    promote_variadic_argument_type(
+                        builder,
+                        &ctx.ir_module.target_info,
+                        argument_type,
+                    )
+                } else {
+                    argument_type.clone()
+                }
+            })
+            .collect_vec();
+
         let argument_types_iter = ir_function
             .parameters
             .iter()
-            .chain(call.variadic_argument_types.iter());
+            .chain(variadic_argument_types.iter());
 
         // If we're using variadic arguments, then we have to re-generate the ABI
         // function signature for the way we're calling it

@@ -638,7 +638,7 @@ fn lower_expr(
             Ok(builder.push(ir::Instruction::Call(ir::Call {
                 function: call.function,
                 arguments,
-                variadic_argument_types,
+                unpromoted_variadic_argument_types: variadic_argument_types,
             })))
         }
         ExprKind::Variable(variable) => {

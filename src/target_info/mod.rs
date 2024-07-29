@@ -57,6 +57,10 @@ impl TargetInfo {
         TypeLayout::basic(ByteUnits::of(2))
     }
 
+    pub fn int_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(4))
+    }
+
     pub fn long_layout(&self) -> TypeLayout {
         if self.ms_abi {
             TypeLayout::basic(ByteUnits::of(4))

@@ -74,7 +74,7 @@ pub fn declare_function(
         stmts: vec![],
         is_foreign: true,
         source,
-        abide_abi: false,
+        abide_abi: true,
         tag: None,
     });
 
