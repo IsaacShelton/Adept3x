@@ -8,7 +8,7 @@ use llvm_sys::{
     LLVMTypeKind,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Param {
     padding_index: Option<usize>,
     begin_index: usize,
@@ -49,7 +49,7 @@ impl ParamRange {
 }
 
 // Maps IR parameters to LLVM-IR parameters
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ParamsMapping {
     inalloc_index: Option<usize>,
     sret_index: Option<usize>,

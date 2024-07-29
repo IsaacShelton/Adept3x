@@ -925,8 +925,16 @@ unsafe fn emit_call(
             .map(Cow::Owned::<ABIFunction>)
             .unwrap_or_else(|| Cow::Borrowed(&abi_function_approximation));
 
-        let actual_params_mapping =
-            ParamsMapping::new(&ctx.type_layout_cache, &actual_abi_function, ctx.ir_module);
+        let actual_params_mapping = ir_function
+            .is_cstyle_variadic
+            .then(|| {
+                Cow::Owned(ParamsMapping::new(
+                    &ctx.type_layout_cache,
+                    &actual_abi_function,
+                    ctx.ir_module,
+                ))
+            })
+            .unwrap_or_else(|| Cow::Borrowed(&params_mapping));
 
         let function_type = get_abi_function_type(
             ctx,
