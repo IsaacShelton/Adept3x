@@ -69,7 +69,7 @@ pub fn emit_epilogue(
             let value = emit_address_at_offset(
                 builder,
                 ctx.target_data,
-                abi_return_info,
+                &abi_return_info.abi_type,
                 &return_location.return_value_address,
             );
 

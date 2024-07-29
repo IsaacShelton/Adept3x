@@ -103,6 +103,12 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                     .first()
                     .expect("function has body")
                     .llvm_basicblock);
+            } else if let Some(entry_basicblock) = entry_basicblock {
+                builder.position(entry_basicblock);
+                builder.br(basicblocks
+                    .first()
+                    .expect("function has body")
+                    .llvm_basicblock);
             }
 
             for basicblock in basicblocks.iter() {

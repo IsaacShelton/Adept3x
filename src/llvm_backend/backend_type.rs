@@ -118,9 +118,10 @@ pub unsafe fn get_abi_function_type(
         }
         ABITypeKind::InAlloca(inalloca) => {
             if inalloca.sret {
-                let inner =
-                    unsafe { to_backend_type(ctx.for_making_type(), &function.return_type)? };
-                LLVMPointerType(inner, 0)
+                LLVMPointerType(
+                    unsafe { to_backend_type(ctx.for_making_type(), &function.return_type)? },
+                    0,
+                )
             } else {
                 LLVMVoidType()
             }

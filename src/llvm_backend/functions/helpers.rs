@@ -2,10 +2,7 @@ use crate::{
     data_units::ByteUnits,
     ir,
     llvm_backend::{
-        abi::{
-            abi_function::ABIParam,
-            abi_type::{get_struct_field_types, is_struct_type},
-        },
+        abi::abi_type::{get_struct_field_types, is_struct_type, ABIType},
         address::Address,
         backend_type::{to_backend_mem_type, to_backend_type},
         builder::{Builder, Volatility},
@@ -19,12 +16,14 @@ use crate::{
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMConstInt, LLVMGetInsertBlock, LLVMGetTypeKind,
-        LLVMInt64Type, LLVMInt8Type, LLVMPositionBuilderBefore, LLVMSetAlignment, LLVMTypeOf,
+        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMBuildTruncOrBitCast, LLVMConstInt,
+        LLVMGetInsertBlock, LLVMGetPointerAddressSpace, LLVMGetTypeKind, LLVMGetValueKind,
+        LLVMInt1Type, LLVMInt64Type, LLVMInt8Type, LLVMIsThreadLocal, LLVMPositionBuilderBefore,
+        LLVMSetAlignment, LLVMTypeOf,
     },
     prelude::{LLVMTypeRef, LLVMValueRef},
     target::{LLVMByteOrder, LLVMByteOrdering, LLVMPreferredAlignmentOfType, LLVMStoreSizeOfType},
-    LLVMTypeKind,
+    LLVMTypeKind, LLVMValueKind,
 };
 use std::{borrow::Cow, ffi::CStr};
 
@@ -214,15 +213,14 @@ pub fn get_natural_type_alignment(
 pub fn emit_address_at_offset<'a>(
     builder: &Builder,
     target_data: &TargetData,
-    abi_param: &ABIParam,
+    abi_type: &ABIType,
     address: &'a Address,
 ) -> Cow<'a, Address> {
-    if let Some(offset) = abi_param.abi_type.get_direct_offset() {
+    if let Some(offset) = abi_type.get_direct_offset() {
         if !offset.is_zero() {
             let mut address = address.with_element_type(unsafe { LLVMInt8Type() });
             address = builder.gep_in_bounds(target_data, &address, 0, offset.bytes());
-            address =
-                address.with_element_type(abi_param.abi_type.coerce_to_type().flatten().unwrap());
+            address = address.with_element_type(abi_type.coerce_to_type().flatten().unwrap());
             return Cow::Owned(address);
         }
     }
@@ -396,4 +394,113 @@ pub fn build_coerced_load(
 
     builder.memcpy(&tmp, &source, size);
     builder.load(&tmp, Volatility::Normal)
+}
+
+pub fn build_coerced_store(
+    builder: &Builder,
+    target_data: &TargetData,
+    source: LLVMValueRef,
+    destination: &Address,
+    alloca_point: LLVMValueRef,
+) {
+    let source_type = unsafe { LLVMTypeOf(source) };
+    let mut destination_type = destination.element_type();
+
+    if source_type == destination_type {
+        builder.store(source, destination);
+        return;
+    }
+
+    let source_size = target_data.abi_size_of_type(source_type);
+
+    let destination = if is_struct_type(destination_type) {
+        let minimized_range = enter_struct_pointer_for_coerced_access(
+            builder,
+            target_data,
+            destination,
+            destination_type,
+            source_size.try_into().unwrap(),
+        );
+        destination_type = destination.element_type();
+        minimized_range
+    } else {
+        destination.clone()
+    };
+
+    if is_pointer_type(source_type) && is_pointer_type(destination_type) {
+        // NOTE: We don't support pointers with non-default address spaces yet
+        assert_eq!(unsafe { LLVMGetPointerAddressSpace(source_type) }, unsafe {
+            LLVMGetPointerAddressSpace(destination_type)
+        });
+    }
+
+    if is_integer_or_pointer_type(source_type) && is_integer_or_pointer_type(destination_type) {
+        let source = coerce_integer_likes(builder, target_data, source, destination_type);
+        builder.store(source, &destination);
+        return;
+    }
+
+    let destination_size = target_data.abi_size_of_type(destination_type);
+
+    if source_size <= destination_size {
+        let destination = destination.with_element_type(source_type);
+        builder.store(source, &destination);
+        return;
+    }
+
+    // Coerce via memory
+    let size = unsafe {
+        LLVMConstInt(
+            LLVMInt64Type(),
+            destination_size.try_into().unwrap(),
+            false as _,
+        )
+    };
+    let tmp = Address::from(build_tmp_alloca_for_coerce(
+        builder,
+        target_data,
+        source_type,
+        destination.base.alignment,
+        alloca_point,
+    ));
+    builder.store(source, &tmp);
+    builder.memcpy(&destination, &tmp, size);
+}
+
+pub fn emit_load_of_scalar(
+    builder: &Builder,
+    address: &Address,
+    volatility: Volatility,
+    ir_type: &ir::Type,
+) -> LLVMValueRef {
+    let address = if is_thread_local(address.base_pointer()) {
+        todo!("thread locals in emit_load_of_scalar not supported yet")
+    } else {
+        address
+    };
+
+    match ir_type {
+        ir::Type::Vector(_) => todo!("vector types in emit_load_of_scalar not supported yet"),
+        ir::Type::Atomic(_) => todo!("atomic types in emit_load_of_scalar not supported yet"),
+        _ => (),
+    }
+
+    let load = builder.load(address, volatility);
+    emit_from_mem(builder, load, ir_type)
+}
+
+fn is_thread_local(value: LLVMValueRef) -> bool {
+    unsafe {
+        LLVMGetValueKind(value) == LLVMValueKind::LLVMGlobalVariableValueKind
+            && LLVMIsThreadLocal(value) != 0
+    }
+}
+
+pub fn emit_from_mem(builder: &Builder, value: LLVMValueRef, ir_type: &ir::Type) -> LLVMValueRef {
+    match ir_type {
+        ir::Type::Boolean => unsafe {
+            LLVMBuildTruncOrBitCast(builder.get(), value, LLVMInt1Type(), cstr!("").as_ptr())
+        },
+        _ => value,
+    }
 }

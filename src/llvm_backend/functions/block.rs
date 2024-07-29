@@ -1,6 +1,7 @@
 use super::{
     body::{BasicBlockInfo, FnCtx},
     function_type::FunctionType,
+    helpers::emit_load_of_scalar,
     param_values::ParamValue,
     params_mapping::Param,
 };
@@ -16,6 +17,7 @@ use crate::{
                 kinds::{get_type_expansion, TypeExpansion},
                 ABITypeKind, CoerceAndExpand,
             },
+            has_scalar_evaluation_kind,
         },
         address::Address,
         backend_type::{get_abi_function_type, get_unabi_function_type, to_backend_type},
@@ -24,7 +26,7 @@ use crate::{
         error::BackendError,
         functions::{
             helpers::{
-                build_coerced_load, build_mem_tmp, build_mem_tmp_without_cast,
+                build_coerced_load, build_coerced_store, build_mem_tmp, build_mem_tmp_without_cast,
                 build_tmp_alloca_address, emit_address_at_offset, is_integer_type,
             },
             params_mapping::ParamsMapping,
@@ -721,17 +723,19 @@ unsafe fn emit_call(
             ABITypeKind::Indirect(_)
             | ABITypeKind::CoerceAndExpand(_)
             | ABITypeKind::InAlloca(_) => {
-                let sret_pointer = if let Some(return_destination) = return_destination {
-                    return_destination.clone()
+                let sret_pointer = if let Some(return_destination) = return_destination.as_ref() {
+                    Cow::Borrowed(return_destination)
                 } else {
-                    build_mem_tmp(
-                        ctx,
-                        builder,
-                        fn_ctx.alloca_point.expect("function has body"),
-                        ir_return_type,
-                        cstr!("tmp"),
-                    )?
-                    .into()
+                    Cow::Owned(
+                        build_mem_tmp(
+                            ctx,
+                            builder,
+                            fn_ctx.alloca_point.expect("function has body"),
+                            ir_return_type,
+                            cstr!("tmp"),
+                        )?
+                        .into(),
+                    )
                 };
 
                 if let Some(sret_index) = params_mapping.sret_index() {
@@ -837,12 +841,110 @@ unsafe fn emit_call(
 
         builder.restore_stack_pointer(ctx.backend_module, saved_stack_pointer);
 
-        for arg in ir_call_args.iter() {
-            LLVMDumpValue(*arg);
-            println!();
-        }
-        LLVMDumpValue(returned);
-        todo!("extract return value from ABI function call");
+        let abi_type = &abi_return_info.abi_type;
+        let return_type = &ir_function.return_type;
+
+        let return_value = match &abi_type.kind {
+            ABITypeKind::Direct(_) | ABITypeKind::Extend(_) => {
+                let backend_return_type =
+                    unsafe { to_backend_type(ctx.for_making_type(), return_type)? };
+                let coerce_to_type = abi_type.coerce_to_type().flatten().unwrap();
+                let direct_offset = abi_type.get_direct_offset().unwrap();
+
+                if coerce_to_type == backend_return_type && direct_offset.is_zero() {
+                    if has_scalar_evaluation_kind(return_type) {
+                        if unsafe { LLVMTypeOf(returned) } != backend_return_type {
+                            builder.bitcast(returned, backend_return_type)
+                        } else {
+                            returned
+                        }
+                    } else if return_type.is_complex() {
+                        todo!("complex types not supported via direct/extend ABI return mode yet")
+                    } else {
+                        returned
+                    }
+                } else {
+                    let tmp: Cow<Address> = if let Some(destination) = return_destination.as_ref() {
+                        Cow::Borrowed(destination)
+                    } else {
+                        Cow::Owned(Address::from(build_mem_tmp(
+                            ctx,
+                            builder,
+                            alloca_point,
+                            return_type,
+                            cstr!("coerce"),
+                        )?))
+                    };
+
+                    let address = emit_address_at_offset(builder, ctx.target_data, abi_type, &tmp);
+                    build_coerced_store(builder, ctx.target_data, returned, &address, alloca_point);
+                    convert_tmp_to_rvalue(builder, &address, return_type)
+                }
+            }
+            ABITypeKind::Indirect(_) | ABITypeKind::InAlloca(_) => convert_tmp_to_rvalue(
+                builder,
+                sret_pointer.as_ref().expect("sret pointer"),
+                &ir_function.return_type,
+            ),
+            ABITypeKind::Ignore => unsafe {
+                LLVMGetUndef(to_backend_type(
+                    ctx.for_making_type(),
+                    &ir_function.return_type,
+                )?)
+            },
+            ABITypeKind::Expand(_) | ABITypeKind::IndirectAliased(_) => {
+                panic!("invalid return value ABI")
+            }
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                let coerce_to_type = coerce_and_expand.coerce_to_type;
+                let address = sret_pointer.expect("sret pointer");
+                let returned_type = unsafe { LLVMTypeOf(returned) };
+
+                assert_eq!(
+                    returned_type,
+                    coerce_and_expand.unpadded_coerce_and_expand_type
+                );
+
+                let element_types = get_struct_field_types(coerce_to_type);
+                let requires_extract = is_struct_type(returned_type);
+                let mut unpadded_field_index = 0;
+
+                for (element_index, element_type) in element_types.iter().copied().enumerate() {
+                    if is_padding_for_coerce_expand(element_type) {
+                        continue;
+                    }
+
+                    let element_address = builder.gep_struct(
+                        ctx.target_data,
+                        &address,
+                        element_index,
+                        Some(element_types.as_slice()),
+                    );
+
+                    let element = if requires_extract {
+                        let value = unsafe {
+                            LLVMBuildExtractValue(
+                                builder.get(),
+                                returned,
+                                unpadded_field_index,
+                                cstr!("").as_ptr(),
+                            )
+                        };
+                        unpadded_field_index += 1;
+                        value
+                    } else {
+                        assert_eq!(unpadded_field_index, 0);
+                        returned
+                    };
+
+                    builder.store(element, &element_address);
+                }
+
+                convert_tmp_to_rvalue(builder, &address, &ir_function.return_type)
+            }
+        };
+
+        Ok(return_value)
     } else {
         let function_type = get_unabi_function_type(ctx.for_making_type(), ir_function)?;
 
@@ -854,6 +956,16 @@ unsafe fn emit_call(
             arguments.len().try_into().unwrap(),
             cstr!("").as_ptr(),
         ))
+    }
+}
+
+fn convert_tmp_to_rvalue(builder: &Builder, address: &Address, ir_type: &ir::Type) -> LLVMValueRef {
+    if has_scalar_evaluation_kind(ir_type) {
+        emit_load_of_scalar(builder, address, Volatility::Normal, ir_type)
+    } else if ir_type.is_complex() {
+        todo!("convert_tmp_to_rvalue not supported for complex types yet")
+    } else {
+        builder.load(address, Volatility::Normal)
     }
 }
 
@@ -926,10 +1038,8 @@ fn coerce_and_expand(
     ));
     builder.store(argument, &address);
 
-    let address = address.with_element_type(coerce_type);
-
     assert!(is_struct_type(coerce_type));
-
+    let address = address.with_element_type(coerce_type);
     let field_types = get_struct_field_types(coerce_type);
 
     for (field_i, (llvm_arg_i, element_type)) in param_mapping
@@ -1052,7 +1162,8 @@ fn expand_type_to_args(
             todo!("expand_type_to_args not supported for complex types yet")
         }
         TypeExpansion::None => {
-            let argument = builder.load(argument_address, Volatility::Normal);
+            let argument =
+                emit_load_of_scalar(builder, argument_address, Volatility::Normal, argument_type);
 
             let llvm_arg_i = llvm_arg_i_iterator
                 .next()
@@ -1114,7 +1225,7 @@ fn direct_or_extend(
     )?);
     builder.store(argument, &source);
 
-    let source = emit_address_at_offset(builder, ctx.target_data, abi_param, &source);
+    let source = emit_address_at_offset(builder, ctx.target_data, &abi_param.abi_type, &source);
 
     if is_struct_type(coerce_to_type)
         && abi_param.abi_type.is_direct()
@@ -1184,10 +1295,9 @@ fn trivial_direct_or_extend(
     let param_range = param_mapping.range();
     assert_eq!(param_range.len(), 1);
 
-    let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
-
     let mut argument = argument;
     let mut llvm_argument_type = unsafe { LLVMTypeOf(argument) };
+    let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
 
     if coerce_to_type != llvm_argument_type && is_integer_type(llvm_argument_type) {
         argument = builder.zext(argument, coerce_to_type);

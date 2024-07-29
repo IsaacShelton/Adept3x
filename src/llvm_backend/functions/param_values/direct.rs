@@ -1,4 +1,4 @@
-use super::{helpers::emit_load_of_scalar, ParamValueConstructionCtx, ParamValues};
+use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
     ir,
     llvm_backend::{
@@ -13,20 +13,17 @@ use crate::{
         error::BackendError,
         functions::{
             helpers::{
-                build_mem_tmp_with_alignment, build_tmp_alloca_address,
-                build_tmp_alloca_for_coerce, coerce_integer_likes, emit_address_at_offset,
-                enter_struct_pointer_for_coerced_access, is_integer_or_pointer_type,
-                is_pointer_type,
+                build_coerced_store, build_mem_tmp_with_alignment, build_tmp_alloca_address,
+                emit_address_at_offset, emit_load_of_scalar, is_pointer_type,
             },
             param_values::value::ParamValue,
             params_mapping::ParamRange,
         },
-        target_data::TargetData,
     },
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::{LLVMConstInt, LLVMGetParam, LLVMGetPointerAddressSpace, LLVMInt64Type, LLVMTypeOf},
+    core::{LLVMConstInt, LLVMGetParam, LLVMInt64Type, LLVMTypeOf},
     prelude::{LLVMTypeRef, LLVMValueRef},
 };
 
@@ -94,7 +91,8 @@ impl ParamValues {
             cstr!(""),
         )?);
 
-        let pointer = emit_address_at_offset(builder, ctx.target_data, abi_param, &alloca);
+        let pointer =
+            emit_address_at_offset(builder, ctx.target_data, &abi_param.abi_type, &alloca);
 
         // Flatten struct type if possible for better optimizations
         if abi_param.abi_type.can_be_flattened() == Some(true)
@@ -218,75 +216,4 @@ fn apply_attributes(
         // TODO: Apply attributes
         // TODO: Apply restrict?
     }
-}
-
-fn build_coerced_store(
-    builder: &Builder,
-    target_data: &TargetData,
-    source: LLVMValueRef,
-    destination: &Address,
-    alloca_point: LLVMValueRef,
-) {
-    let source_type = unsafe { LLVMTypeOf(source) };
-    let mut destination_type = destination.element_type();
-
-    if source_type == destination_type {
-        builder.store(source, destination);
-        return;
-    }
-
-    let source_size = target_data.abi_size_of_type(source_type);
-
-    let destination = if is_struct_type(destination_type) {
-        let minimized_range = enter_struct_pointer_for_coerced_access(
-            builder,
-            target_data,
-            destination,
-            destination_type,
-            source_size.try_into().unwrap(),
-        );
-        destination_type = destination.element_type();
-        minimized_range
-    } else {
-        destination.clone()
-    };
-
-    if is_pointer_type(source_type) && is_pointer_type(destination_type) {
-        // NOTE: We don't support pointers with non-default address spaces yet
-        assert_eq!(unsafe { LLVMGetPointerAddressSpace(source_type) }, unsafe {
-            LLVMGetPointerAddressSpace(destination_type)
-        });
-    }
-
-    if is_integer_or_pointer_type(source_type) && is_integer_or_pointer_type(destination_type) {
-        let source = coerce_integer_likes(builder, target_data, source, destination_type);
-        builder.store(source, &destination);
-        return;
-    }
-
-    let destination_size = target_data.abi_size_of_type(destination_type);
-
-    if source_size <= destination_size {
-        let destination = destination.with_element_type(source_type);
-        builder.store(source, &destination);
-        return;
-    }
-
-    // Coerce via memory
-    let size = unsafe {
-        LLVMConstInt(
-            LLVMInt64Type(),
-            destination_size.try_into().unwrap(),
-            false as _,
-        )
-    };
-    let tmp = Address::from(build_tmp_alloca_for_coerce(
-        builder,
-        target_data,
-        source_type,
-        destination.base.alignment,
-        alloca_point,
-    ));
-    builder.store(source, &tmp);
-    builder.memcpy(&destination, &tmp, size);
 }

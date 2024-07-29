@@ -4,7 +4,7 @@ pub mod abi_function;
 pub mod abi_type;
 pub mod arch;
 mod cxx;
-mod empty;
+pub mod empty;
 
 pub fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
     match ty {

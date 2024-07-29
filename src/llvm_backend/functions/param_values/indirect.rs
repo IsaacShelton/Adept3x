@@ -6,8 +6,8 @@ use crate::{
         builder::Volatility,
         error::BackendError,
         functions::{
-            helpers::{build_mem_tmp, make_natural_address_for_pointer},
-            param_values::{helpers::emit_load_of_scalar, value::ParamValue},
+            helpers::{build_mem_tmp, emit_load_of_scalar, make_natural_address_for_pointer},
+            param_values::value::ParamValue,
         },
     },
 };
