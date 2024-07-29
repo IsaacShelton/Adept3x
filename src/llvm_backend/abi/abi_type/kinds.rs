@@ -257,6 +257,7 @@ pub struct InAlloca {
 pub struct CoerceAndExpand {
     pub coerce_to_type: LLVMTypeRef,
     pub unpadded_coerce_and_expand_type: LLVMTypeRef,
+    pub alignment: ByteUnits,
 }
 
 impl CoerceAndExpand {

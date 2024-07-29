@@ -14,9 +14,9 @@ use append_only_vec::AppendOnlyVec;
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMAddFunction, LLVMBuildBitCast, LLVMBuildBr, LLVMBuildCall2, LLVMCreateBuilder,
-        LLVMDisposeBuilder, LLVMFunctionType, LLVMGetInsertBlock, LLVMInt8Type, LLVMPointerType,
-        LLVMPositionBuilderAtEnd, LLVMVoidType,
+        LLVMAddFunction, LLVMBuildBitCast, LLVMBuildBr, LLVMBuildCall2, LLVMBuildZExt,
+        LLVMCreateBuilder, LLVMDisposeBuilder, LLVMFunctionType, LLVMGetInsertBlock, LLVMInt8Type,
+        LLVMPointerType, LLVMPositionBuilderAtEnd, LLVMVoidType,
     },
     prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
 };
@@ -56,6 +56,10 @@ impl Builder {
 
     pub fn take_phi_relocations(&mut self) -> AppendOnlyVec<PhiRelocation> {
         std::mem::replace(&mut self.phi_relocations, AppendOnlyVec::new())
+    }
+
+    pub fn zext(&self, value: LLVMValueRef, new_type: LLVMTypeRef) -> LLVMValueRef {
+        unsafe { LLVMBuildZExt(self.get(), value, new_type, cstr!("").as_ptr()) }
     }
 
     pub fn bitcast(&self, value: LLVMValueRef, new_type: LLVMTypeRef) -> LLVMValueRef {

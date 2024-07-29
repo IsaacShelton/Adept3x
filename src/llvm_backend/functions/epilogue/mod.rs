@@ -1,12 +1,10 @@
 use super::{
-    helpers::{build_tmp_alloca_for_coerce, get_natural_type_alignment},
+    helpers::{build_coerced_load, get_natural_type_alignment},
     return_location::ReturnLocation,
 };
 use crate::llvm_backend::{
     abi::{
-        abi_type::{
-            get_struct_field_types, is_padding_for_coerce_expand, is_struct_type, ABITypeKind,
-        },
+        abi_type::{get_struct_field_types, is_padding_for_coerce_expand, ABITypeKind},
         has_scalar_evaluation_kind,
     },
     address::Address,
@@ -14,21 +12,18 @@ use crate::llvm_backend::{
     builder::{Builder, Volatility},
     ctx::{BackendCtx, FunctionSkeleton},
     error::BackendError,
-    functions::helpers::{
-        coerce_integer_likes, emit_address_at_offset, enter_struct_pointer_for_coerced_access,
-        is_integer_or_pointer_type,
-    },
+    functions::helpers::emit_address_at_offset,
     raw_address::RawAddress,
 };
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildInsertValue, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStructGEP2, LLVMConstInt,
-        LLVMGetLastParam, LLVMGetParam, LLVMGetPoison, LLVMInt64Type,
+        LLVMBuildInsertValue, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStructGEP2,
+        LLVMGetLastParam, LLVMGetParam, LLVMGetPoison,
     },
-    prelude::{LLVMBasicBlockRef, LLVMTypeRef, LLVMValueRef},
+    prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
-use std::{borrow::Cow, ptr::null_mut};
+use std::ptr::null_mut;
 
 pub struct EpilogueInfo {
     pub llvm_basicblock: LLVMBasicBlockRef,
@@ -197,58 +192,4 @@ pub fn emit_epilogue(
     Ok(EpilogueInfo {
         llvm_basicblock: epilogue_basicblock,
     })
-}
-
-fn build_coerced_load(
-    ctx: &BackendCtx,
-    builder: &Builder,
-    source: &Address,
-    desired_type: LLVMTypeRef,
-    alloca_point: LLVMValueRef,
-) -> LLVMValueRef {
-    let mut source = Cow::Borrowed(source);
-    let mut source_type = source.element_type();
-
-    if source_type == desired_type {
-        return builder.load(&source, Volatility::Normal);
-    }
-
-    let destination_size = ctx.target_data.abi_size_of_type(desired_type);
-
-    if is_struct_type(source_type) {
-        source = Cow::Owned(enter_struct_pointer_for_coerced_access(
-            builder,
-            ctx.target_data,
-            &source,
-            source_type,
-            destination_size.try_into().unwrap(),
-        ));
-
-        source_type = source.element_type();
-    }
-
-    let source_size = ctx.target_data.abi_size_of_type(source_type);
-
-    if is_integer_or_pointer_type(desired_type) && is_integer_or_pointer_type(source_type) {
-        let value = builder.load(&source, Volatility::Normal);
-        return coerce_integer_likes(builder, ctx.target_data, value, desired_type);
-    }
-
-    if source_size >= destination_size {
-        return builder.load(&source.with_element_type(desired_type), Volatility::Normal);
-    }
-
-    let size =
-        unsafe { LLVMConstInt(LLVMInt64Type(), source_size.try_into().unwrap(), false as _) };
-
-    let tmp = Address::from(build_tmp_alloca_for_coerce(
-        builder,
-        ctx.target_data,
-        desired_type,
-        source.base.alignment,
-        alloca_point,
-    ));
-
-    builder.memcpy(&tmp, &source, size);
-    builder.load(&tmp, Volatility::Normal)
 }

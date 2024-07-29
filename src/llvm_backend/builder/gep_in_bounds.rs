@@ -11,7 +11,8 @@ impl Builder {
         &self,
         target_data: &TargetData,
         address: &Address,
-        index: u64,
+        field_index: u64,
+        array_index: u64,
     ) -> Address {
         let element_type = address.element_type();
         let element_size = ByteUnits::of(
@@ -21,7 +22,10 @@ impl Builder {
                 .unwrap(),
         );
 
-        let mut indices = [unsafe { LLVMConstInt(LLVMInt64Type(), index, false as _) }];
+        let mut indices = [
+            unsafe { LLVMConstInt(LLVMInt64Type(), field_index, false as _) },
+            unsafe { LLVMConstInt(LLVMInt64Type(), array_index, false as _) },
+        ];
 
         let base = unsafe {
             LLVMBuildInBoundsGEP2(
@@ -37,7 +41,7 @@ impl Builder {
         RawAddress {
             base,
             nullable: false,
-            alignment: address.alignment_at_offset(&(ByteUnits::of(index) * element_size)),
+            alignment: address.alignment_at_offset(&(ByteUnits::of(field_index) * element_size)),
             element_type,
         }
         .into()

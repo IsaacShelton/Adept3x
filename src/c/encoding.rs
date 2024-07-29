@@ -1,4 +1,3 @@
-
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub enum Encoding {
     Default,

@@ -1,14 +1,31 @@
-use super::{ctx::ToBackendTypeCtx, structure::to_backend_struct_type, BackendError};
-use crate::{data_units::BitUnits, ir, target_info::type_layout::TypeLayoutCache};
+use super::{
+    abi::{
+        abi_function::ABIFunction,
+        abi_type::{kinds::TypeExpansion, ABITypeKind},
+    },
+    ctx::{BackendCtx, ToBackendTypeCtx},
+    functions::params_mapping::ParamsMapping,
+    structure::to_backend_struct_type,
+    BackendError,
+};
+use crate::{
+    data_units::BitUnits,
+    ir,
+    llvm_backend::abi::abi_type::{
+        get_struct_field_types, is_struct_type, kinds::get_type_expansion, Direct, Extend,
+    },
+    target_info::type_layout::TypeLayoutCache,
+};
 use llvm_sys::{
     core::{
-        LLVMArrayType2, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMInt16Type,
-        LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMIntType, LLVMPointerType,
-        LLVMStructType, LLVMVoidType,
+        LLVMArrayType2, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetGlobalContext,
+        LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMIntType,
+        LLVMPointerType, LLVMPointerTypeInContext, LLVMStructType, LLVMVoidType,
     },
     prelude::LLVMTypeRef,
 };
 use std::borrow::Borrow;
+use std::ptr::null_mut;
 
 pub unsafe fn to_backend_type<'a>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
@@ -72,7 +89,7 @@ pub unsafe fn to_backend_types<'a, 't>(
     Ok(results)
 }
 
-pub unsafe fn get_function_type<'a>(
+pub unsafe fn get_unabi_function_type<'a>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
     function: &ir::Function,
 ) -> Result<LLVMTypeRef, BackendError> {
@@ -82,6 +99,148 @@ pub unsafe fn get_function_type<'a>(
         &function.return_type,
         function.is_cstyle_variadic,
     )
+}
+
+pub unsafe fn get_abi_function_type(
+    ctx: &BackendCtx,
+    function: &ir::Function,
+    abi_function: &ABIFunction,
+    params_mapping: &ParamsMapping,
+) -> Result<LLVMTypeRef, BackendError> {
+    let abi_return_info = &abi_function.return_type.abi_type;
+
+    let return_type = match &abi_return_info.kind {
+        ABITypeKind::Direct(direct) => direct.coerce_to_type.expect("filled direct return mode"),
+        ABITypeKind::Extend(extend) => extend.coerce_to_type.expect("filled extend return mode"),
+        ABITypeKind::Indirect(_) | ABITypeKind::Ignore => LLVMVoidType(),
+        ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+            coerce_and_expand.unpadded_coerce_and_expand_type
+        }
+        ABITypeKind::InAlloca(inalloca) => {
+            if inalloca.sret {
+                let inner =
+                    unsafe { to_backend_type(ctx.for_making_type(), &function.return_type)? };
+                LLVMPointerType(inner, 0)
+            } else {
+                LLVMVoidType()
+            }
+        }
+        ABITypeKind::IndirectAliased(_) | ABITypeKind::Expand(_) => {
+            panic!("invalid abi return mode")
+        }
+    };
+
+    let mut arg_types = vec![null_mut(); params_mapping.llvm_arity()].into_boxed_slice();
+
+    for (mapped_param, abi_param) in params_mapping
+        .params()
+        .iter()
+        .zip(&abi_function.parameter_types)
+    {
+        let param_range = mapped_param.range();
+
+        if let Some(padding_index) = mapped_param.padding_index() {
+            arg_types[padding_index] = abi_param
+                .abi_type
+                .padding_type()
+                .flatten()
+                .expect("padding type");
+        }
+
+        match &abi_param.abi_type.kind {
+            ABITypeKind::Direct(Direct {
+                coerce_to_type,
+                can_be_flattened,
+                ..
+            }) => {
+                let arg_type = coerce_to_type.expect("filled in direct/extend for fty");
+
+                if *can_be_flattened && is_struct_type(arg_type) {
+                    let field_types = get_struct_field_types(arg_type);
+
+                    assert_eq!(field_types.len(), param_range.len());
+
+                    for (llvm_arg_i, field_type) in
+                        param_range.iter().zip(field_types.iter().copied())
+                    {
+                        arg_types[llvm_arg_i] = field_type;
+                    }
+                } else {
+                    assert_eq!(param_range.len(), 1);
+                    arg_types[param_range.start] = arg_type;
+                }
+            }
+            ABITypeKind::Extend(Extend { coerce_to_type, .. }) => {
+                assert_eq!(param_range.len(), 1);
+                arg_types[param_range.start] = coerce_to_type.expect("filled in extend for fty");
+            }
+            ABITypeKind::Indirect(_) => {
+                assert_eq!(param_range.len(), 1);
+                arg_types[param_range.start] = LLVMPointerTypeInContext(LLVMGetGlobalContext(), 0);
+            }
+            ABITypeKind::IndirectAliased(indirect_aliased) => {
+                assert_eq!(param_range.len(), 1);
+                arg_types[param_range.start] = LLVMPointerTypeInContext(
+                    LLVMGetGlobalContext(),
+                    indirect_aliased.address_space,
+                );
+            }
+            ABITypeKind::Expand(_) => {
+                let mut llvm_arg_i_iterator = param_range.iter();
+                expand_types(
+                    ctx,
+                    &abi_param.ir_type,
+                    &mut llvm_arg_i_iterator,
+                    &mut arg_types,
+                )?
+            }
+            ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
+                let sequence = coerce_and_expand.expanded_type_sequence();
+                assert_eq!(sequence.len(), param_range.len());
+
+                for (llvm_arg_i, field_type) in param_range.iter().zip(sequence.iter().copied()) {
+                    arg_types[llvm_arg_i] = field_type;
+                }
+            }
+            ABITypeKind::InAlloca(_) | ABITypeKind::Ignore => assert_eq!(param_range.len(), 0),
+        }
+    }
+
+    Ok(LLVMFunctionType(
+        return_type,
+        arg_types.as_mut_ptr(),
+        arg_types.len().try_into().unwrap(),
+        function.is_cstyle_variadic as _,
+    ))
+}
+
+unsafe fn expand_types(
+    ctx: &BackendCtx,
+    ir_type: &ir::Type,
+    llvm_arg_i_iterator: &mut impl Iterator<Item = usize>,
+    arg_types: &mut [LLVMTypeRef],
+) -> Result<(), BackendError> {
+    let expansion = get_type_expansion(ir_type, &ctx.type_layout_cache, ctx.ir_module);
+
+    match expansion {
+        TypeExpansion::FixedArray(fixed_array) => {
+            for _ in 0..fixed_array.length {
+                expand_types(ctx, ir_type, llvm_arg_i_iterator, arg_types)?;
+            }
+        }
+        TypeExpansion::Record(fields) => {
+            for field in fields {
+                expand_types(ctx, &field.ir_type, llvm_arg_i_iterator, arg_types)?;
+            }
+        }
+        TypeExpansion::Complex(_) => todo!("expand_types for complex types not supported yet"),
+        TypeExpansion::None => {
+            arg_types[llvm_arg_i_iterator.next().expect("argument position")] =
+                to_backend_type(ctx.for_making_type(), ir_type)?
+        }
+    }
+
+    Ok(())
 }
 
 pub unsafe fn get_function_pointer_type<'a>(

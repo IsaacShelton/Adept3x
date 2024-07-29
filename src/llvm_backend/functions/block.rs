@@ -1,22 +1,32 @@
 use super::{
     body::{BasicBlockInfo, FnCtx},
+    function_type::FunctionType,
     param_values::ParamValue,
     params_mapping::Param,
 };
 use crate::{
+    data_units::ByteUnits,
     ir::{self, Call, FloatOrSign, Instruction, IntegerSign},
     llvm_backend::{
         abi::{
             abi_function::{ABIFunction, ABIParam},
-            abi_type::ABITypeKind,
+            abi_type::{
+                get_struct_field_types, get_struct_num_fields, is_padding_for_coerce_expand,
+                is_struct_type,
+                kinds::{get_type_expansion, TypeExpansion},
+                ABITypeKind, CoerceAndExpand,
+            },
         },
         address::Address,
-        backend_type::{get_function_type, to_backend_type},
+        backend_type::{get_abi_function_type, get_unabi_function_type, to_backend_type},
         builder::{Builder, PhiRelocation, Volatility},
         ctx::BackendCtx,
         error::BackendError,
         functions::{
-            helpers::{build_mem_tmp, build_mem_tmp_without_cast},
+            helpers::{
+                build_coerced_load, build_mem_tmp, build_mem_tmp_without_cast,
+                build_tmp_alloca_address, emit_address_at_offset, is_integer_type,
+            },
             params_mapping::ParamsMapping,
         },
         value_catalog::ValueCatalog,
@@ -648,8 +658,6 @@ unsafe fn emit_call(
         .get(&call.function)
         .expect("callee to exist");
 
-    let function_type = get_function_type(ctx.for_making_type(), ir_function)?;
-
     let skeleton = ctx
         .func_skeletons
         .get(&call.function)
@@ -701,7 +709,7 @@ unsafe fn emit_call(
         let params_mapping =
             ParamsMapping::new(&ctx.type_layout_cache, &abi_function, ctx.ir_module);
 
-        let mut ir_call_args = vec![null_mut(); params_mapping.llvm_arity()];
+        let mut ir_call_args = vec![null_mut(); params_mapping.llvm_arity()].into_boxed_slice();
 
         // We can optionally choose to override the return destination if desired
         let return_destination: Option<Address> = None;
@@ -769,6 +777,7 @@ unsafe fn emit_call(
                     argument_type,
                     abi_param,
                     param_mapping,
+                    &skeleton.function_type,
                     &mut ir_call_args[..],
                 )?,
                 ABITypeKind::Indirect(_) | ABITypeKind::IndirectAliased(_) => indirect(
@@ -782,21 +791,61 @@ unsafe fn emit_call(
                     &mut ir_call_args[..],
                 )?,
                 ABITypeKind::Ignore => assert_eq!(param_mapping.range().len(), 0),
-                ABITypeKind::Expand(_) => todo!(),
-                ABITypeKind::CoerceAndExpand(_) => todo!(),
+                ABITypeKind::Expand(_) => expand(
+                    builder,
+                    ctx,
+                    alloca_point,
+                    argument,
+                    argument_type,
+                    param_mapping,
+                    &skeleton.function_type,
+                    &mut ir_call_args,
+                )?,
+                ABITypeKind::CoerceAndExpand(CoerceAndExpand { alignment, .. }) => {
+                    coerce_and_expand(
+                        builder,
+                        ctx,
+                        alloca_point,
+                        argument,
+                        argument_type,
+                        abi_param,
+                        param_mapping,
+                        *alignment,
+                        &mut ir_call_args[..],
+                    )?
+                }
                 ABITypeKind::InAlloca(_) => {
                     unimplemented!("inalloca pass mode not supported at the moment")
                 }
             }
-
-            todo!();
         }
 
-        println!("{:?}", params_mapping);
-        todo!("call abi_abide function");
+        // NOTE: We don't support inalloca here yet
+        assert!(abi_function.inalloca_combined_struct.is_none());
+
+        let function_type =
+            get_abi_function_type(ctx, ir_function, &abi_function, &params_mapping)?;
+
+        let returned = LLVMBuildCall2(
+            builder.get(),
+            function_type,
+            function_value,
+            ir_call_args.as_mut_ptr(),
+            ir_call_args.len().try_into().unwrap(),
+            cstr!("").as_ptr(),
+        );
+
         builder.restore_stack_pointer(ctx.backend_module, saved_stack_pointer);
-        todo!();
+
+        for arg in ir_call_args.iter() {
+            LLVMDumpValue(*arg);
+            println!();
+        }
+        LLVMDumpValue(returned);
+        todo!("extract return value from ABI function call");
     } else {
+        let function_type = get_unabi_function_type(ctx.for_making_type(), ir_function)?;
+
         Ok(LLVMBuildCall2(
             builder.get(),
             function_type,
@@ -831,7 +880,7 @@ fn indirect(
         alloca_point,
         argument_type,
         abi_param.abi_type.indirect_align().unwrap(),
-        cstr!("byval-tmp"),
+        cstr!("byvaltmp"),
     )?);
 
     builder.store(argument, &abi_argument);
@@ -840,18 +889,320 @@ fn indirect(
     Ok(())
 }
 
+fn coerce_and_expand(
+    builder: &Builder,
+    ctx: &BackendCtx,
+    alloca_point: LLVMValueRef,
+    argument: LLVMValueRef,
+    argument_type: &ir::Type,
+    abi_param: &ABIParam,
+    param_mapping: &Param,
+    alignment: ByteUnits,
+    ir_call_args: &mut [LLVMValueRef],
+) -> Result<(), BackendError> {
+    let coerce_type = abi_param.abi_type.coerce_and_expand_type().unwrap();
+    let backend_argument_type = unsafe { to_backend_type(ctx.for_making_type(), argument_type)? };
+
+    // TODO: Is this alignment proper?
+    // We'll max these just to be safe for now, but it should only depend on
+    // the alignment of the coerce aggregate and of the original type.
+    let abi_alignment = ByteUnits::of(
+        ctx.target_data
+            .abi_size_of_type(backend_argument_type)
+            .try_into()
+            .unwrap(),
+    );
+    let layout_alignment = ctx.type_layout_cache.get(argument_type).alignment;
+    let alignment = alignment.max(abi_alignment).max(layout_alignment);
+
+    // TODO: We shouldn't need to do this in most cases.
+    let address = Address::from(build_tmp_alloca_address(
+        builder,
+        alloca_point,
+        backend_argument_type,
+        alignment,
+        cstr!("coerceandexpand.tmp"),
+        None,
+    ));
+    builder.store(argument, &address);
+
+    let address = address.with_element_type(coerce_type);
+
+    assert!(is_struct_type(coerce_type));
+
+    let field_types = get_struct_field_types(coerce_type);
+
+    for (field_i, (llvm_arg_i, element_type)) in param_mapping
+        .range()
+        .iter()
+        .zip(field_types.iter().copied())
+        .enumerate()
+    {
+        if is_padding_for_coerce_expand(element_type) {
+            continue;
+        }
+
+        let element_address = builder.gep_struct(
+            ctx.target_data,
+            &address,
+            field_i,
+            Some(field_types.as_slice()),
+        );
+
+        ir_call_args[llvm_arg_i] = builder.load(&element_address, Volatility::Normal);
+    }
+
+    Ok(())
+}
+
+fn expand(
+    builder: &Builder,
+    ctx: &BackendCtx,
+    alloca_point: LLVMValueRef,
+    argument: LLVMValueRef,
+    argument_type: &ir::Type,
+    param_mapping: &Param,
+    function_type: &FunctionType,
+    ir_call_args: &mut [LLVMValueRef],
+) -> Result<(), BackendError> {
+    let mut llvm_arg_i_iterator = param_mapping.range().iter();
+
+    // TODO: We shouldn't need to do this in most cases.
+    let backend_argument_type = unsafe { to_backend_type(ctx.for_making_type(), argument_type)? };
+    let alignment = ctx.type_layout_cache.get(argument_type).alignment;
+    let argument_address = Address::from(build_tmp_alloca_address(
+        builder,
+        alloca_point,
+        backend_argument_type,
+        alignment,
+        cstr!("coerceandexpand.tmp"),
+        None,
+    ));
+    builder.store(argument, &argument_address);
+
+    expand_type_to_args(
+        builder,
+        ctx,
+        &argument_address,
+        argument_type,
+        function_type,
+        &mut llvm_arg_i_iterator,
+        ir_call_args,
+    )?;
+    assert!(llvm_arg_i_iterator.next().is_none());
+
+    Ok(())
+}
+
+fn expand_type_to_args(
+    builder: &Builder,
+    ctx: &BackendCtx,
+    argument_address: &Address,
+    argument_type: &ir::Type,
+    function_type: &FunctionType,
+    llvm_arg_i_iterator: &mut impl Iterator<Item = usize>,
+    ir_call_args: &mut [LLVMValueRef],
+) -> Result<(), BackendError> {
+    let expansion = get_type_expansion(argument_type, &ctx.type_layout_cache, ctx.ir_module);
+
+    match expansion {
+        TypeExpansion::FixedArray(fixed_array) => {
+            for index in 0..fixed_array.length {
+                let element_address = builder.gep(ctx.target_data, argument_address, 0, index);
+                let element_type = &fixed_array.inner;
+
+                expand_type_to_args(
+                    builder,
+                    ctx,
+                    &element_address,
+                    element_type,
+                    function_type,
+                    llvm_arg_i_iterator,
+                    ir_call_args,
+                )?
+            }
+        }
+        TypeExpansion::Record(fields) => {
+            let precomputed_field_types = fields
+                .iter()
+                .map(|field| unsafe { to_backend_type(ctx.for_making_type(), &field.ir_type) })
+                .collect::<Result<Box<[_]>, _>>()?;
+
+            for (field_i, field) in fields.iter().enumerate() {
+                let element_address = builder.gep_struct(
+                    ctx.target_data,
+                    argument_address,
+                    field_i,
+                    Some(&precomputed_field_types),
+                );
+                let element_type = &field.ir_type;
+
+                expand_type_to_args(
+                    builder,
+                    ctx,
+                    &element_address,
+                    element_type,
+                    function_type,
+                    llvm_arg_i_iterator,
+                    ir_call_args,
+                )?
+            }
+        }
+        TypeExpansion::Complex(_) => {
+            todo!("expand_type_to_args not supported for complex types yet")
+        }
+        TypeExpansion::None => {
+            let argument = builder.load(argument_address, Volatility::Normal);
+
+            let llvm_arg_i = llvm_arg_i_iterator
+                .next()
+                .expect("argument position to insert into");
+
+            let argument =
+                if unsafe { LLVMTypeOf(argument) } == function_type.parameters[llvm_arg_i] {
+                    argument
+                } else {
+                    builder.bitcast(argument, function_type.parameters[llvm_arg_i])
+                };
+
+            ir_call_args[llvm_arg_i] = argument;
+        }
+    }
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn direct_or_extend(
-    _builder: &Builder,
-    _ctx: &BackendCtx,
-    _alloca_point: LLVMValueRef,
-    _argument: LLVMValueRef,
-    _argument_type: &ir::Type,
-    _abi_param: &ABIParam,
-    _param_mapping: &Param,
-    _ir_call_args: &mut [LLVMValueRef],
+    builder: &Builder,
+    ctx: &BackendCtx,
+    alloca_point: LLVMValueRef,
+    argument: LLVMValueRef,
+    argument_type: &ir::Type,
+    abi_param: &ABIParam,
+    param_mapping: &Param,
+    llvm_function_type: &FunctionType,
+    ir_call_args: &mut [LLVMValueRef],
 ) -> Result<(), BackendError> {
-    todo!("direct_or_extend")
+    let param_range = param_mapping.range();
+    let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
+    let direct_offset = abi_param.abi_type.get_direct_offset().unwrap();
+
+    if !is_struct_type(coerce_to_type) {
+        let backend_argument_type =
+            unsafe { to_backend_type(ctx.for_making_type(), argument_type)? };
+
+        if coerce_to_type == backend_argument_type && direct_offset.is_zero() {
+            return trivial_direct_or_extend(
+                builder,
+                argument,
+                abi_param,
+                param_mapping,
+                llvm_function_type,
+                ir_call_args,
+            );
+        }
+    }
+
+    // Coerce by memory
+    let source = Address::from(build_mem_tmp(
+        ctx,
+        builder,
+        alloca_point,
+        argument_type,
+        cstr!("coerce"),
+    )?);
+    builder.store(argument, &source);
+
+    let source = emit_address_at_offset(builder, ctx.target_data, abi_param, &source);
+
+    if is_struct_type(coerce_to_type)
+        && abi_param.abi_type.is_direct()
+        && abi_param.abi_type.can_be_flattened().unwrap()
+    {
+        let source_type = source.element_type();
+        let source_type_size = ctx.target_data.abi_size_of_type(source_type);
+        let destination_type_size = ctx.target_data.abi_size_of_type(coerce_to_type);
+
+        let source = if source_type_size < destination_type_size {
+            let tmp_alloca = Address::from(build_tmp_alloca_address(
+                builder,
+                alloca_point,
+                source_type,
+                source.base.alignment,
+                cstr!("upscale"),
+                None,
+            ));
+            let size = unsafe {
+                LLVMConstInt(
+                    LLVMInt64Type(),
+                    source_type_size.try_into().unwrap(),
+                    false as _,
+                )
+            };
+            builder.memcpy(&tmp_alloca, &source, size);
+            tmp_alloca
+        } else {
+            source.with_element_type(coerce_to_type)
+        };
+
+        let num_fields = get_struct_num_fields(coerce_to_type);
+        assert_eq!(param_range.len(), num_fields);
+
+        let precomputed_field_types = get_struct_field_types(coerce_to_type);
+
+        for field_i in 0..num_fields {
+            let element_pointer = builder.gep_struct(
+                ctx.target_data,
+                &source,
+                field_i,
+                Some(precomputed_field_types.as_slice()),
+            );
+            ir_call_args[param_range.start + field_i] =
+                builder.load(&element_pointer, Volatility::Normal);
+        }
+        return Ok(());
+    }
+
+    assert_eq!(param_range.len(), 1);
+
+    ir_call_args[param_range.start] =
+        build_coerced_load(ctx, builder, &source, coerce_to_type, alloca_point);
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn trivial_direct_or_extend(
+    builder: &Builder,
+    argument: LLVMValueRef,
+    abi_param: &ABIParam,
+    param_mapping: &Param,
+    llvm_function_type: &FunctionType,
+    ir_call_args: &mut [LLVMValueRef],
+) -> Result<(), BackendError> {
+    let param_range = param_mapping.range();
+    assert_eq!(param_range.len(), 1);
+
+    let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
+
+    let mut argument = argument;
+    let mut llvm_argument_type = unsafe { LLVMTypeOf(argument) };
+
+    if coerce_to_type != llvm_argument_type && is_integer_type(llvm_argument_type) {
+        argument = builder.zext(argument, coerce_to_type);
+        llvm_argument_type = unsafe { LLVMTypeOf(argument) };
+    }
+
+    if let Some(expected_llvm_argument_type) = llvm_function_type.parameters.get(param_range.start)
+    {
+        if llvm_argument_type != *expected_llvm_argument_type {
+            argument = builder.bitcast(argument, *expected_llvm_argument_type);
+        }
+    }
+
+    ir_call_args[param_range.start] = argument;
+    Ok(())
 }
 
 // Since rust-analyzer struggles with `izip!` macro,

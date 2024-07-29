@@ -214,6 +214,7 @@ impl ABIType {
     pub fn new_coerce_and_expand(
         coerce_to_type: LLVMTypeRef,
         unpadded_coerce_to_type: LLVMTypeRef,
+        alignment: ByteUnits,
     ) -> Self {
         assert_eq!(
             unsafe { LLVMGetTypeKind(coerce_to_type) },
@@ -262,6 +263,7 @@ impl ABIType {
             kind: ABITypeKind::CoerceAndExpand(CoerceAndExpand {
                 coerce_to_type,
                 unpadded_coerce_and_expand_type: unpadded_coerce_to_type,
+                alignment,
             }),
             padding_in_register: false,
         }

@@ -8,7 +8,7 @@ use crate::{
         },
         address::Address,
         backend_type::{to_backend_mem_type, to_backend_type},
-        builder::Builder,
+        builder::{Builder, Volatility},
         ctx::BackendCtx,
         error::BackendError,
         raw_address::RawAddress,
@@ -19,8 +19,8 @@ use crate::{
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMGetInsertBlock, LLVMGetTypeKind, LLVMInt8Type,
-        LLVMPositionBuilderBefore, LLVMSetAlignment, LLVMTypeOf,
+        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMConstInt, LLVMGetInsertBlock, LLVMGetTypeKind,
+        LLVMInt64Type, LLVMInt8Type, LLVMPositionBuilderBefore, LLVMSetAlignment, LLVMTypeOf,
     },
     prelude::{LLVMTypeRef, LLVMValueRef},
     target::{LLVMByteOrder, LLVMByteOrdering, LLVMPreferredAlignmentOfType, LLVMStoreSizeOfType},
@@ -220,7 +220,7 @@ pub fn emit_address_at_offset<'a>(
     if let Some(offset) = abi_param.abi_type.get_direct_offset() {
         if !offset.is_zero() {
             let mut address = address.with_element_type(unsafe { LLVMInt8Type() });
-            address = builder.gep_in_bounds(target_data, &address, offset.bytes());
+            address = builder.gep_in_bounds(target_data, &address, 0, offset.bytes());
             address =
                 address.with_element_type(abi_param.abi_type.coerce_to_type().flatten().unwrap());
             return Cow::Owned(address);
@@ -342,4 +342,58 @@ pub fn build_tmp_alloca_for_coerce(
     let preferred_alignment = unsafe { LLVMPreferredAlignmentOfType(target_data.get(), ty) };
     let alignment = min_alignment.max(ByteUnits::of(preferred_alignment.into()));
     build_tmp_alloca_address(builder, alloca_point, ty, alignment, cstr!(""), None)
+}
+
+pub fn build_coerced_load(
+    ctx: &BackendCtx,
+    builder: &Builder,
+    source: &Address,
+    desired_type: LLVMTypeRef,
+    alloca_point: LLVMValueRef,
+) -> LLVMValueRef {
+    let mut source = Cow::Borrowed(source);
+    let mut source_type = source.element_type();
+
+    if source_type == desired_type {
+        return builder.load(&source, Volatility::Normal);
+    }
+
+    let destination_size = ctx.target_data.abi_size_of_type(desired_type);
+
+    if is_struct_type(source_type) {
+        source = Cow::Owned(enter_struct_pointer_for_coerced_access(
+            builder,
+            ctx.target_data,
+            &source,
+            source_type,
+            destination_size.try_into().unwrap(),
+        ));
+
+        source_type = source.element_type();
+    }
+
+    let source_size = ctx.target_data.abi_size_of_type(source_type);
+
+    if is_integer_or_pointer_type(desired_type) && is_integer_or_pointer_type(source_type) {
+        let value = builder.load(&source, Volatility::Normal);
+        return coerce_integer_likes(builder, ctx.target_data, value, desired_type);
+    }
+
+    if source_size >= destination_size {
+        return builder.load(&source.with_element_type(desired_type), Volatility::Normal);
+    }
+
+    let size =
+        unsafe { LLVMConstInt(LLVMInt64Type(), source_size.try_into().unwrap(), false as _) };
+
+    let tmp = Address::from(build_tmp_alloca_for_coerce(
+        builder,
+        ctx.target_data,
+        desired_type,
+        source.base.alignment,
+        alloca_point,
+    ));
+
+    builder.memcpy(&tmp, &source, size);
+    builder.load(&tmp, Volatility::Normal)
 }
