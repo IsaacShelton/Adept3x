@@ -8,14 +8,13 @@ use crate::{
     ast::{self, Source},
     c::{
         self,
+        lexer::lex_c_code,
         parser::{Input, Parser},
-        preprocessor::{DefineKind, PreToken, PreTokenKind, Preprocessed},
-        token::CToken,
+        preprocessor::{DefineKind, Preprocessed},
         translate_expr,
     },
     compiler::Compiler,
     exit_unless,
-    inflow::{InflowTools, IntoInflow, IntoInflowStream},
     lexer::Lexer,
     llvm_backend::llvm_backend,
     lower::lower,
@@ -148,16 +147,6 @@ pub fn compile_workspace(compiler: &Compiler, folder_path: &Path) {
         },
         source_file_cache,
     );
-}
-
-fn lex_c_code(preprocessed: Vec<PreToken>, eof_source: Source) -> Vec<CToken> {
-    c::Lexer::new(
-        preprocessed
-            .into_iter()
-            .into_inflow_stream(PreToken::new(PreTokenKind::EndOfSequence, eof_source))
-            .into_inflow(),
-    )
-    .collect_vec(true)
 }
 
 fn is_hidden(entry: &DirEntry) -> bool {

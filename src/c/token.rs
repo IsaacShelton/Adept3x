@@ -1,5 +1,5 @@
 use super::{encoding::Encoding, lexer::LexError, punctuator::Punctuator};
-use crate::ast::Source;
+use crate::{ast::Source, inflow::InflowEnd};
 use derive_more::{Deref, IsVariant, Unwrap};
 use num_bigint::BigInt;
 
@@ -163,7 +163,7 @@ impl Integer {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum IntegerSuffix {
     Int,
     UnsignedInt,
@@ -173,7 +173,7 @@ pub enum IntegerSuffix {
     UnsignedLongLong,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FloatSuffix {
     Float,
     LongDouble,
@@ -193,5 +193,11 @@ pub struct CToken {
 impl CToken {
     pub fn new(kind: CTokenKind, source: Source) -> CToken {
         CToken { kind, source }
+    }
+}
+
+impl InflowEnd for CToken {
+    fn is_inflow_end(&self) -> bool {
+        matches!(&self.kind, CTokenKind::EndOfFile)
     }
 }

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(clippy::diverging_sub_expression)]
 #![allow(clippy::module_name_repetitions)]
+#![feature(string_remove_matches)]
 
 mod ast;
 mod borrow;

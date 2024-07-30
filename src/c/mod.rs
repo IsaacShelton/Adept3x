@@ -6,5 +6,4 @@ pub mod punctuator;
 pub mod token;
 pub mod translation;
 
-pub use self::lexer::Lexer;
 pub use self::translation::translate_expr;
