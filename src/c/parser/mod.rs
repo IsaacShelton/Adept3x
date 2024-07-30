@@ -445,8 +445,8 @@ impl<'a> Parser<'a> {
         let mut typedefs = HashMap::default();
 
         diagnostics.push(WarningDiagnostic::new(
-            "automatically inserting va_list definition",
-            Source::internal(),
+            "Auto-inserting definition of 'va_list'",
+            input.peek().source,
         ));
 
         typedefs.insert(

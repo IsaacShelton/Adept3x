@@ -17,7 +17,7 @@ pub fn decorate_pointer(
 ) -> Result<Type, ParseError> {
     if !pointer.type_qualifiers.is_empty() {
         diagnostics.push(WarningDiagnostic::new(
-            "ignoring pointer type qualifiers",
+            "Ignoring pointer type qualifiers",
             source,
         ))
     }

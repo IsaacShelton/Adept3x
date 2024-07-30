@@ -16,11 +16,11 @@ use crate::{
 use builder::Builder;
 use resolved::{IntegerKnown, IntegerSign};
 
-pub fn lower(
+pub fn lower<'a>(
     options: &BuildOptions,
     ast: &resolved::Ast,
-    target_info: TargetInfo,
-) -> Result<ir::Module, LowerError> {
+    target_info: &'a TargetInfo,
+) -> Result<ir::Module<'a>, LowerError> {
     let mut ir_module = ir::Module::new(target_info);
 
     for (structure_ref, structure) in ast.structures.iter() {

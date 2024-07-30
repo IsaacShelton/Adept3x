@@ -23,7 +23,7 @@ pub use value::Value;
 pub struct Interpreter<'a, S: SyscallHandler> {
     pub syscall_handler: S,
     max_steps_left: Option<u64>,
-    ir_module: &'a ir::Module,
+    ir_module: &'a ir::Module<'a>,
     memory: Memory,
     global_addresses: HashMap<ir::GlobalRef, ir::Literal>,
 }

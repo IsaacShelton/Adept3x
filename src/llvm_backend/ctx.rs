@@ -43,7 +43,7 @@ pub struct StructureCache {
 #[derive(Debug)]
 pub struct ToBackendTypeCtx<'a> {
     pub structure_cache: &'a StructureCache,
-    pub ir_module: &'a ir::Module,
+    pub ir_module: &'a ir::Module<'a>,
     pub visited: RefCell<HashSet<StructureRef>>,
 }
 
@@ -62,7 +62,7 @@ pub struct FunctionSkeleton {
 
 pub struct BackendCtx<'a> {
     pub backend_module: &'a BackendModule,
-    pub ir_module: &'a ir::Module,
+    pub ir_module: &'a ir::Module<'a>,
     pub builder: Option<Builder>,
     pub func_skeletons: HashMap<ir::FunctionRef, FunctionSkeleton>,
     pub globals: HashMap<ir::GlobalRef, LLVMValueRef>,

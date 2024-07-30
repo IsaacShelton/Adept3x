@@ -288,7 +288,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
         if self.packed && !field_packed && packed_field_alignment < field_alignment {
             self.diagnostics.push(WarningDiagnostic::new(
-                format!("unpacked field in type '{}'", self.friendly_record_name),
+                format!("Unpacked field in type '{}'", self.friendly_record_name),
                 field.source,
             ));
         }
@@ -321,7 +321,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
             self.diagnostics.push(WarningDiagnostic::new(
                 format!(
-                    "padded type '{}', with {} bits to alignment boundary",
+                    "Padded type '{}', with {} bits to alignment boundary",
                     self.friendly_record_name,
                     pad_size.bits()
                 ),
@@ -335,7 +335,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             && !self.has_packed_field
         {
             self.diagnostics.push(WarningDiagnostic::new(
-                format!("unnecessarily packed type '{}'", self.friendly_record_name),
+                format!("Unnecessarily packed type '{}'", self.friendly_record_name),
                 record.source,
             ));
         }
@@ -381,7 +381,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
                 if self.diagnostics.flags().warn_padded_bitfield {
                     self.diagnostics.push(WarningDiagnostic::new(
                         format!(
-                            "padded bitfield of '{}' at index {}",
+                            "Padded bitfield of '{}' at index {}",
                             self.friendly_record_name, field_i,
                         ),
                         field.source,
@@ -391,7 +391,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
                 if self.diagnostics.flags().warn_padded_field {
                     self.diagnostics.push(WarningDiagnostic::new(
                         format!(
-                            "padded field of '{}' at index {}",
+                            "Padded field of '{}' at index {}",
                             self.friendly_record_name, field_i,
                         ),
                         field.source,

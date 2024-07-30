@@ -370,13 +370,13 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else if name == "once" {
             self.diagnostics.push(WarningDiagnostic::new(
-                "`#pragma once` not supported yet",
+                "Directive `#pragma once` is not supported yet",
                 source,
             ));
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else if name == "STDC" {
             self.diagnostics.push(WarningDiagnostic::new(
-                "`#pragma STDC` not supported yet",
+                "Directive `#pragma STDC` is not supported yet",
                 source,
             ));
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))

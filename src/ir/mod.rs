@@ -12,14 +12,14 @@ pub use crate::resolved::{FunctionRef, GlobalRef};
 pub type Structures = HashMap<StructureRef, Structure>;
 
 #[derive(Clone)]
-pub struct Module {
-    pub target_info: TargetInfo,
+pub struct Module<'a> {
+    pub target_info: &'a TargetInfo,
     pub functions: HashMap<FunctionRef, Function>,
     pub structures: Structures,
     pub globals: HashMap<GlobalRef, Global>,
 }
 
-impl std::fmt::Debug for Module {
+impl<'a> std::fmt::Debug for Module<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "SlotMap {{")?;
         for ir_function in self.functions.values() {
@@ -440,8 +440,8 @@ pub struct ValueReference {
     pub instruction_id: usize,
 }
 
-impl Module {
-    pub fn new(target_info: TargetInfo) -> Self {
+impl<'a> Module<'a> {
+    pub fn new(target_info: &'a TargetInfo) -> Self {
         Self {
             target_info,
             functions: HashMap::new(),
