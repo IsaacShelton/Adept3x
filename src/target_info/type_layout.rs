@@ -1,7 +1,7 @@
 use super::{record_layout::record_info::RecordInfo, TargetInfo};
 use crate::{
     data_units::{BitUnits, ByteUnits},
-    ir,
+    ir, resolved,
     target_info::record_layout::{itanium::ItaniumRecordLayoutBuilder, record_info},
 };
 use once_map::unsync::OnceMap;
@@ -49,14 +49,20 @@ pub struct TypeLayoutCache<'a> {
     memo: OnceMap<ir::Type, TypeLayout>,
     pub target_info: &'a TargetInfo,
     pub structures: &'a ir::Structures,
+    pub resolved_ast: &'a resolved::Ast<'a>,
 }
 
 impl<'a> TypeLayoutCache<'a> {
-    pub fn new(target_info: &'a TargetInfo, structures: &'a ir::Structures) -> Self {
+    pub fn new(
+        target_info: &'a TargetInfo,
+        structures: &'a ir::Structures,
+        resolved_ast: &'a resolved::Ast,
+    ) -> Self {
         Self {
             memo: OnceMap::new(),
             target_info,
             structures,
+            resolved_ast,
         }
     }
 
@@ -92,12 +98,20 @@ impl<'a> TypeLayoutCache<'a> {
                     .get(structure_ref)
                     .expect("referenced structure to exist");
 
+                let resolved_structure = self
+                    .resolved_ast
+                    .structures
+                    .get(*structure_ref)
+                    .expect("referenced structure to exist");
+
+                let name = &resolved_structure.name;
+
                 let info = record_info::info_from_structure(structure);
-                self.get_impl_record_layout(&info)
+                self.get_impl_record_layout(&info, Some(name))
             }
             ir::Type::AnonymousComposite(type_composite) => {
                 let info = record_info::info_from_composite(type_composite);
-                self.get_impl_record_layout(&info)
+                self.get_impl_record_layout(&info, None)
             }
             ir::Type::FixedArray(fixed_array) => {
                 let element_info = self.get(&fixed_array.inner);
@@ -118,11 +132,19 @@ impl<'a> TypeLayoutCache<'a> {
         }
     }
 
-    fn get_impl_record_layout(&self, info: &RecordInfo) -> TypeLayout {
+    fn get_impl_record_layout(&self, info: &RecordInfo, name: Option<&str>) -> TypeLayout {
         // TODO: We should cache this
 
         let mut builder = ItaniumRecordLayoutBuilder::new(self, None);
-        builder.layout(info);
+        let diagnostics = builder.layout(info);
+
+        for diagnostic in diagnostics {
+            eprintln!(
+                "warning: {} (for {})",
+                diagnostic,
+                name.unwrap_or("<unnamed>"),
+            )
+        }
 
         let size = ByteUnits::try_from(builder.size).unwrap();
 

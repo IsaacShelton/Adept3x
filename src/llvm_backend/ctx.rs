@@ -9,7 +9,11 @@ use super::{
     module::BackendModule,
     target_data::TargetData,
 };
-use crate::{ir, resolved::StructureRef, target_info::type_layout::TypeLayoutCache};
+use crate::{
+    ir,
+    resolved::{self, StructureRef},
+    target_info::type_layout::TypeLayoutCache,
+};
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use once_map::unsync::OnceMap;
 use std::{
@@ -76,8 +80,10 @@ impl<'a> BackendCtx<'a> {
         ir_module: &'a ir::Module,
         backend_module: &'a BackendModule,
         target_data: &'a TargetData,
+        resolved_ast: &'a resolved::Ast,
     ) -> Self {
-        let type_layout_cache = TypeLayoutCache::new(&ir_module.target_info, &ir_module.structures);
+        let type_layout_cache =
+            TypeLayoutCache::new(&ir_module.target_info, &ir_module.structures, resolved_ast);
 
         Self {
             ir_module,

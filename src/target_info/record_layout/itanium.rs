@@ -42,6 +42,8 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
     // NOTE: We don't support using external layouts / inferring alignments yet
     pub use_external_layout: bool,
     pub infer_alignment: bool,
+
+    pub diagnostics: Vec<String>,
 }
 
 impl<'a> ItaniumRecordLayoutBuilder<'a> {
@@ -74,14 +76,16 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             has_packed_field: false,
             use_external_layout: false, // We don't support using external layouts yet
             infer_alignment: false,
+            diagnostics: vec![],
         }
     }
 
-    pub fn layout(&mut self, record: &RecordInfo) {
+    pub fn layout(&mut self, record: &RecordInfo) -> Vec<String> {
         // NOTE: This only works for C types
         self.init_layout(record);
         self.layout_fields(record);
         self.finish_layout(record);
+        std::mem::take(&mut self.diagnostics)
     }
 
     pub fn init_layout(&mut self, record: &RecordInfo) {
@@ -108,11 +112,11 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             let insert_extra_padding_here =
                 insert_extra_padding && (has_next || !has_flexible_array_member);
 
-            self.layout_field(field, insert_extra_padding_here);
+            self.layout_field(field, insert_extra_padding_here, i);
         }
     }
 
-    pub fn layout_field(&mut self, field: &ir::Field, insert_extra_padding: bool) {
+    pub fn layout_field(&mut self, field: &ir::Field, insert_extra_padding: bool, field_i: usize) {
         let field_class = field.as_cxx_record();
         let is_overlapping_empty_field = is_potentially_overlapping(field)
             && field_class.as_ref().map_or(false, |class| class.is_empty());
@@ -141,7 +145,10 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
         let mut effective_field_size = field_size;
 
-        if !field.ir_type.is_incomplete_array() {
+        if field.ir_type.is_incomplete_array() {
+            field_size = ByteUnits::of(0);
+            effective_field_size = ByteUnits::of(0);
+        } else {
             if is_potentially_overlapping(field) {
                 todo!("ItaniumRecordLayoutBuilder::layout_field for is_potentially_overlapping is not fully implemented yet");
 
@@ -177,6 +184,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
         let unpacked_field_offset = field_offset;
         let max_alignment = field.get_max_alignment();
+
         let mut packed_field_alignment = packed_field_alignment.max(max_alignment);
         let mut preferred_alignment = preferred_alignment.max(max_alignment);
         let mut unpacked_field_alignment = unpacked_field_alignment.max(max_alignment);
@@ -194,7 +202,15 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             field_alignment = packed_field_alignment;
         }
 
-        let align_to = field_alignment;
+        // HACK: Why does this work? This should be `field_align` I think,
+        // but it only works when it's `self.preferred_alignment`? This has
+        // to be wrong probably.
+        // Otherwise, the padded/unpadded field offsets don't match correctly,
+        // so perhaps `defaults_to_aix_power_alignment` does apply even though it
+        // seems like it shouldn't? If so, we have some additional corner cases
+        // we will need to eventually worry about.
+        let align_to = self.preferred_alignment;
+
         let mut field_offset = field_offset.align_to(BitUnits::from(align_to));
 
         let unpacked_field_offset =
@@ -214,6 +230,8 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             }
         }
 
+        assert!((field_offset % BitUnits::from(align_to)).is_zero());
+
         // Place field at current location
         self.field_offsets.push(field_offset);
 
@@ -224,6 +242,8 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
                 unpacked_field_offset,
                 field_packed,
                 field,
+                field_i,
+                align_to,
             );
         }
 
@@ -240,12 +260,12 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
 
         // Reserve space for this field
         if !is_overlapping_empty_field {
-            let effective_field_size_bits = BitUnits::from(effective_field_size);
+            let effective_field_size = BitUnits::from(effective_field_size);
 
             if self.is_union {
-                self.data_size = self.data_size.max(effective_field_size_bits);
+                self.data_size = self.data_size.max(effective_field_size);
             } else {
-                self.data_size = field_offset + effective_field_size_bits;
+                self.data_size = field_offset + effective_field_size;
             }
 
             self.padded_field_size = self
@@ -272,7 +292,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
 
         if self.packed && !field_packed && packed_field_alignment < field_alignment {
-            eprintln!("warning - unpacked field");
+            self.diagnostics.push("unpacked field".into())
         }
     }
 
@@ -301,10 +321,10 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         if self.size > unpadded_size {
             let pad_size = self.size - unpadded_size;
 
-            eprintln!(
-                "warning - padded record with {} bits to alignment boundary",
+            self.diagnostics.push(format!(
+                "padded record with {} bits to alignment boundary",
                 pad_size.bits()
-            );
+            ));
         }
 
         if self.packed
@@ -312,7 +332,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             && unpacked_size == self.size
             && !self.has_packed_field
         {
-            eprintln!("warning - unnecessarily packed record");
+            self.diagnostics.push("unnecessarily packed record".into());
         }
     }
 
@@ -349,17 +369,31 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         unpacked_field_offset: BitUnits,
         field_packed: bool,
         field: &ir::Field,
+        field_i: usize,
+        align_to: ByteUnits,
     ) {
         if !self.is_union && field_offset > unpadded_field_offset {
             // TODO: Improve warning messages
-            if field.is_bitfield() {
-                eprintln!("warning - padded struct bitfield");
+            self.diagnostics.push(if field.is_bitfield() {
+                format!(
+                    "padded struct bitfield field {} ({} bytes not {} bytes, packed={}, align_to={} bytes)",
+                    field_i,
+                    ByteUnits::try_from(field_offset).unwrap().bytes(),
+                    ByteUnits::try_from(unpadded_field_offset).unwrap().bytes(),
+                    field_packed,
+                    align_to.bytes()
+                )
             } else {
-                eprintln!("warning - padded struct field");
-            }
+                format!(
+                    "padded struct field field {} ({} bytes not {} bytes, packed={}, align_to={} bytes)",
+                    field_i,
+                    ByteUnits::try_from(field_offset).unwrap().bytes(),
+                    ByteUnits::try_from(unpadded_field_offset).unwrap().bytes(),
+                    field_packed,
+                    align_to.bytes()
+                )
+            });
         }
-
-        eprintln!("warning - check_field_padding not implemented yet");
 
         if field_packed && field_offset != unpacked_field_offset {
             self.has_packed_field = true;

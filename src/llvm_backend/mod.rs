@@ -28,7 +28,7 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::{cli::BuildOptions, ir};
+use crate::{cli::BuildOptions, ir, resolved};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -49,6 +49,7 @@ use std::{
 pub unsafe fn llvm_backend(
     options: &BuildOptions,
     ir_module: &ir::Module,
+    resolved_ast: &resolved::Ast,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
 ) -> Result<(), BackendError> {
@@ -78,7 +79,7 @@ pub unsafe fn llvm_backend(
     let target_data = TargetData::new(&target_machine);
     LLVMSetModuleDataLayout(backend_module.get(), target_data.get());
 
-    let mut ctx = BackendCtx::new(ir_module, &backend_module, &target_data);
+    let mut ctx = BackendCtx::new(ir_module, &backend_module, &target_data, resolved_ast);
 
     create_static_variables()?;
     create_globals(&mut ctx)?;

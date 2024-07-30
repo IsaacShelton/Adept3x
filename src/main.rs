@@ -250,6 +250,7 @@ fn compile_project(
             llvm_backend(
                 options,
                 &ir_module,
+                &resolved_ast,
                 &output_object_filepath,
                 &output_binary_filepath,
             )
@@ -302,6 +303,7 @@ fn compile(
                 llvm_backend(
                     options,
                     &ir_module,
+                    &resolved_ast,
                     &output_object_filepath,
                     &output_binary_filepath,
                 )
