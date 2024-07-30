@@ -154,7 +154,7 @@ impl ResolveErrorKind {
 impl Show for ResolveError {
     fn show(
         &self,
-        w: &mut impl std::fmt::Write,
+        w: &mut dyn std::fmt::Write,
         source_file_cache: &SourceFileCache,
     ) -> std::fmt::Result {
         write!(

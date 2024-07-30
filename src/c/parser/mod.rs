@@ -16,6 +16,7 @@ use super::{
 };
 use crate::ast::{Ast, FileIdentifier, Source};
 use crate::ast::{Parameter, Type, TypeKind};
+use crate::diagnostics::{Diagnostics, WarningDiagnostic};
 use derive_more::IsVariant;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -26,6 +27,7 @@ pub struct Parser<'a> {
     input: Input<'a>,
     typedefs: HashMap<String, CTypedef>,
     enum_constants: HashMap<String, Integer>,
+    diagnostics: &'a Diagnostics<'a>,
 }
 
 impl Parser<'_> {
@@ -439,10 +441,14 @@ pub struct EnumerationNamed {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(input: Input<'a>) -> Self {
+    pub fn new(input: Input<'a>, diagnostics: &'a Diagnostics<'a>) -> Self {
         let mut typedefs = HashMap::default();
 
-        eprintln!("warning: automatically inserting va_list definition");
+        diagnostics.push(WarningDiagnostic::new(
+            "automatically inserting va_list definition",
+            Source::internal(),
+        ));
+
         typedefs.insert(
             "va_list".into(),
             CTypedef {
@@ -457,6 +463,7 @@ impl<'a> Parser<'a> {
             input,
             typedefs,
             enum_constants: HashMap::default(),
+            diagnostics,
         }
     }
 
@@ -503,6 +510,7 @@ impl<'a> Parser<'a> {
                                     &declaration.attribute_specifiers[..],
                                     &declaration.declaration_specifiers,
                                     &mut self.typedefs,
+                                    self.diagnostics,
                                 )?,
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
@@ -512,6 +520,7 @@ impl<'a> Parser<'a> {
                                         &declaration.declaration_specifiers,
                                         declarator,
                                         parameter_type_list,
+                                        self.diagnostics,
                                     )?;
                                 }
                             }

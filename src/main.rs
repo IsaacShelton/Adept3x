@@ -7,6 +7,7 @@ mod borrow;
 mod c;
 mod cli;
 mod data_units;
+mod diagnostics;
 mod inflow;
 mod interpreter;
 mod ir;
@@ -48,9 +49,10 @@ use crate::show::Show;
 use crate::source_file_cache::SourceFileCache;
 use crate::tag::Tag;
 use crate::text::IntoText;
+use diagnostics::{DiagnosticFlags, Diagnostics};
 use indexmap::IndexMap;
 use indoc::indoc;
-use std::{ffi::OsStr, fmt, fs::metadata, io, path::Path, process::exit};
+use std::{ffi::OsStr, fs::metadata, path::Path, process::exit};
 use target_info::TargetInfo;
 use walkdir::{DirEntry, WalkDir};
 
@@ -69,6 +71,7 @@ fn build_project(build_command: BuildCommand) {
     let BuildCommand { filename, options } = build_command;
     let source_file_cache = SourceFileCache::new();
     let filepath = Path::new(&filename);
+    let diagnostics = Diagnostics::new(&source_file_cache, DiagnosticFlags::default());
 
     // TODO: Determine this based on triple
     let target_info = TargetInfo {
@@ -79,7 +82,13 @@ fn build_project(build_command: BuildCommand) {
 
     match metadata(filepath) {
         Ok(metadata) if metadata.is_dir() => {
-            compile_project(&options, target_info, &source_file_cache, filepath);
+            compile_project(
+                &options,
+                target_info,
+                &source_file_cache,
+                filepath,
+                &diagnostics,
+            );
         }
         _ => {
             if !filepath.is_file() {
@@ -90,8 +99,10 @@ fn build_project(build_command: BuildCommand) {
             if filepath.extension().unwrap_or_default() == "h" {
                 let key = source_file_cache.add_or_exit(&filename);
                 let text = source_file_cache.get(key).content().chars().into_text(key);
-                let preprocessed =
-                    exit_unless(c::preprocessor::preprocess(text), &source_file_cache);
+                let preprocessed = exit_unless(
+                    c::preprocessor::preprocess(text, &diagnostics),
+                    &source_file_cache,
+                );
                 println!("{preprocessed:?}");
                 return;
             }
@@ -103,18 +114,9 @@ fn build_project(build_command: BuildCommand) {
                 &source_file_cache,
                 project_folder,
                 &filename,
+                &diagnostics,
             );
         }
-    }
-}
-
-struct ErrorFormatter<W: io::Write> {
-    writer: W,
-}
-
-impl<W: io::Write> fmt::Write for ErrorFormatter<W> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.writer.write_all(s.as_bytes()).map_err(|_| fmt::Error)
     }
 }
 
@@ -136,6 +138,7 @@ fn compile_project(
     target_info: TargetInfo,
     source_file_cache: &SourceFileCache,
     filepath: &Path,
+    diagnostics: &Diagnostics,
 ) {
     let folder_path = filepath;
     let walker = WalkDir::new(filepath).min_depth(1).into_iter();
@@ -180,23 +183,19 @@ fn compile_project(
                 defines,
                 end_of_file,
             } = exit_unless(
-                c::preprocessor::preprocess(content.chars().into_text(key)),
+                c::preprocessor::preprocess(content.chars().into_text(key), diagnostics),
                 source_file_cache,
             );
 
             let lexed = lex(document, end_of_file);
+            let mut parser = Parser::new(Input::new(lexed, source_file_cache, key), diagnostics);
 
-            let (file_id, mut parser) = if let Some(ast) = &mut ast {
-                let mut parser = Parser::new(Input::new(lexed, source_file_cache, key));
-                (
-                    exit_unless(parser.parse_into(ast, filename), source_file_cache),
-                    parser,
-                )
+            let file_id = if let Some(ast) = &mut ast {
+                exit_unless(parser.parse_into(ast, filename), source_file_cache)
             } else {
-                let mut parser = Parser::new(Input::new(lexed, source_file_cache, key));
                 let (new_ast, file_id) = exit_unless(parser.parse(), source_file_cache);
                 ast = Some(new_ast);
-                (file_id, parser)
+                file_id
             };
 
             // Translate preprocessor #define object macros
@@ -214,10 +213,9 @@ fn compile_project(
                             lex(expanded_replacement.clone(), Source::internal());
                         parser.switch_input(lexed_replacement);
 
-                        if let Ok(value) = parser
-                            .parse_expr_singular()
-                            .and_then(|expr| translate_expr(ast_file, parser.typedefs(), &expr))
-                        {
+                        if let Ok(value) = parser.parse_expr_singular().and_then(|expr| {
+                            translate_expr(ast_file, parser.typedefs(), &expr, diagnostics)
+                        }) {
                             ast_file.defines.insert(
                                 define_name.clone(),
                                 ast::Define {
@@ -253,6 +251,7 @@ fn compile_project(
                 &resolved_ast,
                 &output_object_filepath,
                 &output_binary_filepath,
+                &diagnostics,
             )
         },
         source_file_cache,
@@ -265,6 +264,7 @@ fn compile(
     source_file_cache: &SourceFileCache,
     project_folder: &Path,
     filename: &str,
+    diagnostics: &Diagnostics,
 ) {
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");
@@ -306,6 +306,7 @@ fn compile(
                     &resolved_ast,
                     &output_object_filepath,
                     &output_binary_filepath,
+                    &diagnostics,
                 )
             },
             source_file_cache,

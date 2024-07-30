@@ -28,7 +28,7 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::{cli::BuildOptions, ir, resolved};
+use crate::{cli::BuildOptions, diagnostics::Diagnostics, ir, resolved};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -52,6 +52,7 @@ pub unsafe fn llvm_backend(
     resolved_ast: &resolved::Ast,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
+    diagnostics: &Diagnostics,
 ) -> Result<(), BackendError> {
     LLVM_InitializeAllTargetInfos();
     LLVM_InitializeAllTargets();
@@ -79,7 +80,13 @@ pub unsafe fn llvm_backend(
     let target_data = TargetData::new(&target_machine);
     LLVMSetModuleDataLayout(backend_module.get(), target_data.get());
 
-    let mut ctx = BackendCtx::new(ir_module, &backend_module, &target_data, resolved_ast);
+    let mut ctx = BackendCtx::new(
+        ir_module,
+        &backend_module,
+        &target_data,
+        resolved_ast,
+        diagnostics,
+    );
 
     create_static_variables()?;
     create_globals(&mut ctx)?;

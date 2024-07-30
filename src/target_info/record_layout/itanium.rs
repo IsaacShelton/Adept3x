@@ -1,6 +1,7 @@
 use super::record_info::RecordInfo;
 use crate::{
     data_units::{BitUnits, ByteUnits},
+    diagnostics::{Diagnostics, WarningDiagnostic},
     ir, resolved,
     target_info::type_layout::TypeLayoutCache,
 };
@@ -43,13 +44,16 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
     pub use_external_layout: bool,
     pub infer_alignment: bool,
 
-    pub diagnostics: Vec<String>,
+    pub friendly_record_name: &'a str,
+    pub diagnostics: &'a Diagnostics<'a>,
 }
 
 impl<'a> ItaniumRecordLayoutBuilder<'a> {
     pub fn new(
         type_layout_cache: &'a TypeLayoutCache,
         empty_subobjects: Option<&'a mut EmptySubobjects>,
+        diagnostics: &'a Diagnostics,
+        friendly_record_name: Option<&'a str>,
     ) -> Self {
         Self {
             type_layout_cache,
@@ -76,16 +80,16 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             has_packed_field: false,
             use_external_layout: false, // We don't support using external layouts yet
             infer_alignment: false,
-            diagnostics: vec![],
+            friendly_record_name: friendly_record_name.unwrap_or("<unnamed composite>"),
+            diagnostics,
         }
     }
 
-    pub fn layout(&mut self, record: &RecordInfo) -> Vec<String> {
+    pub fn layout(&mut self, record: &RecordInfo) {
         // NOTE: This only works for C types
         self.init_layout(record);
         self.layout_fields(record);
         self.finish_layout(record);
-        std::mem::take(&mut self.diagnostics)
     }
 
     pub fn init_layout(&mut self, record: &RecordInfo) {
@@ -202,15 +206,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             field_alignment = packed_field_alignment;
         }
 
-        // HACK: Why does this work? This should be `field_align` I think,
-        // but it only works when it's `self.preferred_alignment`? This has
-        // to be wrong probably.
-        // Otherwise, the padded/unpadded field offsets don't match correctly,
-        // so perhaps `defaults_to_aix_power_alignment` does apply even though it
-        // seems like it shouldn't? If so, we have some additional corner cases
-        // we will need to eventually worry about.
-        let align_to = self.preferred_alignment;
-
+        let align_to = field_alignment;
         let mut field_offset = field_offset.align_to(BitUnits::from(align_to));
 
         let unpacked_field_offset =
@@ -243,7 +239,6 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
                 field_packed,
                 field,
                 field_i,
-                align_to,
             );
         }
 
@@ -292,7 +287,10 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         }
 
         if self.packed && !field_packed && packed_field_alignment < field_alignment {
-            self.diagnostics.push("unpacked field".into())
+            self.diagnostics.push(WarningDiagnostic::new(
+                format!("unpacked field in type '{}'", self.friendly_record_name),
+                field.source,
+            ));
         }
     }
 
@@ -321,9 +319,13 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         if self.size > unpadded_size {
             let pad_size = self.size - unpadded_size;
 
-            self.diagnostics.push(format!(
-                "padded record with {} bits to alignment boundary",
-                pad_size.bits()
+            self.diagnostics.push(WarningDiagnostic::new(
+                format!(
+                    "padded type '{}', with {} bits to alignment boundary",
+                    self.friendly_record_name,
+                    pad_size.bits()
+                ),
+                record.source,
             ));
         }
 
@@ -332,7 +334,10 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             && unpacked_size == self.size
             && !self.has_packed_field
         {
-            self.diagnostics.push("unnecessarily packed record".into());
+            self.diagnostics.push(WarningDiagnostic::new(
+                format!("unnecessarily packed type '{}'", self.friendly_record_name),
+                record.source,
+            ));
         }
     }
 
@@ -370,29 +375,29 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
         field_packed: bool,
         field: &ir::Field,
         field_i: usize,
-        align_to: ByteUnits,
     ) {
         if !self.is_union && field_offset > unpadded_field_offset {
-            // TODO: Improve warning messages
-            self.diagnostics.push(if field.is_bitfield() {
-                format!(
-                    "padded struct bitfield field {} ({} bytes not {} bytes, packed={}, align_to={} bytes)",
-                    field_i,
-                    ByteUnits::try_from(field_offset).unwrap().bytes(),
-                    ByteUnits::try_from(unpadded_field_offset).unwrap().bytes(),
-                    field_packed,
-                    align_to.bytes()
-                )
+            if field.is_bitfield() {
+                if self.diagnostics.flags().warn_padded_bitfield {
+                    self.diagnostics.push(WarningDiagnostic::new(
+                        format!(
+                            "padded bitfield of '{}' at index {}",
+                            self.friendly_record_name, field_i,
+                        ),
+                        field.source,
+                    ));
+                }
             } else {
-                format!(
-                    "padded struct field field {} ({} bytes not {} bytes, packed={}, align_to={} bytes)",
-                    field_i,
-                    ByteUnits::try_from(field_offset).unwrap().bytes(),
-                    ByteUnits::try_from(unpadded_field_offset).unwrap().bytes(),
-                    field_packed,
-                    align_to.bytes()
-                )
-            });
+                if self.diagnostics.flags().warn_padded_field {
+                    self.diagnostics.push(WarningDiagnostic::new(
+                        format!(
+                            "padded field of '{}' at index {}",
+                            self.friendly_record_name, field_i,
+                        ),
+                        field.source,
+                    ));
+                }
+            }
         }
 
         if field_packed && field_offset != unpacked_field_offset {

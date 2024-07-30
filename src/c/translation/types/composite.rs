@@ -5,6 +5,7 @@ use crate::{
         error::ParseErrorKind, CTypedef, Composite, CompositeKind, DeclarationSpecifiers,
         MemberDeclaration, MemberDeclarator, ParseError,
     },
+    diagnostics::Diagnostics,
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
@@ -13,6 +14,7 @@ pub fn make_composite(
     ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     composite: &Composite,
+    diagnostics: &Diagnostics,
 ) -> Result<TypeKind, ParseError> {
     if !composite.attributes.is_empty() {
         return Err(
@@ -53,6 +55,7 @@ pub fn make_composite(
                                         declarator,
                                         &DeclarationSpecifiers::from(&member.specifier_qualifiers),
                                         false,
+                                        diagnostics,
                                     )?;
 
                                     if is_typedef {

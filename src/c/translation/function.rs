@@ -5,6 +5,7 @@ use crate::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError,
     },
+    diagnostics::Diagnostics,
 };
 use std::collections::HashMap;
 
@@ -15,6 +16,7 @@ pub fn declare_function(
     declaration_specifiers: &DeclarationSpecifiers,
     declarator: &Declarator,
     parameter_type_list: &ParameterTypeList,
+    diagnostics: &Diagnostics,
 ) -> Result<(), ParseError> {
     let source = declarator.source;
     let (name, return_type, is_typedef) = get_name_and_type(
@@ -23,6 +25,7 @@ pub fn declare_function(
         declarator,
         declaration_specifiers,
         false,
+        diagnostics,
     )?;
     let mut required = vec![];
 
@@ -35,6 +38,7 @@ pub fn declare_function(
                     declarator,
                     &param.declaration_specifiers,
                     true,
+                    diagnostics,
                 )?,
                 ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
                 ParameterDeclarationCore::Nothing => todo!(),

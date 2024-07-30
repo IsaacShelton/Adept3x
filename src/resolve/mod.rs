@@ -155,6 +155,7 @@ pub fn resolve<'a>(
                 name: structure.name.clone(),
                 fields,
                 is_packed: structure.is_packed,
+                source: structure.source,
             });
 
             if structure.prefer_pod {

@@ -4,6 +4,7 @@ use crate::{
         parser::{expr::Caster, CTypedef, ParseError},
         translation::types::{build_type_specifier_qualifier, TypeBaseBuilder},
     },
+    diagnostics::Diagnostics,
 };
 use std::collections::HashMap;
 
@@ -11,6 +12,7 @@ pub fn get_caster_type(
     ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     caster: &Caster,
+    diagnostics: &Diagnostics,
 ) -> Result<ast::Type, ParseError> {
     let mut builder = TypeBaseBuilder::new(caster.source);
 
@@ -23,7 +25,7 @@ pub fn get_caster_type(
         .type_specifier_qualifiers
         .iter()
     {
-        build_type_specifier_qualifier(ast_file, &mut builder, typedefs, tsq)?;
+        build_type_specifier_qualifier(ast_file, &mut builder, typedefs, tsq, diagnostics)?;
     }
 
     if let Some(_abstract_declarator) = &caster.abstract_declarator {

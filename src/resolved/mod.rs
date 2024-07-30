@@ -108,6 +108,7 @@ pub struct Structure {
     pub name: String,
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
+    pub source: Source,
 }
 
 pub use crate::ast::Privacy;

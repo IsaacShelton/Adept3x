@@ -56,6 +56,7 @@ fn lower_structure(
         fields.push(ir::Field {
             ir_type: lower_type(&ir_module.target_info, &field.resolved_type, resolved_ast)?,
             properties: ir::FieldProperties::default(),
+            source: field.source,
         });
     }
 
@@ -64,6 +65,7 @@ fn lower_structure(
         ir::Structure {
             fields,
             is_packed: structure.is_packed,
+            source: structure.source,
         },
     );
 

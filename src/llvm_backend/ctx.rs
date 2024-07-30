@@ -10,6 +10,7 @@ use super::{
     target_data::TargetData,
 };
 use crate::{
+    diagnostics::Diagnostics,
     ir,
     resolved::{self, StructureRef},
     target_info::type_layout::TypeLayoutCache,
@@ -81,9 +82,14 @@ impl<'a> BackendCtx<'a> {
         backend_module: &'a BackendModule,
         target_data: &'a TargetData,
         resolved_ast: &'a resolved::Ast,
+        diagnostics: &'a Diagnostics,
     ) -> Self {
-        let type_layout_cache =
-            TypeLayoutCache::new(&ir_module.target_info, &ir_module.structures, resolved_ast);
+        let type_layout_cache = TypeLayoutCache::new(
+            &ir_module.target_info,
+            &ir_module.structures,
+            resolved_ast,
+            diagnostics,
+        );
 
         Self {
             ir_module,

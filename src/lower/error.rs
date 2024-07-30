@@ -46,7 +46,7 @@ impl LowerErrorKind {
 impl Show for LowerError {
     fn show(
         &self,
-        w: &mut impl std::fmt::Write,
+        w: &mut dyn std::fmt::Write,
         source_file_cache: &SourceFileCache,
     ) -> std::fmt::Result {
         write!(

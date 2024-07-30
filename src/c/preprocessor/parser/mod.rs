@@ -10,7 +10,11 @@ use super::{
     pre_token::{PreToken, PreTokenKind, Punctuator},
     PreprocessorError,
 };
-use crate::{ast::Source, inflow::TryPeek};
+use crate::{
+    ast::Source,
+    diagnostics::{Diagnostics, WarningDiagnostic},
+    inflow::TryPeek,
+};
 use crate::{
     c::preprocessor::ast::{FunctionMacro, IfSection},
     inflow::Inflow,
@@ -21,16 +25,18 @@ use std::borrow::Borrow;
 
 pub use error::{ParseError, ParseErrorKind};
 
-pub struct Parser<T: Inflow<LexedLine>> {
+pub struct Parser<'a, T: Inflow<LexedLine>> {
     lines: T,
     disabled: bool,
+    diagnostics: &'a Diagnostics<'a>,
 }
 
-impl<T: Inflow<LexedLine>> Parser<T> {
-    pub fn new(lines: T) -> Self {
+impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
+    pub fn new(lines: T, diagnostics: &'a Diagnostics) -> Self {
         Self {
             lines,
             disabled: false,
+            diagnostics,
         }
     }
 
@@ -359,14 +365,20 @@ impl<T: Inflow<LexedLine>> Parser<T> {
             }
         };
 
-        if name == "once" {
-            eprintln!("warning: #pragma once not supported yet");
-            Ok(GroupPart::TextLine(TextLine { content: vec![] }))
-        } else if name == "ADEPT" {
+        if name == "ADEPT" {
             self.parse_adept_pragma(line)?;
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
+        } else if name == "once" {
+            self.diagnostics.push(WarningDiagnostic::new(
+                "`#pragma once` not supported yet",
+                source,
+            ));
+            Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else if name == "STDC" {
-            eprintln!("warning: #pragma STDC not supported yet");
+            self.diagnostics.push(WarningDiagnostic::new(
+                "`#pragma STDC` not supported yet",
+                source,
+            ));
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else {
             Err(ParseErrorKind::UnrecognizedPragmaDirective(name.into())
@@ -547,8 +559,11 @@ fn peek_directive_name(line: &(impl Borrow<[PreToken]> + ?Sized)) -> Option<&str
     }
 }
 
-pub fn parse(tokens: impl Inflow<LexedLine>) -> Result<PreprocessorAst, PreprocessorError> {
-    let mut parser = Parser::new(tokens);
+pub fn parse(
+    tokens: impl Inflow<LexedLine>,
+    diagnostics: &Diagnostics,
+) -> Result<PreprocessorAst, PreprocessorError> {
+    let mut parser = Parser::new(tokens, diagnostics);
 
     Ok(PreprocessorAst {
         group: parser.parse_group()?,

@@ -14,6 +14,7 @@ use crate::{
         expr::{Expr, ExprKind},
         CTypedef, ParseError,
     },
+    diagnostics::Diagnostics,
 };
 use std::collections::HashMap;
 
@@ -21,6 +22,7 @@ pub fn translate_expr(
     ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     expr: &Expr,
+    diagnostics: &Diagnostics,
 ) -> Result<ast::Expr, ParseError> {
     Ok(match &expr.kind {
         ExprKind::Integer(integer) => translate_expr_integer(integer, expr.source)?,
@@ -43,8 +45,12 @@ pub fn translate_expr(
             return Err(ParseErrorKind::UndefinedVariable(name.into()).at(expr.source));
         }
         ExprKind::EnumConstant(_, _) => todo!(),
-        ExprKind::CompoundLiteral(compound_literal) => {
-            translate_compound_literal(ast_file, typedefs, compound_literal, expr.source)?
-        }
+        ExprKind::CompoundLiteral(compound_literal) => translate_compound_literal(
+            ast_file,
+            typedefs,
+            compound_literal,
+            expr.source,
+            diagnostics,
+        )?,
     })
 }

@@ -26,7 +26,7 @@ impl From<ParseError> for PreprocessorError {
 impl Show for PreprocessorError {
     fn show(
         &self,
-        w: &mut impl std::fmt::Write,
+        w: &mut dyn std::fmt::Write,
         source_file_cache: &SourceFileCache,
     ) -> std::fmt::Result {
         write!(

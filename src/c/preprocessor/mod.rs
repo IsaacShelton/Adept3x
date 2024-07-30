@@ -13,6 +13,7 @@ use self::lexer::Lexer;
 use self::parser::{parse, ParseErrorKind};
 use self::stdc::stdc;
 use crate::ast::Source;
+use crate::diagnostics::Diagnostics;
 use crate::inflow::IntoInflow;
 use crate::text::Text;
 use std::collections::HashMap;
@@ -40,9 +41,12 @@ pub struct Preprocessed {
     pub end_of_file: Source,
 }
 
-pub fn preprocess(text: impl Text) -> Result<Preprocessed, PreprocessorError> {
+pub fn preprocess(
+    text: impl Text,
+    diagnostics: &Diagnostics,
+) -> Result<Preprocessed, PreprocessorError> {
     let lexer = Lexer::new(text);
-    let ast = parse(lexer.into_inflow())?;
+    let ast = parse(lexer.into_inflow(), diagnostics)?;
     let (document, defines) = expand_ast(&ast, stdc())?;
 
     Ok(Preprocessed {

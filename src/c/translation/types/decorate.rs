@@ -6,15 +6,20 @@ use crate::{
         parser::{ArrayQualifier, CTypedef, FunctionQualifier, ParseError, Pointer},
         translate_expr,
     },
+    diagnostics::{Diagnostics, WarningDiagnostic},
 };
 
 pub fn decorate_pointer(
     ast_type: Type,
     pointer: &Pointer,
     source: Source,
+    diagnostics: &Diagnostics,
 ) -> Result<Type, ParseError> {
     if !pointer.type_qualifiers.is_empty() {
-        eprintln!("warning: ignoring pointer type qualifiers");
+        diagnostics.push(WarningDiagnostic::new(
+            "ignoring pointer type qualifiers",
+            source,
+        ))
     }
 
     Ok(Type::new(TypeKind::Pointer(Box::new(ast_type)), source))
@@ -27,6 +32,7 @@ pub fn decorate_array(
     array: &ArrayQualifier,
     for_parameter: bool,
     source: Source,
+    diagnostics: &Diagnostics,
 ) -> Result<Type, ParseError> {
     if !array.type_qualifiers.is_empty() {
         todo!("array type qualifiers not supported yet");
@@ -48,7 +54,7 @@ pub fn decorate_array(
             Ok(Type::new(
                 TypeKind::FixedArray(Box::new(FixedArray {
                     ast_type,
-                    count: translate_expr(ast_file, typedefs, count)?,
+                    count: translate_expr(ast_file, typedefs, count, diagnostics)?,
                 })),
                 source,
             ))

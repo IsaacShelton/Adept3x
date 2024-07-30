@@ -1,6 +1,7 @@
 use super::{record_layout::record_info::RecordInfo, TargetInfo};
 use crate::{
     data_units::{BitUnits, ByteUnits},
+    diagnostics::Diagnostics,
     ir, resolved,
     target_info::record_layout::{itanium::ItaniumRecordLayoutBuilder, record_info},
 };
@@ -50,6 +51,7 @@ pub struct TypeLayoutCache<'a> {
     pub target_info: &'a TargetInfo,
     pub structures: &'a ir::Structures,
     pub resolved_ast: &'a resolved::Ast<'a>,
+    pub diagnostics: &'a Diagnostics<'a>,
 }
 
 impl<'a> TypeLayoutCache<'a> {
@@ -57,12 +59,14 @@ impl<'a> TypeLayoutCache<'a> {
         target_info: &'a TargetInfo,
         structures: &'a ir::Structures,
         resolved_ast: &'a resolved::Ast,
+        diagnostics: &'a Diagnostics<'a>,
     ) -> Self {
         Self {
             memo: OnceMap::new(),
             target_info,
             structures,
             resolved_ast,
+            diagnostics,
         }
     }
 
@@ -135,16 +139,8 @@ impl<'a> TypeLayoutCache<'a> {
     fn get_impl_record_layout(&self, info: &RecordInfo, name: Option<&str>) -> TypeLayout {
         // TODO: We should cache this
 
-        let mut builder = ItaniumRecordLayoutBuilder::new(self, None);
-        let diagnostics = builder.layout(info);
-
-        for diagnostic in diagnostics {
-            eprintln!(
-                "warning: {} (for {})",
-                diagnostic,
-                name.unwrap_or("<unnamed>"),
-            )
-        }
+        let mut builder = ItaniumRecordLayoutBuilder::new(self, None, self.diagnostics, name);
+        builder.layout(info);
 
         let size = ByteUnits::try_from(builder.size).unwrap();
 

@@ -7,6 +7,7 @@ mod types;
 use self::types::get_name_and_type;
 use crate::ast::{self, File};
 use crate::c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError};
+use crate::diagnostics::Diagnostics;
 use std::collections::HashMap;
 
 pub use self::expr::translate_expr;
@@ -18,6 +19,7 @@ pub fn declare_named_declaration(
     _attribute_specifiers: &[()],
     declaration_specifiers: &DeclarationSpecifiers,
     typedefs: &mut HashMap<String, CTypedef>,
+    diagnostics: &Diagnostics,
 ) -> Result<(), ParseError> {
     let (name, ast_type, is_typedef) = get_name_and_type(
         ast_file,
@@ -25,6 +27,7 @@ pub fn declare_named_declaration(
         declarator,
         declaration_specifiers,
         false,
+        diagnostics,
     )?;
 
     if is_typedef {

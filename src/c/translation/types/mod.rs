@@ -8,6 +8,7 @@ use self::decorate::{decorate_array, decorate_function, decorate_pointer};
 use self::enumeration::make_anonymous_enum;
 use self::get_type_base::get_type_base;
 use super::parameters::has_parameters;
+use crate::diagnostics::Diagnostics;
 use crate::{
     ast::{self, FloatSize, IntegerBits, IntegerSign, Parameter, Source, Type, TypeKind},
     c::parser::{
@@ -140,6 +141,7 @@ pub fn build_type_specifier_qualifier(
     builder: &mut TypeBaseBuilder,
     typedefs: &HashMap<String, CTypedef>,
     tsq: &TypeSpecifierQualifier,
+    diagnostics: &Diagnostics,
 ) -> Result<(), ParseError> {
     match tsq {
         TypeSpecifierQualifier::TypeSpecifier(ts) => match &ts.kind {
@@ -153,9 +155,10 @@ pub fn build_type_specifier_qualifier(
             TypeSpecifierKind::Double => builder.double(ts.source)?,
             TypeSpecifierKind::Signed => builder.sign(IntegerSign::Signed, ts.source)?,
             TypeSpecifierKind::Unsigned => builder.sign(IntegerSign::Unsigned, ts.source)?,
-            TypeSpecifierKind::Composite(composite) => {
-                builder.concrete(make_composite(ast_file, typedefs, composite)?, ts.source)?
-            }
+            TypeSpecifierKind::Composite(composite) => builder.concrete(
+                make_composite(ast_file, typedefs, composite, diagnostics)?,
+                ts.source,
+            )?,
             TypeSpecifierKind::Enumeration(enumeration) => {
                 builder.concrete(make_anonymous_enum(ast_file, enumeration)?, ts.source)?
             }
@@ -190,13 +193,15 @@ pub fn get_name_and_type(
     declarator: &Declarator,
     declaration_specifiers: &DeclarationSpecifiers,
     for_parameter: bool,
+    diagnostics: &Diagnostics,
 ) -> Result<(String, Type, bool), ParseError> {
-    let (name, decorators) = get_name_and_decorators(ast_file, typedefs, declarator)?;
+    let (name, decorators) = get_name_and_decorators(ast_file, typedefs, declarator, diagnostics)?;
     let type_base = get_type_base(
         ast_file,
         typedefs,
         declaration_specifiers,
         declarator.source,
+        diagnostics,
     )?;
 
     let mut ast_type = type_base.ast_type;
@@ -204,7 +209,7 @@ pub fn get_name_and_type(
     for decorator in decorators.iter() {
         match decorator {
             Decorator::Pointer(pointer) => {
-                ast_type = decorate_pointer(ast_type, pointer, decorator.source())?;
+                ast_type = decorate_pointer(ast_type, pointer, decorator.source(), diagnostics)?;
             }
             Decorator::Array(array) => {
                 ast_type = decorate_array(
@@ -214,6 +219,7 @@ pub fn get_name_and_type(
                     array,
                     for_parameter,
                     decorator.source(),
+                    diagnostics,
                 )?;
             }
             Decorator::Function(function) => {
@@ -229,16 +235,19 @@ fn get_name_and_decorators(
     ast_file: &mut ast::File,
     typedefs: &HashMap<String, CTypedef>,
     declarator: &Declarator,
+    diagnostics: &Diagnostics,
 ) -> Result<(String, Decorators), ParseError> {
     match &declarator.kind {
         DeclaratorKind::Named(name) => Ok((name.to_string(), Decorators::default())),
         DeclaratorKind::Pointer(inner, pointer) => {
-            let (name, mut decorators) = get_name_and_decorators(ast_file, typedefs, inner)?;
+            let (name, mut decorators) =
+                get_name_and_decorators(ast_file, typedefs, inner, diagnostics)?;
             decorators.then_pointer(pointer.clone());
             Ok((name, decorators))
         }
         DeclaratorKind::Function(inner, parameter_type_list) => {
-            let (name, mut decorators) = get_name_and_decorators(ast_file, typedefs, inner)?;
+            let (name, mut decorators) =
+                get_name_and_decorators(ast_file, typedefs, inner, diagnostics)?;
             let mut parameters =
                 Vec::with_capacity(parameter_type_list.parameter_declarations.len());
 
@@ -252,6 +261,7 @@ fn get_name_and_decorators(
                                 declarator,
                                 &parameter.declaration_specifiers,
                                 true,
+                                diagnostics,
                             )?;
                             (parameter_name, ast_type)
                         }
@@ -277,7 +287,8 @@ fn get_name_and_decorators(
             Ok((name, decorators))
         }
         DeclaratorKind::Array(inner, array_qualifier) => {
-            let (name, mut decorators) = get_name_and_decorators(ast_file, typedefs, inner)?;
+            let (name, mut decorators) =
+                get_name_and_decorators(ast_file, typedefs, inner, diagnostics)?;
             decorators.then_array(array_qualifier.clone());
             Ok((name, decorators))
         }

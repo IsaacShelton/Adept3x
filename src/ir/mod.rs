@@ -1,6 +1,8 @@
+use crate::ast::Source;
 use crate::data_units::ByteUnits;
 use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
 use crate::target_info::TargetInfo;
+use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
 use std::{collections::HashMap, ffi::CString};
 
@@ -52,6 +54,7 @@ pub struct Function {
 pub struct Structure {
     pub fields: Vec<Field>,
     pub is_packed: bool,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -188,17 +191,23 @@ pub struct Store {
     pub destination: Value,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Derivative, Clone, Debug)]
+#[derivative(Hash, PartialEq, Eq)]
 pub struct Field {
     pub ir_type: Type,
     pub properties: FieldProperties,
+
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
+    pub source: Source,
 }
 
 impl Field {
-    pub fn basic(ir_type: Type) -> Self {
+    pub fn basic(ir_type: Type, source: Source) -> Self {
         Self {
             ir_type,
             properties: FieldProperties::default(),
+            source,
         }
     }
 
@@ -332,14 +341,15 @@ impl Type {
     pub fn reference_counted_no_pointer(&self) -> Self {
         let subtypes = vec![
             // Reference count
-            Field::basic(Type::U64),
+            Field::basic(Type::U64, Source::internal()),
             // Value
-            Field::basic(self.clone()),
+            Field::basic(self.clone(), Source::internal()),
         ];
 
         Type::AnonymousComposite(TypeComposite {
             fields: subtypes,
             is_packed: false,
+            source: Source::internal(),
         })
     }
 
@@ -382,10 +392,15 @@ impl Type {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(PartialEq, Eq, Hash)]
 pub struct TypeComposite {
     pub fields: Vec<Field>,
     pub is_packed: bool,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    pub source: Source,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
