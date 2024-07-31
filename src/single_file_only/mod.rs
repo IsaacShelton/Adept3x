@@ -51,8 +51,12 @@ pub fn compile_single_file_only(compiler: &Compiler, project_folder: &Path, file
     );
 
     if compiler.options.interpret {
-        run_build_system_interpreter(&resolved_ast, &ir_module);
-        return;
+        if run_build_system_interpreter(&resolved_ast, &ir_module).is_err() {
+            eprintln!("interpreter failed");
+            exit(1);
+        } else {
+            return;
+        }
     }
 
     exit_unless(

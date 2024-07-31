@@ -50,6 +50,7 @@ pub enum ParseErrorKind {
     Lexical {
         message: String,
     },
+    CannotCallFunctionsAtGlobalScope,
     Other {
         message: String,
     },
@@ -155,6 +156,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::ExpectedEnumMemberName => {
                 write!(f, "Expected enum member name")?;
+            }
+            ParseErrorKind::CannotCallFunctionsAtGlobalScope => {
+                write!(f, "Cannot call functions at global scope")?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;

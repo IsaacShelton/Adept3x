@@ -203,6 +203,8 @@ impl<T: Text> Lexer<T> {
             '=' => {
                 if self.characters.eat('=') {
                     Has(TokenKind::Equals.at(source))
+                } else if self.characters.eat('>') {
+                    Has(TokenKind::FatArrow.at(source))
                 } else {
                     Has(TokenKind::Assign.at(source))
                 }

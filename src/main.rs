@@ -5,6 +5,7 @@
 #![feature(never_type)]
 #![feature(exhaustive_patterns)]
 #![feature(maybe_uninit_array_assume_init)]
+#![feature(once_cell_try_insert)]
 
 mod ast;
 mod borrow;
@@ -47,7 +48,7 @@ use compiler::Compiler;
 use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
 use generate_workspace::new_project;
 use single_file_only::compile_single_file_only;
-use std::{fs::metadata, path::Path, process::exit};
+use std::{fs::metadata, path::Path, process::exit, sync::OnceLock};
 use target_info::TargetInfo;
 use workspace::compile_workspace;
 
@@ -89,6 +90,7 @@ fn build_project(build_command: BuildCommand) {
         target_info,
         source_file_cache: &source_file_cache,
         diagnostics: &diagnostics,
+        version: OnceLock::new(),
     };
 
     if metadata.is_dir() {

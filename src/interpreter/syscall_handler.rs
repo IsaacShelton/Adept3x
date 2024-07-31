@@ -1,5 +1,10 @@
+use std::str::FromStr;
+
 use super::{memory::Memory, Value};
-use crate::ir::{self, InterpreterSyscallKind};
+use crate::{
+    ir::{self, InterpreterSyscallKind},
+    version::AdeptVersion,
+};
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
 
@@ -27,6 +32,7 @@ pub enum ProjectKind {
 #[derive(Debug, Default)]
 pub struct BuildSystemSyscallHandler {
     pub projects: Vec<Project>,
+    pub version: Option<AdeptVersion>,
 }
 
 fn read_cstring(memory: &Memory, value: &Value) -> String {
@@ -56,6 +62,21 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             ir::InterpreterSyscallKind::Println => {
                 assert_eq!(args.len(), 1);
                 println!("{}", read_cstring(memory, &args[0]));
+                Value::Literal(ir::Literal::Void)
+            }
+            ir::InterpreterSyscallKind::BuildSetAdeptVersion => {
+                assert_eq!(args.len(), 1);
+
+                let version_string = read_cstring(memory, &args[0]);
+                if let Ok(version) = AdeptVersion::from_str(&version_string) {
+                    self.version = Some(version);
+                } else {
+                    println!(
+                        "warning: Ignoring unrecognized Adept version '{}'",
+                        version_string
+                    );
+                }
+
                 Value::Literal(ir::Literal::Void)
             }
             ir::InterpreterSyscallKind::BuildAddProject => {

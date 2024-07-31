@@ -123,6 +123,7 @@ pub enum TokenKind {
     Decrement,
     Namespace,
     Extend,
+    FatArrow,
 }
 
 impl Display for TokenKind {
@@ -203,6 +204,7 @@ impl Display for TokenKind {
             TokenKind::Decrement => f.write_str("'--'"),
             TokenKind::Namespace => f.write_str("'::'"),
             TokenKind::Extend => f.write_str("'..'"),
+            TokenKind::FatArrow => f.write_str("'=>'"),
         }
     }
 }
@@ -285,7 +287,8 @@ impl TokenKind {
             | TokenKind::Hash
             | TokenKind::Ellipsis
             | TokenKind::Namespace
-            | TokenKind::Extend => 0,
+            | TokenKind::Extend
+            | TokenKind::FatArrow => 0,
         }
     }
 

@@ -141,6 +141,7 @@ pub enum Instruction {
 pub enum InterpreterSyscallKind {
     Println,
     BuildAddProject,
+    BuildSetAdeptVersion,
 }
 
 #[derive(Clone, Debug)]

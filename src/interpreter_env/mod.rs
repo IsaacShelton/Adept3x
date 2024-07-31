@@ -118,6 +118,31 @@ pub fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
     });
 
     file.functions.push(ast::Function {
+        name: "adept".into(),
+        parameters: ast::Parameters {
+            required: vec![ast::Parameter::new("version_string".into(), ptr_u8.clone())],
+            is_cstyle_vararg: false,
+        },
+        return_type: void.clone(),
+        stmts: vec![ast::StmtKind::Expr(
+            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+                kind: InterpreterSyscallKind::BuildSetAdeptVersion,
+                args: vec![(
+                    ptr_u8.clone(),
+                    ast::ExprKind::Variable("version_string".into()).at(source),
+                )],
+                result_type: void.clone(),
+            }))
+            .at(source),
+        )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+    });
+
+    file.functions.push(ast::Function {
         name: "project".into(),
         parameters: ast::Parameters {
             required: vec![
@@ -156,10 +181,13 @@ pub fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
         is_foreign: false,
         source,
         tag: None,
-    })
+    });
 }
 
-pub fn run_build_system_interpreter(resolved_ast: &resolved::Ast<'_>, ir_module: &ir::Module) {
+pub fn run_build_system_interpreter<'a>(
+    resolved_ast: &'a resolved::Ast<'_>,
+    ir_module: &'a ir::Module,
+) -> Result<Interpreter<'a, BuildSystemSyscallHandler>, ()> {
     let (interpreter_entry_point, _fn) = resolved_ast
         .functions
         .iter()
@@ -174,9 +202,9 @@ pub fn run_build_system_interpreter(resolved_ast: &resolved::Ast<'_>, ir_module:
         Ok(result) => assert!(result.is_literal() && result.unwrap_literal().is_void()),
         Err(err) => {
             eprintln!("build script error: {}", err);
-            return;
+            return Err(());
         }
     }
 
-    println!("Building:\n{:#?}", interpreter.syscall_handler.projects);
+    Ok(interpreter)
 }

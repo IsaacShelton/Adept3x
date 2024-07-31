@@ -1,4 +1,5 @@
 use crate::{
+    ast::Source,
     inflow::Inflow,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{Token, TokenKind},
@@ -57,11 +58,23 @@ where
         }
     }
 
+    pub fn eat_remember(&mut self, token: impl Borrow<TokenKind>) -> Option<Source> {
+        if self.peek_is(token) {
+            Some(self.advance().source)
+        } else {
+            None
+        }
+    }
+
     pub fn eat_identifier(&mut self) -> Option<String> {
         self.peek()
             .kind
             .is_identifier()
             .then(|| self.advance().kind.unwrap_identifier())
+    }
+
+    pub fn ignore_newlines(&mut self) {
+        while self.eat(TokenKind::Newline) {}
     }
 
     pub fn filename(&self) -> &str {

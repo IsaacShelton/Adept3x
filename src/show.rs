@@ -8,6 +8,10 @@ pub trait Show {
     ) -> std::fmt::Result;
 }
 
+pub fn into_show<T: Show + 'static>(show: T) -> Box<dyn Show> {
+    Box::new(show)
+}
+
 pub fn error_println(message: &str, source: Source, source_file_cache: &SourceFileCache) {
     eprintln!(
         "{}:{}:{}: error: {}",

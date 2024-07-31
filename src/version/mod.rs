@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 const ADEPT_VERSION: AdeptVersion = AdeptVersion {
     major: 3,
@@ -11,6 +11,16 @@ pub struct AdeptVersion {
     major: u8,
     minor: u8,
     release: u8,
+}
+
+impl Display for AdeptVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.release == 0 {
+            write!(f, "{}.{}", self.major, self.minor)
+        } else {
+            write!(f, "{}.{}.{}", self.major, self.minor, self.release)
+        }
+    }
 }
 
 impl PartialOrd for AdeptVersion {
@@ -29,16 +39,30 @@ impl Ord for AdeptVersion {
 }
 
 impl FromStr for AdeptVersion {
-    type Err = !;
+    type Err = ();
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let mut chunks = text.split('.');
 
         let parse_digit = |x| u8::from_str(x).ok();
 
-        let major = chunks.next().and_then(parse_digit).unwrap_or(0);
-        let minor = chunks.next().and_then(parse_digit).unwrap_or(0);
-        let release = chunks.next().and_then(parse_digit).unwrap_or(0);
+        let major = chunks
+            .next()
+            .map(|chunk| parse_digit(chunk).ok_or(()))
+            .transpose()?
+            .unwrap_or(0);
+
+        let minor = chunks
+            .next()
+            .map(|chunk| parse_digit(chunk).ok_or(()))
+            .transpose()?
+            .unwrap_or(0);
+
+        let release = chunks
+            .next()
+            .map(|chunk| parse_digit(chunk).ok_or(()))
+            .transpose()?
+            .unwrap_or(0);
 
         Ok(Self {
             major,

@@ -9,11 +9,10 @@ mod fs;
 mod normal_file;
 
 use crate::{
-    ast::{self, Source},
+    ast::{self, Ast, AstFile, FileId, Function, Parameters, Source, StmtKind, TypeKind},
     c::{
         self,
         lexer::lex_c_code,
-        parser::{Input, Parser},
         preprocessor::{DefineKind, Preprocessed},
         translate_expr,
     },
@@ -21,14 +20,14 @@ use crate::{
     compiler::Compiler,
     diagnostics::WarningDiagnostic,
     exit_unless,
-    inflow::{Inflow, InflowStream, IntoInflow},
+    inflow::{Inflow, IntoInflow},
     interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
     lexer::Lexer,
     llvm_backend::llvm_backend,
     lower::lower,
-    parser::{parse, parse_into},
+    parser::{self, error::ParseErrorKind, parse, parse_into, Input},
     resolve::resolve,
-    show::error_println,
+    show::{into_show, Show},
     text::{IntoText, IntoTextStream, TextStream},
     token::{Token, TokenKind},
 };
@@ -40,8 +39,8 @@ use std::{
     path::Path,
     process::exit,
     sync::{
-        atomic::{AtomicU64, Ordering},
-        Barrier, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Barrier, Mutex, OnceLock,
     },
     time::Instant,
 };
@@ -56,7 +55,7 @@ pub fn compile_workspace(compiler: &Compiler, folder_path: &Path) {
     let start_time = Instant::now();
     let files_processed = AtomicU64::new(0);
     let bytes_processed = AtomicU64::new(0);
-    let files_failed = AtomicU64::new(0);
+    let num_files_failed = AtomicU64::new(0);
 
     let ExploreResult {
         root_node,
@@ -68,15 +67,21 @@ pub fn compile_workspace(compiler: &Compiler, folder_path: &Path) {
     let all_modules_done = Barrier::new(num_threads);
     let normal_files = Mutex::new(normal_files);
     let module_files = Mutex::new(module_files);
+    let has_module_errors = AtomicBool::new(false);
 
     std::thread::scope(|scope| {
         for _ in 0..num_threads {
             scope.spawn(|| {
                 // ===== Process module files =====
-                while let Some(module_file) = module_files.lock().unwrap().pop() {
+                loop {
+                    // CAREFUL: Lock doesn't immediately drop unless we do it this way (while loop is not equivalent)
+                    let Some(module_file) = module_files.lock().unwrap().pop() else {
+                        break;
+                    };
+
                     let Ok(did_bytes) = compile_module_file(compiler, &root_node, &module_file)
                     else {
-                        files_failed.fetch_add(1, Ordering::Relaxed);
+                        num_files_failed.fetch_add(1, Ordering::Relaxed);
                         continue;
                     };
 
@@ -86,11 +91,22 @@ pub fn compile_workspace(compiler: &Compiler, folder_path: &Path) {
 
                 all_modules_done.wait();
 
+                // ==== Don't continue if module files had errors =====
+                if num_files_failed.load(Ordering::SeqCst) != 0 {
+                    has_module_errors.store(true, Ordering::Relaxed);
+                    return;
+                }
+
                 // ===== Process normal files =====
-                while let Some(normal_file) = normal_files.lock().unwrap().pop() {
+                loop {
+                    // CAREFUL: Lock doesn't immediately drop unless we do it this way (while loop is not equivalent)
+                    let Some(normal_file) = normal_files.lock().unwrap().pop() else {
+                        break;
+                    };
+
                     let Ok(did_bytes) = compile_normal_file(compiler, &root_node, &normal_file)
                     else {
-                        files_failed.fetch_add(1, Ordering::Relaxed);
+                        num_files_failed.fetch_add(1, Ordering::Relaxed);
                         continue;
                     };
 
@@ -101,22 +117,31 @@ pub fn compile_workspace(compiler: &Compiler, folder_path: &Path) {
         }
     });
 
-    if true {
-        compiler.diagnostics.push(WarningDiagnostic::plain(
-            "Module system is not fully implemented yet, falling back to old system",
-        ));
-        return old_compile_workspace(compiler, folder_path);
+    if let Some(version) = compiler.version.get() {
+        println!("[{}] Adept {}", folder_path.display(), version);
+    } else {
+        eprintln!("error: No Adept version was specified!, Use `pragma => adept(c\"3.0\")` at the top of your module file");
+        exit(1);
     }
+
+    compiler.diagnostics.push(WarningDiagnostic::plain(
+        "Module system is not fully implemented yet",
+    ));
 
     // Print summary:
 
     let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
-    let files_failed = files_failed.load(Ordering::SeqCst);
+    let num_files_failed = num_files_failed.load(Ordering::SeqCst);
 
-    if files_failed != 0 {
+    if num_files_failed != 0 {
+        let prefix = if has_module_errors.load(Ordering::SeqCst) {
+            "module "
+        } else {
+            ""
+        };
+
         eprintln!(
-            "error: {} files were determined to have errors in {:.2} seconds",
-            files_failed, in_how_many_seconds
+            "error: {num_files_failed} {prefix}file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
         );
 
         exit(1);
@@ -135,9 +160,145 @@ pub fn compile_workspace(compiler: &Compiler, folder_path: &Path) {
     );
 }
 
-fn compile_module_file(compiler: &Compiler, _root_node: &FsNode, path: &Path) -> Result<usize, ()> {
-    println!("[module] {}", path.display());
+struct PragmaSection<'a, I: Inflow<Token>> {
+    pub ast: Ast<'a>,
+    pub rest_input: Option<Input<'a, I>>,
+    pub pragma_source: Source,
+}
 
+impl<'a, I: Inflow<Token>> PragmaSection<'a, I> {
+    pub fn run(mut self, base_compiler: &Compiler) -> Result<Option<Input<'a, I>>, Box<dyn Show>> {
+        let compiler = Compiler {
+            options: BuildOptions {
+                emit_llvm_ir: false,
+                emit_ir: false,
+                interpret: true,
+                coerce_main_signature: false,
+            },
+            target_info: base_compiler.target_info.clone(),
+            source_file_cache: base_compiler.source_file_cache,
+            diagnostics: base_compiler.diagnostics,
+            version: OnceLock::new(),
+        };
+
+        setup_build_system_interpreter_symbols(&mut self.ast);
+
+        let resolved_ast = resolve(&self.ast, &compiler.options).map_err(into_show)?;
+
+        let ir_module =
+            lower(&compiler.options, &resolved_ast, &compiler.target_info).map_err(into_show)?;
+
+        if let Ok(interpreter) = run_build_system_interpreter(&resolved_ast, &ir_module) {
+            if let Some(version) = interpreter.syscall_handler.version {
+                if base_compiler.version.try_insert(version).is_err() {
+                    return Err(into_show(
+                        ParseErrorKind::Other {
+                            message: "Adept version was already specified".into(),
+                        }
+                        .at(self.pragma_source),
+                    ));
+                }
+            }
+        }
+
+        Ok(self.rest_input)
+    }
+}
+
+fn parse_pragma_section<'a, I: Inflow<Token> + 'a>(
+    mut input: Input<'a, I>,
+) -> Result<PragmaSection<'a, I>, Box<dyn Show>> {
+    input.ignore_newlines();
+
+    let Some(pragma_source) = input.eat_remember(TokenKind::PragmaKeyword) else {
+        return Err(Box::new(
+            ParseErrorKind::Other {
+                message: "Expected 'pragma' at beginning of module file".into(),
+            }
+            .at(input.peek().source),
+        ));
+    };
+
+    input.ignore_newlines();
+
+    let mut ast_file = AstFile::new();
+    let mut parser = parser::Parser::new(input);
+
+    if parser.input.eat(TokenKind::OpenCurly) {
+        // "Whole-file" mode
+
+        while !parser.input.peek_is(TokenKind::CloseCurly) {
+            parser
+                .parse_top_level(&mut ast_file, vec![])
+                .map_err(into_show)?;
+
+            parser.input.ignore_newlines();
+        }
+
+        if !parser.input.eat(TokenKind::CloseCurly) {
+            return Err(Box::new(
+                ParseErrorKind::Expected {
+                    expected: "'}'".into(),
+                    for_reason: Some("to close pragma section".into()),
+                    got: parser.input.peek().to_string(),
+                }
+                .at(parser.input.peek().source),
+            ));
+        }
+    } else if let Some(source) = parser.input.eat_remember(TokenKind::FatArrow) {
+        let is_block = parser.input.peek_is(TokenKind::OpenCurly);
+
+        let stmts = if is_block {
+            // "Inside-main-only" mode
+            parser.parse_block("pragma").map_err(into_show)?
+        } else {
+            // "Single-expression" mode
+            let expr = parser.parse_expr().map_err(into_show)?;
+            let expr_source = expr.source;
+            vec![StmtKind::Expr(expr).at(expr_source)]
+        };
+
+        ast_file.functions.push(Function {
+            name: "main".into(),
+            parameters: Parameters {
+                required: vec![],
+                is_cstyle_vararg: false,
+            },
+            return_type: TypeKind::Void.at(source),
+            stmts,
+            is_foreign: false,
+            source,
+            abide_abi: false,
+            tag: None,
+        });
+    } else {
+        return Err(Box::new(
+            ParseErrorKind::Expected {
+                expected: "'=>' or '{' after 'pragma' keyword".into(),
+                for_reason: None,
+                got: parser.input.peek().to_string(),
+            }
+            .at(parser.input.peek().source),
+        ));
+    }
+
+    // Leave input unfinished
+    input = parser.input;
+
+    // Create AST from ast file
+    let filename = input.filename();
+    let file_id = FileId::Local(filename.into());
+    let mut ast = Ast::new(filename.into(), input.source_file_cache());
+    ast.files.insert(file_id, ast_file);
+
+    Ok(PragmaSection {
+        ast,
+        rest_input: Some(input),
+        pragma_source,
+    })
+}
+
+fn compile_module_file(compiler: &Compiler, _root_node: &FsNode, path: &Path) -> Result<usize, ()> {
     let content = std::fs::read_to_string(path).map_err(|err| {
         eprintln!("{}", err);
         ()
@@ -148,60 +309,24 @@ fn compile_module_file(compiler: &Compiler, _root_node: &FsNode, path: &Path) ->
     let content = source_file_cache.get(key).content();
 
     let text = content.chars().into_text_stream(key).into_text();
-    let mut lexer = Lexer::new(text).into_inflow();
+    let lexer = Lexer::new(text).into_inflow();
+    let mut input = Input::new(lexer, compiler.source_file_cache, key);
+    input.ignore_newlines();
 
-    // Ignore initial newlines
-    while lexer.peek().kind.is_newline() {
-        lexer.next();
-    }
-
-    match lexer.next() {
-        Token {
-            kind: TokenKind::PragmaKeyword,
-            source,
-        } => {
-            // TODO: UNIMPLEMENTED: Implement pragma sections
-            if true {
-                error_println(
-                    "Handling pragma sections not implemented yet",
-                    source,
-                    compiler.source_file_cache,
-                );
+    while input.peek_is(TokenKind::PragmaKeyword) {
+        input = match parse_pragma_section(input).and_then(|section| section.run(compiler)) {
+            Ok(Some(rest)) => rest,
+            Ok(None) => break,
+            Err(err) => {
+                let mut s = String::new();
+                err.show(&mut s, source_file_cache).unwrap();
+                eprintln!("{}", s);
                 return Err(());
             }
-        }
-        bad => {
-            error_println(
-                "Expected 'pragma' at beginning of module file",
-                bad.source,
-                compiler.source_file_cache,
-            );
-            return Err(());
-        }
+        };
+
+        input.ignore_newlines();
     }
-
-    let mut ast = parse(lexer, source_file_cache, key).map_err(|_| ())?;
-
-    let compiler = Compiler {
-        options: BuildOptions {
-            emit_llvm_ir: false,
-            emit_ir: false,
-            interpret: true,
-            coerce_main_signature: false,
-        },
-        target_info: compiler.target_info.clone(),
-        source_file_cache: compiler.source_file_cache,
-        diagnostics: compiler.diagnostics,
-    };
-
-    setup_build_system_interpreter_symbols(&mut ast);
-
-    let resolved_ast = resolve(&ast, &compiler.options).map_err(|_| ())?;
-
-    let ir_module =
-        lower(&compiler.options, &resolved_ast, &compiler.target_info).map_err(|_| ())?;
-
-    run_build_system_interpreter(&resolved_ast, &ir_module);
 
     Ok(content.len())
 }
@@ -212,8 +337,6 @@ fn compile_normal_file(
     normal_file: &NormalFile,
 ) -> Result<usize, ()> {
     let path = &normal_file.path;
-
-    println!("[code] {}", path.display());
 
     let content = std::fs::read_to_string(path).map_err(|err| {
         eprintln!("{}", err);
@@ -294,8 +417,8 @@ pub fn old_compile_workspace(compiler: &Compiler, folder_path: &Path) {
 
             let lexed = lex_c_code(document, end_of_file);
 
-            let mut parser = Parser::new(
-                Input::new(lexed, source_file_cache, key),
+            let mut parser = c::parser::Parser::new(
+                c::parser::Input::new(lexed, source_file_cache, key),
                 compiler.diagnostics,
             );
 

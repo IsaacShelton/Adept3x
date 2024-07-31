@@ -1,12 +1,11 @@
 mod annotation;
-mod error;
+pub mod error;
 mod input;
 mod make_error;
 
 use self::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
-    input::Input,
 };
 use crate::{
     ast::{
@@ -30,8 +29,28 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use std::{borrow::Borrow, ffi::CString, mem::MaybeUninit};
 
-struct Parser<'a, I: Inflow<Token>> {
-    input: Input<'a, I>,
+pub use self::input::Input;
+
+pub fn parse(
+    tokens: impl Inflow<Token>,
+    source_file_cache: &SourceFileCache,
+    key: SourceFileCacheKey,
+) -> Result<Ast, ParseError> {
+    Parser::new(Input::new(tokens, source_file_cache, key)).parse()
+}
+
+pub fn parse_into(
+    tokens: impl Inflow<Token>,
+    source_file_cache: &SourceFileCache,
+    key: SourceFileCacheKey,
+    ast: &mut Ast,
+    filename: String,
+) -> Result<(), ParseError> {
+    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast, filename)
+}
+
+pub struct Parser<'a, I: Inflow<Token>> {
+    pub input: Input<'a, I>,
 }
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
@@ -64,7 +83,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Ok(())
     }
 
-    fn parse_top_level(
+    pub fn parse_top_level(
         &mut self,
         ast_file: &mut AstFile,
         parent_annotations: Vec<Annotation>,
@@ -183,7 +202,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     }
 
     fn ignore_newlines(&mut self) {
-        while let TokenKind::Newline = self.input.peek().kind {
+        while self.input.peek().kind.is_newline() {
             self.input.advance();
         }
     }
@@ -234,6 +253,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let (name, source) =
             self.parse_identifier_keep_location(Some("for name of global variable"))?;
+
+        // Better error message for trying to call functions at global scope
+        if self.input.peek_is(TokenKind::OpenParen) {
+            return Err(ParseErrorKind::CannotCallFunctionsAtGlobalScope.at(source));
+        }
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 
@@ -461,7 +485,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         })
     }
 
-    fn parse_block(&mut self, to_begin_what_block: &str) -> Result<Vec<Stmt>, ParseError> {
+    pub fn parse_block(&mut self, to_begin_what_block: &str) -> Result<Vec<Stmt>, ParseError> {
         self.ignore_newlines();
 
         self.parse_token(
@@ -629,7 +653,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         .at(source))
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+    pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         let primary = self.parse_expr_primary()?;
         self.parse_operator_expr(0, primary)
     }
@@ -1285,24 +1309,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     fn source_here(&mut self) -> Source {
         self.input.peek().source
     }
-}
-
-pub fn parse(
-    tokens: impl Inflow<Token>,
-    source_file_cache: &SourceFileCache,
-    key: SourceFileCacheKey,
-) -> Result<Ast, ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse()
-}
-
-pub fn parse_into(
-    tokens: impl Inflow<Token>,
-    source_file_cache: &SourceFileCache,
-    key: SourceFileCacheKey,
-    ast: &mut Ast,
-    filename: String,
-) -> Result<(), ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast, filename)
 }
 
 fn is_terminating_token(kind: &TokenKind) -> bool {
