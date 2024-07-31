@@ -16,10 +16,6 @@ use crate::text::Character;
 use crate::text::Text;
 use crate::token::{StringLiteral, StringModifier, Token, TokenKind};
 
-/*
-    NOTE: We guarantee that lexer returns `Some(Token { kind : TokenKind::EndOfFile, .. })`
-    before returning `None`. Prehaps it should be migrated to use `InflowStream` instead?
-*/
 pub struct Lexer<T: Text> {
     characters: T,
     state: State,
@@ -54,10 +50,7 @@ impl<T: Text> Lexer<T> {
             // These require a preceeding space right now, but might be made more permissive later.
             // (at the very least '<' needs a preceeding space to disambiguate between less-than and left-angle)
             // (this seems to be the best syntax trade off as everybody uses a preceeding space anyway)
-            if let Character::At('<', source) = self.characters.peek() {
-                self.characters.next();
-
-                // TODO: CLEANUP: This could be better
+            if let Ok(source) = self.characters.eat_remember('<') {
                 let (token_kind, num_extra_chars) =
                     match &self.characters.peek_n::<3>().map(Character::or_nul) {
                         ['<', '<', '=', ..] => (TokenKind::LogicalLeftShiftAssign, 3),
@@ -72,13 +65,13 @@ impl<T: Text> Lexer<T> {
                     self.characters.next();
                 }
 
-                return Has(Token::new(token_kind, source));
+                return Has(token_kind.at(source));
             }
         }
 
         match self.characters.next() {
             Character::At(c, source) => self.feed_idle_char(c, source),
-            Character::End(source) => Has(Token::new(TokenKind::EndOfFile, source)),
+            Character::End(source) => Has(TokenKind::EndOfFile.at(source)),
         }
     }
 
@@ -86,13 +79,13 @@ impl<T: Text> Lexer<T> {
         use FeedResult::*;
 
         match c {
-            '\n' => Has(Token::new(TokenKind::Newline, source)),
-            '{' => Has(Token::new(TokenKind::OpenCurly, source)),
-            '}' => Has(Token::new(TokenKind::CloseCurly, source)),
-            '(' => Has(Token::new(TokenKind::OpenParen, source)),
-            ')' => Has(Token::new(TokenKind::CloseParen, source)),
-            '[' => Has(Token::new(TokenKind::OpenBracket, source)),
-            ']' => Has(Token::new(TokenKind::CloseBracket, source)),
+            '\n' => Has(TokenKind::Newline.at(source)),
+            '{' => Has(TokenKind::OpenCurly.at(source)),
+            '}' => Has(TokenKind::CloseCurly.at(source)),
+            '(' => Has(TokenKind::OpenParen.at(source)),
+            ')' => Has(TokenKind::CloseParen.at(source)),
+            '[' => Has(TokenKind::OpenBracket.at(source)),
+            ']' => Has(TokenKind::CloseBracket.at(source)),
             '/' if self.characters.eat('*') => {
                 // Multi-line comment
 
@@ -128,7 +121,7 @@ impl<T: Text> Lexer<T> {
                         }
                     }
 
-                    Has(Token::new(TokenKind::DocComment(comment), source))
+                    Has(TokenKind::DocComment(comment).at(source))
                 } else {
                     // Regular line comment
 
@@ -154,10 +147,8 @@ impl<T: Text> Lexer<T> {
                                 start_source: source,
                             })
                         } else {
-                            return Has(Token::new(
-                                TokenKind::Error("Expected hex number after '0x'".into()),
-                                hex_source,
-                            ));
+                            return Has(TokenKind::Error("Expected hex number after '0x'".into())
+                                .at(hex_source));
                         }
                     }
                     _ => State::Number(NumberState::new(String::from(c), source)),
@@ -167,107 +158,101 @@ impl<T: Text> Lexer<T> {
             }
             '.' => {
                 if self.characters.eat("..") {
-                    Has(Token::new(TokenKind::Ellipsis, source))
+                    Has(TokenKind::Ellipsis.at(source))
                 } else if self.characters.eat('.') {
-                    Has(Token::new(TokenKind::Extend, source))
+                    Has(TokenKind::Extend.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Member, source))
+                    Has(TokenKind::Member.at(source))
                 }
             }
             '+' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::AddAssign, source))
+                    Has(TokenKind::AddAssign.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Add, source))
+                    Has(TokenKind::Add.at(source))
                 }
             }
             '-' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::SubtractAssign, source))
+                    Has(TokenKind::SubtractAssign.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Subtract, source))
+                    Has(TokenKind::Subtract.at(source))
                 }
             }
             '*' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::MultiplyAssign, source))
+                    Has(TokenKind::MultiplyAssign.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Multiply, source))
+                    Has(TokenKind::Multiply.at(source))
                 }
             }
             '/' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::DivideAssign, source))
+                    Has(TokenKind::DivideAssign.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Divide, source))
+                    Has(TokenKind::Divide.at(source))
                 }
             }
             '%' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::ModulusAssign, source))
+                    Has(TokenKind::ModulusAssign.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Modulus, source))
+                    Has(TokenKind::Modulus.at(source))
                 }
             }
             '=' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::Equals, source))
+                    Has(TokenKind::Equals.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Assign, source))
+                    Has(TokenKind::Assign.at(source))
                 }
             }
             '!' if self.characters.eat('=') => {
                 self.characters.next();
-                Has(Token::new(TokenKind::NotEquals, source))
+                Has(TokenKind::NotEquals.at(source))
             }
             '>' if self.characters.eat('=') => {
                 self.characters.next();
-                Has(Token::new(TokenKind::GreaterThanEq, source))
+                Has(TokenKind::GreaterThanEq.at(source))
             }
-            '>' if self.characters.eat(">>=") => {
-                Has(Token::new(TokenKind::LogicalRightShiftAssign, source))
-            }
-            '>' if self.characters.eat(">>") => {
-                Has(Token::new(TokenKind::LogicalRightShift, source))
-            }
-            '>' if self.characters.eat(">=") => {
-                Has(Token::new(TokenKind::RightShiftAssign, source))
-            }
-            '>' if self.characters.eat('>') => Has(Token::new(TokenKind::RightShift, source)),
-            '>' => Has(Token::new(TokenKind::GreaterThan, source)),
-            '<' => Has(Token::new(TokenKind::OpenAngle, source)),
-            '!' => Has(Token::new(TokenKind::Not, source)),
-            '~' => Has(Token::new(TokenKind::BitComplement, source)),
+            '>' if self.characters.eat(">>=") => Has(TokenKind::LogicalRightShiftAssign.at(source)),
+            '>' if self.characters.eat(">>") => Has(TokenKind::LogicalRightShift.at(source)),
+            '>' if self.characters.eat(">=") => Has(TokenKind::RightShiftAssign.at(source)),
+            '>' if self.characters.eat('>') => Has(TokenKind::RightShift.at(source)),
+            '>' => Has(TokenKind::GreaterThan.at(source)),
+            '<' => Has(TokenKind::OpenAngle.at(source)),
+            '!' => Has(TokenKind::Not.at(source)),
+            '~' => Has(TokenKind::BitComplement.at(source)),
             '&' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::AmpersandAssign, source))
+                    Has(TokenKind::AmpersandAssign.at(source))
                 } else if self.characters.eat('&') {
-                    Has(Token::new(TokenKind::And, source))
+                    Has(TokenKind::And.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Ampersand, source))
+                    Has(TokenKind::Ampersand.at(source))
                 }
             }
             '|' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::PipeAssign, source))
+                    Has(TokenKind::PipeAssign.at(source))
                 } else if self.characters.eat('|') {
-                    Has(Token::new(TokenKind::Or, source))
+                    Has(TokenKind::Or.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Pipe, source))
+                    Has(TokenKind::Pipe.at(source))
                 }
             }
             '^' => {
                 if self.characters.eat('=') {
-                    Has(Token::new(TokenKind::CaretAssign, source))
+                    Has(TokenKind::CaretAssign.at(source))
                 } else {
-                    Has(Token::new(TokenKind::Caret, source))
+                    Has(TokenKind::Caret.at(source))
                 }
             }
-            ',' => Has(Token::new(TokenKind::Comma, source)),
-            ':' if self.characters.eat('=') => Has(Token::new(TokenKind::DeclareAssign, source)),
-            ':' if self.characters.eat(':') => Has(Token::new(TokenKind::Namespace, source)),
-            ':' => Has(Token::new(TokenKind::Colon, source)),
-            '#' => Has(Token::new(TokenKind::Hash, source)),
+            ',' => Has(TokenKind::Comma.at(source)),
+            ':' if self.characters.eat('=') => Has(TokenKind::DeclareAssign.at(source)),
+            ':' if self.characters.eat(':') => Has(TokenKind::Namespace.at(source)),
+            ':' => Has(TokenKind::Colon.at(source)),
+            '#' => Has(TokenKind::Hash.at(source)),
             '\"' => {
                 self.state = State::String(StringState {
                     value: String::new(),
@@ -294,10 +279,7 @@ impl<T: Text> Lexer<T> {
                 });
                 Waiting
             }
-            _ => Has(Token::new(
-                TokenKind::Error(format!("Unexpected character '{}'", c)),
-                source,
-            )),
+            _ => Has(TokenKind::Error(format!("Unexpected character '{}'", c)).at(source)),
         }
     }
 
@@ -344,10 +326,10 @@ impl<T: Text> Lexer<T> {
 
                         Waiting
                     } else {
-                        Has(Token::new(
-                            TokenKind::Error("Expected character after string esacpe '\\'".into()),
-                            c_source,
-                        ))
+                        Has(
+                            TokenKind::Error("Expected character after string esacpe '\\'".into())
+                                .at(c_source),
+                        )
                     }
                 } else {
                     state.value.push(c);

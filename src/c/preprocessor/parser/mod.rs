@@ -495,7 +495,7 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
                             .into()),
                     }?;
 
-                    result.push(PreToken::new(new_token_kind, token.source));
+                    result.push(new_token_kind.at(token.source));
                 }
                 _ => result.push(token.clone()),
             }

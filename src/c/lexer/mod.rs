@@ -26,7 +26,7 @@ pub fn lex_c_code(preprocessed: Vec<PreToken>, eof_source: Source) -> Vec<CToken
     Lexer::new(
         preprocessed
             .into_iter()
-            .into_inflow_stream(PreToken::new(PreTokenKind::EndOfSequence, eof_source))
+            .into_inflow_stream(PreTokenKind::EndOfSequence.at(eof_source))
             .into_inflow(),
     )
     .collect_vec(true)

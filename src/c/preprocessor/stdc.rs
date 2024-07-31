@@ -1,6 +1,4 @@
-use super::{
-    ast::PlaceholderAffinity, expand::Environment, Define, DefineKind, PreToken, PreTokenKind,
-};
+use super::{ast::PlaceholderAffinity, expand::Environment, Define, DefineKind, PreTokenKind};
 use crate::ast::Source;
 
 pub fn stdc() -> Environment {
@@ -16,10 +14,7 @@ pub fn stdc() -> Environment {
         name: "__STDC_VERSION__".into(),
         source: Source::internal(),
         kind: DefineKind::ObjectMacro(
-            vec![PreToken::new(
-                PreTokenKind::Number("202311L".into()),
-                Source::internal(),
-            )],
+            vec![PreTokenKind::Number("202311L".into()).at(Source::internal())],
             PlaceholderAffinity::Discard,
         ),
     });

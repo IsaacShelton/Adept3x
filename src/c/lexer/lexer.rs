@@ -24,7 +24,7 @@ impl<I: Inflow<PreToken>> InflowStream for Lexer<I> {
         let PreToken { kind, source } = self.input.next();
 
         let kind = match kind {
-            PreTokenKind::EndOfSequence => return CToken::new(CTokenKind::EndOfFile, source),
+            PreTokenKind::EndOfSequence => return CTokenKind::EndOfFile.at(source),
             PreTokenKind::Identifier(name) | PreTokenKind::ProtectedIdentifier(name) => {
                 match name.as_str() {
                     "alignas" | "_Alignas" => CTokenKind::AlignasKeyword,

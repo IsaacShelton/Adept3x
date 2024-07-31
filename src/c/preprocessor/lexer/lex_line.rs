@@ -19,7 +19,7 @@ pub fn lex_line(
     let mut state = starting_state;
 
     fn push_punctuator_token(tokens: &mut Vec<PreToken>, punctuator: Punctuator, source: Source) {
-        tokens.push(PreToken::new(PreTokenKind::Punctuator(punctuator), source));
+        tokens.push(PreTokenKind::Punctuator(punctuator).at(source));
     }
 
     fn prefer_header_name(tokens: &[PreToken]) -> bool {
@@ -135,7 +135,7 @@ pub fn lex_line(
                         state = State::Identifier(c.into(), source);
                     }
                     // Other Unrecognized Characters
-                    _ => tokens.push(PreToken::new(PreTokenKind::Other(c), source)),
+                    _ => tokens.push(PreTokenKind::Other(c).at(source)),
                 }
 
                 preceeded_by_whitespace = match c {
