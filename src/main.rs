@@ -2,6 +2,9 @@
 #![allow(clippy::diverging_sub_expression)]
 #![allow(clippy::module_name_repetitions)]
 #![feature(string_remove_matches)]
+#![feature(never_type)]
+#![feature(exhaustive_patterns)]
+#![feature(maybe_uninit_array_assume_init)]
 
 mod ast;
 mod borrow;
@@ -13,6 +16,7 @@ mod diagnostics;
 mod generate_workspace;
 mod inflow;
 mod interpreter;
+mod interpreter_env;
 mod ir;
 mod lexer;
 mod lexical_utils;
@@ -32,6 +36,7 @@ mod target_info;
 mod text;
 mod token;
 mod try_insert_index_map;
+mod version;
 mod workspace;
 
 use crate::cli::BuildCommand;
@@ -92,7 +97,14 @@ fn build_project(build_command: BuildCommand) {
         if filepath.extension().unwrap_or_default() == "h" {
             let source_file_cache = &compiler.source_file_cache;
 
-            let header_key = source_file_cache.add_or_exit(&filename);
+            let content = std::fs::read_to_string(filepath)
+                .map_err(|err| {
+                    eprintln!("{}", err);
+                    exit(1);
+                })
+                .unwrap();
+
+            let header_key = source_file_cache.add(filepath.into(), content);
 
             let header_contents = source_file_cache
                 .get(header_key)

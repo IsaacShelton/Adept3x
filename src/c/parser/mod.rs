@@ -14,7 +14,7 @@ use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
 };
-use crate::ast::{Ast, FileIdentifier, Source};
+use crate::ast::{Ast, FileId, Source};
 use crate::ast::{Parameter, Type, TypeKind};
 use crate::diagnostics::{Diagnostics, WarningDiagnostic};
 use derive_more::IsVariant;
@@ -471,7 +471,7 @@ impl<'a> Parser<'a> {
         self.input.switch_input(tokens);
     }
 
-    pub fn parse(&mut self) -> Result<(Ast<'a>, FileIdentifier), ParseError> {
+    pub fn parse(&mut self) -> Result<(Ast<'a>, FileId), ParseError> {
         // Get primary filename
         let filename = self.input.filename();
 
@@ -485,13 +485,9 @@ impl<'a> Parser<'a> {
         Ok((ast, file_id))
     }
 
-    pub fn parse_into(
-        &mut self,
-        ast: &mut Ast,
-        filename: String,
-    ) -> Result<FileIdentifier, ParseError> {
+    pub fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<FileId, ParseError> {
         // Create ast file
-        let file_id = FileIdentifier::Local(filename);
+        let file_id = FileId::Local(filename);
         let ast_file = ast.new_file(file_id.clone());
 
         while !self.input.peek().is_end_of_file() {

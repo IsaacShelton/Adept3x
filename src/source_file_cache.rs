@@ -1,5 +1,6 @@
+use std::path::PathBuf;
+
 use append_only_vec::AppendOnlyVec;
-use std::{fs::read_to_string, process::exit};
 
 #[derive(Debug)]
 pub struct SourceFileCache {
@@ -32,42 +33,26 @@ impl SourceFileCache {
         &self.files[key.index as usize]
     }
 
-    pub fn add(&self, filename: &str) -> Result<SourceFileCacheKey, std::io::Error> {
-        match read_to_string(filename) {
-            Ok(content) => {
-                let index = self.files.push(SourceFile {
-                    filename: filename.to_string(),
-                    content,
-                });
+    pub fn add(&self, filename: PathBuf, content: String) -> SourceFileCacheKey {
+        let index = self.files.push(SourceFile { filename, content });
 
-                Ok(SourceFileCacheKey {
-                    index: index.try_into().unwrap(),
-                })
-            }
-            Err(error) => Err(error),
-        }
-    }
-
-    pub fn add_or_exit(&self, filename: &str) -> SourceFileCacheKey {
-        match self.add(filename) {
-            Ok(key) => key,
-            Err(_) => {
-                eprintln!("Failed to open file {}", filename);
-                exit(1)
-            }
+        SourceFileCacheKey {
+            index: index.try_into().unwrap(),
         }
     }
 }
 
 #[derive(Debug)]
 pub struct SourceFile {
-    filename: String,
+    filename: PathBuf,
     content: String,
 }
 
 impl SourceFile {
     pub fn filename(&self) -> &str {
-        &self.filename
+        self.filename
+            .to_str()
+            .unwrap_or("<invalid unicode filename>")
     }
 
     pub fn content(&self) -> &str {

@@ -1,4 +1,4 @@
-use crate::line_column::Location;
+use crate::ast::Source;
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -13,12 +13,12 @@ pub enum AnnotationKind {
 #[derive(Clone, Debug)]
 pub struct Annotation {
     pub kind: AnnotationKind,
-    pub location: Location,
+    pub source: Source,
 }
 
 impl Annotation {
-    pub fn new(kind: AnnotationKind, location: Location) -> Self {
-        Self { kind, location }
+    pub fn new(kind: AnnotationKind, source: Source) -> Self {
+        Self { kind, source }
     }
 }
 

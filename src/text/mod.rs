@@ -1,4 +1,5 @@
 mod character;
+mod eatable;
 mod into_text;
 mod into_text_stream;
 mod text_stream;
@@ -6,6 +7,7 @@ mod text_stream;
 use crate::ast::Source;
 
 pub use character::{is_c_non_digit, Character};
+pub use eatable::Eatable;
 pub use into_text::IntoText;
 pub use into_text_stream::IntoTextStream;
 pub use text_stream::TextStream;
@@ -22,15 +24,28 @@ pub use text_stream::TextStream;
 pub trait Text: TextStream {
     fn peek_nth(&mut self, n: usize) -> Character;
 
+    fn peek_n<const N: usize>(&mut self) -> [Character; N] {
+        std::array::from_fn(|i| self.peek_nth(i))
+    }
+
     fn peek(&mut self) -> Character {
         self.peek_nth(0)
     }
 
-    fn eat(&mut self, expected: &str) -> bool {
+    fn peek_starts_with(&mut self, pattern: impl Eatable) -> bool {
+        for (i, c) in pattern.chars().enumerate() {
+            if !self.peek_nth(i).is(c) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn eat(&mut self, expected: impl Eatable) -> bool {
         self.eat_remember(expected).is_ok()
     }
 
-    fn eat_remember(&mut self, expected: &str) -> Result<Source, Source> {
+    fn eat_remember(&mut self, expected: impl Eatable) -> Result<Source, Source> {
         let start = self.peek().source();
         let mut count = 0;
 

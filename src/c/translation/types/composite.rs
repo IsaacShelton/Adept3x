@@ -1,6 +1,6 @@
 use super::get_name_and_type;
 use crate::{
-    ast::{self, AnonymousStruct, Field, Privacy, Structure, TypeKind},
+    ast::{AnonymousStruct, AstFile, Field, Privacy, Structure, TypeKind},
     c::parser::{
         error::ParseErrorKind, CTypedef, Composite, CompositeKind, DeclarationSpecifiers,
         MemberDeclaration, MemberDeclarator, ParseError,
@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use std::collections::HashMap;
 
 pub fn make_composite(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     composite: &Composite,
     diagnostics: &Diagnostics,

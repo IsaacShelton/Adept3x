@@ -10,38 +10,31 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Alias, ArrayAccess, Assignment, Ast, BasicBinaryOperation, BasicBinaryOperator,
-        BinaryOperator, Block, Call, Conditional, ConformBehavior, Declaration, DeclareAssign,
-        Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field, FieldInitializer, File,
-        FileIdentifier, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
+        self, Alias, ArrayAccess, Assignment, Ast, AstFile, BasicBinaryOperation,
+        BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, ConformBehavior,
+        Declaration, DeclareAssign, Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field,
+        FieldInitializer, FileId, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
         NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation,
         ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind,
         UnaryOperation, UnaryOperator, While,
     },
-    line_column::Location,
+    inflow::Inflow,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{StringLiteral, StringModifier, Token, TokenKind},
     try_insert_index_map::try_insert_into_index_map,
 };
 use ast::FloatSize;
 use indexmap::IndexMap;
-use itertools::Itertools;
 use lazy_format::lazy_format;
 use num_bigint::BigInt;
 use num_traits::Zero;
-use std::{borrow::Borrow, ffi::CString};
+use std::{borrow::Borrow, ffi::CString, mem::MaybeUninit};
 
-struct Parser<'a, I>
-where
-    I: Iterator<Item = Token>,
-{
+struct Parser<'a, I: Inflow<Token>> {
     input: Input<'a, I>,
 }
 
-impl<'a, I> Parser<'a, I>
-where
-    I: Iterator<Item = Token>,
-{
+impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn new(input: Input<'a, I>) -> Self {
         Self { input }
     }
@@ -62,7 +55,7 @@ where
 
     fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<(), ParseError> {
         // Create ast file
-        let ast_file = ast.new_file(FileIdentifier::Local(filename));
+        let ast_file = ast.new_file(FileId::Local(filename));
 
         while !self.input.peek().is_end_of_file() {
             self.parse_top_level(ast_file, vec![])?;
@@ -73,7 +66,7 @@ where
 
     fn parse_top_level(
         &mut self,
-        ast_file: &mut File,
+        ast_file: &mut AstFile,
         parent_annotations: Vec<Annotation>,
     ) -> Result<(), ParseError> {
         let mut annotations = parent_annotations;
@@ -158,12 +151,12 @@ where
         &mut self,
         expected_token: impl Borrow<TokenKind>,
         for_reason: Option<impl ToString>,
-    ) -> Result<Location, ParseError> {
+    ) -> Result<Source, ParseError> {
         let token = self.input.advance();
         let expected_token = expected_token.borrow();
 
         if token.kind == *expected_token {
-            return Ok(token.location);
+            return Ok(token.source);
         }
 
         Err(self.expected_token(expected_token, for_reason, token))
@@ -179,11 +172,11 @@ where
     fn parse_identifier_keep_location(
         &mut self,
         for_reason: Option<impl ToString>,
-    ) -> Result<(String, Location), ParseError> {
+    ) -> Result<(String, Source), ParseError> {
         let token = self.input.advance();
 
         if let TokenKind::Identifier(identifier) = &token.kind {
-            Ok((identifier.into(), token.location))
+            Ok((identifier.into(), token.source))
         } else {
             Err(self.expected_token("identifier", for_reason, token))
         }
@@ -202,22 +195,22 @@ where
         self.parse_token(TokenKind::Hash, Some("to begin annotation"))?;
         self.parse_token(TokenKind::OpenBracket, Some("to begin annotation body"))?;
 
-        let (annotation_name, location) =
+        let (annotation_name, source) =
             self.parse_identifier_keep_location(Some("for annotation name"))?;
 
         self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
 
         match annotation_name.as_str() {
-            "foreign" => Ok(Annotation::new(AnnotationKind::Foreign, location)),
-            "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, location)),
-            "packed" => Ok(Annotation::new(AnnotationKind::Packed, location)),
-            "pod" => Ok(Annotation::new(AnnotationKind::Pod, location)),
-            "abide_abi" => Ok(Annotation::new(AnnotationKind::AbideAbi, location)),
+            "foreign" => Ok(Annotation::new(AnnotationKind::Foreign, source)),
+            "thread_local" => Ok(Annotation::new(AnnotationKind::ThreadLocal, source)),
+            "packed" => Ok(Annotation::new(AnnotationKind::Packed, source)),
+            "pod" => Ok(Annotation::new(AnnotationKind::Pod, source)),
+            "abide_abi" => Ok(Annotation::new(AnnotationKind::AbideAbi, source)),
             _ => Err(ParseError {
                 kind: ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,
                 },
-                source: self.source(location),
+                source,
             }),
         }
     }
@@ -234,23 +227,20 @@ where
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::ThreadLocal => is_thread_local = true,
                 _ => {
-                    return Err(self.unexpected_annotation(
-                        annotation.kind.to_string(),
-                        annotation.location,
-                        Some("for global variable"),
-                    ))
+                    return Err(self.unexpected_annotation(&annotation, Some("for global variable")))
                 }
             }
         }
 
-        let (name, location) =
+        let (name, source) =
             self.parse_identifier_keep_location(Some("for name of global variable"))?;
+
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 
         Ok(Global {
             name,
             ast_type,
-            source: self.source(location),
+            source,
             is_foreign,
             is_thread_local,
         })
@@ -270,13 +260,7 @@ where
             match annotation.kind {
                 AnnotationKind::Packed => is_packed = true,
                 AnnotationKind::Pod => prefer_pod = true,
-                _ => {
-                    return Err(self.unexpected_annotation(
-                        annotation.kind.to_string(),
-                        annotation.location,
-                        Some("for structure"),
-                    ))
-                }
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for structure"))),
             }
         }
 
@@ -329,13 +313,7 @@ where
         #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
-                _ => {
-                    return Err(self.unexpected_annotation(
-                        annotation.kind.to_string(),
-                        annotation.location,
-                        Some("for alias"),
-                    ))
-                }
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for alias"))),
             }
         }
 
@@ -362,13 +340,7 @@ where
         #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
-                _ => {
-                    return Err(self.unexpected_annotation(
-                        annotation.kind.to_string(),
-                        annotation.location,
-                        Some("for enum"),
-                    ))
-                }
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for enum"))),
             }
         }
 
@@ -421,13 +393,7 @@ where
         #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
-                _ => {
-                    return Err(self.unexpected_annotation(
-                        annotation.kind.to_string(),
-                        annotation.location,
-                        Some("for define"),
-                    ))
-                }
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for define"))),
             }
         }
 
@@ -450,13 +416,7 @@ where
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
-                _ => {
-                    return Err(self.unexpected_annotation(
-                        annotation.kind.to_string(),
-                        annotation.location,
-                        Some("for function"),
-                    ))
-                }
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
         }
 
@@ -465,8 +425,7 @@ where
             abide_abi = true;
         }
 
-        let location = self.input.advance().location;
-        let source = self.source(location);
+        let source = self.input.advance().source;
 
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
@@ -480,8 +439,7 @@ where
         self.ignore_newlines();
 
         let return_type = if self.input.peek_is(TokenKind::OpenCurly) {
-            let location = self.input.peek().location;
-            ast::Type::new(ast::TypeKind::Void, self.source(location))
+            ast::TypeKind::Void.at(self.source_here())
         } else {
             self.parse_type(Some("return "), Some("for function"))?
         };
@@ -569,7 +527,7 @@ where
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
-        let location = self.input.peek().location;
+        let source = self.source_here();
 
         match self.input.peek().kind {
             TokenKind::Identifier(_) => {
@@ -581,24 +539,21 @@ where
                     if self.input.peek().is_assignment_like() {
                         self.parse_assignment(left)
                     } else {
-                        Ok(Stmt::new(StmtKind::Expr(left), self.source(location)))
+                        Ok(StmtKind::Expr(left).at(source))
                     }
                 }
             }
             TokenKind::ReturnKeyword => self.parse_return(),
             TokenKind::EndOfFile => Err(self.unexpected_token_is_next()),
-            _ => Ok(Stmt::new(
-                StmtKind::Expr(self.parse_expr()?),
-                self.source(location),
-            )),
+            _ => Ok(Stmt::new(StmtKind::Expr(self.parse_expr()?), source)),
         }
     }
 
     fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
-        let (name, location) = self.parse_identifier_keep_location(Some("for variable name"))?;
+        let (name, source) = self.parse_identifier_keep_location(Some("for variable name"))?;
 
         if self.input.peek().is_assignment_like() {
-            let variable = Expr::new(ExprKind::Variable(name), self.source(location));
+            let variable = ExprKind::Variable(name).at(source);
             self.parse_assignment(variable)
         } else {
             let ast_type = self.parse_type(None::<&str>, Some("for variable type"))?;
@@ -618,13 +573,13 @@ where
                     ast_type,
                     value,
                 })),
-                self.source(location),
+                source,
             ))
         }
     }
 
     fn parse_assignment(&mut self, destination: Expr) -> Result<Stmt, ParseError> {
-        let location = self.input.peek().location;
+        let source = self.input.peek().source;
 
         let operator = match self.input.advance().kind {
             TokenKind::Assign => None,
@@ -641,43 +596,37 @@ where
             TokenKind::LogicalLeftShiftAssign => Some(BasicBinaryOperator::LogicalLeftShift),
             TokenKind::LogicalRightShiftAssign => Some(BasicBinaryOperator::LogicalRightShift),
             got => {
-                return Err(ParseError {
-                    source: self.source(location),
-                    kind: ParseErrorKind::Expected {
-                        expected: "(an assignment operator)".to_string(),
-                        for_reason: Some("for assignment".to_string()),
-                        got: got.to_string(),
-                    },
-                })
+                return Err(ParseErrorKind::Expected {
+                    expected: "(an assignment operator)".to_string(),
+                    for_reason: Some("for assignment".to_string()),
+                    got: got.to_string(),
+                }
+                .at(source))
             }
         };
 
         let value = self.parse_expr()?;
 
-        Ok(Stmt::new(
-            StmtKind::Assignment(Box::new(Assignment {
-                destination,
-                value,
-                operator,
-            })),
-            self.source(location),
-        ))
+        Ok(StmtKind::Assignment(Box::new(Assignment {
+            destination,
+            value,
+            operator,
+        }))
+        .at(source))
     }
 
     fn parse_return(&mut self) -> Result<Stmt, ParseError> {
         // return VALUE
         //          ^
 
-        let location = self.parse_token(TokenKind::ReturnKeyword, Some("for return statement"))?;
+        let source = self.parse_token(TokenKind::ReturnKeyword, Some("for return statement"))?;
 
-        Ok(Stmt::new(
-            StmtKind::Return(if self.input.peek_is(TokenKind::Newline) {
-                None
-            } else {
-                Some(self.parse_expr()?)
-            }),
-            self.source(location),
-        ))
+        Ok(StmtKind::Return(if self.input.peek_is(TokenKind::Newline) {
+            None
+        } else {
+            Some(self.parse_expr()?)
+        })
+        .at(source))
     }
 
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
@@ -690,7 +639,7 @@ where
 
         loop {
             let operator = self.input.peek();
-            let location = operator.location;
+            let source = operator.source;
             let next_precedence = operator.kind.precedence();
 
             if is_terminating_token(&operator.kind)
@@ -723,7 +672,7 @@ where
                 _ => return Ok(lhs),
             };
 
-            lhs = self.parse_math(lhs, binary_operator, next_precedence, location)?;
+            lhs = self.parse_math(lhs, binary_operator, next_precedence, source)?;
         }
     }
 
@@ -733,25 +682,25 @@ where
     }
 
     fn parse_expr_primary_base(&mut self) -> Result<Expr, ParseError> {
-        let Token { kind, location } = self.input.peek();
-        let location = *location;
+        let Token { kind, source } = self.input.peek();
+        let source = *source;
 
         match kind {
             TokenKind::TrueKeyword => {
                 self.input.advance().kind.unwrap_true_keyword();
-                Ok(Expr::new(ExprKind::Boolean(true), self.source(location)))
+                Ok(ExprKind::Boolean(true).at(source))
             }
             TokenKind::FalseKeyword => {
                 self.input.advance().kind.unwrap_false_keyword();
-                Ok(Expr::new(ExprKind::Boolean(false), self.source(location)))
+                Ok(Expr::new(ExprKind::Boolean(false), source))
             }
             TokenKind::Integer(..) => Ok(Expr::new(
                 ExprKind::Integer(Integer::Generic(self.input.advance().kind.unwrap_integer())),
-                self.source(location),
+                source,
             )),
             TokenKind::Float(..) => Ok(Expr::new(
                 ExprKind::Float(self.input.advance().kind.unwrap_float()),
-                self.source(location),
+                source,
             )),
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::NullTerminated,
@@ -761,14 +710,14 @@ where
                     CString::new(self.input.advance().kind.unwrap_string().value)
                         .expect("valid null-terminated string"),
                 ),
-                self.source(location),
+                source,
             )),
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::Normal,
                 ..
             }) => Ok(Expr::new(
                 ExprKind::String(self.input.advance().kind.unwrap_string().value),
-                self.source(location),
+                source,
             )),
             TokenKind::OpenParen => {
                 self.input.advance().kind.unwrap_open_paren();
@@ -788,13 +737,8 @@ where
                     if peek.is_extend() || peek.is_colon() {
                         self.parse_structure_literal()
                     } else {
-                        let next_three = self
-                            .input
-                            .peek_n(5)
-                            .iter()
-                            .skip(2)
-                            .map(|token| &token.kind)
-                            .collect_vec();
+                        let next_three =
+                            array_last::<3, 5, _>(self.input.peek_n()).map(|token| &token.kind);
 
                         match &next_three[..] {
                             [TokenKind::Identifier(_), TokenKind::Colon, ..]
@@ -803,7 +747,7 @@ where
                             }
                             _ => Ok(Expr::new(
                                 ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
-                                self.source(location),
+                                source,
                             )),
                         }
                     }
@@ -812,7 +756,7 @@ where
                 TokenKind::DeclareAssign => self.parse_declare_assign(),
                 _ => Ok(Expr::new(
                     ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
-                    self.source(location),
+                    source,
                 )),
             },
             TokenKind::Not | TokenKind::BitComplement | TokenKind::Subtract => {
@@ -823,12 +767,14 @@ where
                     _ => unreachable!(),
                 };
 
-                let location = self.input.advance().location;
+                // Eat unary operator
+                self.input.advance();
+
                 let inner = self.parse_expr()?;
 
                 Ok(Expr::new(
                     ExprKind::UnaryOperation(Box::new(UnaryOperation { operator, inner })),
-                    self.source(location),
+                    source,
                 ))
             }
             TokenKind::IfKeyword => {
@@ -861,10 +807,7 @@ where
                     otherwise,
                 };
 
-                Ok(Expr::new(
-                    ExprKind::Conditional(conditional),
-                    self.source(location),
-                ))
+                Ok(Expr::new(ExprKind::Conditional(conditional), source))
             }
             TokenKind::WhileKeyword => {
                 self.input.advance().kind.unwrap_while_keyword();
@@ -878,7 +821,7 @@ where
                         condition,
                         block: Block::new(stmts),
                     })),
-                    self.source(location),
+                    source,
                 ))
             }
             unexpected => Err(ParseError {
@@ -891,7 +834,7 @@ where
                         ParseErrorKind::UnexpectedToken { unexpected }
                     }
                 },
-                source: self.source(location),
+                source,
             }),
         }
     }
@@ -914,20 +857,17 @@ where
         // subject.field_name
         //        ^
 
-        let location = self.parse_token(TokenKind::Member, Some("for member expression"))?;
+        let source = self.parse_token(TokenKind::Member, Some("for member expression"))?;
         let field_name = self.parse_identifier(Some("for field name"))?;
 
-        Ok(Expr::new(
-            ExprKind::Member(Box::new(subject), field_name),
-            self.source(location),
-        ))
+        Ok(ExprKind::Member(Box::new(subject), field_name).at(source))
     }
 
     fn parse_array_access(&mut self, subject: Expr) -> Result<Expr, ParseError> {
         // subject[index]
         //        ^
 
-        let location = self.parse_token(TokenKind::OpenBracket, Some("for array access"))?;
+        let source = self.parse_token(TokenKind::OpenBracket, Some("for array access"))?;
 
         self.ignore_newlines();
         let index = self.parse_expr()?;
@@ -935,10 +875,7 @@ where
 
         self.parse_token(TokenKind::CloseBracket, Some("to close array access"))?;
 
-        Ok(Expr::new(
-            ExprKind::ArrayAccess(Box::new(ArrayAccess { subject, index })),
-            self.source(location),
-        ))
+        Ok(ExprKind::ArrayAccess(Box::new(ArrayAccess { subject, index })).at(source))
     }
 
     fn parse_structure_literal(&mut self) -> Result<Expr, ParseError> {
@@ -961,13 +898,12 @@ where
                 }
             } else {
                 let dupe = self.input.eat(TokenKind::Colon);
+                let field_name = self.parse_identifier(Some("for field name in struct literal"))?;
 
-                let (field_name, field_location) =
-                    self.parse_identifier_keep_location(Some("for field name in struct literal"))?;
                 self.ignore_newlines();
 
                 let field_value = if dupe {
-                    ExprKind::Variable(field_name.clone()).at(self.source(field_location))
+                    ExprKind::Variable(field_name.clone()).at(source)
                 } else {
                     self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
                     self.ignore_newlines();
@@ -1031,9 +967,9 @@ where
         // function_name(arg1, arg2, arg3)
         //              ^
 
-        let (function_name, location) =
+        let (function_name, source) =
             self.parse_identifier_keep_location(Some("for function call"))?;
-        let source = self.source(location);
+
         let mut arguments = vec![];
 
         self.parse_token(TokenKind::OpenParen, Some("to begin call argument list"))?;
@@ -1051,14 +987,12 @@ where
 
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
-        Ok(Expr::new(
-            ExprKind::Call(Box::new(Call {
-                function_name,
-                arguments,
-                expected_to_return: None,
-            })),
-            source,
-        ))
+        Ok(ExprKind::Call(Box::new(Call {
+            function_name,
+            arguments,
+            expected_to_return: None,
+        }))
+        .at(source))
     }
 
     fn parse_math(
@@ -1066,31 +1000,27 @@ where
         lhs: Expr,
         operator: BinaryOperator,
         operator_precedence: usize,
-        location: Location,
+        source: Source,
     ) -> Result<Expr, ParseError> {
         let rhs = self.parse_math_rhs(operator_precedence)?;
 
-        Ok(Expr::new(
-            match operator {
-                BinaryOperator::Basic(basic_operator) => {
-                    ExprKind::BasicBinaryOperation(Box::new(BasicBinaryOperation {
-                        operator: basic_operator,
-                        left: lhs,
-                        right: rhs,
-                    }))
-                }
-                BinaryOperator::ShortCircuiting(short_circuiting_operator) => {
-                    ExprKind::ShortCircuitingBinaryOperation(Box::new(
-                        ShortCircuitingBinaryOperation {
-                            operator: short_circuiting_operator,
-                            left: lhs,
-                            right: rhs,
-                        },
-                    ))
-                }
-            },
-            self.source(location),
-        ))
+        Ok(match operator {
+            BinaryOperator::Basic(basic_operator) => {
+                ExprKind::BasicBinaryOperation(Box::new(BasicBinaryOperation {
+                    operator: basic_operator,
+                    left: lhs,
+                    right: rhs,
+                }))
+            }
+            BinaryOperator::ShortCircuiting(short_circuiting_operator) => {
+                ExprKind::ShortCircuitingBinaryOperation(Box::new(ShortCircuitingBinaryOperation {
+                    operator: short_circuiting_operator,
+                    left: lhs,
+                    right: rhs,
+                }))
+            }
+        }
+        .at(source))
     }
 
     fn parse_math_rhs(&mut self, operator_precedence: usize) -> Result<Expr, ParseError> {
@@ -1112,9 +1042,8 @@ where
         // variable_name := value
         //               ^
 
-        let (variable_name, location) =
+        let (variable_name, source) =
             self.parse_identifier_keep_location(Some("for function call"))?;
-        let source = self.source(location);
 
         self.parse_token(
             TokenKind::DeclareAssign,
@@ -1124,13 +1053,11 @@ where
 
         let value = self.parse_expr()?;
 
-        Ok(Expr::new(
-            ExprKind::DeclareAssign(Box::new(DeclareAssign {
-                name: variable_name,
-                value,
-            })),
-            source,
-        ))
+        Ok(ExprKind::DeclareAssign(Box::new(DeclareAssign {
+            name: variable_name,
+            value,
+        }))
+        .at(source))
     }
 
     /// Parses closing '>' brackets of type parameters.
@@ -1142,7 +1069,7 @@ where
 
         /// Sub-function for properly handling trailing `=` signs
         /// resulting from partially consuming '>'-like tokens.
-        fn merge_trailing_equals<I: Iterator<Item = Token>>(
+        fn merge_trailing_equals<I: Inflow<Token>>(
             parser: &mut Parser<I>,
             closer: &Token,
             column_offset: u32,
@@ -1150,11 +1077,11 @@ where
             if parser.input.eat(TokenKind::Assign) {
                 parser
                     .input
-                    .unadvance(TokenKind::Equals.at(closer.location.shift_column(column_offset)));
+                    .unadvance(TokenKind::Equals.at(closer.source.shift_column(column_offset)));
             } else {
                 parser
                     .input
-                    .unadvance(TokenKind::Assign.at(closer.location.shift_column(column_offset)));
+                    .unadvance(TokenKind::Assign.at(closer.source.shift_column(column_offset)));
             }
         }
 
@@ -1162,26 +1089,26 @@ where
             TokenKind::GreaterThan => Ok(()),
             TokenKind::RightShift => {
                 self.input
-                    .unadvance(TokenKind::GreaterThan.at(closer.location.shift_column(1)));
+                    .unadvance(TokenKind::GreaterThan.at(closer.source.shift_column(1)));
                 Ok(())
             }
             TokenKind::LogicalRightShift => {
                 self.input
-                    .unadvance(TokenKind::RightShift.at(closer.location.shift_column(1)));
+                    .unadvance(TokenKind::RightShift.at(closer.source.shift_column(1)));
                 Ok(())
             }
             TokenKind::RightShiftAssign => {
                 merge_trailing_equals(self, &closer, 2);
 
                 self.input
-                    .unadvance(TokenKind::GreaterThan.at(closer.location.shift_column(1)));
+                    .unadvance(TokenKind::GreaterThan.at(closer.source.shift_column(1)));
                 Ok(())
             }
             TokenKind::LogicalRightShiftAssign => {
                 merge_trailing_equals(self, &closer, 3);
 
                 self.input
-                    .unadvance(TokenKind::RightShift.at(closer.location.shift_column(1)));
+                    .unadvance(TokenKind::RightShift.at(closer.source.shift_column(1)));
                 Ok(())
             }
             TokenKind::GreaterThanEq => {
@@ -1197,8 +1124,7 @@ where
         prefix: Option<impl ToString>,
         for_reason: Option<impl ToString>,
     ) -> Result<Type, ParseError> {
-        let location = self.input.peek().location;
-        let source = self.source(location);
+        let source = self.input.peek().source;
 
         match self.input.advance() {
             Token {
@@ -1334,7 +1260,7 @@ where
                     for_reason: for_reason.map(|for_reason| for_reason.to_string()),
                     got: unexpected.to_string(),
                 },
-                source: self.source(unexpected.location),
+                source,
             }),
         }
     }
@@ -1356,17 +1282,13 @@ where
         Ok(name)
     }
 
-    fn source(&self, location: Location) -> Source {
-        Source::new(self.input.key(), location)
-    }
-
     fn source_here(&mut self) -> Source {
-        Source::new(self.input.key(), self.input.peek().location)
+        self.input.peek().source
     }
 }
 
 pub fn parse(
-    tokens: impl Iterator<Item = Token>,
+    tokens: impl Inflow<Token>,
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
 ) -> Result<Ast, ParseError> {
@@ -1374,7 +1296,7 @@ pub fn parse(
 }
 
 pub fn parse_into(
-    tokens: impl Iterator<Item = Token>,
+    tokens: impl Inflow<Token>,
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
     ast: &mut Ast,
@@ -1392,4 +1314,19 @@ fn is_terminating_token(kind: &TokenKind) -> bool {
 
 fn is_right_associative(kind: &TokenKind) -> bool {
     matches!(kind, TokenKind::DeclareAssign)
+}
+
+// Const evaluation currently isn't strong enough in Rust to write a much better version of this
+fn array_last<const LITTLE_N: usize, const BIG_N: usize, T: Copy>(
+    big_array: [T; BIG_N],
+) -> [T; LITTLE_N] {
+    assert!(LITTLE_N <= BIG_N);
+
+    let mut little_array = [const { MaybeUninit::uninit() }; LITTLE_N];
+
+    for i in 0..LITTLE_N {
+        little_array[LITTLE_N - i - 1].write(big_array[BIG_N - i - 1]);
+    }
+
+    unsafe { MaybeUninit::array_assume_init(little_array) }
 }

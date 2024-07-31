@@ -1,6 +1,6 @@
 use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
-    ast::{self, Function, Parameter, Parameters},
+    ast::{self, AstFile, Function, Parameter, Parameters},
     c::parser::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError,
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 pub fn declare_function(
     typedefs: &mut HashMap<String, CTypedef>,
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     _attribute_specifiers: &[()],
     declaration_specifiers: &DeclarationSpecifiers,
     declarator: &Declarator,

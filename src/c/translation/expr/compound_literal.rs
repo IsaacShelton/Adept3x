@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, ConformBehavior, FillBehavior, Source},
+    ast::{self, AstFile, ConformBehavior, FillBehavior, Source},
     c::{
         parser::{
             expr::{CompoundLiteral, Initializer},
@@ -13,7 +13,7 @@ use crate::{
 use std::collections::HashMap;
 
 pub fn translate_compound_literal(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     compound_literal: &CompoundLiteral,
     source: Source,

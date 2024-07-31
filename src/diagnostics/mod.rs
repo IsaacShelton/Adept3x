@@ -6,7 +6,7 @@ use core::fmt::Debug;
 
 pub use warning::WarningDiagnostic;
 
-pub trait Diagnostic: Show {}
+pub trait Diagnostic: Show + Send + Sync {}
 
 #[derive(Clone, Debug)]
 pub struct DiagnosticFlags {

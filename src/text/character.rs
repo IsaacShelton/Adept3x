@@ -8,6 +8,14 @@ pub enum Character {
 
 impl Character {
     #[inline]
+    pub fn or_nul(self) -> char {
+        match self {
+            Character::At(c, _) => c,
+            Character::End(_) => '\0',
+        }
+    }
+
+    #[inline]
     pub fn unwrap(&self) -> (char, Source) {
         match self {
             Character::At(c, source) => (*c, *source),

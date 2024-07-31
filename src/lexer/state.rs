@@ -4,7 +4,6 @@ use super::{
 };
 
 pub enum State {
-    EndOfFile,
     Idle,
     Identifier(IdentifierState),
     String(StringState),

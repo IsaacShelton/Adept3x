@@ -1,5 +1,5 @@
 use crate::inflow::{Inflow, InflowEnd, InflowStream};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, mem::MaybeUninit};
 
 pub struct InflowPeeker<S: InflowStream> {
     stream: S,
@@ -24,6 +24,10 @@ impl<S: InflowStream> InflowStream for InflowPeeker<S> {
 }
 
 impl<T: InflowEnd, S: InflowStream<Item = T>> Inflow<T> for InflowPeeker<S> {
+    fn un_next(&mut self, item: Self::Item) {
+        self.queue.push_front(item);
+    }
+
     fn peek_nth_mut(&mut self, n: usize) -> &mut T {
         while self.queue.len() <= n {
             let item = self.stream.next();
@@ -31,5 +35,21 @@ impl<T: InflowEnd, S: InflowStream<Item = T>> Inflow<T> for InflowPeeker<S> {
         }
 
         self.queue.get_mut(n).unwrap()
+    }
+
+    fn peek_n<const N: usize>(&mut self) -> [&T; N] {
+        let mut array: [MaybeUninit<&T>; N] = [const { MaybeUninit::uninit() }; N];
+
+        while self.queue.len() <= N {
+            let item = self.stream.next();
+            self.queue.push_back(item);
+        }
+
+        for i in 0..N {
+            array[i].write(&self.queue[i]);
+        }
+
+        // SAFETY: We have initialized all elements
+        unsafe { MaybeUninit::array_assume_init(array) }
     }
 }

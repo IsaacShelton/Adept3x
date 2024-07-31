@@ -3,7 +3,7 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 
 use crate::{
-    ast::{self, AnonymousEnum, EnumMember, TypeKind},
+    ast::{self, AnonymousEnum, AstFile, EnumMember, TypeKind},
     c::{
         parser::{error::ParseErrorKind, Enumeration, ParseError},
         translation::eval::evaluate_to_const_integer,
@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub fn make_anonymous_enum(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     enumeration: &Enumeration,
 ) -> Result<TypeKind, ParseError> {
     match enumeration {

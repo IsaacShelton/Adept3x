@@ -49,7 +49,7 @@ fn put_file(path: impl Borrow<Path>, content: &str) {
         let error_filename = path
             .file_name()
             .and_then(|filename| filename.to_str())
-            .unwrap_or("<non-unicode-filename>");
+            .unwrap_or("<invalid unicode filename>");
 
         eprintln!("error: Failed to create '{}' file", error_filename);
         exit(1);

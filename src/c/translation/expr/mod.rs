@@ -8,7 +8,7 @@ use self::{
     string::translate_expr_string,
 };
 use crate::{
-    ast,
+    ast::{self, AstFile},
     c::parser::{
         error::ParseErrorKind,
         expr::{Expr, ExprKind},
@@ -19,7 +19,7 @@ use crate::{
 use std::collections::HashMap;
 
 pub fn translate_expr(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     expr: &Expr,
     diagnostics: &Diagnostics,

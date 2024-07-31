@@ -4,6 +4,7 @@ use crate::{
     resolved::IntegerLiteralBits,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     tag::Tag,
+    version::AdeptVersion,
 };
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -38,12 +39,19 @@ impl Source {
     pub fn is_internal(&self) -> bool {
         self.key == SourceFileCache::INTERNAL_KEY
     }
+
+    pub fn shift_column(&self, amount: u32) -> Self {
+        Self {
+            key: self.key,
+            location: self.location.shift_column(amount),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Ast<'a> {
     pub primary_filename: String,
-    pub files: HashMap<FileIdentifier, File>,
+    pub files: HashMap<FileId, AstFile>,
     pub source_file_cache: &'a SourceFileCache,
 }
 
@@ -56,8 +64,8 @@ impl<'a> Ast<'a> {
         }
     }
 
-    pub fn new_file(&mut self, identifier: FileIdentifier) -> &mut File {
-        self.files.entry(identifier).or_insert_with(File::new)
+    pub fn new_file(&mut self, identifier: FileId) -> &mut AstFile {
+        self.files.entry(identifier).or_insert_with(AstFile::new)
     }
 }
 
@@ -69,7 +77,7 @@ pub struct Version {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FileIdentifier {
+pub enum FileId {
     Local(String),
     Remote {
         owner: Option<String>,
@@ -79,7 +87,8 @@ pub enum FileIdentifier {
 }
 
 #[derive(Clone, Debug)]
-pub struct File {
+pub struct AstModule {
+    pub adept_version: AdeptVersion,
     pub functions: Vec<Function>,
     pub structures: Vec<Structure>,
     pub aliases: IndexMap<String, Alias>,
@@ -88,9 +97,19 @@ pub struct File {
     pub defines: IndexMap<String, Define>,
 }
 
-impl File {
-    pub fn new() -> File {
-        File {
+#[derive(Clone, Debug)]
+pub struct AstFile {
+    pub functions: Vec<Function>,
+    pub structures: Vec<Structure>,
+    pub aliases: IndexMap<String, Alias>,
+    pub globals: Vec<Global>,
+    pub enums: IndexMap<String, Enum>,
+    pub defines: IndexMap<String, Define>,
+}
+
+impl AstFile {
+    pub fn new() -> AstFile {
+        AstFile {
             functions: vec![],
             structures: vec![],
             aliases: IndexMap::default(),

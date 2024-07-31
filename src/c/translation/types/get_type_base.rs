@@ -1,13 +1,13 @@
 use super::{build_type_specifier_qualifier, TypeBase, TypeBaseBuilder};
 use crate::{
-    ast::{self, Source},
+    ast::{AstFile, Source},
     c::parser::{CTypedef, DeclarationSpecifierKind, DeclarationSpecifiers, ParseError},
     diagnostics::Diagnostics,
 };
 use std::collections::HashMap;
 
 pub fn get_type_base(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     declaration_specifiers: &DeclarationSpecifiers,
     parent_source: Source,

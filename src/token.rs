@@ -1,19 +1,22 @@
-use crate::line_column::Location;
+use crate::{ast::Source, inflow::InflowEnd};
+use derivative::Derivative;
 use derive_more::{Deref, IsVariant, Unwrap};
 use num_bigint::BigInt;
 use std::fmt::Display;
 
-#[derive(Clone, Debug, PartialEq, Deref)]
+#[derive(Clone, Debug, Deref, Derivative)]
+#[derivative(PartialEq)]
 pub struct Token {
     #[deref]
     pub kind: TokenKind,
 
-    pub location: Location,
+    #[derivative(PartialEq = "ignore")]
+    pub source: Source,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, location: Location) -> Token {
-        Token { kind, location }
+    pub fn new(kind: TokenKind, source: Source) -> Token {
+        Token { kind, source }
     }
 
     pub fn is_end_of_file(&self) -> bool {
@@ -22,6 +25,12 @@ impl Token {
 
     pub fn is_assignment_like(&self) -> bool {
         self.kind.is_assignment_like()
+    }
+}
+
+impl InflowEnd for Token {
+    fn is_inflow_end(&self) -> bool {
+        self.kind.is_end_of_file()
     }
 }
 
@@ -67,6 +76,7 @@ pub enum TokenKind {
     FalseKeyword,
     DefineKeyword,
     ZeroedKeyword,
+    PragmaKeyword,
     Member,
     Add,
     Subtract,
@@ -144,8 +154,9 @@ impl Display for TokenKind {
             TokenKind::WhileKeyword => f.write_str("'while' keyword"),
             TokenKind::TrueKeyword => f.write_str("'true'"),
             TokenKind::FalseKeyword => f.write_str("'false'"),
-            TokenKind::DefineKeyword => f.write_str("'define'"),
-            TokenKind::ZeroedKeyword => f.write_str("'zeroed'"),
+            TokenKind::DefineKeyword => f.write_str("'define' keyword"),
+            TokenKind::ZeroedKeyword => f.write_str("'zeroed' keyword"),
+            TokenKind::PragmaKeyword => f.write_str("'pragma' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -267,6 +278,7 @@ impl TokenKind {
             | TokenKind::FalseKeyword
             | TokenKind::DefineKeyword
             | TokenKind::ZeroedKeyword
+            | TokenKind::PragmaKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon
@@ -306,10 +318,7 @@ impl TokenKind {
         )
     }
 
-    pub fn at(self, location: Location) -> Token {
-        Token {
-            kind: self,
-            location,
-        }
+    pub fn at(self, source: Source) -> Token {
+        Token { kind: self, source }
     }
 }

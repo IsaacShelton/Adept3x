@@ -1,8 +1,8 @@
-use crate::{line_column::Location, token::StringModifier};
+use crate::{ast::Source, token::StringModifier};
 
 pub struct StringState {
     pub value: String,
     pub closing_char: char,
     pub modifier: StringModifier,
-    pub start_location: Location,
+    pub start_source: Source,
 }

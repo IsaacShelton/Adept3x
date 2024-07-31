@@ -1,4 +1,4 @@
-use crate::source_file_cache::SourceFileCache;
+use crate::{ast::Source, source_file_cache::SourceFileCache};
 
 pub trait Show {
     fn show(
@@ -6,4 +6,14 @@ pub trait Show {
         w: &mut dyn std::fmt::Write,
         source_file_cache: &SourceFileCache,
     ) -> std::fmt::Result;
+}
+
+pub fn error_println(message: &str, source: Source, source_file_cache: &SourceFileCache) {
+    eprintln!(
+        "{}:{}:{}: error: {}",
+        source_file_cache.get(source.key).filename(),
+        source.location.line,
+        source.location.column,
+        message,
+    )
 }

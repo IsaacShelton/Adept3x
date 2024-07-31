@@ -1,5 +1,5 @@
 use crate::{
-    ast,
+    ast::{self, AstFile},
     c::{
         parser::{expr::Caster, CTypedef, ParseError},
         translation::types::{build_type_specifier_qualifier, TypeBaseBuilder},
@@ -9,7 +9,7 @@ use crate::{
 use std::collections::HashMap;
 
 pub fn get_caster_type(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     caster: &Caster,
     diagnostics: &Diagnostics,

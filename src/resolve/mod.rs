@@ -19,7 +19,7 @@ use self::{
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
-    ast::{self, Ast, ConformBehavior, FileIdentifier, Source, Type},
+    ast::{self, Ast, ConformBehavior, FileId, Source, Type},
     cli::BuildOptions,
     resolved::{self, Cast, Enum, TypedExpr, VariableStorage},
     source_file_cache::SourceFileCache,
@@ -38,7 +38,7 @@ use std::{
 };
 
 enum Job {
-    Regular(FileIdentifier, usize, resolved::FunctionRef),
+    Regular(FileId, usize, resolved::FunctionRef),
 }
 
 struct ResolveCtx<'a> {

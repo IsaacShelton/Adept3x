@@ -13,7 +13,10 @@ pub use self::tools::InflowTools;
 pub use self::try_peek::TryPeek;
 
 pub trait Inflow<T>: InflowStream<Item = T> {
+    fn un_next(&mut self, item: Self::Item);
+
     fn peek_nth_mut(&mut self, n: usize) -> &mut T;
+    fn peek_n<const N: usize>(&mut self) -> [&T; N];
 
     fn peek_nth(&mut self, n: usize) -> &T {
         &*self.peek_nth_mut(n)

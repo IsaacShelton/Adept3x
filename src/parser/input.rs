@@ -1,43 +1,38 @@
 use crate::{
-    look_ahead::LookAhead,
-    repeating_last::RepeatingLast,
+    inflow::Inflow,
     source_file_cache::{SourceFileCache, SourceFileCacheKey},
     token::{Token, TokenKind},
 };
 use std::borrow::Borrow;
 
-pub struct Input<'a, I: Iterator<Item = Token>> {
+pub struct Input<'a, I: Inflow<Token>> {
     source_file_cache: &'a SourceFileCache,
-    iterator: LookAhead<RepeatingLast<I>>,
+    inflow: I,
     key: SourceFileCacheKey,
 }
 
 impl<'a, I> Input<'a, I>
 where
-    I: Iterator<Item = Token>,
+    I: Inflow<Token>,
 {
-    pub fn new(
-        iterator: I,
-        source_file_cache: &'a SourceFileCache,
-        key: SourceFileCacheKey,
-    ) -> Self {
+    pub fn new(inflow: I, source_file_cache: &'a SourceFileCache, key: SourceFileCacheKey) -> Self {
         Self {
-            iterator: LookAhead::new(RepeatingLast::new(iterator)),
+            inflow,
             source_file_cache,
             key,
         }
     }
 
     pub fn peek(&mut self) -> &Token {
-        self.iterator.peek_nth(0).unwrap()
+        self.inflow.peek_nth(0)
     }
 
     pub fn peek_nth(&mut self, n: usize) -> &Token {
-        self.iterator.peek_nth(n).unwrap()
+        self.inflow.peek_nth(n)
     }
 
-    pub fn peek_n(&mut self, n: usize) -> &[Token] {
-        self.iterator.peek_n(n)
+    pub fn peek_n<const N: usize>(&mut self) -> [&Token; N] {
+        self.inflow.peek_n::<N>()
     }
 
     pub fn peek_is(&mut self, token: impl Borrow<TokenKind>) -> bool {
@@ -50,7 +45,7 @@ where
     }
 
     pub fn advance(&mut self) -> Token {
-        self.iterator.next().unwrap()
+        self.inflow.next()
     }
 
     pub fn eat(&mut self, token: impl Borrow<TokenKind>) -> bool {
@@ -84,6 +79,6 @@ where
     // Adds input to the front of the queue,
     // useful for partially consuming tokens during parsing.
     pub fn unadvance(&mut self, token: Token) {
-        self.iterator.unadvance(token)
+        self.inflow.un_next(token)
     }
 }

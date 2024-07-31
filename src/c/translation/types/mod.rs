@@ -8,14 +8,14 @@ use self::decorate::{decorate_array, decorate_function, decorate_pointer};
 use self::enumeration::make_anonymous_enum;
 use self::get_type_base::get_type_base;
 use super::parameters::has_parameters;
-use crate::diagnostics::Diagnostics;
 use crate::{
-    ast::{self, FloatSize, IntegerBits, IntegerSign, Parameter, Source, Type, TypeKind},
+    ast::{AstFile, FloatSize, IntegerBits, IntegerSign, Parameter, Source, Type, TypeKind},
     c::parser::{
         error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator,
         DeclaratorKind, Decorator, Decorators, FunctionQualifier, ParameterDeclarationCore,
         ParseError, TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
     },
+    diagnostics::Diagnostics,
 };
 use std::collections::HashMap;
 
@@ -137,7 +137,7 @@ impl TypeBaseBuilder {
 }
 
 pub fn build_type_specifier_qualifier(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     builder: &mut TypeBaseBuilder,
     typedefs: &HashMap<String, CTypedef>,
     tsq: &TypeSpecifierQualifier,
@@ -188,7 +188,7 @@ pub fn build_type_specifier_qualifier(
 }
 
 pub fn get_name_and_type(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     declarator: &Declarator,
     declaration_specifiers: &DeclarationSpecifiers,
@@ -232,7 +232,7 @@ pub fn get_name_and_type(
 }
 
 fn get_name_and_decorators(
-    ast_file: &mut ast::File,
+    ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
     declarator: &Declarator,
     diagnostics: &Diagnostics,
