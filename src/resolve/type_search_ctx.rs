@@ -1,11 +1,10 @@
-use indexmap::IndexMap;
-
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
     ast::{self, Source},
     resolved,
     source_file_cache::SourceFileCache,
 };
+use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct TypeSearchCtx<'a> {

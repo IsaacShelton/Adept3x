@@ -1,4 +1,5 @@
 use crate::{
+    file_id::FileId,
     ir::InterpreterSyscallKind,
     line_column::Location,
     resolved::IntegerLiteralBits,
@@ -10,9 +11,9 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use std::{
     cmp::Ordering,
-    collections::HashMap,
     ffi::CString,
     fmt::{Debug, Display},
+    sync::atomic::{self, AtomicUsize},
 };
 
 // WARNING: Don't implement PartialEq, Eq, or Hash for this.
@@ -48,42 +49,35 @@ impl Source {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Ast<'a> {
-    pub primary_filename: String,
-    pub files: HashMap<FileId, AstFile>,
+#[derive(Debug)]
+pub struct AstWorkspace<'a> {
+    pub files: Vec<AstFile>,
     pub source_file_cache: &'a SourceFileCache,
+    pub next_file_id: AtomicUsize,
 }
 
-impl<'a> Ast<'a> {
-    pub fn new(primary_filename: String, source_file_cache: &'a SourceFileCache) -> Self {
+impl<'a> AstWorkspace<'a> {
+    pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
         Self {
-            primary_filename,
-            files: HashMap::new(),
+            files: Vec::new(),
             source_file_cache,
+            next_file_id: AtomicUsize::new(0),
         }
     }
 
-    pub fn new_file(&mut self, identifier: FileId) -> &mut AstFile {
-        self.files.entry(identifier).or_insert_with(AstFile::new)
+    pub fn new_file(&mut self) -> &mut AstFile {
+        let file_id = FileId(self.next_file_id.fetch_add(1, atomic::Ordering::SeqCst));
+        self.files.push(AstFile::new(file_id));
+        self.files.last_mut().unwrap()
     }
-}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Version {
-    major: u32,
-    minor: u32,
-    patch: u32,
-}
+    pub fn get(&self, id: FileId) -> Option<&AstFile> {
+        self.files.get(id.0)
+    }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FileId {
-    Local(String),
-    Remote {
-        owner: Option<String>,
-        name: String,
-        version: Version,
-    },
+    pub fn get_mut(&mut self, id: FileId) -> Option<&mut AstFile> {
+        self.files.get_mut(id.0)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,6 +93,7 @@ pub struct AstModule {
 
 #[derive(Clone, Debug)]
 pub struct AstFile {
+    pub file_id: FileId,
     pub functions: Vec<Function>,
     pub structures: Vec<Structure>,
     pub aliases: IndexMap<String, Alias>,
@@ -108,8 +103,9 @@ pub struct AstFile {
 }
 
 impl AstFile {
-    pub fn new() -> AstFile {
+    pub fn new(file_id: FileId) -> AstFile {
         AstFile {
+            file_id,
             functions: vec![],
             structures: vec![],
             aliases: IndexMap::default(),

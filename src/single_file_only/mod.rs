@@ -18,8 +18,8 @@ use crate::{
 };
 use std::{path::Path, process::exit};
 
-pub fn compile_single_file_only(compiler: &Compiler, project_folder: &Path, filename: &str) {
-    let source_file_cache = &compiler.source_file_cache;
+pub fn compile_single_file_only(compiler: &mut Compiler, project_folder: &Path, filename: &str) {
+    let source_file_cache = compiler.source_file_cache;
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");
 
@@ -51,18 +51,19 @@ pub fn compile_single_file_only(compiler: &Compiler, project_folder: &Path, file
     );
 
     if compiler.options.interpret {
-        if run_build_system_interpreter(&resolved_ast, &ir_module).is_err() {
-            eprintln!("interpreter failed");
-            exit(1);
-        } else {
-            return;
+        match run_build_system_interpreter(&resolved_ast, &ir_module) {
+            Ok(_) => return,
+            Err(err) => {
+                eprintln!("{}", err);
+                exit(1);
+            }
         }
     }
 
     exit_unless(
         unsafe {
             llvm_backend(
-                &compiler.options,
+                compiler,
                 &ir_module,
                 &resolved_ast,
                 &output_object_filepath,

@@ -14,9 +14,10 @@ use super::{
     punctuator::Punctuator,
     token::{CToken, CTokenKind},
 };
-use crate::ast::{Ast, FileId, Source};
+use crate::ast::{AstWorkspace, Source};
 use crate::ast::{Parameter, Type, TypeKind};
 use crate::diagnostics::{Diagnostics, WarningDiagnostic};
+use crate::file_id::FileId;
 use derive_more::IsVariant;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -471,24 +472,20 @@ impl<'a> Parser<'a> {
         self.input.switch_input(tokens);
     }
 
-    pub fn parse(&mut self) -> Result<(Ast<'a>, FileId), ParseError> {
-        // Get primary filename
-        let filename = self.input.filename();
-
+    pub fn parse(&mut self) -> Result<(AstWorkspace<'a>, FileId), ParseError> {
         // Create global ast
-        let mut ast = Ast::new(filename.into(), self.input.source_file_cache());
+        let mut ast_workspace = AstWorkspace::new(self.input.source_file_cache());
 
         // Parse primary file
-        let file_id = self.parse_into(&mut ast, filename.into())?;
+        let file_id = self.parse_into(&mut ast_workspace)?;
 
         // Return global ast
-        Ok((ast, file_id))
+        Ok((ast_workspace, file_id))
     }
 
-    pub fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<FileId, ParseError> {
+    pub fn parse_into(&mut self, ast: &mut AstWorkspace) -> Result<FileId, ParseError> {
         // Create ast file
-        let file_id = FileId::Local(filename);
-        let ast_file = ast.new_file(file_id.clone());
+        let ast_file = ast.new_file();
 
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
@@ -529,7 +526,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(file_id)
+        Ok(ast_file.file_id)
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {

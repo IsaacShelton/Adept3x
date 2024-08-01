@@ -43,26 +43,10 @@ impl FromStr for AdeptVersion {
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let mut chunks = text.split('.');
-
-        let parse_digit = |x| u8::from_str(x).ok();
-
-        let major = chunks
-            .next()
-            .map(|chunk| parse_digit(chunk).ok_or(()))
-            .transpose()?
-            .unwrap_or(0);
-
-        let minor = chunks
-            .next()
-            .map(|chunk| parse_digit(chunk).ok_or(()))
-            .transpose()?
-            .unwrap_or(0);
-
-        let release = chunks
-            .next()
-            .map(|chunk| parse_digit(chunk).ok_or(()))
-            .transpose()?
-            .unwrap_or(0);
+        let parse_digit = |x| u8::from_str(x).map_err(|_| ());
+        let major = chunks.next().map(parse_digit).transpose()?.unwrap_or(0);
+        let minor = chunks.next().map(parse_digit).transpose()?.unwrap_or(0);
+        let release = chunks.next().map(parse_digit).transpose()?.unwrap_or(0);
 
         Ok(Self {
             major,

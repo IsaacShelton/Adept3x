@@ -1,17 +1,59 @@
 use indexmap::IndexMap;
 
 use crate::{
-    ast::{self, Ast, IntegerBits, Source},
+    ast::{self, AstWorkspace, IntegerBits, Source},
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
-        Interpreter,
+        Interpreter, InterpreterError,
     },
     ir::{self, IntegerSign, InterpreterSyscallKind},
     resolved,
     tag::Tag,
 };
 
-pub fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
+fn thin_cstring_function(
+    name: impl ToString,
+    param_name: impl ToString,
+    syscall_kind: InterpreterSyscallKind,
+) -> ast::Function {
+    let source = Source::internal();
+    let void = ast::TypeKind::Void.at(Source::internal());
+    let ptr_u8 = ast::TypeKind::Pointer(Box::new(
+        ast::TypeKind::Integer {
+            bits: IntegerBits::Bits8,
+            sign: IntegerSign::Unsigned,
+        }
+        .at(source),
+    ))
+    .at(source);
+
+    ast::Function {
+        name: name.to_string(),
+        parameters: ast::Parameters {
+            required: vec![ast::Parameter::new(param_name.to_string(), ptr_u8.clone())],
+            is_cstyle_vararg: false,
+        },
+        return_type: void.clone(),
+        stmts: vec![ast::StmtKind::Expr(
+            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+                kind: syscall_kind,
+                args: vec![(
+                    ptr_u8.clone(),
+                    ast::ExprKind::Variable(param_name.to_string()).at(source),
+                )],
+                result_type: void.clone(),
+            }))
+            .at(source),
+        )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+    }
+}
+
+pub fn setup_build_system_interpreter_symbols(ast: &mut AstWorkspace) {
     // We assume only working with single file for now
     assert_eq!(ast.files.len(), 1);
 
@@ -35,7 +77,8 @@ pub fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
     .at(Source::internal());
 
     // Create entry point for interpreter which will make the call
-    let (_, file) = ast.files.iter_mut().next().unwrap();
+    let file = ast.files.iter_mut().next().unwrap();
+
     file.functions.push(ast::Function {
         name: "<interpreter entry point>".into(),
         parameters: ast::Parameters::default(),
@@ -92,55 +135,29 @@ pub fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
         source,
     });
 
-    file.functions.push(ast::Function {
-        name: "println".into(),
-        parameters: ast::Parameters {
-            required: vec![ast::Parameter::new("message".into(), ptr_u8.clone())],
-            is_cstyle_vararg: false,
-        },
-        return_type: void.clone(),
-        stmts: vec![ast::StmtKind::Expr(
-            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
-                kind: InterpreterSyscallKind::Println,
-                args: vec![(
-                    ptr_u8.clone(),
-                    ast::ExprKind::Variable("message".into()).at(source),
-                )],
-                result_type: void.clone(),
-            }))
-            .at(source),
-        )
-        .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-    });
+    file.functions.push(thin_cstring_function(
+        "println",
+        "message",
+        InterpreterSyscallKind::Println,
+    ));
 
-    file.functions.push(ast::Function {
-        name: "adept".into(),
-        parameters: ast::Parameters {
-            required: vec![ast::Parameter::new("version_string".into(), ptr_u8.clone())],
-            is_cstyle_vararg: false,
-        },
-        return_type: void.clone(),
-        stmts: vec![ast::StmtKind::Expr(
-            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
-                kind: InterpreterSyscallKind::BuildSetAdeptVersion,
-                args: vec![(
-                    ptr_u8.clone(),
-                    ast::ExprKind::Variable("version_string".into()).at(source),
-                )],
-                result_type: void.clone(),
-            }))
-            .at(source),
-        )
-        .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-    });
+    file.functions.push(thin_cstring_function(
+        "adept",
+        "version_string",
+        InterpreterSyscallKind::BuildSetAdeptVersion,
+    ));
+
+    file.functions.push(thin_cstring_function(
+        "link",
+        "filename",
+        InterpreterSyscallKind::BuildLinkFilename,
+    ));
+
+    file.functions.push(thin_cstring_function(
+        "linkFramework",
+        "framework_name",
+        InterpreterSyscallKind::BuildLinkFrameworkName,
+    ));
 
     file.functions.push(ast::Function {
         name: "project".into(),
@@ -187,7 +204,7 @@ pub fn setup_build_system_interpreter_symbols(ast: &mut Ast) {
 pub fn run_build_system_interpreter<'a>(
     resolved_ast: &'a resolved::Ast<'_>,
     ir_module: &'a ir::Module,
-) -> Result<Interpreter<'a, BuildSystemSyscallHandler>, ()> {
+) -> Result<Interpreter<'a, BuildSystemSyscallHandler>, InterpreterError> {
     let (interpreter_entry_point, _fn) = resolved_ast
         .functions
         .iter()
@@ -198,13 +215,7 @@ pub fn run_build_system_interpreter<'a>(
     let handler = BuildSystemSyscallHandler::default();
     let mut interpreter = Interpreter::new(handler, ir_module, max_steps);
 
-    match interpreter.run(interpreter_entry_point) {
-        Ok(result) => assert!(result.is_literal() && result.unwrap_literal().is_void()),
-        Err(err) => {
-            eprintln!("build script error: {}", err);
-            return Err(());
-        }
-    }
-
+    let result = interpreter.run(interpreter_entry_point)?;
+    assert!(result.is_literal() && result.unwrap_literal().is_void());
     Ok(interpreter)
 }

@@ -14,6 +14,7 @@ mod cli;
 mod compiler;
 mod data_units;
 mod diagnostics;
+mod file_id;
 mod generate_workspace;
 mod inflow;
 mod interpreter;
@@ -26,6 +27,7 @@ mod llvm_backend;
 mod look_ahead;
 mod lower;
 mod parser;
+mod pragma_section;
 mod repeating_last;
 mod resolve;
 mod resolved;
@@ -48,7 +50,7 @@ use compiler::Compiler;
 use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
 use generate_workspace::new_project;
 use single_file_only::compile_single_file_only;
-use std::{fs::metadata, path::Path, process::exit, sync::OnceLock};
+use std::{fs::metadata, path::Path, process::exit};
 use target_info::TargetInfo;
 use workspace::compile_workspace;
 
@@ -85,19 +87,21 @@ fn build_project(build_command: BuildCommand) {
         "Assuming target platform is aarch64 darwin",
     ));
 
-    let compiler = Compiler {
+    let mut compiler = Compiler {
         options,
-        target_info,
+        target_info: &target_info,
         source_file_cache: &source_file_cache,
         diagnostics: &diagnostics,
-        version: OnceLock::new(),
+        version: Default::default(),
+        link_filenames: Default::default(),
+        link_frameworks: Default::default(),
     };
 
     if metadata.is_dir() {
-        compile_workspace(&compiler, filepath);
+        compile_workspace(&mut compiler, filepath);
     } else {
         if filepath.extension().unwrap_or_default() == "h" {
-            let source_file_cache = &compiler.source_file_cache;
+            let source_file_cache = compiler.source_file_cache;
 
             let content = std::fs::read_to_string(filepath)
                 .map_err(|err| {
@@ -124,7 +128,7 @@ fn build_project(build_command: BuildCommand) {
         }
 
         let project_folder = filepath.parent().unwrap();
-        compile_single_file_only(&compiler, project_folder, &filename);
+        compile_single_file_only(&mut compiler, project_folder, &filename);
     }
 }
 

@@ -1,10 +1,35 @@
-use crate::{ast::Source, show::Show, source_file_cache::SourceFileCache};
-use std::fmt::Display;
+use crate::{
+    ast::Source,
+    show::Show,
+    source_file_cache::SourceFileCache,
+    token::{Token, TokenKind},
+};
+use std::{borrow::Borrow, fmt::Display};
 
 #[derive(Clone, Debug)]
 pub struct ParseError {
     pub kind: ParseErrorKind,
     pub source: Source,
+}
+
+impl ParseError {
+    pub fn expected(
+        expected: impl ToString,
+        for_reason: Option<impl ToString>,
+        got: impl Borrow<Token>,
+    ) -> Self {
+        match &got.borrow().kind {
+            TokenKind::Error(message) => ParseErrorKind::Lexical {
+                message: message.into(),
+            },
+            _ => ParseErrorKind::Expected {
+                expected: expected.to_string(),
+                for_reason: for_reason.map(|reason| reason.to_string()),
+                got: got.borrow().kind.to_string(),
+            },
+        }
+        .at(got.borrow().source)
+    }
 }
 
 #[derive(Clone, Debug)]

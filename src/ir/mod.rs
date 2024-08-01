@@ -142,6 +142,8 @@ pub enum InterpreterSyscallKind {
     Println,
     BuildAddProject,
     BuildSetAdeptVersion,
+    BuildLinkFilename,
+    BuildLinkFrameworkName,
 }
 
 #[derive(Clone, Debug)]

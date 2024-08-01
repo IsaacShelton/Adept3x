@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 
 use super::{memory::Memory, Value};
 use crate::{
@@ -33,6 +33,8 @@ pub enum ProjectKind {
 pub struct BuildSystemSyscallHandler {
     pub projects: Vec<Project>,
     pub version: Option<AdeptVersion>,
+    pub link_filenames: HashSet<String>,
+    pub link_frameworks: HashSet<String>,
 }
 
 fn read_cstring(memory: &Memory, value: &Value) -> String {
@@ -62,6 +64,16 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             ir::InterpreterSyscallKind::Println => {
                 assert_eq!(args.len(), 1);
                 println!("{}", read_cstring(memory, &args[0]));
+                Value::Literal(ir::Literal::Void)
+            }
+            ir::InterpreterSyscallKind::BuildLinkFilename => {
+                assert_eq!(args.len(), 1);
+                self.link_filenames.insert(read_cstring(memory, &args[0]));
+                Value::Literal(ir::Literal::Void)
+            }
+            ir::InterpreterSyscallKind::BuildLinkFrameworkName => {
+                assert_eq!(args.len(), 1);
+                self.link_frameworks.insert(read_cstring(memory, &args[0]));
                 Value::Literal(ir::Literal::Void)
             }
             ir::InterpreterSyscallKind::BuildSetAdeptVersion => {

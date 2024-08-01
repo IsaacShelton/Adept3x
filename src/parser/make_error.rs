@@ -28,25 +28,6 @@ impl<I: Inflow<Token>> Parser<'_, I> {
         .at(token.source)
     }
 
-    pub fn expected_token(
-        &self,
-        expected: impl ToString,
-        for_reason: Option<impl ToString>,
-        token: Token,
-    ) -> ParseError {
-        match &token.kind {
-            TokenKind::Error(message) => ParseErrorKind::Lexical {
-                message: message.into(),
-            },
-            _ => ParseErrorKind::Expected {
-                expected: expected.to_string(),
-                for_reason: for_reason.map(|reason| reason.to_string()),
-                got: token.kind.to_string(),
-            },
-        }
-        .at(token.source)
-    }
-
     pub fn expected_top_level_construct(&self, token: &Token) -> ParseError {
         ParseErrorKind::ExpectedTopLevelConstruct.at(token.source)
     }

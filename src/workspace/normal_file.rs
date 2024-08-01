@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, IsVariant)]
 pub enum NormalFileKind {
     Adept,
+    AdeptModule,
     CSource,
     CHeader,
 }
@@ -18,6 +19,13 @@ impl NormalFile {
     pub fn adept(path: PathBuf) -> Self {
         Self {
             kind: NormalFileKind::Adept,
+            path,
+        }
+    }
+
+    pub fn adept_module(path: PathBuf) -> Self {
+        Self {
+            kind: NormalFileKind::AdeptModule,
             path,
         }
     }

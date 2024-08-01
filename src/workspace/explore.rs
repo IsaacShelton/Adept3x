@@ -5,14 +5,9 @@
     ---------------------------------------------------------------------------
 */
 
-use super::{
-    fs::{FsNode, FsNodeType},
-    normal_file::NormalFile,
-    NUM_THREADS,
-};
+use super::{fs::Fs, normal_file::NormalFile, NUM_THREADS};
 use append_only_vec::AppendOnlyVec;
 use ignore::{DirEntry, WalkBuilder, WalkState};
-use once_map::OnceMap;
 use std::{
     ffi::OsStr,
     fs::FileType,
@@ -21,20 +16,13 @@ use std::{
 };
 
 pub struct ExploreResult {
-    pub root_node: FsNode,
     pub normal_files: Vec<NormalFile>,
     pub module_files: Vec<PathBuf>,
 }
 
-pub fn explore(folder_path: &Path) -> ExploreResult {
+pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
     let normal_files = AppendOnlyVec::new();
     let module_files = AppendOnlyVec::new();
-
-    let root_node = FsNode {
-        node_type: FsNodeType::Directory,
-        children: OnceMap::new(),
-        last_modified_ms: 0.into(),
-    };
 
     let walker = WalkBuilder::new(folder_path)
         .threads(NUM_THREADS)
@@ -43,7 +31,6 @@ pub fn explore(folder_path: &Path) -> ExploreResult {
         .build_parallel();
 
     walker.run(|| {
-        let root = &root_node;
         let normal_files = &normal_files;
         let module_files = &module_files;
 
@@ -71,21 +58,21 @@ pub fn explore(folder_path: &Path) -> ExploreResult {
 
             if basename == "_.adept" {
                 module_files.push(entry.path().into());
-                add_to_fs_graph(root, &entry, last_modified);
+                add_to_fs_graph(fs, &entry, last_modified);
                 return WalkState::Continue;
             }
 
             normal_files.push(match entry.path().extension().and_then(OsStr::to_str) {
                 Some("adept") => {
-                    add_to_fs_graph(root, &entry, last_modified);
+                    add_to_fs_graph(fs, &entry, last_modified);
                     NormalFile::adept(entry.into_path())
                 }
                 Some("c") => {
-                    add_to_fs_graph(root, &entry, last_modified);
+                    add_to_fs_graph(fs, &entry, last_modified);
                     NormalFile::c_source(entry.into_path())
                 }
                 Some("h") => {
-                    add_to_fs_graph(root, &entry, last_modified);
+                    add_to_fs_graph(fs, &entry, last_modified);
                     NormalFile::c_header(entry.into_path())
                 }
                 _ => return WalkState::Continue,
@@ -96,14 +83,13 @@ pub fn explore(folder_path: &Path) -> ExploreResult {
     });
 
     ExploreResult {
-        root_node,
         normal_files: normal_files.into_vec(),
         module_files: module_files.into_vec(),
     }
 }
 
-fn add_to_fs_graph(root: &FsNode, entry: &DirEntry, last_modified: u64) {
-    root.deep_insert(&normalized_path_segments(entry.path()), last_modified);
+fn add_to_fs_graph(fs: &Fs, entry: &DirEntry, last_modified: u64) {
+    fs.insert(&normalized_path_segments(entry.path()), last_modified);
 }
 
 pub fn normalized_path_segments(path: &Path) -> Vec<&OsStr> {

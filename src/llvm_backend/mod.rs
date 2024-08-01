@@ -28,7 +28,7 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::{cli::BuildOptions, diagnostics::Diagnostics, ir, resolved};
+use crate::{compiler::Compiler, diagnostics::Diagnostics, ir, resolved};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -40,14 +40,14 @@ use llvm_sys::{
     target_machine::{LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMRelocMode},
 };
 use std::{
-    ffi::{c_char, CStr, CString, OsStr},
+    ffi::{c_char, CStr, CString, OsString},
     path::Path,
     process::Command,
     ptr::null_mut,
 };
 
 pub unsafe fn llvm_backend(
-    options: &BuildOptions,
+    compiler: &mut Compiler,
     ir_module: &ir::Module,
     resolved_ast: &resolved::Ast,
     output_object_filepath: &Path,
@@ -60,6 +60,7 @@ pub unsafe fn llvm_backend(
     LLVM_InitializeAllAsmParsers();
     LLVM_InitializeAllAsmPrinters();
 
+    let options = &compiler.options;
     let module_name = CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
     let triple = get_triple();
     let target = get_target_from_triple(&triple)?;
@@ -135,13 +136,28 @@ pub unsafe fn llvm_backend(
             .into());
     }
 
+    let mut args = vec![
+        output_object_filepath.as_os_str().into(),
+        OsString::from("-o"),
+        output_binary_filepath.as_os_str().into(),
+    ];
+
+    for (filename, _) in compiler.link_filenames.iter_mut() {
+        if is_flag_like(filename) {
+            eprintln!("warning: ignoring incorrect link filename '{}'", filename);
+        } else {
+            args.push(OsString::from(filename));
+        }
+    }
+
+    for (framework, _) in compiler.link_frameworks.iter_mut() {
+        args.push(OsString::from("-framework"));
+        args.push(OsString::from(framework));
+    }
+
     // Link resulting object file to create executable
     let mut command = Command::new("gcc")
-        .args([
-            output_object_filepath.as_os_str(),
-            OsStr::new("-o"),
-            output_binary_filepath.as_os_str(),
-        ])
+        .args(args)
         .spawn()
         .expect("Failed to link");
 
@@ -161,4 +177,8 @@ pub unsafe fn llvm_backend(
     }
 
     Ok(())
+}
+
+fn is_flag_like(string: &str) -> bool {
+    string.chars().skip_while(|c| c.is_whitespace()).next() == Some('-')
 }

@@ -9,10 +9,10 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Alias, ArrayAccess, Assignment, Ast, AstFile, BasicBinaryOperation,
+        self, Alias, ArrayAccess, Assignment, AstFile, AstWorkspace, BasicBinaryOperation,
         BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, ConformBehavior,
         Declaration, DeclareAssign, Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field,
-        FieldInitializer, FileId, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
+        FieldInitializer, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
         NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation,
         ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind,
         UnaryOperation, UnaryOperator, While,
@@ -35,7 +35,7 @@ pub fn parse(
     tokens: impl Inflow<Token>,
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
-) -> Result<Ast, ParseError> {
+) -> Result<AstWorkspace, ParseError> {
     Parser::new(Input::new(tokens, source_file_cache, key)).parse()
 }
 
@@ -43,10 +43,9 @@ pub fn parse_into(
     tokens: impl Inflow<Token>,
     source_file_cache: &SourceFileCache,
     key: SourceFileCacheKey,
-    ast: &mut Ast,
-    filename: String,
+    ast: &mut AstWorkspace,
 ) -> Result<(), ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast, filename)
+    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast)
 }
 
 pub struct Parser<'a, I: Inflow<Token>> {
@@ -58,23 +57,20 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Self { input }
     }
 
-    fn parse(mut self) -> Result<Ast<'a>, ParseError> {
-        // Get primary filename
-        let filename = self.input.filename();
-
+    fn parse(mut self) -> Result<AstWorkspace<'a>, ParseError> {
         // Create global ast
-        let mut ast = Ast::new(filename.into(), self.input.source_file_cache());
+        let mut ast = AstWorkspace::new(self.input.source_file_cache());
 
         // Parse primary file
-        self.parse_into(&mut ast, filename.into())?;
+        self.parse_into(&mut ast)?;
 
         // Return global ast
         Ok(ast)
     }
 
-    fn parse_into(&mut self, ast: &mut Ast, filename: String) -> Result<(), ParseError> {
+    fn parse_into(&mut self, ast: &mut AstWorkspace) -> Result<(), ParseError> {
         // Create ast file
-        let ast_file = ast.new_file(FileId::Local(filename));
+        let ast_file = ast.new_file();
 
         while !self.input.peek().is_end_of_file() {
             self.parse_top_level(ast_file, vec![])?;
@@ -178,7 +174,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             return Ok(token.source);
         }
 
-        Err(self.expected_token(expected_token, for_reason, token))
+        Err(ParseError::expected(expected_token, for_reason, token))
     }
 
     fn parse_identifier(
@@ -197,7 +193,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         if let TokenKind::Identifier(identifier) = &token.kind {
             Ok((identifier.into(), token.source))
         } else {
-            Err(self.expected_token("identifier", for_reason, token))
+            Err(ParseError::expected("identifier", for_reason, token))
         }
     }
 
@@ -389,7 +385,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
             if !self.input.eat(TokenKind::Comma) && !self.input.peek_is(TokenKind::CloseParen) {
                 let got = self.input.advance();
-                return Err(self.expected_token(TokenKind::Comma, Some("after enum member"), got));
+                return Err(ParseError::expected(
+                    TokenKind::Comma,
+                    Some("after enum member"),
+                    got,
+                ));
             }
         }
 
@@ -620,12 +620,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::LogicalLeftShiftAssign => Some(BasicBinaryOperator::LogicalLeftShift),
             TokenKind::LogicalRightShiftAssign => Some(BasicBinaryOperator::LogicalRightShift),
             got => {
-                return Err(ParseErrorKind::Expected {
-                    expected: "(an assignment operator)".to_string(),
-                    for_reason: Some("for assignment".to_string()),
-                    got: got.to_string(),
-                }
-                .at(source))
+                return Err(ParseError::expected(
+                    "(an assignment operator)",
+                    Some("for assignment"),
+                    got.at(source),
+                ))
             }
         };
 

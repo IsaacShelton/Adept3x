@@ -8,8 +8,7 @@ pub mod syscall_handler;
 mod value;
 
 use self::{
-    error::InterpreterError, ip::InstructionPointer, memory::Memory, size_of::size_of,
-    syscall_handler::SyscallHandler,
+    ip::InstructionPointer, memory::Memory, size_of::size_of, syscall_handler::SyscallHandler,
 };
 use crate::{
     interpreter::{registers::Registers, value::StructLiteral},
@@ -17,6 +16,7 @@ use crate::{
 };
 use std::collections::HashMap;
 
+pub use error::InterpreterError;
 pub use value::Value;
 
 #[derive(Debug)]
