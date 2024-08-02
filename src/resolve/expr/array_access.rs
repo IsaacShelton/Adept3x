@@ -2,6 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast,
     resolve::{
+        conform_expr_to_default,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -21,6 +22,7 @@ pub fn resolve_array_access_expr(
         None,
         crate::resolve::Initialized::Require,
     )?;
+    let subject = conform_expr_to_default(subject)?;
 
     let index = resolve_expr(
         ctx,
@@ -34,6 +36,7 @@ pub fn resolve_array_access_expr(
         )),
         Initialized::Require,
     )?;
+    let index = conform_expr_to_default(index)?;
 
     let item_type = match &subject.resolved_type.kind {
         resolved::TypeKind::Pointer(inner) => Ok((**inner).clone()),
@@ -43,10 +46,10 @@ pub fn resolve_array_access_expr(
         .at(source)),
     }?;
 
-    if !item_type.kind.is_integer() {
+    if !index.resolved_type.kind.is_integer() {
         return Err(ResolveErrorKind::ExpectedIndexOfType {
             expected: "(any integer type)".to_string(),
-            got: item_type.to_string(),
+            got: index.resolved_type.to_string(),
         }
         .at(source));
     }
