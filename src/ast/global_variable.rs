@@ -2,7 +2,7 @@ use super::Type;
 use crate::source_files::Source;
 
 #[derive(Clone, Debug)]
-pub struct Global {
+pub struct GlobalVar {
     pub name: String,
     pub ast_type: Type,
     pub source: Source,

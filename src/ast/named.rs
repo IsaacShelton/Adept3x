@@ -1,19 +1,24 @@
-use super::{enumeration::Enum, named_expr::Define, type_alias::Alias};
+use std::fmt::Debug;
 
-#[derive(Clone, Debug)]
-pub struct NamedAlias {
+pub struct Named<T> {
     pub name: String,
-    pub alias: Alias,
+    pub value: T,
 }
 
-#[derive(Clone, Debug)]
-pub struct NamedEnum {
-    pub name: String,
-    pub enum_definition: Enum,
+impl<T: Clone> Clone for Named<T> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            value: self.value.clone(),
+        }
+    }
 }
 
-#[derive(Clone, Debug)]
-pub struct NamedDefine {
-    pub name: String,
-    pub define: Define,
+impl<T: Debug> Debug for Named<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Named")
+            .field("name", &self.name)
+            .field("value", &self.value)
+            .finish()
+    }
 }

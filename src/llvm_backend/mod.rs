@@ -28,7 +28,11 @@ use self::{
     target_machine::TargetMachine,
     target_triple::{get_target_from_triple, get_triple},
 };
-use crate::{compiler::Compiler, diagnostics::Diagnostics, ir, resolved};
+use crate::{
+    compiler::Compiler,
+    diagnostics::{Diagnostics, WarningDiagnostic},
+    ir, resolved,
+};
 use colored::Colorize;
 use llvm_sys::{
     analysis::{LLVMVerifierFailureAction::LLVMPrintMessageAction, LLVMVerifyModule},
@@ -40,7 +44,7 @@ use llvm_sys::{
     target_machine::{LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMRelocMode},
 };
 use std::{
-    ffi::{c_char, CStr, CString, OsString},
+    ffi::{c_char, CStr, CString, OsStr, OsString},
     path::Path,
     process::Command,
     ptr::null_mut,
@@ -155,24 +159,38 @@ pub unsafe fn llvm_backend(
         args.push(OsString::from(framework));
     }
 
-    // Link resulting object file to create executable
-    let mut command = Command::new("gcc")
-        .args(args)
-        .spawn()
-        .expect("Failed to link");
+    if ir_module.target_info.kind.is_arbitrary() {
+        let args = args.join(OsStr::new(" "));
 
-    match command.wait() {
-        Ok(status) => {
-            if !status.success() {
+        diagnostics.push(WarningDiagnostic::plain(
+            format!(
+                "Automatic linking is not supported yet on your system, please link manually with something like:\n gcc {}",
+                args.to_string_lossy()
+            )
+        ));
+
+        eprintln!("Success, but requires manual linking, exiting with 1");
+        std::process::exit(1);
+    } else {
+        // Link resulting object file to create executable
+        let mut command = Command::new("gcc")
+            .args(args)
+            .spawn()
+            .expect("Failed to link");
+
+        match command.wait() {
+            Ok(status) => {
+                if !status.success() {
+                    return Err(BackendError {
+                        message: "Failed to link".into(),
+                    });
+                }
+            }
+            Err(_) => {
                 return Err(BackendError {
-                    message: "Failed to link".into(),
+                    message: "Failed to spawn linker".into(),
                 });
             }
-        }
-        Err(_) => {
-            return Err(BackendError {
-                message: "Failed to spawn linker".into(),
-            });
         }
     }
 

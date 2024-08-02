@@ -51,7 +51,7 @@ pub fn resolve_variable_expr(
                 source,
             ),
         ))
-    } else if let Some(define) = ctx.defines.get(name) {
+    } else if let Some(define) = ctx.helper_exprs.get(name) {
         let TypedExpr {
             resolved_type,
             expr,

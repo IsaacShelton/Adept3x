@@ -1,4 +1,4 @@
-pub use crate::resolved::{FloatOrSign, FunctionRef, GlobalRef, IntegerSign};
+pub use crate::resolved::{FloatOrSign, FunctionRef, GlobalVarRef, IntegerSign};
 use crate::{
     data_units::ByteUnits,
     resolved::{FloatOrInteger, IntegerBits, StructureRef},
@@ -16,7 +16,7 @@ pub struct Module<'a> {
     pub target_info: &'a TargetInfo,
     pub functions: HashMap<FunctionRef, Function>,
     pub structures: Structures,
-    pub globals: HashMap<GlobalRef, Global>,
+    pub globals: HashMap<GlobalVarRef, Global>,
 }
 
 impl<'a> std::fmt::Debug for Module<'a> {
@@ -88,7 +88,7 @@ pub enum Instruction {
     Free(Value),
     SizeOf(Type),
     Parameter(u32),
-    GlobalVariable(GlobalRef),
+    GlobalVariable(GlobalVarRef),
     Add(BinaryOperands, FloatOrInteger),
     Checked(OverflowOperation, BinaryOperands),
     Subtract(BinaryOperands, FloatOrInteger),

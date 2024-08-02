@@ -1,6 +1,6 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
-    resolved::{self, GlobalRef},
+    resolved::{self, GlobalVarRef},
     source_files::{Source, SourceFiles},
 };
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct GlobalSearchCtx<'a> {
     source_file_cache: &'a SourceFiles,
-    globals: HashMap<String, (resolved::Type, GlobalRef)>,
+    globals: HashMap<String, (resolved::Type, GlobalVarRef)>,
 }
 
 impl<'a> GlobalSearchCtx<'a> {
@@ -23,7 +23,7 @@ impl<'a> GlobalSearchCtx<'a> {
         &self,
         name: &str,
         source: Source,
-    ) -> Result<(&resolved::Type, &GlobalRef), ResolveError> {
+    ) -> Result<(&resolved::Type, &GlobalVarRef), ResolveError> {
         match self.find_global(name) {
             Some(global) => Ok(global),
             None => Err(ResolveErrorKind::UndeclaredVariable {
@@ -33,7 +33,7 @@ impl<'a> GlobalSearchCtx<'a> {
         }
     }
 
-    pub fn find_global(&self, name: &str) -> Option<(&resolved::Type, &GlobalRef)> {
+    pub fn find_global(&self, name: &str) -> Option<(&resolved::Type, &GlobalVarRef)> {
         if let Some((resolved_type, key)) = self.globals.get(name) {
             return Some((resolved_type, key));
         }
@@ -44,7 +44,7 @@ impl<'a> GlobalSearchCtx<'a> {
         &mut self,
         name: impl ToString,
         resolved_type: resolved::Type,
-        reference: GlobalRef,
+        reference: GlobalVarRef,
     ) {
         self.globals
             .insert(name.to_string(), (resolved_type, reference));

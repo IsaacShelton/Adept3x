@@ -9,13 +9,13 @@ use indexmap::IndexMap;
 pub struct TypeSearchCtx<'a> {
     source_file_cache: &'a SourceFiles,
     types: IndexMap<String, resolved::TypeKind>,
-    aliases: IndexMap<String, &'a ast::Alias>,
+    aliases: IndexMap<String, &'a ast::TypeAlias>,
 }
 
 impl<'a> TypeSearchCtx<'a> {
     pub fn new(
         source_file_cache: &'a SourceFiles,
-        aliases: IndexMap<String, &'a ast::Alias>,
+        aliases: IndexMap<String, &'a ast::TypeAlias>,
     ) -> Self {
         Self {
             source_file_cache,
@@ -42,7 +42,7 @@ impl<'a> TypeSearchCtx<'a> {
         self.types.get(name)
     }
 
-    pub fn find_alias(&self, name: &str) -> Option<&ast::Alias> {
+    pub fn find_alias(&self, name: &str) -> Option<&ast::TypeAlias> {
         self.aliases.get(name).copied()
     }
 

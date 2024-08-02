@@ -73,16 +73,24 @@ fn build_project(build_command: BuildCommand) {
         exit(1);
     };
 
-    // TODO: Determine this based on triple
-    let target_info = TargetInfo {
-        kind: target_info::TargetInfoKind::AARCH64,
-        ms_abi: false,
-        is_darwin: true,
-    };
+    // TODO: Determine this based on default target triple
+    let target_info = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        diagnostics.push(WarningDiagnostic::plain(
+            "Using only supported platform aarch64 darwin",
+        ));
 
-    diagnostics.push(WarningDiagnostic::plain(
-        "Assuming target platform is aarch64 darwin",
-    ));
+        TargetInfo {
+            kind: target_info::TargetInfoKind::AARCH64,
+            ms_abi: false,
+            is_darwin: true,
+        }
+    } else {
+        diagnostics.push(WarningDiagnostic::plain(
+            "Your platform is not supported yet, using arbitrary abi",
+        ));
+
+        TargetInfo::arbitrary()
+    };
 
     let mut compiler = Compiler {
         options,

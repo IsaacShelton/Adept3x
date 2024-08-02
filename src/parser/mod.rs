@@ -10,13 +10,13 @@ use self::{
 };
 use crate::{
     ast::{
-        self, Alias, ArrayAccess, Assignment, AstFile, AstWorkspace, BasicBinaryOperation,
+        self, ArrayAccess, Assignment, AstFile, AstWorkspace, BasicBinaryOperation,
         BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, ConformBehavior,
-        Declaration, DeclareAssign, Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field,
-        FieldInitializer, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
-        NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation,
-        ShortCircuitingBinaryOperator, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation,
-        UnaryOperator, While,
+        Declaration, DeclareAssign, Enum, EnumMemberLiteral, Expr, ExprKind, Field,
+        FieldInitializer, FillBehavior, FixedArray, Function, GlobalVar, HelperExpr, Integer,
+        Named, Parameter, Parameters, ShortCircuitingBinaryOperation,
+        ShortCircuitingBinaryOperator, Stmt, StmtKind, Structure, Type, TypeAlias, TypeKind,
+        UnaryOperation, UnaryOperator, While,
     },
     inflow::Inflow,
     source_files::{Source, SourceFileKey, SourceFiles},
@@ -114,24 +114,27 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 ast_file.functions.push(self.parse_function(annotations)?);
             }
             TokenKind::Identifier(_) => {
-                ast_file.globals.push(self.parse_global(annotations)?);
+                ast_file
+                    .global_variables
+                    .push(self.parse_global_variable(annotations)?);
             }
             TokenKind::StructKeyword => {
                 ast_file.structures.push(self.parse_structure(annotations)?)
             }
             TokenKind::AliasKeyword => {
-                let NamedAlias { name, alias } = self.parse_alias(annotations)?;
+                let Named::<TypeAlias> { name, value: alias } = self.parse_alias(annotations)?;
                 let source = alias.source;
 
-                try_insert_into_index_map(&mut ast_file.aliases, name, alias, |name| {
+                try_insert_into_index_map(&mut ast_file.type_aliases, name, alias, |name| {
                     ParseErrorKind::TypeAliasHasMultipleDefinitions { name }.at(source)
                 })?;
             }
             TokenKind::EnumKeyword => {
-                let NamedEnum {
+                let Named::<Enum> {
                     name,
-                    enum_definition,
+                    value: enum_definition,
                 } = self.parse_enum(annotations)?;
+
                 let source = enum_definition.source;
 
                 try_insert_into_index_map(&mut ast_file.enums, name, enum_definition, |name| {
@@ -139,10 +142,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 })?;
             }
             TokenKind::DefineKeyword => {
-                let NamedDefine { name, define } = self.parse_define(annotations)?;
-                let source = define.source;
+                let Named::<HelperExpr> {
+                    name,
+                    value: named_expr,
+                } = self.parse_helper_expr(annotations)?;
+                let source = named_expr.source;
 
-                try_insert_into_index_map(&mut ast_file.defines, name, define, |name| {
+                try_insert_into_index_map(&mut ast_file.helper_exprs, name, named_expr, |name| {
                     ParseErrorKind::DefineHasMultipleDefinitions { name }.at(source)
                 })?;
             }
@@ -229,7 +235,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
     }
 
-    fn parse_global(&mut self, annotations: Vec<Annotation>) -> Result<Global, ParseError> {
+    fn parse_global_variable(
+        &mut self,
+        annotations: Vec<Annotation>,
+    ) -> Result<GlobalVar, ParseError> {
         // my_global_name Type
         //      ^
 
@@ -256,7 +265,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 
-        Ok(Global {
+        Ok(GlobalVar {
             name,
             ast_type,
             source,
@@ -322,7 +331,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         })
     }
 
-    fn parse_alias(&mut self, annotations: Vec<Annotation>) -> Result<NamedAlias, ParseError> {
+    fn parse_alias(
+        &mut self,
+        annotations: Vec<Annotation>,
+    ) -> Result<Named<TypeAlias>, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -340,16 +352,16 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let ast_type = self.parse_type(None::<&str>, Some("for alias"))?;
 
-        Ok(NamedAlias {
+        Ok(Named::<TypeAlias> {
             name,
-            alias: Alias {
+            value: TypeAlias {
                 value: ast_type,
                 source,
             },
         })
     }
 
-    fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<NamedEnum, ParseError> {
+    fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Named<Enum>, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -394,9 +406,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseParen, Some("to close enum body"))?;
 
-        Ok(NamedEnum {
+        Ok(Named::<Enum> {
             name,
-            enum_definition: Enum {
+            value: Enum {
                 backing_type: None,
                 members,
                 source,
@@ -404,7 +416,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         })
     }
 
-    fn parse_define(&mut self, annotations: Vec<Annotation>) -> Result<NamedDefine, ParseError> {
+    fn parse_helper_expr(
+        &mut self,
+        annotations: Vec<Annotation>,
+    ) -> Result<Named<HelperExpr>, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -422,9 +437,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let value = self.parse_expr()?;
 
-        Ok(NamedDefine {
+        Ok(Named::<HelperExpr> {
+            value: HelperExpr { value, source },
             name,
-            define: Define { value, source },
         })
     }
 

@@ -47,17 +47,17 @@ struct ResolveCtx<'a> {
     pub type_search_ctxs: PerFileId<TypeSearchCtx<'a>>,
     pub function_search_ctxs: PerFileId<FunctionSearchCtx<'a>>,
     pub global_search_ctxs: PerFileId<GlobalSearchCtx<'a>>,
-    pub defines: IndexMap<String, &'a ast::Define>,
+    pub helper_exprs: IndexMap<String, &'a ast::HelperExpr>,
 }
 
 impl<'a> ResolveCtx<'a> {
-    fn new(defines: IndexMap<String, &'a ast::Define>) -> Self {
+    fn new(helper_exprs: IndexMap<String, &'a ast::HelperExpr>) -> Self {
         Self {
             jobs: Default::default(),
             type_search_ctxs: Default::default(),
             function_search_ctxs: Default::default(),
             global_search_ctxs: Default::default(),
-            defines,
+            helper_exprs,
         }
     }
 }
@@ -66,26 +66,32 @@ pub fn resolve<'a>(
     ast_workspace: &'a AstWorkspace,
     options: &BuildOptions,
 ) -> Result<resolved::Ast<'a>, ResolveError> {
-    let mut defines = IndexMap::new();
+    let mut helper_exprs = IndexMap::new();
 
-    // Unify defines into single map
+    // Unify helper expressions into single map
     for file in ast_workspace.files.iter() {
-        for (define_name, define) in file.defines.iter() {
-            try_insert_into_index_map(&mut defines, define_name.clone(), define, |define_name| {
-                ResolveErrorKind::MultipleDefinesNamed { name: define_name }.at(define.source)
-            })?;
+        for (name, helper_expr) in file.helper_exprs.iter() {
+            try_insert_into_index_map(
+                &mut helper_exprs,
+                name.clone(),
+                helper_expr,
+                |define_name| {
+                    ResolveErrorKind::MultipleDefinesNamed { name: define_name }
+                        .at(helper_expr.source)
+                },
+            )?;
         }
     }
 
-    let mut ctx = ResolveCtx::new(defines);
+    let mut ctx = ResolveCtx::new(helper_exprs);
     let source_file_cache = ast_workspace.source_file_cache;
     let mut resolved_ast = resolved::Ast::new(source_file_cache);
 
-    let mut aliases: IndexMap<String, &'a ast::Alias> = IndexMap::new();
+    let mut aliases: IndexMap<String, &'a ast::TypeAlias> = IndexMap::new();
 
     // Unify type aliases into single map
     for file in ast_workspace.files.iter() {
-        for (alias_name, alias) in file.aliases.iter() {
+        for (alias_name, alias) in file.type_aliases.iter() {
             try_insert_into_index_map(&mut aliases, alias_name.clone(), alias, |alias_name| {
                 ResolveErrorKind::MultipleDefinitionsOfTypeNamed { name: alias_name }
                     .at(alias.source)
@@ -182,7 +188,7 @@ pub fn resolve<'a>(
     for file in ast_workspace.files.iter() {
         let type_search_ctx = ctx.type_search_ctxs.get_mut(file.file_id).unwrap();
 
-        for (alias_name, alias) in file.aliases.iter() {
+        for (alias_name, alias) in file.type_aliases.iter() {
             let resolved_type = resolve_type_or_undeclared(
                 type_search_ctx,
                 source_file_cache,
@@ -202,7 +208,7 @@ pub fn resolve<'a>(
             .global_search_ctxs
             .get_or_insert_with(file.file_id, || GlobalSearchCtx::new(source_file_cache));
 
-        for global in file.globals.iter() {
+        for global in file.global_variables.iter() {
             let resolved_type = resolve_type(
                 type_search_ctx,
                 source_file_cache,
@@ -210,7 +216,7 @@ pub fn resolve<'a>(
                 &mut Default::default(),
             )?;
 
-            let global_ref = resolved_ast.globals.insert(resolved::Global {
+            let global_ref = resolved_ast.globals.insert(resolved::GlobalVar {
                 name: global.name.clone(),
                 resolved_type: resolved_type.clone(),
                 source: global.source,
@@ -338,7 +344,7 @@ pub fn resolve<'a>(
                         global_search_ctx,
                         variable_search_ctx,
                         resolved_function_ref,
-                        defines: &ctx.defines,
+                        helper_exprs: &ctx.helper_exprs,
                     };
 
                     resolve_stmts(&mut ctx, &ast_function.stmts)?

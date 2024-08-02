@@ -46,7 +46,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub global_search_ctx: &'b GlobalSearchCtx<'a>,
     pub variable_search_ctx: VariableSearchCtx<'a>,
     pub resolved_function_ref: resolved::FunctionRef,
-    pub defines: &'b IndexMap<String, &'a ast::Define>,
+    pub helper_exprs: &'b IndexMap<String, &'a ast::HelperExpr>,
 }
 
 #[derive(Copy, Clone, Debug)]

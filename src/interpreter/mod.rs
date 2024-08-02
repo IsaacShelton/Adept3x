@@ -14,9 +14,8 @@ use crate::{
     interpreter::{registers::Registers, value::StructLiteral},
     ir,
 };
-use std::collections::HashMap;
-
 pub use error::InterpreterError;
+use std::collections::HashMap;
 pub use value::Value;
 
 #[derive(Debug)]
@@ -25,7 +24,7 @@ pub struct Interpreter<'a, S: SyscallHandler> {
     max_steps_left: Option<u64>,
     ir_module: &'a ir::Module<'a>,
     memory: Memory,
-    global_addresses: HashMap<ir::GlobalRef, ir::Literal>,
+    global_addresses: HashMap<ir::GlobalVarRef, ir::Literal>,
 }
 
 impl<'a, S: SyscallHandler> Interpreter<'a, S> {

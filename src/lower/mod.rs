@@ -74,8 +74,8 @@ fn lower_structure(
 
 fn lower_global(
     ir_module: &mut ir::Module,
-    global_ref: resolved::GlobalRef,
-    global: &resolved::Global,
+    global_ref: resolved::GlobalVarRef,
+    global: &resolved::GlobalVar,
     resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
     ir_module.globals.insert(

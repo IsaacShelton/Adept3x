@@ -5,6 +5,7 @@ use crate::{
     ast::{CInteger, IntegerSign},
     data_units::ByteUnits,
 };
+use derive_more::IsVariant;
 use type_layout::TypeLayout;
 
 #[derive(Clone, Debug)]
@@ -14,8 +15,19 @@ pub struct TargetInfo {
     pub is_darwin: bool,
 }
 
-#[derive(Clone, Debug)]
+impl TargetInfo {
+    pub fn arbitrary() -> Self {
+        Self {
+            kind: TargetInfoKind::Arbitrary,
+            ms_abi: false,
+            is_darwin: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, IsVariant)]
 pub enum TargetInfoKind {
+    Arbitrary,
     X86_64,
     AARCH64,
 }
@@ -30,6 +42,7 @@ impl TargetInfo {
 
         // Otherwise, the signness of `char` depends on the architecture
         match &self.kind {
+            TargetInfoKind::Arbitrary => IntegerSign::Unsigned,
             TargetInfoKind::X86_64 => IntegerSign::Signed,
             TargetInfoKind::AARCH64 => IntegerSign::Unsigned,
         }
@@ -37,7 +50,7 @@ impl TargetInfo {
 
     pub fn is_little_endian(&self) -> bool {
         match &self.kind {
-            TargetInfoKind::X86_64 | TargetInfoKind::AARCH64 => true,
+            TargetInfoKind::Arbitrary | TargetInfoKind::X86_64 | TargetInfoKind::AARCH64 => true,
         }
     }
 

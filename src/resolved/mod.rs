@@ -26,7 +26,7 @@ pub use variable_storage::VariableStorage;
 
 new_key_type! {
     pub struct FunctionRef;
-    pub struct GlobalRef;
+    pub struct GlobalVarRef;
     pub struct StructureRef;
 }
 
@@ -36,7 +36,7 @@ pub struct Ast<'a> {
     pub entry_point: Option<FunctionRef>,
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
-    pub globals: SlotMap<GlobalRef, Global>,
+    pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: IndexMap<String, Enum>,
 }
 
@@ -61,7 +61,7 @@ pub struct Enum {
 }
 
 #[derive(Clone, Debug)]
-pub struct Global {
+pub struct GlobalVar {
     pub name: String,
     pub resolved_type: Type,
     pub source: Source,
@@ -599,7 +599,7 @@ pub struct Variable {
 
 #[derive(Clone, Debug)]
 pub struct GlobalVariable {
-    pub reference: GlobalRef,
+    pub reference: GlobalVarRef,
     pub resolved_type: Type,
 }
 

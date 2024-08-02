@@ -65,7 +65,7 @@ pub struct BackendCtx<'a> {
     pub ir_module: &'a ir::Module<'a>,
     pub builder: Option<Builder>,
     pub func_skeletons: HashMap<ir::FunctionRef, FunctionSkeleton>,
-    pub globals: HashMap<ir::GlobalRef, LLVMValueRef>,
+    pub globals: HashMap<ir::GlobalVarRef, LLVMValueRef>,
     pub anon_global_variables: Vec<LLVMValueRef>,
     pub target_data: &'a TargetData,
     pub intrinsics: Intrinsics,

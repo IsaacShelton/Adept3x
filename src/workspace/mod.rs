@@ -276,9 +276,9 @@ pub fn old_compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                         if let Ok(value) = parser.parse_expr_singular().and_then(|expr| {
                             translate_expr(ast_file, parser.typedefs(), &expr, compiler.diagnostics)
                         }) {
-                            ast_file.defines.insert(
+                            ast_file.helper_exprs.insert(
                                 define_name.clone(),
-                                ast::Define {
+                                ast::HelperExpr {
                                     value,
                                     source: define.source,
                                 },

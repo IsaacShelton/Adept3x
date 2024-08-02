@@ -1,7 +1,3 @@
-use indexmap::IndexMap;
-use num_bigint::BigInt;
-use num_traits::Zero;
-
 use crate::{
     ast::{self, AnonymousEnum, AstFile, EnumMember, TypeKind},
     c::{
@@ -10,6 +6,9 @@ use crate::{
     },
     try_insert_index_map::try_insert_into_index_map,
 };
+use indexmap::IndexMap;
+use num_bigint::BigInt;
+use num_traits::Zero;
 
 pub fn make_anonymous_enum(
     ast_file: &mut AstFile,
@@ -62,9 +61,9 @@ pub fn make_anonymous_enum(
                         .at(enumerator.source);
 
                     try_insert_into_index_map(
-                        &mut ast_file.defines,
+                        &mut ast_file.helper_exprs,
                         enumerator.name.clone(),
-                        ast::Define {
+                        ast::HelperExpr {
                             value: aka_value,
                             source: enumerator.source,
                         },

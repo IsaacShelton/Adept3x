@@ -5,13 +5,13 @@ mod parameters;
 mod types;
 
 use self::types::get_name_and_type;
-use crate::ast::{self, AstFile};
-use crate::c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError};
-use crate::diagnostics::Diagnostics;
+pub use self::{expr::translate_expr, function::declare_function};
+use crate::{
+    ast::{self, AstFile},
+    c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError},
+    diagnostics::Diagnostics,
+};
 use std::collections::HashMap;
-
-pub use self::expr::translate_expr;
-pub use self::function::declare_function;
 
 pub fn declare_named_declaration(
     ast_file: &mut AstFile,
@@ -31,9 +31,9 @@ pub fn declare_named_declaration(
     )?;
 
     if is_typedef {
-        ast_file.aliases.insert(
+        ast_file.type_aliases.insert(
             name.to_string(),
-            ast::Alias {
+            ast::TypeAlias {
                 value: ast_type.clone(),
                 source: declarator.source,
             },
