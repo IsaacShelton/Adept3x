@@ -196,7 +196,7 @@ fn lower_function(
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
             is_foreign: true,
             is_exposed: true,
-            abide_abi: function.abide_abi,
+            abide_abi: function.abide_abi && !ir_module.target_info.kind.is_arbitrary(),
         },
     );
 
