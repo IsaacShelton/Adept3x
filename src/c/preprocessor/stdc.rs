@@ -1,5 +1,5 @@
 use super::{ast::PlaceholderAffinity, expand::Environment, Define, DefineKind, PreTokenKind};
-use crate::ast::Source;
+use crate::source_files::Source;
 
 pub fn stdc() -> Environment {
     let mut stdc = Environment::default();

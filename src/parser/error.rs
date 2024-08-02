@@ -1,7 +1,6 @@
 use crate::{
-    ast::Source,
     show::Show,
-    source_file_cache::SourceFileCache,
+    source_files::{Source, SourceFiles},
     token::{Token, TokenKind},
 };
 use std::{borrow::Borrow, fmt::Display};
@@ -91,7 +90,7 @@ impl Show for ParseError {
     fn show(
         &self,
         w: &mut dyn std::fmt::Write,
-        source_file_cache: &SourceFileCache,
+        source_file_cache: &SourceFiles,
     ) -> std::fmt::Result {
         write!(
             w,

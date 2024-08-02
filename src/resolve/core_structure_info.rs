@@ -1,7 +1,7 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
-    ast::Source,
     resolved::{self, MemoryManagement, StructureRef},
+    source_files::Source,
 };
 
 pub fn get_core_structure_info(

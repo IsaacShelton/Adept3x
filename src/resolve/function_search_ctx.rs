@@ -1,16 +1,19 @@
 use super::error::{ResolveError, ResolveErrorKind};
-use crate::{ast::Source, resolved, source_file_cache::SourceFileCache};
+use crate::{
+    resolved,
+    source_files::{Source, SourceFiles},
+};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FunctionSearchCtx<'a> {
     pub available: HashMap<String, Vec<resolved::FunctionRef>>,
 
-    source_file_cache: &'a SourceFileCache,
+    source_file_cache: &'a SourceFiles,
 }
 
 impl<'a> FunctionSearchCtx<'a> {
-    pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
+    pub fn new(source_file_cache: &'a SourceFiles) -> Self {
         Self {
             available: Default::default(),
             source_file_cache,

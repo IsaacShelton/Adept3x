@@ -4,8 +4,7 @@ mod into_text;
 mod into_text_stream;
 mod text_stream;
 
-use crate::ast::Source;
-
+use crate::source_files::Source;
 pub use character::{is_c_non_digit, Character};
 pub use eatable::Eatable;
 pub use into_text::IntoText;

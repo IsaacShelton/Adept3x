@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, AstFile, ConformBehavior, FillBehavior, Source},
+    ast::{self, AstFile, ConformBehavior, FillBehavior},
     c::{
         parser::{
             expr::{CompoundLiteral, Initializer},
@@ -9,6 +9,7 @@ use crate::{
         translation::expr::caster::get_caster_type,
     },
     diagnostics::Diagnostics,
+    source_files::Source,
 };
 use std::collections::HashMap;
 

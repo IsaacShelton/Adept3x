@@ -1,6 +1,6 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast,
     resolve::{
         core_structure_info::get_core_structure_info,
         destination::resolve_expr_to_destination,
@@ -8,6 +8,7 @@ use crate::{
         Initialized,
     },
     resolved::{self, Member, TypedExpr},
+    source_files::Source,
 };
 
 pub fn resolve_member_expr(

@@ -1,6 +1,7 @@
 use crate::{
-    ast::Source, c::preprocessor::pre_token::Punctuator, show::Show,
-    source_file_cache::SourceFileCache,
+    c::preprocessor::pre_token::Punctuator,
+    show::Show,
+    source_files::{Source, SourceFiles},
 };
 use std::fmt::Display;
 
@@ -20,7 +21,7 @@ impl Show for ParseError {
     fn show(
         &self,
         w: &mut dyn std::fmt::Write,
-        source_file_cache: &SourceFileCache,
+        source_file_cache: &SourceFiles,
     ) -> std::fmt::Result {
         write!(
             w,

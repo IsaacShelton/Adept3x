@@ -530,7 +530,7 @@ fn lower_expr(
             .at(expr.source))
         }
         ExprKind::IntegerKnown(integer) => {
-            use resolved::{IntegerLiteralBits as Bits, IntegerSign as Sign};
+            use resolved::{IntegerFixedBits as Bits, IntegerSign as Sign};
 
             let IntegerKnown { value, bits, sign } = &**integer;
 

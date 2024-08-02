@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-
 use crate::{
-    ast::{AstFile, FixedArray, FunctionPointer, Source, Type, TypeKind},
+    ast::{AstFile, FixedArray, FunctionPointer, Type, TypeKind},
     c::{
         parser::{ArrayQualifier, CTypedef, FunctionQualifier, ParseError, Pointer},
         translate_expr,
     },
     diagnostics::{Diagnostics, WarningDiagnostic},
+    source_files::Source,
 };
+use std::collections::HashMap;
 
 pub fn decorate_pointer(
     ast_type: Type,

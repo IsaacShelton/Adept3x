@@ -1,11 +1,12 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast,
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
     resolved::{self, TypedExpr},
+    source_files::Source,
 };
 use ast::{IntegerBits, IntegerSign};
 

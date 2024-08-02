@@ -1,21 +1,20 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
-    ast::{self, Source},
-    resolved,
-    source_file_cache::SourceFileCache,
+    ast, resolved,
+    source_files::{Source, SourceFiles},
 };
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct TypeSearchCtx<'a> {
-    source_file_cache: &'a SourceFileCache,
+    source_file_cache: &'a SourceFiles,
     types: IndexMap<String, resolved::TypeKind>,
     aliases: IndexMap<String, &'a ast::Alias>,
 }
 
 impl<'a> TypeSearchCtx<'a> {
     pub fn new(
-        source_file_cache: &'a SourceFileCache,
+        source_file_cache: &'a SourceFiles,
         aliases: IndexMap<String, &'a ast::Alias>,
     ) -> Self {
         Self {

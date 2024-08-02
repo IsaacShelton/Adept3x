@@ -1,21 +1,20 @@
 use crate::{
-    ast::Source,
     line_column::{LineColumn, Location},
-    source_file_cache::SourceFileCacheKey,
+    source_files::{Source, SourceFileKey},
     text::{Character, TextStream},
 };
 
 pub struct TextStreamFromIterator<I: Iterator<Item = char>> {
     iterator: LineColumn<I>,
-    source_key: SourceFileCacheKey,
+    file_key: SourceFileKey,
     last_location: Location,
 }
 
 impl<I: Iterator<Item = char>> TextStreamFromIterator<I> {
-    pub fn new(iterator: I, source_key: SourceFileCacheKey) -> Self {
+    pub fn new(iterator: I, file_key: SourceFileKey) -> Self {
         Self {
             iterator: LineColumn::new(iterator),
-            source_key,
+            file_key,
             last_location: Location { line: 1, column: 1 },
         }
     }
@@ -29,13 +28,13 @@ impl<I: Iterator<Item = char>> TextStream for TextStreamFromIterator<I> {
                 Character::At(
                     character,
                     Source {
-                        key: self.source_key,
+                        key: self.file_key,
                         location,
                     },
                 )
             }
             None => Character::End(Source {
-                key: self.source_key,
+                key: self.file_key,
                 location: self.last_location,
             }),
         }

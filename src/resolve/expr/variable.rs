@@ -1,12 +1,12 @@
 use super::{PreferredType, ResolveExprCtx};
 use crate::{
-    ast::Source,
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         expr::resolve_expr,
         Initialized,
     },
     resolved::{self, TypedExpr},
+    source_files::Source,
 };
 
 pub fn resolve_variable_expr(

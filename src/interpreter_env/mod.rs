@@ -1,15 +1,15 @@
-use indexmap::IndexMap;
-
 use crate::{
-    ast::{self, AstWorkspace, IntegerBits, Source},
+    ast::{self, AstWorkspace, IntegerBits},
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
         Interpreter, InterpreterError,
     },
     ir::{self, IntegerSign, InterpreterSyscallKind},
     resolved,
+    source_files::Source,
     tag::Tag,
 };
+use indexmap::IndexMap;
 
 fn thin_cstring_function(
     name: impl ToString,

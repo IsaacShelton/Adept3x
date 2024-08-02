@@ -1,12 +1,15 @@
 use crate::{
-    ast::{self, IntegerKnown, IntegerSign, Source},
+    ast,
     c::{parser::ParseError, token::Integer},
-    resolved::IntegerLiteralBits,
+    source_files::Source,
 };
 
 pub fn translate_expr_integer(integer: &Integer, source: Source) -> Result<ast::Expr, ParseError> {
-    use IntegerLiteralBits::{Bits32, Bits64};
-    use IntegerSign::{Signed, Unsigned};
+    use ast::{
+        IntegerFixedBits::{Bits32, Bits64},
+        IntegerKnown,
+        IntegerSign::{Signed, Unsigned},
+    };
 
     let known = match integer {
         Integer::Int(x) => IntegerKnown {

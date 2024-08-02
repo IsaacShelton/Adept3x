@@ -4,8 +4,8 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::Source,
     inflow::Inflow,
+    source_files::Source,
     token::{Token, TokenKind},
 };
 

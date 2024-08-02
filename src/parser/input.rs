@@ -1,22 +1,21 @@
 use crate::{
-    ast::Source,
     inflow::Inflow,
-    source_file_cache::{SourceFileCache, SourceFileCacheKey},
+    source_files::{Source, SourceFileKey, SourceFiles},
     token::{Token, TokenKind},
 };
 use std::borrow::Borrow;
 
 pub struct Input<'a, I: Inflow<Token>> {
-    source_file_cache: &'a SourceFileCache,
+    source_file_cache: &'a SourceFiles,
     inflow: I,
-    key: SourceFileCacheKey,
+    key: SourceFileKey,
 }
 
 impl<'a, I> Input<'a, I>
 where
     I: Inflow<Token>,
 {
-    pub fn new(inflow: I, source_file_cache: &'a SourceFileCache, key: SourceFileCacheKey) -> Self {
+    pub fn new(inflow: I, source_file_cache: &'a SourceFiles, key: SourceFileKey) -> Self {
         Self {
             inflow,
             source_file_cache,
@@ -81,11 +80,11 @@ where
         self.source_file_cache.get(self.key).filename()
     }
 
-    pub fn key(&self) -> SourceFileCacheKey {
+    pub fn key(&self) -> SourceFileKey {
         self.key
     }
 
-    pub fn source_file_cache(&self) -> &'a SourceFileCache {
+    pub fn source_file_cache(&self) -> &'a SourceFiles {
         self.source_file_cache
     }
 

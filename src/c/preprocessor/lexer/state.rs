@@ -1,9 +1,9 @@
 use crate::{
-    ast::Source,
     c::{
         encoding::Encoding,
         preprocessor::{pre_token::PreTokenKind, PreToken},
     },
+    source_files::Source,
 };
 
 #[derive(Clone, Debug, Default)]

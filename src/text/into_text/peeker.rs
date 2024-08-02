@@ -1,5 +1,5 @@
 use crate::{
-    ast::Source,
+    source_files::Source,
     text::{Character, Text, TextStream},
 };
 use std::collections::VecDeque;

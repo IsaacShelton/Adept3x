@@ -1,4 +1,4 @@
-use crate::{ast::Source, ir};
+use crate::{ir, source_files::Source};
 
 #[derive(Clone, Debug)]
 pub struct RecordInfo<'t> {

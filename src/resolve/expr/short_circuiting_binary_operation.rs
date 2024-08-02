@@ -1,12 +1,13 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior, Source},
+    ast::{self, ConformBehavior},
     resolve::{
         conform_expr,
         error::{ResolveError, ResolveErrorKind},
         ConformMode, Initialized,
     },
     resolved::{self, Drops, TypedExpr},
+    source_files::Source,
 };
 
 pub fn resolve_short_circuiting_binary_operation_expr(

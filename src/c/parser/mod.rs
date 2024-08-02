@@ -5,24 +5,26 @@ pub mod expr;
 mod input;
 mod speculate;
 
-use self::expr::{BracedInitializer, DesignatedInitializer, Designation, Initializer};
-use self::speculate::speculate;
-use self::{error::ParseErrorKind, expr::Expr};
-use super::token::Integer;
-use super::translation::{declare_function, declare_named_declaration};
+pub use self::{error::ParseError, input::Input};
+use self::{
+    error::ParseErrorKind,
+    expr::{BracedInitializer, DesignatedInitializer, Designation, Expr, Initializer},
+    speculate::speculate,
+};
 use super::{
     punctuator::Punctuator,
-    token::{CToken, CTokenKind},
+    token::{CToken, CTokenKind, Integer},
+    translation::{declare_function, declare_named_declaration},
 };
-use crate::ast::{AstWorkspace, Source};
-use crate::ast::{Parameter, Type, TypeKind};
-use crate::diagnostics::{Diagnostics, WarningDiagnostic};
-use crate::file_id::FileId;
+use crate::{
+    ast::{AstWorkspace, Parameter, Type, TypeKind},
+    diagnostics::{Diagnostics, WarningDiagnostic},
+    file_id::FileId,
+    source_files::source::Source,
+};
 use derive_more::IsVariant;
 use itertools::Itertools;
 use std::collections::HashMap;
-
-pub use self::{error::ParseError, input::Input};
 
 pub struct Parser<'a> {
     input: Input<'a>,

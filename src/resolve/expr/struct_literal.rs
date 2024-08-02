@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior, FieldInitializer, FillBehavior, Source},
+    ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
     resolve::{
         conform_expr,
         core_structure_info::get_core_structure_info,
@@ -8,6 +8,7 @@ use crate::{
         resolve_type, ConformMode, Initialized,
     },
     resolved::{self, StructureLiteral, StructureRef, TypedExpr},
+    source_files::Source,
 };
 use indexmap::IndexMap;
 use itertools::Itertools;

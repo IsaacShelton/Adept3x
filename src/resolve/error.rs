@@ -1,4 +1,7 @@
-use crate::{ast::Source, show::Show, source_file_cache::SourceFileCache};
+use crate::{
+    show::Show,
+    source_files::{Source, SourceFiles},
+};
 use itertools::Itertools;
 use std::fmt::Display;
 
@@ -155,7 +158,7 @@ impl Show for ResolveError {
     fn show(
         &self,
         w: &mut dyn std::fmt::Write,
-        source_file_cache: &SourceFileCache,
+        source_file_cache: &SourceFiles,
     ) -> std::fmt::Result {
         write!(
             w,

@@ -1,4 +1,8 @@
-use crate::{ast::Source, diagnostics::Diagnostic, show::Show, source_file_cache::SourceFileCache};
+use crate::{
+    diagnostics::Diagnostic,
+    show::Show,
+    source_files::{Source, SourceFiles},
+};
 
 pub struct WarningDiagnostic {
     message: String,
@@ -25,7 +29,7 @@ impl Show for WarningDiagnostic {
     fn show(
         &self,
         w: &mut dyn std::fmt::Write,
-        source_file_cache: &SourceFileCache,
+        source_file_cache: &SourceFiles,
     ) -> std::fmt::Result {
         if let Some(source) = self.source {
             write!(

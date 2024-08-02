@@ -10,7 +10,7 @@ pub mod fs;
 mod normal_file;
 
 use crate::{
-    ast::{self, Source},
+    ast,
     c::{
         self,
         lexer::lex_c_code,
@@ -26,6 +26,7 @@ use crate::{
     lower::lower,
     parser::{parse, parse_into},
     resolve::resolve,
+    source_files::Source,
     text::IntoText,
 };
 use compile::module::compile_module_file;

@@ -1,8 +1,9 @@
 use super::{build_type_specifier_qualifier, TypeBase, TypeBaseBuilder};
 use crate::{
-    ast::{AstFile, Source},
+    ast::AstFile,
     c::parser::{CTypedef, DeclarationSpecifierKind, DeclarationSpecifiers, ParseError},
     diagnostics::Diagnostics,
+    source_files::Source,
 };
 use std::collections::HashMap;
 

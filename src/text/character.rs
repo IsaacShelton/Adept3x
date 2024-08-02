@@ -1,4 +1,4 @@
-use crate::ast::Source;
+use crate::source_files::Source;
 
 #[derive(Clone, Debug)]
 pub enum Character {

@@ -1,5 +1,5 @@
 use super::{encoding::Encoding, lexer::LexError, punctuator::Punctuator};
-use crate::{ast::Source, inflow::InflowEnd};
+use crate::{inflow::InflowEnd, source_files::Source};
 use derive_more::{Deref, IsVariant, Unwrap};
 use num_bigint::BigInt;
 

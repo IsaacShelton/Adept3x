@@ -2,13 +2,13 @@ use super::{
     error::ParseErrorKind, AbstractDeclarator, ParseError, Parser, SpecifierQualifierList,
 };
 use crate::{
-    ast::Source,
     c::{
         encoding::Encoding,
         parser::speculate::speculate,
         punctuator::Punctuator,
         token::{CTokenKind, FloatSuffix, Integer},
     },
+    source_files::Source,
 };
 
 #[derive(Clone, Debug)]

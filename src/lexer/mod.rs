@@ -4,17 +4,17 @@ mod number_state;
 mod state;
 mod string_state;
 
-use self::state::State;
 use self::{
     hex_number_state::HexNumberState, identifier_state::IdentifierState, number_state::NumberState,
-    string_state::StringState,
+    state::State, string_state::StringState,
 };
-use crate::ast::Source;
-use crate::inflow::InflowStream;
-use crate::lexical_utils::FeedResult;
-use crate::text::Character;
-use crate::text::Text;
-use crate::token::{StringLiteral, StringModifier, Token, TokenKind};
+use crate::{
+    inflow::InflowStream,
+    lexical_utils::FeedResult,
+    source_files::Source,
+    text::{Character, Text},
+    token::{StringLiteral, StringModifier, Token, TokenKind},
+};
 
 pub struct Lexer<T: Text> {
     characters: T,

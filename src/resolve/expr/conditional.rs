@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior, Source},
+    ast::{self, ConformBehavior},
     resolve::{
         conform_expr_or_error,
         error::{ResolveError, ResolveErrorKind},
@@ -9,6 +9,7 @@ use crate::{
         ConformMode, Initialized,
     },
     resolved::{self, Branch, TypedExpr},
+    source_files::Source,
 };
 use itertools::Itertools;
 

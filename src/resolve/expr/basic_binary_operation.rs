@@ -1,12 +1,13 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior, Source},
+    ast::{self, ConformBehavior},
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         unify_types::unify_types,
         Initialized,
     },
     resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpr},
+    source_files::Source,
 };
 use ast::{IntegerBits, IntegerSign};
 

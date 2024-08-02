@@ -1,14 +1,12 @@
+use crate::{
+    c::token::{CToken, CTokenKind},
+    source_files::{Source, SourceFileKey, SourceFiles},
+};
 use std::borrow::Borrow;
 
-use crate::{
-    ast::Source,
-    c::token::{CToken, CTokenKind},
-    source_file_cache::{SourceFileCache, SourceFileCacheKey},
-};
-
 pub struct Input<'a> {
-    source_file_cache: &'a SourceFileCache,
-    key: SourceFileCacheKey,
+    source_file_cache: &'a SourceFiles,
+    key: SourceFileKey,
     tokens: Vec<CToken>,
     stack: Vec<usize>,
 }
@@ -16,8 +14,8 @@ pub struct Input<'a> {
 impl<'a> Input<'a> {
     pub fn new(
         tokens: Vec<CToken>,
-        source_file_cache: &'a SourceFileCache,
-        key: SourceFileCacheKey,
+        source_file_cache: &'a SourceFiles,
+        key: SourceFileKey,
     ) -> Self {
         assert!(tokens.last().map_or(false, |token| token.is_end_of_file()));
 
@@ -45,11 +43,11 @@ impl<'a> Input<'a> {
         self.source_file_cache.get(self.key).filename()
     }
 
-    pub fn source_file_cache(&self) -> &'a SourceFileCache {
+    pub fn source_file_cache(&self) -> &'a SourceFiles {
         self.source_file_cache
     }
 
-    pub fn key(&self) -> SourceFileCacheKey {
+    pub fn key(&self) -> SourceFileKey {
         self.key
     }
 

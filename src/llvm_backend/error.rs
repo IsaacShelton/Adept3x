@@ -1,4 +1,4 @@
-use crate::{show::Show, source_file_cache::SourceFileCache};
+use crate::{show::Show, source_files::SourceFiles};
 
 #[derive(Clone, Debug)]
 pub struct BackendError {
@@ -23,7 +23,7 @@ impl Show for BackendError {
     fn show(
         &self,
         w: &mut dyn std::fmt::Write,
-        _source_file_cache: &SourceFileCache,
+        _source_file_cache: &SourceFiles,
     ) -> std::fmt::Result {
         write!(w, "error: {}", self.message)
     }

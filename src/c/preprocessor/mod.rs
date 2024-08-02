@@ -7,17 +7,6 @@ mod parser;
 mod pre_token;
 mod stdc;
 
-use self::error::PreprocessorError;
-use self::expand::expand_ast;
-use self::lexer::Lexer;
-use self::parser::{parse, ParseErrorKind};
-use self::stdc::stdc;
-use crate::ast::Source;
-use crate::diagnostics::Diagnostics;
-use crate::inflow::IntoInflow;
-use crate::text::Text;
-use std::collections::HashMap;
-
 /*
    Missing features:
    - __has_include
@@ -30,9 +19,17 @@ use std::collections::HashMap;
    - __DATE__
    - etc.
 */
-
 pub use self::ast::{Define, DefineKind};
 pub use self::pre_token::{PreToken, PreTokenKind};
+use self::{
+    error::PreprocessorError,
+    expand::expand_ast,
+    lexer::Lexer,
+    parser::{parse, ParseErrorKind},
+    stdc::stdc,
+};
+use crate::{diagnostics::Diagnostics, inflow::IntoInflow, source_files::Source, text::Text};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct Preprocessed {

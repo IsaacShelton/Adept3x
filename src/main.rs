@@ -33,7 +33,7 @@ mod resolve;
 mod resolved;
 mod show;
 mod single_file_only;
-mod source_file_cache;
+mod source_files;
 mod tag;
 mod target_info;
 mod text;
@@ -42,10 +42,7 @@ mod try_insert_index_map;
 mod version;
 mod workspace;
 
-use crate::cli::BuildCommand;
-use crate::show::Show;
-use crate::source_file_cache::SourceFileCache;
-use crate::text::IntoText;
+use crate::{cli::BuildCommand, show::Show, source_files::SourceFiles, text::IntoText};
 use compiler::Compiler;
 use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
 use generate_workspace::new_project;
@@ -67,7 +64,7 @@ fn main() {
 
 fn build_project(build_command: BuildCommand) {
     let BuildCommand { filename, options } = build_command;
-    let source_file_cache = SourceFileCache::new();
+    let source_file_cache = SourceFiles::new();
     let filepath = Path::new(&filename);
     let diagnostics = Diagnostics::new(&source_file_cache, DiagnosticFlags::default());
 
@@ -132,7 +129,7 @@ fn build_project(build_command: BuildCommand) {
     }
 }
 
-fn exit_unless<T, E: Show>(result: Result<T, E>, source_file_cache: &SourceFileCache) -> T {
+fn exit_unless<T, E: Show>(result: Result<T, E>, source_file_cache: &SourceFiles) -> T {
     match result {
         Ok(value) => value,
         Err(err) => {

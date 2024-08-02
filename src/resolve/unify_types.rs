@@ -1,7 +1,8 @@
 use super::{conform_expr, ConformMode};
 use crate::{
-    ast::{ConformBehavior, Source},
+    ast::ConformBehavior,
     resolved::{self, FloatSize, IntegerBits, IntegerSign, TypedExpr},
+    source_files::Source,
 };
 use itertools::Itertools;
 use num_bigint::BigInt;

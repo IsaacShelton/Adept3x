@@ -1,6 +1,5 @@
 use super::{depleted::Depleted, Environment};
 use crate::{
-    ast::Source,
     c::{
         encoding::Encoding,
         preprocessor::{
@@ -11,6 +10,7 @@ use crate::{
         },
     },
     look_ahead::LookAhead,
+    source_files::Source,
 };
 use itertools::Itertools;
 

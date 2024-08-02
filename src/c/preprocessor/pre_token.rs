@@ -1,8 +1,7 @@
-use crate::{ast::Source, c::encoding::Encoding, inflow::InflowEnd};
+pub use crate::c::punctuator::Punctuator;
+use crate::{c::encoding::Encoding, inflow::InflowEnd, source_files::Source};
 use derive_more::IsVariant;
 use std::fmt::Display;
-
-pub use crate::c::punctuator::Punctuator;
 
 #[derive(Clone, Debug)]
 pub struct PreToken {

@@ -3,19 +3,22 @@ mod decorate;
 mod enumeration;
 mod get_type_base;
 
-use self::composite::make_composite;
-use self::decorate::{decorate_array, decorate_function, decorate_pointer};
-use self::enumeration::make_anonymous_enum;
-use self::get_type_base::get_type_base;
+use self::{
+    composite::make_composite,
+    decorate::{decorate_array, decorate_function, decorate_pointer},
+    enumeration::make_anonymous_enum,
+    get_type_base::get_type_base,
+};
 use super::parameters::has_parameters;
 use crate::{
-    ast::{AstFile, FloatSize, IntegerBits, IntegerSign, Parameter, Source, Type, TypeKind},
+    ast::{AstFile, FloatSize, IntegerBits, IntegerSign, Parameter, Type, TypeKind},
     c::parser::{
         error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator,
         DeclaratorKind, Decorator, Decorators, FunctionQualifier, ParameterDeclarationCore,
         ParseError, TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
     },
     diagnostics::Diagnostics,
+    source_files::Source,
 };
 use std::collections::HashMap;
 

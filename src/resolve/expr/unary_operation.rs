@@ -1,12 +1,13 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast,
     resolve::{
         conform_integer_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
     resolved::{self, TypedExpr},
+    source_files::Source,
 };
 
 pub fn resolve_unary_operation_expr(

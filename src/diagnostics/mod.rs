@@ -1,9 +1,8 @@
 mod warning;
 
-use crate::{show::Show, source_file_cache::SourceFileCache};
+use crate::{show::Show, source_files::SourceFiles};
 use append_only_vec::AppendOnlyVec;
 use core::fmt::Debug;
-
 pub use warning::WarningDiagnostic;
 
 pub trait Diagnostic: Show + Send + Sync {}
@@ -26,7 +25,7 @@ impl Default for DiagnosticFlags {
 }
 
 pub struct Diagnostics<'a> {
-    source_file_cache: &'a SourceFileCache,
+    source_file_cache: &'a SourceFiles,
     diagnostics: AppendOnlyVec<Box<dyn Diagnostic>>,
     flags: DiagnosticFlags,
 }
@@ -38,7 +37,7 @@ impl<'a> Debug for Diagnostics<'a> {
 }
 
 impl<'a> Diagnostics<'a> {
-    pub fn new(source_file_cache: &'a SourceFileCache, flags: DiagnosticFlags) -> Self {
+    pub fn new(source_file_cache: &'a SourceFiles, flags: DiagnosticFlags) -> Self {
         Self {
             source_file_cache,
             diagnostics: AppendOnlyVec::<Box<dyn Diagnostic>>::new(),

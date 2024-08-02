@@ -1,8 +1,9 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
-    ast::{self, Source},
+    ast,
     resolve::{conform_expr_to_default, error::ResolveError, Initialized},
     resolved::{self, TypedExpr},
+    source_files::Source,
 };
 
 pub fn resolve_declare_assign_expr(

@@ -39,7 +39,6 @@
 */
 
 use crate::{
-    ast::Source,
     c::preprocessor::{
         ast::{BinaryOperation, BinaryOperator, ConstExpr, Ternary, UnaryOperation, UnaryOperator},
         parser::{eat_identifier, eat_punctuator},
@@ -47,6 +46,7 @@ use crate::{
         ParseErrorKind, PreprocessorError,
     },
     look_ahead::LookAhead,
+    source_files::Source,
 };
 use std::{borrow::Borrow, num::IntErrorKind};
 

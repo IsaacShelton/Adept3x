@@ -1,0 +1,9 @@
+use super::Type;
+use crate::ast::EnumMember;
+use indexmap::IndexMap;
+
+#[derive(Clone, Debug)]
+pub struct AnonymousEnum {
+    pub members: IndexMap<String, EnumMember>,
+    pub backing_type: Option<Box<Type>>,
+}

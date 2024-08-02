@@ -1,12 +1,13 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior, Source},
+    ast::{self, ConformBehavior},
     resolve::{
         conform_expr, conform_expr_to_default,
         error::{ResolveError, ResolveErrorKind},
         resolve_type, ConformMode, Initialized,
     },
     resolved::{self, TypedExpr},
+    source_files::Source,
 };
 
 pub fn resolve_call_expr(

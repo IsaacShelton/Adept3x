@@ -1,9 +1,14 @@
 mod variable_storage;
 
+pub use self::variable_storage::VariableStorageKey;
+pub use crate::ast::{
+    CInteger, EnumMember, EnumMemberLiteral, FloatSize, IntegerBits, IntegerFixedBits,
+    IntegerKnown, IntegerSign, ShortCircuitingBinaryOperator, UnaryOperator,
+};
 use crate::{
-    ast::{fmt_c_integer, Source},
+    ast::fmt_c_integer,
     ir::InterpreterSyscallKind,
-    source_file_cache::SourceFileCache,
+    source_files::{Source, SourceFiles},
     tag::Tag,
     target_info::TargetInfo,
 };
@@ -17,14 +22,6 @@ use std::{
     fmt::{Debug, Display},
 };
 use thin_vec::ThinVec;
-
-pub use self::variable_storage::VariableStorageKey;
-pub use crate::ast::EnumMember;
-pub use crate::ast::EnumMemberLiteral;
-pub use crate::ast::IntegerKnown;
-pub use crate::ast::ShortCircuitingBinaryOperator;
-pub use crate::ast::UnaryOperator;
-pub use crate::ast::{CInteger, FloatSize, IntegerBits, IntegerSign};
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -35,7 +32,7 @@ new_key_type! {
 
 #[derive(Clone, Debug)]
 pub struct Ast<'a> {
-    pub source_file_cache: &'a SourceFileCache,
+    pub source_file_cache: &'a SourceFiles,
     pub entry_point: Option<FunctionRef>,
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
@@ -44,7 +41,7 @@ pub struct Ast<'a> {
 }
 
 impl<'a> Ast<'a> {
-    pub fn new(source_file_cache: &'a SourceFileCache) -> Self {
+    pub fn new(source_file_cache: &'a SourceFiles) -> Self {
         Self {
             source_file_cache,
             entry_point: None,
@@ -361,14 +358,6 @@ impl TypedExpr {
             is_initialized,
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum IntegerLiteralBits {
-    Bits8,
-    Bits16,
-    Bits32,
-    Bits64,
 }
 
 #[derive(Clone, Debug)]

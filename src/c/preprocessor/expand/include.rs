@@ -1,11 +1,11 @@
 use super::{depleted::Depleted, region::expand_region, Environment};
 use crate::{
-    ast::Source,
     c::preprocessor::{
         error::PreprocessorErrorKind,
         pre_token::{PreToken, PreTokenKind},
         PreprocessorError,
     },
+    source_files::Source,
 };
 
 pub fn expand_include(

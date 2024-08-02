@@ -1,12 +1,12 @@
 use super::{depleted::Depleted, embed::expand_embed, include::expand_include, Environment};
 use crate::{
-    ast::Source,
     c::preprocessor::{
         ast::{ControlLine, ControlLineKind, Define},
         error::PreprocessorErrorKind,
         pre_token::PreToken,
         PreprocessorError,
     },
+    source_files::Source,
 };
 use itertools::Itertools;
 

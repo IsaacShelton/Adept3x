@@ -1,4 +1,4 @@
-use crate::{ast::Source, inflow::InflowEnd};
+use crate::{inflow::InflowEnd, source_files::Source};
 use derivative::Derivative;
 use derive_more::{Deref, IsVariant, Unwrap};
 use num_bigint::BigInt;

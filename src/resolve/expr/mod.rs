@@ -35,7 +35,6 @@ use crate::{
     resolved::{self, FunctionRef, StructureRef, TypedExpr},
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
-
 pub use basic_binary_operation::resolve_basic_binary_operator;
 use indexmap::IndexMap;
 use resolved::IntegerKnown;

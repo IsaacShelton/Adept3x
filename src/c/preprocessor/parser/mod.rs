@@ -11,19 +11,15 @@ use super::{
     PreprocessorError,
 };
 use crate::{
-    ast::Source,
-    diagnostics::{Diagnostics, WarningDiagnostic},
-    inflow::TryPeek,
-};
-use crate::{
     c::preprocessor::ast::{FunctionMacro, IfSection},
-    inflow::Inflow,
+    diagnostics::{Diagnostics, WarningDiagnostic},
+    inflow::{Inflow, TryPeek},
     look_ahead::LookAhead,
+    source_files::Source,
 };
+pub use error::{ParseError, ParseErrorKind};
 use itertools::Itertools;
 use std::borrow::Borrow;
-
-pub use error::{ParseError, ParseErrorKind};
 
 pub struct Parser<'a, T: Inflow<LexedLine>> {
     lines: T,

@@ -19,11 +19,11 @@ use self::{
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
-    ast::{self, AstWorkspace, ConformBehavior, Source, Type},
+    ast::{self, AstWorkspace, ConformBehavior, Type},
     cli::BuildOptions,
     file_id::{per_file_id::PerFileId, FileId},
     resolved::{self, Cast, Enum, TypedExpr, VariableStorage},
-    source_file_cache::SourceFileCache,
+    source_files::{Source, SourceFiles},
     tag::Tag,
     try_insert_index_map::try_insert_into_index_map,
 };
@@ -672,7 +672,7 @@ fn conform_integer_literal(
             )
         }),
         resolved::TypeKind::Integer { bits, sign } => {
-            use resolved::{IntegerBits::*, IntegerLiteralBits, IntegerSign::*};
+            use resolved::{IntegerBits::*, IntegerFixedBits, IntegerSign::*};
 
             let make_integer = |integer_literal_bits| {
                 Some(TypedExpr::new(
@@ -695,70 +695,70 @@ fn conform_integer_literal(
             match (bits, sign) {
                 (Normal, Signed) => {
                     if TryInto::<i64>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits64)
+                        make_integer(IntegerFixedBits::Bits64)
                     } else {
                         None
                     }
                 }
                 (Normal, Unsigned) => {
                     if TryInto::<u64>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits64)
+                        make_integer(IntegerFixedBits::Bits64)
                     } else {
                         None
                     }
                 }
                 (Bits8, Signed) => {
                     if TryInto::<i8>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits8)
+                        make_integer(IntegerFixedBits::Bits8)
                     } else {
                         None
                     }
                 }
                 (Bits8, Unsigned) => {
                     if TryInto::<u8>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits8)
+                        make_integer(IntegerFixedBits::Bits8)
                     } else {
                         None
                     }
                 }
                 (Bits16, Signed) => {
                     if TryInto::<i16>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits16)
+                        make_integer(IntegerFixedBits::Bits16)
                     } else {
                         None
                     }
                 }
                 (Bits16, Unsigned) => {
                     if TryInto::<u16>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits16)
+                        make_integer(IntegerFixedBits::Bits16)
                     } else {
                         None
                     }
                 }
                 (Bits32, Signed) => {
                     if TryInto::<i32>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits32)
+                        make_integer(IntegerFixedBits::Bits32)
                     } else {
                         None
                     }
                 }
                 (Bits32, Unsigned) => {
                     if TryInto::<u32>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits32)
+                        make_integer(IntegerFixedBits::Bits32)
                     } else {
                         None
                     }
                 }
                 (Bits64, Signed) => {
                     if TryInto::<i64>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits64)
+                        make_integer(IntegerFixedBits::Bits64)
                     } else {
                         None
                     }
                 }
                 (Bits64, Unsigned) => {
                     if TryInto::<u64>::try_into(value).is_ok() {
-                        make_integer(IntegerLiteralBits::Bits64)
+                        make_integer(IntegerFixedBits::Bits64)
                     } else {
                         None
                     }
@@ -777,7 +777,7 @@ enum Initialized {
 
 fn resolve_type_or_undeclared<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
-    source_file_cache: &SourceFileCache,
+    source_file_cache: &SourceFiles,
     ast_type: &'a ast::Type,
     used_aliases_stack: &mut HashSet<String>,
 ) -> Result<resolved::Type, ResolveError> {
@@ -797,7 +797,7 @@ fn resolve_type_or_undeclared<'a>(
 
 fn resolve_type<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
-    source_file_cache: &SourceFileCache,
+    source_file_cache: &SourceFiles,
     ast_type: &'a ast::Type,
     used_aliases_stack: &mut HashSet<String>,
 ) -> Result<resolved::Type, ResolveError> {
@@ -955,7 +955,7 @@ fn resolve_type<'a>(
 
 fn resolve_parameters(
     type_search_ctx: &TypeSearchCtx<'_>,
-    source_file_cache: &SourceFileCache,
+    source_file_cache: &SourceFiles,
     parameters: &ast::Parameters,
 ) -> Result<resolved::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
@@ -999,7 +999,7 @@ fn ensure_initialized(
 
 fn resolve_enum_backing_type(
     type_search_ctx: &TypeSearchCtx,
-    source_file_cache: &SourceFileCache,
+    source_file_cache: &SourceFiles,
     backing_type: Option<impl Borrow<Type>>,
     used_aliases: &mut HashSet<String>,
     source: Source,

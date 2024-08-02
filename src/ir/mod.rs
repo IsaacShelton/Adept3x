@@ -1,13 +1,13 @@
-use crate::ast::Source;
-use crate::data_units::ByteUnits;
-use crate::resolved::{FloatOrInteger, IntegerBits, StructureRef};
-use crate::target_info::TargetInfo;
+pub use crate::resolved::{FloatOrSign, FunctionRef, GlobalRef, IntegerSign};
+use crate::{
+    data_units::ByteUnits,
+    resolved::{FloatOrInteger, IntegerBits, StructureRef},
+    source_files::Source,
+    target_info::TargetInfo,
+};
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
 use std::{collections::HashMap, ffi::CString};
-
-pub use crate::resolved::{FloatOrSign, IntegerSign};
-pub use crate::resolved::{FunctionRef, GlobalRef};
 
 pub type Structures = HashMap<StructureRef, Structure>;
 

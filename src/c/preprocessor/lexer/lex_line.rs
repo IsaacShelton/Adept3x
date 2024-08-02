@@ -1,6 +1,5 @@
 use super::state::State;
 use crate::{
-    ast::Source,
     c::{
         encoding::Encoding,
         preprocessor::{
@@ -8,6 +7,7 @@ use crate::{
             PreprocessorError,
         },
     },
+    source_files::Source,
     text::{is_c_non_digit, Character, Text},
 };
 

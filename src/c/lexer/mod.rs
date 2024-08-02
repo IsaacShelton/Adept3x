@@ -7,15 +7,13 @@ use super::{
     token::CToken,
 };
 use crate::{
-    ast::Source,
     inflow::{InflowTools, IntoInflow, IntoInflowStream},
+    source_files::Source,
 };
-
-// The general-purpose C lexer with streaming:
-pub use lexer::Lexer;
-
 // Lex errors that will be in tokens if occur
 pub use error::LexError;
+// The general-purpose C lexer with streaming:
+pub use lexer::Lexer;
 
 // Common lexing routine:
 // We usually want to convert all of the C preprocessor tokens into C tokens

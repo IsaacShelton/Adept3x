@@ -3,6 +3,7 @@ pub mod error;
 mod input;
 mod make_error;
 
+pub use self::input::Input;
 use self::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
@@ -14,11 +15,11 @@ use crate::{
         Declaration, DeclareAssign, Define, Enum, EnumMemberLiteral, Expr, ExprKind, Field,
         FieldInitializer, FillBehavior, FixedArray, Function, Global, Integer, NamedAlias,
         NamedDefine, NamedEnum, Parameter, Parameters, ShortCircuitingBinaryOperation,
-        ShortCircuitingBinaryOperator, Source, Stmt, StmtKind, Structure, Type, TypeKind,
-        UnaryOperation, UnaryOperator, While,
+        ShortCircuitingBinaryOperator, Stmt, StmtKind, Structure, Type, TypeKind, UnaryOperation,
+        UnaryOperator, While,
     },
     inflow::Inflow,
-    source_file_cache::{SourceFileCache, SourceFileCacheKey},
+    source_files::{Source, SourceFileKey, SourceFiles},
     token::{StringLiteral, StringModifier, Token, TokenKind},
     try_insert_index_map::try_insert_into_index_map,
 };
@@ -29,20 +30,18 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use std::{borrow::Borrow, ffi::CString, mem::MaybeUninit};
 
-pub use self::input::Input;
-
 pub fn parse(
     tokens: impl Inflow<Token>,
-    source_file_cache: &SourceFileCache,
-    key: SourceFileCacheKey,
+    source_file_cache: &SourceFiles,
+    key: SourceFileKey,
 ) -> Result<AstWorkspace, ParseError> {
     Parser::new(Input::new(tokens, source_file_cache, key)).parse()
 }
 
 pub fn parse_into(
     tokens: impl Inflow<Token>,
-    source_file_cache: &SourceFileCache,
-    key: SourceFileCacheKey,
+    source_file_cache: &SourceFiles,
+    key: SourceFileKey,
     ast: &mut AstWorkspace,
 ) -> Result<(), ParseError> {
     Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast)
