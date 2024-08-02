@@ -3,22 +3,28 @@ use crate::{
     source_files::{Source, SourceFileKey, SourceFiles},
     token::{Token, TokenKind},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, fmt::Debug};
 
 pub struct Input<'a, I: Inflow<Token>> {
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
     inflow: I,
     key: SourceFileKey,
+}
+
+impl<'a, I: Inflow<Token>> Debug for Input<'a, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Input<Inflow<Token>>").finish()
+    }
 }
 
 impl<'a, I> Input<'a, I>
 where
     I: Inflow<Token>,
 {
-    pub fn new(inflow: I, source_file_cache: &'a SourceFiles, key: SourceFileKey) -> Self {
+    pub fn new(inflow: I, source_files: &'a SourceFiles, key: SourceFileKey) -> Self {
         Self {
             inflow,
-            source_file_cache,
+            source_files,
             key,
         }
     }
@@ -77,15 +83,15 @@ where
     }
 
     pub fn filename(&self) -> &str {
-        self.source_file_cache.get(self.key).filename()
+        self.source_files.get(self.key).filename()
     }
 
     pub fn key(&self) -> SourceFileKey {
         self.key
     }
 
-    pub fn source_file_cache(&self) -> &'a SourceFiles {
-        self.source_file_cache
+    pub fn source_files(&self) -> &'a SourceFiles {
+        self.source_files
     }
 
     // Adds input to the front of the queue,

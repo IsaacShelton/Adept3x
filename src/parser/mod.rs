@@ -10,18 +10,17 @@ use self::{
 };
 use crate::{
     ast::{
-        self, ArrayAccess, Assignment, AstFile, AstWorkspace, BasicBinaryOperation,
-        BasicBinaryOperator, BinaryOperator, Block, Call, Conditional, ConformBehavior,
-        Declaration, DeclareAssign, Enum, EnumMemberLiteral, Expr, ExprKind, Field,
-        FieldInitializer, FillBehavior, FixedArray, Function, GlobalVar, HelperExpr, Integer,
-        Named, Parameter, Parameters, ShortCircuitingBinaryOperation,
-        ShortCircuitingBinaryOperator, Stmt, StmtKind, Structure, Type, TypeAlias, TypeKind,
-        UnaryOperation, UnaryOperator, While,
+        self, ArrayAccess, Assignment, AstFile, BasicBinaryOperation, BasicBinaryOperator,
+        BinaryOperator, Block, Call, Conditional, ConformBehavior, Declaration, DeclareAssign,
+        Enum, EnumMemberLiteral, Expr, ExprKind, Field, FieldInitializer, FillBehavior, FixedArray,
+        Function, GlobalVar, HelperExpr, Integer, Named, Parameter, Parameters,
+        ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Stmt, StmtKind, Structure,
+        Type, TypeAlias, TypeKind, UnaryOperation, UnaryOperator, While,
     },
+    index_map_ext::IndexMapExt,
     inflow::Inflow,
     source_files::{Source, SourceFileKey, SourceFiles},
     token::{StringLiteral, StringModifier, Token, TokenKind},
-    try_insert_index_map::try_insert_into_index_map,
 };
 use ast::FloatSize;
 use indexmap::IndexMap;
@@ -32,19 +31,10 @@ use std::{borrow::Borrow, ffi::CString, mem::MaybeUninit};
 
 pub fn parse(
     tokens: impl Inflow<Token>,
-    source_file_cache: &SourceFiles,
+    source_files: &SourceFiles,
     key: SourceFileKey,
-) -> Result<AstWorkspace, ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse()
-}
-
-pub fn parse_into(
-    tokens: impl Inflow<Token>,
-    source_file_cache: &SourceFiles,
-    key: SourceFileKey,
-    ast: &mut AstWorkspace,
-) -> Result<(), ParseError> {
-    Parser::new(Input::new(tokens, source_file_cache, key)).parse_into(ast)
+) -> Result<AstFile, ParseError> {
+    Parser::new(Input::new(tokens, source_files, key)).parse()
 }
 
 pub struct Parser<'a, I: Inflow<Token>> {
@@ -56,26 +46,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Self { input }
     }
 
-    fn parse(mut self) -> Result<AstWorkspace<'a>, ParseError> {
-        // Create global ast
-        let mut ast = AstWorkspace::new(self.input.source_file_cache());
+    pub fn parse(&mut self) -> Result<AstFile, ParseError> {
+        let mut ast_file = AstFile::new();
 
-        // Parse primary file
-        self.parse_into(&mut ast)?;
-
-        // Return global ast
-        Ok(ast)
-    }
-
-    fn parse_into(&mut self, ast: &mut AstWorkspace) -> Result<(), ParseError> {
-        // Create ast file
-        let ast_file = ast.new_file();
-
+        // Parse into ast file
         while !self.input.peek().is_end_of_file() {
-            self.parse_top_level(ast_file, vec![])?;
+            self.parse_top_level(&mut ast_file, vec![])?;
         }
 
-        Ok(())
+        Ok(ast_file)
     }
 
     pub fn parse_top_level(
@@ -125,7 +104,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let Named::<TypeAlias> { name, value: alias } = self.parse_alias(annotations)?;
                 let source = alias.source;
 
-                try_insert_into_index_map(&mut ast_file.type_aliases, name, alias, |name| {
+                ast_file.type_aliases.try_insert(name, alias, |name| {
                     ParseErrorKind::TypeAliasHasMultipleDefinitions { name }.at(source)
                 })?;
             }
@@ -137,7 +116,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
                 let source = enum_definition.source;
 
-                try_insert_into_index_map(&mut ast_file.enums, name, enum_definition, |name| {
+                ast_file.enums.try_insert(name, enum_definition, |name| {
                     ParseErrorKind::EnumHasMultipleDefinitions { name }.at(source)
                 })?;
             }
@@ -148,7 +127,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 } = self.parse_helper_expr(annotations)?;
                 let source = named_expr.source;
 
-                try_insert_into_index_map(&mut ast_file.helper_exprs, name, named_expr, |name| {
+                ast_file.helper_exprs.try_insert(name, named_expr, |name| {
                     ParseErrorKind::DefineHasMultipleDefinitions { name }.at(source)
                 })?;
             }

@@ -20,11 +20,7 @@ impl From<&str> for BackendError {
 }
 
 impl Show for BackendError {
-    fn show(
-        &self,
-        w: &mut dyn std::fmt::Write,
-        _source_file_cache: &SourceFiles,
-    ) -> std::fmt::Result {
+    fn show(&self, w: &mut dyn std::fmt::Write, _source_files: &SourceFiles) -> std::fmt::Result {
         write!(w, "error: {}", self.message)
     }
 }

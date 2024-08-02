@@ -1,8 +1,10 @@
+mod error;
 mod warning;
 
 use crate::{show::Show, source_files::SourceFiles};
 use append_only_vec::AppendOnlyVec;
 use core::fmt::Debug;
+pub use error::ErrorDiagnostic;
 pub use warning::WarningDiagnostic;
 
 pub trait Diagnostic: Show + Send + Sync {}
@@ -25,7 +27,7 @@ impl Default for DiagnosticFlags {
 }
 
 pub struct Diagnostics<'a> {
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
     diagnostics: AppendOnlyVec<Box<dyn Diagnostic>>,
     flags: DiagnosticFlags,
 }
@@ -37,9 +39,9 @@ impl<'a> Debug for Diagnostics<'a> {
 }
 
 impl<'a> Diagnostics<'a> {
-    pub fn new(source_file_cache: &'a SourceFiles, flags: DiagnosticFlags) -> Self {
+    pub fn new(source_files: &'a SourceFiles, flags: DiagnosticFlags) -> Self {
         Self {
-            source_file_cache,
+            source_files,
             diagnostics: AppendOnlyVec::<Box<dyn Diagnostic>>::new(),
             flags,
         }
@@ -67,7 +69,7 @@ impl<'a> Diagnostics<'a> {
         let mut message = String::new();
 
         diagnostic
-            .show(&mut message, self.source_file_cache)
+            .show(&mut message, self.source_files)
             .expect("show error message");
 
         eprintln!("{message}");

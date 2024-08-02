@@ -3,10 +3,11 @@ mod line;
 mod state;
 
 use self::{lex_line::lex_line, state::State};
-use super::error::PreprocessorErrorKind;
-use super::line_splice::LineSplicer;
-use crate::text::TextStream;
-use crate::{inflow::InflowStream, text::Text};
+use super::{error::PreprocessorErrorKind, line_splice::LineSplicer};
+use crate::{
+    inflow::InflowStream,
+    text::{IntoTextNoSend, Text},
+};
 
 // Lexer for C preprocessor
 pub struct Lexer<T: Text> {
@@ -34,7 +35,7 @@ impl<T: Text> InflowStream for Lexer<T> {
         loop {
             match self.line_splicer.next_line() {
                 Ok(line) => {
-                    let mut line = line.into_text();
+                    let mut line = line.into_text_no_send();
 
                     if line.peek().is_present() {
                         let start_of_line = line.peek().source();

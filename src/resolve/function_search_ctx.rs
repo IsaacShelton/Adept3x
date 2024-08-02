@@ -9,14 +9,14 @@ use std::collections::HashMap;
 pub struct FunctionSearchCtx<'a> {
     pub available: HashMap<String, Vec<resolved::FunctionRef>>,
 
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
 }
 
 impl<'a> FunctionSearchCtx<'a> {
-    pub fn new(source_file_cache: &'a SourceFiles) -> Self {
+    pub fn new(source_files: &'a SourceFiles) -> Self {
         Self {
             available: Default::default(),
-            source_file_cache,
+            source_files,
         }
     }
 

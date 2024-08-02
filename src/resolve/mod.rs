@@ -21,11 +21,11 @@ use self::{
 use crate::{
     ast::{self, AstWorkspace, ConformBehavior, Type},
     cli::BuildOptions,
-    file_id::{per_file_id::PerFileId, FileId},
+    index_map_ext::IndexMapExt,
     resolved::{self, Cast, Enum, TypedExpr, VariableStorage},
     source_files::{Source, SourceFiles},
     tag::Tag,
-    try_insert_index_map::try_insert_into_index_map,
+    workspace::fs::FsNodeId,
 };
 use ast::{FloatSize, IntegerBits, IntegerSign};
 use function_search_ctx::FunctionSearchCtx;
@@ -39,14 +39,14 @@ use std::{
 };
 
 enum Job {
-    Regular(FileId, usize, resolved::FunctionRef),
+    Regular(FsNodeId, usize, resolved::FunctionRef),
 }
 
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
-    pub type_search_ctxs: PerFileId<TypeSearchCtx<'a>>,
-    pub function_search_ctxs: PerFileId<FunctionSearchCtx<'a>>,
-    pub global_search_ctxs: PerFileId<GlobalSearchCtx<'a>>,
+    pub type_search_ctxs: IndexMap<FsNodeId, TypeSearchCtx<'a>>,
+    pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx<'a>>,
+    pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx<'a>>,
     pub helper_exprs: IndexMap<String, &'a ast::HelperExpr>,
 }
 
@@ -69,37 +69,31 @@ pub fn resolve<'a>(
     let mut helper_exprs = IndexMap::new();
 
     // Unify helper expressions into single map
-    for file in ast_workspace.files.iter() {
+    for file in ast_workspace.files.values() {
         for (name, helper_expr) in file.helper_exprs.iter() {
-            try_insert_into_index_map(
-                &mut helper_exprs,
-                name.clone(),
-                helper_expr,
-                |define_name| {
-                    ResolveErrorKind::MultipleDefinesNamed { name: define_name }
-                        .at(helper_expr.source)
-                },
-            )?;
+            helper_exprs.try_insert(name.clone(), helper_expr, |define_name| {
+                ResolveErrorKind::MultipleDefinesNamed { name: define_name }.at(helper_expr.source)
+            })?;
         }
     }
 
     let mut ctx = ResolveCtx::new(helper_exprs);
-    let source_file_cache = ast_workspace.source_file_cache;
-    let mut resolved_ast = resolved::Ast::new(source_file_cache);
+    let source_files = ast_workspace.source_files;
+    let mut resolved_ast = resolved::Ast::new(source_files);
 
     let mut aliases: IndexMap<String, &'a ast::TypeAlias> = IndexMap::new();
 
     // Unify type aliases into single map
-    for file in ast_workspace.files.iter() {
+    for (file_id, file) in ast_workspace.files.iter() {
         for (alias_name, alias) in file.type_aliases.iter() {
-            try_insert_into_index_map(&mut aliases, alias_name.clone(), alias, |alias_name| {
+            aliases.try_insert(alias_name.clone(), alias, |alias_name| {
                 ResolveErrorKind::MultipleDefinitionsOfTypeNamed { name: alias_name }
                     .at(alias.source)
             })?;
         }
 
-        ctx.type_search_ctxs.get_or_insert_with(file.file_id, || {
-            TypeSearchCtx::new(source_file_cache, aliases.clone())
+        ctx.type_search_ctxs.get_or_insert_with(*file_id, || {
+            TypeSearchCtx::new(source_files, aliases.clone())
         });
     }
 
@@ -107,13 +101,13 @@ pub fn resolve<'a>(
     let mut used_aliases = HashSet::<String>::new();
 
     // Pre-compute resolved enum types
-    for file in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(file.file_id).unwrap();
+    for (file_id, file) in ast_workspace.files.iter() {
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(file_id).unwrap();
 
         for (enum_name, enum_definition) in file.enums.iter() {
             let resolved_type = resolve_enum_backing_type(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 enum_definition.backing_type.as_ref(),
                 &mut used_aliases,
                 enum_definition.source,
@@ -139,8 +133,8 @@ pub fn resolve<'a>(
     }
 
     // Precompute resolved struct types
-    for file in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(file.file_id).unwrap();
+    for (file_id, file) in ast_workspace.files.iter() {
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(file_id).unwrap();
 
         for structure in file.structures.iter() {
             let mut fields = IndexMap::new();
@@ -151,7 +145,7 @@ pub fn resolve<'a>(
                     resolved::Field {
                         resolved_type: resolve_type(
                             type_search_ctx,
-                            source_file_cache,
+                            source_files,
                             &field.ast_type,
                             &mut used_aliases,
                         )?,
@@ -185,13 +179,13 @@ pub fn resolve<'a>(
     }
 
     // Resolve type aliases
-    for file in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(file.file_id).unwrap();
+    for (file_id, file) in ast_workspace.files.iter() {
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(file_id).unwrap();
 
         for (alias_name, alias) in file.type_aliases.iter() {
             let resolved_type = resolve_type_or_undeclared(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 &alias.value,
                 &mut used_aliases,
             )?;
@@ -201,17 +195,17 @@ pub fn resolve<'a>(
     }
 
     // Resolve global variables
-    for file in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get(file.file_id).unwrap();
+    for (file_id, file) in ast_workspace.files.iter() {
+        let type_search_ctx = ctx.type_search_ctxs.get(file_id).unwrap();
 
         let global_search_context = ctx
             .global_search_ctxs
-            .get_or_insert_with(file.file_id, || GlobalSearchCtx::new(source_file_cache));
+            .get_or_insert_with(*file_id, || GlobalSearchCtx::new(source_files));
 
         for global in file.global_variables.iter() {
             let resolved_type = resolve_type(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 &global.ast_type,
                 &mut Default::default(),
             )?;
@@ -229,20 +223,20 @@ pub fn resolve<'a>(
     }
 
     // Create initial function jobs
-    for file in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get(file.file_id).unwrap();
+    for (file_id, file) in ast_workspace.files.iter() {
+        let type_search_ctx = ctx.type_search_ctxs.get(file_id).unwrap();
 
-        for (i, function) in file.functions.iter().enumerate() {
+        for (function_i, function) in file.functions.iter().enumerate() {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: function.name.clone(),
                 parameters: resolve_parameters(
                     type_search_ctx,
-                    source_file_cache,
+                    source_files,
                     &function.parameters,
                 )?,
                 return_type: resolve_type(
                     type_search_ctx,
-                    source_file_cache,
+                    source_files,
                     &function.return_type,
                     &mut Default::default(),
                 )?,
@@ -261,11 +255,11 @@ pub fn resolve<'a>(
             });
 
             ctx.jobs
-                .push_back(Job::Regular(file.file_id, i, function_ref));
+                .push_back(Job::Regular(*file_id, function_i, function_ref));
 
             let function_search_context = ctx
                 .function_search_ctxs
-                .get_or_insert_with(file.file_id, || FunctionSearchCtx::new(source_file_cache));
+                .get_or_insert_with(*file_id, || FunctionSearchCtx::new(source_files));
 
             // You can blame stable rust for having to do this.
             // There is no way to "get_or_insert_mut" without pre-cloning the key.
@@ -293,21 +287,22 @@ pub fn resolve<'a>(
             Job::Regular(file_id, function_index, resolved_function_ref) => {
                 let function_search_ctx = ctx
                     .function_search_ctxs
-                    .get(file_id)
+                    .get(&file_id)
                     .expect("function search context to exist for file");
 
                 let type_search_ctx = ctx
                     .type_search_ctxs
-                    .get(file_id)
+                    .get(&file_id)
                     .expect("type search context to exist for file");
 
                 let global_search_ctx = ctx
                     .global_search_ctxs
-                    .get(file_id)
+                    .get(&file_id)
                     .expect("global search context to exist for file");
 
                 let ast_file = ast_workspace
-                    .get(file_id)
+                    .files
+                    .get(&file_id)
                     .expect("file referenced by job to exist");
 
                 let ast_function = ast_file
@@ -315,7 +310,7 @@ pub fn resolve<'a>(
                     .get(function_index)
                     .expect("function referenced by job to exist");
 
-                let mut variable_search_ctx = VariableSearchCtx::new(source_file_cache);
+                let mut variable_search_ctx = VariableSearchCtx::new(source_files);
 
                 {
                     let function = resolved_ast
@@ -326,7 +321,7 @@ pub fn resolve<'a>(
                     for parameter in ast_function.parameters.required.iter() {
                         let resolved_type = resolve_type(
                             type_search_ctx,
-                            source_file_cache,
+                            source_files,
                             &parameter.ast_type,
                             &mut Default::default(),
                         )?;
@@ -783,16 +778,11 @@ enum Initialized {
 
 fn resolve_type_or_undeclared<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
-    source_file_cache: &SourceFiles,
+    source_files: &SourceFiles,
     ast_type: &'a ast::Type,
     used_aliases_stack: &mut HashSet<String>,
 ) -> Result<resolved::Type, ResolveError> {
-    match resolve_type(
-        type_search_ctx,
-        source_file_cache,
-        ast_type,
-        used_aliases_stack,
-    ) {
+    match resolve_type(type_search_ctx, source_files, ast_type, used_aliases_stack) {
         Ok(inner) => Ok(inner),
         Err(_) if ast_type.kind.allow_undeclared() => {
             Ok(resolved::TypeKind::Void.at(ast_type.source))
@@ -803,7 +793,7 @@ fn resolve_type_or_undeclared<'a>(
 
 fn resolve_type<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
-    source_file_cache: &SourceFiles,
+    source_files: &SourceFiles,
     ast_type: &'a ast::Type,
     used_aliases_stack: &mut HashSet<String>,
 ) -> Result<resolved::Type, ResolveError> {
@@ -820,7 +810,7 @@ fn resolve_type<'a>(
         ast::TypeKind::Pointer(inner) => {
             let inner = resolve_type_or_undeclared(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 inner,
                 used_aliases_stack,
             )?;
@@ -840,7 +830,7 @@ fn resolve_type<'a>(
                         if used_aliases_stack.insert(name.clone()) {
                             let inner = resolve_type(
                                 type_search_ctx,
-                                source_file_cache,
+                                source_files,
                                 &definition.value,
                                 used_aliases_stack,
                             );
@@ -889,7 +879,7 @@ fn resolve_type<'a>(
         ast::TypeKind::AnonymousEnum(anonymous_enum) => {
             let resolved_type = Box::new(resolve_enum_backing_type(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 anonymous_enum.backing_type.as_deref(),
                 &mut Default::default(),
                 ast_type.source,
@@ -908,7 +898,7 @@ fn resolve_type<'a>(
                 if let Ok(size) = integer.value().try_into() {
                     let inner = resolve_type(
                         type_search_ctx,
-                        source_file_cache,
+                        source_files,
                         &fixed_array.ast_type,
                         used_aliases_stack,
                     )?;
@@ -929,7 +919,7 @@ fn resolve_type<'a>(
             for parameter in function_pointer.parameters.iter() {
                 let resolved_type = resolve_type(
                     type_search_ctx,
-                    source_file_cache,
+                    source_files,
                     &parameter.ast_type,
                     used_aliases_stack,
                 )?;
@@ -942,7 +932,7 @@ fn resolve_type<'a>(
 
             let return_type = Box::new(resolve_type(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 &function_pointer.return_type,
                 used_aliases_stack,
             )?);
@@ -961,7 +951,7 @@ fn resolve_type<'a>(
 
 fn resolve_parameters(
     type_search_ctx: &TypeSearchCtx<'_>,
-    source_file_cache: &SourceFiles,
+    source_files: &SourceFiles,
     parameters: &ast::Parameters,
 ) -> Result<resolved::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
@@ -971,7 +961,7 @@ fn resolve_parameters(
             name: parameter.name.clone(),
             resolved_type: resolve_type(
                 type_search_ctx,
-                source_file_cache,
+                source_files,
                 &parameter.ast_type,
                 &mut Default::default(),
             )?,
@@ -1005,18 +995,13 @@ fn ensure_initialized(
 
 fn resolve_enum_backing_type(
     type_search_ctx: &TypeSearchCtx,
-    source_file_cache: &SourceFiles,
+    source_files: &SourceFiles,
     backing_type: Option<impl Borrow<Type>>,
     used_aliases: &mut HashSet<String>,
     source: Source,
 ) -> Result<resolved::Type, ResolveError> {
     if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {
-        resolve_type(
-            type_search_ctx,
-            source_file_cache,
-            backing_type,
-            used_aliases,
-        )
+        resolve_type(type_search_ctx, source_files, backing_type, used_aliases)
     } else {
         Ok(resolved::TypeKind::Integer {
             bits: IntegerBits::Bits64,

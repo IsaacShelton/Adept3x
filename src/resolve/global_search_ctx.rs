@@ -7,14 +7,14 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct GlobalSearchCtx<'a> {
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
     globals: HashMap<String, (resolved::Type, GlobalVarRef)>,
 }
 
 impl<'a> GlobalSearchCtx<'a> {
-    pub fn new(source_file_cache: &'a SourceFiles) -> Self {
+    pub fn new(source_files: &'a SourceFiles) -> Self {
         Self {
-            source_file_cache,
+            source_files,
             globals: Default::default(),
         }
     }

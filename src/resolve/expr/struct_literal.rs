@@ -39,7 +39,7 @@ pub fn resolve_struct_literal_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_type = resolve_type(
         ctx.type_search_ctx,
-        ctx.resolved_ast.source_file_cache,
+        ctx.resolved_ast.source_files,
         ast_type,
         &mut Default::default(),
     )?;

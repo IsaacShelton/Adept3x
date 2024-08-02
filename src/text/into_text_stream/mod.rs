@@ -5,14 +5,14 @@ use super::TextStream;
 use crate::source_files::SourceFileKey;
 
 pub trait IntoTextStream {
-    fn into_text_stream(self, file_key: SourceFileKey) -> impl TextStream;
+    fn into_text_stream(self, file_key: SourceFileKey) -> impl TextStream + Send;
 }
 
 impl<I> IntoTextStream for I
 where
-    I: Iterator<Item = char>,
+    I: Iterator<Item = char> + Send,
 {
-    fn into_text_stream(self, file_key: SourceFileKey) -> impl TextStream {
+    fn into_text_stream(self, file_key: SourceFileKey) -> impl TextStream + Send {
         TextStreamFromIterator::new(self, file_key)
     }
 }

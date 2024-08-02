@@ -6,6 +6,8 @@ pub struct InflowStreamFromIterator<T: Clone + InflowEnd, I: Iterator> {
     end: T,
 }
 
+unsafe impl<T: Clone + InflowEnd, I: Iterator> Send for InflowStreamFromIterator<T, I> {}
+
 impl<T: Clone + InflowEnd, I: Iterator<Item = T>> InflowStreamFromIterator<T, I> {
     pub fn new(iterator: I, end: T) -> Self {
         Self {

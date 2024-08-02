@@ -1,7 +1,9 @@
+use crate::path::normalized_path_segments;
 use append_only_vec::AppendOnlyVec;
 use once_map::OnceMap;
 use std::{
     ffi::{OsStr, OsString},
+    path::Path,
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -10,7 +12,7 @@ pub struct Fs {
     pub arena: AppendOnlyVec<FsNode>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsNodeId(usize);
 
 impl FsNodeId {
@@ -20,7 +22,7 @@ impl FsNodeId {
 }
 
 impl Fs {
-    const ROOT: FsNodeId = FsNodeId(0);
+    pub const ROOT: FsNodeId = FsNodeId(0);
 
     pub fn new() -> Self {
         let arena = AppendOnlyVec::new();
@@ -46,9 +48,13 @@ impl Fs {
         FsNodeId(self.arena.push(node))
     }
 
-    pub fn insert(&self, components: &[&OsStr], last_modified_ms: u64) {
-        self.root()
-            .deep_insert(&self, components, last_modified_ms, Some(Self::ROOT));
+    pub fn insert(&self, path: &Path, last_modified_ms: Option<u64>) -> Option<FsNodeId> {
+        self.root().deep_insert(
+            &self,
+            &normalized_path_segments(path),
+            last_modified_ms.unwrap_or(0),
+            Some(Self::ROOT),
+        )
     }
 
     pub fn get(&self, id: FsNodeId) -> &FsNode {
@@ -81,9 +87,9 @@ impl FsNode {
         components: &[&OsStr],
         last_modified_ms: u64,
         parent: Option<FsNodeId>,
-    ) {
+    ) -> Option<FsNodeId> {
         let Some((path_segment, rest)) = components.split_first() else {
-            return;
+            return None;
         };
 
         // Keep track of latest modified date per folder as well
@@ -116,9 +122,12 @@ impl FsNode {
                     .fetch_max(last_modified_ms, Ordering::Relaxed),
                 Some(*id),
             )
+            .unwrap_or(*id)
         };
 
-        self.children
-            .map_insert_ref(*path_segment, make_key, make_value, and_then_do);
+        Some(
+            self.children
+                .map_insert_ref(*path_segment, make_key, make_value, and_then_do),
+        )
     }
 }

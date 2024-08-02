@@ -19,17 +19,17 @@ impl ScopedVariable {
 
 #[derive(Clone, Debug)]
 pub struct VariableSearchCtx<'a> {
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
     variables: VecDeque<HashMap<String, ScopedVariable>>,
 }
 
 impl<'a> VariableSearchCtx<'a> {
-    pub fn new(source_file_cache: &'a SourceFiles) -> Self {
+    pub fn new(source_files: &'a SourceFiles) -> Self {
         let mut variables = VecDeque::with_capacity(16);
         variables.push_front(HashMap::new());
 
         Self {
-            source_file_cache,
+            source_files,
             variables,
         }
     }

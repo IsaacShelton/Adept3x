@@ -4,13 +4,13 @@ use crate::{
     text::{Character, TextStream},
 };
 
-pub struct TextStreamFromIterator<I: Iterator<Item = char>> {
+pub struct TextStreamFromIterator<I: Iterator<Item = char> + Send> {
     iterator: LineColumn<I>,
     file_key: SourceFileKey,
     last_location: Location,
 }
 
-impl<I: Iterator<Item = char>> TextStreamFromIterator<I> {
+impl<I: Iterator<Item = char> + Send> TextStreamFromIterator<I> {
     pub fn new(iterator: I, file_key: SourceFileKey) -> Self {
         Self {
             iterator: LineColumn::new(iterator),
@@ -20,7 +20,7 @@ impl<I: Iterator<Item = char>> TextStreamFromIterator<I> {
     }
 }
 
-impl<I: Iterator<Item = char>> TextStream for TextStreamFromIterator<I> {
+impl<I: Iterator<Item = char> + Send> TextStream for TextStreamFromIterator<I> {
     fn next(&mut self) -> Character {
         match self.iterator.next() {
             Some((character, location)) => {

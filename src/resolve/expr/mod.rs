@@ -264,7 +264,7 @@ pub fn resolve_expr(
 
             let resolved_type = resolve_type(
                 ctx.type_search_ctx,
-                ctx.resolved_ast.source_file_cache,
+                ctx.resolved_ast.source_files,
                 result_type,
                 &mut Default::default(),
             )?;
@@ -274,7 +274,7 @@ pub fn resolve_expr(
             for (expected_arg_type, arg) in args {
                 let preferred_type = resolve_type(
                     ctx.type_search_ctx,
-                    ctx.resolved_ast.source_file_cache,
+                    ctx.resolved_ast.source_files,
                     expected_arg_type,
                     &mut Default::default(),
                 )?;

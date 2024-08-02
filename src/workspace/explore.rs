@@ -5,19 +5,19 @@
     ---------------------------------------------------------------------------
 */
 
-use super::{fs::Fs, normal_file::NormalFile, NUM_THREADS};
-use append_only_vec::AppendOnlyVec;
-use ignore::{DirEntry, WalkBuilder, WalkState};
-use std::{
-    ffi::OsStr,
-    fs::FileType,
-    path::{Path, PathBuf},
-    time::UNIX_EPOCH,
+use super::{
+    fs::Fs,
+    module_file::ModuleFile,
+    normal_file::{NormalFile, NormalFileKind},
+    NUM_THREADS,
 };
+use append_only_vec::AppendOnlyVec;
+use ignore::{WalkBuilder, WalkState};
+use std::{ffi::OsStr, fs::FileType, path::Path, time::UNIX_EPOCH};
 
 pub struct ExploreResult {
     pub normal_files: Vec<NormalFile>,
-    pub module_files: Vec<PathBuf>,
+    pub module_files: Vec<ModuleFile>,
 }
 
 pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
@@ -44,7 +44,7 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
                 return WalkState::Continue;
             }
 
-            let last_modified = u64::try_from(
+            let last_modified_ms = u64::try_from(
                 entry
                     .metadata()
                     .unwrap()
@@ -57,26 +57,25 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
             .expect("you aren't living millions of years into the future");
 
             if basename == "_.adept" {
-                module_files.push(entry.path().into());
-                add_to_fs_graph(fs, &entry, last_modified);
+                let fs_node_id = fs
+                    .insert(entry.path(), Some(last_modified_ms))
+                    .expect("inserted");
+                module_files.push(ModuleFile::new(fs_node_id, entry.path().into()));
                 return WalkState::Continue;
             }
 
-            normal_files.push(match entry.path().extension().and_then(OsStr::to_str) {
-                Some("adept") => {
-                    add_to_fs_graph(fs, &entry, last_modified);
-                    NormalFile::adept(entry.into_path())
-                }
-                Some("c") => {
-                    add_to_fs_graph(fs, &entry, last_modified);
-                    NormalFile::c_source(entry.into_path())
-                }
-                Some("h") => {
-                    add_to_fs_graph(fs, &entry, last_modified);
-                    NormalFile::c_header(entry.into_path())
-                }
+            let kind = match entry.path().extension().and_then(OsStr::to_str) {
+                Some("adept") => NormalFileKind::Adept,
+                Some("c") => NormalFileKind::CSource,
+                Some("h") => NormalFileKind::CHeader,
                 _ => return WalkState::Continue,
-            });
+            };
+
+            let fs_node_id = fs
+                .insert(entry.path(), Some(last_modified_ms))
+                .expect("inserted");
+
+            normal_files.push(NormalFile::new(kind, fs_node_id, entry.into_path()));
 
             WalkState::Continue
         })
@@ -86,28 +85,4 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
         normal_files: normal_files.into_vec(),
         module_files: module_files.into_vec(),
     }
-}
-
-fn add_to_fs_graph(fs: &Fs, entry: &DirEntry, last_modified: u64) {
-    fs.insert(&normalized_path_segments(entry.path()), last_modified);
-}
-
-pub fn normalized_path_segments(path: &Path) -> Vec<&OsStr> {
-    let mut total = Vec::new();
-
-    for segment in path.components() {
-        use std::path::Component::*;
-
-        match segment {
-            Prefix(p) => total.push(p.as_os_str()),
-            RootDir => total.clear(),
-            CurDir => {}
-            ParentDir => {
-                total.pop();
-            }
-            Normal(n) => total.push(n),
-        }
-    }
-
-    total
 }

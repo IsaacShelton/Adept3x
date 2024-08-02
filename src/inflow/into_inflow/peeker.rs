@@ -6,6 +6,8 @@ pub struct InflowPeeker<S: InflowStream> {
     queue: VecDeque<S::Item>,
 }
 
+unsafe impl<S: InflowStream + Send> Send for InflowPeeker<S> {}
+
 impl<S: InflowStream> InflowPeeker<S> {
     pub fn new(stream: S) -> Self {
         Self {

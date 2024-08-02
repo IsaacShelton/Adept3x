@@ -47,15 +47,11 @@ impl LowerErrorKind {
 }
 
 impl Show for LowerError {
-    fn show(
-        &self,
-        w: &mut dyn std::fmt::Write,
-        source_file_cache: &SourceFiles,
-    ) -> std::fmt::Result {
+    fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
         write!(
             w,
             "{}:{}:{}: error: {}",
-            source_file_cache.get(self.source.key).filename(),
+            source_files.get(self.source.key).filename(),
             self.source.location.line,
             self.source.location.column,
             self.kind

@@ -1,18 +1,20 @@
 use super::PragmaSection;
 use crate::{
+    ast::AstWorkspace,
     cli::BuildOptions,
     compiler::Compiler,
-    inflow::Inflow,
     interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
     lower::lower,
-    parser::{error::ParseErrorKind, Input},
+    parser::error::ParseErrorKind,
     resolve::resolve,
     show::{into_show, Show},
-    token::Token,
+    workspace::fs::Fs,
 };
+use indexmap::IndexMap;
+use std::path::Path;
 
-impl<'a, I: Inflow<Token>> PragmaSection<'a, I> {
-    pub fn run(mut self, base_compiler: &Compiler) -> Result<Option<Input<'a, I>>, Box<dyn Show>> {
+impl PragmaSection {
+    pub fn run(mut self, base_compiler: &Compiler, path: &Path) -> Result<(), Box<dyn Show>> {
         let compiler = Compiler {
             options: BuildOptions {
                 emit_llvm_ir: false,
@@ -21,16 +23,21 @@ impl<'a, I: Inflow<Token>> PragmaSection<'a, I> {
                 coerce_main_signature: false,
             },
             target_info: base_compiler.target_info,
-            source_file_cache: base_compiler.source_file_cache,
+            source_files: base_compiler.source_files,
             diagnostics: base_compiler.diagnostics,
             version: Default::default(),
             link_filenames: Default::default(),
             link_frameworks: Default::default(),
         };
 
-        setup_build_system_interpreter_symbols(&mut self.ast);
+        setup_build_system_interpreter_symbols(&mut self.ast_file);
 
-        let resolved_ast = resolve(&self.ast, &compiler.options).map_err(into_show)?;
+        let fs = Fs::new();
+        let fs_node_id = fs.insert(path, None).expect("inserted");
+        let files = IndexMap::from_iter(std::iter::once((fs_node_id, self.ast_file)));
+        let workspace = AstWorkspace::new(fs, files, base_compiler.source_files, None);
+
+        let resolved_ast = resolve(&workspace, &compiler.options).map_err(into_show)?;
 
         let ir_module =
             lower(&compiler.options, &resolved_ast, &compiler.target_info).map_err(into_show)?;
@@ -71,6 +78,6 @@ impl<'a, I: Inflow<Token>> PragmaSection<'a, I> {
                 .map_insert(link_framework, |_| (), |_, _| ());
         }
 
-        Ok(self.rest_input)
+        Ok(())
     }
 }

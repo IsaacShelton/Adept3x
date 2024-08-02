@@ -32,7 +32,7 @@ new_key_type! {
 
 #[derive(Clone, Debug)]
 pub struct Ast<'a> {
-    pub source_file_cache: &'a SourceFiles,
+    pub source_files: &'a SourceFiles,
     pub entry_point: Option<FunctionRef>,
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
@@ -41,9 +41,9 @@ pub struct Ast<'a> {
 }
 
 impl<'a> Ast<'a> {
-    pub fn new(source_file_cache: &'a SourceFiles) -> Self {
+    pub fn new(source_files: &'a SourceFiles) -> Self {
         Self {
-            source_file_cache,
+            source_files,
             entry_point: None,
             functions: SlotMap::with_key(),
             structures: SlotMap::with_key(),

@@ -16,12 +16,12 @@ use crate::{
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
 
-pub struct Lexer<T: Text> {
+pub struct Lexer<T: Text + Send> {
     characters: T,
     state: State,
 }
 
-impl<T: Text> Lexer<T> {
+impl<T: Text + Send> Lexer<T> {
     pub fn new(characters: T) -> Self {
         Self {
             characters,
@@ -397,7 +397,7 @@ impl<T: Text> Lexer<T> {
     }
 }
 
-impl<T: Text> InflowStream for Lexer<T> {
+impl<T: Text + Send> InflowStream for Lexer<T> {
     type Item = Token;
 
     fn next(&mut self) -> Self::Item {

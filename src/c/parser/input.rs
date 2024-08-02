@@ -5,22 +5,18 @@ use crate::{
 use std::borrow::Borrow;
 
 pub struct Input<'a> {
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
     key: SourceFileKey,
     tokens: Vec<CToken>,
     stack: Vec<usize>,
 }
 
 impl<'a> Input<'a> {
-    pub fn new(
-        tokens: Vec<CToken>,
-        source_file_cache: &'a SourceFiles,
-        key: SourceFileKey,
-    ) -> Self {
+    pub fn new(tokens: Vec<CToken>, source_files: &'a SourceFiles, key: SourceFileKey) -> Self {
         assert!(tokens.last().map_or(false, |token| token.is_end_of_file()));
 
         Self {
-            source_file_cache,
+            source_files,
             tokens,
             key,
             stack: vec![0],
@@ -40,11 +36,11 @@ impl<'a> Input<'a> {
     }
 
     pub fn filename(&self) -> &str {
-        self.source_file_cache.get(self.key).filename()
+        self.source_files.get(self.key).filename()
     }
 
-    pub fn source_file_cache(&self) -> &'a SourceFiles {
-        self.source_file_cache
+    pub fn source_files(&self) -> &'a SourceFiles {
+        self.source_files
     }
 
     pub fn key(&self) -> SourceFileKey {

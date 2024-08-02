@@ -1,10 +1,9 @@
 mod parse;
 mod run;
 
-use crate::{ast::AstWorkspace, inflow::Inflow, parser::Input, source_files::Source, token::Token};
+use crate::{ast::AstFile, source_files::Source};
 
-pub struct PragmaSection<'a, I: Inflow<Token>> {
-    pub ast: AstWorkspace<'a>,
-    pub rest_input: Option<Input<'a, I>>,
+pub struct PragmaSection {
+    pub ast_file: AstFile,
     pub pragma_source: Source,
 }

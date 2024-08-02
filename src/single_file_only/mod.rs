@@ -5,6 +5,7 @@
 */
 
 use crate::{
+    ast::AstWorkspace,
     compiler::Compiler,
     exit_unless,
     inflow::IntoInflow,
@@ -14,12 +15,19 @@ use crate::{
     lower::lower,
     parser::parse,
     resolve::resolve,
-    text::{IntoTextStream, TextStream},
+    text::{IntoText, IntoTextStream},
+    workspace::fs::Fs,
 };
+use indexmap::IndexMap;
 use std::{path::Path, process::exit};
 
-pub fn compile_single_file_only(compiler: &mut Compiler, project_folder: &Path, filename: &str) {
-    let source_file_cache = compiler.source_file_cache;
+pub fn compile_single_file_only(
+    compiler: &mut Compiler,
+    project_folder: &Path,
+    filename: &str,
+    filepath: &Path,
+) {
+    let source_files = compiler.source_files;
     let output_binary_filepath = project_folder.join("a.out");
     let output_object_filepath = project_folder.join("a.o");
 
@@ -30,24 +38,30 @@ pub fn compile_single_file_only(compiler: &mut Compiler, project_folder: &Path, 
         })
         .unwrap();
 
-    let key = source_file_cache.add(filename.into(), content);
-    let content = source_file_cache.get(key).content();
+    let key = source_files.add(filename.into(), content);
+    let content = source_files.get(key).content();
     let text = content.chars().into_text_stream(key).into_text();
 
-    let mut ast = exit_unless(
-        parse(Lexer::new(text).into_inflow(), source_file_cache, key),
-        source_file_cache,
+    let fs = Fs::new();
+    let fs_node_id = fs.insert(filepath, None).expect("inserted");
+
+    let mut ast_file = exit_unless(
+        parse(Lexer::new(text).into_inflow(), source_files, key),
+        source_files,
     );
 
     if compiler.options.interpret {
-        setup_build_system_interpreter_symbols(&mut ast);
+        setup_build_system_interpreter_symbols(&mut ast_file);
     }
 
-    let resolved_ast = exit_unless(resolve(&ast, &compiler.options), source_file_cache);
+    let files = IndexMap::from_iter(std::iter::once((fs_node_id, ast_file)));
+    let mut workspace = AstWorkspace::new(fs, files, compiler.source_files, None);
+
+    let resolved_ast = exit_unless(resolve(&mut workspace, &compiler.options), source_files);
 
     let ir_module = exit_unless(
         lower(&compiler.options, &resolved_ast, &compiler.target_info),
-        source_file_cache,
+        source_files,
     );
 
     if compiler.options.interpret {
@@ -71,6 +85,6 @@ pub fn compile_single_file_only(compiler: &mut Compiler, project_folder: &Path, 
                 &compiler.diagnostics,
             )
         },
-        source_file_cache,
+        source_files,
     );
 }

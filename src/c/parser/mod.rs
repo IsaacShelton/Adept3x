@@ -17,9 +17,8 @@ use super::{
     translation::{declare_function, declare_named_declaration},
 };
 use crate::{
-    ast::{AstWorkspace, Parameter, Type, TypeKind},
+    ast::{AstFile, Parameter, Type, TypeKind},
     diagnostics::{Diagnostics, WarningDiagnostic},
-    file_id::FileId,
     source_files::source::Source,
 };
 use derive_more::IsVariant;
@@ -474,20 +473,8 @@ impl<'a> Parser<'a> {
         self.input.switch_input(tokens);
     }
 
-    pub fn parse(&mut self) -> Result<(AstWorkspace<'a>, FileId), ParseError> {
-        // Create global ast
-        let mut ast_workspace = AstWorkspace::new(self.input.source_file_cache());
-
-        // Parse primary file
-        let file_id = self.parse_into(&mut ast_workspace)?;
-
-        // Return global ast
-        Ok((ast_workspace, file_id))
-    }
-
-    pub fn parse_into(&mut self, ast: &mut AstWorkspace) -> Result<FileId, ParseError> {
-        // Create ast file
-        let ast_file = ast.new_file();
+    pub fn parse(&mut self) -> Result<AstFile, ParseError> {
+        let mut ast_file = AstFile::new();
 
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
@@ -500,7 +487,7 @@ impl<'a> Parser<'a> {
                                 DeclaratorKind::Named(..)
                                 | DeclaratorKind::Pointer(..)
                                 | DeclaratorKind::Array(..) => declare_named_declaration(
-                                    ast_file,
+                                    &mut ast_file,
                                     &init_declarator.declarator,
                                     &declaration.attribute_specifiers[..],
                                     &declaration.declaration_specifiers,
@@ -510,7 +497,7 @@ impl<'a> Parser<'a> {
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
                                         &mut self.typedefs,
-                                        ast_file,
+                                        &mut ast_file,
                                         &declaration.attribute_specifiers[..],
                                         &declaration.declaration_specifiers,
                                         declarator,
@@ -528,7 +515,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(ast_file.file_id)
+        Ok(ast_file)
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {

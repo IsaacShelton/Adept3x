@@ -25,7 +25,7 @@ pub fn resolve_call_expr(
     if let Some(required_ty) = &call.expected_to_return {
         let resolved_required_ty = resolve_type(
             ctx.type_search_ctx,
-            ctx.resolved_ast.source_file_cache,
+            ctx.resolved_ast.source_files,
             required_ty,
             &mut Default::default(),
         )?;

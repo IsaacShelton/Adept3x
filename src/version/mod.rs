@@ -1,16 +1,18 @@
 use std::{fmt::Display, str::FromStr};
 
-const ADEPT_VERSION: AdeptVersion = AdeptVersion {
-    major: 3,
-    minor: 0,
-    release: 0,
-};
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AdeptVersion {
     major: u8,
     minor: u8,
     release: u8,
+}
+
+impl AdeptVersion {
+    pub const CURRENT: Self = Self {
+        major: 3,
+        minor: 0,
+        release: 0,
+    };
 }
 
 impl Display for AdeptVersion {

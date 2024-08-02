@@ -7,7 +7,7 @@ mod text_stream;
 use crate::source_files::Source;
 pub use character::{is_c_non_digit, Character};
 pub use eatable::Eatable;
-pub use into_text::IntoText;
+pub use into_text::{IntoText, IntoTextNoSend};
 pub use into_text_stream::IntoTextStream;
 pub use text_stream::TextStream;
 

@@ -1,15 +1,36 @@
 mod peeker;
 
 pub use self::peeker::TextPeeker;
-use super::{IntoTextStream, Text};
-use crate::source_files::SourceFileKey;
+use super::{Text, TextStream};
 
 pub trait IntoText {
-    fn into_text(self, source_file_id: SourceFileKey) -> impl Text;
+    fn into_text(self) -> impl Text + Send;
 }
 
-impl<S: IntoTextStream> IntoText for S {
-    fn into_text(self, source_file_id: SourceFileKey) -> impl Text {
-        TextPeeker::new(self.into_text_stream(source_file_id))
+impl<T> IntoText for T
+where
+    T: TextStream + Send,
+{
+    fn into_text(self) -> impl Text + Send
+    where
+        Self: Sized + Send,
+    {
+        TextPeeker::new(self)
+    }
+}
+
+pub trait IntoTextNoSend {
+    fn into_text_no_send(self) -> impl Text;
+}
+
+impl<T> IntoTextNoSend for T
+where
+    T: TextStream,
+{
+    fn into_text_no_send(self) -> impl Text
+    where
+        Self: Sized,
+    {
+        TextPeeker::new(self)
     }
 }

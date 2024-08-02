@@ -4,12 +4,12 @@ use crate::{
     source_files::{Source, SourceFiles},
 };
 
-pub struct WarningDiagnostic {
+pub struct ErrorDiagnostic {
     message: String,
     source: Option<Source>,
 }
 
-impl WarningDiagnostic {
+impl ErrorDiagnostic {
     pub fn new(message: impl ToString, source: Source) -> Self {
         Self {
             message: message.to_string(),
@@ -25,21 +25,21 @@ impl WarningDiagnostic {
     }
 }
 
-impl Show for WarningDiagnostic {
+impl Show for ErrorDiagnostic {
     fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
         if let Some(source) = self.source {
             write!(
                 w,
-                "{}:{}:{}: warning: {}",
+                "{}:{}:{}: error: {}",
                 source_files.get(source.key).filename(),
                 source.location.line,
                 source.location.column,
                 self.message,
             )
         } else {
-            write!(w, "warning: {}", self.message)
+            write!(w, "error: {}", self.message)
         }
     }
 }
 
-impl Diagnostic for WarningDiagnostic {}
+impl Diagnostic for ErrorDiagnostic {}

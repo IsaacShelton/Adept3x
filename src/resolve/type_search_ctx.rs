@@ -7,18 +7,18 @@ use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct TypeSearchCtx<'a> {
-    source_file_cache: &'a SourceFiles,
+    source_files: &'a SourceFiles,
     types: IndexMap<String, resolved::TypeKind>,
     aliases: IndexMap<String, &'a ast::TypeAlias>,
 }
 
 impl<'a> TypeSearchCtx<'a> {
     pub fn new(
-        source_file_cache: &'a SourceFiles,
+        source_files: &'a SourceFiles,
         aliases: IndexMap<String, &'a ast::TypeAlias>,
     ) -> Self {
         Self {
-            source_file_cache,
+            source_files,
             types: Default::default(),
             aliases,
         }

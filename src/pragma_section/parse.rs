@@ -1,14 +1,16 @@
 use super::PragmaSection;
 use crate::{
-    ast::{AstWorkspace, Function, Parameters, StmtKind, TypeKind},
+    ast::{AstFile, Function, Parameters, StmtKind, TypeKind},
     inflow::Inflow,
     parser::{self, error::ParseError, Input},
     show::{into_show, Show},
     token::{Token, TokenKind},
 };
 
-impl<'a, I: Inflow<Token> + 'a> PragmaSection<'a, I> {
-    pub fn parse(mut input: Input<'a, I>) -> Result<PragmaSection<'a, I>, Box<dyn Show>> {
+impl PragmaSection {
+    pub fn parse<'a, I: Inflow<Token>>(
+        mut input: Input<'a, I>,
+    ) -> Result<(PragmaSection, Input<'a, I>), Box<dyn Show>> {
         // pragma ...
         //   ^
 
@@ -24,9 +26,8 @@ impl<'a, I: Inflow<Token> + 'a> PragmaSection<'a, I> {
 
         input.ignore_newlines();
 
-        let mut ast = AstWorkspace::new(input.source_file_cache());
-        let mut ast_file = ast.new_file();
         let mut parser = parser::Parser::new(input);
+        let mut ast_file = AstFile::new();
 
         if parser.input.eat(TokenKind::OpenCurly) {
             // "Whole-file" mode
@@ -82,13 +83,12 @@ impl<'a, I: Inflow<Token> + 'a> PragmaSection<'a, I> {
             )));
         }
 
-        // Leave input unfinished
-        input = parser.input;
-
-        Ok(PragmaSection {
-            ast,
-            rest_input: Some(input),
-            pragma_source,
-        })
+        Ok((
+            PragmaSection {
+                ast_file,
+                pragma_source,
+            },
+            parser.input,
+        ))
     }
 }

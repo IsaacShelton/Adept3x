@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, AstWorkspace, IntegerBits},
+    ast::{self, AstFile, IntegerBits},
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
         Interpreter, InterpreterError,
@@ -53,10 +53,7 @@ fn thin_cstring_function(
     }
 }
 
-pub fn setup_build_system_interpreter_symbols(ast: &mut AstWorkspace) {
-    // We assume only working with single file for now
-    assert_eq!(ast.files.len(), 1);
-
+pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     let source = Source::internal();
     let void = ast::TypeKind::Void.at(Source::internal());
     let ptr_u8 = ast::TypeKind::Pointer(Box::new(
@@ -75,9 +72,6 @@ pub fn setup_build_system_interpreter_symbols(ast: &mut AstWorkspace) {
         expected_to_return: Some(void.clone()),
     }))
     .at(Source::internal());
-
-    // Create entry point for interpreter which will make the call
-    let file = ast.files.iter_mut().next().unwrap();
 
     file.functions.push(ast::Function {
         name: "<interpreter entry point>".into(),

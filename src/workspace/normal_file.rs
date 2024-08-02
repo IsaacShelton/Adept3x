@@ -1,46 +1,27 @@
+use super::fs::FsNodeId;
 use derive_more::IsVariant;
 use std::path::PathBuf;
 
-#[derive(Clone, Debug, IsVariant)]
+#[derive(Debug, IsVariant)]
 pub enum NormalFileKind {
     Adept,
-    AdeptModule,
     CSource,
     CHeader,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct NormalFile {
     pub kind: NormalFileKind,
     pub path: PathBuf,
+    pub fs_node_id: FsNodeId,
 }
 
 impl NormalFile {
-    pub fn adept(path: PathBuf) -> Self {
+    pub fn new(kind: NormalFileKind, fs_node_id: FsNodeId, path: PathBuf) -> Self {
         Self {
-            kind: NormalFileKind::Adept,
+            kind,
             path,
-        }
-    }
-
-    pub fn adept_module(path: PathBuf) -> Self {
-        Self {
-            kind: NormalFileKind::AdeptModule,
-            path,
-        }
-    }
-
-    pub fn c_source(path: PathBuf) -> Self {
-        Self {
-            kind: NormalFileKind::CSource,
-            path,
-        }
-    }
-
-    pub fn c_header(path: PathBuf) -> Self {
-        Self {
-            kind: NormalFileKind::CHeader,
-            path,
+            fs_node_id,
         }
     }
 }

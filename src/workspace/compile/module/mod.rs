@@ -1,44 +1,41 @@
 use crate::{
     compiler::Compiler,
-    inflow::IntoInflow,
+    diagnostics::ErrorDiagnostic,
+    inflow::{Inflow, IntoInflow},
     lexer::Lexer,
     parser::Input,
     pragma_section::PragmaSection,
-    text::{IntoTextStream, TextStream},
-    token::TokenKind,
+    show::{into_show, Show},
+    text::{IntoText, IntoTextStream},
+    token::{Token, TokenKind},
     workspace::fs::Fs,
 };
 use std::path::Path;
 
-pub fn compile_module_file(compiler: &Compiler, _fs: &Fs, path: &Path) -> Result<usize, ()> {
-    let content = std::fs::read_to_string(path).map_err(|err| {
-        eprintln!("{}", err);
-        ()
-    })?;
+pub fn compile_module_file<'a>(
+    compiler: &Compiler<'a>,
+    _fs: &Fs,
+    path: &Path,
+) -> Result<(usize, Input<'a, impl Inflow<Token> + 'a>), Box<dyn Show + 'a>> {
+    let content = std::fs::read_to_string(path)
+        .map_err(ErrorDiagnostic::plain)
+        .map_err(into_show)?;
 
-    let source_file_cache = &compiler.source_file_cache;
-    let key = source_file_cache.add(path.to_path_buf(), content);
-    let content = source_file_cache.get(key).content();
+    let source_files = &compiler.source_files;
+    let key = source_files.add(path.to_path_buf(), content);
+    let content = source_files.get(key).content();
 
     let text = content.chars().into_text_stream(key).into_text();
     let lexer = Lexer::new(text).into_inflow();
-    let mut input = Input::new(lexer, compiler.source_file_cache, key);
+    let mut input = Input::new(lexer, compiler.source_files, key);
     input.ignore_newlines();
 
     while input.peek_is(TokenKind::PragmaKeyword) {
-        input = match PragmaSection::parse(input).and_then(|section| section.run(compiler)) {
-            Ok(Some(rest)) => rest,
-            Ok(None) => break,
-            Err(err) => {
-                let mut s = String::new();
-                err.show(&mut s, source_file_cache).unwrap();
-                eprintln!("{}", s);
-                return Err(());
-            }
-        };
-
+        let (section, rest_input) = PragmaSection::parse(input)?;
+        input = rest_input;
+        section.run(compiler, path)?;
         input.ignore_newlines();
     }
 
-    Ok(content.len())
+    Ok((content.len(), input))
 }

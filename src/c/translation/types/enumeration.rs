@@ -4,7 +4,7 @@ use crate::{
         parser::{error::ParseErrorKind, Enumeration, ParseError},
         translation::eval::evaluate_to_const_integer,
     },
-    try_insert_index_map::try_insert_into_index_map,
+    index_map_ext::IndexMapExt,
 };
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -60,8 +60,7 @@ pub fn make_anonymous_enum(
                         }))
                         .at(enumerator.source);
 
-                    try_insert_into_index_map(
-                        &mut ast_file.helper_exprs,
+                    ast_file.helper_exprs.try_insert(
                         enumerator.name.clone(),
                         ast::HelperExpr {
                             value: aka_value,
