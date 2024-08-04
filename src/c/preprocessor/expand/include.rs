@@ -22,7 +22,9 @@ pub fn expand_include(
 
     // We can choose to satisfy these includes however we want
     match &files.first().unwrap().kind {
-        PreTokenKind::HeaderName(header_name) => eprintln!("including <{}>", header_name),
+        PreTokenKind::HeaderName(header_name) => {
+            eprintln!("including <{}>", header_name)
+        }
         PreTokenKind::StringLiteral(_encoding, header_name) => {
             eprintln!("including \"{}\"", header_name)
         }

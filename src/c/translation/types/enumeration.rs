@@ -65,6 +65,7 @@ pub fn make_anonymous_enum(
                         ast::HelperExpr {
                             value: aka_value,
                             source: enumerator.source,
+                            is_file_local_only: false,
                         },
                         |name| {
                             ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol { name }

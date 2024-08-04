@@ -8,6 +8,7 @@ pub fn stdc() -> Environment {
         name: "__STDC__".into(),
         source: Source::internal(),
         kind: DefineKind::ObjectMacro(vec![], PlaceholderAffinity::Discard),
+        is_file_local_only: true,
     });
 
     stdc.add_define(Define {
@@ -17,6 +18,7 @@ pub fn stdc() -> Environment {
             vec![PreTokenKind::Number("202311L".into()).at(Source::internal())],
             PlaceholderAffinity::Discard,
         ),
+        is_file_local_only: true,
     });
 
     stdc

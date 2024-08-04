@@ -48,6 +48,7 @@ use std::{
     path::Path,
     process::Command,
     ptr::null_mut,
+    time::{Duration, Instant},
 };
 
 pub unsafe fn llvm_backend(
@@ -57,7 +58,7 @@ pub unsafe fn llvm_backend(
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
     diagnostics: &Diagnostics,
-) -> Result<(), BackendError> {
+) -> Result<Duration, BackendError> {
     LLVM_InitializeAllTargetInfos();
     LLVM_InitializeAllTargets();
     LLVM_InitializeAllTargetMCs();
@@ -172,6 +173,8 @@ pub unsafe fn llvm_backend(
         eprintln!("Success, but requires manual linking, exiting with 1");
         std::process::exit(1);
     } else {
+        let start_time = Instant::now();
+
         // Link resulting object file to create executable
         let mut command = Command::new("gcc")
             .args(args)
@@ -192,9 +195,9 @@ pub unsafe fn llvm_backend(
                 });
             }
         }
-    }
 
-    Ok(())
+        Ok(start_time.elapsed())
+    }
 }
 
 fn is_flag_like(string: &str) -> bool {

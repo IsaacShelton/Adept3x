@@ -6,8 +6,7 @@ mod expr;
 mod include;
 mod region;
 
-use std::collections::HashMap;
-
+pub use self::environment::Environment;
 use self::{control_line::expand_control_line, expr::ExprParser, region::expand_region};
 use super::{
     ast::{
@@ -19,8 +18,7 @@ use super::{
 };
 use crate::c::preprocessor::ast::GroupPart;
 use depleted::Depleted;
-
-pub use self::environment::Environment;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub enum Token {
@@ -49,6 +47,7 @@ pub fn expand_ast(
                         name: define_name.clone(),
                         kind: DefineKind::ObjectMacro(expanded, placeholder_affinity.clone()),
                         source: define.source,
+                        is_file_local_only: define.is_file_local_only,
                     },
                 );
             }

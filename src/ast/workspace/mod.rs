@@ -7,7 +7,7 @@ use crate::{
 };
 use append_only_vec::AppendOnlyVec;
 use indexmap::IndexMap;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug)]
 pub struct AstWorkspace<'a> {
@@ -15,19 +15,37 @@ pub struct AstWorkspace<'a> {
     pub files: IndexMap<FsNodeId, AstFile>,
     pub source_files: &'a SourceFiles,
     pub settings: Box<[Settings]>,
-    pub override_settings: IndexMap<FsNodeId, SettingsId>,
+    pub module_folders: HashMap<FsNodeId, SettingsId>,
 }
 
 impl<'a> AstWorkspace<'a> {
     pub const DEFAULT_SETTINGS_ID: SettingsId = SettingsId(0);
 
+    pub fn get_owning_module(&self, fs_node_id: FsNodeId) -> Option<FsNodeId> {
+        let mut fs_node_id = fs_node_id;
+
+        loop {
+            if self.module_folders.contains_key(&fs_node_id) {
+                return Some(fs_node_id);
+            }
+
+            if let Some(parent) = self.fs.get(fs_node_id).parent {
+                fs_node_id = parent;
+            } else {
+                break;
+            }
+        }
+
+        None
+    }
+
     pub fn new(
         fs: Fs,
         files: IndexMap<FsNodeId, AstFile>,
         source_files: &'a SourceFiles,
-        modules_settings: Option<IndexMap<FsNodeId, Settings>>,
+        module_folders_settings: Option<HashMap<FsNodeId, Settings>>,
     ) -> Self {
-        let mut override_settings = IndexMap::new();
+        let mut override_settings = HashMap::new();
 
         // Construct settings mappings
         let settings = AppendOnlyVec::new();
@@ -35,11 +53,12 @@ impl<'a> AstWorkspace<'a> {
         assert_eq!(
             settings.push(Settings {
                 adept_version: AdeptVersion::CURRENT,
+                debug_skip_merging_helper_exprs: false,
             }),
             Self::DEFAULT_SETTINGS_ID.0
         );
 
-        for (fs_node_id, module) in modules_settings.into_iter().flatten() {
+        for (fs_node_id, module) in module_folders_settings.into_iter().flatten() {
             override_settings.insert(fs_node_id, SettingsId(settings.push(module)));
         }
 
@@ -48,7 +67,7 @@ impl<'a> AstWorkspace<'a> {
             files,
             source_files,
             settings: settings.into_vec().into_boxed_slice(),
-            override_settings,
+            module_folders: override_settings,
         };
         workspace.configure();
         workspace
@@ -66,7 +85,7 @@ impl<'a> AstWorkspace<'a> {
             let fs_node_id = job.fs_node_id;
 
             let settings = self
-                .override_settings
+                .module_folders
                 .get(&fs_node_id)
                 .copied()
                 .unwrap_or(job.settings);
@@ -93,7 +112,8 @@ impl<'a> AstWorkspace<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Settings {
-    adept_version: AdeptVersion,
+    pub adept_version: AdeptVersion,
+    pub debug_skip_merging_helper_exprs: bool,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

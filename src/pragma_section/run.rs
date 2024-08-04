@@ -1,6 +1,6 @@
 use super::PragmaSection;
 use crate::{
-    ast::AstWorkspace,
+    ast::{AstWorkspace, Settings},
     cli::BuildOptions,
     compiler::Compiler,
     interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
@@ -14,13 +14,19 @@ use indexmap::IndexMap;
 use std::path::Path;
 
 impl PragmaSection {
-    pub fn run(mut self, base_compiler: &Compiler, path: &Path) -> Result<(), Box<dyn Show>> {
+    pub fn run(
+        mut self,
+        base_compiler: &Compiler,
+        path: &Path,
+        existing_settings: Option<Settings>,
+    ) -> Result<Settings, Box<dyn Show>> {
         let compiler = Compiler {
             options: BuildOptions {
                 emit_llvm_ir: false,
                 emit_ir: false,
                 interpret: true,
                 coerce_main_signature: false,
+                excute_result: false,
             },
             target_info: base_compiler.target_info,
             source_files: base_compiler.source_files,
@@ -53,20 +59,38 @@ impl PragmaSection {
             })?
             .syscall_handler;
 
-        // Update version
-        if let Some(version) = user_settings.version {
-            if base_compiler.version.try_insert(version).is_err() {
-                return Err(into_show(
-                    ParseErrorKind::Other {
-                        message: "Adept version was already specified".into(),
-                    }
-                    .at(self.pragma_source),
-                ));
-            }
+        let Some(adept_version) = user_settings
+            .version
+            .or_else(|| existing_settings.map(|settings| settings.adept_version))
+        else {
+            return Err(into_show(
+                ParseErrorKind::Other {
+                    message: "No Adept version was specifed for module!".into(),
+                }
+                .at(self.pragma_source),
+            ));
+        };
+
+        if *base_compiler.version.get_or_init(|| adept_version.clone()) != adept_version {
+            return Err(into_show(
+                ParseErrorKind::Other {
+                    message: "Using multiple Adept versions at the same time is not support yet"
+                        .into(),
+                }
+                .at(self.pragma_source),
+            ));
         }
 
         // Update linking information
         for link_filename in user_settings.link_filenames.drain() {
+            let link_filename = path
+                .parent()
+                .expect("file has parent")
+                .join(link_filename)
+                .to_str()
+                .expect("valid utf-8 filename")
+                .to_owned();
+
             base_compiler
                 .link_filenames
                 .map_insert(link_filename, |_| (), |_, _| ());
@@ -78,6 +102,9 @@ impl PragmaSection {
                 .map_insert(link_framework, |_| (), |_, _| ());
         }
 
-        Ok(())
+        Ok(Settings {
+            adept_version,
+            debug_skip_merging_helper_exprs: user_settings.debug_skip_merging_helper_exprs,
+        })
     }
 }

@@ -1,5 +1,3 @@
-use std::{collections::HashSet, str::FromStr};
-
 use super::{memory::Memory, Value};
 use crate::{
     ir::{self, InterpreterSyscallKind},
@@ -7,6 +5,7 @@ use crate::{
 };
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
+use std::{collections::HashSet, str::FromStr};
 
 pub trait SyscallHandler {
     fn syscall<'a>(
@@ -35,6 +34,7 @@ pub struct BuildSystemSyscallHandler {
     pub version: Option<AdeptVersion>,
     pub link_filenames: HashSet<String>,
     pub link_frameworks: HashSet<String>,
+    pub debug_skip_merging_helper_exprs: bool,
 }
 
 fn read_cstring(memory: &Memory, value: &Value) -> String {
@@ -87,6 +87,25 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                         "warning: Ignoring unrecognized Adept version '{}'",
                         version_string
                     );
+                }
+
+                Value::Literal(ir::Literal::Void)
+            }
+            ir::InterpreterSyscallKind::Experimental => {
+                assert_eq!(args.len(), 1);
+
+                let option = read_cstring(memory, &args[0]);
+
+                match option.as_str() {
+                    "debug_skip_merging_helper_exprs" => {
+                        self.debug_skip_merging_helper_exprs = true;
+                    }
+                    _ => {
+                        println!(
+                            "warning: Ignoring unrecognized experimental setting '{}'",
+                            option
+                        );
+                    }
                 }
 
                 Value::Literal(ir::Literal::Void)

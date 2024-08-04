@@ -1,20 +1,18 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
     resolved::{self, GlobalVarRef},
-    source_files::{Source, SourceFiles},
+    source_files::Source,
 };
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct GlobalSearchCtx<'a> {
-    source_files: &'a SourceFiles,
+pub struct GlobalSearchCtx {
     globals: HashMap<String, (resolved::Type, GlobalVarRef)>,
 }
 
-impl<'a> GlobalSearchCtx<'a> {
-    pub fn new(source_files: &'a SourceFiles) -> Self {
+impl GlobalSearchCtx {
+    pub fn new() -> Self {
         Self {
-            source_files,
             globals: Default::default(),
         }
     }

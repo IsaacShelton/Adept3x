@@ -23,7 +23,9 @@ impl Command {
         let mut options = BuildOptions::default();
 
         for option in args {
-            if option == "--emit-llvm-ir" {
+            if option == "-e" {
+                options.excute_result = true;
+            } else if option == "--emit-llvm-ir" {
                 options.emit_llvm_ir = true;
             } else if option == "--emit-ir" {
                 options.emit_ir = true;
@@ -83,6 +85,7 @@ pub struct BuildOptions {
     pub emit_ir: bool,
     pub interpret: bool,
     pub coerce_main_signature: bool,
+    pub excute_result: bool,
 }
 
 impl Default for BuildOptions {
@@ -92,6 +95,7 @@ impl Default for BuildOptions {
             emit_ir: false,
             interpret: false,
             coerce_main_signature: true,
+            excute_result: false,
         }
     }
 }

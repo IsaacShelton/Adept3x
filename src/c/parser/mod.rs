@@ -1360,10 +1360,9 @@ impl<'a> Parser<'a> {
 
         if !self.eat_punctuator(Punctuator::Semicolon) {
             // TODO: Improve error message
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected ';' after declaration"),
-                self.input.peek().source,
-            ));
+            return Err(
+                ParseErrorKind::Misc("Expected ';' after declaration").at(self.input.peek().source)
+            );
         }
 
         Ok(ExternalDeclaration::Declaration(Declaration::Common(

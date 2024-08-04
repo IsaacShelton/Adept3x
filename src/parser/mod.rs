@@ -417,7 +417,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let value = self.parse_expr()?;
 
         Ok(Named::<HelperExpr> {
-            value: HelperExpr { value, source },
+            value: HelperExpr {
+                value,
+                source,
+                is_file_local_only: false,
+            },
             name,
         })
     }

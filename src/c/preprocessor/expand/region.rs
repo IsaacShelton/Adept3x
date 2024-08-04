@@ -278,6 +278,7 @@ fn expand_function_macro<'a>(
             kind: DefineKind::ObjectMacro(std::mem::take(&mut args[i]), PlaceholderAffinity::Keep),
             name: parameter_name.clone(),
             source: Source::internal(),
+            is_file_local_only: false,
         });
     }
 
@@ -312,6 +313,7 @@ fn expand_function_macro<'a>(
             kind: DefineKind::ObjectMacro(rest, PlaceholderAffinity::Keep),
             name: "__VA_ARGS__".into(),
             source: Source::internal(),
+            is_file_local_only: false,
         });
 
         // Add `#define __VA_OPT__(...) __VA_ARGS__` to local environment
@@ -324,6 +326,7 @@ fn expand_function_macro<'a>(
             }),
             name: "__VA_OPT__".into(),
             source: Source::internal(),
+            is_file_local_only: false,
         });
     } else if function_macro.is_variadic {
         // No variadic arguments passed, despite this function-macro
@@ -335,6 +338,7 @@ fn expand_function_macro<'a>(
             ),
             name: "__VA_ARGS__".into(),
             source: Source::internal(),
+            is_file_local_only: false,
         });
 
         // Add `#define __VA_OPT__(...)` to local environment
@@ -347,6 +351,7 @@ fn expand_function_macro<'a>(
             }),
             name: "__VA_OPT__".into(),
             source: Source::internal(),
+            is_file_local_only: false,
         })
     }
 

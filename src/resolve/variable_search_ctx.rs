@@ -1,7 +1,7 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
     resolved::{self, VariableStorageKey},
-    source_files::{Source, SourceFiles},
+    source_files::Source,
 };
 use std::collections::{HashMap, VecDeque};
 
@@ -18,20 +18,16 @@ impl ScopedVariable {
 }
 
 #[derive(Clone, Debug)]
-pub struct VariableSearchCtx<'a> {
-    source_files: &'a SourceFiles,
+pub struct VariableSearchCtx {
     variables: VecDeque<HashMap<String, ScopedVariable>>,
 }
 
-impl<'a> VariableSearchCtx<'a> {
-    pub fn new(source_files: &'a SourceFiles) -> Self {
+impl VariableSearchCtx {
+    pub fn new() -> Self {
         let mut variables = VecDeque::with_capacity(16);
         variables.push_front(HashMap::new());
 
-        Self {
-            source_files,
-            variables,
-        }
+        Self { variables }
     }
 
     pub fn find_variable_or_error(

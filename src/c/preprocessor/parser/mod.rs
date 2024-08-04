@@ -288,6 +288,7 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
             }),
             name: name.to_string(),
             source,
+            is_file_local_only: false,
         })
     }
 
@@ -315,6 +316,7 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
             kind: DefineKind::ObjectMacro(replacement_tokens, PlaceholderAffinity::Discard),
             name,
             source,
+            is_file_local_only: false,
         })
     }
 

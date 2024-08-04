@@ -45,8 +45,8 @@ enum Job {
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
     pub type_search_ctxs: IndexMap<FsNodeId, TypeSearchCtx<'a>>,
-    pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx<'a>>,
-    pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx<'a>>,
+    pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
+    pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx>,
     pub helper_exprs: IndexMap<String, &'a ast::HelperExpr>,
 }
 
@@ -70,10 +70,19 @@ pub fn resolve<'a>(
 
     // Unify helper expressions into single map
     for file in ast_workspace.files.values() {
+        if let Some(settings) = file.settings.map(|id| &ast_workspace.settings[id.0]) {
+            if settings.debug_skip_merging_helper_exprs {
+                continue;
+            }
+        }
+
         for (name, helper_expr) in file.helper_exprs.iter() {
-            helper_exprs.try_insert(name.clone(), helper_expr, |define_name| {
-                ResolveErrorKind::MultipleDefinesNamed { name: define_name }.at(helper_expr.source)
-            })?;
+            if !helper_expr.is_file_local_only {
+                helper_exprs.try_insert(name.clone(), helper_expr, |define_name| {
+                    ResolveErrorKind::MultipleDefinesNamed { name: define_name }
+                        .at(helper_expr.source)
+                })?;
+            }
         }
     }
 
@@ -81,28 +90,31 @@ pub fn resolve<'a>(
     let source_files = ast_workspace.source_files;
     let mut resolved_ast = resolved::Ast::new(source_files);
 
-    let mut aliases: IndexMap<String, &'a ast::TypeAlias> = IndexMap::new();
-
     // Unify type aliases into single map
-    for (file_id, file) in ast_workspace.files.iter() {
-        for (alias_name, alias) in file.type_aliases.iter() {
-            aliases.try_insert(alias_name.clone(), alias, |alias_name| {
-                ResolveErrorKind::MultipleDefinitionsOfTypeNamed { name: alias_name }
-                    .at(alias.source)
-            })?;
-        }
+    for (real_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*real_file_id)
+            .unwrap_or(*real_file_id);
 
-        ctx.type_search_ctxs.get_or_insert_with(*file_id, || {
-            TypeSearchCtx::new(source_files, aliases.clone())
-        });
+        let type_aliases = ctx
+            .type_search_ctxs
+            .get_or_insert_with(file_id, || TypeSearchCtx::default());
+
+        for (alias_name, alias) in file.type_aliases.iter() {
+            type_aliases.put_type_alias(alias_name.clone(), alias, alias.source)?;
+        }
     }
 
     // Temporarily used stack to keep track of used type aliases
     let mut used_aliases = HashSet::<String>::new();
 
     // Pre-compute resolved enum types
-    for (file_id, file) in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(file_id).unwrap();
+    for (real_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*real_file_id)
+            .unwrap_or(*real_file_id);
+
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         for (enum_name, enum_definition) in file.enums.iter() {
             let resolved_type = resolve_enum_backing_type(
@@ -124,7 +136,7 @@ pub fn resolve<'a>(
                 },
             );
 
-            type_search_ctx.put(
+            type_search_ctx.put_type(
                 enum_name.clone(),
                 resolved::TypeKind::Enum(enum_name.clone()),
                 enum_definition.source,
@@ -133,8 +145,12 @@ pub fn resolve<'a>(
     }
 
     // Precompute resolved struct types
-    for (file_id, file) in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(file_id).unwrap();
+    for (real_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*real_file_id)
+            .unwrap_or(*real_file_id);
+
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         for structure in file.structures.iter() {
             let mut fields = IndexMap::new();
@@ -163,13 +179,13 @@ pub fn resolve<'a>(
             });
 
             if structure.prefer_pod {
-                type_search_ctx.put(
+                type_search_ctx.put_type(
                     structure.name.clone(),
                     resolved::TypeKind::PlainOldData(structure.name.clone(), structure_key),
                     structure.source,
                 )?;
             } else {
-                type_search_ctx.put(
+                type_search_ctx.put_type(
                     structure.name.clone(),
                     resolved::TypeKind::ManagedStructure(structure.name.clone(), structure_key),
                     structure.source,
@@ -179,8 +195,12 @@ pub fn resolve<'a>(
     }
 
     // Resolve type aliases
-    for (file_id, file) in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(file_id).unwrap();
+    for (real_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*real_file_id)
+            .unwrap_or(*real_file_id);
+
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         for (alias_name, alias) in file.type_aliases.iter() {
             let resolved_type = resolve_type_or_undeclared(
@@ -190,17 +210,21 @@ pub fn resolve<'a>(
                 &mut used_aliases,
             )?;
 
-            type_search_ctx.put(alias_name.clone(), resolved_type.kind, alias.source)?;
+            type_search_ctx.put_type(alias_name.clone(), resolved_type.kind, alias.source)?;
         }
     }
 
     // Resolve global variables
-    for (file_id, file) in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get(file_id).unwrap();
+    for (real_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*real_file_id)
+            .unwrap_or(*real_file_id);
+
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         let global_search_context = ctx
             .global_search_ctxs
-            .get_or_insert_with(*file_id, || GlobalSearchCtx::new(source_files));
+            .get_or_insert_with(file_id, || GlobalSearchCtx::new());
 
         for global in file.global_variables.iter() {
             let resolved_type = resolve_type(
@@ -223,8 +247,12 @@ pub fn resolve<'a>(
     }
 
     // Create initial function jobs
-    for (file_id, file) in ast_workspace.files.iter() {
-        let type_search_ctx = ctx.type_search_ctxs.get(file_id).unwrap();
+    for (real_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*real_file_id)
+            .unwrap_or(*real_file_id);
+
+        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let function_ref = resolved_ast.functions.insert(resolved::Function {
@@ -255,11 +283,11 @@ pub fn resolve<'a>(
             });
 
             ctx.jobs
-                .push_back(Job::Regular(*file_id, function_i, function_ref));
+                .push_back(Job::Regular(*real_file_id, function_i, function_ref));
 
             let function_search_context = ctx
                 .function_search_ctxs
-                .get_or_insert_with(*file_id, || FunctionSearchCtx::new(source_files));
+                .get_or_insert_with(file_id, || FunctionSearchCtx::new());
 
             // You can blame stable rust for having to do this.
             // There is no way to "get_or_insert_mut" without pre-cloning the key.
@@ -284,7 +312,11 @@ pub fn resolve<'a>(
     // Resolve function bodies
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
-            Job::Regular(file_id, function_index, resolved_function_ref) => {
+            Job::Regular(real_file_id, function_index, resolved_function_ref) => {
+                let file_id = ast_workspace
+                    .get_owning_module(real_file_id)
+                    .unwrap_or(real_file_id);
+
                 let function_search_ctx = ctx
                     .function_search_ctxs
                     .get(&file_id)
@@ -302,7 +334,7 @@ pub fn resolve<'a>(
 
                 let ast_file = ast_workspace
                     .files
-                    .get(&file_id)
+                    .get(&real_file_id)
                     .expect("file referenced by job to exist");
 
                 let ast_function = ast_file
@@ -310,7 +342,7 @@ pub fn resolve<'a>(
                     .get(function_index)
                     .expect("function referenced by job to exist");
 
-                let mut variable_search_ctx = VariableSearchCtx::new(source_files);
+                let mut variable_search_ctx = VariableSearchCtx::new();
 
                 {
                     let function = resolved_ast
@@ -325,9 +357,14 @@ pub fn resolve<'a>(
                             &parameter.ast_type,
                             &mut Default::default(),
                         )?;
-                        let key = function.variables.add_parameter(resolved_type.clone());
 
-                        variable_search_ctx.put(parameter.name.clone(), resolved_type, key);
+                        let variable_key = function.variables.add_parameter(resolved_type.clone());
+
+                        variable_search_ctx.put(
+                            parameter.name.clone(),
+                            resolved_type,
+                            variable_key,
+                        );
                     }
                 }
 

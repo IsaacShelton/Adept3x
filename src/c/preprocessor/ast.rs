@@ -231,6 +231,9 @@ pub struct Define {
     pub kind: DefineKind,
     pub name: String,
     pub source: Source,
+
+    // Used for standard defines that shouldn't be shared
+    pub is_file_local_only: bool,
 }
 
 #[derive(Clone, Debug, Hash, IsVariant)]

@@ -153,6 +153,12 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         InterpreterSyscallKind::BuildLinkFrameworkName,
     ));
 
+    file.functions.push(thin_cstring_function(
+        "experimental",
+        "experiment",
+        InterpreterSyscallKind::Experimental,
+    ));
+
     file.functions.push(ast::Function {
         name: "project".into(),
         parameters: ast::Parameters {

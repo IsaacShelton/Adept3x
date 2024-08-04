@@ -11,7 +11,7 @@ mod module_file;
 mod normal_file;
 
 use crate::{
-    ast::{self, AstFile, AstWorkspace},
+    ast::{self, AstFile, AstWorkspace, Settings},
     c::{
         self,
         lexer::lex_c_code,
@@ -23,6 +23,7 @@ use crate::{
     exit_unless,
     inflow::{Inflow, IntoInflow},
     lexer::Lexer,
+    line_column::Location,
     llvm_backend::llvm_backend,
     lower::lower,
     parser::{parse, Input, Parser},
@@ -42,6 +43,7 @@ use itertools::Itertools;
 use module_file::ModuleFile;
 use normal_file::{NormalFile, NormalFileKind};
 use std::{
+    collections::HashMap,
     path::Path,
     process::exit,
     sync::{
@@ -90,6 +92,7 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     let module_files = Mutex::new(module_files);
     let has_module_errors = AtomicBool::new(false);
     let ast_files = AppendOnlyVec::new();
+    let module_folders = AppendOnlyVec::new();
 
     std::thread::scope(|scope| {
         for _ in 0..num_threads {
@@ -101,12 +104,26 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                         break;
                     };
 
-                    let Ok((did_bytes, rest_input)) =
-                        compile_module_file(compiler, &fs, &module_file.path)
-                    else {
-                        num_files_failed.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    };
+                    let (did_bytes, rest_input, settings) =
+                        match compile_module_file(compiler, &fs, &module_file.path) {
+                            Ok(values) => values,
+                            Err(err) => {
+                                let mut message = String::new();
+                                err.show(&mut message, compiler.source_files)
+                                    .expect("failed to print error");
+                                eprintln!("{}", message);
+
+                                num_files_failed.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+                        };
+
+                    let folder_fs_node_id = fs
+                        .get(module_file.fs_node_id)
+                        .parent
+                        .expect("module file as parent");
+
+                    module_folders.push((folder_fs_node_id, settings));
 
                     code_files
                         .lock()
@@ -132,9 +149,17 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                         break;
                     };
 
-                    let Ok(did_bytes) = compile_code_file(compiler, code_file, &ast_files) else {
-                        num_files_failed.fetch_add(1, Ordering::Relaxed);
-                        continue;
+                    let did_bytes = match compile_code_file(compiler, code_file, &ast_files) {
+                        Ok(did_bytes) => did_bytes,
+                        Err(err) => {
+                            let mut message = String::new();
+                            err.show(&mut message, compiler.source_files)
+                                .expect("failed to print error");
+                            eprintln!("{}", message);
+
+                            num_files_failed.fetch_add(1, Ordering::Relaxed);
+                            continue;
+                        }
                     };
 
                     files_processed.fetch_add(1, Ordering::Relaxed);
@@ -143,37 +168,6 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
             });
         }
     });
-
-    let files = IndexMap::from_iter(ast_files.into_iter());
-    let workspace = AstWorkspace::new(fs, files, compiler.source_files, None);
-
-    let resolved_ast = exit_unless(
-        resolve(&workspace, &compiler.options),
-        compiler.source_files,
-    );
-
-    let ir_module = exit_unless(
-        lower(&compiler.options, &resolved_ast, &compiler.target_info),
-        compiler.source_files,
-    );
-
-    let project_folder = folder_path;
-    let output_binary_filepath = project_folder.join("a.out");
-    let output_object_filepath = project_folder.join("a.o");
-
-    exit_unless(
-        unsafe {
-            llvm_backend(
-                compiler,
-                &ir_module,
-                &resolved_ast,
-                &output_object_filepath,
-                &output_binary_filepath,
-                &compiler.diagnostics,
-            )
-        },
-        compiler.source_files,
-    );
 
     let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
     let num_files_failed = num_files_failed.load(Ordering::SeqCst);
@@ -192,20 +186,47 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
         exit(1);
     }
 
-    if let Some(version) = compiler.version.get() {
-        println!("[{}] Adept {}", folder_path.display(), version);
-    } else {
+    let Some(_adept_version) = compiler.version.get() else {
         eprintln!("error: No Adept version was specified!, Use `pragma => adept(c\"3.0\")` at the top of your module file");
         exit(1);
-    }
+    };
 
-    compiler.diagnostics.push(WarningDiagnostic::plain(
-        "Module system is not fully implemented yet",
-    ));
+    let module_folders = HashMap::<FsNodeId, Settings>::from_iter(module_folders.into_iter());
+    let files = IndexMap::from_iter(ast_files.into_iter());
+    let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
+
+    let resolved_ast = exit_unless(
+        resolve(&workspace, &compiler.options),
+        compiler.source_files,
+    );
+
+    let ir_module = exit_unless(
+        lower(&compiler.options, &resolved_ast, &compiler.target_info),
+        compiler.source_files,
+    );
+
+    let project_folder = folder_path;
+    let output_binary_filepath = project_folder.join("a.out");
+    let output_object_filepath = project_folder.join("a.o");
+
+    let linking_duration = exit_unless(
+        unsafe {
+            llvm_backend(
+                compiler,
+                &ir_module,
+                &resolved_ast,
+                &output_object_filepath,
+                &output_binary_filepath,
+                &compiler.diagnostics,
+            )
+        },
+        compiler.source_files,
+    );
 
     // Print summary:
 
     let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
+    let _linking_took = linking_duration.as_millis() as f64 / 1000.0;
 
     let bytes_processed =
         humansize::make_format(humansize::DECIMAL)(bytes_processed.load(Ordering::SeqCst));
@@ -216,8 +237,10 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
 
     println!(
         "Compiled {} from {} files in {:.2} seconds",
-        bytes_processed, files_processed, in_how_many_seconds
+        bytes_processed, files_processed, in_how_many_seconds,
     );
+
+    compiler.maybe_execute_result(output_binary_filepath.as_os_str());
 }
 
 fn compile_code_file<'a, I: Inflow<Token>>(
@@ -266,7 +289,14 @@ fn compile_normal_file(
                 parse(Lexer::new(text).into_inflow(), source_files, key).map_err(into_show)?,
             ));
         }
-        NormalFileKind::CSource => todo!("parsing c source file"),
+        NormalFileKind::CSource => {
+            compiler.diagnostics.push(WarningDiagnostic::new(
+                "c source files are currently treated the same as headers",
+                Source::new(key, Location { line: 1, column: 1 }),
+            ));
+
+            out_ast_files.push((normal_file.fs_node_id, header(compiler, text, key)?));
+        }
         NormalFileKind::CHeader => {
             out_ast_files.push((normal_file.fs_node_id, header(compiler, text, key)?));
         }
@@ -316,6 +346,7 @@ fn header(
                         ast::HelperExpr {
                             value,
                             source: define.source,
+                            is_file_local_only: define.is_file_local_only,
                         },
                     );
                 }

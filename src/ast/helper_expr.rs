@@ -5,4 +5,5 @@ use crate::source_files::Source;
 pub struct HelperExpr {
     pub value: Expr,
     pub source: Source,
+    pub is_file_local_only: bool,
 }

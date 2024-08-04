@@ -32,6 +32,7 @@ impl Fs {
             children: OnceMap::new(),
             last_modified_ms: 0.into(),
             parent: None,
+            segment: OsString::new().into_boxed_os_str(),
         };
 
         // We assume that the root is at index 0
@@ -74,6 +75,7 @@ pub struct FsNode {
     pub children: OnceMap<OsString, FsNodeId>,
     pub last_modified_ms: AtomicU64,
     pub parent: Option<FsNodeId>,
+    pub segment: Box<OsStr>,
 }
 
 impl FsNode {
@@ -100,7 +102,9 @@ impl FsNode {
 
         let make_key = |path_segment: &OsStr| path_segment.to_os_string();
 
-        let make_value = |_path_segment: &OsString| {
+        let make_value = |path_segment: &OsString| {
+            let segment = path_segment.clone().into_boxed_os_str();
+
             fs.new_node(FsNode {
                 last_modified_ms: last_modified_ms.into(),
                 node_type: rest
@@ -109,6 +113,7 @@ impl FsNode {
                     .unwrap_or(FsNodeType::Directory),
                 children: OnceMap::new(),
                 parent,
+                segment,
             })
         };
 

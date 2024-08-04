@@ -1,26 +1,18 @@
 use super::error::{ResolveError, ResolveErrorKind};
-use crate::{
-    ast, resolved,
-    source_files::{Source, SourceFiles},
-};
+use crate::{ast, resolved, source_files::Source};
 use indexmap::IndexMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TypeSearchCtx<'a> {
-    source_files: &'a SourceFiles,
     types: IndexMap<String, resolved::TypeKind>,
-    aliases: IndexMap<String, &'a ast::TypeAlias>,
+    type_aliases: IndexMap<String, &'a ast::TypeAlias>,
 }
 
 impl<'a> TypeSearchCtx<'a> {
-    pub fn new(
-        source_files: &'a SourceFiles,
-        aliases: IndexMap<String, &'a ast::TypeAlias>,
-    ) -> Self {
+    pub fn new(aliases: IndexMap<String, &'a ast::TypeAlias>) -> Self {
         Self {
-            source_files,
             types: Default::default(),
-            aliases,
+            type_aliases: aliases,
         }
     }
 
@@ -43,22 +35,38 @@ impl<'a> TypeSearchCtx<'a> {
     }
 
     pub fn find_alias(&self, name: &str) -> Option<&ast::TypeAlias> {
-        self.aliases.get(name).copied()
+        self.type_aliases.get(name).copied()
     }
 
-    pub fn put(
+    pub fn put_type(
         &mut self,
         name: impl ToString,
         value: resolved::TypeKind,
         source: Source,
     ) -> Result<(), ResolveError> {
-        if self.types.insert(name.to_string(), value).is_none() {
-            Ok(())
-        } else {
-            Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
+        if self.types.insert(name.to_string(), value).is_some() {
+            return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
                 name: name.to_string(),
             }
-            .at(source))
+            .at(source));
         }
+
+        Ok(())
+    }
+
+    pub fn put_type_alias(
+        &mut self,
+        name: impl ToString,
+        value: &'a ast::TypeAlias,
+        source: Source,
+    ) -> Result<(), ResolveError> {
+        if self.type_aliases.insert(name.to_string(), value).is_some() {
+            return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
+                name: name.to_string(),
+            }
+            .at(source));
+        }
+
+        Ok(())
     }
 }

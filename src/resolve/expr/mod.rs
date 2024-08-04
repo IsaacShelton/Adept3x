@@ -41,10 +41,10 @@ use resolved::IntegerKnown;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
-    pub function_search_ctx: &'b FunctionSearchCtx<'a>,
+    pub function_search_ctx: &'b FunctionSearchCtx,
     pub type_search_ctx: &'b TypeSearchCtx<'a>,
-    pub global_search_ctx: &'b GlobalSearchCtx<'a>,
-    pub variable_search_ctx: VariableSearchCtx<'a>,
+    pub global_search_ctx: &'b GlobalSearchCtx,
+    pub variable_search_ctx: VariableSearchCtx,
     pub resolved_function_ref: resolved::FunctionRef,
     pub helper_exprs: &'b IndexMap<String, &'a ast::HelperExpr>,
 }
