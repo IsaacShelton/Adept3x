@@ -1,0 +1,22 @@
+
+func main {
+    printWelcomeInformation()
+
+    screen_width i32 = 800
+    screen_height i32 = 450
+
+    InitWindow(screen_width, screen_height, c"Example Window!")
+
+    while !WindowShouldClose() {
+        BeginDrawing()
+
+        ClearBackground(RAYWHITE)
+
+        DrawText(c"Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY)
+
+        EndDrawing()
+    }
+
+    CloseWindow()
+}
+

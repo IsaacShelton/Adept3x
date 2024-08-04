@@ -1,0 +1,15 @@
+
+pragma => {
+    adept(c"3.0")
+    link(c"libraylib.a")
+    linkFramework(c"OpenGL")
+    linkFramework(c"Cocoa")
+    linkFramework(c"IOKit")
+    linkFramework(c"Foundation")
+    linkFramework(c"CoreFoundation")
+}
+
+func printWelcomeInformation {
+    printf(c"Welcome to this example program that showcases modules!\n")
+}
+
