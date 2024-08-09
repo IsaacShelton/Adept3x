@@ -6,8 +6,10 @@ mod offset_align;
 mod show_llvm_type;
 
 use self::offset_align::OffsetAlign;
-use crate::{data_units::ByteUnits, ir};
+pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
+use crate::{data_units::ByteUnits, ir, target_info::type_layout::TypeLayoutCache};
 use derive_more::{Deref, IsVariant};
+pub use kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased};
 use llvm_sys::{
     core::{
         LLVMCountStructElementTypes, LLVMGetArrayLength2, LLVMGetElementType,
@@ -17,9 +19,6 @@ use llvm_sys::{
     LLVMType, LLVMTypeKind,
 };
 use std::ptr::null_mut;
-
-pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
-pub use kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased};
 
 #[derive(Clone, Debug, Deref)]
 pub struct ABIType {
@@ -180,6 +179,24 @@ impl ABIType {
             realign,
             padding,
             IndirectOptions { in_register: true },
+        )
+    }
+
+    pub fn new_indirect_natural_align(
+        type_layout_cache: &TypeLayoutCache,
+        ir_type: &ir::Type,
+        byval: Option<bool>,
+        realign: Option<bool>,
+        padding: Option<LLVMTypeRef>,
+    ) -> Self {
+        let alignment = type_layout_cache.get(ir_type).alignment;
+
+        Self::new_indirect(
+            alignment,
+            byval,
+            realign,
+            padding,
+            IndirectOptions::default(),
         )
     }
 

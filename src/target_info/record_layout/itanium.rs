@@ -3,7 +3,7 @@ use crate::{
     data_units::{BitUnits, ByteUnits},
     diagnostics::{Diagnostics, WarningDiagnostic},
     ir, resolved,
-    target_info::type_layout::TypeLayoutCache,
+    target_info::type_layout::{ASTRecordLayout, TypeLayoutCache},
 };
 
 #[derive(Debug)]
@@ -49,6 +49,29 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
 }
 
 impl<'a> ItaniumRecordLayoutBuilder<'a> {
+    pub fn generate(
+        type_layout_cache: &'a TypeLayoutCache,
+        diagnostics: &'a Diagnostics,
+        info: &RecordInfo,
+        name: Option<&'a str>,
+    ) -> ASTRecordLayout {
+        let mut builder =
+            ItaniumRecordLayoutBuilder::new(type_layout_cache, None, diagnostics, name);
+        builder.layout(info);
+
+        let size = ByteUnits::try_from(builder.size).unwrap();
+
+        ASTRecordLayout {
+            size,
+            alignment: builder.alignment,
+            preferred_alignment: builder.preferred_alignment,
+            unadjusted_alignment: builder.unadjusted_alignment,
+            required_alignment: builder.alignment,
+            data_size: size,
+            field_offsets: builder.field_offsets,
+        }
+    }
+
     pub fn new(
         type_layout_cache: &'a TypeLayoutCache,
         empty_subobjects: Option<&'a mut EmptySubobjects>,

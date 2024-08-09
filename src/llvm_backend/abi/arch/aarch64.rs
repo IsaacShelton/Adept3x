@@ -1,3 +1,4 @@
+use super::use_first_field_if_transparent_union;
 use crate::{
     data_units::{BitUnits, ByteUnits},
     ir,
@@ -7,7 +8,7 @@ use crate::{
             abi_type::{ABIType, DirectOptions, ExtendOptions, IndirectOptions},
             cxx::Itanium,
             empty::{is_empty_record, IsEmptyRecordOptions},
-            has_scalar_evaluation_kind,
+            is_aggregate_type_for_abi, is_promotable_integer_type_for_abi,
         },
         backend_type::to_backend_type,
         ctx::BackendCtx,
@@ -74,6 +75,7 @@ impl AARCH64 {
             parameter_types,
             return_type,
             inalloca_combined_struct: None,
+            max_vector_width: ByteUnits::of(0),
         })
     }
 
@@ -313,35 +315,6 @@ impl AARCH64 {
     }
 }
 
-fn is_aggregate_type_for_abi(ty: &ir::Type) -> bool {
-    !has_scalar_evaluation_kind(ty) || ty.is_function_pointer()
-}
-
-fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
-    // NOTE: Arbitrarily sized integers and `char32` should be, but we don't support those yet
-
-    match ty {
-        ir::Type::Boolean | ir::Type::S8 | ir::Type::S16 | ir::Type::U8 | ir::Type::U16 => true,
-        ir::Type::S32
-        | ir::Type::S64
-        | ir::Type::U32
-        | ir::Type::U64
-        | ir::Type::F32
-        | ir::Type::F64
-        | ir::Type::Pointer(_)
-        | ir::Type::Void
-        | ir::Type::Union(_)
-        | ir::Type::Structure(_)
-        | ir::Type::AnonymousComposite(_)
-        | ir::Type::FunctionPointer
-        | ir::Type::FixedArray(_)
-        | ir::Type::Vector(_)
-        | ir::Type::Complex(_)
-        | ir::Type::Atomic(_)
-        | ir::Type::IncompleteArray(_) => false,
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub struct HomoAggregate<'a> {
     base: &'a ir::Type,
@@ -566,9 +539,4 @@ fn is_aarch64_homo_aggregate_base_type(
 
 fn is_aarch64_homo_aggregate_small_enough(homo_aggregate: &HomoAggregate<'_>) -> bool {
     homo_aggregate.num_members <= 4
-}
-
-fn use_first_field_if_transparent_union(ty: &ir::Type) -> &ir::Type {
-    // NOTE: We don't support transparent unions yet
-    ty
 }

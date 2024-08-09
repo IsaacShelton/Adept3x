@@ -21,6 +21,10 @@ impl ByteUnits {
         let bits_in_either = self.units | offset.units;
         Self::of(bits_in_either & (!bits_in_either).wrapping_add(1))
     }
+
+    pub fn to_bits(self) -> BitUnits {
+        BitUnits::from(self)
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]

@@ -23,7 +23,7 @@ pub fn new_project(new_command: NewCommand) {
         folder.join("_.adept"),
         indoc! {r#"
 
-            pragma {
+            pragma => {
                 adept("3.0")
             }
         "#},

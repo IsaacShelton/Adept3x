@@ -3,7 +3,7 @@ use crate::{
     data_units::{BitUnits, ByteUnits},
     diagnostics::Diagnostics,
     ir, resolved,
-    target_info::record_layout::{itanium::ItaniumRecordLayoutBuilder, record_info},
+    target_info::record_layout::itanium::ItaniumRecordLayoutBuilder,
 };
 use once_map::unsync::OnceMap;
 
@@ -110,11 +110,11 @@ impl<'a> TypeLayoutCache<'a> {
 
                 let name = &resolved_structure.name;
 
-                let info = record_info::info_from_structure(structure);
+                let info = RecordInfo::from_structure(structure);
                 self.get_impl_record_layout(&info, Some(name))
             }
             ir::Type::AnonymousComposite(type_composite) => {
-                let info = record_info::info_from_composite(type_composite);
+                let info = RecordInfo::from_composite(type_composite);
                 self.get_impl_record_layout(&info, None)
             }
             ir::Type::FixedArray(fixed_array) => {
@@ -139,20 +139,8 @@ impl<'a> TypeLayoutCache<'a> {
     fn get_impl_record_layout(&self, info: &RecordInfo, name: Option<&str>) -> TypeLayout {
         // TODO: We should cache this
 
-        let mut builder = ItaniumRecordLayoutBuilder::new(self, None, self.diagnostics, name);
-        builder.layout(info);
-
-        let size = ByteUnits::try_from(builder.size).unwrap();
-
-        let record_layout = ASTRecordLayout {
-            size,
-            alignment: builder.alignment,
-            preferred_alignment: builder.preferred_alignment,
-            unadjusted_alignment: builder.unadjusted_alignment,
-            required_alignment: builder.alignment,
-            data_size: size,
-            field_offsets: builder.field_offsets,
-        };
+        let record_layout =
+            ItaniumRecordLayoutBuilder::generate(self, self.diagnostics, info, name);
 
         // NOTE: We don't support alignment attributes yet,
         // so this will always be none

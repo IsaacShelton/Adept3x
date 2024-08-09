@@ -3,6 +3,7 @@ use crate::{
     ir,
     target_info::{type_layout::TypeLayoutCache, TargetInfo},
 };
+use derive_more::IsVariant;
 
 #[derive(Clone, Debug)]
 pub struct Itanium<'a> {
@@ -11,10 +12,7 @@ pub struct Itanium<'a> {
 }
 
 pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {
-    match ty {
-        ir::Type::Structure(..) | ir::Type::AnonymousComposite(..) => Some(true),
-        _ => None,
-    }
+    ty.is_product_type().then_some(true)
 }
 
 impl<'a> Itanium<'a> {
@@ -45,4 +43,19 @@ impl<'a> Itanium<'a> {
             None
         }
     }
+
+    pub fn get_record_arg_abi(&self, ty: &ir::Type) -> RecordArgABI {
+        if !can_pass_in_registers_composite(ty).unwrap_or(false) {
+            RecordArgABI::Indirect
+        } else {
+            RecordArgABI::Default
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, IsVariant)]
+pub enum RecordArgABI {
+    Default,
+    DirectInMemory,
+    Indirect,
 }

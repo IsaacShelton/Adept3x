@@ -17,6 +17,7 @@ pub struct ABIFunction {
     pub parameter_types: Vec<ABIParam>,
     pub return_type: ABIParam,
     pub inalloca_combined_struct: Option<InAllocaStruct>,
+    pub max_vector_width: ByteUnits,
 }
 
 #[derive(Clone, Debug)]

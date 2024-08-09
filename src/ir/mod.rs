@@ -228,7 +228,12 @@ impl Field {
     }
 
     pub fn is_bitfield(&self) -> bool {
+        // NOTE: We don't support bitfields yet
         false
+    }
+
+    pub fn is_unnamed(&self) -> bool {
+        self.properties.is_unnamed
     }
 
     pub fn is_zero_length_bitfield(&self) -> bool {
@@ -250,6 +255,7 @@ impl Field {
 pub struct FieldProperties {
     pub is_no_unique_addr: bool,
     pub is_force_packed: bool,
+    pub is_unnamed: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -258,6 +264,7 @@ impl Default for FieldProperties {
         Self {
             is_no_unique_addr: false,
             is_force_packed: false,
+            is_unnamed: false,
         }
     }
 }
@@ -309,6 +316,22 @@ impl Type {
     pub fn is_fixed_vector(&self) -> bool {
         // NOTE: We don't support fixed vector types yet
         false
+    }
+
+    pub fn is_non_union_composite(&self) -> bool {
+        self.is_structure() || self.is_anonymous_composite()
+    }
+
+    pub fn has_flexible_array_member(&self) -> bool {
+        // NOTE: We don't support flexible array members yet
+        false
+    }
+
+    pub fn is_product_type(&self) -> bool {
+        match self {
+            Type::Structure(_) | Type::AnonymousComposite(_) => true,
+            _ => false,
+        }
     }
 }
 
