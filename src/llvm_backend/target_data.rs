@@ -1,7 +1,11 @@
 use super::target_machine::TargetMachine;
+use crate::data_units::ByteUnits;
 use llvm_sys::{
     prelude::LLVMTypeRef,
-    target::{LLVMABISizeOfType, LLVMDisposeTargetData, LLVMIntPtrType, LLVMTargetDataRef},
+    target::{
+        LLVMABISizeOfType, LLVMDisposeTargetData, LLVMIntPtrType, LLVMStoreSizeOfType,
+        LLVMTargetDataRef,
+    },
     target_machine::LLVMCreateTargetDataLayout,
 };
 
@@ -22,8 +26,12 @@ impl TargetData {
         self.target_data
     }
 
-    pub fn abi_size_of_type(&self, ty: LLVMTypeRef) -> usize {
-        unsafe { LLVMABISizeOfType(self.target_data, ty) as usize }
+    pub fn abi_size_of_type(&self, ty: LLVMTypeRef) -> ByteUnits {
+        ByteUnits::of(unsafe { LLVMABISizeOfType(self.target_data, ty) })
+    }
+
+    pub fn store_size_of_type(&self, ty: LLVMTypeRef) -> ByteUnits {
+        ByteUnits::of(unsafe { LLVMStoreSizeOfType(self.target_data, ty) })
     }
 
     pub fn pointer_sized_int_type(&self) -> LLVMTypeRef {

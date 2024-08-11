@@ -7,16 +7,18 @@ mod show_llvm_type;
 
 use self::offset_align::OffsetAlign;
 pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
-use crate::{data_units::ByteUnits, ir, target_info::type_layout::TypeLayoutCache};
+use crate::{
+    data_units::ByteUnits, ir, llvm_backend::llvm_type_ref_ext::LLVMTypeRefExt,
+    target_info::type_layout::TypeLayoutCache,
+};
 use derive_more::{Deref, IsVariant};
 pub use kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased};
 use llvm_sys::{
     core::{
-        LLVMCountStructElementTypes, LLVMGetArrayLength2, LLVMGetElementType,
-        LLVMGetStructElementTypes, LLVMGetTypeKind, LLVMGetVectorSize, LLVMInt8Type,
+        LLVMGetArrayLength2, LLVMGetElementType, LLVMGetTypeKind, LLVMGetVectorSize, LLVMInt8Type,
     },
     prelude::LLVMTypeRef,
-    LLVMType, LLVMTypeKind,
+    LLVMTypeKind,
 };
 use std::ptr::null_mut;
 
@@ -233,12 +235,9 @@ impl ABIType {
         unpadded_coerce_to_type: LLVMTypeRef,
         alignment: ByteUnits,
     ) -> Self {
-        assert_eq!(
-            unsafe { LLVMGetTypeKind(coerce_to_type) },
-            LLVMTypeKind::LLVMStructTypeKind
-        );
+        assert!(coerce_to_type.is_struct());
 
-        let is_unpadded_struct = is_struct_type(unpadded_coerce_to_type);
+        let is_unpadded_struct = unpadded_coerce_to_type.is_struct();
 
         assert!(
             is_unpadded_struct
@@ -251,9 +250,9 @@ impl ABIType {
         );
 
         let mut unpadded_index = 0;
-        let field_types = get_struct_field_types(coerce_to_type);
+        let field_types = coerce_to_type.field_types();
         let unpadded_field_types =
-            is_unpadded_struct.then(|| get_struct_field_types(unpadded_coerce_to_type));
+            is_unpadded_struct.then(|| unpadded_coerce_to_type.field_types());
 
         for element_type in field_types.iter() {
             if is_padding_for_coerce_expand(*element_type) {
@@ -377,8 +376,8 @@ impl ABIType {
             ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
                 let unpadded = coerce_and_expand.unpadded_coerce_and_expand_type;
 
-                if is_struct_type(unpadded) {
-                    get_struct_field_types(unpadded)
+                if unpadded.is_struct() {
+                    unpadded.field_types()
                 } else {
                     vec![unpadded]
                 }
@@ -469,25 +468,4 @@ pub fn is_padding_for_coerce_expand(ty: LLVMTypeRef) -> bool {
     } else {
         false
     }
-}
-
-pub fn get_struct_num_fields(struct_type: LLVMTypeRef) -> usize {
-    assert!(is_struct_type(struct_type));
-    unsafe { LLVMCountStructElementTypes(struct_type) as usize }
-}
-
-pub fn get_struct_field_types(struct_type: LLVMTypeRef) -> Vec<LLVMTypeRef> {
-    assert!(is_struct_type(struct_type));
-
-    let num_elements = get_struct_num_fields(struct_type);
-    let mut elements = vec![null_mut::<LLVMType>(); num_elements];
-
-    unsafe {
-        LLVMGetStructElementTypes(struct_type, elements.as_mut_ptr());
-    }
-    elements
-}
-
-pub fn is_struct_type(ty: LLVMTypeRef) -> bool {
-    unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMStructTypeKind }
 }

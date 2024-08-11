@@ -5,27 +5,24 @@ use super::{
     },
     ctx::{BackendCtx, ToBackendTypeCtx},
     functions::params_mapping::ParamsMapping,
+    llvm_type_ref_ext::LLVMTypeRefExt,
     structure::to_backend_struct_type,
     BackendError,
 };
 use crate::{
-    data_units::BitUnits,
     ir,
-    llvm_backend::abi::abi_type::{
-        get_struct_field_types, is_struct_type, kinds::get_type_expansion, Direct, Extend,
-    },
+    llvm_backend::abi::abi_type::{kinds::get_type_expansion, Direct, Extend},
     target_info::type_layout::TypeLayoutCache,
 };
 use llvm_sys::{
     core::{
         LLVMArrayType2, LLVMDoubleType, LLVMFloatType, LLVMFunctionType, LLVMGetGlobalContext,
-        LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMIntType,
-        LLVMPointerType, LLVMPointerTypeInContext, LLVMStructType, LLVMVoidType,
+        LLVMInt16Type, LLVMInt1Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType,
+        LLVMPointerTypeInContext, LLVMStructType, LLVMVoidType,
     },
     prelude::LLVMTypeRef,
 };
-use std::borrow::Borrow;
-use std::ptr::null_mut;
+use std::{borrow::Borrow, ptr::null_mut};
 
 pub unsafe fn to_backend_type<'a>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
@@ -156,8 +153,8 @@ pub unsafe fn get_abi_function_type(
             }) => {
                 let arg_type = coerce_to_type.expect("filled in direct/extend for fty");
 
-                if *can_be_flattened && is_struct_type(arg_type) {
-                    let field_types = get_struct_field_types(arg_type);
+                if *can_be_flattened && arg_type.is_struct() {
+                    let field_types = arg_type.field_types();
 
                     assert_eq!(field_types.len(), param_range.len());
 
@@ -280,8 +277,7 @@ pub unsafe fn to_backend_mem_type<'a>(
     assert!(ir_type.is_vector());
 
     if ir_type.is_boolean() {
-        let bits = BitUnits::from(type_layout_cache.get(ir_type).width).bits();
-        return Ok(unsafe { LLVMIntType(bits.try_into().unwrap()) });
+        return Ok(LLVMTypeRef::new_int(type_layout_cache.get(ir_type).width));
     }
 
     to_backend_type(ctx, ir_type)

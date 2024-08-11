@@ -16,18 +16,18 @@ impl RegCount {
         }
     }
 
-    pub fn finite(int: u32, sse: u32) -> Self {
-        Self {
-            int,
-            sse,
-            is_unlimited: false,
-        }
-    }
-
     pub fn ints(int: u32) -> Self {
         Self {
             int,
             sse: 0,
+            is_unlimited: false,
+        }
+    }
+
+    pub fn sses(sse: u32) -> Self {
+        Self {
+            int: 0,
+            sse,
             is_unlimited: false,
         }
     }

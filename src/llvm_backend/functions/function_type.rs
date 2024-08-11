@@ -2,10 +2,11 @@ use super::{super::abi::abi_type::Extend, params_mapping::ParamsMapping};
 use crate::llvm_backend::{
     abi::{
         abi_function::ABIFunction,
-        abi_type::{get_struct_field_types, ABITypeKind, Expand},
+        abi_type::{ABITypeKind, Expand},
     },
     ctx::BackendCtx,
     error::BackendError,
+    llvm_type_ref_ext::LLVMTypeRefExt,
 };
 use llvm_sys::{
     core::{
@@ -84,7 +85,7 @@ pub unsafe fn to_backend_function_type(
                 if direct.can_be_flattened
                     && unsafe { LLVMGetTypeKind(coerced) == LLVMTypeKind::LLVMStructTypeKind }
                 {
-                    let field_types = get_struct_field_types(coerced);
+                    let field_types = coerced.field_types();
                     assert_eq!(range.len(), field_types.len());
 
                     for (field_i, param_i) in range.iter().enumerate() {

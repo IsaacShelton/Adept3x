@@ -10,17 +10,25 @@ use crate::{
             cxx::Itanium,
             is_aggregate_type_for_abi, is_promotable_integer_type_for_abi,
         },
+        backend_type::to_backend_type,
         ctx::BackendCtx,
         error::BackendError,
+        llvm_type_ref_ext::LLVMTypeRefExt,
     },
     target_info::{
         record_layout::{itanium::ItaniumRecordLayoutBuilder, record_info::RecordInfo},
         type_layout::{TypeLayout, TypeLayoutCache},
     },
 };
-use llvm_sys::{core::LLVMIntType, LLVMCallConv};
+use llvm_sys::{
+    core::{LLVMDoubleType, LLVMInt64Type, LLVMStructType},
+    prelude::LLVMTypeRef,
+    target::{LLVMABIAlignmentOfType, LLVMElementAtOffset, LLVMOffsetOfElement},
+    LLVMCallConv,
+};
 use reg_class::RegClass;
 use reg_class_pair::RegClassPair;
+use std::ptr::null_mut;
 
 mod reg_class;
 mod reg_class_pair;
@@ -76,9 +84,9 @@ impl SysV {
         let is_reg_call = calling_convention == LLVMCallConv::LLVMX86RegCallCallConv;
 
         let mut free = if is_reg_call {
-            RegCount::finite(11, 6)
+            RegCount::ints(11) + RegCount::sses(6)
         } else {
-            RegCount::finite(16, 8)
+            RegCount::ints(16) + RegCount::sses(8)
         };
 
         let mut max_vector_width = 0;
@@ -160,7 +168,7 @@ impl SysV {
         })
     }
 
-    #[allow(unused_variables, unreachable_code)]
+    #[allow(unused_variables)]
     fn classify_argument_type(
         &self,
         ctx: &BackendCtx,
@@ -170,12 +178,164 @@ impl SysV {
         is_required: bool,
         is_reg_call: bool,
     ) -> Result<Requirement, BackendError> {
-        let ty = use_first_field_if_transparent_union(ty);
+        let ir_type = use_first_field_if_transparent_union(ty);
 
         let offset_base = todo!();
-        let _reg_class_pair = self.classify(ctx, abi, ty, offset_base, is_required, is_reg_call);
+        let pair = self.classify(ctx, abi, ir_type, offset_base, is_required, is_reg_call);
 
-        todo!()
+        assert!(
+            pair.high != RegClass::Memory || pair.low == RegClass::Memory,
+            "Invalid memory SysV classification"
+        );
+
+        assert!(
+            pair.high != RegClass::SseUp || pair.low == RegClass::Sse,
+            "Invalid memory SseUp classification"
+        );
+
+        let mut needed = RegCount::zeros();
+        let mut result_type = null_mut();
+
+        match pair.low {
+            RegClass::NoClass => {
+                if pair.high.is_no_class() {
+                    return Ok(Requirement::new(
+                        ABIType::new_ignore(),
+                        RegCount::zeros(),
+                        ByteUnits::of(0),
+                    ));
+                }
+
+                assert!(pair.high.is_sse() || pair.high.is_integer() || pair.high.is_x_87_up());
+            }
+            RegClass::Integer => {
+                let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
+
+                needed += RegCount::ints(1);
+
+                result_type = Self::get_integer_type_at_offset(
+                    ctx,
+                    llvm_type,
+                    ByteUnits::of(0),
+                    ir_type,
+                    ByteUnits::of(0),
+                );
+
+                if pair.high.is_no_class()
+                    && result_type.is_integer()
+                    && is_promotable_integer_type_for_abi(ir_type)
+                {
+                    return Ok(Requirement::new(
+                        ABIType::new_extend(ir_type, None, ExtendOptions::default()),
+                        needed,
+                        ByteUnits::of(0),
+                    ));
+                }
+            }
+            RegClass::Sse => {
+                let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
+
+                result_type = Self::get_sse_type_at_offset(
+                    ctx,
+                    llvm_type,
+                    ByteUnits::of(0),
+                    ir_type,
+                    ByteUnits::of(0),
+                );
+
+                needed += RegCount::sses(1);
+            }
+            RegClass::SseUp | RegClass::X87Up => {
+                unreachable!("invalid sysv register classification for low part")
+            }
+            RegClass::X87 | RegClass::ComplexX87 | RegClass::Memory => {
+                if abi.get_record_arg_abi(ir_type).is_indirect() {
+                    needed += RegCount::ints(1);
+                }
+
+                return Ok(Requirement::new(
+                    self.get_indirect_result(ctx, abi, ir_type, free),
+                    needed,
+                    ByteUnits::of(0),
+                ));
+            }
+        }
+
+        let mut high_part = null_mut();
+
+        match pair.high {
+            RegClass::NoClass => (),
+            RegClass::Integer => {
+                let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type) }?;
+
+                needed += RegCount::ints(1);
+
+                high_part = Self::get_integer_type_at_offset(
+                    ctx,
+                    llvm_type,
+                    ByteUnits::of(8),
+                    ir_type,
+                    ByteUnits::of(8),
+                );
+
+                if pair.low.is_no_class() {
+                    return Ok(Requirement::new(
+                        ABIType::new_direct(DirectOptions {
+                            coerce_to_type: Some(high_part),
+                            offset: ByteUnits::of(8),
+                            ..Default::default()
+                        }),
+                        needed,
+                        ByteUnits::of(0),
+                    ));
+                }
+            }
+            RegClass::Sse | RegClass::X87Up => {
+                let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type) }?;
+
+                needed += RegCount::sses(1);
+
+                high_part = Self::get_sse_type_at_offset(
+                    ctx,
+                    llvm_type,
+                    ByteUnits::of(8),
+                    ir_type,
+                    ByteUnits::of(8),
+                );
+
+                if pair.low.is_no_class() {
+                    return Ok(Requirement::new(
+                        ABIType::new_direct(DirectOptions {
+                            coerce_to_type: Some(high_part),
+                            offset: ByteUnits::of(8),
+                            ..Default::default()
+                        }),
+                        needed,
+                        ByteUnits::of(0),
+                    ));
+                }
+            }
+            RegClass::SseUp => {
+                assert!(pair.low.is_sse());
+                result_type = self.get_byte_vector_type(ir_type);
+            }
+            RegClass::X87 | RegClass::ComplexX87 | RegClass::Memory => {
+                unreachable!("invalid sysv register classification for high part")
+            }
+        }
+
+        if !high_part.is_null() {
+            result_type = Self::make_byval_argument_pair(ctx, result_type, high_part);
+        }
+
+        Ok(Requirement::new(
+            ABIType::new_direct(DirectOptions {
+                coerce_to_type: Some(result_type),
+                ..Default::default()
+            }),
+            needed,
+            ByteUnits::of(0),
+        ))
     }
 
     fn classify(
@@ -504,11 +664,8 @@ impl SysV {
             let size = type_layout.width;
 
             if byval_alignment == ByteUnits::of(8) && size <= ByteUnits::of(8) {
-                let integer_type =
-                    unsafe { LLVMIntType(size.to_bits().bits().try_into().unwrap()) };
-
                 return ABIType::new_direct(DirectOptions {
-                    coerce_to_type: Some(integer_type),
+                    coerce_to_type: Some(LLVMTypeRef::new_int(size)),
                     ..DirectOptions::default()
                 });
             }
@@ -521,6 +678,136 @@ impl SysV {
             None,
             IndirectOptions::default(),
         )
+    }
+
+    #[allow(unused_variables)]
+    fn bits_contain_no_user_data(
+        ctx: &BackendCtx,
+        source_type: &ir::Type,
+        start_bit: BitUnits,
+        end_bit: BitUnits,
+    ) -> bool {
+        todo!("bits_contain_no_user_data")
+    }
+
+    #[allow(unused_variables)]
+    fn get_sse_type_at_offset(
+        ctx: &BackendCtx,
+        llvm_type: LLVMTypeRef,
+        llvm_offset: ByteUnits,
+        source_type: &ir::Type,
+        source_offset: ByteUnits,
+    ) -> LLVMTypeRef {
+        todo!("get_sse_type_at_offset")
+    }
+
+    #[allow(unused_variables)]
+    fn get_byte_vector_type(&self, ir_type: &ir::Type) -> LLVMTypeRef {
+        todo!("get_byte_vector_type")
+    }
+
+    fn get_integer_type_at_offset(
+        ctx: &BackendCtx,
+        llvm_type: LLVMTypeRef,
+        llvm_offset: ByteUnits,
+        source_type: &ir::Type,
+        source_offset: ByteUnits,
+    ) -> LLVMTypeRef {
+        if llvm_offset.is_zero() {
+            if llvm_type.is_pointer() || llvm_type.is_i64() {
+                return llvm_type;
+            }
+
+            if llvm_type.is_i8() || llvm_type.is_i16() || llvm_type.is_i32() {
+                let bit_width = llvm_type.integer_width();
+
+                if Self::bits_contain_no_user_data(
+                    ctx,
+                    source_type,
+                    source_offset.to_bits() + bit_width,
+                    source_offset.to_bits() + BitUnits::of(64),
+                ) {
+                    return llvm_type;
+                }
+            }
+        }
+
+        if llvm_type.is_struct() {
+            if llvm_offset < ctx.target_data.abi_size_of_type(llvm_type) {
+                let field_index = unsafe {
+                    LLVMElementAtOffset(ctx.target_data.get(), llvm_type, llvm_offset.bytes())
+                };
+
+                let llvm_offset = llvm_offset
+                    - ByteUnits::of(unsafe {
+                        LLVMOffsetOfElement(ctx.target_data.get(), llvm_type, field_index)
+                    });
+
+                let llvm_element_type =
+                    llvm_type.field_types()[usize::try_from(field_index).unwrap()];
+
+                return Self::get_integer_type_at_offset(
+                    ctx,
+                    llvm_element_type,
+                    llvm_offset,
+                    source_type,
+                    source_offset,
+                );
+            }
+        }
+
+        if llvm_type.is_array() {
+            let element_type = llvm_type.element_type();
+            let element_size = ctx.target_data.abi_size_of_type(element_type);
+            let element_offset = element_size * (llvm_offset / element_size);
+
+            return Self::get_integer_type_at_offset(
+                ctx,
+                element_type,
+                llvm_offset - element_offset,
+                source_type,
+                source_offset,
+            );
+        }
+
+        let type_size = ctx.type_layout_cache.get(source_type).width;
+        assert_ne!(type_size, source_offset);
+
+        LLVMTypeRef::new_int(ByteUnits::of(8).min(type_size - source_offset))
+    }
+
+    fn make_byval_argument_pair(
+        ctx: &BackendCtx,
+        low: LLVMTypeRef,
+        high: LLVMTypeRef,
+    ) -> LLVMTypeRef {
+        let mut low = low;
+        let low_size = ctx.target_data.abi_size_of_type(low);
+        let high_align =
+            ByteUnits::of(unsafe { LLVMABIAlignmentOfType(ctx.target_data.get(), high).into() });
+        let high_start = low_size.align_to(high_align);
+
+        assert!(!high_start.is_zero() && high_start <= ByteUnits::of(8));
+
+        if high_start != ByteUnits::of(8) {
+            if low.is_float() {
+                low = unsafe { LLVMDoubleType() };
+            } else {
+                assert!(low.is_integer_or_pointer());
+                low = unsafe { LLVMInt64Type() };
+            }
+        }
+
+        let mut element_types = [low, high];
+        let result = unsafe { LLVMStructType(element_types.as_mut_ptr(), 2 as _, false as _) };
+
+        assert_eq!(
+            unsafe { LLVMOffsetOfElement(ctx.target_data.get(), result, 1) },
+            8,
+            "invalid x86_64 argument pair"
+        );
+
+        result
     }
 
     fn is_illegal_vector_type(&self, ty: &ir::Type) -> bool {

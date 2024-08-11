@@ -2,11 +2,7 @@ use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
     ir,
     llvm_backend::{
-        abi::{
-            abi_function::ABIParam,
-            abi_type::{get_struct_field_types, get_struct_num_fields, is_struct_type},
-            has_scalar_evaluation_kind,
-        },
+        abi::{abi_function::ABIParam, has_scalar_evaluation_kind},
         address::Address,
         backend_type::to_backend_type,
         builder::{Builder, Volatility},
@@ -14,16 +10,18 @@ use crate::{
         functions::{
             helpers::{
                 build_coerced_store, build_mem_tmp_with_alignment, build_tmp_alloca_address,
-                emit_address_at_offset, emit_load_of_scalar, is_pointer_type,
+                emit_address_at_offset, emit_load_of_scalar,
             },
             param_values::value::ParamValue,
             params_mapping::ParamRange,
         },
+        llvm_type_ref_ext::LLVMTypeRefExt,
+        llvm_value_ref_ext::LLVMValueRefExt,
     },
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::{LLVMConstInt, LLVMGetParam, LLVMInt64Type, LLVMTypeOf},
+    core::{LLVMGetParam, LLVMTypeOf},
     prelude::{LLVMTypeRef, LLVMValueRef},
 };
 
@@ -53,6 +51,7 @@ impl ParamValues {
 
         let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
         let offset_align = abi_param.abi_type.get_direct_offset_align().unwrap();
+        let is_struct = coerce_to_type.is_struct();
 
         apply_attributes(
             abi_param,
@@ -62,7 +61,7 @@ impl ParamValues {
         );
 
         // Trivial argument value
-        if !is_struct_type(coerce_to_type)
+        if !is_struct
             && coerce_to_type == unsafe { to_backend_type(ctx.for_making_type(), ir_param_type)? }
             && offset_align.offset.is_zero()
         {
@@ -79,7 +78,6 @@ impl ParamValues {
             todo!("direct/extend ABI pass mode for fixed vector types are not supported yet");
         }
 
-        let is_struct = is_struct_type(coerce_to_type);
         let user_specified_alignment = ctx.type_layout_cache.get(ir_param_type).alignment;
 
         let alloca = Address::from(build_mem_tmp_with_alignment(
@@ -97,7 +95,7 @@ impl ParamValues {
         // Flatten struct type if possible for better optimizations
         if abi_param.abi_type.can_be_flattened() == Some(true)
             && is_struct
-            && get_struct_num_fields(coerce_to_type) > 1
+            && coerce_to_type.num_fields() > 1
         {
             let struct_size = ctx.target_data.abi_size_of_type(coerce_to_type);
             let pointer_element_size = ctx.target_data.abi_size_of_type(pointer.element_type());
@@ -120,7 +118,7 @@ impl ParamValues {
                 .into()
             };
 
-            let elements = get_struct_field_types(coerce_to_type);
+            let elements = coerce_to_type.field_types();
             assert_eq!(elements.len(), param_range.len());
 
             for (field_i, llvm_parameter_i) in param_range.iter().enumerate() {
@@ -139,15 +137,11 @@ impl ParamValues {
             }
 
             if source_size > destination_size {
-                let destination_size = unsafe {
-                    LLVMConstInt(
-                        LLVMInt64Type(),
-                        destination_size.try_into().unwrap(),
-                        false as i32,
-                    )
-                };
-
-                builder.memcpy(&pointer, &address_to_store_into, destination_size);
+                builder.memcpy(
+                    &pointer,
+                    &address_to_store_into,
+                    LLVMValueRef::new_u64(destination_size.bytes()),
+                );
             }
         } else {
             assert_eq!(param_range.len(), 1);
@@ -207,8 +201,8 @@ fn apply_attributes(
     let offset_align = abi_param.abi_type.get_direct_offset_align().unwrap();
 
     if offset_align.offset.is_zero()
-        && is_pointer_type(desired_llvm_param_type)
-        && is_pointer_type(coerce_to_type)
+        && desired_llvm_param_type.is_pointer()
+        && coerce_to_type.is_pointer()
     {
         assert_eq!(param_range.len(), 1);
         eprintln!("warning: apply_attributes for function prologues does not apply attributes yet");

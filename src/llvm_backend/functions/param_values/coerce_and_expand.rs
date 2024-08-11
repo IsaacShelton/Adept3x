@@ -1,9 +1,10 @@
 use super::{ParamValueConstructionCtx, ParamValues};
 use crate::llvm_backend::{
-    abi::abi_type::{get_struct_field_types, is_padding_for_coerce_expand, is_struct_type},
+    abi::abi_type::is_padding_for_coerce_expand,
     address::Address,
     error::BackendError,
     functions::{helpers::build_mem_tmp_with_alignment, param_values::value::ParamValue},
+    llvm_type_ref_ext::LLVMTypeRefExt,
 };
 use cstr::cstr;
 use llvm_sys::{core::LLVMGetParam, prelude::LLVMTypeRef};
@@ -14,7 +15,7 @@ impl ParamValues {
         construction_ctx: ParamValueConstructionCtx,
         coerce_to_type: LLVMTypeRef,
     ) -> Result<(), BackendError> {
-        assert!(is_struct_type(coerce_to_type));
+        assert!(coerce_to_type.is_struct());
 
         let ParamValueConstructionCtx {
             builder,
@@ -38,7 +39,7 @@ impl ParamValues {
         self.values.push(ParamValue::Indirect(alloca.clone()));
 
         let alloca = alloca.with_element_type(coerce_to_type);
-        let field_types = get_struct_field_types(coerce_to_type);
+        let field_types = coerce_to_type.field_types();
 
         for (field_i, llvm_param_i) in param_range.iter().enumerate() {
             if is_padding_for_coerce_expand(field_types[field_i]) {

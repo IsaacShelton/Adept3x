@@ -4,7 +4,7 @@ use super::{
 };
 use crate::llvm_backend::{
     abi::{
-        abi_type::{get_struct_field_types, is_padding_for_coerce_expand, ABITypeKind},
+        abi_type::{is_padding_for_coerce_expand, ABITypeKind},
         has_scalar_evaluation_kind,
     },
     address::Address,
@@ -13,6 +13,7 @@ use crate::llvm_backend::{
     ctx::{BackendCtx, FunctionSkeleton},
     error::BackendError,
     functions::helpers::emit_address_at_offset,
+    llvm_type_ref_ext::LLVMTypeRefExt,
     raw_address::RawAddress,
 };
 use cstr::cstr;
@@ -107,7 +108,7 @@ pub fn emit_epilogue(
         }
         ABITypeKind::CoerceAndExpand(coerce_and_expand) => {
             let coerce_to_type = coerce_and_expand.coerce_to_type;
-            let field_types = get_struct_field_types(coerce_to_type);
+            let field_types = coerce_to_type.field_types();
 
             let address = return_location
                 .return_value_address
@@ -159,7 +160,7 @@ pub fn emit_epilogue(
                 let arg_struct_type = abi_function.inalloca_combined_struct.as_ref().unwrap().ty;
 
                 let field_type =
-                    get_struct_field_types(arg_struct_type)[inalloca.alloca_field_index as usize];
+                    arg_struct_type.field_types()[inalloca.alloca_field_index as usize];
 
                 let sret = unsafe {
                     LLVMBuildStructGEP2(

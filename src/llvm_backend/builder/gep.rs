@@ -1,10 +1,13 @@
 use super::Builder;
 use crate::{
     data_units::ByteUnits,
-    llvm_backend::{address::Address, raw_address::RawAddress, target_data::TargetData},
+    llvm_backend::{
+        address::Address, llvm_value_ref_ext::LLVMValueRefExt, raw_address::RawAddress,
+        target_data::TargetData,
+    },
 };
 use cstr::cstr;
-use llvm_sys::core::{LLVMBuildGEP2, LLVMConstInt, LLVMInt64Type};
+use llvm_sys::{core::LLVMBuildGEP2, prelude::LLVMValueRef};
 
 impl Builder {
     pub fn gep(
@@ -15,16 +18,11 @@ impl Builder {
         array_index: u64,
     ) -> Address {
         let element_type = address.element_type();
-        let element_size = ByteUnits::of(
-            target_data
-                .abi_size_of_type(element_type)
-                .try_into()
-                .unwrap(),
-        );
+        let element_size = target_data.abi_size_of_type(element_type);
 
         let mut indices = [
-            unsafe { LLVMConstInt(LLVMInt64Type(), field_index, false as _) },
-            unsafe { LLVMConstInt(LLVMInt64Type(), array_index, false as _) },
+            LLVMValueRef::new_u64(field_index),
+            LLVMValueRef::new_u64(array_index),
         ];
 
         let base = unsafe {

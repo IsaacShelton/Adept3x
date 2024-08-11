@@ -7,6 +7,8 @@ mod error;
 mod functions;
 mod globals;
 mod intrinsics;
+mod llvm_type_ref_ext;
+mod llvm_value_ref_ext;
 mod module;
 mod null_terminated_string;
 mod raw_address;

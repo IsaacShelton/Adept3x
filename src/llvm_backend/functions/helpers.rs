@@ -2,12 +2,14 @@ use crate::{
     data_units::ByteUnits,
     ir,
     llvm_backend::{
-        abi::abi_type::{get_struct_field_types, is_struct_type, ABIType},
+        abi::abi_type::ABIType,
         address::Address,
         backend_type::{to_backend_mem_type, to_backend_type},
         builder::{Builder, Volatility},
         ctx::BackendCtx,
         error::BackendError,
+        llvm_type_ref_ext::LLVMTypeRefExt,
+        llvm_value_ref_ext::LLVMValueRefExt,
         raw_address::RawAddress,
         target_data::TargetData,
     },
@@ -16,14 +18,13 @@ use crate::{
 use cstr::cstr;
 use llvm_sys::{
     core::{
-        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMBuildTruncOrBitCast, LLVMConstInt,
-        LLVMGetInsertBlock, LLVMGetPointerAddressSpace, LLVMGetTypeKind, LLVMGetValueKind,
-        LLVMInt1Type, LLVMInt64Type, LLVMInt8Type, LLVMIsThreadLocal, LLVMPositionBuilderBefore,
-        LLVMSetAlignment, LLVMTypeOf,
+        LLVMBuildAlloca, LLVMBuildArrayAlloca, LLVMBuildTruncOrBitCast, LLVMGetInsertBlock,
+        LLVMGetPointerAddressSpace, LLVMGetValueKind, LLVMInt1Type, LLVMInt8Type,
+        LLVMIsThreadLocal, LLVMPositionBuilderBefore, LLVMSetAlignment, LLVMTypeOf,
     },
     prelude::{LLVMTypeRef, LLVMValueRef},
-    target::{LLVMByteOrder, LLVMByteOrdering, LLVMPreferredAlignmentOfType, LLVMStoreSizeOfType},
-    LLVMTypeKind, LLVMValueKind,
+    target::{LLVMByteOrder, LLVMByteOrdering, LLVMPreferredAlignmentOfType},
+    LLVMValueKind,
 };
 use std::{borrow::Cow, ffi::CStr};
 
@@ -233,19 +234,19 @@ pub fn enter_struct_pointer_for_coerced_access(
     target_data: &TargetData,
     source_pointer: &Address,
     source_struct_type: LLVMTypeRef,
-    destination_size: u64,
+    destination_size: ByteUnits,
 ) -> Address {
     // Try to reduce the range of the pointer access while still having
     // enough data to satisfy `destination_size`
 
-    let field_types = get_struct_field_types(source_struct_type);
+    let field_types = source_struct_type.field_types();
 
     let Some(first_field_type) = field_types.first() else {
         return source_pointer.clone();
     };
 
-    let first_field_size = unsafe { LLVMStoreSizeOfType(target_data.get(), *first_field_type) };
-    let source_size = unsafe { LLVMStoreSizeOfType(target_data.get(), source_struct_type) };
+    let first_field_size = target_data.store_size_of_type(*first_field_type);
+    let source_size = target_data.store_size_of_type(source_struct_type);
 
     // Can't scale down anymore
     if first_field_size < destination_size && first_field_size < source_size {
@@ -257,7 +258,7 @@ pub fn enter_struct_pointer_for_coerced_access(
         builder.gep_struct(target_data, source_pointer, 0, Some(field_types.as_slice()));
 
     // Recursively descend
-    if is_struct_type(source_pointer.element_type()) {
+    if source_pointer.element_type().is_struct() {
         enter_struct_pointer_for_coerced_access(
             builder,
             target_data,
@@ -269,19 +270,6 @@ pub fn enter_struct_pointer_for_coerced_access(
         source_pointer
     }
 }
-
-pub fn is_pointer_type(ty: LLVMTypeRef) -> bool {
-    unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMPointerTypeKind }
-}
-
-pub fn is_integer_type(ty: LLVMTypeRef) -> bool {
-    unsafe { LLVMGetTypeKind(ty) == LLVMTypeKind::LLVMIntegerTypeKind }
-}
-
-pub fn is_integer_or_pointer_type(ty: LLVMTypeRef) -> bool {
-    is_integer_type(ty) || is_pointer_type(ty)
-}
-
 pub fn coerce_integer_likes(
     builder: &Builder,
     target_data: &TargetData,
@@ -295,8 +283,8 @@ pub fn coerce_integer_likes(
         return source;
     }
 
-    if is_pointer_type(source_type) {
-        if is_pointer_type(destination_type) {
+    if source_type.is_pointer() {
+        if destination_type.is_pointer() {
             return builder.bitcast(source, destination_type);
         }
 
@@ -304,7 +292,7 @@ pub fn coerce_integer_likes(
         source = builder.ptr_to_int(source, pointer_sized_int_type);
     }
 
-    let destination_int_type = if is_pointer_type(destination_type) {
+    let destination_int_type = if destination_type.is_pointer() {
         target_data.pointer_sized_int_type()
     } else {
         destination_type
@@ -323,7 +311,7 @@ pub fn coerce_integer_likes(
     }
 
     // Re-cast to pointer if desired destination type
-    if is_pointer_type(destination_type) {
+    if destination_type.is_pointer() {
         builder.int_to_ptr(source, destination_type)
     } else {
         source
@@ -358,7 +346,7 @@ pub fn build_coerced_load(
 
     let destination_size = ctx.target_data.abi_size_of_type(desired_type);
 
-    if is_struct_type(source_type) {
+    if source_type.is_struct() {
         source = Cow::Owned(enter_struct_pointer_for_coerced_access(
             builder,
             ctx.target_data,
@@ -372,7 +360,7 @@ pub fn build_coerced_load(
 
     let source_size = ctx.target_data.abi_size_of_type(source_type);
 
-    if is_integer_or_pointer_type(desired_type) && is_integer_or_pointer_type(source_type) {
+    if desired_type.is_integer_or_pointer() && source_type.is_integer_or_pointer() {
         let value = builder.load(&source, Volatility::Normal);
         return coerce_integer_likes(builder, ctx.target_data, value, desired_type);
     }
@@ -380,9 +368,6 @@ pub fn build_coerced_load(
     if source_size >= destination_size {
         return builder.load(&source.with_element_type(desired_type), Volatility::Normal);
     }
-
-    let size =
-        unsafe { LLVMConstInt(LLVMInt64Type(), source_size.try_into().unwrap(), false as _) };
 
     let tmp = Address::from(build_tmp_alloca_for_coerce(
         builder,
@@ -392,7 +377,7 @@ pub fn build_coerced_load(
         alloca_point,
     ));
 
-    builder.memcpy(&tmp, &source, size);
+    builder.memcpy(&tmp, &source, LLVMValueRef::new_u64(source_size.bytes()));
     builder.load(&tmp, Volatility::Normal)
 }
 
@@ -413,7 +398,7 @@ pub fn build_coerced_store(
 
     let source_size = target_data.abi_size_of_type(source_type);
 
-    let destination = if is_struct_type(destination_type) {
+    let destination = if destination_type.is_struct() {
         let minimized_range = enter_struct_pointer_for_coerced_access(
             builder,
             target_data,
@@ -427,14 +412,14 @@ pub fn build_coerced_store(
         destination.clone()
     };
 
-    if is_pointer_type(source_type) && is_pointer_type(destination_type) {
+    if source_type.is_pointer() && destination_type.is_pointer() {
         // NOTE: We don't support pointers with non-default address spaces yet
         assert_eq!(unsafe { LLVMGetPointerAddressSpace(source_type) }, unsafe {
             LLVMGetPointerAddressSpace(destination_type)
         });
     }
 
-    if is_integer_or_pointer_type(source_type) && is_integer_or_pointer_type(destination_type) {
+    if source_type.is_integer_or_pointer() && destination_type.is_integer_or_pointer() {
         let source = coerce_integer_likes(builder, target_data, source, destination_type);
         builder.store(source, &destination);
         return;
@@ -449,13 +434,6 @@ pub fn build_coerced_store(
     }
 
     // Coerce via memory
-    let size = unsafe {
-        LLVMConstInt(
-            LLVMInt64Type(),
-            destination_size.try_into().unwrap(),
-            false as _,
-        )
-    };
     let tmp = Address::from(build_tmp_alloca_for_coerce(
         builder,
         target_data,
@@ -463,8 +441,14 @@ pub fn build_coerced_store(
         destination.base.alignment,
         alloca_point,
     ));
+
     builder.store(source, &tmp);
-    builder.memcpy(&destination, &tmp, size);
+
+    builder.memcpy(
+        &destination,
+        &tmp,
+        LLVMValueRef::new_u64(destination_size.bytes()),
+    );
 }
 
 pub fn emit_load_of_scalar(

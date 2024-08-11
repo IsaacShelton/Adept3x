@@ -12,8 +12,7 @@ use crate::{
         abi::{
             abi_function::{ABIFunction, ABIParam},
             abi_type::{
-                get_struct_field_types, get_struct_num_fields, is_padding_for_coerce_expand,
-                is_struct_type,
+                is_padding_for_coerce_expand,
                 kinds::{get_type_expansion, TypeExpansion},
                 ABITypeKind, CoerceAndExpand,
             },
@@ -27,10 +26,12 @@ use crate::{
         functions::{
             helpers::{
                 build_coerced_load, build_coerced_store, build_mem_tmp, build_mem_tmp_without_cast,
-                build_tmp_alloca_address, emit_address_at_offset, is_integer_type,
+                build_tmp_alloca_address, emit_address_at_offset,
             },
             params_mapping::ParamsMapping,
         },
+        llvm_type_ref_ext::LLVMTypeRefExt,
+        llvm_value_ref_ext::LLVMValueRefExt,
         value_catalog::ValueCatalog,
         values::build_value,
     },
@@ -40,8 +41,10 @@ use crate::{
 use cstr::cstr;
 use itertools::{izip, Itertools};
 use llvm_sys::{
-    core::*, prelude::LLVMValueRef, target::LLVMABISizeOfType, LLVMIntPredicate::*,
-    LLVMRealPredicate::*, LLVMTypeKind,
+    core::*,
+    prelude::{LLVMTypeRef, LLVMValueRef},
+    LLVMIntPredicate::*,
+    LLVMRealPredicate::*,
 };
 use std::{borrow::Cow, ptr::null_mut};
 
@@ -123,8 +126,8 @@ pub unsafe fn create_function_block(
             }
             Instruction::SizeOf(ir_type) => {
                 let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
-                let size = LLVMABISizeOfType(ctx.target_data.get(), backend_type);
-                Some(LLVMConstInt(LLVMInt64Type(), size, false.into()))
+                let size = ctx.target_data.abi_size_of_type(backend_type);
+                Some(LLVMValueRef::new_u64(size.bytes()))
             }
             Instruction::Parameter(index) => {
                 Some(if let Some(prologue) = fn_ctx.prologue.as_ref() {
@@ -514,8 +517,8 @@ pub unsafe fn create_function_block(
                 };
 
                 let mut indices = [
-                    LLVMConstInt(LLVMInt32Type(), 0, true.into()),
-                    LLVMConstInt(LLVMInt32Type(), (*index).try_into().unwrap(), true.into()),
+                    LLVMValueRef::new_u64(0),
+                    LLVMValueRef::new_u64((*index).try_into().unwrap()),
                 ];
 
                 Some(LLVMBuildGEP2(
@@ -654,24 +657,19 @@ unsafe fn promote_variadic_argument(
     value: LLVMValueRef,
 ) -> LLVMValueRef {
     let llvm_type = LLVMTypeOf(value);
-    let llvm_type_kind = LLVMGetTypeKind(llvm_type);
 
-    match llvm_type_kind {
-        LLVMTypeKind::LLVMFloatTypeKind => {
-            LLVMBuildFPExt(builder.get(), value, LLVMDoubleType(), cstr!("").as_ptr())
-        }
-        LLVMTypeKind::LLVMIntegerTypeKind => {
-            let c_int_bits =
-                u32::try_from(BitUnits::from(target_info.int_layout().width).bits()).unwrap();
-            let has_bits = LLVMGetIntTypeWidth(llvm_type);
+    if llvm_type.is_float() {
+        LLVMBuildFPExt(builder.get(), value, LLVMDoubleType(), cstr!("").as_ptr())
+    } else if llvm_type.is_integer() {
+        let c_int_size = BitUnits::from(target_info.int_layout().width);
 
-            if has_bits < c_int_bits {
-                builder.zext(value, LLVMIntType(c_int_bits))
-            } else {
-                value
-            }
+        if llvm_type.integer_width() < c_int_size {
+            builder.zext(value, LLVMTypeRef::new_int(c_int_size))
+        } else {
+            value
         }
-        _ => value,
+    } else {
+        value
     }
 }
 
@@ -1018,8 +1016,8 @@ unsafe fn emit_call(
                     coerce_and_expand.unpadded_coerce_and_expand_type
                 );
 
-                let element_types = get_struct_field_types(coerce_to_type);
-                let requires_extract = is_struct_type(returned_type);
+                let element_types = coerce_to_type.field_types();
+                let requires_extract = returned_type.is_struct();
                 let mut unpadded_field_index = 0;
 
                 for (element_index, element_type) in element_types.iter().copied().enumerate() {
@@ -1131,12 +1129,7 @@ fn coerce_and_expand(
     // TODO: Is this alignment proper?
     // We'll max these just to be safe for now, but it should only depend on
     // the alignment of the coerce aggregate and of the original type.
-    let abi_alignment = ByteUnits::of(
-        ctx.target_data
-            .abi_size_of_type(backend_argument_type)
-            .try_into()
-            .unwrap(),
-    );
+    let abi_alignment = ctx.target_data.abi_size_of_type(backend_argument_type);
     let layout_alignment = ctx.type_layout_cache.get(argument_type).alignment;
     let alignment = alignment.max(abi_alignment).max(layout_alignment);
 
@@ -1151,9 +1144,9 @@ fn coerce_and_expand(
     ));
     builder.store(argument, &address);
 
-    assert!(is_struct_type(coerce_type));
+    assert!(coerce_type.is_struct());
     let address = address.with_element_type(coerce_type);
-    let field_types = get_struct_field_types(coerce_type);
+    let field_types = coerce_type.field_types();
 
     for (field_i, (llvm_arg_i, element_type)) in param_mapping
         .range()
@@ -1312,7 +1305,7 @@ fn direct_or_extend(
     let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
     let direct_offset = abi_param.abi_type.get_direct_offset().unwrap();
 
-    if !is_struct_type(coerce_to_type) {
+    if !coerce_to_type.is_struct() {
         let backend_argument_type =
             unsafe { to_backend_type(ctx.for_making_type(), argument_type)? };
 
@@ -1340,7 +1333,7 @@ fn direct_or_extend(
 
     let source = emit_address_at_offset(builder, ctx.target_data, &abi_param.abi_type, &source);
 
-    if is_struct_type(coerce_to_type)
+    if coerce_to_type.is_struct()
         && abi_param.abi_type.is_direct()
         && abi_param.abi_type.can_be_flattened().unwrap()
     {
@@ -1357,31 +1350,33 @@ fn direct_or_extend(
                 cstr!("upscale"),
                 None,
             ));
-            let size = unsafe {
+
+            let num_bytes_literal = unsafe {
                 LLVMConstInt(
                     LLVMInt64Type(),
-                    source_type_size.try_into().unwrap(),
+                    source_type_size.bytes().try_into().unwrap(),
                     false as _,
                 )
             };
-            builder.memcpy(&tmp_alloca, &source, size);
+
+            builder.memcpy(&tmp_alloca, &source, num_bytes_literal);
             tmp_alloca
         } else {
             source.with_element_type(coerce_to_type)
         };
 
-        let num_fields = get_struct_num_fields(coerce_to_type);
-        assert_eq!(param_range.len(), num_fields);
+        let precomputed_field_types = coerce_to_type.field_types();
 
-        let precomputed_field_types = get_struct_field_types(coerce_to_type);
+        assert_eq!(param_range.len(), precomputed_field_types.len());
 
-        for field_i in 0..num_fields {
+        for field_i in 0..precomputed_field_types.len() {
             let element_pointer = builder.gep_struct(
                 ctx.target_data,
                 &source,
                 field_i,
                 Some(precomputed_field_types.as_slice()),
             );
+
             ir_call_args[param_range.start + field_i] =
                 builder.load(&element_pointer, Volatility::Normal);
         }
@@ -1412,7 +1407,7 @@ fn trivial_direct_or_extend(
     let mut llvm_argument_type = unsafe { LLVMTypeOf(argument) };
     let coerce_to_type = abi_param.abi_type.coerce_to_type().flatten().unwrap();
 
-    if coerce_to_type != llvm_argument_type && is_integer_type(llvm_argument_type) {
+    if coerce_to_type != llvm_argument_type && llvm_argument_type.is_integer() {
         argument = builder.zext_with_name(argument, coerce_to_type, cstr!("up"));
         llvm_argument_type = unsafe { LLVMTypeOf(argument) };
     }

@@ -2,16 +2,14 @@ use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
     ir,
     llvm_backend::{
-        abi::abi_type::{
-            get_struct_field_types,
-            kinds::{get_type_expansion, TypeExpansion},
-        },
+        abi::abi_type::kinds::{get_type_expansion, TypeExpansion},
         address::Address,
         backend_type::{to_backend_mem_type, to_backend_type},
         builder::Builder,
         ctx::BackendCtx,
         error::BackendError,
         functions::helpers::build_mem_tmp_with_alignment,
+        llvm_type_ref_ext::LLVMTypeRefExt,
     },
 };
 use cstr::cstr;
@@ -102,7 +100,7 @@ fn expand_type_from_args(
             // NOTE: We don't support C++ inheritance here
 
             let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
-            let precomputed_field_types = get_struct_field_types(llvm_type);
+            let precomputed_field_types = llvm_type.field_types();
             assert_eq!(fields.len(), precomputed_field_types.len());
 
             for (field_i, field) in fields.iter().enumerate() {

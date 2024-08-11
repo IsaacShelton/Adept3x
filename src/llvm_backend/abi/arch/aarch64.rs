@@ -1,6 +1,6 @@
 use super::use_first_field_if_transparent_union;
 use crate::{
-    data_units::{BitUnits, ByteUnits},
+    data_units::ByteUnits,
     ir,
     llvm_backend::{
         abi::{
@@ -13,14 +13,13 @@ use crate::{
         backend_type::to_backend_type,
         ctx::BackendCtx,
         error::BackendError,
+        llvm_type_ref_ext::LLVMTypeRefExt,
     },
     target_info::type_layout::TypeLayoutCache,
 };
 use derive_more::IsVariant;
 use llvm_sys::{
-    core::{
-        LLVMArrayType2, LLVMInt16Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMIntType,
-    },
+    core::{LLVMArrayType2, LLVMInt16Type, LLVMInt32Type, LLVMInt64Type, LLVMInt8Type},
     prelude::LLVMTypeRef,
     LLVMCallConv,
 };
@@ -198,7 +197,7 @@ impl AARCH64 {
             };
         }
 
-        let size_bytes = ctx.type_layout_cache.get(ty).width;
+        let size = ctx.type_layout_cache.get(ty).width;
 
         let is_empty_record = is_empty_record(
             ty,
@@ -213,12 +212,12 @@ impl AARCH64 {
         // would need to be passed as indirect, but we don't support those yet.
 
         // Empty records are ignored in Darwin for C, but not C++.
-        if is_empty_record || size_bytes.is_zero() {
+        if is_empty_record || size.is_zero() {
             if !self.is_cxx_mode || self.variant.is_darwin_pcs() {
                 return Ok(ABIType::new_ignore());
             }
 
-            if is_empty_record && size_bytes.is_zero() {
+            if is_empty_record && size.is_zero() {
                 return Ok(ABIType::new_ignore());
             }
 
@@ -256,8 +255,8 @@ impl AARCH64 {
             }
         }
 
-        if size_bytes <= ByteUnits::of(16) {
-            let alignment_bytes = if self.variant.is_aapcs() {
+        if size <= ByteUnits::of(16) {
+            let alignment = if self.variant.is_aapcs() {
                 let unadjusted_alignment = ctx.type_layout_cache.get(ty).unadjusted_alignment;
 
                 if unadjusted_alignment < ByteUnits::of(16) {
@@ -270,21 +269,14 @@ impl AARCH64 {
                 ctx.type_layout_cache.get(ty).alignment.max(pointer_width)
             };
 
-            let size_bytes = size_bytes.align_to(alignment_bytes);
+            let size = size.align_to(alignment);
+            let base_type = LLVMTypeRef::new_int(alignment);
 
-            let base_type = unsafe {
-                LLVMIntType(
-                    BitUnits::from(alignment_bytes)
-                        .bits()
-                        .try_into()
-                        .expect("small enough for int type"),
-                )
-            };
-
-            let coerce_to_type = if size_bytes == alignment_bytes {
+            let coerce_to_type = if size == alignment {
                 base_type
             } else {
-                unsafe { LLVMArrayType2(base_type, size_bytes / alignment_bytes) }
+                let length = size / alignment;
+                LLVMTypeRef::new_array(base_type, length)
             };
 
             return Ok(ABIType::new_direct(DirectOptions {

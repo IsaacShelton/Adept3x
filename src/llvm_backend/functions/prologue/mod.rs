@@ -1,10 +1,6 @@
 use super::return_location::ReturnLocation;
 use crate::llvm_backend::{
-    abi::{
-        abi_function::ABIFunction,
-        abi_type::{get_struct_field_types, ABITypeKind},
-        has_scalar_evaluation_kind,
-    },
+    abi::{abi_function::ABIFunction, abi_type::ABITypeKind, has_scalar_evaluation_kind},
     address::Address,
     builder::Builder,
     ctx::{BackendCtx, FunctionSkeleton},
@@ -14,6 +10,7 @@ use crate::llvm_backend::{
         param_values::{ParamValueConstructionCtx, ParamValues},
         params_mapping::ParamsMapping,
     },
+    llvm_type_ref_ext::LLVMTypeRefExt,
     raw_address::RawAddress,
 };
 use cstr::cstr;
@@ -51,7 +48,7 @@ pub fn emit_prologue(
     let inalloca_subtypes = abi_function
         .inalloca_combined_struct
         .as_ref()
-        .map(|inalloca_combined_struct| get_struct_field_types(inalloca_combined_struct.ty));
+        .map(|inalloca_combined_struct| inalloca_combined_struct.ty.field_types());
 
     let return_location = (!returns_ir_void)
         .then(|| match &abi_return_info.abi_type.kind {

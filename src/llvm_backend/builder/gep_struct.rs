@@ -2,7 +2,7 @@ use super::Builder;
 use crate::{
     data_units::ByteUnits,
     llvm_backend::{
-        abi::abi_type::get_struct_field_types, address::Address, raw_address::RawAddress,
+        address::Address, llvm_type_ref_ext::LLVMTypeRefExt, raw_address::RawAddress,
         target_data::TargetData,
     },
 };
@@ -47,7 +47,7 @@ impl Builder {
 
         let field_type = precomputed_field_types
             .map(|fields| fields[index as usize])
-            .unwrap_or_else(|| get_struct_field_types(struct_type)[index as usize]);
+            .unwrap_or_else(|| struct_type.field_types()[index as usize]);
 
         Address {
             base: RawAddress {

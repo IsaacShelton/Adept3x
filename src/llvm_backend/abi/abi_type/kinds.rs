@@ -1,8 +1,11 @@
-use super::{get_struct_field_types, offset_align::OffsetAlign, show_llvm_type::ShowLLVMType};
+use super::{offset_align::OffsetAlign, show_llvm_type::ShowLLVMType};
 use crate::{
     data_units::ByteUnits,
     ir,
-    llvm_backend::{backend_type::to_backend_type, ctx::BackendCtx, error::BackendError},
+    llvm_backend::{
+        backend_type::to_backend_type, ctx::BackendCtx, error::BackendError,
+        llvm_type_ref_ext::LLVMTypeRefExt,
+    },
     target_info::type_layout::TypeLayoutCache,
 };
 use core::fmt::Debug;
@@ -268,7 +271,7 @@ impl CoerceAndExpand {
         };
 
         if is_struct {
-            get_struct_field_types(self.unpadded_coerce_and_expand_type)
+            self.unpadded_coerce_and_expand_type.field_types()
         } else {
             vec![self.unpadded_coerce_and_expand_type]
         }
