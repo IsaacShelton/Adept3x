@@ -77,14 +77,22 @@ fn build_project(build_command: BuildCommand) {
 
     // TODO: Determine this based on default target triple
     let target_info = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        diagnostics.push(WarningDiagnostic::plain(
-            "Using only supported platform aarch64 darwin",
-        ));
-
         TargetInfo {
             kind: target_info::TargetInfoKind::AARCH64,
             ms_abi: false,
             is_darwin: true,
+        }
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        TargetInfo {
+            kind: target_info::TargetInfoKind::AARCH64,
+            ms_abi: false,
+            is_darwin: false,
+        }
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        TargetInfo {
+            kind: target_info::TargetInfoKind::X86_64,
+            ms_abi: false,
+            is_darwin: false,
         }
     } else {
         diagnostics.push(WarningDiagnostic::plain(
