@@ -16,9 +16,12 @@ pub trait LLVMTypeRefExt: Sized + Copy {
     fn is_pointer(self) -> bool;
     fn is_integer(self) -> bool;
     fn is_float(self) -> bool;
+    fn is_double(self) -> bool;
+    fn is_floating_point(self) -> bool;
     fn integer_width(self) -> BitUnits;
     fn is_struct(self) -> bool;
     fn is_array(self) -> bool;
+    fn is_vector(self) -> bool;
     fn num_fields(self) -> usize;
     fn field_types(self) -> Vec<LLVMTypeRef>;
     fn element_type(self) -> LLVMTypeRef;
@@ -41,6 +44,11 @@ pub trait LLVMTypeRefExt: Sized + Copy {
 
     fn is_i64(self) -> bool {
         self.is_integer() && self.integer_width() == BitUnits::of(64)
+    }
+
+    fn is_i128(self) -> bool {
+        // NOTE: We don't support 128-bit integers yet
+        false
     }
 }
 
@@ -65,6 +73,14 @@ impl LLVMTypeRefExt for LLVMTypeRef {
         unsafe { LLVMGetTypeKind(self) == LLVMTypeKind::LLVMFloatTypeKind }
     }
 
+    fn is_double(self) -> bool {
+        unsafe { LLVMGetTypeKind(self) == LLVMTypeKind::LLVMDoubleTypeKind }
+    }
+
+    fn is_floating_point(self) -> bool {
+        self.is_float() || self.is_double()
+    }
+
     fn integer_width(self) -> BitUnits {
         BitUnits::of(unsafe { LLVMGetIntTypeWidth(self) }.into())
     }
@@ -75,6 +91,10 @@ impl LLVMTypeRefExt for LLVMTypeRef {
 
     fn is_array(self) -> bool {
         unsafe { LLVMGetTypeKind(self) == LLVMTypeKind::LLVMArrayTypeKind }
+    }
+
+    fn is_vector(self) -> bool {
+        unsafe { LLVMGetTypeKind(self) == LLVMTypeKind::LLVMVectorTypeKind }
     }
 
     fn num_fields(self) -> usize {

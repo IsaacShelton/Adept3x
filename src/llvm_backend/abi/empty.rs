@@ -27,7 +27,11 @@ pub fn is_empty_record(
     true
 }
 
-fn is_empty_field(field: &ir::Type, ir_module: &ir::Module, options: IsEmptyRecordOptions) -> bool {
+pub fn is_empty_field(
+    field: &ir::Type,
+    ir_module: &ir::Module,
+    options: IsEmptyRecordOptions,
+) -> bool {
     /*
     // NOTE: TODO: Once we add bitfields, we need to keep this in mind
     if is_unnamed_bit_field() {

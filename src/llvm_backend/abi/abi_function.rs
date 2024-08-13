@@ -4,7 +4,7 @@ use crate::{
     ir,
     llvm_backend::{backend_type::to_backend_type, ctx::BackendCtx, error::BackendError},
 };
-use llvm_sys::prelude::LLVMTypeRef;
+use llvm_sys::{prelude::LLVMTypeRef, LLVMCallConv};
 
 #[derive(Clone, Debug)]
 pub struct InAllocaStruct {
@@ -30,10 +30,12 @@ impl ABIFunction {
     pub fn new<'a>(
         ctx: &BackendCtx,
         parameter_types: impl Iterator<Item = &'a ir::Type>,
+        num_required: usize,
         return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<Self, BackendError> {
-        let mut abi_function = Self::new_agnostic(ctx, parameter_types, return_type, is_variadic)?;
+        let mut abi_function =
+            Self::new_agnostic(ctx, parameter_types, num_required, return_type, is_variadic)?;
 
         // Fill in default coerce type for return type
         abi_function
@@ -56,17 +58,27 @@ impl ABIFunction {
     pub fn new_agnostic<'a>(
         ctx: &BackendCtx,
         parameter_types: impl Iterator<Item = &'a ir::Type>,
+        num_required: usize,
         return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<Self, BackendError> {
-        match &ctx.arch {
-            Arch::X86_64(_abi) => todo!(),
-            Arch::AARCH64(abi) => {
-                let itanium = Itanium {
-                    target_info: &ctx.ir_module.target_info,
-                    type_layout_cache: &ctx.type_layout_cache,
-                };
+        let itanium = Itanium {
+            target_info: &ctx.ir_module.target_info,
+            type_layout_cache: &ctx.type_layout_cache,
+        };
+        let calling_convention = LLVMCallConv::LLVMCCallConv;
 
+        match &ctx.arch {
+            Arch::X86_64(abi) => abi.compute_info(
+                ctx,
+                itanium,
+                parameter_types,
+                num_required,
+                return_type,
+                is_variadic,
+                calling_convention,
+            ),
+            Arch::AARCH64(abi) => {
                 abi.compute_info(ctx, itanium, parameter_types, return_type, is_variadic)
             }
         }

@@ -10,7 +10,7 @@ use super::{
     target_data::TargetData,
 };
 use crate::{
-    diagnostics::Diagnostics,
+    diagnostics::{Diagnostics, ErrorDiagnostic},
     ir,
     resolved::{self, StructureRef},
     target_info::type_layout::TypeLayoutCache,
@@ -91,6 +91,37 @@ impl<'a> BackendCtx<'a> {
             diagnostics,
         );
 
+        #[allow(unused_imports)]
+        use crate::llvm_backend::abi::arch::{
+            x86_64::{AvxLevel, SysV, SysVOs, X86_64},
+            Arch,
+        };
+
+        #[allow(unused_assignments)]
+        let mut arch = None;
+
+        #[cfg(target_arch = "x86_64")]
+        {
+            arch = Some(Arch::X86_64(X86_64::SysV(SysV {
+                os: SysVOs::Linux,
+                avx_level: AvxLevel::None,
+            })));
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            arch = Some(Arch::AARCH64(aarch64::AARCH64 {
+                variant: aarch64::Variant::DarwinPCS,
+                is_cxx_mode: false,
+            }));
+        }
+
+        // TODO: Add proper error handling
+        let Some(arch) = arch else {
+            diagnostics.push(ErrorDiagnostic::plain("This platform is not supported"));
+            std::process::exit(1);
+        };
+
         Self {
             ir_module,
             backend_module,
@@ -104,10 +135,7 @@ impl<'a> BackendCtx<'a> {
             static_variables: Vec::new(),
             structure_cache: Default::default(),
             type_layout_cache,
-            arch: Arch::AARCH64(aarch64::AARCH64 {
-                variant: aarch64::Variant::DarwinPCS,
-                is_cxx_mode: false,
-            }),
+            arch,
         }
     }
 

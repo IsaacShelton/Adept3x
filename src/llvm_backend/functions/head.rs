@@ -20,9 +20,12 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
         let mut abi_function = function
             .abide_abi
             .then(|| {
+                let num_required = function.parameters.len();
+
                 ABIFunction::new(
                     ctx,
                     function.parameters.iter(),
+                    num_required,
                     &function.return_type,
                     function.is_cstyle_variadic,
                 )

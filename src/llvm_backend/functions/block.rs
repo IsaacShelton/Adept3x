@@ -755,6 +755,8 @@ unsafe fn emit_call(
             .iter()
             .chain(variadic_argument_types.iter());
 
+        let num_required = ir_function.parameters.len();
+
         // If we're using variadic arguments, then we have to re-generate the ABI
         // function signature for the way we're calling it
         let abi_function_approximation = (abi_function.parameter_types.len() < arguments.len())
@@ -762,6 +764,7 @@ unsafe fn emit_call(
                 ABIFunction::new(
                     ctx,
                     argument_types_iter.clone(),
+                    num_required,
                     &ir_function.return_type,
                     ir_function.is_cstyle_variadic,
                 )
@@ -909,12 +912,15 @@ unsafe fn emit_call(
             .inalloca_combined_struct
             .is_none());
 
+        let num_required = ir_function.parameters.len();
+
         let actual_abi_function = ir_function
             .is_cstyle_variadic
             .then(|| {
                 ABIFunction::new(
                     ctx,
                     ir_function.parameters.iter(),
+                    num_required,
                     &ir_function.return_type,
                     ir_function.is_cstyle_variadic,
                 )

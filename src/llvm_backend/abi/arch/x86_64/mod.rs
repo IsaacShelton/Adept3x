@@ -8,17 +8,13 @@ use crate::{
     ir,
     llvm_backend::{abi::cxx::Itanium, ctx::BackendCtx, error::BackendError},
 };
+pub use avx_level::AvxLevel;
 use llvm_sys::LLVMCallConv;
-use sysv::SysV;
-use win64::Win64;
+pub use sysv::{SysV, SysVOs};
+pub use win64::Win64;
 
 #[derive(Clone, Debug)]
-pub struct X86_64 {
-    pub variant: Variant,
-}
-
-#[derive(Clone, Debug)]
-pub enum Variant {
+pub enum X86_64 {
     SysV(SysV),
     Win64(Win64),
 }
@@ -46,17 +42,16 @@ impl X86_64 {
             );
         }
 
-        match &self.variant {
-            Variant::SysV(sysv) => sysv.compute_info(
+        match self {
+            Self::SysV(sysv) => sysv.compute_info(
                 ctx,
                 &abi,
                 original_parameter_types,
                 num_required,
                 original_return_type,
-                is_variadic,
                 calling_convention,
             ),
-            Variant::Win64(win64) => win64.compute_info(
+            Self::Win64(win64) => win64.compute_info(
                 ctx,
                 &abi,
                 original_parameter_types,

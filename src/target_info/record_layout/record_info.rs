@@ -33,8 +33,8 @@ impl<'t> RecordInfo<'t> {
         }
     }
 
-    pub fn try_from_type(value: &'t ir::Type, ir_module: &'t ir::Module) -> Option<Self> {
-        match value {
+    pub fn try_from_type(ir_type: &'t ir::Type, ir_module: &'t ir::Module) -> Option<Self> {
+        match ir_type {
             ir::Type::Union(_) => {
                 todo!("RecordInfo::try_from_type for unions is not supported yet")
             }

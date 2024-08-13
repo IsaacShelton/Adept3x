@@ -8,6 +8,7 @@ use crate::{
             abi_type::{ABIType, DirectOptions, ExtendOptions, IndirectOptions},
             arch::use_first_field_if_transparent_union,
             cxx::Itanium,
+            empty::{is_empty_field, IsEmptyRecordOptions},
             is_aggregate_type_for_abi, is_promotable_integer_type_for_abi,
         },
         backend_type::to_backend_type,
@@ -20,8 +21,9 @@ use crate::{
         type_layout::{TypeLayout, TypeLayoutCache},
     },
 };
+use derive_more::IsVariant;
 use llvm_sys::{
-    core::{LLVMDoubleType, LLVMInt64Type, LLVMStructType},
+    core::{LLVMDoubleType, LLVMInt64Type, LLVMStructType, LLVMVectorType},
     prelude::LLVMTypeRef,
     target::{LLVMABIAlignmentOfType, LLVMElementAtOffset, LLVMOffsetOfElement},
     LLVMCallConv,
@@ -33,15 +35,22 @@ use std::ptr::null_mut;
 mod reg_class;
 mod reg_class_pair;
 
+#[derive(Clone, Debug, IsVariant)]
+pub enum SysVOs {
+    Darwin,
+    Linux,
+    Bsd,
+}
+
 #[derive(Clone, Debug)]
 pub struct SysV {
-    pub is_darwin: bool,
+    pub os: SysVOs,
     pub avx_level: AvxLevel,
 }
 
 impl SysV {
     fn honors_revision_0_98(&self) -> bool {
-        !self.is_darwin
+        !self.os.is_darwin()
     }
 
     fn post_merge(&self, aggregate_size: ByteUnits, mut pair: RegClassPair) -> RegClassPair {
@@ -60,15 +69,137 @@ impl SysV {
         pair
     }
 
-    #[allow(unused_variables)]
     fn classify_return_type(
         &self,
         ctx: &BackendCtx,
         abi: &Itanium,
         ir_type: &ir::Type,
-        is_variadic: bool,
-    ) -> Requirement {
-        todo!("SysV::classify_return_type not implemented yet")
+    ) -> Result<ABIType, BackendError> {
+        let pair = self.classify(ctx, abi, ir_type, ByteUnits::of(0), true, false);
+
+        assert!(!pair.high.is_memory() || pair.low.is_memory());
+        assert!(!pair.high.is_sse_up() || pair.low.is_sse());
+
+        let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
+
+        let mut result_type = match pair.low {
+            RegClass::NoClass => {
+                if pair.high.is_no_class() {
+                    return Ok(ABIType::new_ignore());
+                }
+
+                let high_part = match pair.high {
+                    RegClass::Sse | RegClass::X87Up => Self::get_sse_type_at_offset(
+                        ctx,
+                        llvm_type,
+                        ByteUnits::of(8),
+                        ir_type,
+                        ByteUnits::of(8),
+                    ),
+                    RegClass::Integer => Self::get_integer_type_at_offset(
+                        ctx,
+                        llvm_type,
+                        ByteUnits::of(8),
+                        ir_type,
+                        ByteUnits::of(8),
+                    ),
+                    _ => panic!("unknown missing low part"),
+                };
+
+                return Ok(ABIType::new_direct(DirectOptions {
+                    coerce_to_type: Some(high_part),
+                    offset: ByteUnits::of(8),
+                    ..Default::default()
+                }));
+            }
+            RegClass::Integer => {
+                let result_type = Self::get_integer_type_at_offset(
+                    ctx,
+                    llvm_type,
+                    ByteUnits::of(0),
+                    ir_type,
+                    ByteUnits::of(0),
+                );
+
+                if pair.high.is_no_class()
+                    && result_type.is_integer()
+                    && is_promotable_integer_type_for_abi(ir_type)
+                {
+                    return Ok(ABIType::new_extend(ir_type, None, ExtendOptions::default()));
+                }
+
+                result_type
+            }
+            RegClass::Sse => Self::get_sse_type_at_offset(
+                ctx,
+                llvm_type,
+                ByteUnits::of(0),
+                ir_type,
+                ByteUnits::of(0),
+            ),
+            RegClass::X87 => todo!("x86 fp80 not supported yet in SysV::classify_return_type"),
+            RegClass::X87Up | RegClass::SseUp => unreachable!(),
+            RegClass::ComplexX87 => {
+                todo!("complex x86 fp80 not supported yet in SysV::classify_return_type")
+            }
+            RegClass::Memory => {
+                return Ok(Self::get_indirect_return_result(
+                    &ctx.type_layout_cache,
+                    ir_type,
+                ));
+            }
+        };
+
+        let high_part = match pair.high {
+            RegClass::Integer => Some(Self::get_integer_type_at_offset(
+                ctx,
+                llvm_type,
+                ByteUnits::of(8),
+                ir_type,
+                ByteUnits::of(8),
+            )),
+            RegClass::Sse => Some(Self::get_sse_type_at_offset(
+                ctx,
+                llvm_type,
+                ByteUnits::of(8),
+                ir_type,
+                ByteUnits::of(8),
+            )),
+
+            RegClass::SseUp => {
+                assert_eq!(pair.low, RegClass::Sse);
+                result_type = self.get_byte_vector_type(ctx, ir_type)?;
+                None
+            }
+            RegClass::X87Up => {
+                if !pair.low.is_x_87() {
+                    Some(Self::get_sse_type_at_offset(
+                        ctx,
+                        llvm_type,
+                        ByteUnits::of(8),
+                        ir_type,
+                        ByteUnits::of(8),
+                    ))
+                } else {
+                    None
+                }
+            }
+            RegClass::NoClass | RegClass::ComplexX87 => None,
+            RegClass::Memory | RegClass::X87 => {
+                unreachable!("invalid high part in SysV::classify_return_type")
+            }
+        };
+
+        let result_type = if let Some(high_part) = high_part {
+            Self::make_byval_argument_pair(ctx, result_type, high_part)
+        } else {
+            result_type
+        };
+
+        Ok(ABIType::new_direct(DirectOptions {
+            coerce_to_type: Some(result_type),
+            ..Default::default()
+        }))
     }
 
     pub fn compute_info<'a>(
@@ -78,7 +209,6 @@ impl SysV {
         original_parameter_types: impl Iterator<Item = &'a ir::Type>,
         num_required: usize,
         original_return_type: &ir::Type,
-        is_variadic: bool,
         calling_convention: LLVMCallConv,
     ) -> Result<ABIFunction, BackendError> {
         let is_reg_call = calling_convention == LLVMCallConv::LLVMX86RegCallCallConv;
@@ -88,8 +218,6 @@ impl SysV {
         } else {
             RegCount::ints(16) + RegCount::sses(8)
         };
-
-        let mut max_vector_width = 0;
 
         let (abi_return_type, return_needed) =
             if let Some(abi_type) = abi.classify_return_type(original_return_type) {
@@ -114,9 +242,8 @@ impl SysV {
                         )
                     }
                 } else {
-                    let requirement =
-                        self.classify_return_type(ctx, abi, original_return_type, is_variadic);
-                    (requirement.abi_type, requirement.needed)
+                    let abi_type = self.classify_return_type(ctx, abi, original_return_type)?;
+                    (abi_type, RegCount::zeros())
                 }
             };
 
@@ -124,6 +251,8 @@ impl SysV {
             ir_type: original_return_type.clone(),
             abi_type: abi_return_type,
         };
+
+        let mut max_vector_width = 0;
 
         // Indirect return value passed via int register
         if return_type.abi_type.is_indirect() {
@@ -168,20 +297,25 @@ impl SysV {
         })
     }
 
-    #[allow(unused_variables)]
     fn classify_argument_type(
         &self,
         ctx: &BackendCtx,
         abi: &Itanium,
-        ty: &ir::Type,
+        ir_type: &ir::Type,
         free: RegCount,
         is_required: bool,
         is_reg_call: bool,
     ) -> Result<Requirement, BackendError> {
-        let ir_type = use_first_field_if_transparent_union(ty);
+        let ir_type = use_first_field_if_transparent_union(ir_type);
 
-        let offset_base = todo!();
-        let pair = self.classify(ctx, abi, ir_type, offset_base, is_required, is_reg_call);
+        let pair = self.classify(
+            ctx,
+            abi,
+            ir_type,
+            ByteUnits::of(0),
+            is_required,
+            is_reg_call,
+        );
 
         assert!(
             pair.high != RegClass::Memory || pair.low == RegClass::Memory,
@@ -317,7 +451,7 @@ impl SysV {
             }
             RegClass::SseUp => {
                 assert!(pair.low.is_sse());
-                result_type = self.get_byte_vector_type(ir_type);
+                result_type = self.get_byte_vector_type(ctx, ir_type)?;
             }
             RegClass::X87 | RegClass::ComplexX87 | RegClass::Memory => {
                 unreachable!("invalid sysv register classification for high part")
@@ -429,7 +563,7 @@ impl SysV {
             }
         }
 
-        todo!()
+        pair
     }
 
     fn classify_record(
@@ -508,7 +642,7 @@ impl SysV {
             let field_pair = if field.is_bitfield() {
                 todo!("bitfields are not supported yet in SysV::classify_record");
             } else {
-                self.classify(ctx, abi, ty, offset_base, is_required, false)
+                self.classify(ctx, abi, &field.ir_type, offset_base, is_required, false)
             };
 
             pair.merge_with(field_pair);
@@ -680,17 +814,107 @@ impl SysV {
         )
     }
 
-    #[allow(unused_variables)]
+    fn bits_contain_no_user_data_in_record(
+        ctx: &BackendCtx,
+        start_bit: BitUnits,
+        end_bit: BitUnits,
+        info: &RecordInfo,
+    ) -> bool {
+        let record_layout = ItaniumRecordLayoutBuilder::generate(
+            &ctx.type_layout_cache,
+            ctx.type_layout_cache.diagnostics,
+            info,
+            None,
+        );
+
+        assert_eq!(record_layout.field_offsets.len(), info.fields.len());
+
+        // NOTE: We don't support C++ records here
+        for (field_offset, field) in record_layout
+            .field_offsets
+            .iter()
+            .copied()
+            .zip(info.fields.iter())
+        {
+            if field_offset >= end_bit {
+                break;
+            }
+
+            let field_start = if field_offset < start_bit {
+                start_bit - field_offset
+            } else {
+                BitUnits::of(0)
+            };
+
+            let field_end = end_bit - field_offset;
+
+            if !Self::bits_contain_no_user_data(ctx, &field.ir_type, field_start, field_end) {
+                return false;
+            }
+        }
+
+        true
+    }
+
     fn bits_contain_no_user_data(
         ctx: &BackendCtx,
-        source_type: &ir::Type,
+        ir_type: &ir::Type,
         start_bit: BitUnits,
         end_bit: BitUnits,
     ) -> bool {
-        todo!("bits_contain_no_user_data")
+        let size = ctx.type_layout_cache.get(ir_type).width;
+
+        if size.to_bits() <= start_bit {
+            return true;
+        }
+
+        match ir_type {
+            ir::Type::Union(_) | ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
+                // record
+
+                Self::bits_contain_no_user_data_in_record(
+                    ctx,
+                    start_bit,
+                    end_bit,
+                    &RecordInfo::try_from_type(ir_type, ctx.ir_module)
+                        .expect("failed to get record info for SysV::bits_contain_no_user_data"),
+                )
+            }
+            ir::Type::FixedArray(fixed_array) => {
+                let element_type = &fixed_array.inner;
+                let element_size = ctx.type_layout_cache.get(&element_type).width;
+                let num_elements = fixed_array.length;
+
+                for i in 0..num_elements {
+                    let element_offset = element_size.to_bits() * i;
+                    if element_offset >= end_bit {
+                        break;
+                    }
+
+                    let element_start = if element_offset < start_bit {
+                        start_bit - element_offset
+                    } else {
+                        BitUnits::of(0)
+                    };
+
+                    let element_end = end_bit - element_offset;
+
+                    if !Self::bits_contain_no_user_data(
+                        ctx,
+                        element_type,
+                        element_start,
+                        element_end,
+                    ) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            _ => false,
+        }
     }
 
-    #[allow(unused_variables)]
     fn get_sse_type_at_offset(
         ctx: &BackendCtx,
         llvm_type: LLVMTypeRef,
@@ -698,12 +922,117 @@ impl SysV {
         source_type: &ir::Type,
         source_offset: ByteUnits,
     ) -> LLVMTypeRef {
-        todo!("get_sse_type_at_offset")
+        let source_size = ctx.type_layout_cache.get(source_type).width - source_offset;
+
+        let t0 = Self::get_fp_type_at_offset(ctx, llvm_type, llvm_offset);
+
+        let Some(t0) = t0 else {
+            return unsafe { LLVMDoubleType() };
+        };
+
+        if t0.is_double() {
+            return unsafe { LLVMDoubleType() };
+        }
+
+        let t0_size = ctx.target_data.abi_size_of_type(t0);
+
+        let t1 = if source_size > t0_size {
+            Self::get_fp_type_at_offset(ctx, llvm_type, llvm_offset + t0_size)
+        } else {
+            None::<LLVMTypeRef>
+        };
+
+        let Some(t1) = t1 else {
+            return t0;
+        };
+
+        if t0.is_float() && t1.is_float() {
+            return unsafe { LLVMVectorType(t0, 2 as _) };
+        }
+
+        unsafe { LLVMDoubleType() }
     }
 
-    #[allow(unused_variables)]
-    fn get_byte_vector_type(&self, ir_type: &ir::Type) -> LLVMTypeRef {
-        todo!("get_byte_vector_type")
+    fn get_fp_type_at_offset(
+        ctx: &BackendCtx,
+        llvm_type: LLVMTypeRef,
+        llvm_offset: ByteUnits,
+    ) -> Option<LLVMTypeRef> {
+        if llvm_offset.is_zero() && llvm_type.is_floating_point() {
+            return Some(llvm_type);
+        }
+
+        if llvm_type.is_struct() {
+            if llvm_type.num_fields() == 0 {
+                return None;
+            }
+
+            let element_index = unsafe {
+                LLVMElementAtOffset(ctx.target_data.get(), llvm_type, llvm_offset.bytes())
+            };
+
+            let element_offset = llvm_offset
+                - ByteUnits::of(unsafe {
+                    LLVMOffsetOfElement(ctx.target_data.get(), llvm_type, element_index)
+                });
+
+            let element_type = llvm_type.field_types()[usize::try_from(element_index).unwrap()];
+
+            return Self::get_fp_type_at_offset(ctx, element_type, element_offset);
+        }
+
+        if llvm_type.is_array() {
+            let element_type = llvm_type.element_type();
+            let element_size = ctx.target_data.abi_size_of_type(element_type);
+            let element_offset = llvm_offset - element_size * (llvm_offset / element_size);
+            return Self::get_fp_type_at_offset(ctx, element_type, element_offset);
+        }
+
+        None
+    }
+
+    fn pass_int128_vectors_in_mem(&self) -> bool {
+        self.os.is_linux() || self.os.is_bsd()
+    }
+
+    fn get_byte_vector_type(
+        &self,
+        ctx: &BackendCtx,
+        ir_type: &ir::Type,
+    ) -> Result<LLVMTypeRef, BackendError> {
+        let ir_type = if let Some(single_element_type) = is_single_element_struct(ctx, ir_type) {
+            single_element_type
+        } else {
+            ir_type
+        };
+
+        let llvm_type = unsafe { to_backend_type(ctx.for_making_type(), ir_type)? };
+
+        if llvm_type.is_vector() {
+            if self.pass_int128_vectors_in_mem() && llvm_type.element_type().is_i128() {
+                let size = ctx.type_layout_cache.get(ir_type).width;
+
+                return Ok(unsafe {
+                    LLVMVectorType(
+                        LLVMTypeRef::new_int(BitUnits::of(64)),
+                        (size / ByteUnits::of(8)).try_into().unwrap(),
+                    )
+                });
+            }
+
+            return Ok(llvm_type);
+        }
+
+        let size = ctx.type_layout_cache.get(ir_type).width;
+
+        assert!(matches!(size.bytes(), 16 | 32 | 64));
+
+        Ok(unsafe {
+            LLVMVectorType(
+                LLVMDoubleType(),
+                (size / ByteUnits::of(8)).try_into().unwrap(),
+            )
+        })
     }
 
     fn get_integer_type_at_offset(
@@ -834,4 +1163,67 @@ impl Requirement {
             max_vector_width,
         }
     }
+}
+
+fn is_single_element_struct<'a>(
+    ctx: &'a BackendCtx,
+    ir_type: &'a ir::Type,
+) -> Option<&'a ir::Type> {
+    if ir_type.has_flexible_array_member() {
+        return None;
+    }
+
+    let Some(record_info) = RecordInfo::try_from_type(ir_type, ctx.ir_module) else {
+        return None;
+    };
+
+    // NOTE: We don't support C++ records here yet
+
+    let mut found = None::<&ir::Type>;
+
+    for field in record_info.fields.iter() {
+        let mut field_type = &field.ir_type;
+
+        if is_empty_field(
+            field_type,
+            ctx.ir_module,
+            IsEmptyRecordOptions {
+                allow_arrays: true,
+                ..Default::default()
+            },
+        ) {
+            continue;
+        }
+
+        if found.is_some() {
+            // We have multiple non-empty fields
+            return None;
+        }
+
+        while let ir::Type::FixedArray(fixed_array) = field_type {
+            if fixed_array.length == 1 {
+                field_type = &fixed_array.inner;
+            } else {
+                break;
+            }
+        }
+
+        if !is_aggregate_type_for_abi(field_type) {
+            found = Some(field_type);
+        } else {
+            found = is_single_element_struct(ctx, field_type);
+
+            if found.is_none() {
+                return None;
+            }
+        }
+    }
+
+    if let Some(found) = found {
+        if ctx.type_layout_cache.get(found).width == ctx.type_layout_cache.get(ir_type).width {
+            return Some(found);
+        }
+    }
+
+    None
 }
