@@ -1,7 +1,11 @@
-use super::epilogue::{emit_epilogue, EpilogueInfo};
-use super::prologue::emit_prologue;
-use super::{block::create_function_block, prologue::PrologueInfo};
+use super::{
+    attribute::{add_func_attribute, create_enum_attribute},
+    block::create_function_block,
+    epilogue::{emit_epilogue, EpilogueInfo},
+    prologue::{emit_prologue, PrologueInfo},
+};
 use crate::{
+    data_units::AtomicByteUnits,
     ir,
     llvm_backend::{
         builder::Builder, ctx::BackendCtx, error::BackendError, value_catalog::ValueCatalog,
@@ -9,11 +13,9 @@ use crate::{
     },
 };
 use cstr::cstr;
-use llvm_sys::core::{LLVMGetUndef, LLVMInt32Type};
-use llvm_sys::prelude::LLVMValueRef;
 use llvm_sys::{
-    core::{LLVMAddIncoming, LLVMAppendBasicBlock},
-    prelude::LLVMBasicBlockRef,
+    core::{LLVMAddIncoming, LLVMAppendBasicBlock, LLVMGetUndef, LLVMInt32Type},
+    prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
 use std::cell::OnceCell;
 
@@ -28,6 +30,7 @@ pub struct FnCtx {
     pub epilogue: Option<EpilogueInfo>,
     pub overflow_basicblock: OnceCell<LLVMBasicBlockRef>,
     pub alloca_point: Option<LLVMValueRef>,
+    pub max_vector_width_bytes: AtomicByteUnits,
 }
 
 pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), BackendError> {
@@ -83,6 +86,7 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                 epilogue,
                 overflow_basicblock: OnceCell::new(),
                 alloca_point,
+                max_vector_width_bytes: AtomicByteUnits::of(0),
             };
 
             let basicblocks = ir_function
@@ -133,6 +137,16 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
                     let mut value = build_value(ctx, &value_catalog, &builder, &incoming.value)?;
                     LLVMAddIncoming(relocation.phi_node, &mut value, &mut backend_block, 1);
                 }
+            }
+
+            let max_vector_width = fn_ctx.max_vector_width_bytes.into_inner();
+
+            if !max_vector_width.is_zero() {
+                let nounwind = create_enum_attribute(
+                    cstr!("min-legal-vector-width"),
+                    max_vector_width.to_bits().bits(),
+                );
+                add_func_attribute(skeleton.function, nounwind);
             }
         }
     }

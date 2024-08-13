@@ -10,6 +10,7 @@ use super::{
     target_data::TargetData,
 };
 use crate::{
+    data_units::ByteUnits,
     diagnostics::{Diagnostics, ErrorDiagnostic},
     ir,
     resolved::{self, StructureRef},
@@ -58,6 +59,7 @@ pub struct FunctionSkeleton {
     pub abi_function: Option<ABIFunction>,
     pub function_type: FunctionType,
     pub ir_function_ref: ir::FunctionRef,
+    pub max_vector_width: ByteUnits,
 }
 
 pub struct BackendCtx<'a> {

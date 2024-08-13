@@ -46,7 +46,7 @@ use llvm_sys::{
     LLVMIntPredicate::*,
     LLVMRealPredicate::*,
 };
-use std::{borrow::Cow, ptr::null_mut};
+use std::{borrow::Cow, ptr::null_mut, sync::atomic};
 
 pub unsafe fn create_function_block(
     ctx: &BackendCtx,
@@ -721,6 +721,13 @@ unsafe fn emit_call(
         .func_skeletons
         .get(&call.function)
         .expect("ir function to exist");
+
+    // Keep track of maximum vector width passed/recieved/returned within current function
+    // SAFETY: This is okay, as we promise to never read from this
+    // without synchronizing
+    fn_ctx
+        .max_vector_width_bytes
+        .max(skeleton.max_vector_width, atomic::Ordering::Relaxed);
 
     let function_value = skeleton.function;
 

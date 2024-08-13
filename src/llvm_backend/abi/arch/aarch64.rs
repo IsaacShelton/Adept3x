@@ -74,7 +74,7 @@ impl AARCH64 {
             parameter_types,
             return_type,
             inalloca_combined_struct: None,
-            max_vector_width: ByteUnits::of(0),
+            head_max_vector_width: ByteUnits::of(0),
         })
     }
 

@@ -95,8 +95,10 @@ impl FsNode {
         };
 
         // Keep track of latest modified date per folder as well
+        // SAFETY: This is okay, as we promise to never read from this
+        // without synchronizing
         self.last_modified_ms
-            .fetch_max(last_modified_ms, Ordering::SeqCst);
+            .fetch_max(last_modified_ms, Ordering::Relaxed);
 
         // ===== Insert node into sub-tree =====
 
@@ -120,14 +122,13 @@ impl FsNode {
         let and_then_do = |_path_segment: &OsString, id: &FsNodeId| {
             let node = fs.get(*id);
 
-            node.deep_insert(
-                fs,
-                rest,
-                node.last_modified_ms
-                    .fetch_max(last_modified_ms, Ordering::Relaxed),
-                Some(*id),
-            )
-            .unwrap_or(*id)
+            // SAFETY: This is okay, as we promise to never read from this
+            // without synchronizing
+            node.last_modified_ms
+                .fetch_max(last_modified_ms, Ordering::Relaxed);
+
+            node.deep_insert(fs, rest, last_modified_ms, Some(*id))
+                .unwrap_or(*id)
         };
 
         Some(

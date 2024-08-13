@@ -219,51 +219,53 @@ impl SysV {
             RegCount::ints(16) + RegCount::sses(8)
         };
 
-        let (abi_return_type, return_needed) =
-            if let Some(abi_type) = abi.classify_return_type(original_return_type) {
-                (abi_type, RegCount::zeros())
-            } else {
-                // NOTE: We don't support long doubles here
+        let Requirement {
+            abi_type: abi_return_type,
+            needed: return_needed,
+            max_vector_width: return_max_vector_width,
+        } = if let Some(abi_type) = abi.classify_return_type(original_return_type) {
+            Requirement::new(abi_type, RegCount::zeros(), ByteUnits::of(0))
+        } else {
+            // NOTE: We don't support long doubles here
 
-                if is_reg_call && original_return_type.is_non_union_composite() {
-                    let requirement =
-                        self.classify_reg_call_struct_type(ctx, abi, original_return_type)?;
+            if is_reg_call && original_return_type.is_non_union_composite() {
+                let requirement =
+                    self.classify_reg_call_struct_type(ctx, abi, original_return_type)?;
 
-                    if free.can_spare(requirement.needed) {
-                        free -= requirement.needed;
-                        (requirement.abi_type, requirement.needed)
-                    } else {
-                        (
-                            Self::get_indirect_return_result(
-                                &ctx.type_layout_cache,
-                                original_return_type,
-                            ),
-                            RegCount::zeros(),
-                        )
-                    }
+                if free.can_spare(requirement.needed) {
+                    free -= requirement.needed;
+                    requirement
                 } else {
-                    let abi_type = self.classify_return_type(ctx, abi, original_return_type)?;
-                    (abi_type, RegCount::zeros())
+                    Requirement::new(
+                        Self::get_indirect_return_result(
+                            &ctx.type_layout_cache,
+                            original_return_type,
+                        ),
+                        RegCount::zeros(),
+                        ByteUnits::of(0),
+                    )
                 }
-            };
+            } else {
+                let abi_type = self.classify_return_type(ctx, abi, original_return_type)?;
+                Requirement::new(abi_type, RegCount::zeros(), ByteUnits::of(0))
+            }
+        };
 
         let return_type = ABIParam {
             ir_type: original_return_type.clone(),
             abi_type: abi_return_type,
         };
 
-        let mut max_vector_width = 0;
+        let mut head_max_vector_width = ByteUnits::of(0);
 
         // Indirect return value passed via int register
         if return_type.abi_type.is_indirect() {
             free -= RegCount::ints(1);
-        } else if return_needed.has_sses(1) && max_vector_width > 0 {
-            todo!("set max vector width")
+        } else if return_needed.has_sses(1) && !return_max_vector_width.is_zero() {
+            head_max_vector_width = return_max_vector_width;
         }
 
         // NOTE: We don't support chain calling
-
-        let mut max_vector_width = ByteUnits::of(0);
         let mut parameter_types = Vec::new();
 
         for (i, parameter) in original_parameter_types.enumerate() {
@@ -277,7 +279,7 @@ impl SysV {
 
             let abi_type = if free.can_spare(requirement.needed) {
                 free -= requirement.needed;
-                max_vector_width = max_vector_width.max(requirement.max_vector_width);
+                head_max_vector_width = head_max_vector_width.max(requirement.max_vector_width);
                 requirement.abi_type
             } else {
                 self.get_indirect_result(ctx, abi, parameter, free)
@@ -293,7 +295,7 @@ impl SysV {
             parameter_types,
             return_type,
             inalloca_combined_struct: None,
-            max_vector_width,
+            head_max_vector_width,
         })
     }
 
@@ -734,7 +736,6 @@ impl SysV {
                 }
 
                 needed += requirement.needed;
-                todo!()
             }
         }
 

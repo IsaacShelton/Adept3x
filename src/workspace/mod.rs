@@ -47,7 +47,7 @@ use std::{
     path::Path,
     process::exit,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Barrier, Mutex,
     },
     time::Instant,
@@ -78,6 +78,7 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     let files_processed = AtomicU64::new(0);
     let bytes_processed = AtomicU64::new(0);
     let num_files_failed = AtomicU64::new(0);
+    let num_module_files_failed = AtomicU64::new(0);
 
     let fs = Fs::new();
 
@@ -90,7 +91,6 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     let all_modules_done = Barrier::new(num_threads);
     let code_files = Mutex::new(normal_files.drain(..).map(CodeFile::Normal).collect_vec());
     let module_files = Mutex::new(module_files);
-    let has_module_errors = AtomicBool::new(false);
     let ast_files = AppendOnlyVec::new();
     let module_folders = AppendOnlyVec::new();
 
@@ -113,7 +113,9 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                                     .expect("failed to print error");
                                 eprintln!("{}", message);
 
-                                num_files_failed.fetch_add(1, Ordering::Relaxed);
+                                // SAFETY: This is okay, since we never need to read this until the
+                                // threads have been synchronized
+                                num_module_files_failed.fetch_add(1, Ordering::Relaxed);
                                 continue;
                             }
                         };
@@ -130,15 +132,20 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                         .unwrap()
                         .push(CodeFile::Module(module_file, rest_input));
 
+                    // SAFETY: These are okay, since we never need to read them until the
+                    // threads have been synchronized
                     files_processed.fetch_add(1, Ordering::Relaxed);
                     bytes_processed.fetch_add(did_bytes.try_into().unwrap(), Ordering::Relaxed);
                 }
 
+                // NOTE: This synchronizes the threads, and marks the end of module-related modifications/processing.
+                // `num_module_files_failed` can now be consistently read from...
                 all_modules_done.wait();
 
                 // ==== Don't continue if module files had errors =====
-                if num_files_failed.load(Ordering::SeqCst) != 0 {
-                    has_module_errors.store(true, Ordering::Relaxed);
+                // SAFETY: This is okay, as all the modifications happened before we synchronized
+                // the modifying threads.
+                if num_module_files_failed.load(Ordering::Relaxed) != 0 {
                     return;
                 }
 
@@ -157,11 +164,15 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                                 .expect("failed to print error");
                             eprintln!("{}", message);
 
+                            // SAFETY: This is okay, as we don't need to read the value
+                            // until all of the modifying threads are joined.
                             num_files_failed.fetch_add(1, Ordering::Relaxed);
                             continue;
                         }
                     };
 
+                    // SAFETY: These are okay, as we don't need to read these values
+                    // until all of the modifying threads are joined.
                     files_processed.fetch_add(1, Ordering::Relaxed);
                     bytes_processed.fetch_add(did_bytes.try_into().unwrap(), Ordering::Relaxed);
                 }
@@ -170,17 +181,22 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     });
 
     let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
-    let num_files_failed = num_files_failed.load(Ordering::SeqCst);
 
-    if num_files_failed != 0 {
-        let prefix = if has_module_errors.load(Ordering::SeqCst) {
-            "module "
-        } else {
-            ""
-        };
-
+    // SAFETY: This is okay since all modifying threads were joined (and thereby synchronized)
+    let num_module_files_failed = num_module_files_failed.load(Ordering::Relaxed);
+    if num_module_files_failed != 0 {
         eprintln!(
-            "error: {num_files_failed} {prefix}file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
+            "error: {num_module_files_failed} module file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
+        );
+
+        exit(1);
+    }
+
+    // SAFETY: This is okay since all modifying threads were joined (and thereby synchronized)
+    let num_files_failed = num_files_failed.load(Ordering::Relaxed);
+    if num_files_failed != 0 {
+        eprintln!(
+            "error: {num_files_failed} file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
         );
 
         exit(1);
@@ -228,11 +244,13 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
     let _linking_took = linking_duration.as_millis() as f64 / 1000.0;
 
+    // SAFETY: This is okay, as we synchronized by joining
     let bytes_processed =
-        humansize::make_format(humansize::DECIMAL)(bytes_processed.load(Ordering::SeqCst));
+        humansize::make_format(humansize::DECIMAL)(bytes_processed.load(Ordering::Relaxed));
 
+    // SAFETY: This is okay, as we synchronized by joining
     let files_processed = files_processed
-        .load(Ordering::SeqCst)
+        .load(Ordering::Relaxed)
         .separate_with_commas();
 
     println!(

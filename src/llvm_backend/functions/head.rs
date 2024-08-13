@@ -2,11 +2,14 @@ use super::{
     attribute::{add_func_attribute, create_enum_attribute},
     function_type::{to_backend_function_type, FunctionType},
 };
-use crate::llvm_backend::{
-    abi::abi_function::ABIFunction,
-    backend_type::{to_backend_type, to_backend_types},
-    ctx::{BackendCtx, FunctionSkeleton},
-    error::BackendError,
+use crate::{
+    data_units::ByteUnits,
+    llvm_backend::{
+        abi::abi_function::ABIFunction,
+        backend_type::{to_backend_type, to_backend_types},
+        ctx::{BackendCtx, FunctionSkeleton},
+        error::BackendError,
+    },
 };
 use cstr::cstr;
 use llvm_sys::{
@@ -31,6 +34,11 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
                 )
             })
             .transpose()?;
+
+        let max_vector_width = abi_function
+            .as_ref()
+            .map(|abi_function| abi_function.head_max_vector_width)
+            .unwrap_or(ByteUnits::ZERO);
 
         let function_type = if let Some(abi_function) = &mut abi_function {
             to_backend_function_type(ctx, abi_function, function.is_cstyle_variadic)?
@@ -76,6 +84,7 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
                 abi_function,
                 function_type,
                 ir_function_ref: *function_ref,
+                max_vector_width,
             },
         );
     }
