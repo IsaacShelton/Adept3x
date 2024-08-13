@@ -677,6 +677,16 @@ fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExp
 
     let possible_types = [
         resolved::TypeKind::Integer {
+            bits: Bits32,
+            sign: Signed,
+        }
+        .at(source),
+        resolved::TypeKind::Integer {
+            bits: Bits32,
+            sign: Unsigned,
+        }
+        .at(source),
+        resolved::TypeKind::Integer {
             bits: Bits64,
             sign: Signed,
         }

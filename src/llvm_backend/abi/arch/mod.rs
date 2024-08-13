@@ -3,8 +3,9 @@ pub mod x86_64;
 
 use self::{aarch64::AARCH64, x86_64::X86_64};
 use crate::ir;
+use derive_more::IsVariant;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IsVariant)]
 pub enum Arch {
     X86_64(X86_64),
     AARCH64(AARCH64),

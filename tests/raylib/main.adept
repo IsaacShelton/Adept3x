@@ -2,8 +2,8 @@
 func main {
     printWelcomeInformation()
 
-    screen_width i32 = 800
-    screen_height i32 = 450
+    screen_width := 800
+    screen_height := 450
 
     InitWindow(screen_width, screen_height, c"Example Window!")
 

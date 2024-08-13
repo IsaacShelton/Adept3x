@@ -141,7 +141,7 @@ pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), Backend
 
             let max_vector_width = fn_ctx.max_vector_width_bytes.into_inner();
 
-            if !max_vector_width.is_zero() {
+            if !max_vector_width.is_zero() && ctx.arch.is_x_86_64() {
                 let nounwind = create_enum_attribute(
                     cstr!("min-legal-vector-width"),
                     max_vector_width.to_bits().bits(),
