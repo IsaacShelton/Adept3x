@@ -1,7 +1,7 @@
 use crate::{
     ir,
     llvm_backend::{
-        abi::{abi_function::ABIFunction, cxx::Itanium},
+        abi::{abi_function::ABIFunction, abi_type::ABIType, cxx::Itanium},
         ctx::BackendCtx,
         error::BackendError,
     },
@@ -24,4 +24,10 @@ impl Win64 {
     ) -> Result<ABIFunction, BackendError> {
         todo!("Win64::compute_info not supported yet")
     }
+}
+
+#[derive(Clone, Debug)]
+struct Requirement {
+    pub abi_type: ABIType,
+    pub free_sses: u32,
 }

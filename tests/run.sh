@@ -19,7 +19,6 @@ function expect_fail_compile() {
 
 pushd "$self" > /dev/null
 cargo build
-compile aliases
 compile and_or
 compile annotation_groups
 compile array_access
@@ -59,6 +58,7 @@ compile structure_literals
 compile structure_literals_abbr
 compile structure_pod
 compile unary_operators
+compile type_aliases
 compile variables
 compile variables_override
 compile variables_typed

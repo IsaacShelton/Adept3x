@@ -517,8 +517,8 @@ pub unsafe fn create_function_block(
                 };
 
                 let mut indices = [
-                    LLVMValueRef::new_u64(0),
-                    LLVMValueRef::new_u64((*index).try_into().unwrap()),
+                    LLVMValueRef::new_i32(0),
+                    LLVMValueRef::new_i32((*index).try_into().unwrap()),
                 ];
 
                 Some(LLVMBuildGEP2(

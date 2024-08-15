@@ -30,18 +30,6 @@ impl X86_64 {
         is_variadic: bool,
         calling_convention: LLVMCallConv,
     ) -> Result<ABIFunction, BackendError> {
-        if calling_convention == LLVMCallConv::LLVMWin64CallConv {
-            return (Win64 {}).compute_info(
-                ctx,
-                &abi,
-                original_parameter_types,
-                num_required,
-                original_return_type,
-                is_variadic,
-                calling_convention,
-            );
-        }
-
         match self {
             Self::SysV(sysv) => sysv.compute_info(
                 ctx,

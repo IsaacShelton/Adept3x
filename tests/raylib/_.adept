@@ -9,7 +9,3 @@ pragma => {
     linkFramework(c"CoreFoundation")
 }
 
-func printWelcomeInformation {
-    printf(c"Welcome to this example program that showcases modules!\n")
-}
-

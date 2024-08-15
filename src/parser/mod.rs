@@ -100,8 +100,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::StructKeyword => {
                 ast_file.structures.push(self.parse_structure(annotations)?)
             }
-            TokenKind::AliasKeyword => {
-                let Named::<TypeAlias> { name, value: alias } = self.parse_alias(annotations)?;
+            TokenKind::TypeAliasKeyword => {
+                let Named::<TypeAlias> { name, value: alias } =
+                    self.parse_type_alias(annotations)?;
                 let source = alias.source;
 
                 ast_file.type_aliases.try_insert(name, alias, |name| {
@@ -310,26 +311,26 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         })
     }
 
-    fn parse_alias(
+    fn parse_type_alias(
         &mut self,
         annotations: Vec<Annotation>,
     ) -> Result<Named<TypeAlias>, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
-        let name = self.parse_identifier(Some("for alias name after 'alias' keyword"))?;
+        let name = self.parse_identifier(Some("for alias name after 'typealias' keyword"))?;
         self.ignore_newlines();
 
         #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
-                _ => return Err(self.unexpected_annotation(&annotation, Some("for alias"))),
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for type alias"))),
             }
         }
 
-        self.parse_token(TokenKind::Assign, Some("after alias name"))?;
+        self.parse_token(TokenKind::Assign, Some("after type alias name"))?;
 
-        let ast_type = self.parse_type(None::<&str>, Some("for alias"))?;
+        let ast_type = self.parse_type(None::<&str>, Some("for type alias"))?;
 
         Ok(Named::<TypeAlias> {
             name,
