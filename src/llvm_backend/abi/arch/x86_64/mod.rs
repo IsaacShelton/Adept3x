@@ -11,7 +11,7 @@ use crate::{
 };
 pub use avx_level::AvxLevel;
 use llvm_sys::LLVMCallConv;
-pub use sysv::SysV;
+pub use sysv::{SysV, SysVOs};
 pub use win64::Win64;
 
 #[derive(Clone, Debug)]

@@ -24,6 +24,13 @@ pub struct Win64 {
 }
 
 impl Win64 {
+    pub fn new(avx_level: AvxLevel) -> Self {
+        Self {
+            avx_level,
+            is_mingw: true,
+        }
+    }
+
     pub fn compute_info<'a>(
         &self,
         ctx: &BackendCtx,

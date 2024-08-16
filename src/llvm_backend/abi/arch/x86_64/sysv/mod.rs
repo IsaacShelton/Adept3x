@@ -19,7 +19,6 @@ use crate::{
     target_info::{
         record_layout::{itanium::ItaniumRecordLayoutBuilder, record_info::RecordInfo},
         type_layout::{TypeLayout, TypeLayoutCache},
-        TargetOs,
     },
 };
 use derive_more::IsVariant;
@@ -43,34 +42,6 @@ pub enum SysVOs {
     Bsd,
 }
 
-impl TryFrom<&TargetOs> for SysVOs {
-    type Error = ();
-
-    fn try_from(value: &TargetOs) -> Result<Self, Self::Error> {
-        match value {
-            TargetOs::Windows => Err(()),
-            TargetOs::Mac => Ok(Self::Darwin),
-            TargetOs::Linux => Ok(Self::Linux),
-        }
-    }
-}
-
-impl TryFrom<Option<&TargetOs>> for SysVOs {
-    type Error = ();
-
-    fn try_from(value: Option<&TargetOs>) -> Result<Self, Self::Error> {
-        value.map(Self::try_from).unwrap_or(Err(()))
-    }
-}
-
-impl TryFrom<&Option<TargetOs>> for SysVOs {
-    type Error = ();
-
-    fn try_from(value: &Option<TargetOs>) -> Result<Self, Self::Error> {
-        value.as_ref().map(Self::try_from).unwrap_or(Err(()))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct SysV {
     pub os: SysVOs,
@@ -78,6 +49,10 @@ pub struct SysV {
 }
 
 impl SysV {
+    pub fn new(os: SysVOs, avx_level: AvxLevel) -> Self {
+        Self { os, avx_level }
+    }
+
     fn honors_revision_0_98(&self) -> bool {
         !self.os.is_darwin()
     }
