@@ -77,7 +77,7 @@ impl ABIFunction {
                 return_type,
                 calling_convention,
             ),
-            Arch::AARCH64(abi) => {
+            Arch::Aarch64(abi) => {
                 abi.compute_info(ctx, itanium, parameter_types, return_type, is_variadic)
             }
         }

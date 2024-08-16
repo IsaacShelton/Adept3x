@@ -36,21 +36,20 @@ impl Win64 {
         let is_reg_call = calling_convention == LLVMCallConv::LLVMX86RegCallCallConv;
         let free_return_sses = if is_vector_call { 4 } else { 16 };
 
-        let abi_return_type = if let Some(abi_type) = abi.classify_return_type(original_return_type)
-        {
-            abi_type
-        } else {
-            self.classify(
-                ctx,
-                abi,
-                original_return_type,
-                free_return_sses,
-                true,
-                is_vector_call,
-                is_reg_call,
-            )
-            .abi_type
-        };
+        let abi_return_type = abi
+            .classify_return_type(original_return_type)
+            .unwrap_or_else(|| {
+                self.classify(
+                    ctx,
+                    abi,
+                    original_return_type,
+                    free_return_sses,
+                    true,
+                    is_vector_call,
+                    is_reg_call,
+                )
+                .abi_type
+            });
 
         let return_type = ABIParam {
             ir_type: original_return_type.clone(),
@@ -59,35 +58,36 @@ impl Win64 {
 
         let mut free_sses = if is_vector_call { 6 } else { 16 };
 
-        let mut parameter_types = Vec::new();
+        let parameter_types = original_parameter_types
+            .enumerate()
+            .map(|(i, parameter)| {
+                let parameter_free_sses = if is_vector_call && i >= 6 {
+                    0
+                } else {
+                    free_sses
+                };
 
-        for (i, parameter) in original_parameter_types.enumerate() {
-            let parameter_free_sses = if is_vector_call && i >= 6 {
-                0
-            } else {
-                free_sses
-            };
+                let requirement = self.classify(
+                    ctx,
+                    abi,
+                    parameter,
+                    parameter_free_sses,
+                    false,
+                    is_vector_call,
+                    is_reg_call,
+                );
 
-            let requirement = self.classify(
-                ctx,
-                abi,
-                parameter,
-                parameter_free_sses,
-                false,
-                is_vector_call,
-                is_reg_call,
-            );
+                free_sses -= requirement.sses;
+                ABIParam {
+                    abi_type: requirement.abi_type,
+                    ir_type: parameter.clone(),
+                }
+            })
+            .collect_vec();
 
-            free_sses -= requirement.sses;
-            parameter_types.push(ABIParam {
-                abi_type: requirement.abi_type,
-                ir_type: parameter.clone(),
-            });
-        }
-
-        if is_vector_call {
-            parameter_types = parameter_types
-                .drain(..)
+        let parameter_types = if is_vector_call {
+            parameter_types
+                .into_iter()
                 .map(|parameter| {
                     let requirement = self.reclassify_homo_vector_aggregate_arg_for_vector_call(
                         ctx,
@@ -102,8 +102,10 @@ impl Win64 {
                         ir_type: parameter.ir_type,
                     }
                 })
-                .collect_vec();
-        }
+                .collect_vec()
+        } else {
+            parameter_types
+        };
 
         Ok(ABIFunction {
             parameter_types,

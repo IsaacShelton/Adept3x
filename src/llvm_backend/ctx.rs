@@ -112,8 +112,8 @@ impl<'a> BackendCtx<'a> {
 
         #[cfg(target_arch = "aarch64")]
         {
-            arch = Some(Arch::AARCH64(aarch64::AARCH64 {
-                variant: aarch64::Variant::DarwinPCS,
+            arch = Some(Arch::Aarch64(aarch64::Aarch64 {
+                variant: aarch64::Aarch64Variant::DarwinPCS,
                 is_cxx_mode: false,
             }));
         }

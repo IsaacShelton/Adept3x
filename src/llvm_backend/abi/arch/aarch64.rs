@@ -26,20 +26,20 @@ use llvm_sys::{
 };
 
 #[derive(Clone, Debug)]
-pub struct AARCH64 {
-    pub variant: Variant,
+pub struct Aarch64 {
+    pub variant: Aarch64Variant,
     pub is_cxx_mode: bool,
 }
 
 #[derive(Copy, Clone, Debug, IsVariant)]
-pub enum Variant {
+pub enum Aarch64Variant {
     DarwinPCS,
     Win64,
     Aapcs,
     AapcsSoft,
 }
 
-impl AARCH64 {
+impl Aarch64 {
     pub fn compute_info<'a>(
         &self,
         ctx: &BackendCtx,
@@ -313,7 +313,7 @@ impl AARCH64 {
 }
 
 struct Aarch64HomoDecider {
-    variant: Variant,
+    variant: Aarch64Variant,
 }
 
 impl HomoDecider for Aarch64HomoDecider {
