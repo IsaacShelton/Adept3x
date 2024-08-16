@@ -318,7 +318,7 @@ impl Type {
         false
     }
 
-    pub fn is_non_union_composite(&self) -> bool {
+    pub fn is_product_type(&self) -> bool {
         self.is_structure() || self.is_anonymous_composite()
     }
 
@@ -327,10 +327,30 @@ impl Type {
         false
     }
 
-    pub fn is_product_type(&self) -> bool {
+    pub fn is_builtin_data(&self) -> bool {
         match self {
-            Type::Structure(_) | Type::AnonymousComposite(_) => true,
-            _ => false,
+            Type::Boolean
+            | Type::S8
+            | Type::S16
+            | Type::S32
+            | Type::S64
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::F32
+            | Type::F64 => true,
+            Type::Pointer(_)
+            | Type::Void
+            | Type::Union(_)
+            | Type::Structure(_)
+            | Type::AnonymousComposite(_)
+            | Type::FunctionPointer
+            | Type::FixedArray(_)
+            | Type::Vector(_)
+            | Type::Complex(_)
+            | Type::Atomic(_)
+            | Type::IncompleteArray(_) => false,
         }
     }
 }

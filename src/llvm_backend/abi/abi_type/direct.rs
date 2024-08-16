@@ -8,6 +8,7 @@ pub struct DirectOptions {
     pub padding: Option<LLVMTypeRef>,
     pub can_be_flattened: bool,
     pub alignment: ByteUnits,
+    pub in_register: bool,
 }
 
 impl Default for DirectOptions {
@@ -18,6 +19,7 @@ impl Default for DirectOptions {
             can_be_flattened: true,
             padding: None,
             alignment: ByteUnits::of(0),
+            in_register: false,
         }
     }
 }

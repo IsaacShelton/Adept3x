@@ -51,7 +51,7 @@ impl ABIType {
                 },
                 coerce_to_type: options.coerce_to_type,
                 padding: options.padding,
-                in_register: false,
+                in_register: options.in_register,
                 can_be_flattened: options.can_be_flattened,
             }),
             padding_in_register: false,

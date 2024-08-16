@@ -62,11 +62,11 @@ impl ABIFunction {
         return_type: &ir::Type,
         is_variadic: bool,
     ) -> Result<Self, BackendError> {
+        let calling_convention = LLVMCallConv::LLVMCCallConv;
         let itanium = Itanium {
             target_info: &ctx.ir_module.target_info,
             type_layout_cache: &ctx.type_layout_cache,
         };
-        let calling_convention = LLVMCallConv::LLVMCCallConv;
 
         match &ctx.arch {
             Arch::X86_64(abi) => abi.compute_info(
@@ -75,7 +75,6 @@ impl ABIFunction {
                 parameter_types,
                 num_required,
                 return_type,
-                is_variadic,
                 calling_convention,
             ),
             Arch::AARCH64(abi) => {

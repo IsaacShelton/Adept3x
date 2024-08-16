@@ -27,7 +27,6 @@ impl X86_64 {
         original_parameter_types: impl Iterator<Item = &'a ir::Type>,
         num_required: usize,
         original_return_type: &ir::Type,
-        is_variadic: bool,
         calling_convention: LLVMCallConv,
     ) -> Result<ABIFunction, BackendError> {
         match self {
@@ -43,9 +42,7 @@ impl X86_64 {
                 ctx,
                 &abi,
                 original_parameter_types,
-                num_required,
                 original_return_type,
-                is_variadic,
                 calling_convention,
             ),
         }

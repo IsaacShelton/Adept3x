@@ -228,7 +228,7 @@ impl SysV {
         } else {
             // NOTE: We don't support long doubles here
 
-            if is_reg_call && original_return_type.is_non_union_composite() {
+            if is_reg_call && original_return_type.is_product_type() {
                 let requirement =
                     self.classify_reg_call_struct_type(ctx, abi, original_return_type)?;
 
@@ -271,7 +271,7 @@ impl SysV {
         for (i, parameter) in original_parameter_types.enumerate() {
             let is_required = i < num_required;
 
-            let requirement = if is_reg_call && parameter.is_non_union_composite() {
+            let requirement = if is_reg_call && parameter.is_product_type() {
                 self.classify_reg_call_struct_type(ctx, abi, parameter)?
             } else {
                 self.classify_argument_type(ctx, abi, parameter, free, is_required, is_reg_call)?

@@ -151,6 +151,16 @@ macro_rules! impl_math_for {
             }
         }
 
+        impl Mul<u32> for $units {
+            type Output = $units;
+
+            fn mul(self, rhs: u32) -> Self::Output {
+                Self {
+                    units: self.units * rhs as u64,
+                }
+            }
+        }
+
         impl Mul<u64> for $units {
             type Output = $units;
 

@@ -5,6 +5,7 @@ pub mod abi_type;
 pub mod arch;
 mod cxx;
 pub mod empty;
+mod homo_aggregate;
 
 pub fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
     match ty {
