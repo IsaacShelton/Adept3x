@@ -7,8 +7,7 @@ use crate::{
     ast::{CInteger, IntegerSign},
     data_units::ByteUnits,
 };
-pub use arch::TargetArch;
-use arch::TargetArchExt;
+pub use arch::{TargetArch, TargetArchExt};
 pub use os::{TargetOs, TargetOsExt};
 use type_layout::TypeLayout;
 

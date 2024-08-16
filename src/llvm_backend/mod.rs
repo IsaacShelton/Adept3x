@@ -93,7 +93,7 @@ pub unsafe fn llvm_backend(
         &target_data,
         resolved_ast,
         diagnostics,
-    );
+    )?;
 
     create_static_variables()?;
     create_globals(&mut ctx)?;

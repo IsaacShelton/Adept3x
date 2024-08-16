@@ -19,8 +19,8 @@ use llvm_sys::LLVMCallConv;
 
 #[derive(Clone, Debug)]
 pub struct Win64 {
-    avx_level: AvxLevel,
-    is_mingw: bool,
+    pub avx_level: AvxLevel,
+    pub is_mingw: bool,
 }
 
 impl Win64 {

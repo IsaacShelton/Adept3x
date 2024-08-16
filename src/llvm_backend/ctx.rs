@@ -7,8 +7,9 @@ use super::{
     target_data::TargetData,
 };
 use crate::{
+    backend::BackendError,
     data_units::ByteUnits,
-    diagnostics::{Diagnostics, ErrorDiagnostic},
+    diagnostics::Diagnostics,
     ir,
     resolved::{self, StructureRef},
     target_info::type_layout::TypeLayoutCache,
@@ -82,7 +83,7 @@ impl<'a> BackendCtx<'a> {
         target_data: &'a TargetData,
         resolved_ast: &'a resolved::Ast,
         diagnostics: &'a Diagnostics,
-    ) -> Self {
+    ) -> Result<Self, BackendError> {
         let type_layout_cache = TypeLayoutCache::new(
             &ir_module.target_info,
             &ir_module.structures,
@@ -90,39 +91,10 @@ impl<'a> BackendCtx<'a> {
             diagnostics,
         );
 
-        #[allow(unused_imports)]
-        use crate::llvm_backend::abi::arch::{
-            aarch64::{Aarch64, Aarch64Variant},
-            x86_64::{AvxLevel, SysV, SysVOs, X86_64},
-            Arch,
-        };
+        let arch = Arch::new(ir_module.target_info)
+            .ok_or_else(|| BackendError::plain("Target platform is not supported"))?;
 
-        #[allow(unused_assignments)]
-        let mut arch = None;
-
-        #[cfg(target_arch = "x86_64")]
-        {
-            arch = Some(Arch::X86_64(X86_64::SysV(SysV {
-                os: SysVOs::Linux,
-                avx_level: AvxLevel::None,
-            })));
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            arch = Some(Arch::Aarch64(Aarch64 {
-                variant: Aarch64Variant::DarwinPCS,
-                is_cxx_mode: false,
-            }));
-        }
-
-        // TODO: Add proper error handling
-        let Some(arch) = arch else {
-            diagnostics.push(ErrorDiagnostic::plain("This platform is not supported"));
-            std::process::exit(1);
-        };
-
-        Self {
+        Ok(Self {
             ir_module,
             backend_module,
             builder: None,
@@ -136,7 +108,7 @@ impl<'a> BackendCtx<'a> {
             structure_cache: Default::default(),
             type_layout_cache,
             arch,
-        }
+        })
     }
 
     pub fn for_making_type(&'a self) -> ToBackendTypeCtx<'a> {
