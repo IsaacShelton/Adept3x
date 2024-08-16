@@ -16,11 +16,11 @@ pub enum Arch {
 
 impl Arch {
     pub fn new(target: &TargetInfo) -> Option<Self> {
-        match target.arch.as_ref()? {
+        Some(match target.arch.as_ref()? {
             TargetArch::X86_64 => {
                 let avx_level = AvxLevel::None;
 
-                Some(Arch::X86_64(match target.os? {
+                Arch::X86_64(match target.os? {
                     TargetOs::Mac | TargetOs::Linux => X86_64::SysV(SysV {
                         os: target.os.as_ref().try_into().ok()?,
                         avx_level,
@@ -29,17 +29,17 @@ impl Arch {
                         is_mingw: true,
                         avx_level,
                     }),
-                }))
+                })
             }
-            TargetArch::Aarch64 => Some(Arch::Aarch64(Aarch64 {
+            TargetArch::Aarch64 => Arch::Aarch64(Aarch64 {
                 variant: match target.os? {
                     TargetOs::Windows => Aarch64Variant::Win64,
                     TargetOs::Mac => Aarch64Variant::DarwinPCS,
                     TargetOs::Linux => Aarch64Variant::Aapcs,
                 },
                 is_cxx_mode: false,
-            })),
-        }
+            }),
+        })
     }
 }
 
