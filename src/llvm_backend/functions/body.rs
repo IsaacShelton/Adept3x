@@ -5,11 +5,11 @@ use super::{
     prologue::{emit_prologue, PrologueInfo},
 };
 use crate::{
+    backend::BackendError,
     data_units::AtomicByteUnits,
     ir,
     llvm_backend::{
-        builder::Builder, ctx::BackendCtx, error::BackendError, value_catalog::ValueCatalog,
-        values::build_value,
+        builder::Builder, ctx::BackendCtx, value_catalog::ValueCatalog, values::build_value,
     },
 };
 use cstr::cstr;

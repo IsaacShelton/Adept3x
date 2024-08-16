@@ -5,6 +5,14 @@ pub struct BackendError {
     pub message: String,
 }
 
+impl BackendError {
+    pub fn plain(message: impl ToString) -> Self {
+        Self {
+            message: message.to_string(),
+        }
+    }
+}
+
 impl From<String> for BackendError {
     fn from(message: String) -> Self {
         Self { message }

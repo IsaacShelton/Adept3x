@@ -2,7 +2,7 @@ use super::{abi_type::ABIType, arch::Arch, cxx::Itanium};
 use crate::{
     data_units::ByteUnits,
     ir,
-    llvm_backend::{backend_type::to_backend_type, ctx::BackendCtx, error::BackendError},
+    llvm_backend::{backend_type::to_backend_type, ctx::BackendCtx, BackendError},
 };
 use llvm_sys::{prelude::LLVMTypeRef, LLVMCallConv};
 

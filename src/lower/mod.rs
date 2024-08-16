@@ -11,7 +11,7 @@ use crate::{
         Member, NumericMode, StmtKind, StructureLiteral, VariableStorageKey,
     },
     tag::Tag,
-    target_info::TargetInfo,
+    target_info::{TargetInfo, TargetOsExt},
 };
 use builder::Builder;
 use resolved::{IntegerKnown, IntegerSign};
@@ -196,7 +196,7 @@ fn lower_function(
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
             is_foreign: true,
             is_exposed: true,
-            abide_abi: function.abide_abi && !ir_module.target_info.kind.is_arbitrary(),
+            abide_abi: function.abide_abi && ir_module.target_info.arch.is_some(),
         },
     );
 
@@ -1276,14 +1276,14 @@ pub fn lower_c_integer(
         (CInteger::Int, IntegerSign::Signed) => ir::Type::S32,
         (CInteger::Int, IntegerSign::Unsigned) => ir::Type::U32,
         (CInteger::Long, IntegerSign::Signed) => {
-            if target_info.ms_abi {
+            if target_info.os.is_windows() {
                 ir::Type::S32
             } else {
                 ir::Type::S64
             }
         }
         (CInteger::Long, IntegerSign::Unsigned) => {
-            if target_info.ms_abi {
+            if target_info.os.is_windows() {
                 ir::Type::U32
             } else {
                 ir::Type::U64

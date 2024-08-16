@@ -13,8 +13,8 @@ use crate::{
         },
         backend_type::to_backend_type,
         ctx::BackendCtx,
-        error::BackendError,
         llvm_type_ref_ext::LLVMTypeRefExt,
+        BackendError,
     },
     target_info::type_layout::TypeLayoutCache,
 };

@@ -1,3 +1,5 @@
+mod arch;
+mod os;
 pub mod record_layout;
 pub mod type_layout;
 
@@ -5,52 +7,40 @@ use crate::{
     ast::{CInteger, IntegerSign},
     data_units::ByteUnits,
 };
-use derive_more::IsVariant;
+pub use arch::TargetArch;
+use arch::TargetArchExt;
+pub use os::{TargetOs, TargetOsExt};
 use type_layout::TypeLayout;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TargetInfo {
-    pub kind: TargetInfoKind,
-    pub ms_abi: bool,
-    pub is_darwin: bool,
+    pub arch: Option<TargetArch>,
+    pub os: Option<TargetOs>,
 }
 
 impl TargetInfo {
-    pub fn arbitrary() -> Self {
-        Self {
-            kind: TargetInfoKind::Arbitrary,
-            ms_abi: false,
-            is_darwin: false,
-        }
+    pub fn is_host(&self) -> bool {
+        self.arch.is_host() && self.os.is_host()
     }
-}
 
-#[derive(Clone, Debug, IsVariant)]
-pub enum TargetInfoKind {
-    Arbitrary,
-    X86_64,
-    AARCH64,
-}
-
-impl TargetInfo {
     pub fn default_c_integer_sign(&self, integer: CInteger) -> IntegerSign {
         // Non-`char` integer types are signed by default.
         // On darwin, `char` is also always signed.
-        if integer != CInteger::Char || self.is_darwin {
+        if integer != CInteger::Char || self.os.is_mac() {
             return IntegerSign::Signed;
         }
 
         // Otherwise, the signness of `char` depends on the architecture
-        match &self.kind {
-            TargetInfoKind::Arbitrary => IntegerSign::Unsigned,
-            TargetInfoKind::X86_64 => IntegerSign::Signed,
-            TargetInfoKind::AARCH64 => IntegerSign::Unsigned,
+        match &self.arch {
+            None => IntegerSign::Unsigned,
+            Some(TargetArch::X86_64) => IntegerSign::Signed,
+            Some(TargetArch::Aarch64) => IntegerSign::Unsigned,
         }
     }
 
     pub fn is_little_endian(&self) -> bool {
-        match &self.kind {
-            TargetInfoKind::Arbitrary | TargetInfoKind::X86_64 | TargetInfoKind::AARCH64 => true,
+        match &self.arch {
+            None | Some(TargetArch::X86_64) | Some(TargetArch::Aarch64) => true,
         }
     }
 
@@ -75,7 +65,7 @@ impl TargetInfo {
     }
 
     pub fn long_layout(&self) -> TypeLayout {
-        if self.ms_abi {
+        if self.os.is_windows() {
             TypeLayout::basic(ByteUnits::of(4))
         } else {
             TypeLayout::basic(ByteUnits::of(8))

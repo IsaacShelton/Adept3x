@@ -6,6 +6,7 @@ use super::{
     params_mapping::Param,
 };
 use crate::{
+    backend::BackendError,
     data_units::{BitUnits, ByteUnits},
     ir::{self, Call, FloatOrSign, Instruction, IntegerSign},
     llvm_backend::{
@@ -22,7 +23,6 @@ use crate::{
         backend_type::{get_abi_function_type, get_unabi_function_type, to_backend_type},
         builder::{Builder, PhiRelocation, Volatility},
         ctx::BackendCtx,
-        error::BackendError,
         functions::{
             helpers::{
                 build_coerced_load, build_coerced_store, build_mem_tmp, build_mem_tmp_without_cast,

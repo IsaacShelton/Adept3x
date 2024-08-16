@@ -3,7 +3,6 @@ mod address;
 mod backend_type;
 mod builder;
 mod ctx;
-mod error;
 mod functions;
 mod globals;
 mod intrinsics;
@@ -22,7 +21,6 @@ mod variable_stack;
 
 use self::{
     ctx::BackendCtx,
-    error::BackendError,
     functions::{body::create_function_bodies, head::create_function_heads},
     globals::{create_globals, create_static_variables},
     module::BackendModule,
@@ -31,9 +29,8 @@ use self::{
     target_triple::{get_target_from_triple, get_triple},
 };
 use crate::{
-    compiler::Compiler,
-    diagnostics::{Diagnostics, WarningDiagnostic},
-    ir, resolved,
+    backend::BackendError, compiler::Compiler, diagnostics::Diagnostics, ir, linking::link_result,
+    resolved,
 };
 use colored::Colorize;
 use llvm_sys::{
@@ -43,14 +40,16 @@ use llvm_sys::{
         LLVMSetModuleDataLayout, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters,
         LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
     },
-    target_machine::{LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMRelocMode},
+    target_machine::{
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMRelocMode,
+        LLVMTargetMachineEmitToFile,
+    },
 };
 use std::{
-    ffi::{c_char, CStr, CString, OsStr, OsString},
+    ffi::{c_char, CStr, CString},
     path::Path,
-    process::Command,
     ptr::null_mut,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 pub unsafe fn llvm_backend(
@@ -116,19 +115,17 @@ pub unsafe fn llvm_backend(
         .expect("failed to write llvm ir to file");
     }
 
-    let output_object_filename =
-        CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
-
     if LLVMVerifyModule(backend_module.get(), LLVMPrintMessageAction, null_mut()) == 1 {
         println!(
             "{}",
             "\n---- WARNING: llvm module verification failed! ----".yellow()
         );
     }
+    let output_object_filename =
+        CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
 
     let mut llvm_emit_error_message: *mut c_char = null_mut();
-
-    llvm_sys::target_machine::LLVMTargetMachineEmitToFile(
+    LLVMTargetMachineEmitToFile(
         target_machine.get(),
         backend_module.get(),
         output_object_filename.into_raw(),
@@ -143,65 +140,11 @@ pub unsafe fn llvm_backend(
             .into());
     }
 
-    let mut args = vec![
-        output_object_filepath.as_os_str().into(),
-        OsString::from("-o"),
-        output_binary_filepath.as_os_str().into(),
-    ];
-
-    for (filename, _) in compiler.link_filenames.iter_mut() {
-        if is_flag_like(filename) {
-            eprintln!("warning: ignoring incorrect link filename '{}'", filename);
-        } else {
-            args.push(OsString::from(filename));
-        }
-    }
-
-    for (framework, _) in compiler.link_frameworks.iter_mut() {
-        args.push(OsString::from("-framework"));
-        args.push(OsString::from(framework));
-    }
-
-    if ir_module.target_info.kind.is_arbitrary() {
-        let args = args.join(OsStr::new(" "));
-
-        diagnostics.push(WarningDiagnostic::plain(
-            format!(
-                "Automatic linking is not supported yet on your system, please link manually with something like:\n gcc {}",
-                args.to_string_lossy()
-            )
-        ));
-
-        eprintln!("Success, but requires manual linking, exiting with 1");
-        std::process::exit(1);
-    } else {
-        let start_time = Instant::now();
-
-        // Link resulting object file to create executable
-        let mut command = Command::new("gcc")
-            .args(args)
-            .spawn()
-            .expect("Failed to link");
-
-        match command.wait() {
-            Ok(status) => {
-                if !status.success() {
-                    return Err(BackendError {
-                        message: "Failed to link".into(),
-                    });
-                }
-            }
-            Err(_) => {
-                return Err(BackendError {
-                    message: "Failed to spawn linker".into(),
-                });
-            }
-        }
-
-        Ok(start_time.elapsed())
-    }
-}
-
-fn is_flag_like(string: &str) -> bool {
-    string.chars().skip_while(|c| c.is_whitespace()).next() == Some('-')
+    link_result(
+        compiler,
+        &ir_module.target_info,
+        diagnostics,
+        output_object_filepath,
+        output_binary_filepath,
+    )
 }

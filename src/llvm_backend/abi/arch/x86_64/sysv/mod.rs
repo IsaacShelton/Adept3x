@@ -1,5 +1,6 @@
 use super::{avx_level::AvxLevel, reg_count::RegCount};
 use crate::{
+    backend::BackendError,
     data_units::{BitUnits, ByteUnits},
     ir,
     llvm_backend::{
@@ -13,7 +14,6 @@ use crate::{
         },
         backend_type::to_backend_type,
         ctx::BackendCtx,
-        error::BackendError,
         llvm_type_ref_ext::LLVMTypeRefExt,
     },
     target_info::{

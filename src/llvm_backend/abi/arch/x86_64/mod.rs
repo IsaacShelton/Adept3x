@@ -5,8 +5,9 @@ mod win64;
 
 use super::super::abi_function::ABIFunction;
 use crate::{
+    backend::BackendError,
     ir,
-    llvm_backend::{abi::cxx::Itanium, ctx::BackendCtx, error::BackendError},
+    llvm_backend::{abi::cxx::Itanium, ctx::BackendCtx},
 };
 pub use avx_level::AvxLevel;
 use llvm_sys::LLVMCallConv;

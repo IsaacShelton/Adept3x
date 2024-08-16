@@ -1,4 +1,5 @@
 use crate::{
+    backend::BackendError,
     data_units::ByteUnits,
     ir,
     llvm_backend::{
@@ -7,7 +8,6 @@ use crate::{
         backend_type::{to_backend_mem_type, to_backend_type},
         builder::{Builder, Volatility},
         ctx::BackendCtx,
-        error::BackendError,
         llvm_type_ref_ext::LLVMTypeRefExt,
         llvm_value_ref_ext::LLVMValueRefExt,
         raw_address::RawAddress,

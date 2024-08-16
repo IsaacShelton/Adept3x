@@ -3,7 +3,10 @@ use crate::{
     data_units::{BitUnits, ByteUnits},
     diagnostics::{Diagnostics, WarningDiagnostic},
     ir, resolved,
-    target_info::type_layout::{ASTRecordLayout, TypeLayoutCache},
+    target_info::{
+        type_layout::{ASTRecordLayout, TypeLayoutCache},
+        TargetOsExt,
+    },
 };
 
 #[derive(Debug)]
@@ -199,7 +202,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             && (field_class.as_ref().map_or(true, |field_class| {
                 field_class.is_cxx_pod()
                     || field_class.is_packed()
-                    || self.type_layout_cache.target_info.is_darwin
+                    || self.type_layout_cache.target_info.os.is_mac()
             })))
             || field.properties.is_force_packed;
 

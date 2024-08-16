@@ -1,5 +1,6 @@
 use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
+    backend::BackendError,
     ir,
     llvm_backend::{
         abi::abi_type::kinds::{get_type_expansion, TypeExpansion},
@@ -7,7 +8,6 @@ use crate::{
         backend_type::{to_backend_mem_type, to_backend_type},
         builder::Builder,
         ctx::BackendCtx,
-        error::BackendError,
         functions::helpers::build_mem_tmp_with_alignment,
         llvm_type_ref_ext::LLVMTypeRefExt,
     },

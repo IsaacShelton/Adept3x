@@ -1,8 +1,5 @@
 use super::{
-    abi::{
-        abi_function::ABIFunction,
-        arch::{aarch64, Arch},
-    },
+    abi::{abi_function::ABIFunction, arch::Arch},
     builder::Builder,
     functions::function_type::FunctionType,
     intrinsics::Intrinsics,
@@ -95,6 +92,7 @@ impl<'a> BackendCtx<'a> {
 
         #[allow(unused_imports)]
         use crate::llvm_backend::abi::arch::{
+            aarch64::{Aarch64, Aarch64Variant},
             x86_64::{AvxLevel, SysV, SysVOs, X86_64},
             Arch,
         };
@@ -112,8 +110,8 @@ impl<'a> BackendCtx<'a> {
 
         #[cfg(target_arch = "aarch64")]
         {
-            arch = Some(Arch::Aarch64(aarch64::Aarch64 {
-                variant: aarch64::Aarch64Variant::DarwinPCS,
+            arch = Some(Arch::Aarch64(Aarch64 {
+                variant: Aarch64Variant::DarwinPCS,
                 is_cxx_mode: false,
             }));
         }

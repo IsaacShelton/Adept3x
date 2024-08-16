@@ -1,8 +1,8 @@
 use super::{
-    backend_type::to_backend_type, builder::Builder, ctx::BackendCtx, error::BackendError,
+    backend_type::to_backend_type, builder::Builder, ctx::BackendCtx,
     null_terminated_string::build_literal_cstring, value_catalog::ValueCatalog,
 };
-use crate::ir;
+use crate::{backend::BackendError, ir};
 use llvm_sys::{
     core::*,
     prelude::{LLVMBool, LLVMValueRef},

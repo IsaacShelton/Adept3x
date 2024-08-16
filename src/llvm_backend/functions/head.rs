@@ -3,12 +3,12 @@ use super::{
     function_type::{to_backend_function_type, FunctionType},
 };
 use crate::{
+    backend::BackendError,
     data_units::ByteUnits,
     llvm_backend::{
         abi::abi_function::ABIFunction,
         backend_type::{to_backend_type, to_backend_types},
         ctx::{BackendCtx, FunctionSkeleton},
-        error::BackendError,
     },
 };
 use cstr::cstr;

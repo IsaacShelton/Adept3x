@@ -1,10 +1,10 @@
 use super::{ParamValueConstructionCtx, ParamValues};
 use crate::{
+    backend::BackendError,
     data_units::ByteUnits,
     llvm_backend::{
         abi::has_scalar_evaluation_kind,
         builder::Volatility,
-        error::BackendError,
         functions::{
             helpers::{build_mem_tmp, emit_load_of_scalar, make_natural_address_for_pointer},
             param_values::value::ParamValue,

@@ -3,8 +3,8 @@ use crate::{
     data_units::ByteUnits,
     ir,
     llvm_backend::{
-        backend_type::to_backend_type, ctx::BackendCtx, error::BackendError,
-        llvm_type_ref_ext::LLVMTypeRefExt,
+        backend_type::to_backend_type, ctx::BackendCtx, llvm_type_ref_ext::LLVMTypeRefExt,
+        BackendError,
     },
     target_info::type_layout::TypeLayoutCache,
 };

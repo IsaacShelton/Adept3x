@@ -3,6 +3,7 @@ use super::helpers::{
     make_natural_address_for_pointer,
 };
 use crate::{
+    backend::BackendError,
     ir,
     llvm_backend::{
         abi::abi_type::{InAlloca, Indirect},
@@ -10,7 +11,6 @@ use crate::{
         backend_type::to_backend_type,
         builder::{Builder, Volatility},
         ctx::{BackendCtx, FunctionSkeleton},
-        error::BackendError,
         raw_address::RawAddress,
     },
 };

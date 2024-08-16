@@ -8,6 +8,7 @@
 #![feature(once_cell_try_insert)]
 
 mod ast;
+mod backend;
 mod borrow;
 mod c;
 mod cli;
@@ -24,6 +25,7 @@ mod iter_ext;
 mod lexer;
 mod lexical_utils;
 mod line_column;
+mod linking;
 mod llvm_backend;
 mod look_ahead;
 mod lower;
@@ -49,7 +51,7 @@ use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
 use generate_workspace::new_project;
 use single_file_only::compile_single_file_only;
 use std::{fs::metadata, path::Path, process::exit};
-use target_info::TargetInfo;
+use target_info::{TargetArch, TargetInfo, TargetOs};
 use text::IntoTextStream;
 use workspace::compile_workspace;
 
@@ -75,32 +77,44 @@ fn build_project(build_command: BuildCommand) {
         exit(1);
     };
 
-    // TODO: Determine this based on default target triple
-    let target_info = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        TargetInfo {
-            kind: target_info::TargetInfoKind::AARCH64,
-            ms_abi: false,
-            is_darwin: true,
-        }
-    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-        TargetInfo {
-            kind: target_info::TargetInfoKind::AARCH64,
-            ms_abi: false,
-            is_darwin: false,
-        }
-    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        TargetInfo {
-            kind: target_info::TargetInfoKind::X86_64,
-            ms_abi: false,
-            is_darwin: false,
-        }
-    } else {
-        diagnostics.push(WarningDiagnostic::plain(
-            "Your platform is not supported yet, using arbitrary abi",
-        ));
+    let target_os = TargetOs::HOST;
+    let target_arch = TargetArch::HOST;
 
-        TargetInfo::arbitrary()
-    };
+    if target_arch.is_none() {
+        diagnostics.push(WarningDiagnostic::plain(
+            "Host architecture is not supported, falling back to best guess",
+        ));
+    }
+
+    if target_os.is_none() {
+        diagnostics.push(WarningDiagnostic::plain(
+            "Host os is not supported, falling back to best guess",
+        ));
+    }
+
+    match target_os.as_ref().zip(target_arch.as_ref()) {
+        Some((TargetOs::Windows, TargetArch::X86_64)) => (),
+        Some((TargetOs::Windows, TargetArch::Aarch64)) => (),
+        Some((TargetOs::Mac, TargetArch::X86_64)) => (),
+        Some((TargetOs::Mac, TargetArch::Aarch64)) => (),
+        Some((TargetOs::Linux, TargetArch::X86_64)) => (),
+        Some((TargetOs::Linux, TargetArch::Aarch64)) => (),
+        None => (),
+        #[allow(unreachable_patterns)]
+        _ => {
+            diagnostics.push(WarningDiagnostic::plain(
+                "Host os/architecture configuration is not officially supported, taking best guess",
+            ));
+        }
+    }
+
+    let target_info = target_arch
+        .zip(target_os)
+        .map(|(target_arch, target_os)| TargetInfo {
+            arch: Some(target_arch),
+            os: Some(target_os),
+        })
+        .unwrap_or_default();
 
     let mut compiler = Compiler {
         options,

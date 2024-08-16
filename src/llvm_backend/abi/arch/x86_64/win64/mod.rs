@@ -1,5 +1,6 @@
 use super::AvxLevel;
 use crate::{
+    backend::BackendError,
     data_units::ByteUnits,
     ir,
     llvm_backend::{
@@ -10,7 +11,6 @@ use crate::{
             homo_aggregate::{is_homo_aggregate, HomoAggregate, HomoDecider},
         },
         ctx::BackendCtx,
-        error::BackendError,
     },
     target_info::type_layout::TypeLayoutCache,
 };
