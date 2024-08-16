@@ -27,6 +27,7 @@ impl PragmaSection {
                 interpret: true,
                 coerce_main_signature: false,
                 excute_result: false,
+                use_pic: None,
             },
             target_info: base_compiler.target_info,
             source_files: base_compiler.source_files,

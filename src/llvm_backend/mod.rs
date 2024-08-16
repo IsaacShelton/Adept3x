@@ -30,7 +30,7 @@ use self::{
 };
 use crate::{
     backend::BackendError, compiler::Compiler, diagnostics::Diagnostics, ir, linking::link_result,
-    resolved,
+    resolved, target_info::TargetOsExt,
 };
 use colored::Colorize;
 use llvm_sys::{
@@ -73,13 +73,16 @@ pub unsafe fn llvm_backend(
     let cpu = CString::new("generic").unwrap();
     let features = CString::new("").unwrap();
     let level = LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault;
-    let use_pic = false;
-    let reloc = if use_pic {
-        LLVMRelocMode::LLVMRelocPIC
-    } else {
-        LLVMRelocMode::LLVMRelocDefault
-    };
     let code_model = LLVMCodeModel::LLVMCodeModelDefault;
+
+    let reloc =
+        if compiler.options.use_pic.unwrap_or_else(|| {
+            ir_module.target_info.os.is_linux() || ir_module.target_info.os.is_mac()
+        }) {
+            LLVMRelocMode::LLVMRelocPIC
+        } else {
+            LLVMRelocMode::LLVMRelocDefault
+        };
 
     let backend_module = BackendModule::new(&module_name);
     let target_machine =

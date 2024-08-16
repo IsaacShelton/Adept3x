@@ -86,6 +86,7 @@ pub struct BuildOptions {
     pub interpret: bool,
     pub coerce_main_signature: bool,
     pub excute_result: bool,
+    pub use_pic: Option<bool>,
 }
 
 impl Default for BuildOptions {
@@ -96,6 +97,7 @@ impl Default for BuildOptions {
             interpret: false,
             coerce_main_signature: true,
             excute_result: false,
+            use_pic: None,
         }
     }
 }
