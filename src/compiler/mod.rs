@@ -3,7 +3,7 @@ use crate::{
     target_info::TargetInfo, version::AdeptVersion,
 };
 use once_map::OnceMap;
-use std::{ffi::OsStr, process::Command, sync::OnceLock};
+use std::{ffi::OsStr, process::Command, sync::OnceLock, time::Duration};
 
 pub struct Compiler<'a> {
     pub options: BuildOptions,
@@ -19,11 +19,25 @@ impl<'a> Compiler<'a> {
     pub fn maybe_execute_result(&self, output_binary_filepath: &OsStr) {
         if self.options.excute_result {
             println!("    ==== executing result ====");
-            let _ = Command::new(output_binary_filepath)
-                .args([] as [&str; 0])
-                .spawn()
-                .expect("failed to run resulting executable")
-                .wait();
+
+            for retry_duration in [10, 10, 10, 50, 100, 250].map(Duration::from_millis) {
+                match Command::new(output_binary_filepath)
+                    .args([] as [&str; 0])
+                    .spawn()
+                {
+                    Ok(mut process) => {
+                        let _ = process.wait();
+                        return;
+                    }
+                    Err(_) => {
+                        // Try again in few milliseconds
+                        std::thread::sleep(retry_duration);
+                    }
+                }
+            }
+
+            eprintln!("error: failed to run resulting executable");
+            std::process::exit(1);
         }
     }
 }
