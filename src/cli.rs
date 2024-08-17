@@ -26,7 +26,8 @@ impl Command {
         for option in args {
             match option.as_str() {
                 "-e" => options.excute_result = true,
-                "--emit-llvm-ir" => options.emit_ir = true,
+                "--emit-ir" => options.emit_ir = true,
+                "--emit-llvm-ir" => options.emit_llvm_ir = true,
                 "--interpret" => {
                     options.interpret = true;
                     options.coerce_main_signature = false;
