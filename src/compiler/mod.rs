@@ -20,6 +20,8 @@ impl<'a> Compiler<'a> {
         if self.options.excute_result {
             println!("    ==== executing result ====");
 
+            let mut last_error = None;
+
             for retry_duration in [10, 10, 10, 50, 100, 250].map(Duration::from_millis) {
                 match Command::new(output_binary_filepath)
                     .args([] as [&str; 0])
@@ -29,14 +31,19 @@ impl<'a> Compiler<'a> {
                         let _ = process.wait();
                         return;
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        last_error = Some(e);
+
                         // Try again in few milliseconds
                         std::thread::sleep(retry_duration);
                     }
                 }
             }
 
-            eprintln!("error: failed to run resulting executable");
+            eprintln!(
+                "error: failed to run resulting executable - {}",
+                last_error.unwrap()
+            );
             std::process::exit(1);
         }
     }
