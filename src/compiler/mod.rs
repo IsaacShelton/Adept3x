@@ -3,7 +3,13 @@ use crate::{
     target_info::TargetInfo, version::AdeptVersion,
 };
 use once_map::OnceMap;
-use std::{ffi::OsStr, process::Command, sync::OnceLock, time::Duration};
+use std::{
+    borrow::Cow,
+    path::{absolute, Path},
+    process::Command,
+    sync::OnceLock,
+    time::Duration,
+};
 
 pub struct Compiler<'a> {
     pub options: BuildOptions,
@@ -16,14 +22,29 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn maybe_execute_result(&self, output_binary_filepath: &OsStr) {
+    pub fn maybe_execute_result(&self, output_binary_filepath: &Path) {
         if self.options.excute_result {
             println!("    ==== executing result ====");
+
+            // Avoid using a relative filename to invoke the resulting executable
+            let output_binary_filepath = if output_binary_filepath.is_relative() {
+                let Ok(absolute_filename) = absolute(&output_binary_filepath) else {
+                    eprintln!(
+                        "error: Failed to get absolute filename of resulting executable '{}'",
+                        output_binary_filepath.to_string_lossy().as_ref(),
+                    );
+                    std::process::exit(1);
+                };
+
+                Cow::Owned(absolute_filename)
+            } else {
+                Cow::Borrowed(output_binary_filepath)
+            };
 
             let mut last_error = None;
 
             for retry_duration in [10, 10, 10, 50, 100, 250].map(Duration::from_millis) {
-                match Command::new(output_binary_filepath)
+                match Command::new(output_binary_filepath.as_os_str())
                     .args([] as [&str; 0])
                     .spawn()
                 {
@@ -41,7 +62,8 @@ impl<'a> Compiler<'a> {
             }
 
             eprintln!(
-                "error: failed to run resulting executable - {}",
+                "error: failed to run resulting executable '{}' - {}",
+                output_binary_filepath.to_string_lossy().as_ref(),
                 last_error.unwrap()
             );
             std::process::exit(1);

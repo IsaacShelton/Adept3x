@@ -88,5 +88,5 @@ pub fn compile_single_file_only(
         source_files,
     );
 
-    compiler.maybe_execute_result(output_binary_filepath.as_os_str());
+    compiler.maybe_execute_result(&output_binary_filepath);
 }

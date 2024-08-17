@@ -258,7 +258,7 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
         bytes_processed, files_processed, in_how_many_seconds,
     );
 
-    compiler.maybe_execute_result(output_binary_filepath.as_os_str());
+    compiler.maybe_execute_result(&output_binary_filepath);
 }
 
 fn compile_code_file<'a, I: Inflow<Token>>(
