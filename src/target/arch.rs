@@ -1,17 +1,29 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
+use std::fmt::Display;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TargetArch {
     X86_64,
     Aarch64,
 }
 
 impl TargetArch {
-    pub const HOST: Option<Self> = if cfg!(target_arch = "x86_64") {
+    pub const HOST: Option<Self> = if cfg!(target_arch = "x86_64") || cfg!(target_os = "windows") {
+        // NOTE: We always consider x86_64 to be host architecture on Windows for portability
         Some(TargetArch::X86_64)
     } else if cfg!(target_arch = "aarch64") {
         Some(TargetArch::Aarch64)
     } else {
         None
     };
+}
+
+impl Display for TargetArch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TargetArch::X86_64 => write!(f, "x86_64"),
+            TargetArch::Aarch64 => write!(f, "aarch64"),
+        }
+    }
 }
 
 pub trait TargetArchExt {

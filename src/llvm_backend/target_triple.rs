@@ -1,18 +1,35 @@
 use super::BackendError;
+use crate::target::{Target, TargetArch, TargetOs};
+use cstr::cstr;
 use llvm_sys::{
     core::LLVMDisposeMessage,
-    target_machine::{LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetRef},
+    target_machine::{LLVMGetTargetFromTriple, LLVMTargetRef},
 };
 use std::{
     ffi::{CStr, CString},
     mem::MaybeUninit,
 };
 
-pub unsafe fn get_triple() -> CString {
-    CString::from_raw(LLVMGetDefaultTargetTriple())
+pub unsafe fn get_triple(target: &Target) -> Result<CString, BackendError> {
+    let Some((arch, os)) = target.arch().zip(target.os()) else {
+        return Err(BackendError::plain(format!("Unsuported target {}", target)));
+    };
+
+    Ok(match arch {
+        TargetArch::X86_64 => match os {
+            TargetOs::Windows => cstr!("x86_64-pc-windows-gnu").into(),
+            TargetOs::Mac => cstr!("x86_64-apple-darwin").into(),
+            TargetOs::Linux => cstr!("x86_64-unknown-linux-gnu").into(),
+        },
+        TargetArch::Aarch64 => match os {
+            TargetOs::Windows => cstr!("aarch64-pc-windows-gnu").into(),
+            TargetOs::Mac => cstr!("arm64-apple-darwin").into(),
+            TargetOs::Linux => cstr!("aarch64-unknown-linux-gnu").into(),
+        },
+    })
 }
 
-pub unsafe fn get_target_from_triple(triple: &CStr) -> Result<LLVMTargetRef, BackendError> {
+pub unsafe fn make_llvm_target(triple: &CStr) -> Result<LLVMTargetRef, BackendError> {
     let mut target: MaybeUninit<LLVMTargetRef> = MaybeUninit::zeroed();
     let mut error_message: MaybeUninit<*mut i8> = MaybeUninit::zeroed();
 

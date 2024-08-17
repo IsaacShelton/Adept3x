@@ -39,7 +39,7 @@ mod show;
 mod single_file_only;
 mod source_files;
 mod tag;
-mod target_info;
+mod target;
 mod text;
 mod token;
 mod version;
@@ -51,7 +51,7 @@ use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
 use generate_workspace::new_project;
 use single_file_only::compile_single_file_only;
 use std::{fs::metadata, path::Path, process::exit};
-use target_info::{TargetArch, TargetInfo, TargetOs};
+use target::{TargetArch, TargetOs};
 use text::IntoTextStream;
 use workspace::compile_workspace;
 
@@ -71,28 +71,26 @@ fn build_project(build_command: BuildCommand) {
     let source_files = SourceFiles::new();
     let filepath = Path::new(&filename);
     let diagnostics = Diagnostics::new(&source_files, DiagnosticFlags::default());
+    let target = options.target;
 
     let Ok(metadata) = metadata(filepath) else {
         eprintln!("error: File or folder does not exist");
         exit(1);
     };
 
-    let target_os = TargetOs::HOST;
-    let target_arch = TargetArch::HOST;
-
-    if target_arch.is_none() {
+    if target.arch().is_none() {
         diagnostics.push(WarningDiagnostic::plain(
             "Host architecture is not supported, falling back to best guess",
         ));
     }
 
-    if target_os.is_none() {
+    if target.os().is_none() {
         diagnostics.push(WarningDiagnostic::plain(
             "Host os is not supported, falling back to best guess",
         ));
     }
 
-    match target_os.as_ref().zip(target_arch.as_ref()) {
+    match target.os().zip(target.arch()) {
         Some((TargetOs::Windows, TargetArch::X86_64)) => (),
         Some((TargetOs::Windows, TargetArch::Aarch64)) => (),
         Some((TargetOs::Mac, TargetArch::X86_64)) => (),
@@ -108,17 +106,9 @@ fn build_project(build_command: BuildCommand) {
         }
     }
 
-    let target_info = target_arch
-        .zip(target_os)
-        .map(|(target_arch, target_os)| TargetInfo {
-            arch: Some(target_arch),
-            os: Some(target_os),
-        })
-        .unwrap_or_default();
-
     let mut compiler = Compiler {
         options,
-        target_info: &target_info,
+        target: &target,
         source_files: &source_files,
         diagnostics: &diagnostics,
         version: Default::default(),

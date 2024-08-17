@@ -6,7 +6,7 @@ use crate::{
         backend_type::to_backend_type, ctx::BackendCtx, llvm_type_ref_ext::LLVMTypeRefExt,
         BackendError,
     },
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use core::fmt::Debug;
 use itertools::Itertools;

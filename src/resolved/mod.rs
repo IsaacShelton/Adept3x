@@ -10,7 +10,7 @@ use crate::{
     ir::InterpreterSyscallKind,
     source_files::{Source, SourceFiles},
     tag::Tag,
-    target_info::TargetInfo,
+    target::Target,
 };
 use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
@@ -192,7 +192,7 @@ impl TypeKind {
         Type { kind: self, source }
     }
 
-    pub fn sign(&self, target_info: Option<&TargetInfo>) -> Option<IntegerSign> {
+    pub fn sign(&self, target_info: Option<&Target>) -> Option<IntegerSign> {
         match self {
             TypeKind::Boolean => None,
             TypeKind::Integer { sign, .. } => Some(*sign),

@@ -16,7 +16,7 @@ use crate::{
         ctx::BackendCtx,
         llvm_type_ref_ext::LLVMTypeRefExt,
     },
-    target_info::{
+    target::{
         record_layout::{itanium::ItaniumRecordLayoutBuilder, record_info::RecordInfo},
         type_layout::{TypeLayout, TypeLayoutCache},
     },

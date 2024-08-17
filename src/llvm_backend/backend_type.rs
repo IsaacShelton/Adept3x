@@ -12,7 +12,7 @@ use super::{
 use crate::{
     ir,
     llvm_backend::abi::abi_type::{kinds::get_type_expansion, Direct, Extend},
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use llvm_sys::{
     core::{

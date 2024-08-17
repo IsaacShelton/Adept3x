@@ -1,13 +1,13 @@
 use super::super::abi_type::ABIType;
 use crate::{
     ir,
-    target_info::{type_layout::TypeLayoutCache, TargetInfo},
+    target::{type_layout::TypeLayoutCache, Target},
 };
 use derive_more::IsVariant;
 
 #[derive(Clone, Debug)]
 pub struct Itanium<'a> {
-    pub target_info: &'a TargetInfo,
+    pub target_info: &'a Target,
     pub type_layout_cache: &'a TypeLayoutCache<'a>,
 }
 
@@ -16,7 +16,7 @@ pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {
 }
 
 impl<'a> Itanium<'a> {
-    pub fn new(type_layout_cache: &'a TypeLayoutCache, target_info: &'a TargetInfo) -> Self {
+    pub fn new(type_layout_cache: &'a TypeLayoutCache, target_info: &'a Target) -> Self {
         Self {
             type_layout_cache,
             target_info,

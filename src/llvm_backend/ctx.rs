@@ -12,7 +12,7 @@ use crate::{
     diagnostics::Diagnostics,
     ir,
     resolved::{self, StructureRef},
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 use once_map::unsync::OnceMap;
@@ -85,13 +85,13 @@ impl<'a> BackendCtx<'a> {
         diagnostics: &'a Diagnostics,
     ) -> Result<Self, BackendError> {
         let type_layout_cache = TypeLayoutCache::new(
-            &ir_module.target_info,
+            &ir_module.target,
             &ir_module.structures,
             resolved_ast,
             diagnostics,
         );
 
-        let arch = Arch::new(ir_module.target_info)
+        let arch = Arch::new(ir_module.target)
             .ok_or_else(|| BackendError::plain("Target platform is not supported"))?;
 
         Ok(Self {

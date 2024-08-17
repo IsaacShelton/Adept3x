@@ -1,3 +1,4 @@
+use crate::target::{Target, TargetOs};
 use std::process::exit;
 
 pub struct Command {
@@ -23,21 +24,30 @@ impl Command {
         let mut options = BuildOptions::default();
 
         for option in args {
-            if option == "-e" {
-                options.excute_result = true;
-            } else if option == "--emit-llvm-ir" {
-                options.emit_llvm_ir = true;
-            } else if option == "--emit-ir" {
-                options.emit_ir = true;
-            } else if option == "--interpret" {
-                options.interpret = true;
-                options.coerce_main_signature = false;
-            } else if filename.is_some() {
-                // TODO: Implement proper error handling and improve error message
-                eprintln!("error: Multiple paths specified");
-                return Err(());
-            } else {
-                filename = Some(option);
+            match option.as_str() {
+                "-e" => options.excute_result = true,
+                "--emit-llvm-ir" => options.emit_ir = true,
+                "--interpret" => {
+                    options.interpret = true;
+                    options.coerce_main_signature = false;
+                }
+                "--windows" => {
+                    options.target = Target::generic_os(TargetOs::Windows);
+                }
+                "--mac" | "--macos" => {
+                    options.target = Target::generic_os(TargetOs::Mac);
+                }
+                "--linux" => {
+                    options.target = Target::generic_os(TargetOs::Linux);
+                }
+                _ => {
+                    if filename.is_some() {
+                        eprintln!("error: Multiple paths specified");
+                        return Err(());
+                    } else {
+                        filename = Some(option);
+                    }
+                }
             }
         }
 
@@ -90,6 +100,7 @@ pub struct BuildOptions {
     pub coerce_main_signature: bool,
     pub excute_result: bool,
     pub use_pic: Option<bool>,
+    pub target: Target,
 }
 
 impl Default for BuildOptions {
@@ -101,6 +112,7 @@ impl Default for BuildOptions {
             coerce_main_signature: true,
             excute_result: false,
             use_pic: None,
+            target: Target::HOST,
         }
     }
 }

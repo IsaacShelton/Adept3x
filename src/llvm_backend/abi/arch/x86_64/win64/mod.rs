@@ -12,7 +12,7 @@ use crate::{
         },
         ctx::BackendCtx,
     },
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use itertools::Itertools;
 use llvm_sys::LLVMCallConv;

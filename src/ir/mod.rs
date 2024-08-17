@@ -3,7 +3,7 @@ use crate::{
     data_units::ByteUnits,
     resolved::{FloatOrInteger, IntegerBits, StructureRef},
     source_files::Source,
-    target_info::TargetInfo,
+    target::Target,
 };
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
@@ -13,7 +13,7 @@ pub type Structures = HashMap<StructureRef, Structure>;
 
 #[derive(Clone)]
 pub struct Module<'a> {
-    pub target_info: &'a TargetInfo,
+    pub target: &'a Target,
     pub functions: HashMap<FunctionRef, Function>,
     pub structures: Structures,
     pub globals: HashMap<GlobalVarRef, Global>,
@@ -488,9 +488,9 @@ pub struct ValueReference {
 }
 
 impl<'a> Module<'a> {
-    pub fn new(target_info: &'a TargetInfo) -> Self {
+    pub fn new(target_info: &'a Target) -> Self {
         Self {
-            target_info,
+            target: target_info,
             functions: HashMap::new(),
             structures: HashMap::new(),
             globals: HashMap::new(),

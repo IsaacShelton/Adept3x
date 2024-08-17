@@ -26,11 +26,11 @@ use self::{
     module::BackendModule,
     target_data::TargetData,
     target_machine::TargetMachine,
-    target_triple::{get_target_from_triple, get_triple},
+    target_triple::{get_triple, make_llvm_target},
 };
 use crate::{
     backend::BackendError, compiler::Compiler, diagnostics::Diagnostics, ir, linking::link_result,
-    resolved, target_info::TargetOsExt,
+    resolved, target::TargetOs,
 };
 use colored::Colorize;
 use llvm_sys::{
@@ -68,8 +68,8 @@ pub unsafe fn llvm_backend(
 
     let options = &compiler.options;
     let module_name = CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
-    let triple = get_triple();
-    let target = get_target_from_triple(&triple)?;
+    let triple = get_triple(&compiler.target)?;
+    let target = make_llvm_target(&triple)?;
     let cpu = CString::new("generic").unwrap();
     let features = CString::new("").unwrap();
     let level = LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault;
@@ -77,7 +77,7 @@ pub unsafe fn llvm_backend(
 
     let reloc =
         if compiler.options.use_pic.unwrap_or_else(|| {
-            ir_module.target_info.os.is_linux() || ir_module.target_info.os.is_mac()
+            matches!(ir_module.target.os(), Some(TargetOs::Linux | TargetOs::Mac))
         }) {
             LLVMRelocMode::LLVMRelocPIC
         } else {
@@ -145,7 +145,7 @@ pub unsafe fn llvm_backend(
 
     link_result(
         compiler,
-        &ir_module.target_info,
+        &ir_module.target,
         diagnostics,
         output_object_filepath,
         output_binary_filepath,

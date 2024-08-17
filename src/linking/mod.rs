@@ -2,7 +2,7 @@ use crate::{
     backend::BackendError,
     compiler::Compiler,
     diagnostics::{Diagnostics, WarningDiagnostic},
-    target_info::{TargetInfo, TargetOs, TargetOsExt},
+    target::{Target, TargetOs, TargetOsExt},
 };
 use std::{
     ffi::{OsStr, OsString},
@@ -13,7 +13,7 @@ use std::{
 
 pub fn link_result(
     compiler: &mut Compiler,
-    target: &TargetInfo,
+    target: &Target,
     diagnostics: &Diagnostics,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
@@ -36,7 +36,7 @@ pub fn link_result(
     }
 
     // Ensure that not trying to link against frameworks when not targetting macOS
-    if !target.os.is_mac() {
+    if !target.os().is_mac() {
         if let Some((framework, _)) = compiler.link_frameworks.read_only_view().iter().next() {
             return Err(BackendError {
                 message: format!(
@@ -58,7 +58,7 @@ pub fn link_result(
     }
 
     // Invoke linker
-    match target.os {
+    match target.os() {
         Some(TargetOs::Mac | TargetOs::Linux) => {
             // Link resulting object file to create executable
             let mut command = Command::new("gcc")

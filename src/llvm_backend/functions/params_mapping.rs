@@ -1,7 +1,7 @@
 use crate::{
     ir,
     llvm_backend::abi::{abi_function::ABIFunction, abi_type::ABITypeKind},
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use llvm_sys::{
     core::{LLVMCountStructElementTypes, LLVMGetTypeKind},

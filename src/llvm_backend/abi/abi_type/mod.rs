@@ -9,7 +9,7 @@ use self::offset_align::OffsetAlign;
 pub use self::{direct::DirectOptions, extend::ExtendOptions, indirect::IndirectOptions};
 use crate::{
     data_units::ByteUnits, ir, llvm_backend::llvm_type_ref_ext::LLVMTypeRefExt,
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use derive_more::{Deref, IsVariant};
 pub use kinds::{CoerceAndExpand, Direct, Expand, Extend, InAlloca, Indirect, IndirectAliased};

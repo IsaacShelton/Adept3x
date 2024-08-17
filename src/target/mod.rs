@@ -9,15 +9,38 @@ use crate::{
 };
 pub use arch::{TargetArch, TargetArchExt};
 pub use os::{TargetOs, TargetOsExt};
+use std::fmt::Display;
 use type_layout::TypeLayout;
 
-#[derive(Clone, Debug, Default)]
-pub struct TargetInfo {
-    pub arch: Option<TargetArch>,
-    pub os: Option<TargetOs>,
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Target {
+    arch: Option<TargetArch>,
+    os: Option<TargetOs>,
 }
 
-impl TargetInfo {
+impl Target {
+    pub const HOST: Self = Self::new(TargetOs::HOST, TargetArch::HOST);
+
+    pub const fn new(os: Option<TargetOs>, arch: Option<TargetArch>) -> Self {
+        Self { arch, os }
+    }
+
+    pub const fn generic_os(os: TargetOs) -> Self {
+        let arch = match os {
+            TargetOs::Windows | TargetOs::Mac | TargetOs::Linux => TargetArch::X86_64,
+        };
+
+        Self::new(Some(os), Some(arch))
+    }
+
+    pub fn os(&self) -> Option<TargetOs> {
+        self.os
+    }
+
+    pub fn arch(&self) -> Option<TargetArch> {
+        self.arch
+    }
+
     pub fn is_host(&self) -> bool {
         self.arch.is_host() && self.os.is_host()
     }
@@ -81,5 +104,16 @@ impl TargetInfo {
 
     pub fn double_layout(&self) -> TypeLayout {
         TypeLayout::basic(ByteUnits::of(8))
+    }
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {}",
+            self.arch.map_or("unknown".into(), |arch| arch.to_string()),
+            self.os.map_or("unknown".into(), |os| os.to_string())
+        )
     }
 }

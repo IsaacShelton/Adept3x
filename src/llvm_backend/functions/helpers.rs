@@ -13,7 +13,7 @@ use crate::{
         raw_address::RawAddress,
         target_data::TargetData,
     },
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use cstr::cstr;
 use llvm_sys::{

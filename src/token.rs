@@ -148,7 +148,7 @@ impl Display for TokenKind {
             TokenKind::StructKeyword => f.write_str("'struct' keyword"),
             TokenKind::UnionKeyword => f.write_str("'union' keyword"),
             TokenKind::EnumKeyword => f.write_str("'enum' keyword"),
-            TokenKind::TypeAliasKeyword => f.write_str("'alias' keyword"),
+            TokenKind::TypeAliasKeyword => f.write_str("'typealias' keyword"),
             TokenKind::IfKeyword => f.write_str("'if' keyword"),
             TokenKind::ElseKeyword => f.write_str("'else' keyword"),
             TokenKind::ElifKeyword => f.write_str("'elif' keyword"),

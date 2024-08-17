@@ -60,7 +60,7 @@ pub fn compile_single_file_only(
     let resolved_ast = exit_unless(resolve(&mut workspace, &compiler.options), source_files);
 
     let ir_module = exit_unless(
-        lower(&compiler.options, &resolved_ast, &compiler.target_info),
+        lower(&compiler.options, &resolved_ast, &compiler.target),
         source_files,
     );
 

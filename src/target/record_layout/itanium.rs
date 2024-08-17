@@ -3,7 +3,7 @@ use crate::{
     data_units::{BitUnits, ByteUnits},
     diagnostics::{Diagnostics, WarningDiagnostic},
     ir, resolved,
-    target_info::{
+    target::{
         type_layout::{ASTRecordLayout, TypeLayoutCache},
         TargetOsExt,
     },

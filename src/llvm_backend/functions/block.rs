@@ -36,7 +36,7 @@ use crate::{
         values::build_value,
     },
     resolved::FloatOrInteger,
-    target_info::TargetInfo,
+    target::Target,
 };
 use cstr::cstr;
 use itertools::{izip, Itertools};
@@ -653,7 +653,7 @@ unsafe fn build_binary_operands(
 
 unsafe fn promote_variadic_argument(
     builder: &Builder,
-    target_info: &TargetInfo,
+    target_info: &Target,
     value: LLVMValueRef,
 ) -> LLVMValueRef {
     let llvm_type = LLVMTypeOf(value);
@@ -675,7 +675,7 @@ unsafe fn promote_variadic_argument(
 
 fn promote_variadic_argument_type(
     builder: &Builder,
-    target_info: &TargetInfo,
+    target_info: &Target,
     ir_type: &ir::Type,
 ) -> ir::Type {
     assert_eq!(
@@ -738,7 +738,7 @@ unsafe fn emit_call(
         .map(|(i, argument)| {
             build_value(ctx, value_catalog, builder, argument).map(|value| {
                 if i >= ir_function.parameters.len() {
-                    promote_variadic_argument(builder, &ctx.ir_module.target_info, value)
+                    promote_variadic_argument(builder, &ctx.ir_module.target, value)
                 } else {
                     value
                 }
@@ -753,7 +753,7 @@ unsafe fn emit_call(
             .unpromoted_variadic_argument_types
             .iter()
             .map(|argument_type| {
-                promote_variadic_argument_type(builder, &ctx.ir_module.target_info, argument_type)
+                promote_variadic_argument_type(builder, &ctx.ir_module.target, argument_type)
             })
             .collect_vec();
 

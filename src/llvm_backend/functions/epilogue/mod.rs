@@ -177,7 +177,7 @@ pub fn emit_epilogue(
                 builder.load_aligned(
                     field_type,
                     sret,
-                    ctx.ir_module.target_info.pointer_layout().alignment,
+                    ctx.ir_module.target.pointer_layout().alignment,
                     Volatility::Normal,
                     cstr!("sret"),
                 )

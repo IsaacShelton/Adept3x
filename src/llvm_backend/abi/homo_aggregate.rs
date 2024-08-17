@@ -1,5 +1,5 @@
 use super::empty::{is_empty_record, IsEmptyRecordOptions};
-use crate::{ir, target_info::type_layout::TypeLayoutCache};
+use crate::{ir, target::type_layout::TypeLayoutCache};
 
 #[derive(Copy, Clone, Debug)]
 pub struct HomoAggregate<'a> {

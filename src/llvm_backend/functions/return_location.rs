@@ -98,7 +98,7 @@ impl ReturnLocation {
             )
         };
 
-        let pointer_alignment = ctx.ir_module.target_info.pointer_layout().alignment;
+        let pointer_alignment = ctx.ir_module.target.pointer_layout().alignment;
 
         let pointer = Address {
             base: RawAddress {

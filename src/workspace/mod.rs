@@ -217,7 +217,7 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     );
 
     let ir_module = exit_unless(
-        lower(&compiler.options, &resolved_ast, &compiler.target_info),
+        lower(&compiler.options, &resolved_ast, &compiler.target),
         compiler.source_files,
     );
 

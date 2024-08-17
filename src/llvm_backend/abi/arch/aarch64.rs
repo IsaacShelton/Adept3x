@@ -16,7 +16,7 @@ use crate::{
         llvm_type_ref_ext::LLVMTypeRefExt,
         BackendError,
     },
-    target_info::type_layout::TypeLayoutCache,
+    target::type_layout::TypeLayoutCache,
 };
 use derive_more::IsVariant;
 use llvm_sys::{
@@ -134,7 +134,7 @@ impl Aarch64 {
         }
 
         // Small aggregates are returned directly via registers or stack
-        if size <= ByteUnits::of(8) && ctx.ir_module.target_info.is_little_endian() {
+        if size <= ByteUnits::of(8) && ctx.ir_module.target.is_little_endian() {
             let ty = match size.bytes() {
                 1 => unsafe { LLVMInt8Type() },
                 2 => unsafe { LLVMInt16Type() },
