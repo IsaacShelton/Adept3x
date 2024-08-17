@@ -41,8 +41,11 @@ impl Command {
             }
         }
 
-        // TODO: Implement proper error handling and improve error message
-        let filename = filename.expect("filename to be specified");
+        let Some(filename) = filename else {
+            // TODO: Implement proper error handling and improve error message
+            eprintln!("error: No folder or filename specified");
+            return Err(());
+        };
 
         Ok(Self {
             kind: CommandKind::Build(BuildCommand { filename, options }),
