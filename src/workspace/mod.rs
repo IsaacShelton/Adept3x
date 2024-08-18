@@ -222,8 +222,11 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     );
 
     let project_folder = folder_path;
-    let output_binary_filepath = project_folder.join("a.out");
-    let output_object_filepath = project_folder.join("a.o");
+    let output_binary_filepath = project_folder.join(compiler.target.default_executable_name());
+    let object_folder = project_folder.join("obj");
+    let output_object_filepath = object_folder.join(compiler.target.default_object_file_name());
+
+    std::fs::create_dir_all(object_folder).expect("failed to create obj folder");
 
     let linking_duration = exit_unless(
         unsafe {

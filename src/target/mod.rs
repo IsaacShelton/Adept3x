@@ -1,4 +1,5 @@
 mod arch;
+mod display;
 mod os;
 pub mod record_layout;
 pub mod type_layout;
@@ -8,6 +9,7 @@ use crate::{
     data_units::ByteUnits,
 };
 pub use arch::{TargetArch, TargetArchExt};
+pub use display::IntoDisplay;
 pub use os::{TargetOs, TargetOsExt};
 use std::fmt::Display;
 use type_layout::TypeLayout;
@@ -43,6 +45,21 @@ impl Target {
 
     pub fn is_host(&self) -> bool {
         self.arch.is_host() && self.os.is_host()
+    }
+
+    pub fn default_executable_name(&self) -> String {
+        match self.os {
+            Some(TargetOs::Windows) => {
+                format!("main-{}-{}.exe", self.arch.display(), self.os.display())
+            }
+            Some(TargetOs::Mac | TargetOs::Linux) | None => {
+                format!("main-{}-{}", self.arch.display(), self.os.display())
+            }
+        }
+    }
+
+    pub fn default_object_file_name(&self) -> String {
+        format!("main-{}-{}.o", self.arch.display(), self.os.display())
     }
 
     pub fn default_c_integer_sign(&self, integer: CInteger) -> IntegerSign {

@@ -1,5 +1,5 @@
 use crate::target::{Target, TargetOs};
-use std::process::exit;
+use std::{path::PathBuf, process::exit, str::FromStr};
 
 pub struct Command {
     pub kind: CommandKind,
@@ -19,11 +19,11 @@ impl Command {
         }
     }
 
-    fn parse_build_project(args: impl Iterator<Item = String>) -> Result<Self, ()> {
+    fn parse_build_project(mut args: impl Iterator<Item = String>) -> Result<Self, ()> {
         let mut filename = None;
         let mut options = BuildOptions::default();
 
-        for option in args {
+        while let Some(option) = args.next() {
             match option.as_str() {
                 "-e" => options.excute_result = true,
                 "--emit-ir" => options.emit_ir = true,
@@ -41,12 +41,21 @@ impl Command {
                 "--linux" => {
                     options.target = Target::generic_os(TargetOs::Linux);
                 }
+                "--infrastructure" => {
+                    let Some(infrastructure) = args.next() else {
+                        eprintln!("error: Expected infrastructure path after '--infrastructure'");
+                        return Err(());
+                    };
+
+                    options.infrastructure = Some(
+                        PathBuf::from_str(&infrastructure)
+                            .expect("invalid non-utf8 infrastructure path"),
+                    );
+                }
                 _ => {
-                    if filename.is_some() {
+                    if filename.replace(option).is_some() {
                         eprintln!("error: Multiple paths specified");
                         return Err(());
-                    } else {
-                        filename = Some(option);
                     }
                 }
             }
@@ -102,10 +111,19 @@ pub struct BuildOptions {
     pub excute_result: bool,
     pub use_pic: Option<bool>,
     pub target: Target,
+    pub infrastructure: Option<PathBuf>,
 }
 
 impl Default for BuildOptions {
     fn default() -> Self {
+        let current_exe = std::env::current_exe()
+            .expect("failed to get adept executable location")
+            .parent()
+            .expect("parent folder")
+            .to_path_buf();
+
+        let infrastructure = current_exe.join("infrastructure");
+
         Self {
             emit_llvm_ir: false,
             emit_ir: false,
@@ -114,6 +132,7 @@ impl Default for BuildOptions {
             excute_result: false,
             use_pic: None,
             target: Target::HOST,
+            infrastructure: Some(infrastructure),
         }
     }
 }

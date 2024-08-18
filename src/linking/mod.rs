@@ -2,12 +2,13 @@ use crate::{
     backend::BackendError,
     compiler::Compiler,
     diagnostics::{Diagnostics, WarningDiagnostic},
-    target::{Target, TargetOs, TargetOsExt},
+    target::{Target, TargetArch, TargetArchExt, TargetOs, TargetOsExt},
 };
 use std::{
     ffi::{OsStr, OsString},
-    path::Path,
+    path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
     time::{Duration, Instant},
 };
 
@@ -20,11 +21,24 @@ pub fn link_result(
 ) -> Result<Duration, BackendError> {
     let start_time = Instant::now();
 
-    let mut args = vec![
-        output_object_filepath.as_os_str().into(),
-        OsString::from("-o"),
-        output_binary_filepath.as_os_str().into(),
-    ];
+    let mut args = Vec::with_capacity(32);
+    args.push("-o".into());
+    args.push(output_binary_filepath.as_os_str().into());
+
+    let infrastructure = compiler
+        .options
+        .infrastructure
+        .as_ref()
+        .expect("infrastructure to exist")
+        .clone();
+
+    if target.os().is_windows() {
+        args.push("--start-group".into());
+        args.push(infrastructure.join("to_windows").join("crt2.o").into());
+        args.push(infrastructure.join("to_windows").join("crtbegin.o").into());
+    }
+
+    args.push(output_object_filepath.as_os_str().into());
 
     // Add arguments to link against requested filenames
     for (filename, _) in compiler.link_filenames.iter_mut() {
@@ -35,7 +49,7 @@ pub fn link_result(
         }
     }
 
-    // Ensure that not trying to link against frameworks when not targetting macOS
+    // Ensure that not trying to link against frameworks when not targeting macOS
     if !target.os().is_mac() {
         if let Some((framework, _)) = compiler.link_frameworks.read_only_view().iter().next() {
             return Err(BackendError {
@@ -52,35 +66,75 @@ pub fn link_result(
         args.push(OsString::from(framework));
     }
 
-    // Don't try to link unless on host platform
-    if !target.is_host() {
-        please_manually_link(args, diagnostics);
+    if target.os().is_windows() {
+        let to_windows = infrastructure.join("to_windows");
+        args.push(to_windows.join("libmsvcrt.a").into());
+        args.push(to_windows.join("libmingw32.a").into());
+        args.push(to_windows.join("libgcc.a").into());
+        args.push(to_windows.join("libgcc_eh.a").into());
+        args.push(to_windows.join("libmingwex.a").into());
+        args.push(to_windows.join("libkernel32.a").into());
+        args.push(to_windows.join("libpthread.a").into());
+        args.push(to_windows.join("libadvapi32.a").into());
+        args.push(to_windows.join("libshell32.a").into());
+        args.push(to_windows.join("libuser32.a").into());
+        args.push(to_windows.join("libkernel32.a").into());
+        args.push(to_windows.join("crtend.o").into());
+        args.push("--end-group".into());
     }
+
+    let linker = if target.is_host() {
+        // Link for host platform
+
+        match target.os() {
+            None | Some(TargetOs::Windows) => {
+                please_manually_link(args, diagnostics);
+            }
+            Some(TargetOs::Mac | TargetOs::Linux) => PathBuf::from_str("/usr/bin/gcc").unwrap(),
+        }
+    } else {
+        // Link for non-host platform
+
+        match target.os() {
+            Some(TargetOs::Windows) => {
+                let host_os = TargetOs::HOST;
+                let host_arch = TargetArch::HOST;
+
+                if (host_os.is_mac() && host_arch.is_aarch64())
+                    || (host_os.is_linux() && host_arch.is_x86_64())
+                {
+                    infrastructure
+                        .join("to_windows")
+                        .join(&format!("from_{}_{}", host_arch.unwrap(), host_os.unwrap()))
+                        .join("x86_64-w64-mingw32-ld")
+                } else {
+                    please_manually_link(args, diagnostics);
+                }
+            }
+            Some(TargetOs::Mac | TargetOs::Linux) | None => {
+                please_manually_link(args, diagnostics);
+            }
+        }
+    };
 
     // Invoke linker
-    match target.os() {
-        Some(TargetOs::Mac | TargetOs::Linux) => {
-            // Link resulting object file to create executable
-            let mut command = Command::new("gcc")
-                .args(args)
-                .spawn()
-                .expect("Failed to link");
+    let mut command = Command::new(linker)
+        .args(args)
+        .spawn()
+        .expect("Failed to link");
 
-            match command.wait() {
-                Ok(bad_status) if !bad_status.success() => {
-                    return Err(BackendError::plain("Failed to link"));
-                }
-                Err(_) => {
-                    return Err(BackendError::plain("Failed to spawn linker"));
-                }
-                Ok(_) => (),
-            }
-
-            // Return time it took to link
-            Ok(start_time.elapsed())
+    match command.wait() {
+        Ok(bad_status) if !bad_status.success() => {
+            return Err(BackendError::plain("Failed to link"));
         }
-        Some(TargetOs::Windows) | None => please_manually_link(args, diagnostics),
+        Err(_) => {
+            return Err(BackendError::plain("Failed to spawn linker"));
+        }
+        Ok(_) => (),
     }
+
+    // Return time it took to link
+    Ok(start_time.elapsed())
 }
 
 fn please_manually_link(args: Vec<OsString>, diagnostics: &Diagnostics) -> ! {

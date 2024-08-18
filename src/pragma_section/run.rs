@@ -30,6 +30,7 @@ impl PragmaSection {
                 excute_result: false,
                 use_pic: None,
                 target: Target::HOST,
+                infrastructure: None,
             },
             target: base_compiler.target,
             source_files: base_compiler.source_files,

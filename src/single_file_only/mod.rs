@@ -28,8 +28,11 @@ pub fn compile_single_file_only(
     filepath: &Path,
 ) {
     let source_files = compiler.source_files;
-    let output_binary_filepath = project_folder.join("a.out");
-    let output_object_filepath = project_folder.join("a.o");
+
+    let output_binary_filepath = project_folder.join(compiler.target.default_executable_name());
+    let object_folder = project_folder.join("obj");
+    let output_object_filepath = object_folder.join(compiler.target.default_object_file_name());
+    std::fs::create_dir_all(object_folder).expect("failed to create obj folder");
 
     let content = std::fs::read_to_string(filename)
         .map_err(|err| {

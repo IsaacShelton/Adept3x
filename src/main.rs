@@ -80,13 +80,13 @@ fn build_project(build_command: BuildCommand) {
 
     if target.arch().is_none() {
         diagnostics.push(WarningDiagnostic::plain(
-            "Host architecture is not supported, falling back to best guess",
+            "Target architecture is not supported, falling back to best guess",
         ));
     }
 
     if target.os().is_none() {
         diagnostics.push(WarningDiagnostic::plain(
-            "Host os is not supported, falling back to best guess",
+            "Target os is not supported, falling back to best guess",
         ));
     }
 

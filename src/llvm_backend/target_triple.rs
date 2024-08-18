@@ -3,7 +3,7 @@ use crate::target::{Target, TargetArch, TargetOs};
 use cstr::cstr;
 use llvm_sys::{
     core::LLVMDisposeMessage,
-    target_machine::{LLVMGetTargetFromTriple, LLVMTargetRef},
+    target_machine::{LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetRef},
 };
 use std::{
     ffi::{CStr, CString},
@@ -12,7 +12,15 @@ use std::{
 
 pub unsafe fn get_triple(target: &Target) -> Result<CString, BackendError> {
     let Some((arch, os)) = target.arch().zip(target.os()) else {
-        return Err(BackendError::plain(format!("Unsuported target {}", target)));
+        return if target.is_host() {
+            // Fallback to host target triple if unknown platform
+            Ok(CString::from_raw(LLVMGetDefaultTargetTriple()))
+        } else {
+            Err(BackendError::plain(format!(
+                "Unsupported target {}",
+                target
+            )))
+        };
     };
 
     Ok(match arch {
