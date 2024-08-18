@@ -11,7 +11,10 @@ use crate::{
 pub use arch::{TargetArch, TargetArchExt};
 pub use display::IntoDisplay;
 pub use os::{TargetOs, TargetOsExt};
-use std::fmt::Display;
+use std::{
+    ffi::{OsStr, OsString},
+    fmt::Display,
+};
 use type_layout::TypeLayout;
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -47,19 +50,33 @@ impl Target {
         self.arch.is_host() && self.os.is_host()
     }
 
-    pub fn default_executable_name(&self) -> String {
+    pub fn default_executable_name(&self, basename: &OsStr) -> OsString {
+        let basename = basename.to_str().unwrap_or("main");
+
         match self.os {
             Some(TargetOs::Windows) => {
-                format!("main-{}-{}.exe", self.arch.display(), self.os.display())
+                format!(
+                    "{}-{}-{}.exe",
+                    basename,
+                    self.arch.display(),
+                    self.os.display()
+                )
             }
             Some(TargetOs::Mac | TargetOs::Linux) | None => {
-                format!("main-{}-{}", self.arch.display(), self.os.display())
+                format!("{}-{}-{}", basename, self.arch.display(), self.os.display())
             }
         }
+        .into()
     }
 
-    pub fn default_object_file_name(&self) -> String {
-        format!("main-{}-{}.o", self.arch.display(), self.os.display())
+    pub fn default_object_file_name(&self, basename: &OsStr) -> OsString {
+        format!(
+            "{}-{}-{}.o",
+            basename.to_str().unwrap_or("main"),
+            self.arch.display(),
+            self.os.display()
+        )
+        .into()
     }
 
     pub fn default_c_integer_sign(&self, integer: CInteger) -> IntegerSign {

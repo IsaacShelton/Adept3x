@@ -83,6 +83,10 @@ pub fn link_result(
         args.push("--end-group".into());
     }
 
+    if target.os().is_mac() {
+        args.push("-Wl,-ld_classic".into());
+    }
+
     let linker = if target.is_host() {
         // Link for host platform
 

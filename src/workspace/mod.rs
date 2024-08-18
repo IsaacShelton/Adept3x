@@ -44,6 +44,8 @@ use module_file::ModuleFile;
 use normal_file::{NormalFile, NormalFileKind};
 use std::{
     collections::HashMap,
+    ffi::OsString,
+    fs::create_dir_all,
     path::Path,
     process::exit,
     sync::{
@@ -222,11 +224,29 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     );
 
     let project_folder = folder_path;
-    let output_binary_filepath = project_folder.join(compiler.target.default_executable_name());
-    let object_folder = project_folder.join("obj");
-    let output_object_filepath = object_folder.join(compiler.target.default_object_file_name());
 
-    std::fs::create_dir_all(object_folder).expect("failed to create obj folder");
+    let project_name = project_folder
+        .file_name()
+        .map(OsString::from)
+        .unwrap_or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .map(|dir| {
+                    dir.file_name()
+                        .map(OsString::from)
+                        .unwrap_or_else(|| OsString::from("main"))
+                })
+                .unwrap_or_else(|| OsString::from("main"))
+        });
+
+    let bin_folder = project_folder.join("bin");
+    let obj_folder = project_folder.join("obj");
+
+    create_dir_all(&bin_folder).expect("failed to create bin folder");
+    create_dir_all(&obj_folder).expect("failed to create obj folder");
+
+    let exe_filepath = bin_folder.join(compiler.target.default_executable_name(&project_name));
+    let obj_filepath = obj_folder.join(compiler.target.default_object_file_name(&project_name));
 
     let linking_duration = exit_unless(
         unsafe {
@@ -234,8 +254,8 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
                 compiler,
                 &ir_module,
                 &resolved_ast,
-                &output_object_filepath,
-                &output_binary_filepath,
+                &obj_filepath,
+                &exe_filepath,
                 &compiler.diagnostics,
             )
         },
@@ -261,7 +281,7 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
         bytes_processed, files_processed, in_how_many_seconds,
     );
 
-    compiler.maybe_execute_result(&output_binary_filepath);
+    compiler.maybe_execute_result(&exe_filepath);
 }
 
 fn compile_code_file<'a, I: Inflow<Token>>(

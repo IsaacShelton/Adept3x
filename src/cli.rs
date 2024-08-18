@@ -49,7 +49,7 @@ impl Command {
 
                     options.infrastructure = Some(
                         PathBuf::from_str(&infrastructure)
-                            .expect("invalid non-utf8 infrastructure path"),
+                            .expect("invalid non-utf-8 infrastructure path"),
                     );
                 }
                 _ => {

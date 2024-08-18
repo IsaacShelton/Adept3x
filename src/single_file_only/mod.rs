@@ -19,7 +19,7 @@ use crate::{
     workspace::fs::Fs,
 };
 use indexmap::IndexMap;
-use std::{path::Path, process::exit};
+use std::{ffi::OsString, fs::create_dir_all, path::Path, process::exit};
 
 pub fn compile_single_file_only(
     compiler: &mut Compiler,
@@ -29,10 +29,25 @@ pub fn compile_single_file_only(
 ) {
     let source_files = compiler.source_files;
 
-    let output_binary_filepath = project_folder.join(compiler.target.default_executable_name());
-    let object_folder = project_folder.join("obj");
-    let output_object_filepath = object_folder.join(compiler.target.default_object_file_name());
-    std::fs::create_dir_all(object_folder).expect("failed to create obj folder");
+    let project_name = filepath.file_name().map(OsString::from).unwrap_or_else(|| {
+        std::env::current_dir()
+            .ok()
+            .map(|dir| {
+                dir.file_name()
+                    .map(OsString::from)
+                    .unwrap_or_else(|| OsString::from("main"))
+            })
+            .unwrap_or_else(|| OsString::from("main"))
+    });
+
+    let bin_folder = project_folder.join("bin");
+    let obj_folder = project_folder.join("obj");
+
+    create_dir_all(&bin_folder).expect("failed to create bin folder");
+    create_dir_all(&obj_folder).expect("failed to create obj folder");
+
+    let exe_filepath = bin_folder.join(compiler.target.default_executable_name(&project_name));
+    let obj_filepath = obj_folder.join(compiler.target.default_object_file_name(&project_name));
 
     let content = std::fs::read_to_string(filename)
         .map_err(|err| {
@@ -83,13 +98,13 @@ pub fn compile_single_file_only(
                 compiler,
                 &ir_module,
                 &resolved_ast,
-                &output_object_filepath,
-                &output_binary_filepath,
+                &obj_filepath,
+                &exe_filepath,
                 &compiler.diagnostics,
             )
         },
         source_files,
     );
 
-    compiler.maybe_execute_result(&output_binary_filepath);
+    compiler.maybe_execute_result(&exe_filepath);
 }
