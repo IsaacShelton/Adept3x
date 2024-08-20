@@ -55,12 +55,11 @@ impl Target {
 
         match self.os {
             Some(TargetOs::Windows) => {
-                format!(
-                    "{}-{}-{}.exe",
-                    basename,
-                    self.arch.display(),
-                    self.os.display()
-                )
+                if self.arch.is_x86_64() {
+                    format!("{}.exe", basename)
+                } else {
+                    format!("{}-{}.exe", basename, self.arch.display())
+                }
             }
             Some(TargetOs::Mac | TargetOs::Linux) | None => {
                 format!("{}-{}-{}", basename, self.arch.display(), self.os.display())

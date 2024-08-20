@@ -73,7 +73,7 @@ impl<'a, I: Inflow<Token>> CodeFile<'a, I> {
     }
 }
 
-pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
+pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
     let compiler = compiler;
 
     let start_time = Instant::now();
@@ -87,7 +87,7 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
     let ExploreResult {
         module_files,
         mut normal_files,
-    } = explore(&fs, folder_path);
+    } = explore(&fs, project_folder);
 
     let num_threads = (normal_files.len() + module_files.len()).min(NUM_THREADS);
     let all_modules_done = Barrier::new(num_threads);
@@ -222,8 +222,6 @@ pub fn compile_workspace(compiler: &mut Compiler, folder_path: &Path) {
         lower(&compiler.options, &resolved_ast, &compiler.target),
         compiler.source_files,
     );
-
-    let project_folder = folder_path;
 
     let project_name = project_folder
         .file_name()

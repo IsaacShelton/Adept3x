@@ -91,9 +91,10 @@ pub fn link_result(
         // Link for host platform
 
         match target.os() {
-            None | Some(TargetOs::Windows) => {
-                please_manually_link(args, diagnostics);
-            }
+            None | Some(TargetOs::Windows) => infrastructure
+                .join("to_windows")
+                .join("from_x86_64_windows")
+                .join("ld.exe"),
             Some(TargetOs::Mac | TargetOs::Linux) => PathBuf::from_str("/usr/bin/gcc").unwrap(),
         }
     } else {

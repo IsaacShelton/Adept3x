@@ -64,7 +64,7 @@ impl ABIFunction {
     ) -> Result<Self, BackendError> {
         let calling_convention = LLVMCallConv::LLVMCCallConv;
         let itanium = Itanium {
-            target_info: &ctx.ir_module.target,
+            target: &ctx.ir_module.target,
             type_layout_cache: &ctx.type_layout_cache,
         };
 

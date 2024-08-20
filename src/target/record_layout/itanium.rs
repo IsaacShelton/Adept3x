@@ -202,7 +202,7 @@ impl<'a> ItaniumRecordLayoutBuilder<'a> {
             && (field_class.as_ref().map_or(true, |field_class| {
                 field_class.is_cxx_pod()
                     || field_class.is_packed()
-                    || self.type_layout_cache.target_info.os.is_mac()
+                    || self.type_layout_cache.target.os.is_mac()
             })))
             || field.properties.is_force_packed;
 

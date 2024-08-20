@@ -7,7 +7,7 @@ use derive_more::IsVariant;
 
 #[derive(Clone, Debug)]
 pub struct Itanium<'a> {
-    pub target_info: &'a Target,
+    pub target: &'a Target,
     pub type_layout_cache: &'a TypeLayoutCache<'a>,
 }
 
@@ -16,10 +16,10 @@ pub fn can_pass_in_registers_composite(ty: &ir::Type) -> Option<bool> {
 }
 
 impl<'a> Itanium<'a> {
-    pub fn new(type_layout_cache: &'a TypeLayoutCache, target_info: &'a Target) -> Self {
+    pub fn new(type_layout_cache: &'a TypeLayoutCache, target: &'a Target) -> Self {
         Self {
             type_layout_cache,
-            target_info,
+            target,
         }
     }
 

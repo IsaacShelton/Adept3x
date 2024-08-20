@@ -192,7 +192,7 @@ impl TypeKind {
         Type { kind: self, source }
     }
 
-    pub fn sign(&self, target_info: Option<&Target>) -> Option<IntegerSign> {
+    pub fn sign(&self, target: Option<&Target>) -> Option<IntegerSign> {
         match self {
             TypeKind::Boolean => None,
             TypeKind::Integer { sign, .. } => Some(*sign),
@@ -205,7 +205,7 @@ impl TypeKind {
                 if let Some(sign) = sign {
                     Some(*sign)
                 } else {
-                    target_info.map(|target_info| target_info.default_c_integer_sign(*integer))
+                    target.map(|target| target.default_c_integer_sign(*integer))
                 }
             }
             TypeKind::Float(_)

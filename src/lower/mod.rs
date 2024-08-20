@@ -19,9 +19,9 @@ use resolved::{IntegerKnown, IntegerSign};
 pub fn lower<'a>(
     options: &BuildOptions,
     ast: &resolved::Ast,
-    target_info: &'a Target,
+    target: &'a Target,
 ) -> Result<ir::Module<'a>, LowerError> {
-    let mut ir_module = ir::Module::new(target_info);
+    let mut ir_module = ir::Module::new(target);
 
     for (structure_ref, structure) in ast.structures.iter() {
         lower_structure(&mut ir_module, structure_ref, structure, ast)?;
@@ -325,7 +325,7 @@ fn lower_stmts(
 
 fn lower_drop(
     builder: &mut Builder,
-    target_info: &Target,
+    target: &Target,
     variable_key: VariableStorageKey,
     function: &resolved::Function,
     resolved_ast: &resolved::Ast,
@@ -337,7 +337,7 @@ fn lower_drop(
 
     if variable.resolved_type.kind.is_managed_structure() {
         let variable_pointer = lower_variable_to_value(variable_key);
-        let variable_type = lower_type(target_info, &variable.resolved_type, resolved_ast)?;
+        let variable_type = lower_type(target, &variable.resolved_type, resolved_ast)?;
         let heap_pointer = builder.push(ir::Instruction::Load((variable_pointer, variable_type)));
         builder.push(ir::Instruction::Free(heap_pointer));
     }
@@ -346,7 +346,7 @@ fn lower_drop(
 }
 
 fn lower_type(
-    target_info: &Target,
+    target: &Target,
     resolved_type: &resolved::Type,
     resolved_ast: &resolved::Ast,
 ) -> Result<ir::Type, LowerError> {
@@ -367,7 +367,7 @@ fn lower_type(
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
         resolved::TypeKind::CInteger { integer, sign } => {
-            Ok(lower_c_integer(target_info, *integer, *sign))
+            Ok(lower_c_integer(target, *integer, *sign))
         }
         resolved::TypeKind::IntegerLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
@@ -387,7 +387,7 @@ fn lower_type(
             FloatSize::Bits64 => ir::Type::F64,
         }),
         resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
-            target_info,
+            target,
             inner,
             resolved_ast,
         )?))),
@@ -405,11 +405,11 @@ fn lower_type(
             todo!("lower anonymous union")
         }
         resolved::TypeKind::AnonymousEnum(anonymous_enum) => {
-            lower_type(target_info, &anonymous_enum.resolved_type, resolved_ast)
+            lower_type(target, &anonymous_enum.resolved_type, resolved_ast)
         }
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
-            let inner = lower_type(target_info, &fixed_array.inner, resolved_ast)?;
+            let inner = lower_type(target, &fixed_array.inner, resolved_ast)?;
 
             Ok(ir::Type::FixedArray(Box::new(ir::FixedArray {
                 length: size,
@@ -423,7 +423,7 @@ fn lower_type(
                 .get(enum_name)
                 .expect("referenced enum to exist");
 
-            lower_type(target_info, &enum_definition.resolved_type, resolved_ast)
+            lower_type(target, &enum_definition.resolved_type, resolved_ast)
         }
     }
 }

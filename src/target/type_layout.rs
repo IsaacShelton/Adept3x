@@ -48,7 +48,7 @@ impl TypeLayout {
 #[derive(Debug)]
 pub struct TypeLayoutCache<'a> {
     memo: OnceMap<ir::Type, TypeLayout>,
-    pub target_info: &'a Target,
+    pub target: &'a Target,
     pub structures: &'a ir::Structures,
     pub resolved_ast: &'a resolved::Ast<'a>,
     pub diagnostics: &'a Diagnostics<'a>,
@@ -56,14 +56,14 @@ pub struct TypeLayoutCache<'a> {
 
 impl<'a> TypeLayoutCache<'a> {
     pub fn new(
-        target_info: &'a Target,
+        target: &'a Target,
         structures: &'a ir::Structures,
         resolved_ast: &'a resolved::Ast,
         diagnostics: &'a Diagnostics<'a>,
     ) -> Self {
         Self {
             memo: OnceMap::new(),
-            target_info,
+            target,
             structures,
             resolved_ast,
             diagnostics,
@@ -81,8 +81,8 @@ impl<'a> TypeLayoutCache<'a> {
 
     fn get_impl(&self, ir_type: &ir::Type) -> TypeLayout {
         match ir_type {
-            ir::Type::Pointer(_) | ir::Type::FunctionPointer => self.target_info.pointer_layout(),
-            ir::Type::Boolean => self.target_info.bool_layout(),
+            ir::Type::Pointer(_) | ir::Type::FunctionPointer => self.target.pointer_layout(),
+            ir::Type::Boolean => self.target.bool_layout(),
             ir::Type::S8 | ir::Type::U8 => TypeLayout::basic(ByteUnits::of(1)),
             ir::Type::S16 | ir::Type::U16 => TypeLayout::basic(ByteUnits::of(2)),
             ir::Type::S32 | ir::Type::U32 => TypeLayout::basic(ByteUnits::of(4)),

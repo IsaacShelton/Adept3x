@@ -653,7 +653,7 @@ unsafe fn build_binary_operands(
 
 unsafe fn promote_variadic_argument(
     builder: &Builder,
-    target_info: &Target,
+    target: &Target,
     value: LLVMValueRef,
 ) -> LLVMValueRef {
     let llvm_type = LLVMTypeOf(value);
@@ -661,7 +661,7 @@ unsafe fn promote_variadic_argument(
     if llvm_type.is_float() {
         LLVMBuildFPExt(builder.get(), value, LLVMDoubleType(), cstr!("").as_ptr())
     } else if llvm_type.is_integer() {
-        let c_int_size = BitUnits::from(target_info.int_layout().width);
+        let c_int_size = BitUnits::from(target.int_layout().width);
 
         if llvm_type.integer_width() < c_int_size {
             builder.zext(value, LLVMTypeRef::new_int(c_int_size))
@@ -675,11 +675,11 @@ unsafe fn promote_variadic_argument(
 
 fn promote_variadic_argument_type(
     builder: &Builder,
-    target_info: &Target,
+    target: &Target,
     ir_type: &ir::Type,
 ) -> ir::Type {
     assert_eq!(
-        target_info.int_layout().width,
+        target.int_layout().width,
         ByteUnits::of(4),
         "we're assuming sizeof C int is 32 bits for now"
     );
@@ -694,9 +694,7 @@ fn promote_variadic_argument_type(
 
         // Promote atomics based on what's inside
         ir::Type::Atomic(inner_type) => ir::Type::Atomic(Box::new(promote_variadic_argument_type(
-            builder,
-            target_info,
-            inner_type,
+            builder, target, inner_type,
         ))),
 
         // Otherwise, keep the same type

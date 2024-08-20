@@ -488,9 +488,9 @@ pub struct ValueReference {
 }
 
 impl<'a> Module<'a> {
-    pub fn new(target_info: &'a Target) -> Self {
+    pub fn new(target: &'a Target) -> Self {
         Self {
-            target: target_info,
+            target,
             functions: HashMap::new(),
             structures: HashMap::new(),
             globals: HashMap::new(),
