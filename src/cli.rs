@@ -41,6 +41,9 @@ impl Command {
                 "--linux" => {
                     options.target = Target::generic_os(TargetOs::Linux);
                 }
+                "--freebsd" => {
+                    options.target = Target::generic_os(TargetOs::FreeBsd);
+                }
                 "--infrastructure" => {
                     let Some(infrastructure) = args.next() else {
                         eprintln!("error: Expected infrastructure path after '--infrastructure'");

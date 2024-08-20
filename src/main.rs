@@ -97,6 +97,7 @@ fn build_project(build_command: BuildCommand) {
         Some((TargetOs::Mac, TargetArch::Aarch64)) => (),
         Some((TargetOs::Linux, TargetArch::X86_64)) => (),
         Some((TargetOs::Linux, TargetArch::Aarch64)) => (),
+        Some((TargetOs::FreeBsd, TargetArch::X86_64)) => (),
         None => (),
         #[allow(unreachable_patterns)]
         _ => {

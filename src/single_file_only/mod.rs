@@ -29,7 +29,7 @@ pub fn compile_single_file_only(
 ) {
     let source_files = compiler.source_files;
 
-    let project_name = filepath.file_name().map(OsString::from).unwrap_or_else(|| {
+    let project_name = filepath.file_stem().map(OsString::from).unwrap_or_else(|| {
         std::env::current_dir()
             .ok()
             .map(|dir| {

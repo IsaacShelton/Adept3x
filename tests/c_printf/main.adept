@@ -3,6 +3,6 @@
 func printf(format ptr<u8>, ...) i32
 
 func main {
-    printf(c"Hello, World!")
+    printf(c"Hello, World!\n")
 }
 
