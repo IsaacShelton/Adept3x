@@ -31,6 +31,7 @@ compile float_literal
 compile function_parameters
 compile function_simple
 compile global_variables
+compile hello_world
 compile if
 compile if_elif_else
 compile if_eval
