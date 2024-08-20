@@ -32,7 +32,9 @@ impl Target {
 
     pub const fn generic_os(os: TargetOs) -> Self {
         let arch = match os {
-            TargetOs::Windows | TargetOs::Mac | TargetOs::Linux => TargetArch::X86_64,
+            TargetOs::Windows | TargetOs::Mac | TargetOs::Linux | TargetOs::FreeBsd => {
+                TargetArch::X86_64
+            }
         };
 
         Self::new(Some(os), Some(arch))
@@ -61,7 +63,7 @@ impl Target {
                     format!("{}-{}.exe", basename, self.arch.display())
                 }
             }
-            Some(TargetOs::Mac | TargetOs::Linux) | None => {
+            Some(TargetOs::Mac | TargetOs::Linux | TargetOs::FreeBsd) | None => {
                 format!("{}-{}-{}", basename, self.arch.display(), self.os.display())
             }
         }

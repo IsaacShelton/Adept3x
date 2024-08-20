@@ -24,13 +24,14 @@ impl Arch {
                     TargetOs::Windows => X86_64::Win64(Win64::new(avx_level)),
                     TargetOs::Mac => X86_64::SysV(SysV::new(SysVOs::Darwin, avx_level)),
                     TargetOs::Linux => X86_64::SysV(SysV::new(SysVOs::Linux, avx_level)),
+                    TargetOs::FreeBsd => X86_64::SysV(SysV::new(SysVOs::Bsd, avx_level)),
                 })
             }
             TargetArch::Aarch64 => Arch::Aarch64(Aarch64 {
                 variant: match target.os()? {
                     TargetOs::Windows => Aarch64Variant::Win64,
                     TargetOs::Mac => Aarch64Variant::DarwinPCS,
-                    TargetOs::Linux => Aarch64Variant::Aapcs,
+                    TargetOs::Linux | TargetOs::FreeBsd => Aarch64Variant::Aapcs,
                 },
                 is_cxx_mode: false,
             }),

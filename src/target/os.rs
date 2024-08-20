@@ -5,6 +5,7 @@ pub enum TargetOs {
     Windows,
     Mac,
     Linux,
+    FreeBsd,
 }
 
 impl TargetOs {
@@ -14,6 +15,8 @@ impl TargetOs {
         Some(TargetOs::Mac)
     } else if cfg!(target_os = "linux") {
         Some(TargetOs::Linux)
+    } else if cfg!(target_os = "freebsd") {
+        Some(TargetOs::FreeBsd)
     } else {
         None
     };
@@ -25,6 +28,7 @@ impl Display for TargetOs {
             TargetOs::Windows => write!(f, "windows"),
             TargetOs::Mac => write!(f, "macos"),
             TargetOs::Linux => write!(f, "linux"),
+            TargetOs::FreeBsd => write!(f, "freebsd"),
         }
     }
 }
@@ -34,6 +38,7 @@ pub trait TargetOsExt {
     fn is_windows(&self) -> bool;
     fn is_mac(&self) -> bool;
     fn is_linux(&self) -> bool;
+    fn is_freebsd(&self) -> bool;
 }
 
 impl TargetOsExt for TargetOs {
@@ -52,6 +57,10 @@ impl TargetOsExt for TargetOs {
     fn is_linux(&self) -> bool {
         matches!(self, TargetOs::Linux)
     }
+
+    fn is_freebsd(&self) -> bool {
+        matches!(self, TargetOs::FreeBsd)
+    }
 }
 
 impl TargetOsExt for Option<TargetOs> {
@@ -69,5 +78,9 @@ impl TargetOsExt for Option<TargetOs> {
 
     fn is_linux(&self) -> bool {
         matches!(self, Some(TargetOs::Linux))
+    }
+
+    fn is_freebsd(&self) -> bool {
+        matches!(self, Some(TargetOs::FreeBsd))
     }
 }

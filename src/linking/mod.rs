@@ -96,6 +96,7 @@ pub fn link_result(
                 .join("from_x86_64_windows")
                 .join("ld.exe"),
             Some(TargetOs::Mac | TargetOs::Linux) => PathBuf::from_str("/usr/bin/gcc").unwrap(),
+            Some(TargetOs::FreeBsd) => PathBuf::from_str("/usr/bin/cc").unwrap(),
         }
     } else {
         // Link for non-host platform
@@ -116,7 +117,7 @@ pub fn link_result(
                     please_manually_link(args, diagnostics);
                 }
             }
-            Some(TargetOs::Mac | TargetOs::Linux) | None => {
+            Some(TargetOs::Mac | TargetOs::Linux | TargetOs::FreeBsd) | None => {
                 please_manually_link(args, diagnostics);
             }
         }

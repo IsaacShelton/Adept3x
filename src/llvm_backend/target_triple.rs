@@ -28,11 +28,13 @@ pub unsafe fn get_triple(target: &Target) -> Result<CString, BackendError> {
             TargetOs::Windows => cstr!("x86_64-pc-windows-gnu").into(),
             TargetOs::Mac => cstr!("x86_64-apple-darwin").into(),
             TargetOs::Linux => cstr!("x86_64-unknown-linux-gnu").into(),
+            TargetOs::FreeBsd => cstr!("x86_64-unknown-freebsd").into(),
         },
         TargetArch::Aarch64 => match os {
             TargetOs::Windows => cstr!("aarch64-pc-windows-gnu").into(),
             TargetOs::Mac => cstr!("arm64-apple-darwin").into(),
             TargetOs::Linux => cstr!("aarch64-unknown-linux-gnu").into(),
+            TargetOs::FreeBsd => cstr!("aarch64-unknown-freebsd").into(),
         },
     })
 }
