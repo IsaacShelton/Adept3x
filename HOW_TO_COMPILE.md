@@ -7,6 +7,8 @@ yield different results.
 
 ### Windows
 
+Rust Setup:
+
 - Download rustup
 - Continue WITHOUT installing the C++ build tools
 - Press `2` for customization
@@ -15,6 +17,8 @@ yield different results.
 - Choose default installation profile
 - Tell it to modify the path variable
 - Press `1` to proceed with the installation
+
+MSYS2 Setup:
 
 - Download MSYS2
 - Install MSYS2
