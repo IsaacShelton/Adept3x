@@ -87,5 +87,5 @@ them if you want to source your own.
   LLVM 18.1.8
 - `to_windows/from_aarch64_macos/ld` comes from Homebrew's build of x86_64
   mingw64
-- `to_windows/from_x86_64_linux/llvm-rc` comes from Homebrew's build of LLVM
-  18.1.8
+- `to_windows/from_aarch64_macos/llvm-windres` comes from Homebrew's build of
+  LLVM 18.1.8
