@@ -69,3 +69,23 @@ cross-compilation.
 - `cargo +nightly build --release`
 - (optional) copy `./infrastructure` folder to `./target/release/infrastructure`
   for easy cross-compiling to other platforms
+
+# FAQ
+
+### Where do the binaries in `infrastructure/` come from?
+
+These necessary files are packaged for convenience, but feel free to replace
+them if you want to source your own.
+
+- The `to_windows/*.(a|o)` files come from MSYS2's x86_64 mingw64
+- `to_windows/from_x86_64_windows/ld.exe` comes from MSYS2's x86_64 mingw64
+- `to_windows/from_x86_64_windows/llvm-windres.exe` comes from the `llvm-rc.exe`
+  of MSYS2's LLVM package
+- `to_windows/from_x86_64_linux/ld` comes from Ubuntu 24.04's build of x86_64
+  mingw64
+- `to_windows/from_x86_64_linux/llvm-windres` comes from Ubuntu 24.04's build of
+  LLVM 18.1.8
+- `to_windows/from_aarch64_macos/ld` comes from Homebrew's build of x86_64
+  mingw64
+- `to_windows/from_x86_64_linux/llvm-rc` comes from Homebrew's build of LLVM
+  18.1.8
