@@ -35,7 +35,7 @@ See "Dereferenced Pointers" section for more details on dereferencing.
 
 #### Dereferencing
 
-You can dereference a pointer with either `*my_variable `**OR** `my_variable.deref()`
+You can dereference a borrowed-value with either `*my_variable `**OR** `my_variable.deref()`
 
 See "Dereferenced Pointers" section for more details on dereferencing.
 
@@ -51,3 +51,4 @@ See "Dereferenced Pointers" section for more details on dereferencing.
 
 - `deref<T>` : `*my_variable` **OR** `my_variable.deref()` **OR** `deref(my_variable)`
 - `deref_const<T>` : `*my_variable` **OR** `my_variable.deref_const()` **OR** `deref_const(my_variable)`
+

@@ -14,6 +14,8 @@
 - `ulong` : equivalent to `unsigned long` in C
 - `longlong` : equivalent to `long long` in C
 - `ulonglong` : equivalent to `unsigned long long` in C
+- `float`: equivalent to `float` in C
+- `double`: equivalent to `double` in C
 
 ### Specific:
 
