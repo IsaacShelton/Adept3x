@@ -16,6 +16,7 @@
 - `ulonglong` : equivalent to `unsigned long long` in C
 - `float`: equivalent to `float` in C
 - `double`: equivalent to `double` in C
+- `usize`: equivalent to `size_t` in C
 
 ### Specific:
 
@@ -71,3 +72,41 @@ Multiplication:
 - `a *= b`
 - `a *%= b`
 - `a *^= b`
+
+### Function Pointers
+
+- `func<arg1 ArgType1, arg2 ArgType2, arg3 ArgType3, return ReturnType>`
+
+Usage Example:
+
+```
+#[foreign]
+func qsort(base ptr<void>, nitems size_t, compar func<a ptr_const<void>, b ptr_const<void>, return int>) void
+
+func main {
+	buffer := array<256, int>::zeroed()
+		
+	for i in Range::upto(buffer.length) {
+		buffer[i] = rand()
+	}
+	
+	qsort(buffer.ptr(), buffer.length, func &compareInts)
+	
+	for integer in buffer {
+		printf("%d\n", integer)
+	}
+}
+
+func compareInts(a, b ptr_const<void>) int {
+	a := a.ptr_const<int>().deref()
+	b := b.ptr_const<int>().deref()
+	
+	return if a < b {
+		1
+	} elif a > b {
+		-1
+	} else {
+		0
+	}
+}
+```
