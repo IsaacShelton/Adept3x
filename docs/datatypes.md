@@ -85,13 +85,13 @@ func qsort(base ptr<void>, nitems size_t, compar func<a ptr_const<void>, b ptr_c
 
 func main {
 	buffer := array<256, int>::zeroed()
-		
+
 	for i in Range::upto(buffer.length) {
 		buffer[i] = rand()
 	}
-	
+
 	qsort(buffer.ptr(), buffer.length, func &compareInts)
-	
+
 	for integer in buffer {
 		printf("%d\n", integer)
 	}
@@ -100,11 +100,11 @@ func main {
 func compareInts(a, b ptr_const<void>) int {
 	a := a.ptr_const<int>().deref()
 	b := b.ptr_const<int>().deref()
-	
+
 	return if a < b {
-		1
-	} elif a > b {
 		-1
+	} elif a > b {
+		1
 	} else {
 		0
 	}
