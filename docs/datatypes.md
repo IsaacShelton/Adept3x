@@ -75,13 +75,13 @@ Multiplication:
 
 ### Function Pointers
 
-- `func<arg1 ArgType1, arg2 ArgType2, arg3 ArgType3, return ReturnType>`
+- `fn<a ptr_const<void>, b ptr_const<void>, int>`
 
 Usage Example:
 
 ```
 #[foreign]
-func qsort(base ptr<void>, nitems size_t, compar func<a ptr_const<void>, b ptr_const<void>, return int>) void
+func qsort(base ptr<void>, nitems size_t, compar fn<a ptr_const<void>, b ptr_const<void>, int>) void
 
 func main {
 	buffer := array<256, int>::zeroed()
@@ -108,5 +108,10 @@ func compareInts(a, b ptr_const<void>) int {
 	} else {
 		0
 	}
+}
+
+func castingFunctionPointers {
+	pointer := ptr<void>::null
+	the_function := pointer.fn<a int, b int, int>()
 }
 ```

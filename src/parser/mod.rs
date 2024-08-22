@@ -1251,30 +1251,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
                 Ok(Type::new(type_kind, source))
             }
-            Token {
-                kind: TokenKind::StructKeyword,
-                ..
-            } => Ok(TypeKind::Named(format!(
-                "struct<{}>",
-                self.parse_name_type_parameters(source)?
-            ))
-            .at(source)),
-            Token {
-                kind: TokenKind::UnionKeyword,
-                ..
-            } => Ok(TypeKind::Named(format!(
-                "union<{}>",
-                self.parse_name_type_parameters(source)?
-            ))
-            .at(source)),
-            Token {
-                kind: TokenKind::EnumKeyword,
-                ..
-            } => Ok(TypeKind::Named(format!(
-                "enum<{}>",
-                self.parse_name_type_parameters(source)?
-            ))
-            .at(source)),
             unexpected => Err(ParseError {
                 kind: ParseErrorKind::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),

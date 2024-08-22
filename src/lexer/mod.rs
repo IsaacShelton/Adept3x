@@ -1,3 +1,4 @@
+mod compound_identifier_state;
 mod hex_number_state;
 mod identifier_state;
 mod number_state;
@@ -15,6 +16,7 @@ use crate::{
     text::{Character, Text},
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
+use compound_identifier_state::CompoundIdentifierState;
 
 pub struct Lexer<T: Text + Send> {
     characters: T,
@@ -33,6 +35,7 @@ impl<T: Text + Send> Lexer<T> {
         match &self.state {
             State::Idle => self.feed_idle(),
             State::Identifier(_) => self.feed_identifier(),
+            State::CompoundIdentifier(_) => self.feed_compound_identifier(),
             State::String(_) => self.feed_string(),
             State::Number(_) => self.feed_number(),
             State::HexNumber(_) => self.feed_hex_number(),
@@ -295,11 +298,35 @@ impl<T: Text + Send> Lexer<T> {
                 state.identifier.push(self.characters.next().unwrap().0);
                 Waiting
             }
+            Character::At('<', _)
+                if matches!(state.identifier.as_str(), "struct" | "union" | "enum") =>
+            {
+                let mut state = std::mem::replace(&mut self.state, State::Idle).unwrap_identifier();
+                state.identifier.push('<');
+
+                self.state = State::CompoundIdentifier(CompoundIdentifierState {
+                    identifier: state.identifier,
+                    start_source: state.start_source,
+                });
+
+                Waiting
+            }
             _ => {
                 let token = state.finalize();
                 self.state = State::Idle;
                 Has(token)
             }
+        }
+    }
+
+    fn feed_compound_identifier(&mut self) -> FeedResult<Token> {
+        let state = self.state.as_mut_compound_identifier();
+
+        if let Some(token) = state.feed(self.characters.next()) {
+            self.state = State::Idle;
+            FeedResult::Has(token)
+        } else {
+            FeedResult::Waiting
         }
     }
 
