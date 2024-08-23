@@ -194,7 +194,7 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         ExprKind::BooleanLiteral(..)
         | ExprKind::IntegerLiteral(..)
         | ExprKind::IntegerKnown(_)
-        | ExprKind::Float(..)
+        | ExprKind::FloatingLiteral(..)
         | ExprKind::String(..)
         | ExprKind::NullTerminatedString(..) => (),
         ExprKind::Call(call) => {
@@ -421,7 +421,7 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
         | ExprKind::BooleanLiteral(_)
         | ExprKind::IntegerLiteral(_)
         | ExprKind::IntegerKnown(_)
-        | ExprKind::Float(..)
+        | ExprKind::FloatingLiteral(..)
         | ExprKind::String(_)
         | ExprKind::NullTerminatedString(_)
         | ExprKind::EnumMemberLiteral(_) => (),

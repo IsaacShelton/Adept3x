@@ -2,7 +2,7 @@
 #[foreign]
 {
     func printf(format ptr<u8>, ...) i32
-    func malloc(size uint) ptr<void>
+    func malloc(size ulonglong) ptr<void>
     func free(pointer ptr<void>) void
 }
 

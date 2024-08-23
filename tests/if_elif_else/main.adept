@@ -5,8 +5,8 @@
     __stdinp ptr<u8>
 
     func printf(format ptr<u8>, ...) i32
-    func fgets(string ptr<u8>, length i32, stream ptr<u8>) void
-    func malloc(size uint) ptr<u8>
+    func fgets(string ptr<u8>, length int, stream ptr<u8>) void
+    func malloc(size ulonglong) ptr<u8>
     func free(pointer ptr<u8>) void
     func strcmp(a ptr<u8>, b ptr<u8>) i32
     func atoi(string ptr<u8>) i32

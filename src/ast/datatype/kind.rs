@@ -33,11 +33,22 @@ impl TypeKind {
         Type { kind: self, source }
     }
 
-    pub fn allow_undeclared(&self) -> bool {
+    pub fn integer(bits: IntegerBits, sign: IntegerSign) -> TypeKind {
+        TypeKind::Integer { bits, sign }
+    }
+
+    pub fn c_integer(integer: CInteger, sign: Option<IntegerSign>) -> TypeKind {
+        TypeKind::CInteger { integer, sign }
+    }
+
+    pub fn allow_indirect_undefined(&self) -> bool {
         // TODO: CLEANUP: This is a bad way of doing it, should `Named` have property for this?
         // This is very rarely needed though, so it's yet to be seen if that would be an improvement.
         if let TypeKind::Named(name) = self {
-            if name.starts_with("struct<") {
+            if name.starts_with("struct<")
+                || name.starts_with("union<")
+                || name.starts_with("enum<")
+            {
                 return true;
             }
         }
@@ -81,7 +92,6 @@ impl Display for &TypeKind {
                 write!(f, "{name}")?;
             }
             TypeKind::Float(size) => f.write_str(match size {
-                FloatSize::Normal => "float",
                 FloatSize::Bits32 => "f32",
                 FloatSize::Bits64 => "f64",
             })?,

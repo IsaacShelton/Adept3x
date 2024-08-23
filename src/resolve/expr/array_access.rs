@@ -28,11 +28,7 @@ pub fn resolve_array_access_expr(
         ctx,
         &array_access.index,
         Some(PreferredType::of(
-            &resolved::TypeKind::Integer {
-                bits: IntegerBits::Bits64,
-                sign: IntegerSign::Unsigned,
-            }
-            .at(source),
+            &resolved::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
         )),
         Initialized::Require,
     )?;

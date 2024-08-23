@@ -11,11 +11,11 @@ use self::{
 use crate::{
     ast::{
         self, ArrayAccess, Assignment, AstFile, BasicBinaryOperation, BasicBinaryOperator,
-        BinaryOperator, Block, Call, Conditional, ConformBehavior, Declaration, DeclareAssign,
-        Enum, EnumMemberLiteral, Expr, ExprKind, Field, FieldInitializer, FillBehavior, FixedArray,
-        Function, GlobalVar, HelperExpr, Integer, Named, Parameter, Parameters,
-        ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Stmt, StmtKind, Structure,
-        Type, TypeAlias, TypeKind, UnaryOperation, UnaryOperator, While,
+        BinaryOperator, Block, CInteger, Call, Conditional, ConformBehavior, Declaration,
+        DeclareAssign, Enum, EnumMemberLiteral, Expr, ExprKind, Field, FieldInitializer,
+        FillBehavior, FixedArray, Function, GlobalVar, HelperExpr, Integer, Named, Parameter,
+        Parameters, ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator, Stmt, StmtKind,
+        Structure, Type, TypeAlias, TypeKind, UnaryOperation, UnaryOperator, While,
     },
     index_map_ext::IndexMapExt,
     inflow::Inflow,
@@ -1156,49 +1156,27 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
                 let type_kind = match identifier.as_str() {
                     "bool" => Ok(TypeKind::Boolean),
-                    "int" => Ok(TypeKind::Integer {
-                        bits: Normal,
-                        sign: Signed,
-                    }),
-                    "uint" => Ok(TypeKind::Integer {
-                        bits: Normal,
-                        sign: Unsigned,
-                    }),
-                    "i8" => Ok(TypeKind::Integer {
-                        bits: Bits8,
-                        sign: Signed,
-                    }),
-                    "u8" => Ok(TypeKind::Integer {
-                        bits: Bits8,
-                        sign: Unsigned,
-                    }),
-                    "i16" => Ok(TypeKind::Integer {
-                        bits: Bits16,
-                        sign: Signed,
-                    }),
-                    "u16" => Ok(TypeKind::Integer {
-                        bits: Bits16,
-                        sign: Unsigned,
-                    }),
-                    "i32" => Ok(TypeKind::Integer {
-                        bits: Bits32,
-                        sign: Signed,
-                    }),
-                    "u32" => Ok(TypeKind::Integer {
-                        bits: Bits32,
-                        sign: Unsigned,
-                    }),
-                    "i64" => Ok(TypeKind::Integer {
-                        bits: Bits64,
-                        sign: Signed,
-                    }),
-                    "u64" => Ok(TypeKind::Integer {
-                        bits: Bits64,
-                        sign: Unsigned,
-                    }),
-                    "float" => Ok(TypeKind::Float(FloatSize::Normal)),
-                    "f32" => Ok(TypeKind::Float(FloatSize::Bits32)),
-                    "f64" => Ok(TypeKind::Float(FloatSize::Bits64)),
+                    "char" => Ok(TypeKind::c_integer(CInteger::Char, None)),
+                    "schar" => Ok(TypeKind::c_integer(CInteger::Char, Some(Signed))),
+                    "uchar" => Ok(TypeKind::c_integer(CInteger::Char, Some(Unsigned))),
+                    "short" => Ok(TypeKind::c_integer(CInteger::Short, Some(Signed))),
+                    "ushort" => Ok(TypeKind::c_integer(CInteger::Short, Some(Unsigned))),
+                    "int" => Ok(TypeKind::c_integer(CInteger::Int, Some(Signed))),
+                    "uint" => Ok(TypeKind::c_integer(CInteger::Int, Some(Unsigned))),
+                    "long" => Ok(TypeKind::c_integer(CInteger::Long, Some(Signed))),
+                    "ulong" => Ok(TypeKind::c_integer(CInteger::Long, Some(Unsigned))),
+                    "longlong" => Ok(TypeKind::c_integer(CInteger::LongLong, Some(Signed))),
+                    "ulonglong" => Ok(TypeKind::c_integer(CInteger::LongLong, Some(Unsigned))),
+                    "i8" => Ok(TypeKind::integer(Bits8, Signed)),
+                    "u8" => Ok(TypeKind::integer(Bits8, Unsigned)),
+                    "i16" => Ok(TypeKind::integer(Bits16, Signed)),
+                    "u16" => Ok(TypeKind::integer(Bits16, Unsigned)),
+                    "i32" => Ok(TypeKind::integer(Bits32, Signed)),
+                    "u32" => Ok(TypeKind::integer(Bits32, Unsigned)),
+                    "i64" => Ok(TypeKind::integer(Bits64, Signed)),
+                    "u64" => Ok(TypeKind::integer(Bits64, Unsigned)),
+                    "f32" | "float" => Ok(TypeKind::Float(FloatSize::Bits32)),
+                    "f64" | "double" => Ok(TypeKind::Float(FloatSize::Bits64)),
                     "void" => Ok(TypeKind::Void),
                     "ptr" => {
                         if self.input.eat(TokenKind::OpenAngle) {

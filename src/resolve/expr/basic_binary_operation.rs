@@ -116,14 +116,14 @@ pub fn resolve_basic_binary_operator(
         )
         .then_some(resolved::BasicBinaryOperator::BitwiseXor),
         ast::BasicBinaryOperator::LeftShift => match resolved_type.kind {
-            resolved::TypeKind::Integer { sign, .. } => Some(match sign {
+            resolved::TypeKind::Integer(_, sign) => Some(match sign {
                 IntegerSign::Signed => resolved::BasicBinaryOperator::LeftShift,
                 IntegerSign::Unsigned => resolved::BasicBinaryOperator::LogicalLeftShift,
             }),
             _ => None,
         },
         ast::BasicBinaryOperator::RightShift => match resolved_type.kind {
-            resolved::TypeKind::Integer { sign, .. } => Some(match sign {
+            resolved::TypeKind::Integer(_, sign) => Some(match sign {
                 IntegerSign::Signed => resolved::BasicBinaryOperator::RightShift,
                 IntegerSign::Unsigned => resolved::BasicBinaryOperator::LogicalRightShift,
             }),
@@ -155,7 +155,7 @@ fn float_or_integer_from_type(
     match &unified_type.kind {
         resolved::TypeKind::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
         resolved::TypeKind::Integer { .. } => Some(FloatOrInteger::Integer),
-        resolved::TypeKind::Float(_) => Some(FloatOrInteger::Float),
+        resolved::TypeKind::Floating(_) => Some(FloatOrInteger::Float),
         _ => None,
     }
 }
@@ -168,19 +168,19 @@ fn float_or_sign_from_type(
         resolved::TypeKind::Boolean if allow_on_bools => {
             Some(FloatOrSign::Integer(IntegerSign::Unsigned))
         }
-        resolved::TypeKind::Integer { sign, .. } => Some(FloatOrSign::Integer(*sign)),
-        resolved::TypeKind::Float(_) => Some(FloatOrSign::Float),
+        resolved::TypeKind::Integer(_, sign) => Some(FloatOrSign::Integer(*sign)),
+        resolved::TypeKind::Floating(_) => Some(FloatOrSign::Float),
         _ => None,
     }
 }
 
 fn numeric_mode_from_type(unified_type: &resolved::Type) -> Option<NumericMode> {
     match &unified_type.kind {
-        resolved::TypeKind::Integer { sign, bits } => Some(match bits {
+        resolved::TypeKind::Integer(bits, sign) => Some(match bits {
             IntegerBits::Normal => NumericMode::CheckOverflow(*sign),
             _ => NumericMode::Integer(*sign),
         }),
-        resolved::TypeKind::Float(_) => Some(NumericMode::Float),
+        resolved::TypeKind::Floating(_) => Some(NumericMode::Float),
         _ => None,
     }
 }
