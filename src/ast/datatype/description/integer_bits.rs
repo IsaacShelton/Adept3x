@@ -6,7 +6,6 @@ pub enum IntegerBits {
     Bits16,
     Bits32,
     Bits64,
-    Normal,
 }
 
 impl IntegerBits {
@@ -26,7 +25,6 @@ impl IntegerBits {
 
     pub fn successor(self) -> Option<IntegerBits> {
         match self {
-            Self::Normal => Some(Self::Normal),
             Self::Bits8 => Some(Self::Bits16),
             Self::Bits16 => Some(Self::Bits32),
             Self::Bits32 => Some(Self::Bits64),
@@ -39,7 +37,7 @@ impl IntegerBits {
             IntegerBits::Bits8 => 8,
             IntegerBits::Bits16 => 16,
             IntegerBits::Bits32 => 32,
-            IntegerBits::Bits64 | IntegerBits::Normal => 64,
+            IntegerBits::Bits64 => 64,
         }
     }
 }

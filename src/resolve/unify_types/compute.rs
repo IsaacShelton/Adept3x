@@ -34,7 +34,7 @@ pub fn compute_unifying_type(
         }
 
         // Otherwise, use the default integer type
-        return Some(TypeKind::Integer(IntegerBits::Normal, IntegerSign::Signed).at(source));
+        return Some(TypeKind::Integer(IntegerBits::Bits32, IntegerSign::Signed).at(source));
     }
 
     // If all values are integer and floating literals, use the default floating-point type
