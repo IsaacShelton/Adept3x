@@ -7,8 +7,8 @@ use crate::{
     cli::BuildOptions,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
-        self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, IntegerBits,
-        Member, NumericMode, StmtKind, StructureLiteral, VariableStorageKey,
+        self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, Member,
+        NumericMode, StmtKind, StructureLiteral, VariableStorageKey,
     },
     tag::Tag,
     target::{Target, TargetOsExt},
@@ -355,8 +355,6 @@ fn lower_type(
     match &resolved_type.kind {
         resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
         resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
-            (Bits::Normal, Sign::Signed) => ir::Type::S64,
-            (Bits::Normal, Sign::Unsigned) => ir::Type::U64,
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
             (Bits::Bits8, Sign::Unsigned) => ir::Type::U8,
             (Bits::Bits16, Sign::Signed) => ir::Type::S16,
@@ -1064,10 +1062,10 @@ pub fn lower_basic_binary_operation(
         resolved::BasicBinaryOperator::Add(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Add(operands, FloatOrInteger::Integer),
             NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
-            NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
+            NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
                 ir::OverflowOperation {
                     operator: OverflowOperator::Add,
-                    bits: IntegerBits::Normal,
+                    bits: *bits,
                     sign: *sign,
                 },
                 operands,
@@ -1076,10 +1074,10 @@ pub fn lower_basic_binary_operation(
         resolved::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Subtract(operands, FloatOrInteger::Integer),
             NumericMode::Float => ir::Instruction::Subtract(operands, FloatOrInteger::Float),
-            NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
+            NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
                 ir::OverflowOperation {
                     operator: OverflowOperator::Subtract,
-                    bits: IntegerBits::Normal,
+                    bits: *bits,
                     sign: *sign,
                 },
                 operands,
@@ -1088,10 +1086,10 @@ pub fn lower_basic_binary_operation(
         resolved::BasicBinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) => ir::Instruction::Multiply(operands, FloatOrInteger::Integer),
             NumericMode::Float => ir::Instruction::Multiply(operands, FloatOrInteger::Float),
-            NumericMode::CheckOverflow(sign) => ir::Instruction::Checked(
+            NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
                 ir::OverflowOperation {
                     operator: OverflowOperator::Multiply,
-                    bits: IntegerBits::Normal,
+                    bits: *bits,
                     sign: *sign,
                 },
                 operands,

@@ -9,7 +9,7 @@ use crate::{
     resolved::{self, FloatOrInteger, FloatOrSign, NumericMode, TypedExpr},
     source_files::Source,
 };
-use ast::{IntegerBits, IntegerSign};
+use ast::IntegerSign;
 
 pub fn resolve_basic_binary_operation_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
@@ -176,10 +176,7 @@ fn float_or_sign_from_type(
 
 fn numeric_mode_from_type(unified_type: &resolved::Type) -> Option<NumericMode> {
     match &unified_type.kind {
-        resolved::TypeKind::Integer(bits, sign) => Some(match bits {
-            IntegerBits::Normal => NumericMode::CheckOverflow(*sign),
-            _ => NumericMode::Integer(*sign),
-        }),
+        resolved::TypeKind::Integer(_, sign) => Some(NumericMode::Integer(*sign)),
         resolved::TypeKind::Floating(_) => Some(NumericMode::Float),
         _ => None,
     }

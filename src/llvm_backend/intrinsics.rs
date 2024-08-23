@@ -15,10 +15,10 @@ use llvm_sys::{
     prelude::{LLVMBool, LLVMModuleRef, LLVMTypeRef, LLVMValueRef},
 };
 use memo_map::MemoMap;
-use std::ptr::null_mut;
 use std::{
     cell::OnceCell,
     ffi::{c_uint, CStr, CString},
+    ptr::null_mut,
 };
 
 pub struct Intrinsics {
@@ -131,7 +131,7 @@ impl Intrinsics {
                 IntegerBits::Bits8 => LLVMInt8Type(),
                 IntegerBits::Bits16 => LLVMInt16Type(),
                 IntegerBits::Bits32 => LLVMInt32Type(),
-                IntegerBits::Bits64 | IntegerBits::Normal => LLVMInt64Type(),
+                IntegerBits::Bits64 => LLVMInt64Type(),
             };
 
             let name = match operation {
@@ -152,7 +152,7 @@ impl Intrinsics {
                 } => "llvm.sadd.with.overflow.i32",
                 OverflowOperation {
                     operator: OverflowOperator::Add,
-                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    bits: IntegerBits::Bits64,
                     sign: IntegerSign::Signed,
                 } => "llvm.sadd.with.overflow.i64",
                 OverflowOperation {
@@ -172,7 +172,7 @@ impl Intrinsics {
                 } => "llvm.uadd.with.overflow.i32",
                 OverflowOperation {
                     operator: OverflowOperator::Add,
-                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    bits: IntegerBits::Bits64,
                     sign: IntegerSign::Unsigned,
                 } => "llvm.uadd.with.overflow.i64",
                 OverflowOperation {
@@ -192,7 +192,7 @@ impl Intrinsics {
                 } => "llvm.ssub.with.overflow.i32",
                 OverflowOperation {
                     operator: OverflowOperator::Subtract,
-                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    bits: IntegerBits::Bits64,
                     sign: IntegerSign::Signed,
                 } => "llvm.ssub.with.overflow.i64",
                 OverflowOperation {
@@ -212,7 +212,7 @@ impl Intrinsics {
                 } => "llvm.usub.with.overflow.i32",
                 OverflowOperation {
                     operator: OverflowOperator::Subtract,
-                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    bits: IntegerBits::Bits64,
                     sign: IntegerSign::Unsigned,
                 } => "llvm.usub.with.overflow.i64",
                 OverflowOperation {
@@ -232,7 +232,7 @@ impl Intrinsics {
                 } => "llvm.smul.with.overflow.i32",
                 OverflowOperation {
                     operator: OverflowOperator::Multiply,
-                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    bits: IntegerBits::Bits64,
                     sign: IntegerSign::Signed,
                 } => "llvm.smul.with.overflow.i64",
                 OverflowOperation {
@@ -252,7 +252,7 @@ impl Intrinsics {
                 } => "llvm.umul.with.overflow.i32",
                 OverflowOperation {
                     operator: OverflowOperator::Multiply,
-                    bits: IntegerBits::Bits64 | IntegerBits::Normal,
+                    bits: IntegerBits::Bits64,
                     sign: IntegerSign::Unsigned,
                 } => "llvm.umul.with.overflow.i64",
             };

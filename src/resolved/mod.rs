@@ -239,8 +239,6 @@ impl Display for TypeKind {
             }
             TypeKind::Integer(bits, sign) => {
                 f.write_str(match (bits, sign) {
-                    (IntegerBits::Normal, IntegerSign::Signed) => "int",
-                    (IntegerBits::Normal, IntegerSign::Unsigned) => "uint",
                     (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
                     (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
                     (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
@@ -546,7 +544,7 @@ impl From<FloatOrSign> for FloatOrInteger {
 #[derive(Clone, Debug)]
 pub enum NumericMode {
     Integer(IntegerSign),
-    CheckOverflow(IntegerSign),
+    CheckOverflow(IntegerBits, IntegerSign),
     Float,
 }
 

@@ -451,6 +451,7 @@ fn conform_expr(
     match &expr.resolved_type.kind {
         resolved::TypeKind::IntegerLiteral(value) => {
             // Integer literal Conversion
+            dbg!(to_type);
             conform_integer_literal(value, expr.expr.source, to_type)
         }
         resolved::TypeKind::Integer(from_bits, from_sign) => {
@@ -728,20 +729,6 @@ fn conform_integer_literal(
             };
 
             match (bits, sign) {
-                (Normal, Signed) => {
-                    if TryInto::<i64>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits64)
-                    } else {
-                        None
-                    }
-                }
-                (Normal, Unsigned) => {
-                    if TryInto::<u64>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits64)
-                    } else {
-                        None
-                    }
-                }
                 (Bits8, Signed) => {
                     if TryInto::<i8>::try_into(value).is_ok() {
                         make_integer(IntegerFixedBits::Bits8)
