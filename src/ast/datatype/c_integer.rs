@@ -1,6 +1,7 @@
 use super::description::{IntegerBits, IntegerSign};
+use derive_more::IsVariant;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IsVariant, PartialOrd, Ord)]
 pub enum CInteger {
     Char,
     Short,
@@ -18,6 +19,32 @@ impl CInteger {
             Self::LongLong => IntegerBits::Bits64,
         }
     }
+
+    pub fn next(&self) -> Option<Self> {
+        match self {
+            Self::Char => Some(Self::Short),
+            Self::Short => Some(Self::Int),
+            Self::Int => Some(Self::Long),
+            Self::Long => Some(Self::LongLong),
+            Self::LongLong => None,
+        }
+    }
+
+    pub fn smallest_that_fits(min_c_integer: Self, bits: IntegerBits) -> Option<Self> {
+        let mut possible = min_c_integer;
+
+        loop {
+            if possible.min_bits() >= bits {
+                return Some(possible);
+            }
+
+            possible = if let Some(bigger) = possible.next() {
+                bigger
+            } else {
+                return None;
+            }
+        }
+    }
 }
 
 pub fn fmt_c_integer(
@@ -26,7 +53,11 @@ pub fn fmt_c_integer(
     sign: Option<IntegerSign>,
 ) -> std::fmt::Result {
     match sign {
-        Some(IntegerSign::Signed) => f.write_str("signed ")?,
+        Some(IntegerSign::Signed) => {
+            if integer.is_char() {
+                f.write_str("signed ")?
+            }
+        }
         Some(IntegerSign::Unsigned) => f.write_str("unsigned ")?,
         None => (),
     }

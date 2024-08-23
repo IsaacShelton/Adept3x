@@ -354,7 +354,7 @@ fn lower_type(
 
     match &resolved_type.kind {
         resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
-        resolved::TypeKind::Integer { bits, sign } => Ok(match (bits, sign) {
+        resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Normal, Sign::Signed) => ir::Type::S64,
             (Bits::Normal, Sign::Unsigned) => ir::Type::U64,
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
@@ -366,9 +366,7 @@ fn lower_type(
             (Bits::Bits64, Sign::Signed) => ir::Type::S64,
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
-        resolved::TypeKind::CInteger { integer, sign } => {
-            Ok(lower_c_integer(target, *integer, *sign))
-        }
+        resolved::TypeKind::CInteger(integer, sign) => Ok(lower_c_integer(target, *integer, *sign)),
         resolved::TypeKind::IntegerLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
                 value: value.to_string(),
@@ -381,8 +379,7 @@ fn lower_type(
             }
             .at(resolved_type.source))
         }
-        resolved::TypeKind::Float(size) => Ok(match size {
-            FloatSize::Normal => ir::Type::F64,
+        resolved::TypeKind::Floating(size) => Ok(match size {
             FloatSize::Bits32 => ir::Type::F32,
             FloatSize::Bits64 => ir::Type::F64,
         }),
@@ -596,9 +593,9 @@ fn lower_expr(
                 .at(expr.source)
             })
         }
-        ExprKind::Float(size, value) => Ok(Value::Literal(match size {
+        ExprKind::FloatingLiteral(size, value) => Ok(Value::Literal(match size {
             FloatSize::Bits32 => Literal::Float32(*value as f32),
-            FloatSize::Bits64 | FloatSize::Normal => Literal::Float64(*value),
+            FloatSize::Bits64 => Literal::Float64(*value),
         })),
         ExprKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),

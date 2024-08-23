@@ -117,11 +117,8 @@ pub fn resolve_expr(
         ast::ExprKind::Integer(value) => {
             let (resolved_type, expr) = match value {
                 ast::Integer::Known(known) => (
-                    resolved::TypeKind::Integer {
-                        bits: IntegerBits::from(known.bits),
-                        sign: known.sign,
-                    }
-                    .at(source),
+                    resolved::TypeKind::Integer(IntegerBits::from(known.bits), known.sign)
+                        .at(source),
                     resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                         value: known.value.clone(),
                         bits: known.bits,
@@ -139,15 +136,14 @@ pub fn resolve_expr(
         }
         ast::ExprKind::Float(value) => Ok(TypedExpr::new(
             resolved::TypeKind::FloatLiteral(*value).at(source),
-            resolved::Expr::new(resolved::ExprKind::Float(FloatSize::Normal, *value), source),
+            resolved::Expr::new(
+                resolved::ExprKind::FloatingLiteral(FloatSize::Bits32, *value),
+                source,
+            ),
         )),
         ast::ExprKind::NullTerminatedString(value) => Ok(TypedExpr::new(
             resolved::TypeKind::Pointer(Box::new(
-                resolved::TypeKind::Integer {
-                    bits: IntegerBits::Bits8,
-                    sign: IntegerSign::Unsigned,
-                }
-                .at(source),
+                resolved::TypeKind::Integer(IntegerBits::Bits8, IntegerSign::Unsigned).at(source),
             ))
             .at(source),
             resolved::Expr::new(

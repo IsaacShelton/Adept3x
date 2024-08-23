@@ -19,6 +19,10 @@ impl CompoundIdentifierState {
                 self.identifier.push(c);
                 None
             }
+            Character::At(c, _) if c.is_whitespace() => Some(
+                TokenKind::Error("Whitespace is not allowed inside compound identifiers".into())
+                    .at(self.start_source),
+            ),
             _ => Some(
                 TokenKind::Error("Expected '>' to close compound identifier".into())
                     .at(self.start_source),

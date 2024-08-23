@@ -453,13 +453,10 @@ fn conform_expr(
             // Integer literal Conversion
             conform_integer_literal(value, expr.expr.source, to_type)
         }
-        resolved::TypeKind::Integer {
-            bits: from_bits,
-            sign: from_sign,
-        } => {
+        resolved::TypeKind::Integer(from_bits, from_sign) => {
             // Integer Conversion
             match &to_type.kind {
-                resolved::TypeKind::Integer { bits, sign } => match conform_behavior {
+                resolved::TypeKind::Integer(bits, sign) => match conform_behavior {
                     ConformBehavior::Adept => conform_integer_value(
                         &expr.expr,
                         *from_bits,
@@ -484,17 +481,20 @@ fn conform_expr(
         resolved::TypeKind::FloatLiteral(value) => {
             // Float Literal Conversion
             match &to_type.kind {
-                resolved::TypeKind::Float(size) => Some(TypedExpr::new(
-                    resolved::TypeKind::Float(*size).at(to_type.source),
-                    resolved::Expr::new(resolved::ExprKind::Float(*size, *value), conform_source),
+                resolved::TypeKind::Floating(size) => Some(TypedExpr::new(
+                    resolved::TypeKind::Floating(*size).at(to_type.source),
+                    resolved::Expr::new(
+                        resolved::ExprKind::FloatingLiteral(*size, *value),
+                        conform_source,
+                    ),
                 )),
                 _ => None,
             }
         }
-        resolved::TypeKind::Float(from_size) => {
+        resolved::TypeKind::Floating(from_size) => {
             // Float Conversion
             match &to_type.kind {
-                resolved::TypeKind::Float(size) => {
+                resolved::TypeKind::Floating(size) => {
                     conform_float_value(&expr.expr, *from_size, *size, to_type.source)
                 }
                 _ => None,
@@ -534,7 +534,7 @@ fn conform_float_value(
     to_size: FloatSize,
     type_source: Source,
 ) -> Option<TypedExpr> {
-    let target_type = resolved::TypeKind::Float(to_size).at(type_source);
+    let target_type = resolved::TypeKind::Floating(to_size).at(type_source);
 
     let from_bits = from_size.bits();
     let to_bits = to_size.bits();
@@ -575,11 +575,7 @@ fn conform_integer_value(
         return None;
     }
 
-    let target_type = resolved::TypeKind::Integer {
-        bits: to_bits,
-        sign: to_sign,
-    }
-    .at(type_source);
+    let target_type = resolved::TypeKind::Integer(to_bits, to_sign).at(type_source);
 
     if from_sign == to_sign && to_bits == from_bits {
         return Some(TypedExpr::new(target_type, expr.clone()));
@@ -606,11 +602,7 @@ fn conform_integer_value_c(
     to_sign: IntegerSign,
     type_source: Source,
 ) -> Option<TypedExpr> {
-    let target_type = resolved::TypeKind::Integer {
-        bits: to_bits,
-        sign: to_sign,
-    }
-    .at(type_source);
+    let target_type = resolved::TypeKind::Integer(to_bits, to_sign).at(type_source);
 
     if from_bits == to_bits && from_sign == to_sign {
         return Some(TypedExpr::new(target_type, expr.clone()));
@@ -654,8 +646,11 @@ fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {
 
 fn conform_float_to_default(value: f64, source: Source) -> TypedExpr {
     TypedExpr::new(
-        resolved::TypeKind::Float(FloatSize::Normal).at(source),
-        resolved::Expr::new(resolved::ExprKind::Float(FloatSize::Normal, value), source),
+        resolved::TypeKind::Floating(FloatSize::Bits64).at(source),
+        resolved::Expr::new(
+            resolved::ExprKind::FloatingLiteral(FloatSize::Bits64, value),
+            source,
+        ),
     )
 }
 
@@ -676,26 +671,10 @@ fn conform_integer_to_default(value: &BigInt, source: Source) -> Option<TypedExp
     use resolved::{IntegerBits::*, IntegerSign::*};
 
     let possible_types = [
-        resolved::TypeKind::Integer {
-            bits: Bits32,
-            sign: Signed,
-        }
-        .at(source),
-        resolved::TypeKind::Integer {
-            bits: Bits32,
-            sign: Unsigned,
-        }
-        .at(source),
-        resolved::TypeKind::Integer {
-            bits: Bits64,
-            sign: Signed,
-        }
-        .at(source),
-        resolved::TypeKind::Integer {
-            bits: Bits64,
-            sign: Unsigned,
-        }
-        .at(source),
+        resolved::TypeKind::Integer(Bits32, Signed).at(source),
+        resolved::TypeKind::Integer(Bits32, Unsigned).at(source),
+        resolved::TypeKind::Integer(Bits64, Signed).at(source),
+        resolved::TypeKind::Integer(Bits64, Unsigned).at(source),
     ];
 
     for possible_type in possible_types.iter() {
@@ -713,22 +692,30 @@ fn conform_integer_literal(
     to_type: &resolved::Type,
 ) -> Option<TypedExpr> {
     match &to_type.kind {
-        resolved::TypeKind::Float(size) => value.to_f64().map(|literal| {
+        resolved::TypeKind::Floating(size) => value.to_f64().map(|literal| {
             TypedExpr::new(
-                resolved::TypeKind::Float(*size).at(source),
-                resolved::Expr::new(resolved::ExprKind::Float(*size, literal), source),
+                resolved::TypeKind::Floating(*size).at(source),
+                resolved::Expr::new(resolved::ExprKind::FloatingLiteral(*size, literal), source),
             )
         }),
-        resolved::TypeKind::Integer { bits, sign } => {
+        resolved::TypeKind::CInteger(_c_integer, _sign) => {
+            todo!("conform_integer_litearl for C integer")
+
+            // if !conform_mode.allow_lossy_integer() {
+            //     eprintln!("warning: Assuming integer literal fits in C integer");
+            // }
+
+            // TypedExpr::new(
+            //     resolved::TypeKind::CInteger((), ()),
+            //     resolved::Expr::new(resolved::ExprKind::IntegerLiteral, source),
+            // )
+        }
+        resolved::TypeKind::Integer(bits, sign) => {
             use resolved::{IntegerBits::*, IntegerFixedBits, IntegerSign::*};
 
             let make_integer = |integer_literal_bits| {
                 Some(TypedExpr::new(
-                    resolved::TypeKind::Integer {
-                        bits: *bits,
-                        sign: *sign,
-                    }
-                    .at(source),
+                    resolved::TypeKind::Integer(*bits, *sign).at(source),
                     resolved::Expr::new(
                         resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                             value: value.clone(),
@@ -831,7 +818,7 @@ fn resolve_type_or_undeclared<'a>(
 ) -> Result<resolved::Type, ResolveError> {
     match resolve_type(type_search_ctx, source_files, ast_type, used_aliases_stack) {
         Ok(inner) => Ok(inner),
-        Err(_) if ast_type.kind.allow_undeclared() => {
+        Err(_) if ast_type.kind.allow_indirect_undefined() => {
             Ok(resolved::TypeKind::Void.at(ast_type.source))
         }
         Err(err) => Err(err),
@@ -846,14 +833,10 @@ fn resolve_type<'a>(
 ) -> Result<resolved::Type, ResolveError> {
     match &ast_type.kind {
         ast::TypeKind::Boolean => Ok(resolved::TypeKind::Boolean),
-        ast::TypeKind::Integer { bits, sign } => Ok(resolved::TypeKind::Integer {
-            bits: *bits,
-            sign: *sign,
-        }),
-        ast::TypeKind::CInteger { integer, sign } => Ok(resolved::TypeKind::CInteger {
-            integer: *integer,
-            sign: *sign,
-        }),
+        ast::TypeKind::Integer { bits, sign } => Ok(resolved::TypeKind::Integer(*bits, *sign)),
+        ast::TypeKind::CInteger { integer, sign } => {
+            Ok(resolved::TypeKind::CInteger(*integer, *sign))
+        }
         ast::TypeKind::Pointer(inner) => {
             let inner = resolve_type_or_undeclared(
                 type_search_ctx,
@@ -920,7 +903,7 @@ fn resolve_type<'a>(
             }
             .at(inner.source)),
         },
-        ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Float(*size)),
+        ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Floating(*size)),
         ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
         ast::TypeKind::AnonymousEnum(anonymous_enum) => {
@@ -1050,10 +1033,6 @@ fn resolve_enum_backing_type(
     if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {
         resolve_type(type_search_ctx, source_files, backing_type, used_aliases)
     } else {
-        Ok(resolved::TypeKind::Integer {
-            bits: IntegerBits::Bits64,
-            sign: IntegerSign::Unsigned,
-        }
-        .at(source))
+        Ok(resolved::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source))
     }
 }

@@ -135,20 +135,14 @@ impl PartialEq for Type {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, IsVariant)]
+#[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum TypeKind {
     Boolean,
-    Integer {
-        bits: IntegerBits,
-        sign: IntegerSign,
-    },
-    CInteger {
-        integer: CInteger,
-        sign: Option<IntegerSign>,
-    },
+    Integer(IntegerBits, IntegerSign),
+    CInteger(CInteger, Option<IntegerSign>),
     IntegerLiteral(BigInt),
     FloatLiteral(f64),
-    Float(FloatSize),
+    Floating(FloatSize),
     Pointer(Box<Type>),
     PlainOldData(String, StructureRef),
     Void,
@@ -159,6 +153,15 @@ pub enum TypeKind {
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
     Enum(String),
+}
+
+impl TypeKind {
+    pub fn is_integer_like(&self) -> bool {
+        matches!(
+            self,
+            Self::Integer(..) | Self::IntegerLiteral(..) | Self::CInteger(..)
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -195,20 +198,20 @@ impl TypeKind {
     pub fn sign(&self, target: Option<&Target>) -> Option<IntegerSign> {
         match self {
             TypeKind::Boolean => None,
-            TypeKind::Integer { sign, .. } => Some(*sign),
+            TypeKind::Integer(_, sign) => Some(*sign),
             TypeKind::IntegerLiteral(value) => Some(if value >= &BigInt::zero() {
                 IntegerSign::Unsigned
             } else {
                 IntegerSign::Signed
             }),
-            TypeKind::CInteger { integer, sign } => {
+            TypeKind::CInteger(integer, sign) => {
                 if let Some(sign) = sign {
                     Some(*sign)
                 } else {
                     target.map(|target| target.default_c_integer_sign(*integer))
                 }
             }
-            TypeKind::Float(_)
+            TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Pointer(_)
             | TypeKind::PlainOldData(_, _)
@@ -234,7 +237,7 @@ impl Display for TypeKind {
             TypeKind::Boolean => {
                 write!(f, "bool")?;
             }
-            TypeKind::Integer { bits, sign } => {
+            TypeKind::Integer(bits, sign) => {
                 f.write_str(match (bits, sign) {
                     (IntegerBits::Normal, IntegerSign::Signed) => "int",
                     (IntegerBits::Normal, IntegerSign::Unsigned) => "uint",
@@ -248,14 +251,13 @@ impl Display for TypeKind {
                     (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
                 })?;
             }
-            TypeKind::CInteger { integer, sign } => {
+            TypeKind::CInteger(integer, sign) => {
                 fmt_c_integer(f, *integer, *sign)?;
             }
             TypeKind::IntegerLiteral(value) => {
                 write!(f, "integer {}", value)?;
             }
-            TypeKind::Float(size) => match size {
-                FloatSize::Normal => f.write_str("float")?,
+            TypeKind::Floating(size) => match size {
                 FloatSize::Bits32 => f.write_str("f32")?,
                 FloatSize::Bits64 => f.write_str("f64")?,
             },
@@ -385,7 +387,7 @@ pub enum ExprKind {
     BooleanLiteral(bool),
     IntegerLiteral(BigInt),
     IntegerKnown(Box<IntegerKnown>),
-    Float(FloatSize, f64),
+    FloatingLiteral(FloatSize, f64),
     String(String),
     NullTerminatedString(CString),
     Call(Box<Call>),
