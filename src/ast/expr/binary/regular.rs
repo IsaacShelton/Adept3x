@@ -1,4 +1,5 @@
 use crate::ast::expr::Expr;
+use derive_more::IsVariant;
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -8,7 +9,7 @@ pub struct BasicBinaryOperation {
     pub right: Expr,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IsVariant)]
 pub enum BasicBinaryOperator {
     Add,
     Subtract,

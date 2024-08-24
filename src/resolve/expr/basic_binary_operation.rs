@@ -10,6 +10,8 @@ use crate::{
     source_files::Source,
 };
 use ast::IntegerSign;
+use num::BigInt;
+use num_bigint::Sign;
 
 pub fn resolve_basic_binary_operation_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
@@ -30,6 +32,17 @@ pub fn resolve_basic_binary_operation_expr(
         preferred_type,
         Initialized::Require,
     )?;
+
+    if let resolved::TypeKind::IntegerLiteral(left) = &left.resolved_type.kind {
+        if let resolved::TypeKind::IntegerLiteral(right) = &right.resolved_type.kind {
+            return resolve_basic_binary_operation_expr_on_literals(
+                &binary_operation.operator,
+                left,
+                right,
+                source,
+            );
+        }
+    }
 
     let unified_type = unify_types(
         preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
@@ -193,4 +206,110 @@ fn numeric_mode_from_type(unified_type: &resolved::Type) -> Option<NumericMode> 
         resolved::TypeKind::Floating(_) => Some(NumericMode::Float),
         _ => None,
     }
+}
+
+pub fn resolve_basic_binary_operation_expr_on_literals(
+    operator: &ast::BasicBinaryOperator,
+    left: &BigInt,
+    right: &BigInt,
+    source: Source,
+) -> Result<TypedExpr, ResolveError> {
+    let result = match operator {
+        ast::BasicBinaryOperator::Add => left + right,
+        ast::BasicBinaryOperator::Subtract => left - right,
+        ast::BasicBinaryOperator::Multiply => left * right,
+        ast::BasicBinaryOperator::Divide => left
+            .checked_div(right)
+            .ok_or_else(|| ResolveErrorKind::DivideByZero.at(source))?,
+        ast::BasicBinaryOperator::Modulus => {
+            if *right == BigInt::ZERO {
+                return Err(ResolveErrorKind::DivideByZero.at(source));
+            } else {
+                left % right
+            }
+        }
+        ast::BasicBinaryOperator::Equals => {
+            return Ok(TypedExpr::new(
+                resolved::TypeKind::Boolean.at(source),
+                resolved::ExprKind::BooleanLiteral(left == right).at(source),
+            ))
+        }
+        ast::BasicBinaryOperator::NotEquals => {
+            return Ok(TypedExpr::new(
+                resolved::TypeKind::Boolean.at(source),
+                resolved::ExprKind::BooleanLiteral(left != right).at(source),
+            ))
+        }
+        ast::BasicBinaryOperator::LessThan => {
+            return Ok(TypedExpr::new(
+                resolved::TypeKind::Boolean.at(source),
+                resolved::ExprKind::BooleanLiteral(left < right).at(source),
+            ))
+        }
+        ast::BasicBinaryOperator::LessThanEq => {
+            return Ok(TypedExpr::new(
+                resolved::TypeKind::Boolean.at(source),
+                resolved::ExprKind::BooleanLiteral(left <= right).at(source),
+            ))
+        }
+        ast::BasicBinaryOperator::GreaterThan => {
+            return Ok(TypedExpr::new(
+                resolved::TypeKind::Boolean.at(source),
+                resolved::ExprKind::BooleanLiteral(left >= right).at(source),
+            ))
+        }
+        ast::BasicBinaryOperator::GreaterThanEq => {
+            return Ok(TypedExpr::new(
+                resolved::TypeKind::Boolean.at(source),
+                resolved::ExprKind::BooleanLiteral(left > right).at(source),
+            ))
+        }
+        ast::BasicBinaryOperator::BitwiseAnd => {
+            return Err(ResolveErrorKind::CannotPerformOnUnspecializedInteger {
+                operation: "bitwise-and".into(),
+            }
+            .at(source))
+        }
+        ast::BasicBinaryOperator::BitwiseOr => {
+            return Err(ResolveErrorKind::CannotPerformOnUnspecializedInteger {
+                operation: "bitwise-or".into(),
+            }
+            .at(source))
+        }
+        ast::BasicBinaryOperator::BitwiseXor => {
+            return Err(ResolveErrorKind::CannotPerformOnUnspecializedInteger {
+                operation: "bitwise-xor".into(),
+            }
+            .at(source))
+        }
+        ast::BasicBinaryOperator::LeftShift | ast::BasicBinaryOperator::LogicalLeftShift => {
+            if left.sign() == Sign::Minus {
+                return Err(ResolveErrorKind::ShiftByNegative.at(source));
+            } else if let Ok(small) = u64::try_from(right) {
+                left.clone() << small
+            } else {
+                return Err(ResolveErrorKind::ShiftByNegative.at(source));
+            }
+        }
+        ast::BasicBinaryOperator::RightShift => {
+            if left.sign() == Sign::Minus {
+                return Err(ResolveErrorKind::ShiftByNegative.at(source));
+            } else if let Ok(small) = u64::try_from(right) {
+                left.clone() >> small
+            } else {
+                return Err(ResolveErrorKind::ShiftByNegative.at(source));
+            }
+        }
+        ast::BasicBinaryOperator::LogicalRightShift => {
+            return Err(ResolveErrorKind::CannotPerformOnUnspecializedInteger {
+                operation: "perform logical right shift on".into(),
+            }
+            .at(source))
+        }
+    };
+
+    return Ok(TypedExpr::new(
+        resolved::TypeKind::IntegerLiteral(result.clone()).at(source),
+        resolved::ExprKind::IntegerLiteral(result).at(source),
+    ));
 }
