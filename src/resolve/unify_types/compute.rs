@@ -195,7 +195,7 @@ pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<Integ
             let (bits, sign) = if a_bits >= b_bits && a_sign.is_unsigned() && b_sign.is_signed() {
                 (a_bits + 1, IntegerSign::Signed)
             } else if b_bits >= a_bits && b_sign.is_unsigned() && a_sign.is_signed() {
-                (a_bits + 1, IntegerSign::Signed)
+                (b_bits + 1, IntegerSign::Signed)
             } else {
                 let sign = (a_sign.is_signed() || b_sign.is_signed())
                     .then_some(IntegerSign::Signed)
@@ -240,7 +240,7 @@ fn unify_integer_properties_flexible(
     let (bits, maybe_sign) = if a_bits >= b_bits && a_can_be_unsigned && b_can_be_signed {
         (a_bits + 1, b.required_sign)
     } else if b_bits >= a_bits && b_can_be_unsigned && a_can_be_signed {
-        (a_bits + 1, a.required_sign)
+        (b_bits + 1, a.required_sign)
     } else {
         let sign = match (a.required_sign, b.required_sign) {
             (None, None) => None,
