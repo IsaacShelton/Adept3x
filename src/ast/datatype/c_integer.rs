@@ -1,4 +1,5 @@
 use super::description::{IntegerBits, IntegerSign};
+use crate::{data_units::ByteUnits, target::Target};
 use derive_more::IsVariant;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, IsVariant, PartialOrd, Ord)]
@@ -43,6 +44,16 @@ impl CInteger {
             } else {
                 return None;
             }
+        }
+    }
+
+    pub fn bytes(&self, target: &Target) -> ByteUnits {
+        match self {
+            CInteger::Char => target.char_layout().width,
+            CInteger::Short => target.short_layout().width,
+            CInteger::Int => target.int_layout().width,
+            CInteger::Long => target.long_layout().width,
+            CInteger::LongLong => target.longlong_layout().width,
         }
     }
 }

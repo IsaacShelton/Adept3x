@@ -1,3 +1,4 @@
+use crate::data_units::{BitUnits, ByteUnits};
 use std::cmp::Ordering;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -40,6 +41,15 @@ impl IntegerBits {
             IntegerBits::Bits64 => 64,
         }
     }
+
+    pub fn bytes(self) -> ByteUnits {
+        match self {
+            IntegerBits::Bits8 => ByteUnits::of(1),
+            IntegerBits::Bits16 => ByteUnits::of(2),
+            IntegerBits::Bits32 => ByteUnits::of(4),
+            IntegerBits::Bits64 => ByteUnits::of(8),
+        }
+    }
 }
 
 impl Ord for IntegerBits {
@@ -51,5 +61,21 @@ impl Ord for IntegerBits {
 impl PartialOrd for IntegerBits {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl TryFrom<ByteUnits> for IntegerBits {
+    type Error = ();
+
+    fn try_from(value: ByteUnits) -> Result<Self, Self::Error> {
+        IntegerBits::new(value.to_bits().bits()).ok_or(())
+    }
+}
+
+impl TryFrom<BitUnits> for IntegerBits {
+    type Error = ();
+
+    fn try_from(value: BitUnits) -> Result<Self, Self::Error> {
+        IntegerBits::new(value.bits()).ok_or(())
     }
 }

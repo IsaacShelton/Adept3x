@@ -254,6 +254,9 @@ fn insert_drops_for_expr(ctx: InsertDropsCtx, expr: &mut Expr) -> VariableUsageS
         | ExprKind::FloatExtend(cast) => {
             mini_scope.union_with(&insert_drops_for_expr(ctx, &mut cast.value));
         }
+        ExprKind::IntegerCast(cast_from) => {
+            mini_scope.union_with(&insert_drops_for_expr(ctx, &mut cast_from.cast.value));
+        }
         ExprKind::Member(member) => {
             mini_scope.union_with(&insert_drops_for_destination(ctx, &mut member.subject));
         }
@@ -443,7 +446,10 @@ fn integrate_active_set_for_expr(expr: &mut Expr, active_set: &mut ActiveSet) {
             integrate_active_set_for_expr(&mut operation.right.expr, active_set);
             active_set.deactivate_drops(&operation.drops);
         }
-        ExprKind::IntegerExtend(..) | ExprKind::IntegerTruncate(..) | ExprKind::FloatExtend(..) =>
+        ExprKind::IntegerExtend(..)
+        | ExprKind::IntegerTruncate(..)
+        | ExprKind::IntegerCast(..)
+        | ExprKind::FloatExtend(..) =>
         {
             #[allow(clippy::unused_unit)]
             ()

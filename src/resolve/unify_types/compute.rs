@@ -134,8 +134,8 @@ impl IntegerProperties {
 pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<IntegerProperties> {
     let b = IntegerProperties::new(ty)?;
 
-    if a == b {
-        return Some(a);
+    if a == IntegerProperties::NONE || a == b {
+        return Some(b);
     }
 
     let integer_properties = match (a.largest_loose_used, b.largest_loose_used) {

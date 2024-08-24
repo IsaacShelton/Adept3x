@@ -1,36 +1,41 @@
 use crate::{
-    ast,
+    ast::{self, CInteger, IntegerKnown, IntegerRigidity},
     c::{parser::ParseError, token::Integer},
+    ir::IntegerSign,
     source_files::Source,
 };
 
 pub fn translate_expr_integer(integer: &Integer, source: Source) -> Result<ast::Expr, ParseError> {
-    use ast::{
-        IntegerFixedBits::{Bits32, Bits64},
-        IntegerKnown,
-        IntegerSign::{Signed, Unsigned},
-    };
-
     let known = match integer {
         Integer::Int(x) => IntegerKnown {
-            bits: Bits32,
-            sign: Signed,
+            rigidity: IntegerRigidity::Loose(CInteger::Int),
             value: (*x).into(),
+            sign: IntegerSign::Signed,
         },
         Integer::UnsignedInt(x) => IntegerKnown {
-            bits: Bits32,
-            sign: Unsigned,
+            rigidity: IntegerRigidity::Loose(CInteger::Int),
             value: (*x).into(),
+            sign: IntegerSign::Unsigned,
         },
-        Integer::Long(x) | Integer::LongLong(x) => IntegerKnown {
-            bits: Bits64,
-            sign: Signed,
+        Integer::Long(x) => IntegerKnown {
+            rigidity: IntegerRigidity::Loose(CInteger::Long),
             value: (*x).into(),
+            sign: IntegerSign::Signed,
         },
-        Integer::UnsignedLong(x) | Integer::UnsignedLongLong(x) => IntegerKnown {
-            bits: Bits64,
-            sign: Unsigned,
+        Integer::UnsignedLong(x) => IntegerKnown {
+            rigidity: IntegerRigidity::Loose(CInteger::Long),
             value: (*x).into(),
+            sign: IntegerSign::Unsigned,
+        },
+        Integer::LongLong(x) => IntegerKnown {
+            rigidity: IntegerRigidity::Loose(CInteger::LongLong),
+            value: (*x).into(),
+            sign: IntegerSign::Signed,
+        },
+        Integer::UnsignedLongLong(x) => IntegerKnown {
+            rigidity: IntegerRigidity::Loose(CInteger::LongLong),
+            value: (*x).into(),
+            sign: IntegerSign::Unsigned,
         },
     };
 

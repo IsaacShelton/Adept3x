@@ -1,4 +1,9 @@
-use crate::{ast::IntegerFixedBits, ir::IntegerSign};
+use crate::{
+    ast::{CInteger, IntegerBits},
+    ir::IntegerSign,
+    resolved,
+    source_files::Source,
+};
 use num::BigInt;
 
 #[derive(Clone, Debug)]
@@ -9,9 +14,27 @@ pub enum Integer {
 
 #[derive(Clone, Debug)]
 pub struct IntegerKnown {
-    pub bits: IntegerFixedBits,
-    pub sign: IntegerSign,
+    pub rigidity: IntegerRigidity,
     pub value: BigInt,
+    pub sign: IntegerSign,
+}
+
+impl IntegerKnown {
+    pub fn make_type(&self, source: Source) -> resolved::Type {
+        match self.rigidity {
+            IntegerRigidity::Fixed(bits) => resolved::TypeKind::Integer(bits, self.sign),
+            IntegerRigidity::Loose(c_integer) => {
+                resolved::TypeKind::CInteger(c_integer, Some(self.sign))
+            }
+        }
+        .at(source)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum IntegerRigidity {
+    Fixed(IntegerBits),
+    Loose(CInteger),
 }
 
 impl Integer {

@@ -2,8 +2,8 @@ mod variable_storage;
 
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{
-    CInteger, EnumMember, EnumMemberLiteral, FloatSize, IntegerBits, IntegerFixedBits,
-    IntegerKnown, IntegerSign, ShortCircuitingBinaryOperator, UnaryOperator,
+    CInteger, EnumMember, EnumMemberLiteral, FloatSize, IntegerBits, IntegerKnown, IntegerSign,
+    ShortCircuitingBinaryOperator, UnaryOperator,
 };
 use crate::{
     ast::fmt_c_integer,
@@ -392,6 +392,7 @@ pub enum ExprKind {
     DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
+    IntegerCast(Box<CastFrom>),
     IntegerExtend(Box<Cast>),
     IntegerTruncate(Box<Cast>),
     FloatExtend(Box<Cast>),
@@ -405,6 +406,12 @@ pub enum ExprKind {
     ResolvedNamedExpression(String, Box<Expr>),
     Zeroed(Box<Type>),
     InterpreterSyscall(InterpreterSyscallKind, Vec<Expr>),
+}
+
+#[derive(Clone, Debug)]
+pub struct CastFrom {
+    pub cast: Cast,
+    pub from_type: Type,
 }
 
 #[derive(Clone, Debug)]
@@ -527,6 +534,34 @@ pub enum FloatOrSign {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub enum FloatOrSignLax {
+    Integer(IntegerSign),
+    IndeterminateInteger(CInteger),
+    Float,
+}
+
+impl FloatOrSignLax {
+    pub fn or_default_for(&self, target: &Target) -> FloatOrSign {
+        match self {
+            FloatOrSignLax::Integer(sign) => FloatOrSign::Integer(*sign),
+            FloatOrSignLax::IndeterminateInteger(c_integer) => {
+                FloatOrSign::Integer(target.default_c_integer_sign(*c_integer))
+            }
+            FloatOrSignLax::Float => FloatOrSign::Float,
+        }
+    }
+}
+
+impl From<FloatOrSignLax> for FloatOrInteger {
+    fn from(value: FloatOrSignLax) -> Self {
+        match value {
+            FloatOrSignLax::Integer(_) | FloatOrSignLax::IndeterminateInteger(_) => Self::Integer,
+            FloatOrSignLax::Float => Self::Float,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub enum FloatOrInteger {
     Integer,
     Float,
@@ -544,8 +579,15 @@ impl From<FloatOrSign> for FloatOrInteger {
 #[derive(Clone, Debug)]
 pub enum NumericMode {
     Integer(IntegerSign),
+    LooseIndeterminateSignInteger(CInteger),
     CheckOverflow(IntegerBits, IntegerSign),
     Float,
+}
+
+#[derive(Clone, Debug)]
+pub enum SignOrIndeterminate {
+    Sign(IntegerSign),
+    Indeterminate(CInteger),
 }
 
 #[derive(Clone, Debug)]
@@ -553,19 +595,19 @@ pub enum BasicBinaryOperator {
     Add(NumericMode),
     Subtract(NumericMode),
     Multiply(NumericMode),
-    Divide(FloatOrSign),
-    Modulus(FloatOrSign),
+    Divide(FloatOrSignLax),
+    Modulus(FloatOrSignLax),
     Equals(FloatOrInteger),
     NotEquals(FloatOrInteger),
-    LessThan(FloatOrSign),
-    LessThanEq(FloatOrSign),
-    GreaterThan(FloatOrSign),
-    GreaterThanEq(FloatOrSign),
+    LessThan(FloatOrSignLax),
+    LessThanEq(FloatOrSignLax),
+    GreaterThan(FloatOrSignLax),
+    GreaterThanEq(FloatOrSignLax),
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
     LeftShift,
-    RightShift,
+    ArithmeticRightShift(SignOrIndeterminate),
     LogicalLeftShift,
     LogicalRightShift,
 }

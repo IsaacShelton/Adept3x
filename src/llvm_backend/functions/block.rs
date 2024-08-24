@@ -427,7 +427,7 @@ pub unsafe fn create_function_block(
 
                 Some(LLVMBuildShl(builder.get(), left, right, cstr!("").as_ptr()))
             }
-            Instruction::RightShift(operands) => {
+            Instruction::ArithmeticRightShift(operands) => {
                 let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
                 Some(LLVMBuildAShr(

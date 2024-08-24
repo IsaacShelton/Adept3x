@@ -19,10 +19,10 @@ use self::{
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
-    ast::{self, AstWorkspace, ConformBehavior, Type},
+    ast::{self, AstWorkspace, CInteger, ConformBehavior, IntegerRigidity, Type},
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
-    resolved::{self, Cast, Enum, TypedExpr, VariableStorage},
+    resolved::{self, Cast, CastFrom, Enum, TypedExpr, VariableStorage},
     source_files::{Source, SourceFiles},
     tag::Tag,
     workspace::fs::FsNodeId,
@@ -30,6 +30,7 @@ use crate::{
 use ast::{FloatSize, IntegerBits, IntegerSign};
 use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
+use num::Zero;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use resolved::IntegerKnown;
@@ -451,7 +452,6 @@ fn conform_expr(
     match &expr.resolved_type.kind {
         resolved::TypeKind::IntegerLiteral(value) => {
             // Integer literal Conversion
-            dbg!(to_type);
             conform_integer_literal(value, expr.expr.source, to_type)
         }
         resolved::TypeKind::Integer(from_bits, from_sign) => {
@@ -476,6 +476,9 @@ fn conform_expr(
                         to_type.source,
                     ),
                 },
+                resolved::TypeKind::CInteger(c_integer, sign) => {
+                    conform_to_c_integer_from_integer(expr, mode, *c_integer, *sign, to_type.source)
+                }
                 _ => None,
             }
         }
@@ -633,6 +636,33 @@ fn conform_integer_value_c(
     todo!("conform_integer_value_c {:?}", conform_mode);
 }
 
+fn conform_to_c_integer_from_integer(
+    expr: &TypedExpr,
+    conform_mode: ConformMode,
+    c_integer: CInteger,
+    sign: Option<IntegerSign>,
+    source: Source,
+) -> Option<TypedExpr> {
+    let target_type = resolved::TypeKind::CInteger(c_integer, sign).at(source);
+
+    if conform_mode.allow_lossy_integer() {
+        let cast_from = CastFrom {
+            cast: resolved::Cast {
+                target_type: target_type.clone(),
+                value: expr.expr.clone(),
+            },
+            from_type: expr.resolved_type.clone(),
+        };
+
+        Some(TypedExpr::new(
+            target_type,
+            resolved::ExprKind::IntegerCast(Box::new(cast_from)).at(source),
+        ))
+    } else {
+        None
+    }
+}
+
 fn conform_expr_to_default(expr: TypedExpr) -> Result<TypedExpr, ResolveError> {
     match &expr.resolved_type.kind {
         resolved::TypeKind::IntegerLiteral(value) => {
@@ -699,28 +729,37 @@ fn conform_integer_literal(
                 resolved::Expr::new(resolved::ExprKind::FloatingLiteral(*size, literal), source),
             )
         }),
-        resolved::TypeKind::CInteger(_c_integer, _sign) => {
-            todo!("conform_integer_litearl for C integer")
+        resolved::TypeKind::CInteger(c_integer, sign) => {
+            let needs_unsigned_bits = value.bits();
+            let needs_bits =
+                needs_unsigned_bits + (*value < BigInt::zero()).then_some(1).unwrap_or(0);
 
-            // if !conform_mode.allow_lossy_integer() {
-            //     eprintln!("warning: Assuming integer literal fits in C integer");
-            // }
-
-            // TypedExpr::new(
-            //     resolved::TypeKind::CInteger((), ()),
-            //     resolved::Expr::new(resolved::ExprKind::IntegerLiteral, source),
-            // )
+            if needs_bits <= c_integer.min_bits().bits().into() {
+                Some(TypedExpr::new(
+                    resolved::TypeKind::CInteger(*c_integer, *sign).at(source),
+                    resolved::Expr::new(
+                        resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                            rigidity: IntegerRigidity::Loose(*c_integer),
+                            value: value.clone(),
+                            sign: sign.unwrap_or(IntegerSign::Signed),
+                        })),
+                        source,
+                    ),
+                ))
+            } else {
+                None
+            }
         }
         resolved::TypeKind::Integer(bits, sign) => {
-            use resolved::{IntegerBits::*, IntegerFixedBits, IntegerSign::*};
+            use resolved::{IntegerBits::*, IntegerSign::*};
 
             let make_integer = |integer_literal_bits| {
                 Some(TypedExpr::new(
                     resolved::TypeKind::Integer(*bits, *sign).at(source),
                     resolved::Expr::new(
                         resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                            rigidity: IntegerRigidity::Fixed(integer_literal_bits),
                             value: value.clone(),
-                            bits: integer_literal_bits,
                             sign: *sign,
                         })),
                         source,
@@ -731,56 +770,56 @@ fn conform_integer_literal(
             match (bits, sign) {
                 (Bits8, Signed) => {
                     if TryInto::<i8>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits8)
+                        make_integer(IntegerBits::Bits8)
                     } else {
                         None
                     }
                 }
                 (Bits8, Unsigned) => {
                     if TryInto::<u8>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits8)
+                        make_integer(IntegerBits::Bits8)
                     } else {
                         None
                     }
                 }
                 (Bits16, Signed) => {
                     if TryInto::<i16>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits16)
+                        make_integer(IntegerBits::Bits16)
                     } else {
                         None
                     }
                 }
                 (Bits16, Unsigned) => {
                     if TryInto::<u16>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits16)
+                        make_integer(IntegerBits::Bits16)
                     } else {
                         None
                     }
                 }
                 (Bits32, Signed) => {
                     if TryInto::<i32>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits32)
+                        make_integer(IntegerBits::Bits32)
                     } else {
                         None
                     }
                 }
                 (Bits32, Unsigned) => {
                     if TryInto::<u32>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits32)
+                        make_integer(IntegerBits::Bits32)
                     } else {
                         None
                     }
                 }
                 (Bits64, Signed) => {
                     if TryInto::<i64>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits64)
+                        make_integer(IntegerBits::Bits64)
                     } else {
                         None
                     }
                 }
                 (Bits64, Unsigned) => {
                     if TryInto::<u64>::try_into(value).is_ok() {
-                        make_integer(IntegerFixedBits::Bits64)
+                        make_integer(IntegerBits::Bits64)
                     } else {
                         None
                     }
