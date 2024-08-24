@@ -117,11 +117,10 @@ pub fn resolve_expr(
         ast::ExprKind::Integer(value) => {
             let (resolved_type, expr) = match value {
                 ast::Integer::Known(known) => (
-                    resolved::TypeKind::Integer(IntegerBits::from(known.bits), known.sign)
-                        .at(source),
+                    known.make_type(source),
                     resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                        rigidity: known.rigidity.clone(),
                         value: known.value.clone(),
-                        bits: known.bits,
                         sign: known.sign,
                     }))
                     .at(source),

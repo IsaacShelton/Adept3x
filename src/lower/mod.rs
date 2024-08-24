@@ -1,20 +1,22 @@
 mod builder;
+mod cast;
 mod error;
 
 use self::error::{LowerError, LowerErrorKind};
 use crate::{
-    ast::CInteger,
+    ast::{CInteger, IntegerBits, IntegerRigidity},
     cli::BuildOptions,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, Member,
-        NumericMode, StmtKind, StructureLiteral, VariableStorageKey,
+        NumericMode, SignOrIndeterminate, StmtKind, StructureLiteral, VariableStorageKey,
     },
     tag::Tag,
     target::{Target, TargetOsExt},
 };
 use builder::Builder;
-use resolved::{IntegerKnown, IntegerSign};
+use cast::{integer_cast, integer_extend, integer_truncate};
+use resolved::IntegerSign;
 
 pub fn lower<'a>(
     options: &BuildOptions,
@@ -293,6 +295,7 @@ fn lower_stmts(
 
                     lower_basic_binary_operation(
                         builder,
+                        ir_module,
                         operator,
                         ir::BinaryOperands::new(existing_value, new_value),
                     )?
@@ -521,61 +524,68 @@ fn lower_expr(
             .at(expr.source))
         }
         ExprKind::IntegerKnown(integer) => {
-            use resolved::{IntegerFixedBits as Bits, IntegerSign as Sign};
+            let value = &integer.value;
+            let sign = &integer.sign;
 
-            let IntegerKnown { value, bits, sign } = &**integer;
+            let bits = match &integer.rigidity {
+                IntegerRigidity::Fixed(bits) => *bits,
+                IntegerRigidity::Loose(c_integer) => {
+                    IntegerBits::try_from(c_integer.bytes(&ir_module.target))
+                        .expect("supported integer size")
+                }
+            };
 
             match (bits, sign) {
-                (Bits::Bits8, Sign::Signed) => {
+                (IntegerBits::Bits8, IntegerSign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed8(value)))
                     } else {
                         Err("i8")
                     }
                 }
-                (Bits::Bits8, Sign::Unsigned) => {
+                (IntegerBits::Bits8, IntegerSign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned8(value)))
                     } else {
                         Err("u8")
                     }
                 }
-                (Bits::Bits16, Sign::Signed) => {
+                (IntegerBits::Bits16, IntegerSign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed16(value)))
                     } else {
                         Err("i16")
                     }
                 }
-                (Bits::Bits16, Sign::Unsigned) => {
+                (IntegerBits::Bits16, IntegerSign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned16(value)))
                     } else {
                         Err("u16")
                     }
                 }
-                (Bits::Bits32, Sign::Signed) => {
+                (IntegerBits::Bits32, IntegerSign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed32(value)))
                     } else {
                         Err("i32")
                     }
                 }
-                (Bits::Bits32, Sign::Unsigned) => {
+                (IntegerBits::Bits32, IntegerSign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned32(value)))
                     } else {
                         Err("u32")
                     }
                 }
-                (Bits::Bits64, Sign::Signed) => {
+                (IntegerBits::Bits64, IntegerSign::Signed) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Signed64(value)))
                     } else {
                         Err("i64")
                     }
                 }
-                (Bits::Bits64, Sign::Unsigned) => {
+                (IntegerBits::Bits64, IntegerSign::Unsigned) => {
                     if let Ok(value) = value.try_into() {
                         Ok(ir::Value::Literal(Literal::Unsigned64(value)))
                     } else {
@@ -689,6 +699,7 @@ fn lower_expr(
 
             lower_basic_binary_operation(
                 builder,
+                ir_module,
                 &operation.operator,
                 ir::BinaryOperands::new(left, right),
             )
@@ -702,26 +713,14 @@ fn lower_expr(
                 resolved_ast,
             )
         }
+        ExprKind::IntegerCast(cast_from) => {
+            integer_cast(builder, ir_module, function, resolved_ast, cast_from)
+        }
         ExprKind::IntegerExtend(cast) => {
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
-
-            Ok(builder.push(
-                match cast
-                    .target_type
-                    .kind
-                    .sign(Some(&ir_module.target))
-                    .expect("integer extend result type to be an integer type")
-                {
-                    resolved::IntegerSign::Signed => ir::Instruction::SignExtend(value, ir_type),
-                    resolved::IntegerSign::Unsigned => ir::Instruction::ZeroExtend(value, ir_type),
-                },
-            ))
+            integer_extend(builder, ir_module, function, resolved_ast, cast)
         }
         ExprKind::IntegerTruncate(cast) => {
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
-            Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
+            integer_truncate(builder, ir_module, function, resolved_ast, cast)
         }
         ExprKind::FloatExtend(cast) => {
             let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
@@ -1055,12 +1054,15 @@ fn lower_expr(
 
 pub fn lower_basic_binary_operation(
     builder: &mut Builder,
+    ir_module: &ir::Module,
     operator: &resolved::BasicBinaryOperator,
     operands: ir::BinaryOperands,
 ) -> Result<Value, LowerError> {
     match operator {
         resolved::BasicBinaryOperator::Add(mode) => Ok(builder.push(match mode {
-            NumericMode::Integer(_) => ir::Instruction::Add(operands, FloatOrInteger::Integer),
+            NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
+                ir::Instruction::Add(operands, FloatOrInteger::Integer)
+            }
             NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
             NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
                 ir::OverflowOperation {
@@ -1072,7 +1074,9 @@ pub fn lower_basic_binary_operation(
             ),
         })),
         resolved::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
-            NumericMode::Integer(_) => ir::Instruction::Subtract(operands, FloatOrInteger::Integer),
+            NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
+                ir::Instruction::Subtract(operands, FloatOrInteger::Integer)
+            }
             NumericMode::Float => ir::Instruction::Subtract(operands, FloatOrInteger::Float),
             NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
                 ir::OverflowOperation {
@@ -1084,7 +1088,9 @@ pub fn lower_basic_binary_operation(
             ),
         })),
         resolved::BasicBinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
-            NumericMode::Integer(_) => ir::Instruction::Multiply(operands, FloatOrInteger::Integer),
+            NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
+                ir::Instruction::Multiply(operands, FloatOrInteger::Integer)
+            }
             NumericMode::Float => ir::Instruction::Multiply(operands, FloatOrInteger::Float),
             NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
                 ir::OverflowOperation {
@@ -1095,30 +1101,32 @@ pub fn lower_basic_binary_operation(
                 operands,
             ),
         })),
-        resolved::BasicBinaryOperator::Divide(mode) => {
-            Ok(builder.push(ir::Instruction::Divide(operands, *mode)))
-        }
-        resolved::BasicBinaryOperator::Modulus(mode) => {
-            Ok(builder.push(ir::Instruction::Modulus(operands, *mode)))
-        }
+        resolved::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instruction::Divide(
+            operands,
+            mode.or_default_for(ir_module.target),
+        ))),
+        resolved::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instruction::Modulus(
+            operands,
+            mode.or_default_for(ir_module.target),
+        ))),
         resolved::BasicBinaryOperator::Equals(mode) => {
             Ok(builder.push(ir::Instruction::Equals(operands, *mode)))
         }
         resolved::BasicBinaryOperator::NotEquals(mode) => {
             Ok(builder.push(ir::Instruction::NotEquals(operands, *mode)))
         }
-        resolved::BasicBinaryOperator::LessThan(mode) => {
-            Ok(builder.push(ir::Instruction::LessThan(operands, *mode)))
-        }
-        resolved::BasicBinaryOperator::LessThanEq(mode) => {
-            Ok(builder.push(ir::Instruction::LessThanEq(operands, *mode)))
-        }
-        resolved::BasicBinaryOperator::GreaterThan(mode) => {
-            Ok(builder.push(ir::Instruction::GreaterThan(operands, *mode)))
-        }
-        resolved::BasicBinaryOperator::GreaterThanEq(mode) => {
-            Ok(builder.push(ir::Instruction::GreaterThanEq(operands, *mode)))
-        }
+        resolved::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(
+            ir::Instruction::LessThan(operands, mode.or_default_for(ir_module.target)),
+        )),
+        resolved::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(
+            ir::Instruction::LessThanEq(operands, mode.or_default_for(ir_module.target)),
+        )),
+        resolved::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(
+            ir::Instruction::GreaterThan(operands, mode.or_default_for(ir_module.target)),
+        )),
+        resolved::BasicBinaryOperator::GreaterThanEq(mode) => Ok(builder.push(
+            ir::Instruction::GreaterThanEq(operands, mode.or_default_for(ir_module.target)),
+        )),
         resolved::BasicBinaryOperator::BitwiseAnd => {
             Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))
         }
@@ -1132,8 +1140,18 @@ pub fn lower_basic_binary_operation(
         | resolved::BasicBinaryOperator::LeftShift => {
             Ok(builder.push(ir::Instruction::LeftShift(operands)))
         }
-        resolved::BasicBinaryOperator::RightShift => {
-            Ok(builder.push(ir::Instruction::RightShift(operands)))
+        resolved::BasicBinaryOperator::ArithmeticRightShift(sign_or_indeterminate) => {
+            let sign = match sign_or_indeterminate {
+                SignOrIndeterminate::Sign(sign) => *sign,
+                SignOrIndeterminate::Indeterminate(c_integer) => {
+                    ir_module.target.default_c_integer_sign(*c_integer)
+                }
+            };
+
+            Ok(builder.push(match sign {
+                IntegerSign::Signed => ir::Instruction::ArithmeticRightShift(operands),
+                IntegerSign::Unsigned => ir::Instruction::LogicalRightShift(operands),
+            }))
         }
         resolved::BasicBinaryOperator::LogicalRightShift => {
             Ok(builder.push(ir::Instruction::LogicalRightShift(operands)))

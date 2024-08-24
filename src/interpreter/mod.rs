@@ -156,7 +156,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 ir::Instruction::BitwiseOr(_) => todo!(),
                 ir::Instruction::BitwiseXor(_) => todo!(),
                 ir::Instruction::LeftShift(_) => todo!(),
-                ir::Instruction::RightShift(_) => todo!(),
+                ir::Instruction::ArithmeticRightShift(_) => todo!(),
                 ir::Instruction::LogicalRightShift(_) => todo!(),
                 ir::Instruction::Bitcast(_, _) => todo!(),
                 ir::Instruction::ZeroExtend(_, _) => todo!(),
