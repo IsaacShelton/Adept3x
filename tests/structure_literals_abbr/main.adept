@@ -3,7 +3,7 @@
 func printf(format ptr<u8>, ...) i32
 
 #[pod]
-struct Vector3i (x int, y int, z int)
+struct Vector3i (x i32, y i32, z i32)
 
 func main {
     x := 123

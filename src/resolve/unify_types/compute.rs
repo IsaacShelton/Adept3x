@@ -5,6 +5,7 @@ use crate::{
     source_files::Source,
 };
 use itertools::Itertools;
+use num::BigInt;
 use std::borrow::Borrow;
 
 pub fn compute_unifying_type(
@@ -64,6 +65,7 @@ fn compute_unifying_integer_type<'a>(
         largest_loose_used,
         required_bits,
         required_sign,
+        ..
     } = IntegerProperties::compute(types_iter)?;
 
     let required_sign = required_sign.unwrap_or(IntegerSign::Signed);
@@ -85,6 +87,7 @@ pub struct IntegerProperties {
     pub largest_loose_used: Option<CInteger>,
     pub required_bits: Option<IntegerBits>,
     pub required_sign: Option<IntegerSign>,
+    pub is_concrete: bool,
 }
 
 impl IntegerProperties {
@@ -92,6 +95,7 @@ impl IntegerProperties {
         largest_loose_used: None,
         required_bits: None,
         required_sign: None,
+        is_concrete: false,
     };
 
     pub fn new(ty: &Type) -> Option<Self> {
@@ -100,26 +104,30 @@ impl IntegerProperties {
                 largest_loose_used: None,
                 required_bits: Some(*bits),
                 required_sign: Some(*sign),
+                is_concrete: true,
             }),
             TypeKind::CInteger(c_integer, sign) => Some(Self {
                 largest_loose_used: Some(*c_integer),
                 required_bits: Some(c_integer.min_bits()),
                 required_sign: *sign,
+                is_concrete: true,
             }),
             TypeKind::IntegerLiteral(value) => {
                 let unsigned_bits = value.bits();
 
-                let sign = IntegerSign::from(value);
+                let sign = (*value < BigInt::ZERO).then_some(IntegerSign::Signed);
 
-                let bits = sign
-                    .is_signed()
-                    .then_some(unsigned_bits + 1)
-                    .unwrap_or(unsigned_bits);
+                let bits = if sign == Some(IntegerSign::Signed) {
+                    unsigned_bits + 1
+                } else {
+                    unsigned_bits
+                };
 
                 Some(Self {
                     largest_loose_used: None,
                     required_bits: Some(IntegerBits::new(bits)?),
-                    required_sign: Some(sign),
+                    required_sign: sign,
+                    is_concrete: false,
                 })
             }
             _ => None,
@@ -138,14 +146,51 @@ pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<Integ
         return Some(b);
     }
 
+    let a_bits = a.required_bits?.bits();
+    let b_bits = b.required_bits?.bits();
+
+    let a_sign = a.required_sign;
+    let b_sign = b.required_sign;
+
+    if !a.is_concrete || !b.is_concrete {
+        let bits = a_bits.max(b_bits);
+        let bits = IntegerBits::new(bits.into()).unwrap_or(IntegerBits::Bits64);
+
+        let largest_loose_used =
+            if let (Some(a_large), Some(b_large)) = (a.largest_loose_used, b.largest_loose_used) {
+                Some(a_large.max(b_large))
+            } else {
+                a.largest_loose_used.or(b.largest_loose_used)
+            };
+
+        let largest_loose_used = largest_loose_used.map(|c_integer| {
+            CInteger::smallest_that_fits(c_integer, bits).unwrap_or(CInteger::LongLong)
+        });
+
+        let required_sign = if a_sign == Some(IntegerSign::Signed)
+            || b_sign == Some(IntegerSign::Signed)
+        {
+            Some(IntegerSign::Signed)
+        } else if a_sign == Some(IntegerSign::Unsigned) || b_sign == Some(IntegerSign::Unsigned) {
+            Some(IntegerSign::Unsigned)
+        } else {
+            None
+        };
+
+        return Some(IntegerProperties {
+            largest_loose_used,
+            required_bits: Some(bits),
+            required_sign,
+            is_concrete: a.is_concrete || b.is_concrete,
+        });
+    }
+
     let integer_properties = match (a.largest_loose_used, b.largest_loose_used) {
         (None, None) => {
             // Two normal fixed-size integers
 
-            let a_bits = a.required_bits?.bits();
-            let b_bits = b.required_bits?.bits();
-            let a_sign = a.required_sign?;
-            let b_sign = b.required_sign?;
+            let a_sign = a_sign.or(b_sign).unwrap();
+            let b_sign = b_sign.unwrap_or(a_sign);
 
             let (bits, sign) = if a_bits >= b_bits && a_sign.is_unsigned() && b_sign.is_signed() {
                 (a_bits + 1, IntegerSign::Signed)
@@ -165,6 +210,7 @@ pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<Integ
                 largest_loose_used: None,
                 required_bits: Some(bits),
                 required_sign: Some(sign),
+                is_concrete: true,
             })
         }
         (None, Some(min_c_integer)) | (Some(min_c_integer), None) => {
@@ -217,5 +263,6 @@ fn unify_integer_properties_flexible(
         largest_loose_used: CInteger::smallest_that_fits(min_c_integer, bits),
         required_bits: Some(bits),
         required_sign: maybe_sign,
+        is_concrete: true,
     })
 }
