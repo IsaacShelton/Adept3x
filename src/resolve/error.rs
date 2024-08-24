@@ -143,6 +143,13 @@ pub enum ResolveErrorKind {
         of: String,
         function_name: String,
     },
+    DivideByZero,
+    ModuloByZero,
+    ShiftByNegative,
+    ShiftTooLarge,
+    CannotPerformOnUnspecializedInteger {
+        operation: String,
+    },
     Other {
         message: String,
     },
@@ -370,6 +377,21 @@ impl Display for ResolveErrorKind {
 
             ResolveErrorKind::FunctionMustReturnType { of, function_name } => {
                 write!(f, "Function '{}' must return '{}'", function_name, of)?;
+            }
+            ResolveErrorKind::DivideByZero => {
+                write!(f, "Cannot divide by zero")?;
+            }
+            ResolveErrorKind::ModuloByZero => {
+                write!(f, "Cannot modulo by zero")?;
+            }
+            ResolveErrorKind::ShiftByNegative => {
+                write!(f, "Cannot shift by negative")?;
+            }
+            ResolveErrorKind::ShiftTooLarge => {
+                write!(f, "Cannot shift by that large amount")?;
+            }
+            ResolveErrorKind::CannotPerformOnUnspecializedInteger { operation } => {
+                write!(f, "Cannot {operation} unspecialized integers")?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
