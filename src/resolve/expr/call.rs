@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior},
     resolve::{
-        conform::{conform_expr, conform_expr_to_default, ConformMode},
+        conform::{conform_expr, to_default::conform_expr_to_default, ConformMode},
         error::{ResolveError, ResolveErrorKind},
         resolve_type, Initialized,
     },
