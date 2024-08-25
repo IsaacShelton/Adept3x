@@ -60,15 +60,9 @@ impl TypeBaseBuilder {
                 IntegerSign::Signed
             };
 
-            Type::new(TypeKind::Integer { bits, sign }, self.source)
+            Type::new(TypeKind::Integer(bits, sign), self.source)
         } else if let Some(sign) = self.sign {
-            Type::new(
-                TypeKind::Integer {
-                    bits: IntegerBits::Bits32,
-                    sign,
-                },
-                self.source,
-            )
+            Type::new(TypeKind::Integer(IntegerBits::Bits32, sign), self.source)
         } else {
             return Err(ParseErrorKind::InvalidType.at(self.source));
         };
@@ -117,11 +111,11 @@ impl TypeBaseBuilder {
     }
 
     pub fn float(&mut self, source: Source) -> Result<(), ParseError> {
-        self.concrete(TypeKind::Float(FloatSize::Bits32), source)
+        self.concrete(TypeKind::Floating(FloatSize::Bits32), source)
     }
 
     pub fn double(&mut self, source: Source) -> Result<(), ParseError> {
-        self.concrete(TypeKind::Float(FloatSize::Bits64), source)
+        self.concrete(TypeKind::Floating(FloatSize::Bits64), source)
     }
 
     pub fn sign(&mut self, sign: IntegerSign, source: Source) -> Result<(), ParseError> {
