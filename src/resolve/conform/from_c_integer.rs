@@ -82,10 +82,7 @@ pub fn from_c_integer_to_c_integer(
         return Some(TypedExpr::new(
             target_type.clone(),
             ExprKind::IntegerCast(Box::new(CastFrom {
-                cast: Cast {
-                    target_type,
-                    value: expr.expr.clone(),
-                },
+                cast: Cast::new(target_type, expr.expr.clone()),
                 from_type: TypeKind::CInteger(from_c_integer, from_sign).at(source),
             }))
             .at(source),
@@ -113,10 +110,7 @@ fn from_c_integer_to_integer(
     Some(TypedExpr::new(
         target_type.clone(),
         ExprKind::IntegerCast(Box::new(CastFrom {
-            cast: Cast {
-                target_type,
-                value: expr.expr.clone(),
-            },
+            cast: Cast::new(target_type, expr.expr.clone()),
             from_type: TypeKind::CInteger(from_c_integer, from_sign).at(source),
         }))
         .at(source),

@@ -222,18 +222,13 @@ fn unify_integer_properties_flexible(
     } else if b_bits >= a_bits && b_can_be_unsigned && a_can_be_signed {
         (b_bits + BitUnits::of(1), a.required_sign)
     } else {
-        let sign = match (a.required_sign, b.required_sign) {
-            (None, None) => None,
-            (None, Some(sign)) | (Some(sign), None) => {
-                sign.is_signed().then_some(IntegerSign::Signed)
-            }
-            (Some(a_sign), Some(b_sign)) => Some(IntegerSign::stronger(a_sign, b_sign)),
-        };
-
-        (a_bits.max(b_bits), sign)
+        (
+            a_bits.max(b_bits),
+            IntegerSign::strongest(a.required_sign, b.required_sign),
+        )
     };
 
-    let bits = IntegerBits::new(bits.into()).unwrap_or(IntegerBits::Bits64);
+    let bits = IntegerBits::new(bits).unwrap_or(IntegerBits::Bits64);
 
     Some(IntegerProperties {
         largest_loose_used: CInteger::smallest_that_fits(min_c_integer, bits),
