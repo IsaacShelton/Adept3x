@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast,
     resolve::{
-        conform::conform_integer_literal_to_default_or_error,
+        conform::to_default::conform_integer_literal_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },

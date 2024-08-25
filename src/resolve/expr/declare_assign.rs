@@ -1,7 +1,7 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast,
-    resolve::{conform::conform_expr_to_default, error::ResolveError, Initialized},
+    resolve::{conform::to_default::conform_expr_to_default, error::ResolveError, Initialized},
     resolved::{self, TypedExpr},
     source_files::Source,
 };
