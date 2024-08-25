@@ -1,9 +1,9 @@
 use super::{
-    conform_expr,
+    conform::{conform_expr, ConformMode},
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
     expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
-    resolve_type, ConformMode, Initialized,
+    resolve_type, Initialized,
 };
 use crate::{
     ast::{self, ConformBehavior},
@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub fn resolve_stmts(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     stmts: &[ast::Stmt],
 ) -> Result<Vec<resolved::Stmt>, ResolveError> {
     let mut resolved_stmts = Vec::with_capacity(stmts.len());
@@ -24,7 +24,7 @@ pub fn resolve_stmts(
 }
 
 pub fn resolve_stmt(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     ast_stmt: &ast::Stmt,
 ) -> Result<resolved::Stmt, ResolveError> {
     let source = ast_stmt.source;

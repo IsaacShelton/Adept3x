@@ -156,6 +156,53 @@ pub enum TypeKind {
 }
 
 impl TypeKind {
+    pub fn i8() -> Self {
+        Self::Integer(IntegerBits::Bits8, IntegerSign::Signed)
+    }
+
+    pub fn u8() -> Self {
+        Self::Integer(IntegerBits::Bits8, IntegerSign::Unsigned)
+    }
+
+    pub fn i16() -> Self {
+        Self::Integer(IntegerBits::Bits16, IntegerSign::Signed)
+    }
+
+    pub fn u16() -> Self {
+        Self::Integer(IntegerBits::Bits16, IntegerSign::Unsigned)
+    }
+
+    pub fn i32() -> Self {
+        Self::Integer(IntegerBits::Bits32, IntegerSign::Signed)
+    }
+
+    pub fn u32() -> Self {
+        Self::Integer(IntegerBits::Bits32, IntegerSign::Unsigned)
+    }
+
+    pub fn i64() -> Self {
+        Self::Integer(IntegerBits::Bits64, IntegerSign::Signed)
+    }
+
+    pub fn u64() -> Self {
+        Self::Integer(IntegerBits::Bits64, IntegerSign::Unsigned)
+    }
+
+    pub fn f32() -> Self {
+        Self::Floating(FloatSize::Bits32)
+    }
+
+    pub fn f64() -> Self {
+        Self::Floating(FloatSize::Bits64)
+    }
+
+    pub fn signed(bits: IntegerBits) -> Self {
+        Self::Integer(bits, IntegerSign::Signed)
+    }
+    pub fn unsigned(bits: IntegerBits) -> Self {
+        Self::Integer(bits, IntegerSign::Unsigned)
+    }
+
     pub fn is_integer_like(&self) -> bool {
         matches!(
             self,
@@ -418,6 +465,12 @@ pub struct CastFrom {
 pub struct Cast {
     pub target_type: Type,
     pub value: Expr,
+}
+
+impl Cast {
+    pub fn new(target_type: Type, value: Expr) -> Self {
+        Self { target_type, value }
+    }
 }
 
 #[derive(Clone, Debug)]

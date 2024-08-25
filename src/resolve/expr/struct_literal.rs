@@ -2,10 +2,10 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
     resolve::{
-        conform_expr,
+        conform::{conform_expr, ConformMode},
         core_structure_info::get_core_structure_info,
         error::{ResolveError, ResolveErrorKind},
-        resolve_type, ConformMode, Initialized,
+        resolve_type, Initialized,
     },
     resolved::{self, StructureLiteral, StructureRef, TypedExpr},
     source_files::Source,

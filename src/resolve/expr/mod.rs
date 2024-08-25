@@ -15,14 +15,18 @@ use self::{
     short_circuiting_binary_operation::resolve_short_circuiting_binary_operation_expr,
 };
 use super::{
-    error::ResolveError, function_search_ctx::FunctionSearchCtx,
-    global_search_ctx::GlobalSearchCtx, type_search_ctx::TypeSearchCtx,
-    variable_search_ctx::VariableSearchCtx, ConformMode, Initialized,
+    conform::{conform_expr_or_error, ConformMode},
+    error::ResolveError,
+    function_search_ctx::FunctionSearchCtx,
+    global_search_ctx::GlobalSearchCtx,
+    type_search_ctx::TypeSearchCtx,
+    variable_search_ctx::VariableSearchCtx,
+    Initialized,
 };
 use crate::{
     ast::{self, ConformBehavior},
     resolve::{
-        conform_expr_or_error, ensure_initialized,
+        ensure_initialized,
         error::ResolveErrorKind,
         expr::{
             call::resolve_call_expr, conditional::resolve_conditional_expr,

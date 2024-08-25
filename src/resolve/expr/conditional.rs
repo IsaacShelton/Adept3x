@@ -2,11 +2,11 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior},
     resolve::{
-        conform_expr_or_error,
+        conform::{conform_expr_or_error, ConformMode},
         error::{ResolveError, ResolveErrorKind},
         resolve_stmts,
         unify_types::unify_types,
-        ConformMode, Initialized,
+        Initialized,
     },
     resolved::{self, Branch, TypedExpr},
     source_files::Source,
