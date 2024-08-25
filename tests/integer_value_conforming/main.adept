@@ -15,7 +15,7 @@ func signed {
     value_i16 i16 = 10
     value_i32 i32 = 10
     value_i64 i64 = 10
-    value_int int = 10
+    value_longlong int = 10
 
     printf(c"-------------- i8 + ...\n")
 
@@ -36,11 +36,11 @@ func signed {
     // printf(c"value = %hhd\n", value)
 
     // value i8 = 0
-    // value = value + value_int
+    // value = value + value_longlong
     // printf(c"value = %hhd\n", value)
 
     // value i8 = 0
-    // value = value + value_int
+    // value = value + value_longlong
     // printf(c"value = %hhd\n", value)
 
     printf(c"-------------- i16 + ...\n")
@@ -61,7 +61,7 @@ func signed {
     // printf(c"value = %hd\n", value)
 
     // value i16 = 0
-    // value = value + value_int
+    // value = value + value_longlong
     // printf(c"value = %hd\n", value)
 
     printf(c"-------------- i32 + ...\n")
@@ -83,7 +83,7 @@ func signed {
     // printf(c"value = %d\n", value)
 
     // value i32 = 0
-    // value = value + value_int
+    // value = value + value_longlong
     // printf(c"value = %d\n", value)
 
     printf(c"-------------- i64 + ...\n")
@@ -104,9 +104,9 @@ func signed {
     value = value + value_i64
     printf(c"value = %lld\n", value)
 
-    value i64 = 0
-    value = value + value_int
-    printf(c"value = %lld\n", value)
+    // value i64 = 0
+    // value = value + value_longlong
+    // printf(c"value = %lld\n", value)
 
     printf(c"-------------- int + ...\n")
 
@@ -127,7 +127,7 @@ func signed {
     printf(c"value = %lld\n", value)
 
     value longlong = 0
-    value = value + value_int
+    value = value + value_longlong
     printf(c"value = %lld\n", value)
 }
 
@@ -138,7 +138,7 @@ func unsigned {
     value_u16 u16 = 10
     value_u32 u32 = 10
     value_u64 u64 = 10
-    value_uint uint = 10
+    value_ulonglong uint = 10
 
     printf(c"-------------- u8 + ...\n")
 
@@ -159,11 +159,11 @@ func unsigned {
     // printf(c"value = %hhu\n", value)
 
     // value u8 = 0
-    // value = value + value_uint
+    // value = value + value_ulonglong
     // printf(c"value = %hhu\n", value)
 
     // value u8 = 0
-    // value = value + value_uint
+    // value = value + value_ulonglong
     // printf(c"value = %hhu\n", value)
 
     printf(c"-------------- u16 + ...\n")
@@ -185,7 +185,7 @@ func unsigned {
     // printf(c"value = %hu\n", value)
 
     // value u16 = 0
-    // value = value + value_uint
+    // value = value + value_ulonglong
     // printf(c"value = %hu\n", value)
 
     printf(c"-------------- u32 + ...\n")
@@ -207,7 +207,7 @@ func unsigned {
     // printf(c"value = %u\n", value)
 
     // value u32 = 0
-    // value = value + value_uint
+    // value = value + value_ulonglong
     // printf(c"value = %u\n", value)
 
     printf(c"-------------- u64 + ...\n")
@@ -228,9 +228,9 @@ func unsigned {
     value = value + value_u64
     printf(c"value = %llu\n", value)
 
-    value u64 = 0
-    value = value + value_uint
-    printf(c"value = %llu\n", value)
+    // value u64 = 0
+    // value = value + value_ulonglong
+    // printf(c"value = %llu\n", value)
 
     printf(c"-------------- uint + ...\n")
 
@@ -251,7 +251,7 @@ func unsigned {
     printf(c"value = %llu\n", value)
 
     value ulonglong = 0
-    value = value + value_uint
+    value = value + value_ulonglong
     printf(c"value = %llu\n", value)
 }
 

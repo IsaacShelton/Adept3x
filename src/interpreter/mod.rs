@@ -150,20 +150,36 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 ir::Instruction::LessThanEq(ops, _f_or_i) => self.lte(ops, &registers),
                 ir::Instruction::GreaterThan(ops, _f_or_i) => self.gt(ops, &registers),
                 ir::Instruction::GreaterThanEq(ops, _f_or_i) => self.gte(ops, &registers),
-                ir::Instruction::And(_) => todo!(),
-                ir::Instruction::Or(_) => todo!(),
-                ir::Instruction::BitwiseAnd(_) => todo!(),
-                ir::Instruction::BitwiseOr(_) => todo!(),
-                ir::Instruction::BitwiseXor(_) => todo!(),
-                ir::Instruction::LeftShift(_) => todo!(),
-                ir::Instruction::ArithmeticRightShift(_) => todo!(),
-                ir::Instruction::LogicalRightShift(_) => todo!(),
-                ir::Instruction::Bitcast(_, _) => todo!(),
-                ir::Instruction::ZeroExtend(_, _) => todo!(),
-                ir::Instruction::SignExtend(_, _) => todo!(),
-                ir::Instruction::FloatExtend(_, _) => todo!(),
-                ir::Instruction::Truncate(_, _) => todo!(),
-                ir::Instruction::TruncateFloat(_, _) => todo!(),
+                ir::Instruction::And(_) => todo!("Interpreter / ir::Instruction::And"),
+                ir::Instruction::Or(_) => todo!("Interpreter / ir::Instruction::Or"),
+                ir::Instruction::BitwiseAnd(_) => {
+                    todo!("Interpreter / ir::Instruction::BitwiseAnd")
+                }
+                ir::Instruction::BitwiseOr(_) => todo!("Interpreter / ir::Instruction::BitwiseOr"),
+                ir::Instruction::BitwiseXor(_) => {
+                    todo!("Interpreter / ir::Instruction::BitwiseXor")
+                }
+                ir::Instruction::LeftShift(_) => todo!("Interpreter / ir::Instruction::LeftShift"),
+                ir::Instruction::ArithmeticRightShift(_) => {
+                    todo!("Interpreter / ir::Instruction::ArithmeticRightShift")
+                }
+                ir::Instruction::LogicalRightShift(_) => {
+                    todo!("Interpreter / ir::Instruction::LogicalRightShift")
+                }
+                ir::Instruction::Bitcast(_, _) => todo!("Interpreter / ir::Instruction::BitCast"),
+                ir::Instruction::ZeroExtend(_, _) => {
+                    todo!("Interpreter / ir::Instruction::ZeroExtend")
+                }
+                ir::Instruction::SignExtend(_, _) => {
+                    todo!("Interpreter / ir::Instruction::SignExtend")
+                }
+                ir::Instruction::FloatExtend(_, _) => {
+                    todo!("Interpreter / ir::Instruction::FloatExtend")
+                }
+                ir::Instruction::Truncate(_, _) => todo!("Interpreter / ir::Instruction::Truncate"),
+                ir::Instruction::TruncateFloat(_, _) => {
+                    todo!("Interpreter / ir::Instruction::TruncateFloat")
+                }
                 ir::Instruction::Member {
                     struct_type,
                     subject_pointer,
@@ -192,11 +208,40 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         fields: ty.struct_fields(self.ir_module).unwrap(),
                     })
                 }
-                ir::Instruction::IsZero(_) => todo!(),
-                ir::Instruction::IsNotZero(_) => todo!(),
-                ir::Instruction::Negate(_) => todo!(),
-                ir::Instruction::NegateFloat(_) => todo!(),
-                ir::Instruction::BitComplement(_) => todo!(),
+                ir::Instruction::IsZero(_) => todo!("Interpreter / ir::Instruction::IsZero"),
+                ir::Instruction::IsNonZero(value) => {
+                    let value = self.eval(&registers, value);
+
+                    match value {
+                        Value::Undefined => Value::Undefined,
+                        Value::Literal(literal) => {
+                            Value::Literal(ir::Literal::Boolean(match literal {
+                                ir::Literal::Void => false,
+                                ir::Literal::Boolean(x) => x,
+                                ir::Literal::Signed8(x) => x != 0,
+                                ir::Literal::Signed16(x) => x != 0,
+                                ir::Literal::Signed32(x) => x != 0,
+                                ir::Literal::Signed64(x) => x != 0,
+                                ir::Literal::Unsigned8(x) => x != 0,
+                                ir::Literal::Unsigned16(x) => x != 0,
+                                ir::Literal::Unsigned32(x) => x != 0,
+                                ir::Literal::Unsigned64(x) => x != 0,
+                                ir::Literal::Float32(x) => x != 0.0,
+                                ir::Literal::Float64(x) => x != 0.0,
+                                ir::Literal::NullTerminatedString(_) => true,
+                                ir::Literal::Zeroed(_) => false,
+                            }))
+                        }
+                        Value::StructLiteral(_) => Value::Undefined,
+                    }
+                }
+                ir::Instruction::Negate(_) => todo!("Interpreter / ir::Instruction::Negate"),
+                ir::Instruction::NegateFloat(_) => {
+                    todo!("Interpreter /ir::Instruction::NegateFloat")
+                }
+                ir::Instruction::BitComplement(_) => {
+                    todo!("Interpreter / ir::Instruction::BitComplement")
+                }
                 ir::Instruction::Break(break_info) => {
                     new_ip = Some(InstructionPointer {
                         basicblock_id: break_info.basicblock_id,

@@ -34,7 +34,7 @@ pub fn unify_types(
             Some(conformed) => conformed,
             None => {
                 panic!(
-                    "cannot conform to unified type {unified_type} for value of type {}",
+                    "cannot conform from '{}' to unified type '{unified_type}'",
                     expr.resolved_type,
                 );
             }

@@ -572,7 +572,7 @@ pub unsafe fn create_function_block(
                 let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildIsNull(builder.get(), value, cstr!("").as_ptr()))
             }
-            Instruction::IsNotZero(inner) => {
+            Instruction::IsNonZero(inner) => {
                 let value = build_value(ctx, value_catalog, builder, inner)?;
                 Some(LLVMBuildIsNotNull(builder.get(), value, cstr!("").as_ptr()))
             }

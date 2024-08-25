@@ -39,9 +39,8 @@ pub fn resolve_unary_operation_expr(
     };
 
     let result_type = match unary_operation.operator {
-        UnaryOperator::Not => TypeKind::Boolean.at(source),
-        UnaryOperator::BitComplement => resolved_expr.resolved_type.clone(),
-        UnaryOperator::Negate => resolved_expr.resolved_type.clone(),
+        UnaryOperator::Not | UnaryOperator::IsNonZero => TypeKind::Boolean.at(source),
+        UnaryOperator::BitComplement | UnaryOperator::Negate => resolved_expr.resolved_type.clone(),
     };
 
     let expr = Expr::new(

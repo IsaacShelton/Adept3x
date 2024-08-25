@@ -27,6 +27,7 @@ mod lexical_utils;
 mod line_column;
 mod linking;
 mod llvm_backend;
+mod logic;
 mod look_ahead;
 mod lower;
 mod parser;

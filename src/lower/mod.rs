@@ -876,6 +876,7 @@ fn lower_expr(
                 resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
                 resolved::UnaryOperator::BitComplement => ir::Instruction::BitComplement(inner),
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
+                resolved::UnaryOperator::IsNonZero => ir::Instruction::IsNonZero(inner),
             }))
         }
         ExprKind::Conditional(conditional) => {

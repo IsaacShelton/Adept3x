@@ -12,6 +12,14 @@ pub enum CInteger {
 }
 
 impl CInteger {
+    pub fn largest(a: Option<Self>, b: Option<Self>) -> Option<Self> {
+        if let (Some(a), Some(b)) = (a, b) {
+            Some(a.max(b))
+        } else {
+            a.or(b)
+        }
+    }
+
     pub fn min_bits(self) -> IntegerBits {
         match self {
             Self::Char => IntegerBits::Bits8,
