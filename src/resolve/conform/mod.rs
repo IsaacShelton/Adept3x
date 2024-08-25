@@ -1,23 +1,22 @@
 mod from_float;
 mod from_float_literal;
 mod from_integer;
+mod from_integer_literal;
 mod from_pointer;
 mod mode;
 
 pub use self::mode::ConformMode;
 use self::{
     from_float::from_float, from_float_literal::from_float_literal, from_integer::from_integer,
-    from_pointer::from_pointer,
+    from_integer_literal::from_integer_literal, from_pointer::from_pointer,
 };
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
-    ast::{ConformBehavior, FloatSize, IntegerKnown, IntegerRigidity},
-    resolved::{Expr, ExprKind, IntegerBits, IntegerSign, Type, TypeKind, TypedExpr},
+    ast::{ConformBehavior, FloatSize},
+    resolved::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
-use num::Zero;
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 
 pub fn conform_expr_or_error(
     expr: &TypedExpr,
@@ -107,61 +106,4 @@ fn integer_literal_to_default(value: &BigInt, source: Source) -> Option<TypedExp
     }
 
     None
-}
-
-fn from_integer_literal(value: &BigInt, source: Source, to_type: &Type) -> Option<TypedExpr> {
-    match &to_type.kind {
-        TypeKind::Floating(size) => value.to_f64().map(|literal| {
-            TypedExpr::new(
-                TypeKind::Floating(*size).at(source),
-                Expr::new(ExprKind::FloatingLiteral(*size, literal), source),
-            )
-        }),
-        TypeKind::CInteger(c_integer, sign) => {
-            let needs_unsigned_bits = value.bits();
-            let needs_bits =
-                needs_unsigned_bits + (*value < BigInt::zero()).then_some(1).unwrap_or(0);
-
-            if needs_bits <= c_integer.min_bits().bits().into() {
-                Some(TypedExpr::new(
-                    TypeKind::CInteger(*c_integer, *sign).at(source),
-                    Expr::new(
-                        ExprKind::IntegerKnown(Box::new(IntegerKnown {
-                            rigidity: IntegerRigidity::Loose(*c_integer),
-                            value: value.clone(),
-                            sign: sign.unwrap_or(IntegerSign::Signed),
-                        })),
-                        source,
-                    ),
-                ))
-            } else {
-                None
-            }
-        }
-        TypeKind::Integer(bits, sign) => {
-            let does_fit = match (bits, sign) {
-                (IntegerBits::Bits8, IntegerSign::Signed) => i8::try_from(value).is_ok(),
-                (IntegerBits::Bits8, IntegerSign::Unsigned) => u8::try_from(value).is_ok(),
-                (IntegerBits::Bits16, IntegerSign::Signed) => i16::try_from(value).is_ok(),
-                (IntegerBits::Bits16, IntegerSign::Unsigned) => u16::try_from(value).is_ok(),
-                (IntegerBits::Bits32, IntegerSign::Signed) => i32::try_from(value).is_ok(),
-                (IntegerBits::Bits32, IntegerSign::Unsigned) => u32::try_from(value).is_ok(),
-                (IntegerBits::Bits64, IntegerSign::Signed) => i64::try_from(value).is_ok(),
-                (IntegerBits::Bits64, IntegerSign::Unsigned) => u64::try_from(value).is_ok(),
-            };
-
-            does_fit.then(|| {
-                TypedExpr::new(
-                    TypeKind::Integer(*bits, *sign).at(source),
-                    ExprKind::IntegerKnown(Box::new(IntegerKnown {
-                        rigidity: IntegerRigidity::Fixed(*bits),
-                        value: value.clone(),
-                        sign: *sign,
-                    }))
-                    .at(source),
-                )
-            })
-        }
-        _ => None,
-    }
 }
