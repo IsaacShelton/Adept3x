@@ -1,60 +1,9 @@
-use super::{
-    fmt_c_integer, AnonymousEnum, AnonymousStruct, AnoymousUnion, CInteger, FixedArray, FloatSize,
-    FunctionPointer, IntegerBits, IntegerSign, Type,
+use super::TypeKind;
+use crate::{
+    ast::{fmt_c_integer, FloatSize, IntegerBits},
+    ir::IntegerSign,
 };
-use crate::source_files::Source;
 use std::fmt::Display;
-
-#[derive(Clone, Debug)]
-pub enum TypeKind {
-    Boolean,
-    Integer {
-        bits: IntegerBits,
-        sign: IntegerSign,
-    },
-    CInteger {
-        integer: CInteger,
-        sign: Option<IntegerSign>,
-    },
-    Float(FloatSize),
-    Pointer(Box<Type>),
-    FixedArray(Box<FixedArray>),
-    PlainOldData(Box<Type>),
-    Void,
-    Named(String),
-    AnonymousStruct(AnonymousStruct),
-    AnonymousUnion(AnoymousUnion),
-    AnonymousEnum(AnonymousEnum),
-    FunctionPointer(FunctionPointer),
-}
-
-impl TypeKind {
-    pub fn at(self, source: Source) -> Type {
-        Type { kind: self, source }
-    }
-
-    pub fn integer(bits: IntegerBits, sign: IntegerSign) -> TypeKind {
-        TypeKind::Integer { bits, sign }
-    }
-
-    pub fn c_integer(integer: CInteger, sign: Option<IntegerSign>) -> TypeKind {
-        TypeKind::CInteger { integer, sign }
-    }
-
-    pub fn allow_indirect_undefined(&self) -> bool {
-        // TODO: CLEANUP: This is a bad way of doing it, should `Named` have property for this?
-        // This is very rarely needed though, so it's yet to be seen if that would be an improvement.
-        if let TypeKind::Named(name) = self {
-            if name.starts_with("struct<")
-                || name.starts_with("union<")
-                || name.starts_with("enum<")
-            {
-                return true;
-            }
-        }
-        false
-    }
-}
 
 impl Display for &TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -62,7 +11,7 @@ impl Display for &TypeKind {
             TypeKind::Boolean => {
                 write!(f, "bool")?;
             }
-            TypeKind::Integer { bits, sign } => {
+            TypeKind::Integer(bits, sign) => {
                 f.write_str(match (bits, sign) {
                     (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
                     (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
@@ -74,7 +23,7 @@ impl Display for &TypeKind {
                     (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
                 })?;
             }
-            TypeKind::CInteger { integer, sign } => {
+            TypeKind::CInteger(integer, sign) => {
                 fmt_c_integer(f, *integer, *sign)?;
             }
             TypeKind::Pointer(inner) => {
@@ -89,7 +38,7 @@ impl Display for &TypeKind {
             TypeKind::Named(name) => {
                 write!(f, "{name}")?;
             }
-            TypeKind::Float(size) => f.write_str(match size {
+            TypeKind::Floating(size) => f.write_str(match size {
                 FloatSize::Bits32 => "f32",
                 FloatSize::Bits64 => "f64",
             })?,

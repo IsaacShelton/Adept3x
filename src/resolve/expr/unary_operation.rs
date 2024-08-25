@@ -1,12 +1,12 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast,
+    ast::{self, UnaryOperator},
     resolve::{
         conform::to_default::conform_integer_literal_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, TypedExpr},
+    resolved::{Expr, ExprKind, TypeKind, TypedExpr, UnaryOperation},
     source_files::Source,
 };
 
@@ -24,9 +24,9 @@ pub fn resolve_unary_operation_expr(
     )?;
 
     let resolved_expr = match &resolved_expr.resolved_type.kind {
-        resolved::TypeKind::Boolean => resolved_expr,
-        resolved::TypeKind::Integer { .. } => resolved_expr,
-        resolved::TypeKind::IntegerLiteral(value) => {
+        TypeKind::Boolean => resolved_expr,
+        TypeKind::Integer(..) => resolved_expr,
+        TypeKind::IntegerLiteral(value) => {
             conform_integer_literal_to_default_or_error(value, resolved_expr.expr.source)?
         }
         _ => {
@@ -39,13 +39,13 @@ pub fn resolve_unary_operation_expr(
     };
 
     let result_type = match unary_operation.operator {
-        resolved::UnaryOperator::Not => resolved::TypeKind::Boolean.at(source),
-        resolved::UnaryOperator::BitComplement => resolved_expr.resolved_type.clone(),
-        resolved::UnaryOperator::Negate => resolved_expr.resolved_type.clone(),
+        UnaryOperator::Not => TypeKind::Boolean.at(source),
+        UnaryOperator::BitComplement => resolved_expr.resolved_type.clone(),
+        UnaryOperator::Negate => resolved_expr.resolved_type.clone(),
     };
 
-    let expr = resolved::Expr::new(
-        resolved::ExprKind::UnaryOperation(Box::new(resolved::UnaryOperation {
+    let expr = Expr::new(
+        ExprKind::UnaryOperation(Box::new(UnaryOperation {
             operator: unary_operation.operator.clone(),
             inner: resolved_expr,
         })),

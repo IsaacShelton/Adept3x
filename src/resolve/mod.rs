@@ -424,10 +424,8 @@ fn resolve_type<'a>(
 ) -> Result<resolved::Type, ResolveError> {
     match &ast_type.kind {
         ast::TypeKind::Boolean => Ok(resolved::TypeKind::Boolean),
-        ast::TypeKind::Integer { bits, sign } => Ok(resolved::TypeKind::Integer(*bits, *sign)),
-        ast::TypeKind::CInteger { integer, sign } => {
-            Ok(resolved::TypeKind::CInteger(*integer, *sign))
-        }
+        ast::TypeKind::Integer(bits, sign) => Ok(resolved::TypeKind::Integer(*bits, *sign)),
+        ast::TypeKind::CInteger(integer, sign) => Ok(resolved::TypeKind::CInteger(*integer, *sign)),
         ast::TypeKind::Pointer(inner) => {
             let inner = resolve_type_or_undeclared(
                 type_search_ctx,
@@ -494,7 +492,7 @@ fn resolve_type<'a>(
             }
             .at(inner.source)),
         },
-        ast::TypeKind::Float(size) => Ok(resolved::TypeKind::Floating(*size)),
+        ast::TypeKind::Floating(size) => Ok(resolved::TypeKind::Floating(*size)),
         ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
         ast::TypeKind::AnonymousEnum(anonymous_enum) => {

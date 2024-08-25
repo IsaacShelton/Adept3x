@@ -19,11 +19,7 @@ fn thin_cstring_function(
     let source = Source::internal();
     let void = ast::TypeKind::Void.at(Source::internal());
     let ptr_u8 = ast::TypeKind::Pointer(Box::new(
-        ast::TypeKind::Integer {
-            bits: IntegerBits::Bits8,
-            sign: IntegerSign::Unsigned,
-        }
-        .at(source),
+        ast::TypeKind::Integer(IntegerBits::Bits8, IntegerSign::Unsigned).at(source),
     ))
     .at(source);
 
@@ -57,11 +53,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     let source = Source::internal();
     let void = ast::TypeKind::Void.at(Source::internal());
     let ptr_u8 = ast::TypeKind::Pointer(Box::new(
-        ast::TypeKind::Integer {
-            bits: IntegerBits::Bits8,
-            sign: IntegerSign::Unsigned,
-        }
-        .at(source),
+        ast::TypeKind::Integer(IntegerBits::Bits8, IntegerSign::Unsigned).at(source),
     ))
     .at(source);
 
@@ -87,13 +79,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     file.enums.insert(
         "ProjectKind".into(),
         ast::Enum {
-            backing_type: Some(
-                ast::TypeKind::Integer {
-                    bits: IntegerBits::Bits64,
-                    sign: IntegerSign::Unsigned,
-                }
-                .at(source),
-            ),
+            backing_type: Some(ast::TypeKind::u64().at(source)),
             source,
             members: IndexMap::from_iter([
                 (
