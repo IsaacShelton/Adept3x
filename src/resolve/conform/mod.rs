@@ -1,3 +1,4 @@
+mod from_c_integer;
 mod from_float;
 mod from_float_literal;
 mod from_integer;
@@ -8,8 +9,9 @@ pub mod to_default;
 
 pub use self::mode::ConformMode;
 use self::{
-    from_float::from_float, from_float_literal::from_float_literal, from_integer::from_integer,
-    from_integer_literal::from_integer_literal, from_pointer::from_pointer,
+    from_c_integer::from_c_integer, from_float::from_float, from_float_literal::from_float_literal,
+    from_integer::from_integer, from_integer_literal::from_integer_literal,
+    from_pointer::from_pointer,
 };
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
@@ -17,22 +19,6 @@ use crate::{
     resolved::{Type, TypeKind, TypedExpr},
     source_files::Source,
 };
-
-pub fn conform_expr_or_error(
-    expr: &TypedExpr,
-    target_type: &Type,
-    mode: ConformMode,
-    behavior: ConformBehavior,
-    conform_source: Source,
-) -> Result<TypedExpr, ResolveError> {
-    conform_expr(expr, target_type, mode, behavior, conform_source).ok_or_else(|| {
-        ResolveErrorKind::TypeMismatch {
-            left: expr.resolved_type.to_string(),
-            right: target_type.to_string(),
-        }
-        .at(expr.expr.source)
-    })
-}
 
 pub fn conform_expr(
     expr: &TypedExpr,
@@ -58,6 +44,25 @@ pub fn conform_expr(
         TypeKind::FloatLiteral(from) => from_float_literal(*from, to_type, conform_source),
         TypeKind::Floating(from_size) => from_float(expr, *from_size, to_type),
         TypeKind::Pointer(from_inner) => from_pointer(expr, mode, from_inner, to_type),
+        TypeKind::CInteger(from_size, from_sign) => {
+            from_c_integer(expr, mode, *from_size, *from_sign, to_type, conform_source)
+        }
         _ => None,
     }
+}
+
+pub fn conform_expr_or_error(
+    expr: &TypedExpr,
+    target_type: &Type,
+    mode: ConformMode,
+    behavior: ConformBehavior,
+    conform_source: Source,
+) -> Result<TypedExpr, ResolveError> {
+    conform_expr(expr, target_type, mode, behavior, conform_source).ok_or_else(|| {
+        ResolveErrorKind::TypeMismatch {
+            left: expr.resolved_type.to_string(),
+            right: target_type.to_string(),
+        }
+        .at(expr.expr.source)
+    })
 }

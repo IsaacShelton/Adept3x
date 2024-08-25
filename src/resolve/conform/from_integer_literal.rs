@@ -1,5 +1,6 @@
 use crate::{
     ast::{CInteger, FloatSize, IntegerBits, IntegerKnown, IntegerRigidity},
+    data_units::BitUnits,
     ir::IntegerSign,
     resolved::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
@@ -56,9 +57,10 @@ fn from_integer_literal_to_c_integer(
     to_sign: Option<IntegerSign>,
     source: Source,
 ) -> Option<TypedExpr> {
-    let needs_bits = value.bits() + (*value < BigInt::zero()).then_some(1).unwrap_or(0);
+    let needs_bits =
+        BitUnits::of(value.bits() + (*value < BigInt::zero()).then_some(1).unwrap_or(0));
 
-    (needs_bits <= to_c_integer.min_bits().bits().into()).then(|| {
+    (needs_bits <= to_c_integer.min_bits().bits()).then(|| {
         TypedExpr::new(
             TypeKind::CInteger(to_c_integer, to_sign).at(source),
             ExprKind::IntegerKnown(Box::new(IntegerKnown {

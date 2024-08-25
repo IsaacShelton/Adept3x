@@ -12,6 +12,7 @@ pub enum UnaryOperator {
     Not,
     BitComplement,
     Negate,
+    IsNonZero,
 }
 
 impl Display for UnaryOperator {
@@ -20,6 +21,7 @@ impl Display for UnaryOperator {
             Self::Not => "!",
             Self::BitComplement => "~",
             Self::Negate => "-",
+            Self::IsNonZero => "bool()",
         })
     }
 }

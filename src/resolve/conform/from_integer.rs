@@ -1,7 +1,6 @@
 use super::ConformMode;
 use crate::{
     ast::{CInteger, ConformBehavior, IntegerBits},
-    data_units::BitUnits,
     ir::IntegerSign,
     resolved::{Cast, CastFrom, Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
@@ -89,22 +88,15 @@ fn conform_from_integer_to_c_integer(
     conform_mode: ConformMode,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
-    c_integer: CInteger,
-    sign: Option<IntegerSign>,
+    to_c_integer: CInteger,
+    to_sign: Option<IntegerSign>,
     source: Source,
 ) -> Option<TypedExpr> {
-    let target_type = TypeKind::CInteger(c_integer, sign).at(source);
+    let target_type = TypeKind::CInteger(to_c_integer, to_sign).at(source);
 
-    let needed_bits = if from_sign.is_unsigned() {
-        BitUnits::of(from_bits.bits().into()) + BitUnits::of(1)
-    } else {
-        BitUnits::of(from_bits.bits().into())
-    };
-
-    let is_lossless = match sign {
-        Some(to_sign) if sign == Some(to_sign) && (to_sign.is_signed() || to_sign == from_sign) => {
-            needed_bits <= BitUnits::of(c_integer.min_bits().bits().into())
-        }
+    let is_lossless = match to_sign {
+        Some(to_sign) if from_sign == to_sign => from_bits <= to_c_integer.min_bits(),
+        Some(to_sign) if to_sign.is_signed() => from_bits < to_c_integer.min_bits(),
         _ => false,
     };
 

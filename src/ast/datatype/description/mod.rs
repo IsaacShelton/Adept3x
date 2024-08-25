@@ -4,4 +4,4 @@ mod integer_sign;
 
 pub use float_size::FloatSize;
 pub use integer_bits::IntegerBits;
-pub use integer_sign::IntegerSign;
+pub use integer_sign::{IntegerSign, OptionIntegerSignExt};

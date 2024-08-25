@@ -1,4 +1,7 @@
-use crate::resolved::{IntegerSign, Type, TypeKind};
+use crate::{
+    data_units::BitUnits,
+    resolved::{IntegerSign, Type, TypeKind},
+};
 
 pub fn integer_literals_all_fit<'a>(
     preferred_type: Option<&Type>,
@@ -16,13 +19,13 @@ pub fn integer_literals_all_fit<'a>(
         TypeKind::IntegerLiteral(value) => {
             let literal_sign = IntegerSign::from(value);
 
-            let literal_bits = match literal_sign {
+            let literal_bits = BitUnits::of(match literal_sign {
                 IntegerSign::Unsigned => value.bits(),
                 IntegerSign::Signed => value.bits() + 1,
-            };
+            });
 
             (preferred_sign.is_signed() || literal_sign.is_unsigned())
-                && literal_bits <= preferred_bits.bits().into()
+                && literal_bits <= preferred_bits.bits()
         }
         _ => false,
     })

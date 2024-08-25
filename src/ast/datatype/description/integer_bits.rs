@@ -10,14 +10,14 @@ pub enum IntegerBits {
 }
 
 impl IntegerBits {
-    pub fn new(bits: u64) -> Option<Self> {
-        if bits <= 8 {
+    pub fn new(bits: BitUnits) -> Option<Self> {
+        if bits <= BitUnits::of(8) {
             Some(Self::Bits8)
-        } else if bits <= 16 {
+        } else if bits <= BitUnits::of(16) {
             Some(Self::Bits16)
-        } else if bits <= 32 {
+        } else if bits <= BitUnits::of(32) {
             Some(Self::Bits32)
-        } else if bits <= 64 {
+        } else if bits <= BitUnits::of(64) {
             Some(Self::Bits64)
         } else {
             None
@@ -33,12 +33,12 @@ impl IntegerBits {
         }
     }
 
-    pub fn bits(self) -> u8 {
+    pub fn bits(self) -> BitUnits {
         match self {
-            IntegerBits::Bits8 => 8,
-            IntegerBits::Bits16 => 16,
-            IntegerBits::Bits32 => 32,
-            IntegerBits::Bits64 => 64,
+            IntegerBits::Bits8 => BitUnits::of(8),
+            IntegerBits::Bits16 => BitUnits::of(16),
+            IntegerBits::Bits32 => BitUnits::of(32),
+            IntegerBits::Bits64 => BitUnits::of(64),
         }
     }
 
@@ -68,7 +68,7 @@ impl TryFrom<ByteUnits> for IntegerBits {
     type Error = ();
 
     fn try_from(value: ByteUnits) -> Result<Self, Self::Error> {
-        IntegerBits::new(value.to_bits().bits()).ok_or(())
+        IntegerBits::new(value.to_bits()).ok_or(())
     }
 }
 
@@ -76,6 +76,6 @@ impl TryFrom<BitUnits> for IntegerBits {
     type Error = ();
 
     fn try_from(value: BitUnits) -> Result<Self, Self::Error> {
-        IntegerBits::new(value.bits()).ok_or(())
+        IntegerBits::new(value).ok_or(())
     }
 }
