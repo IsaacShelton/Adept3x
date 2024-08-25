@@ -110,23 +110,23 @@ func signed {
 
     printf(c"-------------- int + ...\n")
 
-    value int = 0
+    value longlong = 0
     value = value + value_i8
     printf(c"value = %lld\n", value)
 
-    value int = 0
+    value longlong = 0
     value = value + value_i16
     printf(c"value = %lld\n", value)
 
-    value int = 0
+    value longlong = 0
     value = value + value_i32
     printf(c"value = %lld\n", value)
 
-    value int = 0
+    value longlong = 0
     value = value + value_i64
     printf(c"value = %lld\n", value)
 
-    value int = 0
+    value longlong = 0
     value = value + value_int
     printf(c"value = %lld\n", value)
 }
@@ -234,23 +234,23 @@ func unsigned {
 
     printf(c"-------------- uint + ...\n")
 
-    value uint = 0
+    value ulonglong = 0
     value = value + value_u8
     printf(c"value = %llu\n", value)
 
-    value uint = 0
+    value ulonglong = 0
     value = value + value_u16
     printf(c"value = %llu\n", value)
 
-    value uint = 0
+    value ulonglong = 0
     value = value + value_u32
     printf(c"value = %llu\n", value)
 
-    value uint = 0
+    value ulonglong = 0
     value = value + value_u64
     printf(c"value = %llu\n", value)
 
-    value uint = 0
+    value ulonglong = 0
     value = value + value_uint
     printf(c"value = %llu\n", value)
 }

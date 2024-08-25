@@ -2,9 +2,9 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior},
     resolve::{
-        conform_expr,
+        conform::{conform_expr, ConformMode},
         error::{ResolveError, ResolveErrorKind},
-        ConformMode, Initialized,
+        Initialized,
     },
     resolved::{self, Drops, TypedExpr},
     source_files::Source,

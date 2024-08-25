@@ -1,21 +1,13 @@
 mod compute;
 mod integer_literals;
 
-use super::{conform_expr, ConformMode};
+use super::conform::{conform_expr, ConformMode};
 use crate::{
     ast::ConformBehavior,
     resolved::{self, TypedExpr},
     source_files::Source,
 };
 use compute::compute_unifying_type;
-
-// bool <= u8 <= char <= u16 <= short <= int <= u32 <= long <= u64 <= longlong
-//
-//     - If any loose, result is loose
-//     - Bits is max of min bits
-//
-//     - size_t is its own type, must be manually converted to/from
-// error: 12345678 may not always fit inside `int`, which is only guaranteed to be 16-bits, use trunc<int>(1234243341343) to ignore
 
 pub fn unify_types(
     preferred_type: Option<&resolved::Type>,
