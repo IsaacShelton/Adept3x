@@ -312,13 +312,7 @@ impl TokenKind {
     }
 
     pub fn could_start_type(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Identifier(_)
-                | TokenKind::StructKeyword
-                | TokenKind::UnionKeyword
-                | TokenKind::EnumKeyword
-        )
+        matches!(self, TokenKind::Identifier(_))
     }
 
     pub fn at(self, source: Source) -> Token {

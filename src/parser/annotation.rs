@@ -2,15 +2,6 @@ use crate::source_files::Source;
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
-pub enum AnnotationKind {
-    Foreign,
-    ThreadLocal,
-    Packed,
-    Pod,
-    AbideAbi,
-}
-
-#[derive(Clone, Debug)]
 pub struct Annotation {
     pub kind: AnnotationKind,
     pub source: Source,
@@ -19,6 +10,21 @@ pub struct Annotation {
 impl Annotation {
     pub fn new(kind: AnnotationKind, source: Source) -> Self {
         Self { kind, source }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AnnotationKind {
+    Foreign,
+    ThreadLocal,
+    Packed,
+    Pod,
+    AbideAbi,
+}
+
+impl AnnotationKind {
+    pub fn at(self, source: Source) -> Annotation {
+        Annotation { kind: self, source }
     }
 }
 

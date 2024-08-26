@@ -96,7 +96,7 @@ pub fn resolve_stmt(
             )?;
 
             let value = declaration
-                .value
+                .initial_value
                 .as_ref()
                 .map(|value| {
                     resolve_expr(
