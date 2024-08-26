@@ -1,8 +1,8 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
-func main i32 {
+func main int {
     signed()
     unsigned()
     return 0

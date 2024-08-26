@@ -1,13 +1,13 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
 func main {
     greet(c"John")
     showNumber(getNumber())
 }
 
-func greet(name ptr<u8>) {
+func greet(name ptr<char>) {
     printf(c"Hello, %s!\n", name)
 }
 
@@ -16,5 +16,5 @@ func getNumber() int {
 }
 
 func showNumber(number int) {
-    printf(c"Your number is %lld\n", number)
+    printf(c"Your number is %d\n", number)
 }

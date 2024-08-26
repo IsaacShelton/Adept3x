@@ -1,6 +1,6 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
 #[pod]
 struct Integer (value s32)

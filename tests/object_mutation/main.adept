@@ -1,8 +1,8 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
-struct Vector3f (x float, y float, z float)
+struct Vector3f (x double, y double, z double)
 
 func main {
     v := Vector3f { x: 1, y: 2, z: 3 }

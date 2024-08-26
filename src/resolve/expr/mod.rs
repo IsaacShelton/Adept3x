@@ -24,7 +24,7 @@ use super::{
     Initialized,
 };
 use crate::{
-    ast::{self, ConformBehavior},
+    ast::{self, CInteger, ConformBehavior},
     resolve::{
         ensure_initialized,
         error::ResolveErrorKind,
@@ -38,7 +38,7 @@ use crate::{
     },
     resolved::{self, FunctionRef, StructureRef, TypedExpr},
 };
-use ast::{FloatSize, IntegerBits, IntegerSign};
+use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
 use indexmap::IndexMap;
 use resolved::IntegerKnown;
@@ -146,7 +146,7 @@ pub fn resolve_expr(
         )),
         ast::ExprKind::NullTerminatedString(value) => Ok(TypedExpr::new(
             resolved::TypeKind::Pointer(Box::new(
-                resolved::TypeKind::Integer(IntegerBits::Bits8, IntegerSign::Unsigned).at(source),
+                resolved::TypeKind::CInteger(CInteger::Char, None).at(source),
             ))
             .at(source),
             resolved::Expr::new(

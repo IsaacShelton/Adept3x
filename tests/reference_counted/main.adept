@@ -1,8 +1,8 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
-struct Person (firstname ptr<u8>, lastname ptr<u8>)
+struct Person (firstname ptr<char>, lastname ptr<char>)
 
 func main {
     john := Person {

@@ -1,12 +1,12 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
 func main {
     printf(c"Message is : %s\n", getMessage())
 }
 
-func getMessage() ptr<u8> {
+func getMessage() ptr<char> {
     return c"Hi this is a message"
 }
 

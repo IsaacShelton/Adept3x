@@ -11,7 +11,7 @@ use self::{
 };
 use super::parameters::has_parameters;
 use crate::{
-    ast::{AstFile, FloatSize, IntegerBits, IntegerSign, Parameter, Type, TypeKind},
+    ast::{AstFile, CInteger, FloatSize, IntegerSign, Parameter, Type, TypeKind},
     c::parser::{
         error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator,
         DeclaratorKind, Decorator, Decorators, FunctionQualifier, ParameterDeclarationCore,
@@ -31,7 +31,7 @@ pub struct TypeBase {
 #[derive(Debug)]
 pub struct TypeBaseBuilder {
     pub source: Source,
-    pub bits: Option<IntegerBits>,
+    pub size: Option<CInteger>,
     pub sign: Option<IntegerSign>,
     pub concrete: Option<Type>,
     pub is_typedef: bool,
@@ -41,7 +41,7 @@ impl TypeBaseBuilder {
     pub fn new(source: Source) -> Self {
         Self {
             source,
-            bits: None,
+            size: None,
             sign: None,
             concrete: None,
             is_typedef: false,
@@ -51,18 +51,10 @@ impl TypeBaseBuilder {
     pub fn build(self) -> Result<TypeBase, ParseError> {
         let ast_type = if let Some(concrete) = self.concrete {
             concrete
-        } else if let Some(bits) = self.bits {
-            let sign = if let Some(sign) = self.sign {
-                sign
-            } else if bits == IntegerBits::Bits8 {
-                IntegerSign::Unsigned
-            } else {
-                IntegerSign::Signed
-            };
-
-            Type::new(TypeKind::Integer(bits, sign), self.source)
+        } else if let Some(size) = self.size {
+            Type::new(TypeKind::CInteger(size, self.sign), self.source)
         } else if let Some(sign) = self.sign {
-            Type::new(TypeKind::Integer(IntegerBits::Bits32, sign), self.source)
+            Type::new(TypeKind::CInteger(CInteger::Int, Some(sign)), self.source)
         } else {
             return Err(ParseErrorKind::InvalidType.at(self.source));
         };
@@ -80,7 +72,7 @@ impl TypeBaseBuilder {
     }
 
     pub fn concrete(&mut self, type_kind: TypeKind, source: Source) -> Result<(), ParseError> {
-        if self.bits.is_some() || self.sign.is_some() || self.concrete.is_some() {
+        if self.sign.is_some() || self.sign.is_some() || self.concrete.is_some() {
             return Err(ParseErrorKind::InvalidType.at(source));
         }
 
@@ -92,21 +84,23 @@ impl TypeBaseBuilder {
         self.concrete(TypeKind::Boolean, source)
     }
 
-    pub fn integer(&mut self, bits: IntegerBits, source: Source) -> Result<(), ParseError> {
-        if self.bits.is_some() || self.concrete.is_some() {
-            return Err(ParseErrorKind::InvalidType.at(source));
-        }
-
-        self.bits = Some(bits);
-        Ok(())
-    }
-
-    pub fn long(&mut self, source: Source) -> Result<(), ParseError> {
+    pub fn integer(&mut self, size: CInteger, source: Source) -> Result<(), ParseError> {
         if self.concrete.is_some() {
             return Err(ParseErrorKind::InvalidType.at(source));
         }
 
-        self.bits = Some(IntegerBits::Bits64);
+        if let Some(existing_size) = self.size {
+            if existing_size < CInteger::Int && size > CInteger::Int {
+                return Err(ParseErrorKind::InvalidType.at(source));
+            }
+        }
+
+        if self.size == Some(CInteger::Long) && size == CInteger::Long {
+            self.size = Some(CInteger::LongLong);
+        } else {
+            self.size = Some(size);
+        }
+
         Ok(())
     }
 
@@ -144,10 +138,10 @@ pub fn build_type_specifier_qualifier(
         TypeSpecifierQualifier::TypeSpecifier(ts) => match &ts.kind {
             TypeSpecifierKind::Void => builder.void(ts.source)?,
             TypeSpecifierKind::Bool => builder.bool(ts.source)?,
-            TypeSpecifierKind::Char => builder.integer(IntegerBits::Bits8, ts.source)?,
-            TypeSpecifierKind::Short => builder.integer(IntegerBits::Bits16, ts.source)?,
-            TypeSpecifierKind::Int => builder.integer(IntegerBits::Bits32, ts.source)?,
-            TypeSpecifierKind::Long => builder.long(ts.source)?,
+            TypeSpecifierKind::Char => builder.integer(CInteger::Char, ts.source)?,
+            TypeSpecifierKind::Short => builder.integer(CInteger::Short, ts.source)?,
+            TypeSpecifierKind::Int => builder.integer(CInteger::Int, ts.source)?,
+            TypeSpecifierKind::Long => builder.integer(CInteger::Long, ts.source)?,
             TypeSpecifierKind::Float => builder.float(ts.source)?,
             TypeSpecifierKind::Double => builder.double(ts.source)?,
             TypeSpecifierKind::Signed => builder.sign(IntegerSign::Signed, ts.source)?,

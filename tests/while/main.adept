@@ -2,19 +2,19 @@
 #[foreign]
 {
     // NOTE: This is only macOS (also type is incorrect but it's a pointer so doesn't matter)
-    __stdinp ptr<u8>
+    __stdinp ptr<void>
 
-    func printf(format ptr<u8>, ...) i32
-    func fgets(string ptr<u8>, length i32, stream ptr<u8>) void
-    func malloc(size ulonglong) ptr<u8>
-    func free(pointer ptr<u8>) void
-    func strcmp(a ptr<u8>, b ptr<u8>) i32
-    func atoi(string ptr<u8>) i32
+    func printf(format ptr<char>, ...) int
+    func fgets(string ptr<char>, length int, stream ptr<void>) void
+    func malloc(size ulonglong) ptr<void>
+    func free(pointer ptr<void>) void
+    func strcmp(a ptr<char>, b ptr<char>) int
+    func atoi(string ptr<char>) int
 }
 
 func main {
     printf(c"Enter a number: ")
-    number ptr<u8> = malloc(1024)
+    number ptr<char> = malloc(1024)
     fgets(number, 1024, __stdinp)
     i := atoi(number)
     free(number)

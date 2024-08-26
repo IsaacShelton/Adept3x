@@ -1,6 +1,6 @@
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
 func main {
     printf(c"0x10 = %lld\n", 0x10)

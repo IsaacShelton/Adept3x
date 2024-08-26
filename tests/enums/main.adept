@@ -2,7 +2,7 @@
 enum Color (Red, Green, Blue)
 
 #[foreign]
-func printf(format ptr<u8>, ...) i32
+func printf(format ptr<char>, ...) int
 
 func main {
     red := Color::Red

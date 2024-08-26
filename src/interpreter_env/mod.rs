@@ -1,10 +1,13 @@
 use crate::{
-    ast::{self, AstFile, IntegerBits},
+    ast::{
+        AstFile, Call, Enum, EnumMember, ExprKind, Field, Function, InterpreterSyscall, Parameter,
+        Parameters, Privacy, StmtKind, Structure, TypeKind,
+    },
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
         Interpreter, InterpreterError,
     },
-    ir::{self, IntegerSign, InterpreterSyscallKind},
+    ir::{self, InterpreterSyscallKind},
     resolved,
     source_files::Source,
     tag::Tag,
@@ -15,27 +18,24 @@ fn thin_cstring_function(
     name: impl ToString,
     param_name: impl ToString,
     syscall_kind: InterpreterSyscallKind,
-) -> ast::Function {
+) -> Function {
     let source = Source::internal();
-    let void = ast::TypeKind::Void.at(Source::internal());
-    let ptr_u8 = ast::TypeKind::Pointer(Box::new(
-        ast::TypeKind::Integer(IntegerBits::Bits8, IntegerSign::Unsigned).at(source),
-    ))
-    .at(source);
+    let void = TypeKind::Void.at(Source::internal());
+    let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
 
-    ast::Function {
+    Function {
         name: name.to_string(),
-        parameters: ast::Parameters {
-            required: vec![ast::Parameter::new(param_name.to_string(), ptr_u8.clone())],
+        parameters: Parameters {
+            required: vec![Parameter::new(param_name.to_string(), ptr_char.clone())],
             is_cstyle_vararg: false,
         },
         return_type: void.clone(),
-        stmts: vec![ast::StmtKind::Expr(
-            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+        stmts: vec![StmtKind::Expr(
+            ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: syscall_kind,
                 args: vec![(
-                    ptr_u8.clone(),
-                    ast::ExprKind::Variable(param_name.to_string()).at(source),
+                    ptr_char.clone(),
+                    ExprKind::Variable(param_name.to_string()).at(source),
                 )],
                 result_type: void.clone(),
             }))
@@ -51,25 +51,22 @@ fn thin_cstring_function(
 
 pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     let source = Source::internal();
-    let void = ast::TypeKind::Void.at(Source::internal());
-    let ptr_u8 = ast::TypeKind::Pointer(Box::new(
-        ast::TypeKind::Integer(IntegerBits::Bits8, IntegerSign::Unsigned).at(source),
-    ))
-    .at(source);
+    let void = TypeKind::Void.at(Source::internal());
+    let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
 
     // Call to function we actually care about
-    let call = ast::ExprKind::Call(Box::new(ast::Call {
+    let call = ExprKind::Call(Box::new(Call {
         function_name: "main".into(),
         arguments: vec![],
         expected_to_return: Some(void.clone()),
     }))
     .at(Source::internal());
 
-    file.functions.push(ast::Function {
+    file.functions.push(Function {
         name: "<interpreter entry point>".into(),
-        parameters: ast::Parameters::default(),
+        parameters: Parameters::default(),
         return_type: void.clone(),
-        stmts: vec![ast::StmtKind::Return(Some(call)).at(Source::internal())],
+        stmts: vec![StmtKind::Return(Some(call)).at(Source::internal())],
         is_foreign: false,
         source,
         abide_abi: false,
@@ -78,20 +75,20 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.enums.insert(
         "ProjectKind".into(),
-        ast::Enum {
-            backing_type: Some(ast::TypeKind::u64().at(source)),
+        Enum {
+            backing_type: Some(TypeKind::u64().at(source)),
             source,
             members: IndexMap::from_iter([
                 (
                     "ConsoleApp".into(),
-                    ast::EnumMember {
+                    EnumMember {
                         value: (ProjectKind::ConsoleApp as u64).into(),
                         explicit_value: true,
                     },
                 ),
                 (
                     "WindowedApp".into(),
-                    ast::EnumMember {
+                    EnumMember {
                         value: (ProjectKind::WindowedApp as u64).into(),
                         explicit_value: true,
                     },
@@ -100,13 +97,13 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         },
     );
 
-    file.structures.push(ast::Structure {
+    file.structures.push(Structure {
         name: "Project".into(),
         fields: IndexMap::from_iter([(
             "kind".into(),
-            ast::Field {
-                ast_type: ast::TypeKind::Named("ProjectKind".into()).at(source),
-                privacy: ast::Privacy::Public,
+            Field {
+                ast_type: TypeKind::Named("ProjectKind".into()).at(source),
+                privacy: Privacy::Public,
                 source,
             },
         )]),
@@ -145,31 +142,31 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         InterpreterSyscallKind::Experimental,
     ));
 
-    file.functions.push(ast::Function {
+    file.functions.push(Function {
         name: "project".into(),
-        parameters: ast::Parameters {
+        parameters: Parameters {
             required: vec![
-                ast::Parameter::new("name".into(), ptr_u8.clone()),
-                ast::Parameter::new(
+                Parameter::new("name".into(), ptr_char.clone()),
+                Parameter::new(
                     "project".into(),
-                    ast::TypeKind::Named("Project".into()).at(source),
+                    TypeKind::Named("Project".into()).at(source),
                 ),
             ],
             is_cstyle_vararg: false,
         },
         return_type: void.clone(),
-        stmts: vec![ast::StmtKind::Expr(
-            ast::ExprKind::InterpreterSyscall(Box::new(ast::InterpreterSyscall {
+        stmts: vec![StmtKind::Expr(
+            ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: InterpreterSyscallKind::BuildAddProject,
                 args: vec![
                     (
-                        ptr_u8.clone(),
-                        ast::ExprKind::Variable("name".into()).at(source),
+                        ptr_char.clone(),
+                        ExprKind::Variable("name".into()).at(source),
                     ),
                     (
-                        ast::TypeKind::Named("ProjectKind".into()).at(source),
-                        ast::ExprKind::Member(
-                            Box::new(ast::ExprKind::Variable("project".into()).at(source)),
+                        TypeKind::Named("ProjectKind".into()).at(source),
+                        ExprKind::Member(
+                            Box::new(ExprKind::Variable("project".into()).at(source)),
                             "kind".into(),
                         )
                         .at(source),
