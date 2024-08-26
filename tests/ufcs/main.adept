@@ -3,6 +3,18 @@
 func printf(format ptr<char>, ...) int
 
 func main {
+    // NOTE: Adept has tiered Uniform Function Call Syntax
+    // Functions can be called using `action(a, b, c)` OR `a.action(b, c)`
+
+    // However, when formatting:
+    // - Functions whose first parameter is named `self` will prefer to use `a.action(b, c)`
+    // - Functions whose first parameter is named `this` will have no preference
+    // - Functions whose first parameter is not named `self` or `this` will prefer to use `action(a, b, c)`
+
+    // There is no semantic difference between functions or methods,
+    // the only difference is in how they are auto-formatted.
+
+    // For example, the below would change if formatted, since it prefers to use `action(a, b, c)` syntax
     c"Hello World!\n".printf()
 }
 

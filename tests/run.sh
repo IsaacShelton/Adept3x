@@ -44,8 +44,9 @@ compile integer_value_conforming
 compile math_floats
 compile math_simple
 compile member_pod
-compile_module modules_simple
 compile_module modules_headers
+compile_module modules_simple
+compile multiline_comments
 compile nested_expressions
 compile object_mutation
 compile op_then_assign

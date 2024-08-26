@@ -92,9 +92,19 @@ impl<T: Text + Send> Lexer<T> {
             '/' if self.characters.eat('*') => {
                 // Multi-line comment
 
+                let mut nesting = 0;
+
                 loop {
+                    if self.characters.eat("/*") {
+                        nesting += 1;
+                    }
+
                     if self.characters.eat("*/") {
-                        break;
+                        if nesting == 0 {
+                            break;
+                        } else {
+                            nesting -= 1;
+                        }
                     }
 
                     if self.characters.peek().is_end() {
@@ -430,7 +440,6 @@ impl<T: Text + Send> InflowStream for Lexer<T> {
     fn next(&mut self) -> Self::Item {
         loop {
             match self.feed() {
-                FeedResult::Eof(eof) => return eof,
                 FeedResult::Waiting => (),
                 FeedResult::Has(token) => return token,
             }
