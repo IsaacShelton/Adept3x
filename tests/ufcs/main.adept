@@ -1,0 +1,8 @@
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    c"Hello World!\n".printf()
+}
+

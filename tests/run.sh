@@ -60,6 +60,7 @@ compile structure_literals_abbr
 compile structure_pod
 compile unary_operators
 compile type_aliases
+compile ufcs
 compile variables
 compile variables_override
 compile variables_typed

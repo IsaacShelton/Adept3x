@@ -12,8 +12,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         //        ^
 
         let source = self.parse_token(TokenKind::Member, Some("for member expression"))?;
-        let field_name = self.parse_identifier(Some("for field name"))?;
+        let member_name = self.parse_identifier(Some("for member name"))?;
 
-        Ok(ExprKind::Member(Box::new(subject), field_name).at(source))
+        if self.input.peek_is(TokenKind::OpenParen) {
+            self.parse_call_with(member_name, vec![subject], source)
+        } else {
+            Ok(ExprKind::Member(Box::new(subject), member_name).at(source))
+        }
     }
 }
