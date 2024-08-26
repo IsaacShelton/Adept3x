@@ -9,7 +9,7 @@ use crate::{
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_declare_assign(&mut self) -> Result<Expr, ParseError> {
         // variable_name := value
-        //               ^
+        //       ^
 
         let (variable_name, source) =
             self.parse_identifier_keep_location(Some("for function call"))?;

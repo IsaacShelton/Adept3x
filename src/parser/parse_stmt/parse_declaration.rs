@@ -17,8 +17,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .then(|| self.parse_expr())
             .transpose()?;
 
-        self.ignore_newlines();
-
         Ok(Stmt::new(
             StmtKind::Declaration(Box::new(Declaration {
                 name,

@@ -9,7 +9,7 @@ use crate::{
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call(&mut self) -> Result<Expr, ParseError> {
         // function_name(arg1, arg2, arg3)
-        //              ^
+        //       ^
 
         let (function_name, source) =
             self.parse_identifier_keep_location(Some("for function call"))?;

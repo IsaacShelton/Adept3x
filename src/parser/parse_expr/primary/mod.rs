@@ -167,10 +167,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     TokenKind::Error(message) => ParseErrorKind::Lexical {
                         message: message.into(),
                     },
-                    _ => {
-                        let unexpected = unexpected.to_string();
-                        ParseErrorKind::UnexpectedToken { unexpected }
-                    }
+                    _ => ParseErrorKind::UnexpectedToken {
+                        unexpected: unexpected.to_string(),
+                    },
                 },
                 source,
             }),
