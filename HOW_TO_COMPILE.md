@@ -23,9 +23,9 @@ MSYS2 Setup:
 - Download MSYS2
 - Install MSYS2
 - Open the MSYS2 Mingw64 Prompt
-- `pacman -S git --no-confirm`
-- `pacman -S mingw-w64-x86_64-gcc --no-confirm`
-- `pacman -S mingw-w64-x86_64-llvm --no-confirm`
+- `pacman -S git --noconfirm`
+- `pacman -S mingw-w64-x86_64-gcc --noconfirm`
+- `pacman -S mingw-w64-x86_64-llvm --noconfirm`
 - `git clone https://github.com/IsaacShelton/Adept3x`
 - `cd Adept3x`
 - `LLVM_SYS_181_PREFIX=/mingw64 ~/.cargo/bin/cargo +nightly build --release`
