@@ -108,20 +108,22 @@ jobs:
         env:
           LLVM_SYS_181_PREFIX: /home/linuxbrew/.linuxbrew/opt/llvm@18
           zstd_DIR: /home/linuxbrew/.linuxbrew/opt/zstd
-      - name: Archive Build Result
+      - name: Archive Build Result (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
         uses: a7ul/tar-action@v1.2.0
         with:
           command: c
-          files: target/x86_64-pc-windows-gnu/release/adept.exe
-          outPath: build-${{ matrix.os }}.tar.gz
-      - name: Archive Build Result
+          cwd: target/x86_64-pc-windows-gnu/release
+          files: adept.exe
+          outPath: ${{github.workspace}}/build-${{ matrix.os }}.tar.gz
+      - name: Archive Build Result (macOS / Linux)
         if: ${{ matrix.os != 'windows-latest' }}
         uses: a7ul/tar-action@v1.2.0
         with:
           command: c
-          files: target/release/adept
-          outPath: build-${{ matrix.os }}.tar.gz
+          cwd: target/release
+          files: adept
+          outPath: ${{github.workspace}}/build-${{ matrix.os }}.tar.gz
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
         with:
