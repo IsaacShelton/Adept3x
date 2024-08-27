@@ -1,0 +1,197 @@
+name: Remote Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      fullName:
+        description: The full name of the release
+        default: Adept 3.0
+        required: true
+        type: string
+      shortVersion:
+        description: The short version number
+        default: "3.0"
+        required: true
+        type: string
+      longVersion:
+        description: The long version number
+        default: "3.0.0"
+        required: true
+        type: string
+      alternativeBinaryName:
+        description: The alternative binary name
+        default: "adept3-0"
+        required: true
+        type: string
+
+env:
+  BUILD_TYPE: Release
+  IS_GITHUB_WORKFLOW: On
+
+jobs:
+  build:
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: ${{github.workspace}}
+    name: ${{ format('Build / {0}', matrix.os) }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure to use MinGW-w64 (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          export CC=x86_64-w64-mingw32-gcc
+          export CXX=x86_64-w64-mingw32-g++
+      - name: Download and extract prebuilt LLVM (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: bash
+        run: |
+          pacman -S mingw-w64-x86_64-gcc --no-confirm
+          pacman -S mingw-w64-x86_64-llvm --no-confirm
+      - name: Download static zlib libraries (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-zlib --noconfirm
+      - name: Download zstd library (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-zstd --noconfirm
+      - name: Install LLVM and dependencies (macOS)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install llvm@18
+          brew install zstd
+      - name: Install LLVM and dependencies (Ubuntu)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get remove -y llvm-13
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install llvm@18
+          brew install zstd
+      - name: Build (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          cargo build --release
+        env:
+          CFLAGS: -static-libstdc++
+          CXXFLAGS: -static-libstdc++
+          LLVM_SYS_181_PREFIX: C:\msys64\mingw64
+          zstd_DIR: C:\msys64\mingw64
+          zstd_LIBRARY: C:\msys64\mingw64\lib\libzstd.a
+          ZLIB_INCLUDE_DIR: C:\msys64\mingw64\include
+          ZLIB_LIBRARY: C:\msys64\mingw64\lib\libz.a
+      - name: Build (macOS)
+        env:
+          CC: /opt/homebrew/opt/llvm/bin/clang
+          LLVM_SYS_181_PREFIX: /opt/homebrew/opt/llvm
+          zstd_DIR: /usr/local/opt/zstd
+          CFLAGS: -static-libstdc++
+          CXXFLAGS: -static-libstdc++
+          LDFLAGS: /opt/homebrew/opt/llvm/lib/libunwind.a
+      - name: Build (Linux)
+        if: ${{ matrix.os == 'linux-latest' }}
+        run: |
+          cargo build --release
+        env:
+          LLVM_SYS_181_PREFIX: /home/linuxbrew/.linuxbrew/opt/llvm@18
+          zstd_DIR: /home/linuxbrew/.linuxbrew/opt/zstd
+      - name: Archive Build Result
+        if: ${{ matrix.os == 'windows-latest' }}
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: target/release/adept.exe
+          outPath: build-${{ matrix.os }}.tar.gz
+      - name: Archive Build Result
+        if: ${{ matrix.os != 'windows-latest' }}
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: target/release/adept
+          outPath: build-${{ matrix.os }}.tar.gz
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-${{ matrix.os }}-archive
+          path: build-${{ matrix.os }}.tar.gz
+  test:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    name: ${{ format('Test / {0}', matrix.os) }}
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: build-${{ matrix.os }}-archive
+      - name: Unpack Build Artifact
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: x
+          files: build-${{ matrix.os }}.tar.gz
+  deploy:
+    name: Deploy
+    needs: [test]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Get workflow dispatch inputs (workflow dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo 'fullName=${{github.event.inputs.fullName}}' >> $GITHUB_ENV
+          echo 'shortVersion=${{github.event.inputs.shortVersion}}' >> $GITHUB_ENV
+          echo 'longVersion=${{github.event.inputs.longVersion}}' >> $GITHUB_ENV
+          echo 'alternativeBinaryName=${{github.event.inputs.alternativeBinaryName}}' >> $GITHUB_ENV
+          echo 'releaseName=${{github.event.inputs.fullName}}' >> $GITHUB_ENV
+          echo 'releaseTagName=v${{github.event.inputs.shortVersion}}' >> $GITHUB_ENV
+      - name: Get default inputs (push / pr)
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo 'fullName=Adept Nightly' >> $GITHUB_ENV
+          echo 'shortVersion=nightly' >> $GITHUB_ENV
+          echo 'longVersion=nightly' >> $GITHUB_ENV
+          echo 'alternativeBinaryName=adept-nightly' >> $GITHUB_ENV
+          echo 'releaseName=Nightly' >> $GITHUB_ENV
+          echo 'releaseTagName=Nightly' >> $GITHUB_ENV
+      - name: Download Build Artifact (windows-latest)
+        uses: actions/download-artifact@v3
+        with:
+          name: build-windows-latest-archive
+      - name: Download Build Artifact (macos-latest)
+        uses: actions/download-artifact@v3
+        with:
+          name: build-macos-latest-archive
+      - name: Download Build Artifact (ubuntu-latest)
+        uses: actions/download-artifact@v3
+        with:
+          name: build-ubuntu-latest-archive
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date '+%B %d %Y at %l:%M %p %Z')"
+      - name: Release
+        uses: IsaacShelton/update-existing-release@v1.3.4
+        with:
+          token: ${{secrets.GITHUB_TOKEN}}
+          release: ${{env.releaseName}}
+          body: ${{ format('Last built on {0} - {1}', steps.date.outputs.date, github.sha) }}
+          tag: ${{env.releaseTagName}}
+          replace: true
+          files: >
+            build-windows-latest.tar.gz
+            build-macos-latest.tar.gz
+            build-linux-latest.tar.gz
