@@ -91,6 +91,8 @@ jobs:
           ZLIB_INCLUDE_DIR: C:\msys64\mingw64\include
           ZLIB_LIBRARY: C:\msys64\mingw64\lib\libz.a
       - name: Build (macOS)
+        run: |
+          cargo build --release
         env:
           CC: /opt/homebrew/opt/llvm/bin/clang
           LLVM_SYS_181_PREFIX: /opt/homebrew/opt/llvm
