@@ -80,7 +80,7 @@ jobs:
       - name: Build (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          cargo build --release
+          cargo build --release --target x86_64-pc-windows-gnu
         env:
           CFLAGS: -static-libstdc++
           CXXFLAGS: -static-libstdc++
@@ -112,7 +112,7 @@ jobs:
         uses: a7ul/tar-action@v1.2.0
         with:
           command: c
-          files: target/release/adept.exe
+          files: target/x86_64-pc-windows-gnu/release/adept.exe
           outPath: build-${{ matrix.os }}.tar.gz
       - name: Archive Build Result
         if: ${{ matrix.os != 'windows-latest' }}
@@ -196,4 +196,4 @@ jobs:
           files: >
             build-windows-latest.tar.gz
             build-macos-latest.tar.gz
-            build-linux-latest.tar.gz
+            build-ubuntu-latest.tar.gz
