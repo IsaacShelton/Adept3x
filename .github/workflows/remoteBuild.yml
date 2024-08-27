@@ -83,7 +83,6 @@ jobs:
         run: |
           cargo build --release --target x86_64-pc-windows-gnu
         env:
-          RUSTFLAGS: -C link-arg=-fuse-ld=C:\msys64\mingw64\x86_64-w64-mingw32\bin\ld.exe
           CFLAGS: -static-libstdc++
           CXXFLAGS: -static-libstdc++
           LLVM_SYS_181_PREFIX: C:\msys64\mingw64
