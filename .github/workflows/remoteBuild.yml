@@ -59,7 +59,6 @@ jobs:
             components: clippy
       - name: Install LLVM and dependencies (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        shell: bash
         run: |
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-gcc --noconfirm
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-llvm --noconfirm
@@ -74,7 +73,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get update
-          sudo apt-get remove -y llvm-13
+          sudo apt-get remove -y llvm
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           brew install llvm@18
           brew install zstd
@@ -91,6 +90,7 @@ jobs:
           ZLIB_INCLUDE_DIR: C:\msys64\mingw64\include
           ZLIB_LIBRARY: C:\msys64\mingw64\lib\libz.a
       - name: Build (macOS)
+        if: ${{ matrix.os == 'macos-latest' }}
         run: |
           cargo build --release
         env:
@@ -100,8 +100,8 @@ jobs:
           CFLAGS: -static-libstdc++
           CXXFLAGS: -static-libstdc++
           LDFLAGS: /opt/homebrew/opt/llvm/lib/libunwind.a
-      - name: Build (Linux)
-        if: ${{ matrix.os == 'linux-latest' }}
+      - name: Build (Ubuntu)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           cargo build --release
         env:
