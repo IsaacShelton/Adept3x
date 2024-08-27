@@ -1,22 +1,11 @@
 
 pragma => {
     adept(c"3.0")
-
-    #[windows] {
-        link(c"libraylib.a")
-        return
-    }
-
-    #[macos] {
-        link(c"libraylib.a")
-        linkFramework(c"OpenGL")
-        linkFramework(c"Cocoa")
-        linkFramework(c"IOKit")
-        linkFramework(c"Foundation")
-        linkFramework(c"CoreFoundation")
-        return
-    }
-
-    panic("Unsupported platform")
+    link(c"libraylib.a")
+    linkFramework(c"OpenGL")
+    linkFramework(c"Cocoa")
+    linkFramework(c"IOKit")
+    linkFramework(c"Foundation")
+    linkFramework(c"CoreFoundation")
 }
 

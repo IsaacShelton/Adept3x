@@ -52,7 +52,11 @@ impl TypeBaseBuilder {
         let ast_type = if let Some(concrete) = self.concrete {
             concrete
         } else if let Some(size) = self.size {
-            Type::new(TypeKind::CInteger(size, self.sign), self.source)
+            let sign = self
+                .sign
+                .or_else(|| (!size.is_char()).then_some(IntegerSign::Signed));
+
+            Type::new(TypeKind::CInteger(size, sign), self.source)
         } else if let Some(sign) = self.sign {
             Type::new(TypeKind::CInteger(CInteger::Int, Some(sign)), self.source)
         } else {
