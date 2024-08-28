@@ -21,7 +21,6 @@ use std::{
     ffi::CString,
     fmt::{Debug, Display},
 };
-use thin_vec::ThinVec;
 pub use variable_storage::VariableStorage;
 
 new_key_type! {
@@ -144,9 +143,8 @@ pub enum TypeKind {
     FloatLiteral(f64),
     Floating(FloatSize),
     Pointer(Box<Type>),
-    PlainOldData(String, StructureRef),
+    Structure(String, StructureRef),
     Void,
-    ManagedStructure(String, StructureRef),
     AnonymousStruct(),
     AnonymousUnion(),
     AnonymousEnum(AnonymousEnum),
@@ -261,9 +259,8 @@ impl TypeKind {
             TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Pointer(_)
-            | TypeKind::PlainOldData(_, _)
+            | TypeKind::Structure(_, _)
             | TypeKind::Void
-            | TypeKind::ManagedStructure(_, _)
             | TypeKind::AnonymousStruct(..)
             | TypeKind::AnonymousUnion(..)
             | TypeKind::FixedArray(..)
@@ -310,11 +307,8 @@ impl Display for TypeKind {
             TypeKind::Pointer(inner) => {
                 write!(f, "ptr<{}>", inner.kind)?;
             }
-            TypeKind::PlainOldData(name, _) => {
-                write!(f, "pod<{}>", name)?;
-            }
             TypeKind::Void => f.write_str("void")?,
-            TypeKind::ManagedStructure(name, _) => f.write_str(name)?,
+            TypeKind::Structure(name, _) => f.write_str(name)?,
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
             TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
@@ -333,37 +327,17 @@ impl Display for TypeKind {
 pub struct Stmt {
     pub kind: StmtKind,
     pub source: Source,
-    pub drops: Drops,
 }
 
 impl Stmt {
     pub fn new(kind: StmtKind, source: Source) -> Self {
-        Self {
-            kind,
-            source,
-            drops: Drops::default(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Drops {
-    pub drops: ThinVec<VariableStorageKey>,
-}
-
-impl Drops {
-    pub fn push(&mut self, variable: VariableStorageKey) {
-        self.drops.push(variable);
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &VariableStorageKey> + '_ {
-        self.drops.iter()
+        Self { kind, source }
     }
 }
 
 #[derive(Clone, Debug, Unwrap)]
 pub enum StmtKind {
-    Return(Option<Expr>, Drops),
+    Return(Option<Expr>),
     Expr(TypedExpr),
     Declaration(Declaration),
     Assignment(Assignment),
@@ -420,12 +394,6 @@ impl Expr {
 }
 
 #[derive(Clone, Debug)]
-pub enum MemoryManagement {
-    None,
-    ReferenceCounted,
-}
-
-#[derive(Clone, Debug)]
 pub enum ExprKind {
     Variable(Box<Variable>),
     GlobalVariable(Box<GlobalVariable>),
@@ -478,7 +446,6 @@ pub struct Member {
     pub subject: Destination,
     pub structure_ref: StructureRef,
     pub index: usize,
-    pub memory_management: MemoryManagement,
     pub field_type: Type,
 }
 
@@ -486,7 +453,6 @@ pub struct Member {
 pub struct StructureLiteral {
     pub structure_type: Type,
     pub fields: IndexMap<String, (Expr, usize)>,
-    pub memory_management: MemoryManagement,
 }
 
 // Make sure ExprKind doesn't accidentally become huge
@@ -575,7 +541,6 @@ pub enum DestinationKind {
         structure_ref: StructureRef,
         index: usize,
         field_type: Type,
-        memory_management: MemoryManagement,
     },
     ArrayAccess(Box<ArrayAccess>),
 }
@@ -677,7 +642,6 @@ pub struct ShortCircuitingBinaryOperation {
     pub operator: ShortCircuitingBinaryOperator,
     pub left: TypedExpr,
     pub right: TypedExpr,
-    pub drops: Drops,
 }
 
 #[derive(Clone, Debug)]

@@ -18,7 +18,6 @@ pub enum AnnotationKind {
     Foreign,
     ThreadLocal,
     Packed,
-    Pod,
     AbideAbi,
 }
 
@@ -34,7 +33,6 @@ impl Display for AnnotationKind {
             Self::Foreign => "foreign",
             Self::ThreadLocal => "thread_local",
             Self::Packed => "packed",
-            Self::Pod => "pod",
             Self::AbideAbi => "abide_abi",
         })
     }

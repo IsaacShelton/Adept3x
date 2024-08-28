@@ -108,7 +108,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             },
         )]),
         is_packed: false,
-        prefer_pod: false,
         source,
     });
 

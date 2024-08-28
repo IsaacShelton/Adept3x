@@ -44,11 +44,10 @@ pub fn resolve_struct_literal_expr(
         &mut Default::default(),
     )?;
 
-    let (struct_name, structure_ref, memory_management) =
-        get_core_structure_info(&resolved_type, source)?;
+    let (struct_name, structure_ref) = get_core_structure_info(&resolved_type, source)?;
 
     let structure_type =
-        resolved::TypeKind::PlainOldData(struct_name.to_string(), structure_ref).at(source);
+        resolved::TypeKind::Structure(struct_name.to_string(), structure_ref).at(source);
 
     let mut next_index = 0;
     let mut resolved_fields = IndexMap::new();
@@ -173,7 +172,6 @@ pub fn resolve_struct_literal_expr(
             resolved::ExprKind::StructureLiteral(Box::new(StructureLiteral {
                 structure_type,
                 fields: resolved_fields,
-                memory_management,
             })),
             ast_type.source,
         ),

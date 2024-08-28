@@ -15,7 +15,6 @@ pub enum TypeKind {
     Floating(FloatSize),
     Pointer(Box<Type>),
     FixedArray(Box<FixedArray>),
-    PlainOldData(Box<Type>),
     Void,
     Named(String),
     AnonymousStruct(AnonymousStruct),

@@ -86,12 +86,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     count,
                 })))
             }
-            "pod" => {
-                self.parse_token(TokenKind::OpenAngle, Some("to specify inner type of 'pod'"))?;
-                let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                self.parse_type_parameters_close()?;
-                Ok(TypeKind::PlainOldData(Box::new(inner)))
-            }
             identifier => Ok(TypeKind::Named(identifier.into())),
         }?;
 

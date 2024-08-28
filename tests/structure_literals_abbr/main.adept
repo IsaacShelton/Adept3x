@@ -2,7 +2,6 @@
 #[foreign]
 func printf(format ptr<char>, ...) int
 
-#[pod]
 struct Vector3i (x i32, y i32, z i32)
 
 func main {

@@ -29,9 +29,6 @@ impl Display for &TypeKind {
             TypeKind::Pointer(inner) => {
                 write!(f, "ptr<{inner}>")?;
             }
-            TypeKind::PlainOldData(inner) => {
-                write!(f, "pod<{inner}>")?;
-            }
             TypeKind::Void => {
                 write!(f, "void")?;
             }

@@ -5,7 +5,6 @@ mod error;
 mod expr;
 mod function_search_ctx;
 mod global_search_ctx;
-mod lifetime;
 mod stmt;
 mod type_search_ctx;
 mod unify_types;
@@ -176,19 +175,11 @@ pub fn resolve<'a>(
                 source: structure.source,
             });
 
-            if structure.prefer_pod {
-                type_search_ctx.put_type(
-                    structure.name.clone(),
-                    resolved::TypeKind::PlainOldData(structure.name.clone(), structure_key),
-                    structure.source,
-                )?;
-            } else {
-                type_search_ctx.put_type(
-                    structure.name.clone(),
-                    resolved::TypeKind::ManagedStructure(structure.name.clone(), structure_key),
-                    structure.source,
-                )?;
-            }
+            type_search_ctx.put_type(
+                structure.name.clone(),
+                resolved::TypeKind::Structure(structure.name.clone(), structure_key),
+                structure.source,
+            )?;
         }
     }
 
@@ -386,8 +377,6 @@ pub fn resolve<'a>(
                     .expect("resolved function head to exist");
 
                 resolved_function.stmts = resolved_stmts;
-
-                lifetime::insert_drops(resolved_function);
             }
         }
     }
@@ -465,33 +454,6 @@ fn resolve_type<'a>(
                 }
             }
         }
-        ast::TypeKind::PlainOldData(inner) => match &inner.kind {
-            ast::TypeKind::Named(name) => {
-                let resolved_inner_kind = type_search_ctx
-                    .find_type_or_error(name, ast_type.source)
-                    .cloned()?;
-
-                let structure_ref = match resolved_inner_kind {
-                    resolved::TypeKind::ManagedStructure(_, structure_ref) => structure_ref,
-                    resolved::TypeKind::PlainOldData(_, structure_ref) => structure_ref,
-                    _ => {
-                        return Err(ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
-                            bad_type: inner.to_string(),
-                        }
-                        .at(inner.source));
-                    }
-                };
-
-                Ok(resolved::TypeKind::PlainOldData(
-                    name.clone(),
-                    structure_ref,
-                ))
-            }
-            _ => Err(ResolveErrorKind::CannotCreatePlainOldDataOfNonStructure {
-                bad_type: inner.to_string(),
-            }
-            .at(inner.source)),
-        },
         ast::TypeKind::Floating(size) => Ok(resolved::TypeKind::Floating(*size)),
         ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),

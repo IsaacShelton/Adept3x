@@ -2,7 +2,6 @@
 #[foreign]
 func printf(format ptr<char>, ...) int
 
-#[pod]
 struct Integer (value s32)
 
 typealias s32 = i32

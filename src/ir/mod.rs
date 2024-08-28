@@ -377,29 +377,6 @@ impl Type {
         Type::Pointer(Box::new(self.clone()))
     }
 
-    pub fn reference_counted_pointer(&self) -> Self {
-        // Don't allow wrapping pointer values with reference counting
-        // This will catch us if we accidentally nest more than once
-        assert!(!self.is_pointer());
-
-        Type::Pointer(Box::new(self.reference_counted_no_pointer()))
-    }
-
-    pub fn reference_counted_no_pointer(&self) -> Self {
-        let subtypes = vec![
-            // Reference count
-            Field::basic(Type::U64, Source::internal()),
-            // Value
-            Field::basic(self.clone(), Source::internal()),
-        ];
-
-        Type::AnonymousComposite(TypeComposite {
-            fields: subtypes,
-            is_packed: false,
-            source: Source::internal(),
-        })
-    }
-
     pub fn is_integer_like(&self) -> bool {
         matches!(
             self,

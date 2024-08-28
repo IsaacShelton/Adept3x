@@ -81,7 +81,7 @@ pub enum ResolveErrorKind {
     FieldDoesNotExist {
         field_name: String,
     },
-    CannotCreateStructLiteralForNonPlainOldDataStructure {
+    CannotCreateStructLiteralForNonStructure {
         bad_type: String,
     },
     MissingFields {
@@ -270,10 +270,10 @@ impl Display for ResolveErrorKind {
             ResolveErrorKind::FieldDoesNotExist { field_name } => {
                 write!(f, "Field '{}' does not exist", field_name)?;
             }
-            ResolveErrorKind::CannotCreateStructLiteralForNonPlainOldDataStructure { bad_type } => {
+            ResolveErrorKind::CannotCreateStructLiteralForNonStructure { bad_type } => {
                 write!(
                     f,
-                    "Cannot create struct literal for non-plain-old-data structure '{}'",
+                    "Cannot create struct literal for non-structure '{}'",
                     bad_type
                 )?;
             }

@@ -25,7 +25,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             "foreign" => AnnotationKind::Foreign,
             "thread_local" => AnnotationKind::ThreadLocal,
             "packed" => AnnotationKind::Packed,
-            "pod" => AnnotationKind::Pod,
             "abide_abi" => AnnotationKind::AbideAbi,
             _ => {
                 return Err(ParseErrorKind::UnrecognizedAnnotation {

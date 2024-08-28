@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     ast::{self, ConformBehavior},
-    resolved::{self, Drops},
+    resolved,
 };
 
 pub fn resolve_stmts(
@@ -79,7 +79,7 @@ pub fn resolve_stmt(
             };
 
             Ok(resolved::Stmt::new(
-                resolved::StmtKind::Return(return_value, Drops::default()),
+                resolved::StmtKind::Return(return_value),
                 source,
             ))
         }

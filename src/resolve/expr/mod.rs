@@ -154,18 +154,20 @@ pub fn resolve_expr(
                 source,
             ),
         )),
-        ast::ExprKind::String(value) => {
+        ast::ExprKind::String(_value) => {
+            return Err(ResolveErrorKind::StringTypeNotDefined.at(source));
+
+            // NOTE: We don't support string types yet, but once we do, we will need
+            // something like this:
+
+            /*
             let type_kind = ctx.type_search_ctx.find_type_or_error("String", source)?;
 
-            let structure_ref = match type_kind {
-                resolved::TypeKind::ManagedStructure(_, structure_ref) => structure_ref,
-                _ => return Err(ResolveErrorKind::StringTypeNotDefined.at(source)),
-            };
-
             Ok(TypedExpr::new(
-                resolved::TypeKind::ManagedStructure("String".into(), *structure_ref).at(source),
+                resolved::TypeKind::Structure("String".into(), *structure_ref).at(source),
                 resolved::Expr::new(resolved::ExprKind::String(value.clone()), source),
             ))
+            */
         }
         ast::ExprKind::Call(call) => resolve_call_expr(ctx, call, source),
         ast::ExprKind::DeclareAssign(declare_assign) => {

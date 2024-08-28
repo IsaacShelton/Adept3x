@@ -216,17 +216,7 @@ fn lower_stmts(
 
     for stmt in stmts.iter() {
         result = match &stmt.kind {
-            StmtKind::Return(expr, drops) => {
-                for variable_key in drops.drops.iter() {
-                    lower_drop(
-                        builder,
-                        &ir_module.target,
-                        *variable_key,
-                        function,
-                        resolved_ast,
-                    )?;
-                }
-
+            StmtKind::Return(expr) => {
                 let instruction = ir::Instruction::Return(if let Some(expr) = expr {
                     Some(lower_expr(
                         builder,
@@ -311,41 +301,9 @@ fn lower_stmts(
                 Value::Literal(Literal::Void)
             }
         };
-
-        for variable_key in stmt.drops.iter() {
-            lower_drop(
-                builder,
-                &ir_module.target,
-                *variable_key,
-                function,
-                resolved_ast,
-            )?;
-        }
     }
 
     Ok(result)
-}
-
-fn lower_drop(
-    builder: &mut Builder,
-    target: &Target,
-    variable_key: VariableStorageKey,
-    function: &resolved::Function,
-    resolved_ast: &resolved::Ast,
-) -> Result<(), LowerError> {
-    let variable = function
-        .variables
-        .get(variable_key)
-        .expect("referenced variable to exist");
-
-    if variable.resolved_type.kind.is_managed_structure() {
-        let variable_pointer = lower_variable_to_value(variable_key);
-        let variable_type = lower_type(target, &variable.resolved_type, resolved_ast)?;
-        let heap_pointer = builder.push(ir::Instruction::Load((variable_pointer, variable_type)));
-        builder.push(ir::Instruction::Free(heap_pointer));
-    }
-
-    Ok(())
 }
 
 fn lower_type(
@@ -390,12 +348,7 @@ fn lower_type(
             resolved_ast,
         )?))),
         resolved::TypeKind::Void => Ok(ir::Type::Void),
-        resolved::TypeKind::ManagedStructure(_, structure_ref) => {
-            Ok(ir::Type::Structure(*structure_ref).reference_counted_pointer())
-        }
-        resolved::TypeKind::PlainOldData(_, structure_ref) => {
-            Ok(ir::Type::Structure(*structure_ref))
-        }
+        resolved::TypeKind::Structure(_, structure_ref) => Ok(ir::Type::Structure(*structure_ref)),
         resolved::TypeKind::AnonymousStruct() => {
             todo!("lower anonymous struct")
         }
@@ -450,32 +403,10 @@ fn lower_destination(
             subject,
             structure_ref,
             index,
-            memory_management,
             ..
         } => {
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
-
-            let subject_pointer = match memory_management {
-                resolved::MemoryManagement::None => subject_pointer,
-                resolved::MemoryManagement::ReferenceCounted => {
-                    // Load pointer from pointed object
-
-                    let struct_type =
-                        ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
-
-                    let subject_pointer = builder.push(ir::Instruction::Load((
-                        subject_pointer,
-                        struct_type.pointer(),
-                    )));
-
-                    builder.push(ir::Instruction::Member {
-                        struct_type,
-                        subject_pointer,
-                        index: 1,
-                    })
-                }
-            };
 
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
@@ -733,35 +664,10 @@ fn lower_expr(
                 structure_ref,
                 index,
                 field_type,
-                memory_management,
             } = &**member;
 
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
-
-            let subject_pointer = match memory_management {
-                resolved::MemoryManagement::None => subject_pointer,
-                resolved::MemoryManagement::ReferenceCounted => {
-                    // Take off reference counted wrapper
-
-                    // Get inner structure type
-                    let struct_type =
-                        ir::Type::Structure(*structure_ref).reference_counted_no_pointer();
-
-                    // Load pointer to referece counted wrapper
-                    let subject_pointer = builder.push(ir::Instruction::Load((
-                        subject_pointer,
-                        struct_type.pointer(),
-                    )));
-
-                    // Obtain pointer to inner data
-                    builder.push(ir::Instruction::Member {
-                        subject_pointer,
-                        struct_type,
-                        index: 1,
-                    })
-                }
-            };
 
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
@@ -802,7 +708,6 @@ fn lower_expr(
             let StructureLiteral {
                 structure_type,
                 fields,
-                memory_management,
             } = &**structure_literal;
 
             let result_ir_type = lower_type(&ir_module.target, structure_type, resolved_ast)?;
@@ -820,48 +725,7 @@ fn lower_expr(
             // Drop the index part of the values
             let values = values.drain(..).map(|(_, value)| value).collect();
 
-            match memory_management {
-                resolved::MemoryManagement::None => {
-                    Ok(builder.push(ir::Instruction::StructureLiteral(result_ir_type, values)))
-                }
-                resolved::MemoryManagement::ReferenceCounted => {
-                    let flat = builder.push(ir::Instruction::StructureLiteral(
-                        result_ir_type.clone(),
-                        values,
-                    ));
-
-                    let wrapper_struct_type = result_ir_type.reference_counted_no_pointer();
-
-                    let heap_memory =
-                        builder.push(ir::Instruction::Malloc(wrapper_struct_type.clone()));
-
-                    // TODO: Assert that malloc didn't return NULL
-
-                    let at_reference_count = builder.push(ir::Instruction::Member {
-                        subject_pointer: heap_memory.clone(),
-                        struct_type: wrapper_struct_type.clone(),
-                        index: 0,
-                    });
-
-                    builder.push(ir::Instruction::Store(ir::Store {
-                        new_value: ir::Value::Literal(Literal::Unsigned64(1)),
-                        destination: at_reference_count,
-                    }));
-
-                    let at_value = builder.push(ir::Instruction::Member {
-                        subject_pointer: heap_memory.clone(),
-                        struct_type: wrapper_struct_type.clone(),
-                        index: 1,
-                    });
-
-                    builder.push(ir::Instruction::Store(ir::Store {
-                        new_value: flat,
-                        destination: at_value,
-                    }));
-
-                    Ok(heap_memory)
-                }
-            }
+            Ok(builder.push(ir::Instruction::StructureLiteral(result_ir_type, values)))
         }
         ExprKind::UnaryOperation(unary_operation) => {
             let inner = lower_expr(

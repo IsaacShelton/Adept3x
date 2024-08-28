@@ -22,12 +22,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.ignore_newlines();
 
         let mut is_packed = false;
-        let mut prefer_pod = false;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Packed => is_packed = true,
-                AnnotationKind::Pod => prefer_pod = true,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for structure"))),
             }
         }
@@ -66,7 +64,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             fields,
             is_packed,
-            prefer_pod,
             source,
         })
     }

@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Drops, TypedExpr},
+    resolved::{self, TypedExpr},
     source_files::Source,
 };
 
@@ -78,7 +78,6 @@ pub fn resolve_short_circuiting_binary_operation_expr(
                     operator: binary_operation.operator,
                     left,
                     right,
-                    drops: Drops::default(),
                 },
             )),
             source,

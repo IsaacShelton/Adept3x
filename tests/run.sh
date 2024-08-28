@@ -43,7 +43,7 @@ compile integer_unsigned_overflow
 compile integer_value_conforming
 compile math_floats
 compile math_simple
-compile member_pod
+compile member
 compile_module modules_headers
 compile_module modules_simple
 compile multiline_comments
@@ -58,7 +58,6 @@ compile signed_unsigned_promotion
 compile structure_definitions
 compile structure_literals
 compile structure_literals_abbr
-compile structure_pod
 compile unary_operators
 compile type_aliases
 compile ufcs

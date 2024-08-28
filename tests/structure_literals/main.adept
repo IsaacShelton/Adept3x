@@ -5,7 +5,7 @@ func printf(format ptr<char>, ...) int
 struct Vector3i (x int, y int, z int)
 
 func main {
-    vector := pod<Vector3i> {
+    vector := Vector3i {
         x: 123,
         y: 456,
         z: 789,

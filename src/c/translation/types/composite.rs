@@ -95,7 +95,6 @@ pub fn make_composite(
                     name: name.clone(),
                     fields,
                     is_packed,
-                    prefer_pod: true,
                     source: composite.source,
                 });
 

@@ -19,8 +19,7 @@ pub fn resolve_member_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
-    let (_, structure_ref, memory_management) =
-        get_core_structure_info(&resolved_subject.resolved_type, source)?;
+    let (_, structure_ref) = get_core_structure_info(&resolved_subject.resolved_type, source)?;
 
     let structure = ctx
         .resolved_ast
@@ -58,7 +57,6 @@ pub fn resolve_member_expr(
                 structure_ref,
                 index,
                 field_type: found_field.resolved_type.clone(),
-                memory_management,
             })),
             source,
         ),
