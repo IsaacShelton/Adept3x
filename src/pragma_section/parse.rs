@@ -1,14 +1,17 @@
 use super::PragmaSection;
 use crate::{
-    ast::{AstFile, Function, Parameters, StmtKind, TypeKind},
+    ast::{AstFile, Expr, ExprKind, Function, Parameters, Stmt, StmtKind, TypeKind},
+    diagnostics::ErrorDiagnostic,
     inflow::Inflow,
     parser::{self, error::ParseError, Input},
     show::{into_show, Show},
+    source_files::Source,
     token::{Token, TokenKind},
 };
 
 impl PragmaSection {
     pub fn parse<'a, I: Inflow<Token>>(
+        allow_experimental_pragma_features: bool,
         mut input: Input<'a, I>,
     ) -> Result<(PragmaSection, Input<'a, I>), Box<dyn Show>> {
         // pragma ...
@@ -33,11 +36,18 @@ impl PragmaSection {
             // "Whole-file" mode
 
             // Parse top-level contructs until we hit a '}'
-            while !parser.input.peek_is(TokenKind::CloseCurly) {
-                parser
-                    .parse_top_level(&mut ast_file, vec![])
-                    .map_err(into_show)?;
-                parser.input.ignore_newlines();
+            if allow_experimental_pragma_features {
+                while !parser.input.peek_is_or_eof(TokenKind::CloseCurly) {
+                    parser
+                        .parse_top_level(&mut ast_file, vec![])
+                        .map_err(into_show)?;
+                    parser.input.ignore_newlines();
+                }
+            } else {
+                return Err(Box::new(ErrorDiagnostic::new(
+                    "Whole-file pragma directives are an experimental feature and may be removed",
+                    pragma_source,
+                )));
             }
 
             // Eat the final '}'
@@ -61,6 +71,12 @@ impl PragmaSection {
                 let expr_source = expr.source;
                 vec![StmtKind::Expr(expr).at(expr_source)]
             };
+
+            if !allow_experimental_pragma_features {
+                for stmt in stmts.iter() {
+                    restrict_allowed_stmt(stmt)?;
+                }
+            }
 
             ast_file.functions.push(Function {
                 name: "main".into(),
@@ -91,4 +107,45 @@ impl PragmaSection {
             parser.input,
         ))
     }
+}
+
+fn restrict_allowed_stmt(stmt: &Stmt) -> Result<(), Box<dyn Show>> {
+    match &stmt.kind {
+        StmtKind::Expr(inner) => restrict_allowed_expr(inner)?,
+        _ => return Err(found_forbidden_stmt(stmt.source)),
+    }
+
+    Ok(())
+}
+
+fn restrict_allowed_expr(expr: &Expr) -> Result<(), Box<dyn Show>> {
+    match &expr.kind {
+        ExprKind::NullTerminatedString(_) => (),
+        ExprKind::Call(call) => {
+            if call.expected_to_return.is_some() {
+                return Err(found_forbidden_expr(expr.source));
+            }
+
+            for argument in call.arguments.iter() {
+                restrict_allowed_expr(argument)?;
+            }
+        }
+        _ => return Err(found_forbidden_expr(expr.source)),
+    }
+
+    Ok(())
+}
+
+fn found_forbidden_stmt(source: Source) -> Box<dyn Show> {
+    Box::new(ErrorDiagnostic::new(
+        "Support for this statement inside pragma directives is an experimental feature that may be removed",
+        source,
+    ))
+}
+
+fn found_forbidden_expr(source: Source) -> Box<dyn Show> {
+    Box::new(ErrorDiagnostic::new(
+        "Support for this expression inside pragma directives is an experimental feature that may be removed",
+        source,
+    ))
 }

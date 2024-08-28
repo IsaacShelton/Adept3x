@@ -29,6 +29,7 @@ impl PragmaSection {
                 coerce_main_signature: false,
                 excute_result: false,
                 use_pic: None,
+                allow_experimental_pragma_features: false,
                 target: Target::HOST,
                 infrastructure: None,
             },
