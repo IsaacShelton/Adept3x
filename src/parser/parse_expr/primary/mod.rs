@@ -66,37 +66,54 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::StructKeyword | TokenKind::UnionKeyword | TokenKind::EnumKeyword => {
                 self.parse_structure_literal()
             }
-            TokenKind::Identifier(_) => match self.input.peek_nth(1).kind {
-                TokenKind::Namespace => self.parse_enum_member_literal(),
-                TokenKind::OpenAngle => self.parse_structure_literal(),
-                TokenKind::OpenCurly => {
-                    let peek = &self.input.peek_nth(2).kind;
+            TokenKind::Identifier(_) => {
+                // TODO: CLEANUP: This should be cleaned up once we have proper
+                // namespaces and generic parsing that applies to all cases
 
-                    if peek.is_extend() || peek.is_colon() {
-                        self.parse_structure_literal()
-                    } else {
-                        let next_three =
-                            array_last::<3, 5, _>(self.input.peek_n()).map(|token| &token.kind);
+                match self.input.peek_nth(1).kind {
+                    TokenKind::Namespace => self.parse_enum_member_literal(),
+                    TokenKind::OpenAngle => {
+                        let name = self.input.eat_identifier().unwrap();
+                        let generics = self.parse_generics()?;
 
-                        match &next_three[..] {
-                            [TokenKind::Identifier(_), TokenKind::Colon, ..]
-                            | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
-                                self.parse_structure_literal()
+                        if !generics.is_empty() {
+                            todo!("generics in expressions not implemented yet");
+                        }
+
+                        let ast_type = self.parse_type_from_parts(name, vec![], source)?;
+                        self.parse_structure_literal_with(ast_type)
+                    }
+                    TokenKind::OpenCurly => {
+                        let peek = &self.input.peek_nth(2).kind;
+
+                        if peek.is_extend() || peek.is_colon() {
+                            self.parse_structure_literal()
+                        } else {
+                            let next_three =
+                                array_last::<3, 5, _>(self.input.peek_n()).map(|token| &token.kind);
+
+                            match &next_three[..] {
+                                [TokenKind::Identifier(_), TokenKind::Colon, ..]
+                                | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
+                                    self.parse_structure_literal()
+                                }
+                                _ => Ok(Expr::new(
+                                    ExprKind::Variable(
+                                        self.input.advance().kind.unwrap_identifier(),
+                                    ),
+                                    source,
+                                )),
                             }
-                            _ => Ok(Expr::new(
-                                ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
-                                source,
-                            )),
                         }
                     }
+                    TokenKind::OpenParen => self.parse_call(),
+                    TokenKind::DeclareAssign => self.parse_declare_assign(),
+                    _ => Ok(Expr::new(
+                        ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
+                        source,
+                    )),
                 }
-                TokenKind::OpenParen => self.parse_call(),
-                TokenKind::DeclareAssign => self.parse_declare_assign(),
-                _ => Ok(Expr::new(
-                    ExprKind::Variable(self.input.advance().kind.unwrap_identifier()),
-                    source,
-                )),
-            },
+            }
             TokenKind::Not | TokenKind::BitComplement | TokenKind::Subtract => {
                 let operator = match kind {
                     TokenKind::Not => UnaryOperator::Not,

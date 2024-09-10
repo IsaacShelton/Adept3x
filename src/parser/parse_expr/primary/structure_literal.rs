@@ -1,6 +1,8 @@
 use super::Parser;
 use crate::{
-    ast::{ConformBehavior, Expr, ExprKind, FieldInitializer, FillBehavior, StructureLiteral},
+    ast::{
+        ConformBehavior, Expr, ExprKind, FieldInitializer, FillBehavior, StructureLiteral, Type,
+    },
     inflow::Inflow,
     parser::error::ParseError,
     token::{Token, TokenKind},
@@ -12,8 +14,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         //  ^
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of struct literal"))?;
-        let source = ast_type.source;
+        self.parse_structure_literal_with(ast_type)
+    }
 
+    pub fn parse_structure_literal_with(&mut self, ast_type: Type) -> Result<Expr, ParseError> {
+        // Type { x: VALUE, b: VALUE, c: VALUE, :d, :e, ..SPECIFIER }
+        //      ^
+
+        let source = ast_type.source;
         self.parse_token(TokenKind::OpenCurly, Some("to begin struct literal"))?;
         self.ignore_newlines();
 

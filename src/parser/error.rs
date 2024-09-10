@@ -75,6 +75,15 @@ pub enum ParseErrorKind {
         message: String,
     },
     CannotCallFunctionsAtGlobalScope,
+    IncorrectNumberOfTypeParametersFor {
+        name: String,
+        got: usize,
+        expected: usize,
+    },
+    ExpectedTypeParameterToBeType {
+        name: String,
+        word_for_nth: String,
+    },
     Other {
         message: String,
     },
@@ -179,6 +188,24 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::CannotCallFunctionsAtGlobalScope => {
                 write!(f, "Cannot call functions at global scope")?;
+            }
+            ParseErrorKind::IncorrectNumberOfTypeParametersFor {
+                name,
+                got,
+                expected,
+            } => {
+                write!(
+                    f,
+                    "Incorrect number of type parameters for '{}' (got {}, expected {})",
+                    name, got, expected
+                )?;
+            }
+            ParseErrorKind::ExpectedTypeParameterToBeType { name, word_for_nth } => {
+                write!(
+                    f,
+                    "Expected {} type parameter to '{}' to be a type",
+                    word_for_nth, name
+                )?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;

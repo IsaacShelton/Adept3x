@@ -3,8 +3,9 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{FixedArray, Type, TypeKind},
+    ast::{CompileTimeArgument, Type, TypeKind},
     inflow::Inflow,
+    source_files::Source,
     token::{Token, TokenKind},
 };
 
@@ -28,6 +29,48 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             });
         };
 
+        let generics = self.parse_generics()?;
+        self.parse_type_from_parts(identifier, generics, source)
+    }
+
+    pub fn parse_generics(&mut self) -> Result<Vec<CompileTimeArgument>, ParseError> {
+        let mut generics = vec![];
+
+        if !self.input.eat(TokenKind::OpenAngle) {
+            return Ok(generics);
+        }
+
+        loop {
+            if self.parse_type_parameters_close().is_some() {
+                break;
+            } else if self.input.peek_is(TokenKind::EndOfFile) {
+                // TODO: Improve error message
+                return Err(self.unexpected_token_is_next());
+            }
+
+            if !generics.is_empty() && !self.input.eat(TokenKind::Comma) {
+                // TODO: Improve error message
+                return Err(self.unexpected_token_is_next());
+            }
+
+            generics.push(if self.input.peek().could_start_type() {
+                CompileTimeArgument::Type(
+                    self.parse_type(None::<&str>, Some("for compile time argument"))?,
+                )
+            } else {
+                CompileTimeArgument::Expr(self.parse_expr()?)
+            });
+        }
+
+        Ok(generics)
+    }
+
+    pub fn parse_type_from_parts(
+        &mut self,
+        identifier: String,
+        generics: Vec<CompileTimeArgument>,
+        source: Source,
+    ) -> Result<Type, ParseError> {
         let type_kind = match identifier.as_str() {
             "bool" => Ok(TypeKind::Boolean),
             "char" => Ok(TypeKind::char()),
@@ -52,39 +95,38 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             "f32" | "float" => Ok(TypeKind::f32()),
             "f64" | "double" => Ok(TypeKind::f64()),
             "void" => Ok(TypeKind::Void),
-            "ptr" => Ok(TypeKind::Pointer(Box::new(
-                if self.input.eat(TokenKind::OpenAngle) {
-                    let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                    self.parse_type_parameters_close()?;
-                    inner
+            "ptr" => {
+                if generics.len() == 1 {
+                    if let CompileTimeArgument::Type(inner) = generics.into_iter().next().unwrap() {
+                        Ok(TypeKind::Pointer(Box::new(inner)))
+                    } else {
+                        Err(ParseError {
+                            kind: ParseErrorKind::ExpectedTypeParameterToBeType {
+                                name: identifier,
+                                word_for_nth: "first".into(),
+                            },
+                            source,
+                        })
+                    }
                 } else {
-                    TypeKind::Void.at(source)
-                },
-            ))),
-            "array" => {
-                if !self.input.eat(TokenKind::OpenAngle) {
-                    return Err(ParseError {
-                        kind: ParseErrorKind::ExpectedTypeParameters,
+                    Err(ParseError {
+                        kind: ParseErrorKind::IncorrectNumberOfTypeParametersFor {
+                            name: identifier,
+                            expected: 1,
+                            got: generics.len(),
+                        },
                         source,
-                    });
+                    })
                 }
+            }
+            "array" => {
+                // TODO: Update fixed array type to use compile time arguments
+                todo!("array<$N, $T> not updated yet to use compile time arguments");
 
-                let count = self.parse_expr()?;
-
-                if !self.input.eat(TokenKind::Comma) {
-                    return Err(ParseError {
-                        kind: ParseErrorKind::ExpectedCommaInTypeParameters,
-                        source: self.source_here(),
-                    });
-                }
-
-                let inner = self.parse_type(None::<&str>, None::<&str>)?;
-                self.parse_type_parameters_close()?;
-
-                Ok(TypeKind::FixedArray(Box::new(FixedArray {
-                    ast_type: inner,
-                    count,
-                })))
+                // Ok(TypeKind::FixedArray(Box::new(FixedArray {
+                //     ast_type: inner,
+                //     count,
+                // })))
             }
             identifier => Ok(TypeKind::Named(identifier.into())),
         }?;
@@ -96,14 +138,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     /// This function may partially consume tokens, so be
     /// aware that any previously peeked tokens may no longer be in
     /// the same lookahead position after calling this function.
-    fn parse_type_parameters_close(&mut self) -> Result<(), ParseError> {
-        let closer = self.input.advance();
+    fn parse_type_parameters_close(&mut self) -> Option<()> {
+        let closer = self.input.peek();
+        let source = closer.source;
 
         /// Sub-function for properly handling trailing `=` signs
         /// resulting from partially consuming '>'-like tokens.
         fn merge_trailing_equals<I: Inflow<Token>>(
             parser: &mut Parser<I>,
-            closer: &Token,
+            closer: Token,
             column_offset: u32,
         ) {
             if parser.input.eat(TokenKind::Assign) {
@@ -118,36 +161,42 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
 
         match &closer.kind {
-            TokenKind::GreaterThan => Ok(()),
+            TokenKind::GreaterThan => {
+                self.input.advance();
+                Some(())
+            }
             TokenKind::RightShift => {
+                self.input.advance();
                 self.input
-                    .unadvance(TokenKind::GreaterThan.at(closer.source.shift_column(1)));
-                Ok(())
+                    .unadvance(TokenKind::GreaterThan.at(source.shift_column(1)));
+                Some(())
             }
             TokenKind::LogicalRightShift => {
+                self.input.advance();
                 self.input
-                    .unadvance(TokenKind::RightShift.at(closer.source.shift_column(1)));
-                Ok(())
+                    .unadvance(TokenKind::RightShift.at(source.shift_column(1)));
+                Some(())
             }
             TokenKind::RightShiftAssign => {
-                merge_trailing_equals(self, &closer, 2);
-
+                let closer = self.input.advance();
+                merge_trailing_equals(self, closer, 2);
                 self.input
-                    .unadvance(TokenKind::GreaterThan.at(closer.source.shift_column(1)));
-                Ok(())
+                    .unadvance(TokenKind::GreaterThan.at(source.shift_column(1)));
+                Some(())
             }
             TokenKind::LogicalRightShiftAssign => {
-                merge_trailing_equals(self, &closer, 3);
-
+                let closer = self.input.advance();
+                merge_trailing_equals(self, closer, 3);
                 self.input
-                    .unadvance(TokenKind::RightShift.at(closer.source.shift_column(1)));
-                Ok(())
+                    .unadvance(TokenKind::RightShift.at(source.shift_column(1)));
+                Some(())
             }
             TokenKind::GreaterThanEq => {
-                merge_trailing_equals(self, &closer, 1);
-                Ok(())
+                let closer = self.input.advance();
+                merge_trailing_equals(self, closer, 1);
+                Some(())
             }
-            _ => Err(self.unexpected_token(&closer)),
+            _ => None,
         }
     }
 }
