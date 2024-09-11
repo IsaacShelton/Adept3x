@@ -80,7 +80,7 @@ pub enum ParseErrorKind {
         got: usize,
         expected: usize,
     },
-    ExpectedTypeParameterToBeType {
+    ExpectedTypeParameterToBeAType {
         name: String,
         word_for_nth: String,
     },
@@ -200,7 +200,7 @@ impl Display for ParseErrorKind {
                     name, got, expected
                 )?;
             }
-            ParseErrorKind::ExpectedTypeParameterToBeType { name, word_for_nth } => {
+            ParseErrorKind::ExpectedTypeParameterToBeAType { name, word_for_nth } => {
                 write!(
                     f,
                     "Expected {} type parameter to '{}' to be a type",

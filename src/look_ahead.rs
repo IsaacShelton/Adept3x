@@ -51,7 +51,7 @@ where
 
         // TODO: CLEANUP: Find better solution
         let contiguous = self.buffer.make_contiguous();
-        &contiguous[..contiguous.len().max(count)]
+        &contiguous[..contiguous.len().min(count)]
     }
 
     pub fn peek_nth(&mut self, index: usize) -> Option<&I::Item> {

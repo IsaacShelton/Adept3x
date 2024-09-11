@@ -101,7 +101,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                         Ok(TypeKind::Pointer(Box::new(inner)))
                     } else {
                         Err(ParseError {
-                            kind: ParseErrorKind::ExpectedTypeParameterToBeType {
+                            kind: ParseErrorKind::ExpectedTypeParameterToBeAType {
                                 name: identifier,
                                 word_for_nth: "first".into(),
                             },
