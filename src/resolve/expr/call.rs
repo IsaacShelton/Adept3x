@@ -15,6 +15,13 @@ pub fn resolve_call_expr(
     call: &ast::Call,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
+    if !call.generics.is_empty() {
+        return Err(ResolveErrorKind::Other {
+            message: "Resolution of calls with generics is not implemented yet".into(),
+        }
+        .at(source));
+    }
+
     let function_ref = ctx
         .function_search_ctx
         .find_function_or_error(&call.function_name, source)?;

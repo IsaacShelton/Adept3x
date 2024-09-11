@@ -59,6 +59,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         function_name: "main".into(),
         arguments: vec![],
         expected_to_return: Some(void.clone()),
+        generics: vec![],
     }))
     .at(Source::internal());
 

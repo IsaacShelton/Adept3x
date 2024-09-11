@@ -3,16 +3,18 @@ use crate::{
     ast::{DeclareAssign, Expr, ExprKind},
     inflow::Inflow,
     parser::error::ParseError,
+    source_files::Source,
     token::{Token, TokenKind},
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_declare_assign(&mut self) -> Result<Expr, ParseError> {
+    pub fn parse_declare_assign(
+        &mut self,
+        variable_name: String,
+        source: Source,
+    ) -> Result<Expr, ParseError> {
         // variable_name := value
-        //       ^
-
-        let (variable_name, source) =
-            self.parse_identifier_keep_location(Some("for function call"))?;
+        //               ^
 
         self.parse_token(
             TokenKind::DeclareAssign,

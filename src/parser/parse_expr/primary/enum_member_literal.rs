@@ -3,19 +3,18 @@ use crate::{
     ast::{EnumMemberLiteral, Expr, ExprKind},
     inflow::Inflow,
     parser::error::{ParseError, ParseErrorKind},
+    source_files::Source,
     token::{Token, TokenKind},
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_enum_member_literal(&mut self) -> Result<Expr, ParseError> {
+    pub fn parse_enum_member_literal(
+        &mut self,
+        enum_name: String,
+        source: Source,
+    ) -> Result<Expr, ParseError> {
         // EnumName::EnumVariant
         //    ^
-
-        let source = self.source_here();
-        let enum_name = self
-            .input
-            .eat_identifier()
-            .ok_or_else(|| ParseErrorKind::ExpectedEnumName.at(source))?;
 
         self.parse_token(TokenKind::Namespace, Some("for enum member literal"))?;
 
@@ -23,7 +22,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let variant_name = self
             .input
             .eat_identifier()
-            .ok_or_else(|| ParseErrorKind::ExpectedEnumName.at(variant_source))?;
+            .ok_or_else(|| ParseErrorKind::ExpectedEnumMemberName.at(variant_source))?;
 
         Ok(ExprKind::EnumMemberLiteral(Box::new(EnumMemberLiteral {
             enum_name,

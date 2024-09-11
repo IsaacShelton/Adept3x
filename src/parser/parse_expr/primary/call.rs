@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{Call, Expr, ExprKind},
+    ast::{Call, CompileTimeArgument, Expr, ExprKind},
     inflow::Inflow,
     parser::error::ParseError,
     source_files::Source,
@@ -8,19 +8,22 @@ use crate::{
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_call(&mut self) -> Result<Expr, ParseError> {
+    pub fn parse_call(
+        &mut self,
+        function_name: String,
+        generics: Vec<CompileTimeArgument>,
+        source: Source,
+    ) -> Result<Expr, ParseError> {
         // function_name(arg1, arg2, arg3)
         //       ^
 
-        let (function_name, source) =
-            self.parse_identifier_keep_location(Some("for function call"))?;
-
-        self.parse_call_with(function_name, vec![], source)
+        self.parse_call_with(function_name, generics, vec![], source)
     }
 
     pub fn parse_call_with(
         &mut self,
         function_name: String,
+        generics: Vec<CompileTimeArgument>,
         prefix_args: Vec<Expr>,
         source: Source,
     ) -> Result<Expr, ParseError> {
@@ -45,6 +48,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             function_name,
             arguments: args,
             expected_to_return: None,
+            generics,
         }))
         .at(source))
     }

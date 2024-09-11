@@ -69,7 +69,6 @@ pub enum ParseErrorKind {
     DefineHasMultipleDefinitions {
         name: String,
     },
-    ExpectedEnumName,
     ExpectedEnumMemberName,
     Lexical {
         message: String,
@@ -84,6 +83,7 @@ pub enum ParseErrorKind {
         name: String,
         word_for_nth: String,
     },
+    GenericsNotSupportedHere,
     Other {
         message: String,
     },
@@ -180,9 +180,6 @@ impl Display for ParseErrorKind {
             ParseErrorKind::DefineHasMultipleDefinitions { name } => {
                 write!(f, "Define '{}' has multiple definitions", name)?;
             }
-            ParseErrorKind::ExpectedEnumName => {
-                write!(f, "Expected enum name")?;
-            }
             ParseErrorKind::ExpectedEnumMemberName => {
                 write!(f, "Expected enum member name")?;
             }
@@ -206,6 +203,9 @@ impl Display for ParseErrorKind {
                     "Expected {} type parameter to '{}' to be a type",
                     word_for_nth, name
                 )?;
+            }
+            ParseErrorKind::GenericsNotSupportedHere => {
+                write!(f, "Generics not supported here")?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;
