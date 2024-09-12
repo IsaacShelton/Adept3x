@@ -96,6 +96,8 @@ pub enum TokenKind {
     Colon,
     Hash,
     Ellipsis,
+    AddressOf,
+    Dereference,
     DeclareAssign,
     Assign,
     AddAssign,
@@ -103,18 +105,18 @@ pub enum TokenKind {
     MultiplyAssign,
     DivideAssign,
     ModulusAssign,
-    AmpersandAssign,
-    PipeAssign,
-    CaretAssign,
+    BitAndAssign,
+    BitOrAssign,
+    BitXorAssign,
     LeftShiftAssign,
     RightShiftAssign,
     LogicalLeftShiftAssign,
     LogicalRightShiftAssign,
     And,
     Or,
-    Ampersand,
-    Pipe,
-    Caret,
+    BitAnd,
+    BitOr,
+    BitXor,
     LeftShift,
     RightShift,
     LogicalLeftShift,
@@ -177,6 +179,8 @@ impl Display for TokenKind {
             TokenKind::Colon => f.write_str("':'"),
             TokenKind::Hash => f.write_str("'#'"),
             TokenKind::Ellipsis => f.write_str("'...'"),
+            TokenKind::AddressOf => f.write_str("(address of) '&'"),
+            TokenKind::Dereference => f.write_str("(dereference) '*'"),
             TokenKind::DeclareAssign => f.write_str("':='"),
             TokenKind::Assign => f.write_str("'='"),
             TokenKind::AddAssign => f.write_str("'+='"),
@@ -184,18 +188,18 @@ impl Display for TokenKind {
             TokenKind::MultiplyAssign => f.write_str("'*='"),
             TokenKind::DivideAssign => f.write_str("'/='"),
             TokenKind::ModulusAssign => f.write_str("'%='"),
-            TokenKind::AmpersandAssign => f.write_str("'&='"),
-            TokenKind::PipeAssign => f.write_str("'|='"),
-            TokenKind::CaretAssign => f.write_str("'^='"),
+            TokenKind::BitAndAssign => f.write_str("'&='"),
+            TokenKind::BitOrAssign => f.write_str("'|='"),
+            TokenKind::BitXorAssign => f.write_str("'^='"),
             TokenKind::LeftShiftAssign => f.write_str("'<<='"),
             TokenKind::RightShiftAssign => f.write_str("'>>='"),
             TokenKind::LogicalLeftShiftAssign => f.write_str("'<<<='"),
             TokenKind::LogicalRightShiftAssign => f.write_str("'>>>='"),
             TokenKind::And => f.write_str("'&&'"),
             TokenKind::Or => f.write_str("'||'"),
-            TokenKind::Ampersand => f.write_str("'&'"),
-            TokenKind::Pipe => f.write_str("'|'"),
-            TokenKind::Caret => f.write_str("'^'"),
+            TokenKind::BitAnd => f.write_str("'&'"),
+            TokenKind::BitOr => f.write_str("'|'"),
+            TokenKind::BitXor => f.write_str("'^'"),
             TokenKind::LeftShift => f.write_str("'<<'"),
             TokenKind::RightShift => f.write_str("'>>'"),
             TokenKind::LogicalLeftShift => f.write_str("'<<<'"),
@@ -234,9 +238,9 @@ impl TokenKind {
             TokenKind::GreaterThanEq => 9,
             TokenKind::Equals => 8,
             TokenKind::NotEquals => 8,
-            TokenKind::Ampersand => 7,
-            TokenKind::Caret => 6,
-            TokenKind::Pipe => 5,
+            TokenKind::BitAnd => 7,
+            TokenKind::BitXor => 6,
+            TokenKind::BitOr => 5,
             TokenKind::And => 4,
             TokenKind::Or => 3,
             TokenKind::DeclareAssign
@@ -245,9 +249,9 @@ impl TokenKind {
             | TokenKind::MultiplyAssign
             | TokenKind::DivideAssign
             | TokenKind::ModulusAssign
-            | TokenKind::AmpersandAssign
-            | TokenKind::PipeAssign
-            | TokenKind::CaretAssign
+            | TokenKind::BitAndAssign
+            | TokenKind::BitOrAssign
+            | TokenKind::BitXorAssign
             | TokenKind::LeftShiftAssign
             | TokenKind::RightShiftAssign
             | TokenKind::LogicalLeftShiftAssign
@@ -286,6 +290,8 @@ impl TokenKind {
             | TokenKind::Colon
             | TokenKind::Hash
             | TokenKind::Ellipsis
+            | TokenKind::AddressOf
+            | TokenKind::Dereference
             | TokenKind::Namespace
             | TokenKind::Extend
             | TokenKind::FatArrow => 0,
@@ -300,9 +306,9 @@ impl TokenKind {
                 | Self::MultiplyAssign
                 | Self::DivideAssign
                 | Self::ModulusAssign
-                | Self::AmpersandAssign
-                | Self::PipeAssign
-                | Self::CaretAssign
+                | Self::BitAndAssign
+                | Self::BitOrAssign
+                | Self::BitXorAssign
                 | Self::LeftShiftAssign
                 | Self::RightShiftAssign
                 | Self::LogicalLeftShiftAssign

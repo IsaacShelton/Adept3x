@@ -62,6 +62,11 @@ impl Character {
     }
 
     #[inline]
+    pub fn is_spacing(&self) -> bool {
+        matches!(self, Character::At(' ' | '\n' | '\t', _))
+    }
+
+    #[inline]
     pub fn source(&self) -> Source {
         match self {
             Character::At(_, source) => *source,

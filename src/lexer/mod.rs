@@ -195,8 +195,10 @@ impl<T: Text + Send> Lexer<T> {
             '*' => {
                 if self.characters.eat('=') {
                     Has(TokenKind::MultiplyAssign.at(source))
-                } else {
+                } else if self.characters.peek().is_spacing() {
                     Has(TokenKind::Multiply.at(source))
+                } else {
+                    Has(TokenKind::Dereference.at(source))
                 }
             }
             '/' => {
@@ -240,27 +242,29 @@ impl<T: Text + Send> Lexer<T> {
             '~' => Has(TokenKind::BitComplement.at(source)),
             '&' => {
                 if self.characters.eat('=') {
-                    Has(TokenKind::AmpersandAssign.at(source))
+                    Has(TokenKind::BitAndAssign.at(source))
                 } else if self.characters.eat('&') {
                     Has(TokenKind::And.at(source))
+                } else if self.characters.peek().is_spacing() {
+                    Has(TokenKind::BitAnd.at(source))
                 } else {
-                    Has(TokenKind::Ampersand.at(source))
+                    Has(TokenKind::AddressOf.at(source))
                 }
             }
             '|' => {
                 if self.characters.eat('=') {
-                    Has(TokenKind::PipeAssign.at(source))
+                    Has(TokenKind::BitOrAssign.at(source))
                 } else if self.characters.eat('|') {
                     Has(TokenKind::Or.at(source))
                 } else {
-                    Has(TokenKind::Pipe.at(source))
+                    Has(TokenKind::BitOr.at(source))
                 }
             }
             '^' => {
                 if self.characters.eat('=') {
-                    Has(TokenKind::CaretAssign.at(source))
+                    Has(TokenKind::BitXorAssign.at(source))
                 } else {
-                    Has(TokenKind::Caret.at(source))
+                    Has(TokenKind::BitXor.at(source))
                 }
             }
             ',' => Has(TokenKind::Comma.at(source)),
