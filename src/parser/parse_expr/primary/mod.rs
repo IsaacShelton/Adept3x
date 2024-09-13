@@ -82,26 +82,23 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                         self.parse_enum_member_literal(name, source)
                     }
                     TokenKind::OpenCurly => {
-                        let ast_type = self.parse_type_from_parts(name, generics, source)?;
                         let peek = &self.input.peek_nth(1).kind;
 
                         if peek.is_extend() || peek.is_colon() {
+                            let ast_type = self.parse_type_from_parts(name, generics, source)?;
                             self.parse_structure_literal_with(ast_type)
                         } else {
                             let next_three =
-                                array_last::<3, 5, _>(self.input.peek_n()).map(|token| &token.kind);
+                                array_last::<2, 4, _>(self.input.peek_n()).map(|token| &token.kind);
 
                             match &next_three[..] {
-                                [TokenKind::Identifier(_), TokenKind::Colon, ..]
-                                | [TokenKind::Newline, TokenKind::Identifier(_), TokenKind::Colon, ..] => {
+                                [TokenKind::Colon, ..]
+                                | [TokenKind::Identifier(_), TokenKind::Colon, ..] => {
+                                    let ast_type =
+                                        self.parse_type_from_parts(name, generics, source)?;
                                     self.parse_structure_literal_with(ast_type)
                                 }
-                                _ => Ok(Expr::new(
-                                    ExprKind::Variable(
-                                        self.input.advance().kind.unwrap_identifier(),
-                                    ),
-                                    source,
-                                )),
+                                _ => Ok(Expr::new(ExprKind::Variable(name), source)),
                             }
                         }
                     }

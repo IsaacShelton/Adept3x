@@ -437,6 +437,15 @@ fn lower_destination(
                 index,
             }))
         }
+        DestinationKind::Dereference(pointer_lvalue) => {
+            let pointer_rvalue =
+                lower_expr(builder, ir_module, pointer_lvalue, function, resolved_ast)?;
+
+            let result_pointer_type =
+                lower_type(&ir_module.target, &destination.resolved_type, resolved_ast)?;
+
+            Ok(builder.push(ir::Instruction::Load((pointer_rvalue, result_pointer_type))))
+        }
     }
 }
 

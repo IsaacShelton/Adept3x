@@ -205,6 +205,7 @@ pub fn resolve_stmt(
                 resolved::DestinationKind::GlobalVariable(..) => (),
                 resolved::DestinationKind::Member { .. } => (),
                 resolved::DestinationKind::ArrayAccess { .. } => (),
+                resolved::DestinationKind::Dereference { .. } => (),
             }
 
             let operator = assignment

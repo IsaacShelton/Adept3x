@@ -1,4 +1,5 @@
 use super::Expr;
+use derive_more::IsVariant;
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -7,7 +8,7 @@ pub struct UnaryOperation {
     pub inner: Expr,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IsVariant)]
 pub enum UnaryOperator {
     Not,
     BitComplement,

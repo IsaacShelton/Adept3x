@@ -207,6 +207,10 @@ impl TypeKind {
             Self::Integer(..) | Self::IntegerLiteral(..) | Self::CInteger(..)
         )
     }
+
+    pub fn is_ambiguous_type(&self) -> bool {
+        self.is_integer_literal()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -543,6 +547,7 @@ pub enum DestinationKind {
         field_type: Type,
     },
     ArrayAccess(Box<ArrayAccess>),
+    Dereference(Expr),
 }
 
 #[derive(Copy, Clone, Debug)]

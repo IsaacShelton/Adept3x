@@ -23,6 +23,43 @@ pub fn resolve_unary_operation_expr(
         Initialized::Require,
     )?;
 
+    let operator = &unary_operation.operator;
+
+    if operator.is_address_of() || operator.is_dereference() {
+        if resolved_expr.resolved_type.kind.is_ambiguous_type() {
+            return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
+                operator: unary_operation.operator.to_string(),
+                bad_type: resolved_expr.resolved_type.to_string(),
+            }
+            .at(source));
+        }
+
+        let mut result_type = resolved_expr.resolved_type.clone();
+        if operator.is_dereference() {
+            if let TypeKind::Pointer(inner) = result_type.kind {
+                result_type = *inner;
+            } else {
+                return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
+                    operator: unary_operation.operator.to_string(),
+                    bad_type: resolved_expr.resolved_type.to_string(),
+                }
+                .at(source));
+            }
+        } else if operator.is_address_of() {
+            result_type = TypeKind::Pointer(Box::new(result_type)).at(source);
+        }
+
+        let expr = Expr::new(
+            ExprKind::UnaryOperation(Box::new(UnaryOperation {
+                operator: unary_operation.operator.clone(),
+                inner: resolved_expr,
+            })),
+            source,
+        );
+
+        return Ok(TypedExpr::new(result_type, expr));
+    }
+
     let resolved_expr = match &resolved_expr.resolved_type.kind {
         TypeKind::Boolean => resolved_expr,
         TypeKind::Integer(..) => resolved_expr,
