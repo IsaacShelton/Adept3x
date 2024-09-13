@@ -736,11 +736,21 @@ fn lower_expr(
                 resolved_ast,
             )?;
 
+            let inner_type = lower_type(
+                ir_module.target,
+                &unary_operation.inner.resolved_type,
+                resolved_ast,
+            )?;
+
             Ok(builder.push(match unary_operation.operator {
                 resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
                 resolved::UnaryOperator::BitComplement => ir::Instruction::BitComplement(inner),
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
                 resolved::UnaryOperator::IsNonZero => ir::Instruction::IsNonZero(inner),
+                resolved::UnaryOperator::AddressOf => {
+                    unimplemented!("address of operator");
+                }
+                resolved::UnaryOperator::Dereference => ir::Instruction::Load((inner, inner_type)),
             }))
         }
         ExprKind::Conditional(conditional) => {

@@ -13,6 +13,8 @@ pub enum UnaryOperator {
     BitComplement,
     Negate,
     IsNonZero,
+    AddressOf,
+    Dereference,
 }
 
 impl Display for UnaryOperator {
@@ -22,6 +24,8 @@ impl Display for UnaryOperator {
             Self::BitComplement => "~",
             Self::Negate => "-",
             Self::IsNonZero => "bool()",
+            Self::AddressOf => "(address of) &",
+            Self::Dereference => "(dereference) *",
         })
     }
 }

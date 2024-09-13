@@ -22,19 +22,23 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     return self.parse_declaration();
                 }
 
-                let lhs = self.parse_expr()?;
-
-                if self.input.peek().is_assignment_like() {
-                    // Assignment-Like Statement
-                    return self.parse_assignment(lhs);
-                }
-
-                // Plain Expression Statement
-                Ok(StmtKind::Expr(lhs).at(source))
+                ()
             }
-            TokenKind::ReturnKeyword => self.parse_return(),
-            TokenKind::EndOfFile => Err(self.unexpected_token_is_next()),
-            _ => Ok(Stmt::new(StmtKind::Expr(self.parse_expr()?), source)),
+            TokenKind::ReturnKeyword => return self.parse_return(),
+            TokenKind::EndOfFile => return Err(self.unexpected_token_is_next()),
+            _ => (),
         }
+
+        let lhs = self.parse_expr_primary()?;
+
+        if self.input.peek().is_assignment_like() {
+            // Assignment-Like Statement
+            return self.parse_assignment(lhs);
+        }
+
+        let lhs = self.parse_operator_expr(0, lhs)?;
+
+        // Plain Expression Statement
+        Ok(StmtKind::Expr(lhs).at(source))
     }
 }

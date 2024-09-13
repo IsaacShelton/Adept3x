@@ -41,6 +41,10 @@ pub fn resolve_unary_operation_expr(
     let result_type = match unary_operation.operator {
         UnaryOperator::Not | UnaryOperator::IsNonZero => TypeKind::Boolean.at(source),
         UnaryOperator::BitComplement | UnaryOperator::Negate => resolved_expr.resolved_type.clone(),
+        UnaryOperator::AddressOf => {
+            TypeKind::Pointer(Box::new(resolved_expr.resolved_type.clone())).at(source)
+        }
+        UnaryOperator::Dereference => resolved_expr.resolved_type.clone(),
     };
 
     let expr = Expr::new(

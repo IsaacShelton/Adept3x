@@ -122,18 +122,24 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     }
                 }
             }
-            TokenKind::Not | TokenKind::BitComplement | TokenKind::Subtract => {
+            TokenKind::Not
+            | TokenKind::BitComplement
+            | TokenKind::Subtract
+            | TokenKind::AddressOf
+            | TokenKind::Dereference => {
                 let operator = match kind {
                     TokenKind::Not => UnaryOperator::Not,
                     TokenKind::BitComplement => UnaryOperator::BitComplement,
                     TokenKind::Subtract => UnaryOperator::Negate,
+                    TokenKind::AddressOf => UnaryOperator::AddressOf,
+                    TokenKind::Dereference => UnaryOperator::Dereference,
                     _ => unreachable!(),
                 };
 
                 // Eat unary operator
                 self.input.advance();
 
-                let inner = self.parse_expr()?;
+                let inner = self.parse_expr_primary()?;
 
                 Ok(Expr::new(
                     ExprKind::UnaryOperation(Box::new(UnaryOperation { operator, inner })),
