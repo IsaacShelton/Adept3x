@@ -1,0 +1,19 @@
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    message i32 = 0x41000041
+    printf(c"&message = %s\n", &message)
+
+    stair long = 0
+    stair_ptr ptr<long> = &stair
+    *stair_ptr = 1234
+    printf(c"*stair_ptr = %ld\n", *stair_ptr)
+
+    pi := 0.0
+    pi_ptr ptr<double> = &pi
+    *pi_ptr = 3.14159
+    printf(c"PI = %f\n", pi)
+}
+

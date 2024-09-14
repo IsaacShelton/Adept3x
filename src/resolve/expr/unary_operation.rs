@@ -3,6 +3,7 @@ use crate::{
     ast::{self, UnaryOperator},
     resolve::{
         conform::to_default::conform_integer_literal_to_default_or_error,
+        destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -25,7 +26,14 @@ pub fn resolve_unary_operation_expr(
 
     let operator = &unary_operation.operator;
 
-    if operator.is_address_of() || operator.is_dereference() {
+    if operator.is_address_of() {
+        let result_type = resolved_expr.resolved_type.clone().pointer(source);
+        let destination = resolve_expr_to_destination(resolved_expr)?;
+        let expr = Expr::new(ExprKind::AddressOf(Box::new(destination)), source);
+        return Ok(TypedExpr::new(result_type, expr));
+    }
+
+    if operator.is_dereference() {
         if resolved_expr.resolved_type.kind.is_ambiguous_type() {
             return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
                 operator: unary_operation.operator.to_string(),
@@ -34,20 +42,15 @@ pub fn resolve_unary_operation_expr(
             .at(source));
         }
 
-        let mut result_type = resolved_expr.resolved_type.clone();
-        if operator.is_dereference() {
-            if let TypeKind::Pointer(inner) = result_type.kind {
-                result_type = *inner;
-            } else {
-                return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
-                    operator: unary_operation.operator.to_string(),
-                    bad_type: resolved_expr.resolved_type.to_string(),
-                }
-                .at(source));
+        let result_type = if let TypeKind::Pointer(inner) = &resolved_expr.resolved_type.kind {
+            (**inner).clone()
+        } else {
+            return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
+                operator: unary_operation.operator.to_string(),
+                bad_type: resolved_expr.resolved_type.to_string(),
             }
-        } else if operator.is_address_of() {
-            result_type = TypeKind::Pointer(Box::new(result_type)).at(source);
-        }
+            .at(source));
+        };
 
         let expr = Expr::new(
             ExprKind::UnaryOperation(Box::new(UnaryOperation {
@@ -78,10 +81,9 @@ pub fn resolve_unary_operation_expr(
     let result_type = match unary_operation.operator {
         UnaryOperator::Not | UnaryOperator::IsNonZero => TypeKind::Boolean.at(source),
         UnaryOperator::BitComplement | UnaryOperator::Negate => resolved_expr.resolved_type.clone(),
-        UnaryOperator::AddressOf => {
-            TypeKind::Pointer(Box::new(resolved_expr.resolved_type.clone())).at(source)
+        UnaryOperator::Dereference | UnaryOperator::AddressOf => {
+            unreachable!("should've already handled address-of/dereference operators")
         }
-        UnaryOperator::Dereference => resolved_expr.resolved_type.clone(),
     };
 
     let expr = Expr::new(

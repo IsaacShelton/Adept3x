@@ -88,10 +88,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                             let ast_type = self.parse_type_from_parts(name, generics, source)?;
                             self.parse_structure_literal_with(ast_type)
                         } else {
-                            let next_three =
+                            let last_two =
                                 array_last::<2, 4, _>(self.input.peek_n()).map(|token| &token.kind);
 
-                            match &next_three[..] {
+                            match &last_two[..] {
                                 [TokenKind::Colon, ..]
                                 | [TokenKind::Identifier(_), TokenKind::Colon, ..] => {
                                     let ast_type =

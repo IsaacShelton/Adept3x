@@ -122,6 +122,12 @@ pub struct Type {
     pub source: Source,
 }
 
+impl Type {
+    pub fn pointer(self, source: Source) -> Self {
+        TypeKind::Pointer(Box::new(self)).at(source)
+    }
+}
+
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.kind, f)
@@ -418,6 +424,7 @@ pub enum ExprKind {
     Member(Box<Member>),
     StructureLiteral(Box<StructureLiteral>),
     UnaryOperation(Box<UnaryOperation>),
+    AddressOf(Box<Destination>),
     Conditional(Box<Conditional>),
     While(Box<While>),
     ArrayAccess(Box<ArrayAccess>),

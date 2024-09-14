@@ -51,6 +51,7 @@ compile nested_expressions
 compile object_mutation
 compile op_then_assign
 compile_module preprocessor_toggle
+compile pointers
 compile reference_counted
 compile return
 compile return_message

@@ -437,15 +437,13 @@ fn lower_destination(
                 index,
             }))
         }
-        DestinationKind::Dereference(pointer_lvalue) => {
-            let pointer_rvalue =
-                lower_expr(builder, ir_module, pointer_lvalue, function, resolved_ast)?;
-
-            let result_pointer_type =
-                lower_type(&ir_module.target, &destination.resolved_type, resolved_ast)?;
-
-            Ok(builder.push(ir::Instruction::Load((pointer_rvalue, result_pointer_type))))
-        }
+        DestinationKind::Dereference(lvalue) => Ok(lower_expr(
+            builder,
+            ir_module,
+            lvalue,
+            function,
+            resolved_ast,
+        )?),
     }
 }
 
@@ -756,11 +754,15 @@ fn lower_expr(
                 resolved::UnaryOperator::BitComplement => ir::Instruction::BitComplement(inner),
                 resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
                 resolved::UnaryOperator::IsNonZero => ir::Instruction::IsNonZero(inner),
-                resolved::UnaryOperator::AddressOf => {
-                    unimplemented!("address of operator");
-                }
+                resolved::UnaryOperator::AddressOf => unreachable!(),
                 resolved::UnaryOperator::Dereference => ir::Instruction::Load((inner, inner_type)),
             }))
+        }
+        ExprKind::AddressOf(destination) => {
+            let subject_pointer =
+                lower_destination(builder, ir_module, destination, function, resolved_ast)?;
+
+            Ok(subject_pointer)
         }
         ExprKind::Conditional(conditional) => {
             let resume_basicblock_id = builder.new_block();
