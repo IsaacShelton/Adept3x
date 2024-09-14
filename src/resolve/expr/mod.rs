@@ -16,6 +16,7 @@ use self::{
 };
 use super::{
     conform::{conform_expr_or_error, ConformMode},
+    destination::resolve_expr_to_destination,
     error::ResolveError,
     function_search_ctx::FunctionSearchCtx,
     global_search_ctx::GlobalSearchCtx,
@@ -24,7 +25,7 @@ use super::{
     Initialized,
 };
 use crate::{
-    ast::{self, CInteger, ConformBehavior},
+    ast::{self, CInteger, ConformBehavior, UnaryOperator},
     resolve::{
         ensure_initialized,
         error::ResolveErrorKind,
@@ -32,11 +33,11 @@ use crate::{
             call::resolve_call_expr, conditional::resolve_conditional_expr,
             declare_assign::resolve_declare_assign_expr, member_expr::resolve_member_expr,
             struct_literal::resolve_struct_literal_expr,
-            unary_operation::resolve_unary_operation_expr, variable::resolve_variable_expr,
+            unary_operation::resolve_unary_math_operation_expr, variable::resolve_variable_expr,
         },
         resolve_stmts, resolve_type,
     },
-    resolved::{self, FunctionRef, StructureRef, TypedExpr},
+    resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypedExpr},
 };
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
@@ -206,9 +207,27 @@ pub fn resolve_expr(
                 source,
             )
         }
-        ast::ExprKind::UnaryOperation(unary_operation) => {
-            resolve_unary_operation_expr(ctx, unary_operation, preferred_type, source)
-        }
+        ast::ExprKind::UnaryOperation(unary_operation) => match &unary_operation.operator {
+            UnaryOperator::Math(operator) => resolve_unary_math_operation_expr(
+                ctx,
+                operator,
+                &unary_operation.inner,
+                preferred_type,
+                source,
+            ),
+            UnaryOperator::AddressOf => {
+                let resolved_expr = resolve_expr(
+                    ctx,
+                    &unary_operation.inner,
+                    preferred_type,
+                    Initialized::Require,
+                )?;
+                let result_type = resolved_expr.resolved_type.clone().pointer(source);
+                let destination = resolve_expr_to_destination(resolved_expr)?;
+                let expr = Expr::new(ExprKind::AddressOf(Box::new(destination)), source);
+                return Ok(TypedExpr::new(result_type, expr));
+            }
+        },
         ast::ExprKind::Conditional(conditional) => {
             resolve_conditional_expr(ctx, conditional, preferred_type, source)
         }

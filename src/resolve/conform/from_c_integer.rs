@@ -3,8 +3,8 @@ use crate::{
     ast::{CInteger, IntegerBits, OptionIntegerSignExt},
     logic::implies,
     resolved::{
-        Cast, CastFrom, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryOperation,
-        UnaryOperator,
+        Cast, CastFrom, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryMathOperation,
+        UnaryMathOperator,
     },
     source_files::Source,
 };
@@ -52,8 +52,8 @@ fn from_c_integer_to_bool(
 
     Some(TypedExpr::new(
         TypeKind::Boolean.at(source),
-        ExprKind::UnaryOperation(Box::new(UnaryOperation {
-            operator: UnaryOperator::IsNonZero,
+        ExprKind::UnaryMathOperation(Box::new(UnaryMathOperation {
+            operator: UnaryMathOperator::IsNonZero,
             inner: expr.clone(),
         }))
         .at(source),

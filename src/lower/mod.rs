@@ -9,7 +9,8 @@ use crate::{
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, Member,
-        NumericMode, SignOrIndeterminate, StmtKind, StructureLiteral, VariableStorageKey,
+        NumericMode, SignOrIndeterminate, StmtKind, StructureLiteral, UnaryMathOperation,
+        VariableStorageKey,
     },
     tag::Tag,
     target::{Target, TargetOsExt},
@@ -734,29 +735,21 @@ fn lower_expr(
 
             Ok(builder.push(ir::Instruction::StructureLiteral(result_ir_type, values)))
         }
-        ExprKind::UnaryOperation(unary_operation) => {
-            let inner = lower_expr(
-                builder,
-                ir_module,
-                &unary_operation.inner.expr,
-                function,
-                resolved_ast,
-            )?;
+        ExprKind::UnaryMathOperation(operation) => {
+            let UnaryMathOperation { operator, inner } = &**operation;
 
-            let inner_type = lower_type(
-                ir_module.target,
-                &unary_operation.inner.resolved_type,
-                resolved_ast,
-            )?;
+            let ir_type = lower_type(ir_module.target, &inner.resolved_type, resolved_ast)?;
+            let value = lower_expr(builder, ir_module, &inner.expr, function, resolved_ast)?;
 
-            Ok(builder.push(match unary_operation.operator {
-                resolved::UnaryOperator::Not => ir::Instruction::IsZero(inner),
-                resolved::UnaryOperator::BitComplement => ir::Instruction::BitComplement(inner),
-                resolved::UnaryOperator::Negate => ir::Instruction::Negate(inner),
-                resolved::UnaryOperator::IsNonZero => ir::Instruction::IsNonZero(inner),
-                resolved::UnaryOperator::AddressOf => unreachable!(),
-                resolved::UnaryOperator::Dereference => ir::Instruction::Load((inner, inner_type)),
-            }))
+            let instruction = match operator {
+                resolved::UnaryMathOperator::Not => ir::Instruction::IsZero(value),
+                resolved::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
+                resolved::UnaryMathOperator::Negate => ir::Instruction::Negate(value),
+                resolved::UnaryMathOperator::IsNonZero => ir::Instruction::IsNonZero(value),
+                resolved::UnaryMathOperator::Dereference => ir::Instruction::Load((value, ir_type)),
+            };
+
+            Ok(builder.push(instruction))
         }
         ExprKind::AddressOf(destination) => {
             let subject_pointer =

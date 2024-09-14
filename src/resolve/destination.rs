@@ -24,7 +24,7 @@ pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination,
                 }
             }
             ExprKind::ArrayAccess(array_access) => DestinationKind::ArrayAccess(array_access),
-            ExprKind::UnaryOperation(unary_operation)
+            ExprKind::UnaryMathOperation(unary_operation)
                 if unary_operation.operator.is_dereference() =>
             {
                 DestinationKind::Dereference(unary_operation.inner.expr)

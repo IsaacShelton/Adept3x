@@ -6,7 +6,10 @@ mod structure_literal;
 
 use super::{super::error::ParseError, is_right_associative, is_terminating_token, Parser};
 use crate::{
-    ast::{Block, Conditional, Expr, ExprKind, Integer, UnaryOperation, UnaryOperator, While},
+    ast::{
+        Block, Conditional, Expr, ExprKind, Integer, UnaryMathOperator, UnaryOperation,
+        UnaryOperator, While,
+    },
     inflow::Inflow,
     parser::{array_last, error::ParseErrorKind},
     token::{StringLiteral, StringModifier, Token, TokenKind},
@@ -119,29 +122,50 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     }
                 }
             }
-            TokenKind::Not
-            | TokenKind::BitComplement
-            | TokenKind::Subtract
-            | TokenKind::AddressOf
-            | TokenKind::Dereference => {
-                let operator = match kind {
-                    TokenKind::Not => UnaryOperator::Not,
-                    TokenKind::BitComplement => UnaryOperator::BitComplement,
-                    TokenKind::Subtract => UnaryOperator::Negate,
-                    TokenKind::AddressOf => UnaryOperator::AddressOf,
-                    TokenKind::Dereference => UnaryOperator::Dereference,
-                    _ => unreachable!(),
-                };
-
-                // Eat unary operator
+            TokenKind::Not => {
                 self.input.advance();
 
-                let inner = self.parse_expr_primary()?;
+                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
+                    UnaryMathOperator::Not,
+                    self.parse_expr_primary()?,
+                )))
+                .at(source))
+            }
+            TokenKind::BitComplement => {
+                self.input.advance();
 
-                Ok(Expr::new(
-                    ExprKind::UnaryOperation(Box::new(UnaryOperation { operator, inner })),
-                    source,
-                ))
+                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
+                    UnaryMathOperator::BitComplement,
+                    self.parse_expr_primary()?,
+                )))
+                .at(source))
+            }
+            TokenKind::Subtract => {
+                self.input.advance();
+
+                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
+                    UnaryMathOperator::Negate,
+                    self.parse_expr_primary()?,
+                )))
+                .at(source))
+            }
+            TokenKind::AddressOf => {
+                self.input.advance();
+
+                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new(
+                    UnaryOperator::AddressOf,
+                    self.parse_expr_primary()?,
+                )))
+                .at(source))
+            }
+            TokenKind::Dereference => {
+                self.input.advance();
+
+                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
+                    UnaryMathOperator::Dereference,
+                    self.parse_expr_primary()?,
+                )))
+                .at(source))
             }
             TokenKind::IfKeyword => {
                 self.input.advance().kind.unwrap_if_keyword();

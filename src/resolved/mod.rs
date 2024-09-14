@@ -3,7 +3,7 @@ mod variable_storage;
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{
     CInteger, EnumMember, EnumMemberLiteral, FloatSize, IntegerBits, IntegerKnown, IntegerSign,
-    ShortCircuitingBinaryOperator, UnaryOperator,
+    ShortCircuitingBinaryOperator, UnaryMathOperator,
 };
 use crate::{
     ast::fmt_c_integer,
@@ -423,7 +423,7 @@ pub enum ExprKind {
     FloatExtend(Box<Cast>),
     Member(Box<Member>),
     StructureLiteral(Box<StructureLiteral>),
-    UnaryOperation(Box<UnaryOperation>),
+    UnaryMathOperation(Box<UnaryMathOperation>),
     AddressOf(Box<Destination>),
     Conditional(Box<Conditional>),
     While(Box<While>),
@@ -657,8 +657,8 @@ pub struct ShortCircuitingBinaryOperation {
 }
 
 #[derive(Clone, Debug)]
-pub struct UnaryOperation {
-    pub operator: UnaryOperator,
+pub struct UnaryMathOperation {
+    pub operator: UnaryMathOperator,
     pub inner: TypedExpr,
 }
 
