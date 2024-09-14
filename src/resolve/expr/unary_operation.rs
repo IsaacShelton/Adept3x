@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, UnaryMathOperator},
     resolve::{
-        conform::to_default::conform_integer_literal_to_default_or_error,
+        conform::to_default::conform_expr_to_default,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -17,70 +17,32 @@ pub fn resolve_unary_math_operation_expr(
     preferred_type: Option<PreferredType>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_expr = resolve_expr(ctx, inner, preferred_type, Initialized::Require)?;
+    let resolved_expr = resolve_expr(ctx, inner, preferred_type, Initialized::Require)
+        .and_then(conform_expr_to_default)?;
 
-    if operator.is_dereference() {
-        if resolved_expr.resolved_type.kind.is_ambiguous_type() {
-            return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
-                operator: operator.to_string(),
-                bad_type: resolved_expr.resolved_type.to_string(),
-            }
-            .at(source));
+    if resolved_expr.resolved_type.is_ambiguous() {
+        return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
+            operator: operator.to_string(),
+            bad_type: resolved_expr.resolved_type.to_string(),
         }
-
-        let result_type = if let TypeKind::Pointer(inner) = &resolved_expr.resolved_type.kind {
-            (**inner).clone()
-        } else {
-            return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
-                operator: operator.to_string(),
-                bad_type: resolved_expr.resolved_type.to_string(),
-            }
-            .at(source));
-        };
-
-        let expr = Expr::new(
-            ExprKind::UnaryMathOperation(Box::new(UnaryMathOperation {
-                operator: operator.clone(),
-                inner: resolved_expr,
-            })),
-            source,
-        );
-
-        return Ok(TypedExpr::new(result_type, expr));
+        .at(source));
     }
-
-    let resolved_expr = match &resolved_expr.resolved_type.kind {
-        TypeKind::Boolean => resolved_expr,
-        TypeKind::Integer(..) => resolved_expr,
-        TypeKind::IntegerLiteral(value) => {
-            conform_integer_literal_to_default_or_error(value, resolved_expr.expr.source)?
-        }
-        _ => {
-            return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
-                operator: operator.to_string(),
-                bad_type: resolved_expr.resolved_type.to_string(),
-            }
-            .at(source));
-        }
-    };
 
     let result_type = match operator {
         UnaryMathOperator::Not | UnaryMathOperator::IsNonZero => TypeKind::Boolean.at(source),
         UnaryMathOperator::BitComplement | UnaryMathOperator::Negate => {
             resolved_expr.resolved_type.clone()
         }
-        UnaryMathOperator::Dereference => {
-            unreachable!("should've already handled address-of/dereference operators")
-        }
     };
 
-    let expr = Expr::new(
-        ExprKind::UnaryMathOperation(Box::new(UnaryMathOperation {
-            operator: operator.clone(),
-            inner: resolved_expr,
-        })),
-        source,
-    );
-
-    Ok(TypedExpr::new(result_type, expr))
+    Ok(TypedExpr::new(
+        result_type,
+        Expr::new(
+            ExprKind::UnaryMathOperation(Box::new(UnaryMathOperation {
+                operator: operator.clone(),
+                inner: resolved_expr,
+            })),
+            source,
+        ),
+    ))
 }

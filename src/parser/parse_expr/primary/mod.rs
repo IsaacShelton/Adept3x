@@ -161,8 +161,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::Dereference => {
                 self.input.advance();
 
-                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
-                    UnaryMathOperator::Dereference,
+                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new(
+                    UnaryOperator::Dereference,
                     self.parse_expr_primary()?,
                 )))
                 .at(source))

@@ -126,6 +126,10 @@ impl Type {
     pub fn pointer(self, source: Source) -> Self {
         TypeKind::Pointer(Box::new(self)).at(source)
     }
+
+    pub fn is_ambiguous(&self) -> bool {
+        self.kind.is_ambiguous()
+    }
 }
 
 impl Display for Type {
@@ -214,7 +218,7 @@ impl TypeKind {
         )
     }
 
-    pub fn is_ambiguous_type(&self) -> bool {
+    pub fn is_ambiguous(&self) -> bool {
         self.is_integer_literal()
     }
 }
@@ -424,6 +428,7 @@ pub enum ExprKind {
     Member(Box<Member>),
     StructureLiteral(Box<StructureLiteral>),
     UnaryMathOperation(Box<UnaryMathOperation>),
+    Dereference(Box<TypedExpr>),
     AddressOf(Box<Destination>),
     Conditional(Box<Conditional>),
     While(Box<While>),

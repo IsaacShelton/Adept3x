@@ -737,8 +737,6 @@ fn lower_expr(
         }
         ExprKind::UnaryMathOperation(operation) => {
             let UnaryMathOperation { operator, inner } = &**operation;
-
-            let ir_type = lower_type(ir_module.target, &inner.resolved_type, resolved_ast)?;
             let value = lower_expr(builder, ir_module, &inner.expr, function, resolved_ast)?;
 
             let instruction = match operator {
@@ -746,16 +744,21 @@ fn lower_expr(
                 resolved::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
                 resolved::UnaryMathOperator::Negate => ir::Instruction::Negate(value),
                 resolved::UnaryMathOperator::IsNonZero => ir::Instruction::IsNonZero(value),
-                resolved::UnaryMathOperator::Dereference => ir::Instruction::Load((value, ir_type)),
             };
 
             Ok(builder.push(instruction))
         }
-        ExprKind::AddressOf(destination) => {
-            let subject_pointer =
-                lower_destination(builder, ir_module, destination, function, resolved_ast)?;
-
-            Ok(subject_pointer)
+        ExprKind::AddressOf(destination) => Ok(lower_destination(
+            builder,
+            ir_module,
+            destination,
+            function,
+            resolved_ast,
+        )?),
+        ExprKind::Dereference(subject) => {
+            let ir_type = lower_type(ir_module.target, &subject.resolved_type, resolved_ast)?;
+            let value = lower_expr(builder, ir_module, &subject.expr, function, resolved_ast)?;
+            Ok(builder.push(ir::Instruction::Load((value, ir_type))))
         }
         ExprKind::Conditional(conditional) => {
             let resume_basicblock_id = builder.new_block();

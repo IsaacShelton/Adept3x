@@ -4,6 +4,13 @@ use crate::ast::Expr;
 pub use math::*;
 
 #[derive(Clone, Debug)]
+pub enum UnaryOperator {
+    Math(UnaryMathOperator),
+    AddressOf,
+    Dereference,
+}
+
+#[derive(Clone, Debug)]
 pub struct UnaryOperation {
     pub operator: UnaryOperator,
     pub inner: Expr,
@@ -20,10 +27,4 @@ impl UnaryOperation {
             inner,
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum UnaryOperator {
-    Math(UnaryMathOperator),
-    AddressOf,
 }

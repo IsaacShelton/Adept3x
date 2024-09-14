@@ -37,7 +37,7 @@ use crate::{
         },
         resolve_stmts, resolve_type,
     },
-    resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypedExpr},
+    resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr},
 };
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
@@ -226,6 +226,34 @@ pub fn resolve_expr(
                 let destination = resolve_expr_to_destination(resolved_expr)?;
                 let expr = Expr::new(ExprKind::AddressOf(Box::new(destination)), source);
                 return Ok(TypedExpr::new(result_type, expr));
+            }
+            UnaryOperator::Dereference => {
+                let resolved_expr = resolve_expr(
+                    ctx,
+                    &unary_operation.inner,
+                    preferred_type,
+                    Initialized::Require,
+                )?;
+
+                let result_type = match &resolved_expr.resolved_type.kind {
+                    TypeKind::Pointer(inner)
+                        if !resolved_expr.resolved_type.kind.is_ambiguous() =>
+                    {
+                        (**inner).clone()
+                    }
+                    _ => {
+                        return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
+                            operator: "(dereference) *".into(),
+                            bad_type: resolved_expr.resolved_type.to_string(),
+                        }
+                        .at(source));
+                    }
+                };
+
+                return Ok(TypedExpr::new(
+                    result_type,
+                    Expr::new(ExprKind::Dereference(Box::new(resolved_expr)), source),
+                ));
             }
         },
         ast::ExprKind::Conditional(conditional) => {
