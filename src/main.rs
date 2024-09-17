@@ -16,6 +16,7 @@ mod compiler;
 mod data_units;
 mod diagnostics;
 mod generate_workspace;
+mod ident;
 mod index_map_ext;
 mod inflow;
 mod interpreter;

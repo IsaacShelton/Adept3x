@@ -312,6 +312,10 @@ impl<T: Text + Send> Lexer<T> {
                 state.identifier.push(self.characters.next().unwrap().0);
                 Waiting
             }
+            Character::At('/', _) if self.characters.peek_nth(1).is_alphabetic() => {
+                state.identifier.push(self.characters.next().unwrap().0);
+                Waiting
+            }
             Character::At('<', _)
                 if matches!(state.identifier.as_str(), "struct" | "union" | "enum") =>
             {

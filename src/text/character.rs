@@ -48,6 +48,14 @@ impl Character {
     }
 
     #[inline]
+    pub fn is_alphabetic(&self) -> bool {
+        match self {
+            Character::At(c, _) => c.is_alphabetic(),
+            Character::End(_) => false,
+        }
+    }
+
+    #[inline]
     pub fn is_c_non_digit(&self) -> bool {
         // NOTE: We support the extension of using '$' in identifier/non-digit character
         match self {
