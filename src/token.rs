@@ -46,12 +46,19 @@ pub struct StringLiteral {
     pub modifier: StringModifier,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NamespacedIndentifier {
+    pub namespace: String,
+    pub basename: String,
+}
+
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum TokenKind {
     EndOfFile,
     Error(String),
     Newline,
     Identifier(String),
+    NamespacedIdentifier(NamespacedIndentifier),
     OpenCurly,
     CloseCurly,
     OpenParen,
@@ -135,6 +142,7 @@ impl Display for TokenKind {
             TokenKind::Error(message) => write!(f, "'lex error - {}'", message),
             TokenKind::Newline => f.write_str("'newline'"),
             TokenKind::Identifier(_) => f.write_str("'identifier'"),
+            TokenKind::NamespacedIdentifier(_) => f.write_str("'namespaced identifier'"),
             TokenKind::OpenCurly => f.write_str("'{'"),
             TokenKind::CloseCurly => f.write_str("'}'"),
             TokenKind::OpenParen => f.write_str("'('"),
@@ -262,6 +270,7 @@ impl TokenKind {
             | TokenKind::Error(_)
             | TokenKind::Newline
             | TokenKind::Identifier(_)
+            | TokenKind::NamespacedIdentifier(_)
             | TokenKind::CloseCurly
             | TokenKind::OpenParen
             | TokenKind::CloseParen

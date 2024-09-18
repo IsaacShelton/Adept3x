@@ -1,16 +1,28 @@
 use crate::{
     source_files::Source,
-    token::{Token, TokenKind},
+    token::{NamespacedIndentifier, Token, TokenKind},
 };
 
 pub struct IdentifierState {
     pub identifier: String,
     pub start_source: Source,
+    pub last_slash: Option<usize>,
 }
 
 impl IdentifierState {
     pub fn finalize(&mut self) -> Token {
-        let identifier = std::mem::take(&mut self.identifier);
+        let mut identifier = std::mem::take(&mut self.identifier);
+
+        if let Some(last_slash) = self.last_slash {
+            let basename = identifier.split_off(last_slash + 1);
+            let namespace = identifier;
+
+            return TokenKind::NamespacedIdentifier(NamespacedIndentifier {
+                namespace,
+                basename,
+            })
+            .at(self.start_source);
+        }
 
         match identifier.as_str() {
             "func" => TokenKind::FuncKeyword,

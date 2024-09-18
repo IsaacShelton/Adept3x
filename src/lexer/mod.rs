@@ -295,6 +295,7 @@ impl<T: Text + Send> Lexer<T> {
                 self.state = State::Identifier(IdentifierState {
                     identifier: String::from(c),
                     start_source: source,
+                    last_slash: None,
                 });
                 Waiting
             }
@@ -313,6 +314,7 @@ impl<T: Text + Send> Lexer<T> {
                 Waiting
             }
             Character::At('/', _) if self.characters.peek_nth(1).is_alphabetic() => {
+                state.last_slash = Some(state.identifier.len());
                 state.identifier.push(self.characters.next().unwrap().0);
                 Waiting
             }
