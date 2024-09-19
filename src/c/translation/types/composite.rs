@@ -6,6 +6,7 @@ use crate::{
         MemberDeclaration, MemberDeclarator, ParseError,
     },
     diagnostics::Diagnostics,
+    name::Name,
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
@@ -30,8 +31,8 @@ pub fn make_composite(
         })?;
 
         return Ok(match &composite.kind {
-            CompositeKind::Struct => TypeKind::Named(format!("struct<{}>", name)),
-            CompositeKind::Union => TypeKind::Named(format!("union<{}>", name)),
+            CompositeKind::Struct => TypeKind::Named(Name::plain(format!("struct<{}>", name))),
+            CompositeKind::Union => TypeKind::Named(Name::plain(format!("union<{}>", name))),
         });
     };
 
@@ -98,7 +99,7 @@ pub fn make_composite(
                     source: composite.source,
                 });
 
-                Ok(TypeKind::Named(name))
+                Ok(TypeKind::Named(Name::plain(name)))
             } else {
                 let anonymous_struct = AnonymousStruct { fields, is_packed };
 

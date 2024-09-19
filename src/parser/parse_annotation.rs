@@ -19,13 +19,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let (annotation_name, source) =
             self.parse_identifier_keep_location(Some("for annotation name"))?;
 
-        self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
-
-        Ok(match annotation_name.as_str() {
+        let annotation = match annotation_name.as_str() {
             "foreign" => AnnotationKind::Foreign,
             "thread_local" => AnnotationKind::ThreadLocal,
             "packed" => AnnotationKind::Packed,
             "abide_abi" => AnnotationKind::AbideAbi,
+            "namespace" => {
+                let namespace = self.parse_identifier(Some("for namespace name"))?;
+                AnnotationKind::Namespace(namespace)
+            }
             _ => {
                 return Err(ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,
@@ -33,6 +35,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 .at(source))
             }
         }
-        .at(source))
+        .at(source);
+
+        self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
+        Ok(annotation)
     }
 }

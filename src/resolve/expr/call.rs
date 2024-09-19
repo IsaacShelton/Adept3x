@@ -1,6 +1,7 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior},
+    name::ResolvedName,
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode},
         error::{ResolveError, ResolveErrorKind},
@@ -22,9 +23,14 @@ pub fn resolve_call_expr(
         .at(source));
     }
 
-    let function_ref = ctx
-        .function_search_ctx
-        .find_function_or_error(&call.function_name, source)?;
+    let resolved_name = ResolvedName::Project(call.function_name.basename.clone().into_boxed_str());
+
+    let Some(function_ref) = ctx.function_search_ctx.find_function(&resolved_name) else {
+        return Err(ResolveErrorKind::FailedToFindFunction {
+            name: call.function_name.to_string(),
+        }
+        .at(source));
+    };
 
     let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
     let return_type = function.return_type.clone();

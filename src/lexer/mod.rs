@@ -269,7 +269,7 @@ impl<T: Text + Send> Lexer<T> {
             }
             ',' => Has(TokenKind::Comma.at(source)),
             ':' if self.characters.eat('=') => Has(TokenKind::DeclareAssign.at(source)),
-            ':' if self.characters.eat(':') => Has(TokenKind::Namespace.at(source)),
+            ':' if self.characters.eat(':') => Has(TokenKind::StaticMember.at(source)),
             ':' => Has(TokenKind::Colon.at(source)),
             '#' => Has(TokenKind::Hash.at(source)),
             '\"' => {

@@ -5,6 +5,7 @@ use super::{
 use crate::{
     ast::{CompileTimeArgument, Type, TypeKind},
     inflow::Inflow,
+    name::Name,
     source_files::Source,
     token::{Token, TokenKind},
 };
@@ -16,9 +17,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         for_reason: Option<impl ToString>,
     ) -> Result<Type, ParseError> {
         let source = self.input.peek().source;
-        let token = self.input.advance();
+        let token = self.input.peek().clone();
 
-        let TokenKind::Identifier(identifier) = token.kind else {
+        let Ok(name) = self.parse_name(None::<&str>) else {
             return Err(ParseError {
                 kind: ParseErrorKind::ExpectedType {
                     prefix: prefix.map(|prefix| prefix.to_string()),
@@ -30,7 +31,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         };
 
         let generics = self.parse_generics()?;
-        self.parse_type_from_parts(identifier, generics, source)
+        self.parse_type_from_parts(name, generics, source)
     }
 
     pub fn parse_generics(&mut self) -> Result<Vec<CompileTimeArgument>, ParseError> {
@@ -67,42 +68,42 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
     pub fn parse_type_from_parts(
         &mut self,
-        identifier: String,
+        name: Name,
         generics: Vec<CompileTimeArgument>,
         source: Source,
     ) -> Result<Type, ParseError> {
-        let type_kind = match identifier.as_str() {
-            "bool" => Ok(TypeKind::Boolean),
-            "char" => Ok(TypeKind::char()),
-            "schar" => Ok(TypeKind::schar()),
-            "uchar" => Ok(TypeKind::uchar()),
-            "short" => Ok(TypeKind::short()),
-            "ushort" => Ok(TypeKind::ushort()),
-            "int" => Ok(TypeKind::int()),
-            "uint" => Ok(TypeKind::uint()),
-            "long" => Ok(TypeKind::long()),
-            "ulong" => Ok(TypeKind::ulong()),
-            "longlong" => Ok(TypeKind::longlong()),
-            "ulonglong" => Ok(TypeKind::ulonglong()),
-            "i8" => Ok(TypeKind::i8()),
-            "u8" => Ok(TypeKind::u8()),
-            "i16" => Ok(TypeKind::i16()),
-            "u16" => Ok(TypeKind::u16()),
-            "i32" => Ok(TypeKind::i32()),
-            "u32" => Ok(TypeKind::u32()),
-            "i64" => Ok(TypeKind::i64()),
-            "u64" => Ok(TypeKind::u64()),
-            "f32" | "float" => Ok(TypeKind::f32()),
-            "f64" | "double" => Ok(TypeKind::f64()),
-            "void" => Ok(TypeKind::Void),
-            "ptr" => {
+        let type_kind = match name.as_plain_str() {
+            Some("bool") => Ok(TypeKind::Boolean),
+            Some("char") => Ok(TypeKind::char()),
+            Some("schar") => Ok(TypeKind::schar()),
+            Some("uchar") => Ok(TypeKind::uchar()),
+            Some("short") => Ok(TypeKind::short()),
+            Some("ushort") => Ok(TypeKind::ushort()),
+            Some("int") => Ok(TypeKind::int()),
+            Some("uint") => Ok(TypeKind::uint()),
+            Some("long") => Ok(TypeKind::long()),
+            Some("ulong") => Ok(TypeKind::ulong()),
+            Some("longlong") => Ok(TypeKind::longlong()),
+            Some("ulonglong") => Ok(TypeKind::ulonglong()),
+            Some("i8") => Ok(TypeKind::i8()),
+            Some("u8") => Ok(TypeKind::u8()),
+            Some("i16") => Ok(TypeKind::i16()),
+            Some("u16") => Ok(TypeKind::u16()),
+            Some("i32") => Ok(TypeKind::i32()),
+            Some("u32") => Ok(TypeKind::u32()),
+            Some("i64") => Ok(TypeKind::i64()),
+            Some("u64") => Ok(TypeKind::u64()),
+            Some("f32" | "float") => Ok(TypeKind::f32()),
+            Some("f64" | "double") => Ok(TypeKind::f64()),
+            Some("void") => Ok(TypeKind::Void),
+            Some("ptr") => {
                 if generics.len() == 1 {
                     if let CompileTimeArgument::Type(inner) = generics.into_iter().next().unwrap() {
                         Ok(TypeKind::Pointer(Box::new(inner)))
                     } else {
                         Err(ParseError {
                             kind: ParseErrorKind::ExpectedTypeParameterToBeAType {
-                                name: identifier,
+                                name: name.to_string(),
                                 word_for_nth: "first".into(),
                             },
                             source,
@@ -111,7 +112,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 } else {
                     Err(ParseError {
                         kind: ParseErrorKind::IncorrectNumberOfTypeParametersFor {
-                            name: identifier,
+                            name: name.to_string(),
                             expected: 1,
                             got: generics.len(),
                         },
@@ -119,7 +120,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     })
                 }
             }
-            "array" => {
+            Some("array") => {
                 // TODO: Update fixed array type to use compile time arguments
                 todo!("array<$N, $T> not updated yet to use compile time arguments");
 
@@ -128,7 +129,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 //     count,
                 // })))
             }
-            identifier => Ok(TypeKind::Named(identifier.into())),
+            _ => Ok(TypeKind::Named(name)),
         }?;
 
         Ok(Type::new(type_kind, source))

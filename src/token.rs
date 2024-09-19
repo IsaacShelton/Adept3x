@@ -1,4 +1,4 @@
-use crate::{inflow::InflowEnd, source_files::Source};
+use crate::{inflow::InflowEnd, name::Name, source_files::Source};
 use derivative::Derivative;
 use derive_more::{Deref, IsVariant, Unwrap};
 use num_bigint::BigInt;
@@ -46,19 +46,13 @@ pub struct StringLiteral {
     pub modifier: StringModifier,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct NamespacedIndentifier {
-    pub namespace: String,
-    pub basename: String,
-}
-
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum TokenKind {
     EndOfFile,
     Error(String),
     Newline,
     Identifier(String),
-    NamespacedIdentifier(NamespacedIndentifier),
+    NamespacedIdentifier(Name),
     OpenCurly,
     CloseCurly,
     OpenParen,
@@ -130,7 +124,7 @@ pub enum TokenKind {
     LogicalRightShift,
     Increment,
     Decrement,
-    Namespace,
+    StaticMember,
     Extend,
     FatArrow,
 }
@@ -141,8 +135,12 @@ impl Display for TokenKind {
             TokenKind::EndOfFile => f.write_str("end-of-file"),
             TokenKind::Error(message) => write!(f, "'lex error - {}'", message),
             TokenKind::Newline => f.write_str("'newline'"),
-            TokenKind::Identifier(_) => f.write_str("'identifier'"),
-            TokenKind::NamespacedIdentifier(_) => f.write_str("'namespaced identifier'"),
+            TokenKind::Identifier(name) => write!(f, "(identifier) '{}'", name),
+            TokenKind::NamespacedIdentifier(name) => write!(
+                f,
+                "(namespaced identifier) '{}{}'",
+                name.namespace, name.basename,
+            ),
             TokenKind::OpenCurly => f.write_str("'{'"),
             TokenKind::CloseCurly => f.write_str("'}'"),
             TokenKind::OpenParen => f.write_str("'('"),
@@ -214,7 +212,7 @@ impl Display for TokenKind {
             TokenKind::LogicalRightShift => f.write_str("'>>>'"),
             TokenKind::Increment => f.write_str("'++'"),
             TokenKind::Decrement => f.write_str("'--'"),
-            TokenKind::Namespace => f.write_str("'::'"),
+            TokenKind::StaticMember => f.write_str("'::'"),
             TokenKind::Extend => f.write_str("'..'"),
             TokenKind::FatArrow => f.write_str("'=>'"),
         }
@@ -301,7 +299,7 @@ impl TokenKind {
             | TokenKind::Ellipsis
             | TokenKind::AddressOf
             | TokenKind::Dereference
-            | TokenKind::Namespace
+            | TokenKind::StaticMember
             | TokenKind::Extend
             | TokenKind::FatArrow => 0,
         }

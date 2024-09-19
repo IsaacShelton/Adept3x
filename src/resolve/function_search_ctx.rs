@@ -1,10 +1,9 @@
-use super::error::{ResolveError, ResolveErrorKind};
-use crate::{resolved, source_files::Source};
+use crate::{name::ResolvedName, resolved};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FunctionSearchCtx {
-    pub available: HashMap<String, Vec<resolved::FunctionRef>>,
+    pub available: HashMap<ResolvedName, Vec<resolved::FunctionRef>>,
 }
 
 impl FunctionSearchCtx {
@@ -14,21 +13,7 @@ impl FunctionSearchCtx {
         }
     }
 
-    pub fn find_function_or_error(
-        &self,
-        name: &str,
-        source: Source,
-    ) -> Result<resolved::FunctionRef, ResolveError> {
-        match self.find_function(name) {
-            Some(function) => Ok(function),
-            None => Err(ResolveErrorKind::FailedToFindFunction {
-                name: name.to_string(),
-            }
-            .at(source)),
-        }
-    }
-
-    pub fn find_function(&self, name: &str) -> Option<resolved::FunctionRef> {
+    pub fn find_function(&self, name: &ResolvedName) -> Option<resolved::FunctionRef> {
         self.available
             .get(name)
             .and_then(|list| list.first())

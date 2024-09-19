@@ -16,7 +16,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         // EnumName::EnumVariant
         //    ^
 
-        self.parse_token(TokenKind::Namespace, Some("for enum member literal"))?;
+        self.parse_token(TokenKind::StaticMember, Some("for enum member literal"))?;
 
         let variant_source = self.source_here();
         let variant_name = self

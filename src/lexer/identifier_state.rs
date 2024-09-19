@@ -1,6 +1,7 @@
 use crate::{
+    name::Name,
     source_files::Source,
-    token::{NamespacedIndentifier, Token, TokenKind},
+    token::{Token, TokenKind},
 };
 
 pub struct IdentifierState {
@@ -17,7 +18,7 @@ impl IdentifierState {
             let basename = identifier.split_off(last_slash + 1);
             let namespace = identifier;
 
-            return TokenKind::NamespacedIdentifier(NamespacedIndentifier {
+            return TokenKind::NamespacedIdentifier(Name {
                 namespace,
                 basename,
             })

@@ -8,6 +8,7 @@ use crate::{
         Interpreter, InterpreterError,
     },
     ir::{self, InterpreterSyscallKind},
+    name::Name,
     resolved,
     source_files::Source,
     tag::Tag,
@@ -56,7 +57,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     // Call to function we actually care about
     let call = ExprKind::Call(Box::new(Call {
-        function_name: "main".into(),
+        function_name: Name::plain("main"),
         arguments: vec![],
         expected_to_return: Some(void.clone()),
         generics: vec![],
@@ -103,7 +104,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         fields: IndexMap::from_iter([(
             "kind".into(),
             Field {
-                ast_type: TypeKind::Named("ProjectKind".into()).at(source),
+                ast_type: TypeKind::Named(Name::plain("ProjectKind")).at(source),
                 privacy: Privacy::Public,
                 source,
             },
@@ -149,7 +150,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                 Parameter::new("name".into(), ptr_char.clone()),
                 Parameter::new(
                     "project".into(),
-                    TypeKind::Named("Project".into()).at(source),
+                    TypeKind::Named(Name::plain("Project")).at(source),
                 ),
             ],
             is_cstyle_vararg: false,
@@ -164,7 +165,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                         ExprKind::Variable("name".into()).at(source),
                     ),
                     (
-                        TypeKind::Named("ProjectKind".into()).at(source),
+                        TypeKind::Named(Name::plain("ProjectKind")).at(source),
                         ExprKind::Member(
                             Box::new(ExprKind::Variable("project".into()).at(source)),
                             "kind".into(),

@@ -1,6 +1,10 @@
-use super::{error::ParseError, Parser};
+use super::{
+    error::{ParseError, ParseErrorKind},
+    Parser,
+};
 use crate::{
     inflow::Inflow,
+    name::Name,
     source_files::Source,
     token::{Token, TokenKind},
 };
@@ -42,9 +46,27 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
     }
 
+    pub fn parse_name(&mut self, for_reason: Option<impl ToString>) -> Result<Name, ParseError> {
+        let token = self.input.advance();
+
+        match token.kind {
+            TokenKind::NamespacedIdentifier(name) => Ok(name),
+            TokenKind::Identifier(basename) => Ok(Name {
+                namespace: "".into(),
+                basename,
+            }),
+            _ => Err(ParseError::expected("identifier", for_reason, token)),
+        }
+    }
+
     pub fn ignore_newlines(&mut self) {
         while self.input.peek().kind.is_newline() {
             self.input.advance();
         }
     }
+}
+
+pub fn into_plain_name(name: Name, source: Source) -> Result<String, ParseError> {
+    name.into_plain()
+        .ok_or_else(|| ParseErrorKind::NamespaceNotAllowedHere.at(source))
 }

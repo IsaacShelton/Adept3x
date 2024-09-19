@@ -2,6 +2,7 @@ use super::Parser;
 use crate::{
     ast::{Call, CompileTimeArgument, Expr, ExprKind},
     inflow::Inflow,
+    name::Name,
     parser::error::ParseError,
     source_files::Source,
     token::{Token, TokenKind},
@@ -10,7 +11,7 @@ use crate::{
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call(
         &mut self,
-        function_name: String,
+        function_name: Name,
         generics: Vec<CompileTimeArgument>,
         source: Source,
     ) -> Result<Expr, ParseError> {
@@ -22,7 +23,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
     pub fn parse_call_with(
         &mut self,
-        function_name: String,
+        function_name: Name,
         generics: Vec<CompileTimeArgument>,
         prefix_args: Vec<Expr>,
         source: Source,

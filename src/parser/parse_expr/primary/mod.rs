@@ -11,7 +11,7 @@ use crate::{
         UnaryOperator, While,
     },
     inflow::Inflow,
-    parser::{array_last, error::ParseErrorKind},
+    parser::{array_last, error::ParseErrorKind, parse_util::into_plain_name},
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
 use std::ffi::CString;
@@ -69,19 +69,20 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::StructKeyword | TokenKind::UnionKeyword | TokenKind::EnumKeyword => {
                 self.parse_structure_literal()
             }
-            TokenKind::Identifier(_) => {
+            TokenKind::Identifier(_) | TokenKind::NamespacedIdentifier(_) => {
                 // TODO: CLEANUP: This should be cleaned up once we have proper
                 // namespaces and generic parsing that applies to all cases
 
-                let name = self.input.eat_identifier().unwrap();
+                let name = self.parse_name(None::<&str>).unwrap();
                 let generics = self.parse_generics()?;
 
                 match self.input.peek().kind {
-                    TokenKind::Namespace => {
+                    TokenKind::StaticMember => {
                         if !generics.is_empty() {
                             return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
                         }
 
+                        let name = into_plain_name(name, source)?;
                         self.parse_enum_member_literal(name, source)
                     }
                     TokenKind::OpenCurly => {
@@ -101,7 +102,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                                         self.parse_type_from_parts(name, generics, source)?;
                                     self.parse_structure_literal_with(ast_type)
                                 }
-                                _ => Ok(Expr::new(ExprKind::Variable(name), source)),
+                                _ => Ok(Expr::new(
+                                    ExprKind::Variable(into_plain_name(name, source)?),
+                                    source,
+                                )),
                             }
                         }
                     }
@@ -111,14 +115,17 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                             return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
                         }
 
-                        self.parse_declare_assign(name, source)
+                        self.parse_declare_assign(into_plain_name(name, source)?, source)
                     }
                     _ => {
                         if !generics.is_empty() {
                             return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
                         }
 
-                        Ok(Expr::new(ExprKind::Variable(name), source))
+                        Ok(Expr::new(
+                            ExprKind::Variable(into_plain_name(name, source)?),
+                            source,
+                        ))
                     }
                 }
             }

@@ -84,6 +84,7 @@ pub enum ParseErrorKind {
         word_for_nth: String,
     },
     GenericsNotSupportedHere,
+    NamespaceNotAllowedHere,
     Other {
         message: String,
     },
@@ -206,6 +207,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::GenericsNotSupportedHere => {
                 write!(f, "Generics not supported here")?;
+            }
+            ParseErrorKind::NamespaceNotAllowedHere => {
+                write!(f, "Namespace not allowed here")?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;

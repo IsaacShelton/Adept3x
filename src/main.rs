@@ -30,6 +30,7 @@ mod llvm_backend;
 mod logic;
 mod look_ahead;
 mod lower;
+mod name;
 mod parser;
 mod path;
 mod pragma_section;

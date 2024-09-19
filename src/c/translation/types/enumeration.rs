@@ -5,6 +5,7 @@ use crate::{
         translation::eval::evaluate_to_const_integer,
     },
     index_map_ext::IndexMapExt,
+    name::Name,
 };
 use indexmap::IndexMap;
 use num_bigint::BigInt;
@@ -91,7 +92,10 @@ pub fn make_anonymous_enum(
                 todo!("support enum type specifiers")
             }
 
-            Ok(TypeKind::Named(format!("enum<{}>", named.name)))
+            Ok(TypeKind::Named(Name::plain(format!(
+                "enum<{}>",
+                named.name
+            ))))
         }
     }
 }

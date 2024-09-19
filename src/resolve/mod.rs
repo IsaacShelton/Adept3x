@@ -22,6 +22,7 @@ use crate::{
     ast::{self, AstWorkspace, Type},
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
+    name::ResolvedName,
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_files::{Source, SourceFiles},
     tag::Tag,
@@ -103,7 +104,7 @@ pub fn resolve<'a>(
     }
 
     // Temporarily used stack to keep track of used type aliases
-    let mut used_aliases = HashSet::<String>::new();
+    let mut used_aliases = HashSet::<ResolvedName>::new();
 
     // Pre-compute resolved enum types
     for (real_file_id, file) in ast_workspace.files.iter() {
@@ -278,23 +279,12 @@ pub fn resolve<'a>(
                 .function_search_ctxs
                 .get_or_insert_with(file_id, || FunctionSearchCtx::new());
 
-            // You can blame stable rust for having to do this.
-            // There is no way to "get_or_insert_mut" without pre-cloning the key.
-            let function_group = match function_search_context.available.get_mut(&function.name) {
-                Some(group) => group,
-                None => {
-                    function_search_context
-                        .available
-                        .insert(function.name.clone(), Vec::new());
+            let resolved_name = ResolvedName::Project(function.name.clone().into_boxed_str());
 
-                    function_search_context
-                        .available
-                        .get_mut(&function.name)
-                        .unwrap()
-                }
-            };
-
-            function_group.push(function_ref);
+            function_search_context
+                .available
+                .entry(resolved_name)
+                .or_insert_with(|| vec![function_ref]);
         }
     }
 
@@ -394,7 +384,7 @@ fn resolve_type_or_undeclared<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
     source_files: &SourceFiles,
     ast_type: &'a ast::Type,
-    used_aliases_stack: &mut HashSet<String>,
+    used_aliases_stack: &mut HashSet<ResolvedName>,
 ) -> Result<resolved::Type, ResolveError> {
     match resolve_type(type_search_ctx, source_files, ast_type, used_aliases_stack) {
         Ok(inner) => Ok(inner),
@@ -409,7 +399,7 @@ fn resolve_type<'a>(
     type_search_ctx: &'a TypeSearchCtx<'_>,
     source_files: &SourceFiles,
     ast_type: &'a ast::Type,
-    used_aliases_stack: &mut HashSet<String>,
+    used_aliases_stack: &mut HashSet<ResolvedName>,
 ) -> Result<resolved::Type, ResolveError> {
     match &ast_type.kind {
         ast::TypeKind::Boolean => Ok(resolved::TypeKind::Boolean),
@@ -427,31 +417,32 @@ fn resolve_type<'a>(
         }
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
         ast::TypeKind::Named(name) => {
-            let search = type_search_ctx
-                .find_type_or_error(name, ast_type.source)
-                .cloned();
+            eprintln!("warning: resolved_type currently always resolves name to project basename");
+            let resolved_name = ResolvedName::Project(name.basename.clone().into_boxed_str());
 
-            match search {
-                Ok(found) => Ok(found),
-                Err(err) => {
-                    if let Some(definition) = type_search_ctx.find_alias(name) {
-                        if used_aliases_stack.insert(name.clone()) {
-                            let inner = resolve_type(
-                                type_search_ctx,
-                                source_files,
-                                &definition.value,
-                                used_aliases_stack,
-                            );
-                            used_aliases_stack.remove(name.as_str());
-                            inner.map(|ty| ty.kind)
-                        } else {
-                            Err(ResolveErrorKind::RecursiveTypeAlias { name: name.clone() }
-                                .at(definition.source))
-                        }
-                    } else {
-                        Err(err)
+            if let Some(found) = type_search_ctx.find_type(&resolved_name) {
+                Ok(found.clone())
+            } else if let Some(definition) = type_search_ctx.find_alias(&resolved_name) {
+                if used_aliases_stack.insert(resolved_name.clone()) {
+                    let inner = resolve_type(
+                        type_search_ctx,
+                        source_files,
+                        &definition.value,
+                        used_aliases_stack,
+                    );
+                    used_aliases_stack.remove(&resolved_name);
+                    inner.map(|ty| ty.kind)
+                } else {
+                    Err(ResolveErrorKind::RecursiveTypeAlias {
+                        name: name.to_string(),
                     }
+                    .at(definition.source))
                 }
+            } else {
+                Err(ResolveErrorKind::UndeclaredType {
+                    name: name.to_string(),
+                }
+                .at(ast_type.source))
             }
         }
         ast::TypeKind::Floating(size) => Ok(resolved::TypeKind::Floating(*size)),
@@ -578,7 +569,7 @@ fn resolve_enum_backing_type(
     type_search_ctx: &TypeSearchCtx,
     source_files: &SourceFiles,
     backing_type: Option<impl Borrow<Type>>,
-    used_aliases: &mut HashSet<String>,
+    used_aliases: &mut HashSet<ResolvedName>,
     source: Source,
 ) -> Result<resolved::Type, ResolveError> {
     if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {

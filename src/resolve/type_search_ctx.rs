@@ -1,40 +1,26 @@
 use super::error::{ResolveError, ResolveErrorKind};
-use crate::{ast, resolved, source_files::Source};
+use crate::{ast, name::ResolvedName, resolved, source_files::Source};
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug, Default)]
 pub struct TypeSearchCtx<'a> {
-    types: IndexMap<String, resolved::TypeKind>,
-    type_aliases: IndexMap<String, &'a ast::TypeAlias>,
+    types: IndexMap<ResolvedName, resolved::TypeKind>,
+    type_aliases: IndexMap<ResolvedName, &'a ast::TypeAlias>,
 }
 
 impl<'a> TypeSearchCtx<'a> {
-    pub fn new(aliases: IndexMap<String, &'a ast::TypeAlias>) -> Self {
+    pub fn new(aliases: IndexMap<ResolvedName, &'a ast::TypeAlias>) -> Self {
         Self {
             types: Default::default(),
             type_aliases: aliases,
         }
     }
 
-    pub fn find_type_or_error(
-        &self,
-        name: &str,
-        source: Source,
-    ) -> Result<&resolved::TypeKind, ResolveError> {
-        match self.find_type(name) {
-            Some(info) => Ok(info),
-            None => Err(ResolveErrorKind::UndeclaredType {
-                name: name.to_string(),
-            }
-            .at(source)),
-        }
-    }
-
-    pub fn find_type(&self, name: &str) -> Option<&resolved::TypeKind> {
+    pub fn find_type(&self, name: &ResolvedName) -> Option<&resolved::TypeKind> {
         self.types.get(name)
     }
 
-    pub fn find_alias(&self, name: &str) -> Option<&ast::TypeAlias> {
+    pub fn find_alias(&self, name: &ResolvedName) -> Option<&ast::TypeAlias> {
         self.type_aliases.get(name).copied()
     }
 
@@ -44,7 +30,10 @@ impl<'a> TypeSearchCtx<'a> {
         value: resolved::TypeKind,
         source: Source,
     ) -> Result<(), ResolveError> {
-        if self.types.insert(name.to_string(), value).is_some() {
+        eprintln!("warning: TypeSearchCtx::put_type always puts at root");
+        let resolved_name = ResolvedName::Project(name.to_string().into_boxed_str());
+
+        if self.types.insert(resolved_name, value).is_some() {
             return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
                 name: name.to_string(),
             }
@@ -60,7 +49,10 @@ impl<'a> TypeSearchCtx<'a> {
         value: &'a ast::TypeAlias,
         source: Source,
     ) -> Result<(), ResolveError> {
-        if self.type_aliases.insert(name.to_string(), value).is_some() {
+        eprintln!("warning: TypeSearchCtx::put_type_alias always puts at root");
+        let resolved_name = ResolvedName::Project(name.to_string().into_boxed_str());
+
+        if self.type_aliases.insert(resolved_name, value).is_some() {
             return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {
                 name: name.to_string(),
             }
