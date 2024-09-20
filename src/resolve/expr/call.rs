@@ -1,7 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior},
-    name::ResolvedName,
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode},
         error::{ResolveError, ResolveErrorKind},
@@ -23,24 +22,15 @@ pub fn resolve_call_expr(
         .at(source));
     }
 
-    eprintln!("warning: function call name resolution not fully implemented yet");
-    let resolved_name = if !call.function_name.namespace.is_empty() {
-        ResolvedName::Project(
-            format!(
-                "{}{}",
-                call.function_name.namespace, call.function_name.basename
-            )
-            .into_boxed_str(),
-        )
-    } else {
-        ResolvedName::Project(call.function_name.basename.clone().into_boxed_str())
-    };
-
-    let Some(function_ref) = ctx.function_search_ctx.find_function(&resolved_name) else {
-        return Err(ResolveErrorKind::FailedToFindFunction {
-            name: call.function_name.to_string(),
+    let function_ref = match ctx.function_search_ctx.find_function(&call.function_name) {
+        Ok(function_ref) => function_ref,
+        Err(reason) => {
+            return Err(ResolveErrorKind::FailedToFindFunction {
+                name: call.function_name.to_string(),
+                reason,
+            }
+            .at(source));
         }
-        .at(source));
     };
 
     let function = ctx.resolved_ast.functions.get(function_ref).unwrap();

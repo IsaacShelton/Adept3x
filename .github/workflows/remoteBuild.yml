@@ -83,8 +83,8 @@ jobs:
         run: |
           cargo build --release --target x86_64-pc-windows-gnu
         env:
-          CFLAGS: -static-libstdc++
-          CXXFLAGS: -static-libstdc++
+          CFLAGS: -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
+          CXXFLAGS: -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
           LLVM_SYS_181_PREFIX: C:\msys64\mingw64
           zstd_DIR: C:\msys64\mingw64
           zstd_LIBRARY: C:\msys64\mingw64\lib\libzstd.a

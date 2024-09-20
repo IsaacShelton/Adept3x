@@ -1,3 +1,4 @@
+use super::function_search_ctx::FindFunctionError;
 use crate::{
     show::Show,
     source_files::{Source, SourceFiles},
@@ -30,6 +31,7 @@ pub enum ResolveErrorKind {
     },
     FailedToFindFunction {
         name: String,
+        reason: FindFunctionError,
     },
     UndeclaredVariable {
         name: String,
@@ -197,9 +199,12 @@ impl Display for ResolveErrorKind {
                     value
                 )?;
             }
-            ResolveErrorKind::FailedToFindFunction { name } => {
-                write!(f, "Failed to find function '{}'", name)?;
-            }
+            ResolveErrorKind::FailedToFindFunction { name, reason } => match reason {
+                FindFunctionError::NotDefined => write!(f, "Failed to find function '{}'", name)?,
+                FindFunctionError::Ambiguous => {
+                    write!(f, "Multiple possibilities for function '{}'", name)?
+                }
+            },
             ResolveErrorKind::UndeclaredVariable { name } => {
                 write!(f, "Undeclared variable '{}'", name)?;
             }
