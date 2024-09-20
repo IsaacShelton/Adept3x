@@ -252,7 +252,7 @@ pub fn resolve<'a>(
             };
 
             let function_ref = resolved_ast.functions.insert(resolved::Function {
-                name,
+                name: name.clone(),
                 parameters: resolve_parameters(
                     type_search_ctx,
                     source_files,
@@ -285,11 +285,9 @@ pub fn resolve<'a>(
                 .function_search_ctxs
                 .get_or_insert_with(file_id, || FunctionSearchCtx::new());
 
-            let resolved_name = ResolvedName::Project(function.name.clone().into_boxed_str());
-
             function_search_context
                 .available
-                .entry(resolved_name)
+                .entry(name)
                 .or_insert_with(|| vec![function_ref]);
         }
     }

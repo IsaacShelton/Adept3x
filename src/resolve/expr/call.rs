@@ -23,7 +23,18 @@ pub fn resolve_call_expr(
         .at(source));
     }
 
-    let resolved_name = ResolvedName::Project(call.function_name.basename.clone().into_boxed_str());
+    eprintln!("warning: function call name resolution not fully implemented yet");
+    let resolved_name = if !call.function_name.namespace.is_empty() {
+        ResolvedName::Project(
+            format!(
+                "{}{}",
+                call.function_name.namespace, call.function_name.basename
+            )
+            .into_boxed_str(),
+        )
+    } else {
+        ResolvedName::Project(call.function_name.basename.clone().into_boxed_str())
+    };
 
     let Some(function_ref) = ctx.function_search_ctx.find_function(&resolved_name) else {
         return Err(ResolveErrorKind::FailedToFindFunction {

@@ -56,7 +56,7 @@ impl Display for ResolvedName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ResolvedName::Remote(name) => write!(f, "<remote>/{}", name),
-            ResolvedName::Project(name) => write!(f, "<project>/{}", name),
+            ResolvedName::Project(name) => write!(f, "{}", name),
         }
     }
 }
