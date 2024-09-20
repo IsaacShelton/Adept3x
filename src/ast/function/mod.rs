@@ -14,4 +14,5 @@ pub struct Function {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
+    pub namespace: Option<String>,
 }

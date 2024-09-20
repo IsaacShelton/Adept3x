@@ -42,3 +42,21 @@ pub enum ResolvedName {
     Remote(Box<str>),
     Project(Box<str>),
 }
+
+impl ResolvedName {
+    pub fn plain(&self) -> &str {
+        match self {
+            ResolvedName::Remote(name) => &**name,
+            ResolvedName::Project(name) => &**name,
+        }
+    }
+}
+
+impl Display for ResolvedName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResolvedName::Remote(name) => write!(f, "<remote>/{}", name),
+            ResolvedName::Project(name) => write!(f, "<project>/{}", name),
+        }
+    }
+}

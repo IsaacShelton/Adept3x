@@ -47,6 +47,7 @@ fn thin_cstring_function(
         is_foreign: false,
         source,
         tag: None,
+        namespace: None,
     }
 }
 
@@ -73,6 +74,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         source,
         abide_abi: false,
         tag: Some(Tag::InterpreterEntryPoint),
+        namespace: None,
     });
 
     file.enums.insert(
@@ -182,6 +184,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         is_foreign: false,
         source,
         tag: None,
+        namespace: None,
     });
 }
 

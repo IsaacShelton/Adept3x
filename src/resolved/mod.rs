@@ -8,6 +8,7 @@ pub use crate::ast::{
 use crate::{
     ast::fmt_c_integer,
     ir::InterpreterSyscallKind,
+    name::ResolvedName,
     source_files::{Source, SourceFiles},
     tag::Tag,
     target::Target,
@@ -70,7 +71,7 @@ pub struct GlobalVar {
 
 #[derive(Clone, Debug)]
 pub struct Function {
-    pub name: String,
+    pub name: ResolvedName,
     pub parameters: Parameters,
     pub return_type: Type,
     pub stmts: Vec<Stmt>,

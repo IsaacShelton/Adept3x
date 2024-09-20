@@ -90,6 +90,7 @@ impl PragmaSection {
                 source,
                 abide_abi: false,
                 tag: None,
+                namespace: None,
             });
         } else {
             return Err(Box::new(ParseError::expected(

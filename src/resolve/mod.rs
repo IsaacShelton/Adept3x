@@ -245,8 +245,14 @@ pub fn resolve<'a>(
         let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         for (function_i, function) in file.functions.iter().enumerate() {
+            let name = if let Some(namespace) = function.namespace.as_ref() {
+                ResolvedName::Project(format!("{}/{}", namespace, function.name).into_boxed_str())
+            } else {
+                ResolvedName::Project(function.name.clone().into_boxed_str())
+            };
+
             let function_ref = resolved_ast.functions.insert(resolved::Function {
-                name: function.name.clone(),
+                name,
                 parameters: resolve_parameters(
                     type_search_ctx,
                     source_files,

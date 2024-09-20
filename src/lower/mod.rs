@@ -161,7 +161,7 @@ fn lower_function(
             } else {
                 return Err(LowerErrorKind::MustReturnValueOfTypeBeforeExitingFunction {
                     return_type: function.return_type.to_string(),
-                    function: function.name.clone(),
+                    function: function.name.to_string(),
                 }
                 .at(function.source));
             }
@@ -189,10 +189,19 @@ fn lower_function(
         }
     }
 
+    eprintln!("warning: name mangling does not take all cases into account yet");
+    let mangled_name = if function.name.plain() == "main" {
+        "main".into()
+    } else if function.is_foreign {
+        function.name.plain().to_string()
+    } else {
+        function.name.to_string()
+    };
+
     ir_module.functions.insert(
         function_ref,
         ir::Function {
-            mangled_name: function.name.clone(),
+            mangled_name,
             basicblocks,
             parameters,
             return_type,

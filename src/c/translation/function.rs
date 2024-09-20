@@ -80,6 +80,7 @@ pub fn declare_function(
         source,
         abide_abi: true,
         tag: None,
+        namespace: None,
     });
 
     Ok(())

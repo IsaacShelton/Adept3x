@@ -16,11 +16,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let mut is_foreign = false;
         let mut abide_abi = false;
+        let mut namespace = None;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
+                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
         }
@@ -63,6 +65,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             source,
             abide_abi,
             tag: None,
+            namespace,
         })
     }
 }
