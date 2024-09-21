@@ -35,6 +35,7 @@ pub struct BuildSystemSyscallHandler {
     pub link_filenames: HashSet<String>,
     pub link_frameworks: HashSet<String>,
     pub debug_skip_merging_helper_exprs: bool,
+    pub imported_namespaces: Vec<Box<str>>,
 }
 
 fn read_cstring(memory: &Memory, value: &Value) -> String {
@@ -64,6 +65,13 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             ir::InterpreterSyscallKind::Println => {
                 assert_eq!(args.len(), 1);
                 println!("{}", read_cstring(memory, &args[0]));
+                Value::Literal(ir::Literal::Void)
+            }
+            ir::InterpreterSyscallKind::BuildAddProject => {
+                assert_eq!(args.len(), 2);
+                let name = read_cstring(memory, &args[0]);
+                let kind = ProjectKind::from_u64(args[1].as_u64().unwrap()).unwrap();
+                self.projects.push(Project { name, kind });
                 Value::Literal(ir::Literal::Void)
             }
             ir::InterpreterSyscallKind::BuildLinkFilename => {
@@ -110,11 +118,10 @@ impl SyscallHandler for BuildSystemSyscallHandler {
 
                 Value::Literal(ir::Literal::Void)
             }
-            ir::InterpreterSyscallKind::BuildAddProject => {
-                assert_eq!(args.len(), 2);
-                let name = read_cstring(memory, &args[0]);
-                let kind = ProjectKind::from_u64(args[1].as_u64().unwrap()).unwrap();
-                self.projects.push(Project { name, kind });
+            ir::InterpreterSyscallKind::ImportNamespace => {
+                assert_eq!(args.len(), 1);
+                self.imported_namespaces
+                    .push(read_cstring(memory, &args[0]).into_boxed_str());
                 Value::Literal(ir::Literal::Void)
             }
         }

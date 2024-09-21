@@ -110,6 +110,7 @@ impl PragmaSection {
         Ok(Settings {
             adept_version,
             debug_skip_merging_helper_exprs: user_settings.debug_skip_merging_helper_exprs,
+            imported_namespaces: user_settings.imported_namespaces,
         })
     }
 }

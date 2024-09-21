@@ -145,6 +145,7 @@ pub enum InterpreterSyscallKind {
     BuildLinkFilename,
     BuildLinkFrameworkName,
     Experimental,
+    ImportNamespace,
 }
 
 #[derive(Clone, Debug)]

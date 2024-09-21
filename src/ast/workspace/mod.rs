@@ -54,6 +54,7 @@ impl<'a> AstWorkspace<'a> {
             settings.push(Settings {
                 adept_version: AdeptVersion::CURRENT,
                 debug_skip_merging_helper_exprs: false,
+                imported_namespaces: vec![],
             }),
             Self::DEFAULT_SETTINGS_ID.0
         );
@@ -114,6 +115,7 @@ impl<'a> AstWorkspace<'a> {
 pub struct Settings {
     pub adept_version: AdeptVersion,
     pub debug_skip_merging_helper_exprs: bool,
+    pub imported_namespaces: Vec<Box<str>>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

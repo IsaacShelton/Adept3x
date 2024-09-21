@@ -281,9 +281,21 @@ pub fn resolve<'a>(
             ctx.jobs
                 .push_back(Job::Regular(*real_file_id, function_i, function_ref));
 
-            let function_search_context = ctx
-                .function_search_ctxs
-                .get_or_insert_with(file_id, || FunctionSearchCtx::new());
+            let imported_namespaces =
+                if let Some(settings) = file.settings.map(|id| &ast_workspace.settings[id.0]) {
+                    Some(&settings.imported_namespaces)
+                } else {
+                    None
+                };
+
+            let function_search_context =
+                ctx.function_search_ctxs.get_or_insert_with(file_id, || {
+                    FunctionSearchCtx::new(
+                        imported_namespaces
+                            .map(|namespaces| namespaces.clone())
+                            .unwrap_or_else(|| vec![]),
+                    )
+                });
 
             function_search_context
                 .available

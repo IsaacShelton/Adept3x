@@ -145,6 +145,12 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         InterpreterSyscallKind::Experimental,
     ));
 
+    file.functions.push(thin_cstring_function(
+        "importNamespace",
+        "namespace",
+        InterpreterSyscallKind::ImportNamespace,
+    ));
+
     file.functions.push(Function {
         name: "project".into(),
         parameters: Parameters {

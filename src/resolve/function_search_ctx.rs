@@ -17,11 +17,10 @@ pub enum FindFunctionError {
 }
 
 impl FunctionSearchCtx {
-    pub fn new() -> Self {
+    pub fn new(imported_namespaces: Vec<Box<str>>) -> Self {
         Self {
             available: Default::default(),
-            // TODO: Make this value user-specified
-            imported_namespaces: vec!["io".to_string().into_boxed_str()],
+            imported_namespaces,
         }
     }
 
