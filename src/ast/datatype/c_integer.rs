@@ -1,5 +1,5 @@
 use super::description::{IntegerBits, IntegerSign};
-use crate::{data_units::ByteUnits, target::Target};
+use crate::{ast::Settings, data_units::ByteUnits, target::Target};
 use derive_more::IsVariant;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, IsVariant, PartialOrd, Ord)]
@@ -20,10 +20,17 @@ impl CInteger {
         }
     }
 
-    pub fn min_bits(self) -> IntegerBits {
+    pub fn min_bits(self, assumptions: CIntegerAssumptions) -> IntegerBits {
         match self {
             Self::Char => IntegerBits::Bits8,
-            Self::Short | Self::Int => IntegerBits::Bits16,
+            Self::Short => IntegerBits::Bits16,
+            Self::Int => {
+                if assumptions.int_at_least_32_bits {
+                    IntegerBits::Bits32
+                } else {
+                    IntegerBits::Bits16
+                }
+            }
             Self::Long => IntegerBits::Bits32,
             Self::LongLong => IntegerBits::Bits64,
         }
@@ -39,11 +46,15 @@ impl CInteger {
         }
     }
 
-    pub fn smallest_that_fits(min_c_integer: Self, bits: IntegerBits) -> Option<Self> {
+    pub fn smallest_that_fits(
+        min_c_integer: Self,
+        bits: IntegerBits,
+        assumptions: CIntegerAssumptions,
+    ) -> Option<Self> {
         let mut possible = min_c_integer;
 
         loop {
-            if possible.min_bits() >= bits {
+            if possible.min_bits(assumptions) >= bits {
                 return Some(possible);
             }
 
@@ -90,4 +101,17 @@ pub fn fmt_c_integer(
     })?;
 
     Ok(())
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct CIntegerAssumptions {
+    pub int_at_least_32_bits: bool,
+}
+
+impl CIntegerAssumptions {
+    pub fn new(settings: &Settings) -> Self {
+        Self {
+            int_at_least_32_bits: settings.assume_int_at_least_32_bits,
+        }
+    }
 }

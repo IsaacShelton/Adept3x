@@ -15,6 +15,34 @@ use crate::{
 };
 use indexmap::IndexMap;
 
+fn thin_void_function(name: impl ToString, syscall_kind: InterpreterSyscallKind) -> Function {
+    let source = Source::internal();
+    let void = TypeKind::Void.at(Source::internal());
+
+    Function {
+        name: name.to_string(),
+        parameters: Parameters {
+            required: vec![],
+            is_cstyle_vararg: false,
+        },
+        return_type: void.clone(),
+        stmts: vec![StmtKind::Expr(
+            ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
+                kind: syscall_kind,
+                args: vec![],
+                result_type: void.clone(),
+            }))
+            .at(source),
+        )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+        namespace: None,
+    }
+}
+
 fn thin_cstring_function(
     name: impl ToString,
     param_name: impl ToString,
@@ -149,6 +177,11 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         "importNamespace",
         "namespace",
         InterpreterSyscallKind::ImportNamespace,
+    ));
+
+    file.functions.push(thin_void_function(
+        "assumeIntAtLeast32Bits",
+        InterpreterSyscallKind::AssumeIntAtLeast32Bits,
     ));
 
     file.functions.push(Function {

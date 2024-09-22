@@ -5,10 +5,7 @@ use super::{
     expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
     resolve_type, Initialized,
 };
-use crate::{
-    ast::{self, ConformBehavior},
-    resolved,
-};
+use crate::{ast, resolved};
 
 pub fn resolve_stmts(
     ctx: &mut ResolveExprCtx,
@@ -50,7 +47,7 @@ pub fn resolve_stmt(
                     &result,
                     return_type,
                     ConformMode::Normal,
-                    ConformBehavior::Adept,
+                    ctx.adept_conform_behavior(),
                     source,
                 ) {
                     Some(result.expr)
@@ -113,7 +110,7 @@ pub fn resolve_stmt(
                         value,
                         &resolved_type,
                         ConformMode::Normal,
-                        ConformBehavior::Adept,
+                        ctx.adept_conform_behavior(),
                         source,
                     ) {
                         Some(value) => Ok(value.expr),
@@ -174,7 +171,7 @@ pub fn resolve_stmt(
                 &value,
                 &destination_expr.resolved_type,
                 ConformMode::Normal,
-                ConformBehavior::Adept,
+                ctx.adept_conform_behavior(),
                 source,
             )
             .ok_or_else(|| {

@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, AstFile, ConformBehavior, FillBehavior},
+    ast::{self, AstFile, FillBehavior, Language},
     c::{
         parser::{
             expr::{CompoundLiteral, Initializer},
@@ -47,7 +47,7 @@ pub fn translate_compound_literal(
             ast_type,
             fields,
             fill_behavior: FillBehavior::Zeroed,
-            conform_behavior: ConformBehavior::C,
+            language: Language::C,
         }))
         .at(source),
     )

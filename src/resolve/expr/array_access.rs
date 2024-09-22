@@ -22,7 +22,8 @@ pub fn resolve_array_access_expr(
         None,
         crate::resolve::Initialized::Require,
     )?;
-    let subject = conform_expr_to_default(subject)?;
+    let c_integer_assumptions = ctx.c_integer_assumptions();
+    let subject = conform_expr_to_default(subject, c_integer_assumptions)?;
 
     let index = resolve_expr(
         ctx,
@@ -32,7 +33,7 @@ pub fn resolve_array_access_expr(
         )),
         Initialized::Require,
     )?;
-    let index = conform_expr_to_default(index)?;
+    let index = conform_expr_to_default(index, c_integer_assumptions)?;
 
     let item_type = match &subject.resolved_type.kind {
         resolved::TypeKind::Pointer(inner) => Ok((**inner).clone()),

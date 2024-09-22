@@ -1,6 +1,6 @@
 use super::integer_literals::integer_literals_all_fit;
 use crate::{
-    ast::{CInteger, ConformBehavior, FloatSize, IntegerBits},
+    ast::{CInteger, CIntegerAssumptions, ConformBehavior, FloatSize, IntegerBits},
     data_units::BitUnits,
     resolved::{IntegerSign, Type, TypeKind, TypedExpr},
     source_files::Source,
@@ -12,7 +12,7 @@ use std::borrow::Borrow;
 pub fn compute_unifying_type(
     preferred_type: Option<&Type>,
     values: &[impl Borrow<TypedExpr>],
-    _conform_behavior: ConformBehavior,
+    behavior: ConformBehavior,
     source: Source,
 ) -> Option<Type> {
     let types_iter = values.iter().map(|expr| &expr.borrow().resolved_type);
@@ -52,7 +52,7 @@ pub fn compute_unifying_type(
 
     // If all values are integers and integer literals
     if types_iter.clone().all(|ty| ty.kind.is_integer_like()) {
-        return compute_unifying_integer_type(types_iter, source);
+        return compute_unifying_integer_type(types_iter, behavior, source);
     }
 
     None
@@ -60,6 +60,7 @@ pub fn compute_unifying_type(
 
 fn compute_unifying_integer_type<'a>(
     types_iter: impl Iterator<Item = &'a Type>,
+    behavior: ConformBehavior,
     source: Source,
 ) -> Option<Type> {
     let IntegerProperties {
@@ -67,13 +68,15 @@ fn compute_unifying_integer_type<'a>(
         required_bits,
         required_sign,
         ..
-    } = IntegerProperties::compute(types_iter)?;
+    } = IntegerProperties::compute(types_iter, behavior.c_integer_assumptions())?;
 
     let required_sign = required_sign.unwrap_or(IntegerSign::Signed);
+    let assumptions = behavior.c_integer_assumptions();
 
     if let Some(c_integer) = largest_loose_used {
-        let c_integer = CInteger::smallest_that_fits(c_integer, required_bits.unwrap())
-            .unwrap_or(CInteger::LongLong);
+        let c_integer =
+            CInteger::smallest_that_fits(c_integer, required_bits.unwrap(), assumptions)
+                .unwrap_or(CInteger::LongLong);
 
         return Some(TypeKind::CInteger(c_integer, Some(required_sign)).at(source));
     }
@@ -99,7 +102,7 @@ impl IntegerProperties {
         is_concrete: false,
     };
 
-    pub fn new(ty: &Type) -> Option<Self> {
+    pub fn new(ty: &Type, assumptions: CIntegerAssumptions) -> Option<Self> {
         match &ty.kind {
             TypeKind::Integer(bits, sign) => Some(Self {
                 largest_loose_used: None,
@@ -109,7 +112,7 @@ impl IntegerProperties {
             }),
             TypeKind::CInteger(c_integer, sign) => Some(Self {
                 largest_loose_used: Some(*c_integer),
-                required_bits: Some(c_integer.min_bits()),
+                required_bits: Some(c_integer.min_bits(assumptions)),
                 required_sign: *sign,
                 is_concrete: true,
             }),
@@ -135,13 +138,22 @@ impl IntegerProperties {
         }
     }
 
-    pub fn compute<'a>(mut types: impl Iterator<Item = &'a Type>) -> Option<IntegerProperties> {
-        types.try_fold(IntegerProperties::NONE, unify_integer_properties)
+    pub fn compute<'a>(
+        mut types: impl Iterator<Item = &'a Type>,
+        assumptions: CIntegerAssumptions,
+    ) -> Option<IntegerProperties> {
+        types.try_fold(IntegerProperties::NONE, |properties, ty| {
+            unify_integer_properties(properties, assumptions, ty)
+        })
     }
 }
 
-pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<IntegerProperties> {
-    let b = IntegerProperties::new(ty)?;
+pub fn unify_integer_properties(
+    a: IntegerProperties,
+    assumptions: CIntegerAssumptions,
+    ty: &Type,
+) -> Option<IntegerProperties> {
+    let b = IntegerProperties::new(ty, assumptions)?;
 
     if a == IntegerProperties::NONE || a == b {
         return Some(b);
@@ -158,7 +170,8 @@ pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<Integ
 
         let largest_loose_used =
             CInteger::largest(a.largest_loose_used, b.largest_loose_used).map(|c_integer| {
-                CInteger::smallest_that_fits(c_integer, bits).unwrap_or(CInteger::LongLong)
+                CInteger::smallest_that_fits(c_integer, bits, assumptions)
+                    .unwrap_or(CInteger::LongLong)
             });
 
         return Some(IntegerProperties {
@@ -195,11 +208,11 @@ pub fn unify_integer_properties(a: IntegerProperties, ty: &Type) -> Option<Integ
         }
         (None, Some(min_c_integer)) | (Some(min_c_integer), None) => {
             // One normal fixed-size integer combined with a flexible C integer
-            unify_integer_properties_flexible(a, b, min_c_integer)
+            unify_integer_properties_flexible(a, b, min_c_integer, assumptions)
         }
         (Some(a_c_integer), Some(b_c_integer)) => {
             // Two flexible C integers
-            unify_integer_properties_flexible(a, b, a_c_integer.max(b_c_integer))
+            unify_integer_properties_flexible(a, b, a_c_integer.max(b_c_integer), assumptions)
         }
     };
     integer_properties
@@ -209,6 +222,7 @@ fn unify_integer_properties_flexible(
     a: IntegerProperties,
     b: IntegerProperties,
     min_c_integer: CInteger,
+    assumptions: CIntegerAssumptions,
 ) -> Option<IntegerProperties> {
     let a_bits = a.required_bits?.bits();
     let b_bits = b.required_bits?.bits();
@@ -231,7 +245,7 @@ fn unify_integer_properties_flexible(
     let bits = IntegerBits::new(bits).unwrap_or(IntegerBits::Bits64);
 
     Some(IntegerProperties {
-        largest_loose_used: CInteger::smallest_that_fits(min_c_integer, bits),
+        largest_loose_used: CInteger::smallest_that_fits(min_c_integer, bits, assumptions),
         required_bits: Some(bits),
         required_sign: maybe_sign,
         is_concrete: true,

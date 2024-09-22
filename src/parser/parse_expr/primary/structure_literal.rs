@@ -1,8 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{
-        ConformBehavior, Expr, ExprKind, FieldInitializer, FillBehavior, StructureLiteral, Type,
-    },
+    ast::{Expr, ExprKind, FieldInitializer, FillBehavior, Language, StructureLiteral, Type},
     inflow::Inflow,
     parser::error::ParseError,
     token::{Token, TokenKind},
@@ -68,7 +66,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 ast_type,
                 fields,
                 fill_behavior,
-                conform_behavior: ConformBehavior::Adept,
+                language: Language::Adept,
             })),
             source,
         ))

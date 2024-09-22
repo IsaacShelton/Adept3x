@@ -24,7 +24,7 @@ pub fn conform_expr(
     expr: &TypedExpr,
     to_type: &Type,
     mode: ConformMode,
-    conform_behavior: ConformBehavior,
+    behavior: ConformBehavior,
     conform_source: Source,
 ) -> Option<TypedExpr> {
     if expr.resolved_type == *to_type {
@@ -32,15 +32,15 @@ pub fn conform_expr(
     }
 
     match &expr.resolved_type.kind {
-        TypeKind::IntegerLiteral(from) => from_integer_literal(from, expr.expr.source, to_type),
-        TypeKind::Integer(from_bits, from_sign) => from_integer(
-            expr,
-            mode,
-            conform_behavior,
-            *from_bits,
-            *from_sign,
+        TypeKind::IntegerLiteral(from) => from_integer_literal(
+            from,
+            behavior.c_integer_assumptions(),
+            expr.expr.source,
             to_type,
         ),
+        TypeKind::Integer(from_bits, from_sign) => {
+            from_integer(expr, mode, behavior, *from_bits, *from_sign, to_type)
+        }
         TypeKind::FloatLiteral(from) => from_float_literal(*from, to_type, conform_source),
         TypeKind::Floating(from_size) => from_float(expr, *from_size, to_type),
         TypeKind::Pointer(from_inner) => from_pointer(expr, mode, from_inner, to_type),

@@ -1,4 +1,4 @@
-use super::AstFile;
+use super::{AstFile, CIntegerAssumptions};
 use crate::{
     iter_ext::MapSecond,
     source_files::SourceFiles,
@@ -55,6 +55,7 @@ impl<'a> AstWorkspace<'a> {
                 adept_version: AdeptVersion::CURRENT,
                 debug_skip_merging_helper_exprs: false,
                 imported_namespaces: vec![],
+                assume_int_at_least_32_bits: false,
             }),
             Self::DEFAULT_SETTINGS_ID.0
         );
@@ -116,9 +117,18 @@ pub struct Settings {
     pub adept_version: AdeptVersion,
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
+    pub assume_int_at_least_32_bits: bool,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+impl Settings {
+    pub fn c_integer_assumptions(&self) -> CIntegerAssumptions {
+        CIntegerAssumptions {
+            int_at_least_32_bits: self.assume_int_at_least_32_bits,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SettingsId(pub usize);
 
 struct ConfigureJob {

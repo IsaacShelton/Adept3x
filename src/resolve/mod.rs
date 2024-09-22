@@ -360,6 +360,13 @@ pub fn resolve<'a>(
                     }
                 }
 
+                let file = ast_workspace
+                    .files
+                    .get(&real_file_id)
+                    .expect("referenced file exists");
+
+                let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
+
                 let resolved_stmts = {
                     let mut ctx = ResolveExprCtx {
                         resolved_ast: &mut resolved_ast,
@@ -369,6 +376,7 @@ pub fn resolve<'a>(
                         variable_search_ctx,
                         resolved_function_ref,
                         helper_exprs: &ctx.helper_exprs,
+                        settings,
                     };
 
                     resolve_stmts(&mut ctx, &ast_function.stmts)?

@@ -1,12 +1,12 @@
 use super::Expr;
-use crate::ast::{ConformBehavior, Type};
+use crate::ast::{Language, Type};
 
 #[derive(Clone, Debug)]
 pub struct StructureLiteral {
     pub ast_type: Type,
     pub fields: Vec<FieldInitializer>,
     pub fill_behavior: FillBehavior,
-    pub conform_behavior: ConformBehavior,
+    pub language: Language,
 }
 
 #[derive(Clone, Debug)]

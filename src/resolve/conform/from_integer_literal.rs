@@ -1,5 +1,5 @@
 use crate::{
-    ast::{CInteger, FloatSize, IntegerBits, IntegerKnown, IntegerRigidity},
+    ast::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerKnown, IntegerRigidity},
     data_units::BitUnits,
     ir::IntegerSign,
     resolved::{Expr, ExprKind, Type, TypeKind, TypedExpr},
@@ -8,11 +8,16 @@ use crate::{
 use num::{BigInt, Zero};
 use num_traits::ToPrimitive;
 
-pub fn from_integer_literal(value: &BigInt, source: Source, to_type: &Type) -> Option<TypedExpr> {
+pub fn from_integer_literal(
+    value: &BigInt,
+    assumptions: CIntegerAssumptions,
+    source: Source,
+    to_type: &Type,
+) -> Option<TypedExpr> {
     match &to_type.kind {
         TypeKind::Floating(to_size) => from_integer_literal_to_float(value, *to_size, source),
         TypeKind::CInteger(to_c_integer, to_sign) => {
-            from_integer_literal_to_c_integer(value, *to_c_integer, *to_sign, source)
+            from_integer_literal_to_c_integer(value, *to_c_integer, *to_sign, assumptions, source)
         }
         TypeKind::Integer(to_bits, to_sign) => {
             from_integer_literal_to_integer(value, *to_bits, *to_sign, source)
@@ -55,12 +60,13 @@ fn from_integer_literal_to_c_integer(
     value: &BigInt,
     to_c_integer: CInteger,
     to_sign: Option<IntegerSign>,
+    assumptions: CIntegerAssumptions,
     source: Source,
 ) -> Option<TypedExpr> {
     let needs_bits =
         BitUnits::of(value.bits() + (*value < BigInt::zero()).then_some(1).unwrap_or(0));
 
-    (needs_bits <= to_c_integer.min_bits().bits()).then(|| {
+    (needs_bits <= to_c_integer.min_bits(assumptions).bits()).then(|| {
         TypedExpr::new(
             TypeKind::CInteger(to_c_integer, to_sign).at(source),
             ExprKind::IntegerKnown(Box::new(IntegerKnown {

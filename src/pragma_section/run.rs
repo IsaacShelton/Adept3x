@@ -111,6 +111,7 @@ impl PragmaSection {
             adept_version,
             debug_skip_merging_helper_exprs: user_settings.debug_skip_merging_helper_exprs,
             imported_namespaces: user_settings.imported_namespaces,
+            assume_int_at_least_32_bits: user_settings.assume_int_at_least_32_bits,
         })
     }
 }

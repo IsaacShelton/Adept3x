@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior},
+    ast,
     resolve::{
         conform::{conform_expr, ConformMode},
         error::{ResolveError, ResolveErrorKind},
@@ -29,7 +29,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         &left,
         &local_bool_type,
         ConformMode::Normal,
-        ConformBehavior::Adept,
+        ctx.adept_conform_behavior(),
         source,
     )
     .ok_or_else(|| {
@@ -55,7 +55,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         &right,
         &local_bool_type,
         ConformMode::Normal,
-        ConformBehavior::Adept,
+        ctx.adept_conform_behavior(),
         source,
     )
     .ok_or_else(|| {

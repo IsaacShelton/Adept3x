@@ -25,7 +25,9 @@ use super::{
     Initialized,
 };
 use crate::{
-    ast::{self, CInteger, ConformBehavior, UnaryOperator},
+    ast::{
+        self, CInteger, CIntegerAssumptions, ConformBehavior, Language, Settings, UnaryOperator,
+    },
     resolve::{
         ensure_initialized,
         error::ResolveErrorKind,
@@ -52,6 +54,24 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub variable_search_ctx: VariableSearchCtx,
     pub resolved_function_ref: resolved::FunctionRef,
     pub helper_exprs: &'b IndexMap<String, &'a ast::HelperExpr>,
+    pub settings: &'b Settings,
+}
+
+impl<'a, 'b> ResolveExprCtx<'a, 'b> {
+    pub fn adept_conform_behavior(&self) -> ConformBehavior {
+        ConformBehavior::Adept(self.c_integer_assumptions())
+    }
+
+    pub fn conform_behavior(&self, language: Language) -> ConformBehavior {
+        match language {
+            Language::Adept => self.adept_conform_behavior(),
+            Language::C => ConformBehavior::C,
+        }
+    }
+
+    pub fn c_integer_assumptions(&self) -> CIntegerAssumptions {
+        self.settings.c_integer_assumptions()
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -195,15 +215,17 @@ pub fn resolve_expr(
                 ast_type,
                 fields,
                 fill_behavior,
-                conform_behavior,
+                language,
             } = &**literal;
+
+            let conform_behavior = ctx.conform_behavior(*language);
 
             resolve_struct_literal_expr(
                 ctx,
                 ast_type,
                 fields,
                 *fill_behavior,
-                *conform_behavior,
+                conform_behavior,
                 source,
             )
         }
@@ -271,7 +293,7 @@ pub fn resolve_expr(
                 )?,
                 &resolved::TypeKind::Boolean.at(source),
                 ConformMode::Normal,
-                ConformBehavior::Adept,
+                ctx.adept_conform_behavior(),
                 source,
             )?
             .expr;

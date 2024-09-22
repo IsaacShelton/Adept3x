@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior},
+    ast,
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode},
         error::{ResolveError, ResolveErrorKind},
@@ -86,7 +86,7 @@ pub fn resolve_call_expr(
                 &argument,
                 preferred_type,
                 ConformMode::ParameterPassing,
-                ConformBehavior::Adept,
+                ctx.adept_conform_behavior(),
                 source,
             ) {
                 argument = conformed_argument;
@@ -100,7 +100,7 @@ pub fn resolve_call_expr(
                 .at(source));
             }
         } else {
-            match conform_expr_to_default(argument) {
+            match conform_expr_to_default(argument, ctx.c_integer_assumptions()) {
                 Ok(conformed_argument) => argument = conformed_argument,
                 Err(error) => return Err(error),
             }

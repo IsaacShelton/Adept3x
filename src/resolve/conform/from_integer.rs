@@ -16,7 +16,7 @@ pub fn from_integer(
 ) -> Option<TypedExpr> {
     match &to_type.kind {
         TypeKind::Integer(to_bits, to_sign) => match behavior {
-            ConformBehavior::Adept => from_integer_adept_mode(
+            ConformBehavior::Adept(_) => from_integer_adept_mode(
                 &expr.expr,
                 from_bits,
                 from_sign,
@@ -37,6 +37,7 @@ pub fn from_integer(
         TypeKind::CInteger(to_c_integer, to_sign) => conform_from_integer_to_c_integer(
             expr,
             mode,
+            behavior,
             from_bits,
             from_sign,
             *to_c_integer,
@@ -85,7 +86,8 @@ fn from_integer_c_mode(
 
 fn conform_from_integer_to_c_integer(
     expr: &TypedExpr,
-    conform_mode: ConformMode,
+    mode: ConformMode,
+    behavior: ConformBehavior,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
     to_c_integer: CInteger,
@@ -93,14 +95,15 @@ fn conform_from_integer_to_c_integer(
     source: Source,
 ) -> Option<TypedExpr> {
     let target_type = TypeKind::CInteger(to_c_integer, to_sign).at(source);
+    let assumptions = behavior.c_integer_assumptions();
 
     let is_lossless = match to_sign {
-        Some(to_sign) if from_sign == to_sign => from_bits <= to_c_integer.min_bits(),
-        Some(to_sign) if to_sign.is_signed() => from_bits < to_c_integer.min_bits(),
+        Some(to_sign) if from_sign == to_sign => from_bits <= to_c_integer.min_bits(assumptions),
+        Some(to_sign) if to_sign.is_signed() => from_bits < to_c_integer.min_bits(assumptions),
         _ => false,
     };
 
-    if conform_mode.allow_lossy_integer() || is_lossless {
+    if mode.allow_lossy_integer() || is_lossless {
         let cast_from = CastFrom {
             cast: Cast::new(target_type.clone(), expr.expr.clone()),
             from_type: expr.resolved_type.clone(),

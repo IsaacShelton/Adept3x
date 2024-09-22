@@ -36,6 +36,7 @@ pub struct BuildSystemSyscallHandler {
     pub link_frameworks: HashSet<String>,
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
+    pub assume_int_at_least_32_bits: bool,
 }
 
 fn read_cstring(memory: &Memory, value: &Value) -> String {
@@ -122,6 +123,11 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                 assert_eq!(args.len(), 1);
                 self.imported_namespaces
                     .push(read_cstring(memory, &args[0]).into_boxed_str());
+                Value::Literal(ir::Literal::Void)
+            }
+            ir::InterpreterSyscallKind::AssumeIntAtLeast32Bits => {
+                assert_eq!(args.len(), 0);
+                self.assume_int_at_least_32_bits = true;
                 Value::Literal(ir::Literal::Void)
             }
         }

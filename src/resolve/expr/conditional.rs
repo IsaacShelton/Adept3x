@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, ConformBehavior},
+    ast,
     resolve::{
         conform::{conform_expr_or_error, ConformMode},
         error::{ResolveError, ResolveErrorKind},
@@ -36,7 +36,7 @@ pub fn resolve_conditional_expr(
             &condition,
             &resolved::TypeKind::Boolean.at(source),
             ConformMode::Normal,
-            ConformBehavior::Adept,
+            ctx.adept_conform_behavior(),
             source,
         )?;
 
@@ -105,7 +105,7 @@ pub fn resolve_conditional_expr(
         unify_types(
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
             &mut last_exprs[..],
-            ConformBehavior::Adept,
+            ctx.adept_conform_behavior(),
             source,
         )
         .ok_or_else(|| {

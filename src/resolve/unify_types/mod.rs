@@ -12,12 +12,11 @@ use compute::compute_unifying_type;
 pub fn unify_types(
     preferred_type: Option<&resolved::Type>,
     exprs: &mut [&mut TypedExpr],
-    conform_behavior: ConformBehavior,
+    behavior: ConformBehavior,
     conform_source: Source,
 ) -> Option<resolved::Type> {
     // Compute the unifying type for the supplied expressions
-    let Some(unified_type) =
-        compute_unifying_type(preferred_type, exprs, conform_behavior, conform_source)
+    let Some(unified_type) = compute_unifying_type(preferred_type, exprs, behavior, conform_source)
     else {
         return None;
     };
@@ -28,7 +27,7 @@ pub fn unify_types(
             expr,
             &unified_type,
             ConformMode::Normal,
-            ConformBehavior::Adept,
+            behavior,
             conform_source,
         ) {
             Some(conformed) => conformed,
