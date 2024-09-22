@@ -180,8 +180,8 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     ));
 
     file.functions.push(thin_void_function(
-        "assumeIntAtLeast32Bits",
-        InterpreterSyscallKind::AssumeIntAtLeast32Bits,
+        "dontAssumeIntAtLeast32Bits",
+        InterpreterSyscallKind::DontAssumeIntAtLeast32Bits,
     ));
 
     file.functions.push(Function {

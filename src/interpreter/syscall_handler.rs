@@ -28,7 +28,7 @@ pub enum ProjectKind {
     WindowedApp = 1,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct BuildSystemSyscallHandler {
     pub projects: Vec<Project>,
     pub version: Option<AdeptVersion>,
@@ -37,6 +37,20 @@ pub struct BuildSystemSyscallHandler {
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
+}
+
+impl Default for BuildSystemSyscallHandler {
+    fn default() -> Self {
+        Self {
+            projects: vec![],
+            version: None,
+            link_filenames: HashSet::new(),
+            link_frameworks: HashSet::new(),
+            debug_skip_merging_helper_exprs: false,
+            imported_namespaces: vec![],
+            assume_int_at_least_32_bits: true,
+        }
+    }
 }
 
 fn read_cstring(memory: &Memory, value: &Value) -> String {
@@ -125,9 +139,9 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                     .push(read_cstring(memory, &args[0]).into_boxed_str());
                 Value::Literal(ir::Literal::Void)
             }
-            ir::InterpreterSyscallKind::AssumeIntAtLeast32Bits => {
+            ir::InterpreterSyscallKind::DontAssumeIntAtLeast32Bits => {
                 assert_eq!(args.len(), 0);
-                self.assume_int_at_least_32_bits = true;
+                self.assume_int_at_least_32_bits = false;
                 Value::Literal(ir::Literal::Void)
             }
         }

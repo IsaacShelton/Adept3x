@@ -51,12 +51,7 @@ impl<'a> AstWorkspace<'a> {
         let settings = AppendOnlyVec::new();
 
         assert_eq!(
-            settings.push(Settings {
-                adept_version: AdeptVersion::CURRENT,
-                debug_skip_merging_helper_exprs: false,
-                imported_namespaces: vec![],
-                assume_int_at_least_32_bits: false,
-            }),
+            settings.push(Settings::default()),
             Self::DEFAULT_SETTINGS_ID.0
         );
 
@@ -118,6 +113,17 @@ pub struct Settings {
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Settings {
+        Settings {
+            adept_version: AdeptVersion::CURRENT,
+            debug_skip_merging_helper_exprs: false,
+            imported_namespaces: vec![],
+            assume_int_at_least_32_bits: true,
+        }
+    }
 }
 
 impl Settings {

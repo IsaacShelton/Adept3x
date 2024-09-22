@@ -37,11 +37,22 @@ pub fn parse(
 
 pub struct Parser<'a, I: Inflow<Token>> {
     pub input: Input<'a, I>,
+    pub treat_string_literals_as_cstring_literals: bool,
 }
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn new(input: Input<'a, I>) -> Self {
-        Self { input }
+        Self {
+            input,
+            treat_string_literals_as_cstring_literals: false,
+        }
+    }
+
+    pub fn new_for_pragma(input: Input<'a, I>) -> Self {
+        Self {
+            input,
+            treat_string_literals_as_cstring_literals: true,
+        }
     }
 
     pub fn parse(&mut self) -> Result<AstFile, ParseError> {

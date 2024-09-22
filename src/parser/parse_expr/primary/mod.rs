@@ -57,7 +57,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 modifier: StringModifier::Normal,
                 ..
             }) => Ok(Expr::new(
-                ExprKind::String(self.input.advance().kind.unwrap_string().value),
+                if self.treat_string_literals_as_cstring_literals {
+                    ExprKind::NullTerminatedString(
+                        CString::new(self.input.advance().kind.unwrap_string().value)
+                            .expect("valid null-terminated string"),
+                    )
+                } else {
+                    ExprKind::String(self.input.advance().kind.unwrap_string().value)
+                },
                 source,
             )),
             TokenKind::OpenParen => {

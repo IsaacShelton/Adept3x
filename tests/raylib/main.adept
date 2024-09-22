@@ -1,7 +1,7 @@
 
 func main {
-    screen_width int = 800
-    screen_height int = 450
+    screen_width := 800
+    screen_height := 450
 
     InitWindow(screen_width, screen_height, c"Example Window!")
 

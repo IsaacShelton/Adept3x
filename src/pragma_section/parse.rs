@@ -29,7 +29,7 @@ impl PragmaSection {
 
         input.ignore_newlines();
 
-        let mut parser = parser::Parser::new(input);
+        let mut parser = parser::Parser::new_for_pragma(input);
         let mut ast_file = AstFile::new();
 
         if parser.input.eat(TokenKind::OpenCurly) {
