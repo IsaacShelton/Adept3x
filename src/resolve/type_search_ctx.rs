@@ -1,5 +1,10 @@
 use super::error::{ResolveError, ResolveErrorKind};
-use crate::{ast, name::ResolvedName, resolved, source_files::Source};
+use crate::{
+    ast,
+    name::{Name, ResolvedName},
+    resolved,
+    source_files::Source,
+};
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug, Default)]
@@ -26,12 +31,11 @@ impl<'a> TypeSearchCtx<'a> {
 
     pub fn put_type(
         &mut self,
-        name: impl ToString,
+        name: &Name,
         value: resolved::TypeKind,
         source: Source,
     ) -> Result<(), ResolveError> {
-        eprintln!("warning: TypeSearchCtx::put_type always puts at root");
-        let resolved_name = ResolvedName::Project(name.to_string().into_boxed_str());
+        let resolved_name = ResolvedName::new(name);
 
         if self.types.insert(resolved_name, value).is_some() {
             return Err(ResolveErrorKind::MultipleDefinitionsOfTypeNamed {

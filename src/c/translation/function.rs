@@ -6,6 +6,7 @@ use crate::{
         ParameterDeclarationCore, ParameterTypeList, ParseError,
     },
     diagnostics::Diagnostics,
+    name::Name,
 };
 use std::collections::HashMap;
 
@@ -72,7 +73,7 @@ pub fn declare_function(
     };
 
     ast_file.functions.push(Function {
-        name,
+        name: Name::plain(name),
         parameters,
         return_type,
         stmts: vec![],
@@ -80,7 +81,6 @@ pub fn declare_function(
         source,
         abide_abi: true,
         tag: None,
-        namespace: None,
     });
 
     Ok(())

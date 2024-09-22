@@ -102,7 +102,7 @@ impl PartialEq for Parameter {
 
 #[derive(Clone, Debug)]
 pub struct Structure {
-    pub name: String,
+    pub name: ResolvedName,
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
     pub source: Source,
@@ -154,7 +154,7 @@ pub enum TypeKind {
     FloatLiteral(f64),
     Floating(FloatSize),
     Pointer(Box<Type>),
-    Structure(String, StructureRef),
+    Structure(ResolvedName, StructureRef),
     Void,
     AnonymousStruct(),
     AnonymousUnion(),
@@ -323,7 +323,7 @@ impl Display for TypeKind {
                 write!(f, "ptr<{}>", inner.kind)?;
             }
             TypeKind::Void => f.write_str("void")?,
-            TypeKind::Structure(name, _) => f.write_str(name)?,
+            TypeKind::Structure(name, _) => write!(f, "{}", name)?,
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
             TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,

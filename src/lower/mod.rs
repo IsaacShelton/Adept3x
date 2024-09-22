@@ -189,7 +189,6 @@ fn lower_function(
         }
     }
 
-    eprintln!("warning: name mangling does not take all cases into account yet");
     let mangled_name = if function.name.plain() == "main" {
         "main".into()
     } else if function.is_foreign {

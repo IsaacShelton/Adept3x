@@ -6,6 +6,7 @@ use super::{
 use crate::{
     ast::{Function, Parameters, TypeKind},
     inflow::Inflow,
+    name::Name,
     token::{Token, TokenKind},
 };
 
@@ -57,7 +58,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .unwrap_or_default();
 
         Ok(Function {
-            name,
+            name: Name::new(namespace, name),
             parameters,
             return_type,
             stmts,
@@ -65,7 +66,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             source,
             abide_abi,
             tag: None,
-            namespace,
         })
     }
 }

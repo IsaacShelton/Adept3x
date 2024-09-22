@@ -7,6 +7,15 @@ pub struct Name {
 }
 
 impl Name {
+    pub fn new(namespace: Option<impl Into<String>>, basename: impl Into<String>) -> Self {
+        Self {
+            namespace: namespace
+                .map(|namespace| namespace.into())
+                .unwrap_or_default(),
+            basename: basename.into(),
+        }
+    }
+
     pub fn plain(basename: impl Into<String>) -> Self {
         Self {
             namespace: "".into(),
@@ -29,11 +38,19 @@ impl Name {
             None
         }
     }
+
+    pub fn fullname(&self) -> String {
+        if self.namespace.is_empty() {
+            self.basename.clone()
+        } else {
+            format!("{}/{}", self.namespace, self.basename)
+        }
+    }
 }
 
 impl Display for Name {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.namespace, self.basename)
+        write!(f, "{}", self.fullname())
     }
 }
 
@@ -44,6 +61,10 @@ pub enum ResolvedName {
 }
 
 impl ResolvedName {
+    pub fn new(name: &Name) -> Self {
+        Self::Project(name.fullname().into_boxed_str())
+    }
+
     pub fn plain(&self) -> &str {
         match self {
             ResolvedName::Remote(name) => &**name,

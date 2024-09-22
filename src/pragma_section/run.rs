@@ -70,7 +70,7 @@ impl PragmaSection {
         else {
             return Err(into_show(
                 ParseErrorKind::Other {
-                    message: "No Adept version was specifed for module!".into(),
+                    message: "No Adept version was specifed for module! Use `pragma => adept(\"3.0\")` at the top of the module file".into(),
                 }
                 .at(self.pragma_source),
             ));

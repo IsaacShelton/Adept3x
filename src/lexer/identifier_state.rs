@@ -16,6 +16,10 @@ impl IdentifierState {
 
         if let Some(last_slash) = self.last_slash {
             let basename = identifier.split_off(last_slash + 1);
+
+            // Remove trailing slash
+            identifier.pop();
+
             let namespace = identifier;
 
             return TokenKind::NamespacedIdentifier(Name {

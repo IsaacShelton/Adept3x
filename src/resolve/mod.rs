@@ -22,7 +22,7 @@ use crate::{
     ast::{self, AstWorkspace, Type},
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
-    name::ResolvedName,
+    name::{Name, ResolvedName},
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_files::{Source, SourceFiles},
     tag::Tag,
@@ -135,7 +135,7 @@ pub fn resolve<'a>(
             );
 
             type_search_ctx.put_type(
-                enum_name.clone(),
+                &Name::plain(enum_name.clone()),
                 resolved::TypeKind::Enum(enum_name.clone()),
                 enum_definition.source,
             )?;
@@ -169,16 +169,18 @@ pub fn resolve<'a>(
                 );
             }
 
+            let resolved_name = ResolvedName::new(&structure.name);
+
             let structure_key = resolved_ast.structures.insert(resolved::Structure {
-                name: structure.name.clone(),
+                name: resolved_name.clone(),
                 fields,
                 is_packed: structure.is_packed,
                 source: structure.source,
             });
 
             type_search_ctx.put_type(
-                structure.name.clone(),
-                resolved::TypeKind::Structure(structure.name.clone(), structure_key),
+                &structure.name,
+                resolved::TypeKind::Structure(resolved_name, structure_key),
                 structure.source,
             )?;
         }
@@ -200,7 +202,11 @@ pub fn resolve<'a>(
                 &mut used_aliases,
             )?;
 
-            type_search_ctx.put_type(alias_name.clone(), resolved_type.kind, alias.source)?;
+            type_search_ctx.put_type(
+                &Name::plain(alias_name.clone()),
+                resolved_type.kind,
+                alias.source,
+            )?;
         }
     }
 
@@ -245,11 +251,7 @@ pub fn resolve<'a>(
         let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
 
         for (function_i, function) in file.functions.iter().enumerate() {
-            let name = if let Some(namespace) = function.namespace.as_ref() {
-                ResolvedName::Project(format!("{}/{}", namespace, function.name).into_boxed_str())
-            } else {
-                ResolvedName::Project(function.name.clone().into_boxed_str())
-            };
+            let name = ResolvedName::new(&function.name);
 
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: name.clone(),
@@ -270,7 +272,7 @@ pub fn resolve<'a>(
                 source: function.source,
                 abide_abi: function.abide_abi,
                 tag: function.tag.or_else(|| {
-                    if options.coerce_main_signature && function.name == "main" {
+                    if options.coerce_main_signature && function.name.basename == "main" {
                         Some(Tag::Main)
                     } else {
                         None
@@ -438,8 +440,7 @@ fn resolve_type<'a>(
         }
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
         ast::TypeKind::Named(name) => {
-            eprintln!("warning: resolved_type currently always resolves name to project basename");
-            let resolved_name = ResolvedName::Project(name.basename.clone().into_boxed_str());
+            let resolved_name = ResolvedName::new(name);
 
             if let Some(found) = type_search_ctx.find_type(&resolved_name) {
                 Ok(found.clone())

@@ -108,10 +108,8 @@ impl<'a> TypeLayoutCache<'a> {
                     .get(*structure_ref)
                     .expect("referenced structure to exist");
 
-                let name = &resolved_structure.name;
-
                 let info = RecordInfo::from_structure(structure);
-                self.get_impl_record_layout(&info, Some(name))
+                self.get_impl_record_layout(&info, Some(resolved_structure.name.plain()))
             }
             ir::Type::AnonymousComposite(type_composite) => {
                 let info = RecordInfo::from_composite(type_composite);

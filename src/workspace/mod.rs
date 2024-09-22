@@ -205,7 +205,7 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
     }
 
     let Some(_adept_version) = compiler.version.get() else {
-        eprintln!("error: No Adept version was specified!, Use `pragma => adept(c\"3.0\")` at the top of your module file");
+        eprintln!("error: No Adept version was specified! Use `pragma => adept(\"3.0\")` at the top of the module file");
         exit(1);
     };
 

@@ -6,6 +6,7 @@ use super::{
 use crate::{
     ast::{Field, Structure},
     inflow::Inflow,
+    name::Name,
     token::{Token, TokenKind},
 };
 use indexmap::IndexMap;
@@ -22,11 +23,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.ignore_newlines();
 
         let mut is_packed = false;
+        let mut namespace = None;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Packed => is_packed = true,
-                _ => return Err(self.unexpected_annotation(&annotation, Some("for structure"))),
+                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
+                _ => return Err(self.unexpected_annotation(&annotation, Some("for struct"))),
             }
         }
 
@@ -61,7 +64,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.parse_token(TokenKind::CloseParen, Some("to end struct fields"))?;
 
         Ok(Structure {
-            name,
+            name: Name::new(namespace, name),
             fields,
             is_packed,
             source,

@@ -15,12 +15,12 @@ use crate::{
 };
 use indexmap::IndexMap;
 
-fn thin_void_function(name: impl ToString, syscall_kind: InterpreterSyscallKind) -> Function {
+fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallKind) -> Function {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
 
     Function {
-        name: name.to_string(),
+        name: Name::plain(name),
         parameters: Parameters {
             required: vec![],
             is_cstyle_vararg: false,
@@ -39,33 +39,29 @@ fn thin_void_function(name: impl ToString, syscall_kind: InterpreterSyscallKind)
         is_foreign: false,
         source,
         tag: None,
-        namespace: None,
     }
 }
 
 fn thin_cstring_function(
-    name: impl ToString,
-    param_name: impl ToString,
+    name: impl Into<String>,
+    param_name: impl Into<String>,
     syscall_kind: InterpreterSyscallKind,
 ) -> Function {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
     let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
-
+    let param_name = param_name.into();
     Function {
-        name: name.to_string(),
+        name: Name::plain(name.into()),
         parameters: Parameters {
-            required: vec![Parameter::new(param_name.to_string(), ptr_char.clone())],
+            required: vec![Parameter::new(param_name.clone(), ptr_char.clone())],
             is_cstyle_vararg: false,
         },
         return_type: void.clone(),
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: syscall_kind,
-                args: vec![(
-                    ptr_char.clone(),
-                    ExprKind::Variable(param_name.to_string()).at(source),
-                )],
+                args: vec![(ptr_char.clone(), ExprKind::Variable(param_name).at(source))],
                 result_type: void.clone(),
             }))
             .at(source),
@@ -75,7 +71,6 @@ fn thin_cstring_function(
         is_foreign: false,
         source,
         tag: None,
-        namespace: None,
     }
 }
 
@@ -94,7 +89,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     .at(Source::internal());
 
     file.functions.push(Function {
-        name: "<interpreter entry point>".into(),
+        name: Name::plain("<interpreter entry point>"),
         parameters: Parameters::default(),
         return_type: void.clone(),
         stmts: vec![StmtKind::Return(Some(call)).at(Source::internal())],
@@ -102,7 +97,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         source,
         abide_abi: false,
         tag: Some(Tag::InterpreterEntryPoint),
-        namespace: None,
     });
 
     file.enums.insert(
@@ -130,7 +124,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     );
 
     file.structures.push(Structure {
-        name: "Project".into(),
+        name: Name::plain("Project"),
         fields: IndexMap::from_iter([(
             "kind".into(),
             Field {
@@ -185,7 +179,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     ));
 
     file.functions.push(Function {
-        name: "project".into(),
+        name: Name::plain("project"),
         parameters: Parameters {
             required: vec![
                 Parameter::new("name".into(), ptr_char.clone()),
@@ -223,7 +217,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         is_foreign: false,
         source,
         tag: None,
-        namespace: None,
     });
 }
 

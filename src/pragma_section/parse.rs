@@ -3,6 +3,7 @@ use crate::{
     ast::{AstFile, Expr, ExprKind, Function, Parameters, Stmt, StmtKind, TypeKind},
     diagnostics::ErrorDiagnostic,
     inflow::Inflow,
+    name::Name,
     parser::{self, error::ParseError, Input},
     show::{into_show, Show},
     source_files::Source,
@@ -79,7 +80,7 @@ impl PragmaSection {
             }
 
             ast_file.functions.push(Function {
-                name: "main".into(),
+                name: Name::plain("main"),
                 parameters: Parameters {
                     required: vec![],
                     is_cstyle_vararg: false,
@@ -90,7 +91,6 @@ impl PragmaSection {
                 source,
                 abide_abi: false,
                 tag: None,
-                namespace: None,
             });
         } else {
             return Err(Box::new(ParseError::expected(

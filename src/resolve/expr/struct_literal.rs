@@ -47,7 +47,7 @@ pub fn resolve_struct_literal_expr(
     let (struct_name, structure_ref) = get_core_structure_info(&resolved_type, source)?;
 
     let structure_type =
-        resolved::TypeKind::Structure(struct_name.to_string(), structure_ref).at(source);
+        resolved::TypeKind::Structure(struct_name.clone(), structure_ref).at(source);
 
     let mut next_index = 0;
     let mut resolved_fields = IndexMap::new();
