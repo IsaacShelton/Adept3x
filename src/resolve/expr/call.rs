@@ -37,12 +37,8 @@ pub fn resolve_call_expr(
     let return_type = function.return_type.clone();
 
     if let Some(required_ty) = &call.expected_to_return {
-        let resolved_required_ty = resolve_type(
-            ctx.type_search_ctx,
-            ctx.resolved_ast.source_files,
-            required_ty,
-            &mut Default::default(),
-        )?;
+        let resolved_required_ty =
+            resolve_type(ctx.type_search_ctx, required_ty, &mut Default::default())?;
 
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {

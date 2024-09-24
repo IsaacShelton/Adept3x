@@ -6,6 +6,7 @@ use crate::{
 use itertools::Itertools;
 use std::fmt::Display;
 
+#[derive(Clone, Debug)]
 pub struct ResolveError {
     pub kind: ResolveErrorKind,
     pub source: Source,
@@ -37,6 +38,9 @@ pub enum ResolveErrorKind {
         name: String,
     },
     UndeclaredType {
+        name: String,
+    },
+    AmbiguousType {
         name: String,
     },
     NotEnoughArgumentsToFunction {
@@ -210,6 +214,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::UndeclaredType { name } => {
                 write!(f, "Undeclared type '{}'", name)?;
+            }
+            ResolveErrorKind::AmbiguousType { name } => {
+                write!(f, "Ambiguous type '{}'", name)?;
             }
             ResolveErrorKind::NotEnoughArgumentsToFunction { name } => {
                 write!(f, "Not enough arguments for call to function '{}'", name)?;

@@ -87,7 +87,6 @@ pub fn resolve_stmt(
         ast::StmtKind::Declaration(declaration) => {
             let resolved_type = resolve_type(
                 ctx.type_search_ctx,
-                ctx.resolved_ast.source_files,
                 &declaration.ast_type,
                 &mut Default::default(),
             )?;

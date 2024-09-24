@@ -37,13 +37,7 @@ pub fn resolve_struct_literal_expr(
     conform_behavior: ConformBehavior,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_type = resolve_type(
-        ctx.type_search_ctx,
-        ctx.resolved_ast.source_files,
-        ast_type,
-        &mut Default::default(),
-    )?;
-
+    let resolved_type = resolve_type(ctx.type_search_ctx, ast_type, &mut Default::default())?;
     let (struct_name, structure_ref) = get_core_structure_info(&resolved_type, source)?;
 
     let structure_type =

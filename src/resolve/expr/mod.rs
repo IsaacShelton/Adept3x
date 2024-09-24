@@ -332,19 +332,14 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let resolved_type = resolve_type(
-                ctx.type_search_ctx,
-                ctx.resolved_ast.source_files,
-                result_type,
-                &mut Default::default(),
-            )?;
+            let resolved_type =
+                resolve_type(ctx.type_search_ctx, result_type, &mut Default::default())?;
 
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
                 let preferred_type = resolve_type(
                     ctx.type_search_ctx,
-                    ctx.resolved_ast.source_files,
                     expected_arg_type,
                     &mut Default::default(),
                 )?;
