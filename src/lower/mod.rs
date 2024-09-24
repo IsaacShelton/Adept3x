@@ -7,6 +7,7 @@ use crate::{
     ast::{CInteger, IntegerBits, IntegerRigidity},
     cli::BuildOptions,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
+    name::ResolvedName,
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, Member,
         NumericMode, SignOrIndeterminate, StmtKind, StructureLiteral, UnaryMathOperation,
@@ -860,7 +861,7 @@ fn lower_expr(
         ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let enum_definition = resolved_ast
                 .enums
-                .get(&enum_member_literal.enum_name)
+                .get(&ResolvedName::new(&enum_member_literal.enum_name))
                 .expect("referenced enum to exist for enum member literal");
 
             let member = enum_definition
@@ -868,7 +869,7 @@ fn lower_expr(
                 .get(&enum_member_literal.variant_name)
                 .ok_or_else(|| {
                     LowerErrorKind::NoSuchEnumMember {
-                        enum_name: enum_member_literal.enum_name.clone(),
+                        enum_name: enum_member_literal.enum_name.to_string(),
                         variant_name: enum_member_literal.variant_name.clone(),
                     }
                     .at(enum_member_literal.source)
@@ -885,7 +886,7 @@ fn lower_expr(
             let make_error = |_| {
                 LowerErrorKind::CannotFit {
                     value: value.to_string(),
-                    expected_type: enum_member_literal.enum_name.clone(),
+                    expected_type: enum_member_literal.enum_name.to_string(),
                 }
                 .at(enum_definition.source)
             };
@@ -917,7 +918,7 @@ fn lower_expr(
                 }
                 _ => {
                     return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
-                        enum_name: enum_member_literal.enum_name.clone(),
+                        enum_name: enum_member_literal.enum_name.to_string(),
                     }
                     .at(enum_definition.source))
                 }

@@ -25,13 +25,7 @@ impl FunctionSearchCtx {
     }
 
     pub fn find_function(&self, name: &Name) -> Result<resolved::FunctionRef, FindFunctionError> {
-        eprintln!("warning: function call name resolution not fully implemented yet");
-
-        let resolved_name = if !name.namespace.is_empty() {
-            ResolvedName::Project(format!("{}{}", name.namespace, name.basename).into_boxed_str())
-        } else {
-            ResolvedName::Project(name.basename.clone().into_boxed_str())
-        };
+        let resolved_name = ResolvedName::new(name);
 
         if let Some(found) = self
             .available
@@ -45,9 +39,10 @@ impl FunctionSearchCtx {
         if name.namespace.is_empty() {
             let mut matches = self.imported_namespaces.iter().filter_map(|namespace| {
                 self.available
-                    .get(&ResolvedName::Project(
-                        format!("{}/{}", namespace, name.basename).into_boxed_str(),
-                    ))
+                    .get(&ResolvedName::new(&Name::new(
+                        Some(namespace.to_string()),
+                        name.basename.clone(),
+                    )))
                     .and_then(|list| list.first())
                     .copied()
             });

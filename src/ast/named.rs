@@ -1,7 +1,8 @@
+use crate::name::Name;
 use std::fmt::Debug;
 
 pub struct Named<T> {
-    pub name: String,
+    pub name: Name,
     pub value: T,
 }
 

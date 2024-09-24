@@ -60,7 +60,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let source = alias.source;
 
                 ast_file.type_aliases.try_insert(name, alias, |name| {
-                    ParseErrorKind::TypeAliasHasMultipleDefinitions { name }.at(source)
+                    ParseErrorKind::TypeAliasHasMultipleDefinitions {
+                        name: name.to_string(),
+                    }
+                    .at(source)
                 })?;
             }
             TokenKind::EnumKeyword => {
@@ -72,7 +75,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let source = enum_definition.source;
 
                 ast_file.enums.try_insert(name, enum_definition, |name| {
-                    ParseErrorKind::EnumHasMultipleDefinitions { name }.at(source)
+                    ParseErrorKind::EnumHasMultipleDefinitions {
+                        name: name.to_string(),
+                    }
+                    .at(source)
                 })?;
             }
             TokenKind::DefineKeyword => {
@@ -83,7 +89,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let source = named_expr.source;
 
                 ast_file.helper_exprs.try_insert(name, named_expr, |name| {
-                    ParseErrorKind::DefineHasMultipleDefinitions { name }.at(source)
+                    ParseErrorKind::DefineHasMultipleDefinitions {
+                        name: name.to_string(),
+                    }
+                    .at(source)
                 })?;
             }
             TokenKind::EndOfFile => {

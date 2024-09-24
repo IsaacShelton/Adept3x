@@ -37,7 +37,7 @@ pub struct Ast<'a> {
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
-    pub enums: IndexMap<String, Enum>,
+    pub enums: IndexMap<ResolvedName, Enum>,
 }
 
 impl<'a> Ast<'a> {
@@ -161,7 +161,7 @@ pub enum TypeKind {
     AnonymousEnum(AnonymousEnum),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
-    Enum(String),
+    Enum(ResolvedName),
 }
 
 impl TypeKind {

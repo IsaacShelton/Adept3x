@@ -55,22 +55,24 @@ pub fn make_anonymous_enum(
                 if let Some(definition_name) = &definition.name {
                     let aka_value =
                         ast::ExprKind::EnumMemberLiteral(Box::new(ast::EnumMemberLiteral {
-                            enum_name: format!("enum<{}>", definition_name),
+                            enum_name: Name::plain(format!("enum<{}>", definition_name)),
                             variant_name: enumerator.name.clone(),
                             source: enumerator.source,
                         }))
                         .at(enumerator.source);
 
                     ast_file.helper_exprs.try_insert(
-                        enumerator.name.clone(),
+                        Name::plain(enumerator.name.clone()),
                         ast::HelperExpr {
                             value: aka_value,
                             source: enumerator.source,
                             is_file_local_only: false,
                         },
                         |name| {
-                            ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol { name }
-                                .at(enumerator.source)
+                            ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol {
+                                name: name.to_string(),
+                            }
+                            .at(enumerator.source)
                         },
                     )?;
                 }

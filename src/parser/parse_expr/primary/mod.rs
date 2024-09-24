@@ -89,7 +89,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                             return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
                         }
 
-                        let name = into_plain_name(name, source)?;
                         self.parse_enum_member_literal(name, source)
                     }
                     TokenKind::OpenCurly => {

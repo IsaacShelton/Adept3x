@@ -2,6 +2,7 @@ use super::{annotation::Annotation, error::ParseError, Parser};
 use crate::{
     ast::{HelperExpr, Named},
     inflow::Inflow,
+    name::Name,
     token::{Token, TokenKind},
 };
 
@@ -28,12 +29,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let value = self.parse_expr()?;
 
         Ok(Named::<HelperExpr> {
+            name: Name::plain(name),
             value: HelperExpr {
                 value,
                 source,
                 is_file_local_only: false,
             },
-            name,
         })
     }
 }

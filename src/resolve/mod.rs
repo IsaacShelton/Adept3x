@@ -22,7 +22,7 @@ use crate::{
     ast::{self, AstWorkspace, Type},
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
-    name::{Name, ResolvedName},
+    name::ResolvedName,
     resolved::{self, Enum, TypedExpr, VariableStorage},
     source_files::Source,
     tag::Tag,
@@ -45,11 +45,11 @@ struct ResolveCtx<'a> {
     pub type_search_ctxs: IndexMap<FsNodeId, TypeSearchCtx<'a>>,
     pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
     pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx>,
-    pub helper_exprs: IndexMap<String, &'a ast::HelperExpr>,
+    pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
 }
 
 impl<'a> ResolveCtx<'a> {
-    fn new(helper_exprs: IndexMap<String, &'a ast::HelperExpr>) -> Self {
+    fn new(helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>) -> Self {
         Self {
             jobs: Default::default(),
             type_search_ctxs: Default::default(),
@@ -76,9 +76,11 @@ pub fn resolve<'a>(
 
         for (name, helper_expr) in file.helper_exprs.iter() {
             if !helper_expr.is_file_local_only {
-                helper_exprs.try_insert(name.clone(), helper_expr, |define_name| {
-                    ResolveErrorKind::MultipleDefinesNamed { name: define_name }
-                        .at(helper_expr.source)
+                helper_exprs.try_insert(ResolvedName::new(name), helper_expr, |define_name| {
+                    ResolveErrorKind::MultipleDefinesNamed {
+                        name: define_name.to_string(),
+                    }
+                    .at(helper_expr.source)
                 })?;
             }
         }
@@ -128,7 +130,7 @@ pub fn resolve<'a>(
             let members = enum_definition.members.clone();
 
             resolved_ast.enums.insert(
-                enum_name.clone(),
+                ResolvedName::new(enum_name),
                 Enum {
                     resolved_type,
                     source: enum_definition.source,
@@ -137,8 +139,8 @@ pub fn resolve<'a>(
             );
 
             type_search_ctx.put_type(
-                &Name::plain(enum_name.clone()),
-                resolved::TypeKind::Enum(enum_name.clone()),
+                enum_name,
+                resolved::TypeKind::Enum(ResolvedName::new(enum_name)),
                 enum_definition.source,
             )?;
         }
@@ -199,7 +201,7 @@ pub fn resolve<'a>(
             let resolved_type =
                 resolve_type_or_undeclared(type_search_ctx, &alias.value, &mut used_aliases)?;
 
-            type_search_ctx.override_type(&Name::plain(alias_name.clone()), resolved_type.kind);
+            type_search_ctx.override_type(&alias_name, resolved_type.kind);
         }
     }
 

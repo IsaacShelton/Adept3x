@@ -2,16 +2,17 @@ use super::{
     enumeration::Enum, global_variable::GlobalVar, structure::Structure, type_alias::TypeAlias,
     Function, HelperExpr, SettingsId,
 };
+use crate::name::Name;
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct AstFile {
     pub functions: Vec<Function>,
     pub structures: Vec<Structure>,
-    pub type_aliases: IndexMap<String, TypeAlias>,
+    pub type_aliases: IndexMap<Name, TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
-    pub enums: IndexMap<String, Enum>,
-    pub helper_exprs: IndexMap<String, HelperExpr>,
+    pub enums: IndexMap<Name, Enum>,
+    pub helper_exprs: IndexMap<Name, HelperExpr>,
     pub settings: Option<SettingsId>,
 }
 

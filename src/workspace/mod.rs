@@ -26,6 +26,7 @@ use crate::{
     line_column::Location,
     llvm_backend::llvm_backend,
     lower::lower,
+    name::Name,
     parser::{parse, Input, Parser},
     resolve::resolve,
     show::{into_show, Show},
@@ -381,7 +382,7 @@ fn header(
                     )
                 }) {
                     ast_file.helper_exprs.insert(
-                        define_name.clone(),
+                        Name::plain(define_name.clone()),
                         ast::HelperExpr {
                             value,
                             source: define.source,

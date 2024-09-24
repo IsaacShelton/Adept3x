@@ -100,7 +100,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     });
 
     file.enums.insert(
-        "ProjectKind".into(),
+        Name::plain("ProjectKind"),
         Enum {
             backing_type: Some(TypeKind::u64().at(source)),
             source,

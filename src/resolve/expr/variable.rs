@@ -1,5 +1,6 @@
 use super::{PreferredType, ResolveExprCtx};
 use crate::{
+    name::{Name, ResolvedName},
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         expr::resolve_expr,
@@ -51,7 +52,12 @@ pub fn resolve_variable_expr(
                 source,
             ),
         ))
-    } else if let Some(define) = ctx.helper_exprs.get(name) {
+    } else if let Some(define) = ctx
+        .helper_exprs
+        // TODO: CLEANUP: PERFORMANCE: Once we have proper support for
+        // namespaced helper expressions, this should be cleaned up
+        .get(&ResolvedName::new(&Name::new(None::<&str>, name)))
+    {
         let TypedExpr {
             resolved_type,
             expr,

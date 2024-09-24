@@ -10,6 +10,7 @@ use crate::{
     ast::{self, AstFile},
     c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError},
     diagnostics::Diagnostics,
+    name::Name,
 };
 use std::collections::HashMap;
 
@@ -32,7 +33,7 @@ pub fn declare_named_declaration(
 
     if is_typedef {
         ast_file.type_aliases.insert(
-            name.to_string(),
+            Name::plain(name.clone()),
             ast::TypeAlias {
                 value: ast_type.clone(),
                 source: declarator.source,

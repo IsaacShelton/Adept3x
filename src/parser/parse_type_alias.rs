@@ -2,6 +2,7 @@ use super::{annotation::Annotation, error::ParseError, Parser};
 use crate::{
     ast::{Named, TypeAlias},
     inflow::Inflow,
+    name::Name,
     token::{Token, TokenKind},
 };
 
@@ -28,7 +29,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let becomes_type = self.parse_type(None::<&str>, Some("for type alias"))?;
 
         Ok(Named::<TypeAlias> {
-            name,
+            name: Name::plain(name),
             value: TypeAlias {
                 value: becomes_type,
                 source,

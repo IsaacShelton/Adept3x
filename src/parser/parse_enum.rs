@@ -2,6 +2,7 @@ use super::{annotation::Annotation, error::ParseError, Parser};
 use crate::{
     ast::{Enum, EnumMember, Named},
     inflow::Inflow,
+    name::Name,
     token::{Token, TokenKind},
 };
 use indexmap::IndexMap;
@@ -54,7 +55,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.parse_token(TokenKind::CloseParen, Some("to close enum body"))?;
 
         Ok(Named::<Enum> {
-            name,
+            name: Name::plain(name),
             value: Enum {
                 backing_type: None,
                 members,

@@ -2,6 +2,7 @@ use super::Parser;
 use crate::{
     ast::{EnumMemberLiteral, Expr, ExprKind},
     inflow::Inflow,
+    name::Name,
     parser::error::{ParseError, ParseErrorKind},
     source_files::Source,
     token::{Token, TokenKind},
@@ -10,7 +11,7 @@ use crate::{
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_enum_member_literal(
         &mut self,
-        enum_name: String,
+        enum_name: Name,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // EnumName::EnumVariant

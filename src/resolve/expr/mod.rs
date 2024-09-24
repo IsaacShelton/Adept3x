@@ -28,6 +28,7 @@ use crate::{
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, Language, Settings, UnaryOperator,
     },
+    name::ResolvedName,
     resolve::{
         ensure_initialized,
         error::ResolveErrorKind,
@@ -53,7 +54,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub global_search_ctx: &'b GlobalSearchCtx,
     pub variable_search_ctx: VariableSearchCtx,
     pub resolved_function_ref: resolved::FunctionRef,
-    pub helper_exprs: &'b IndexMap<String, &'a ast::HelperExpr>,
+    pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub settings: &'b Settings,
 }
 
@@ -315,7 +316,8 @@ pub fn resolve_expr(
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let resolved_type =
-                resolved::TypeKind::Enum(enum_member_literal.enum_name.clone()).at(ast_expr.source);
+                resolved::TypeKind::Enum(ResolvedName::new(&enum_member_literal.enum_name))
+                    .at(ast_expr.source);
 
             Ok(TypedExpr::new(
                 resolved_type,
