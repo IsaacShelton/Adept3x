@@ -435,7 +435,7 @@ pub enum ExprKind {
     While(Box<While>),
     ArrayAccess(Box<ArrayAccess>),
     EnumMemberLiteral(Box<EnumMemberLiteral>),
-    ResolvedNamedExpression(String, Box<Expr>),
+    ResolvedNamedExpression(Box<Expr>),
     Zeroed(Box<Type>),
     InterpreterSyscall(InterpreterSyscallKind, Vec<Expr>),
 }

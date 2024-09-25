@@ -160,6 +160,9 @@ pub enum ResolveErrorKind {
         ty: String,
         member: String,
     },
+    AmbiguousSymbol {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -411,6 +414,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::StaticMemberOfTypeDoesNotExist { ty, member } => {
                 write!(f, "Static member '{member}' does not exist on type '{ty}'")?;
+            }
+            ResolveErrorKind::AmbiguousSymbol { name } => {
+                write!(f, "Ambiguous symbol '{name}'")?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
