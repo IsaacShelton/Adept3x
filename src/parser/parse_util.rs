@@ -51,10 +51,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         match token.kind {
             TokenKind::NamespacedIdentifier(name) => Ok(name),
-            TokenKind::Identifier(basename) => Ok(Name {
-                namespace: "".into(),
-                basename,
-            }),
+            TokenKind::Identifier(basename) => Ok(Name::plain(basename)),
             _ => Err(ParseError::expected("identifier", for_reason, token)),
         }
     }

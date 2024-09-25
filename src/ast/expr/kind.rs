@@ -3,12 +3,12 @@ use super::{
     Integer, InterpreterSyscall, ShortCircuitingBinaryOperation, StructureLiteral, UnaryOperation,
     While,
 };
-use crate::source_files::Source;
+use crate::{name::Name, source_files::Source};
 use std::ffi::CString;
 
 #[derive(Clone, Debug)]
 pub enum ExprKind {
-    Variable(String),
+    Variable(Name),
     Boolean(bool),
     Integer(Integer),
     Float(f64),

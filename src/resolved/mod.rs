@@ -62,7 +62,7 @@ pub struct Enum {
 
 #[derive(Clone, Debug)]
 pub struct GlobalVar {
-    pub name: String,
+    pub name: ResolvedName,
     pub resolved_type: Type,
     pub source: Source,
     pub is_foreign: bool,

@@ -6,6 +6,7 @@ use super::{
 use crate::{
     ast::GlobalVar,
     inflow::Inflow,
+    name::Name,
     token::{Token, TokenKind},
 };
 
@@ -19,11 +20,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let mut is_foreign = false;
         let mut is_thread_local = false;
+        let mut namespace = None;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::ThreadLocal => is_thread_local = true,
+                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 _ => {
                     return Err(self.unexpected_annotation(&annotation, Some("for global variable")))
                 }
@@ -41,7 +44,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 
         Ok(GlobalVar {
-            name,
+            name: Name::new(namespace, name),
             ast_type,
             source,
             is_foreign,

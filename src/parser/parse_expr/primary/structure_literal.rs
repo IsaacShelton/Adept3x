@@ -2,6 +2,7 @@ use super::Parser;
 use crate::{
     ast::{Expr, ExprKind, FieldInitializer, FillBehavior, Language, StructureLiteral, Type},
     inflow::Inflow,
+    name::Name,
     parser::error::ParseError,
     token::{Token, TokenKind},
 };
@@ -38,7 +39,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 self.ignore_newlines();
 
                 let field_value = if dupe {
-                    ExprKind::Variable(field_name.clone()).at(source)
+                    ExprKind::Variable(Name::plain(field_name.clone())).at(source)
                 } else {
                     self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
                     self.ignore_newlines();

@@ -1,4 +1,8 @@
-use super::{annotation::Annotation, error::ParseError, Parser};
+use super::{
+    annotation::{Annotation, AnnotationKind},
+    error::ParseError,
+    Parser,
+};
 use crate::{
     ast::{HelperExpr, Named},
     inflow::Inflow,
@@ -14,6 +18,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.source_here();
         self.input.advance();
 
+        let mut namespace = None;
         let name = self.parse_identifier(Some("for define name after 'define' keyword"))?;
         self.ignore_newlines();
 
@@ -22,6 +27,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
+                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for define"))),
             }
         }
@@ -29,7 +35,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let value = self.parse_expr()?;
 
         Ok(Named::<HelperExpr> {
-            name: Name::plain(name),
+            name: Name::new(namespace, name),
             value: HelperExpr {
                 value,
                 source,

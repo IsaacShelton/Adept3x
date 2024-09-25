@@ -61,7 +61,10 @@ fn thin_cstring_function(
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: syscall_kind,
-                args: vec![(ptr_char.clone(), ExprKind::Variable(param_name).at(source))],
+                args: vec![(
+                    ptr_char.clone(),
+                    ExprKind::Variable(Name::plain(param_name)).at(source),
+                )],
                 result_type: void.clone(),
             }))
             .at(source),
@@ -197,12 +200,12 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                 args: vec![
                     (
                         ptr_char.clone(),
-                        ExprKind::Variable("name".into()).at(source),
+                        ExprKind::Variable(Name::plain("name")).at(source),
                     ),
                     (
                         TypeKind::Named(Name::plain("ProjectKind")).at(source),
                         ExprKind::Member(
-                            Box::new(ExprKind::Variable("project".into()).at(source)),
+                            Box::new(ExprKind::Variable(Name::plain("project")).at(source)),
                             "kind".into(),
                         )
                         .at(source),

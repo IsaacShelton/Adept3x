@@ -1,5 +1,6 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
+    name::ResolvedName,
     resolved::{self, GlobalVarRef},
     source_files::Source,
 };
@@ -7,7 +8,7 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct GlobalSearchCtx {
-    globals: HashMap<String, (resolved::Type, GlobalVarRef)>,
+    globals: HashMap<ResolvedName, (resolved::Type, GlobalVarRef)>,
 }
 
 impl GlobalSearchCtx {
@@ -19,7 +20,7 @@ impl GlobalSearchCtx {
 
     pub fn find_global_or_error(
         &self,
-        name: &str,
+        name: &ResolvedName,
         source: Source,
     ) -> Result<(&resolved::Type, &GlobalVarRef), ResolveError> {
         match self.find_global(name) {
@@ -31,7 +32,7 @@ impl GlobalSearchCtx {
         }
     }
 
-    pub fn find_global(&self, name: &str) -> Option<(&resolved::Type, &GlobalVarRef)> {
+    pub fn find_global(&self, name: &ResolvedName) -> Option<(&resolved::Type, &GlobalVarRef)> {
         if let Some((resolved_type, key)) = self.globals.get(name) {
             return Some((resolved_type, key));
         }
@@ -40,11 +41,10 @@ impl GlobalSearchCtx {
 
     pub fn put(
         &mut self,
-        name: impl ToString,
+        name: ResolvedName,
         resolved_type: resolved::Type,
         reference: GlobalVarRef,
     ) {
-        self.globals
-            .insert(name.to_string(), (resolved_type, reference));
+        self.globals.insert(name, (resolved_type, reference));
     }
 }

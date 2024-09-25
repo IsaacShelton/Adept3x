@@ -221,15 +221,17 @@ pub fn resolve<'a>(
             let resolved_type =
                 resolve_type(type_search_ctx, &global.ast_type, &mut Default::default())?;
 
+            let resolved_name = ResolvedName::new(&global.name);
+
             let global_ref = resolved_ast.globals.insert(resolved::GlobalVar {
-                name: global.name.clone(),
+                name: resolved_name.clone(),
                 resolved_type: resolved_type.clone(),
                 source: global.source,
                 is_foreign: global.is_foreign,
                 is_thread_local: global.is_thread_local,
             });
 
-            global_search_context.put(global.name.clone(), resolved_type, global_ref);
+            global_search_context.put(resolved_name, resolved_type, global_ref);
         }
     }
 
@@ -258,7 +260,7 @@ pub fn resolve<'a>(
                 source: function.source,
                 abide_abi: function.abide_abi,
                 tag: function.tag.or_else(|| {
-                    if options.coerce_main_signature && function.name.basename == "main" {
+                    if options.coerce_main_signature && &*function.name.basename == "main" {
                         Some(Tag::Main)
                     } else {
                         None
@@ -520,7 +522,7 @@ fn ensure_initialized(
         Err(match &subject.kind {
             ast::ExprKind::Variable(variable_name) => {
                 ResolveErrorKind::CannotUseUninitializedVariable {
-                    variable_name: variable_name.clone(),
+                    variable_name: variable_name.to_string(),
                 }
             }
             _ => ResolveErrorKind::CannotUseUninitializedValue,

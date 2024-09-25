@@ -108,10 +108,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                                         self.parse_type_from_parts(name, generics, source)?;
                                     self.parse_structure_literal_with(ast_type)
                                 }
-                                _ => Ok(Expr::new(
-                                    ExprKind::Variable(into_plain_name(name, source)?),
-                                    source,
-                                )),
+                                _ => Ok(Expr::new(ExprKind::Variable(name), source)),
                             }
                         }
                     }
@@ -128,10 +125,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                             return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
                         }
 
-                        Ok(Expr::new(
-                            ExprKind::Variable(into_plain_name(name, source)?),
-                            source,
-                        ))
+                        Ok(Expr::new(ExprKind::Variable(name), source))
                     }
                 }
             }

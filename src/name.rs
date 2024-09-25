@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Name {
-    pub namespace: String,
-    pub basename: String,
+    pub namespace: Box<str>,
+    pub basename: Box<str>,
 }
 
 impl Name {
@@ -11,21 +11,22 @@ impl Name {
         Self {
             namespace: namespace
                 .map(|namespace| namespace.into())
-                .unwrap_or_default(),
-            basename: basename.into(),
+                .unwrap_or_default()
+                .into_boxed_str(),
+            basename: basename.into().into_boxed_str(),
         }
     }
 
     pub fn plain(basename: impl Into<String>) -> Self {
         Self {
             namespace: "".into(),
-            basename: basename.into(),
+            basename: basename.into().into_boxed_str(),
         }
     }
 
     pub fn into_plain(self) -> Option<String> {
         if self.namespace.is_empty() {
-            Some(self.basename)
+            Some(self.basename.to_string())
         } else {
             None
         }
@@ -41,7 +42,7 @@ impl Name {
 
     pub fn fullname(&self) -> String {
         if self.namespace.is_empty() {
-            self.basename.clone()
+            self.basename.clone().to_string()
         } else {
             format!("{}/{}", self.namespace, self.basename)
         }

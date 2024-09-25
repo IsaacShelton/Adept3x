@@ -12,12 +12,15 @@ use crate::{
 
 pub fn resolve_variable_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
-    name: &str,
+    name: &Name,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    if let Some(variable) = ctx.variable_search_ctx.find_variable(name) {
+    if let Some(variable) = name
+        .as_plain_str()
+        .and_then(|name| ctx.variable_search_ctx.find_variable(name))
+    {
         let function = ctx
             .resolved_ast
             .functions
@@ -30,7 +33,7 @@ pub fn resolve_variable_expr(
             .expect("found variable to exist")
             .is_initialized();
 
-        Ok(TypedExpr::new_maybe_initialized(
+        return Ok(TypedExpr::new_maybe_initialized(
             variable.resolved_type.clone(),
             resolved::Expr::new(
                 resolved::ExprKind::Variable(Box::new(resolved::Variable {
@@ -40,9 +43,13 @@ pub fn resolve_variable_expr(
                 source,
             ),
             is_initialized,
-        ))
-    } else if let Some((resolved_type, reference)) = ctx.global_search_ctx.find_global(name) {
-        Ok(TypedExpr::new(
+        ));
+    }
+
+    let resolved_name = ResolvedName::new(name);
+
+    if let Some((resolved_type, reference)) = ctx.global_search_ctx.find_global(&resolved_name) {
+        return Ok(TypedExpr::new(
             resolved_type.clone(),
             resolved::Expr::new(
                 resolved::ExprKind::GlobalVariable(Box::new(resolved::GlobalVariable {
@@ -51,31 +58,32 @@ pub fn resolve_variable_expr(
                 })),
                 source,
             ),
-        ))
-    } else if let Some(define) = ctx
-        .helper_exprs
-        // TODO: CLEANUP: PERFORMANCE: Once we have proper support for
-        // namespaced helper expressions, this should be cleaned up
-        .get(&ResolvedName::new(&Name::new(None::<&str>, name)))
-    {
+        ));
+    }
+
+    if let Some(define) = ctx.helper_exprs.get(&resolved_name) {
         let TypedExpr {
             resolved_type,
             expr,
             is_initialized,
         } = resolve_expr(ctx, &define.value, preferred_type, initialized)?;
 
-        Ok(TypedExpr::new_maybe_initialized(
+        return Ok(TypedExpr::new_maybe_initialized(
             resolved_type,
             resolved::Expr::new(
                 resolved::ExprKind::ResolvedNamedExpression(name.to_string(), Box::new(expr)),
                 source,
             ),
             is_initialized,
-        ))
-    } else {
-        Err(ResolveErrorKind::UndeclaredVariable {
-            name: name.to_string(),
-        }
-        .at(source))
+        ));
     }
+
+    // TODO: Check if any global variables from imported namespaces match
+    // TODO: Check if any helper exprs from imported namespaces match
+    // TODO: They should probably be checked at the same time
+
+    Err(ResolveErrorKind::UndeclaredVariable {
+        name: name.to_string(),
+    }
+    .at(source))
 }
