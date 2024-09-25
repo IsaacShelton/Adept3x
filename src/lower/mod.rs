@@ -7,7 +7,6 @@ use crate::{
     ast::{CInteger, IntegerBits, IntegerRigidity},
     cli::BuildOptions,
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
-    name::ResolvedName,
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, Member,
         NumericMode, SignOrIndeterminate, StmtKind, StructureLiteral, UnaryMathOperation,
@@ -861,7 +860,7 @@ fn lower_expr(
         ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let enum_definition = resolved_ast
                 .enums
-                .get(&ResolvedName::new(&enum_member_literal.enum_name))
+                .get(&enum_member_literal.enum_name)
                 .expect("referenced enum to exist for enum member literal");
 
             let member = enum_definition

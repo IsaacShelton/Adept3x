@@ -156,6 +156,10 @@ pub enum ResolveErrorKind {
     CannotPerformOnUnspecializedInteger {
         operation: String,
     },
+    StaticMemberOfTypeDoesNotExist {
+        ty: String,
+        member: String,
+    },
     Other {
         message: String,
     },
@@ -404,6 +408,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::CannotPerformOnUnspecializedInteger { operation } => {
                 write!(f, "Cannot {operation} unspecialized integers")?;
+            }
+            ResolveErrorKind::StaticMemberOfTypeDoesNotExist { ty, member } => {
+                write!(f, "Static member '{member}' does not exist on type '{ty}'")?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

@@ -2,7 +2,7 @@ mod variable_storage;
 
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{
-    CInteger, EnumMember, EnumMemberLiteral, FloatSize, IntegerBits, IntegerKnown, IntegerSign,
+    CInteger, EnumMember, FloatSize, IntegerBits, IntegerKnown, IntegerSign,
     ShortCircuitingBinaryOperator, UnaryMathOperator,
 };
 use crate::{
@@ -486,6 +486,13 @@ pub struct ArrayAccess {
     pub subject: Expr,
     pub item_type: Type,
     pub index: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumMemberLiteral {
+    pub enum_name: ResolvedName,
+    pub variant_name: String,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]

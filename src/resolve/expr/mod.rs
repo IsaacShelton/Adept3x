@@ -315,14 +315,31 @@ pub fn resolve_expr(
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
-            let resolved_type =
-                resolved::TypeKind::Enum(ResolvedName::new(&enum_member_literal.enum_name))
-                    .at(ast_expr.source);
+            let resolved_type = resolve_type(
+                ctx.type_search_ctx,
+                &ast::TypeKind::Named(enum_member_literal.enum_name.clone())
+                    .at(enum_member_literal.source),
+                &mut Default::default(),
+            )?;
+
+            let TypeKind::Enum(resolved_name) = &resolved_type.kind else {
+                return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
+                    ty: enum_member_literal.enum_name.to_string(),
+                    member: enum_member_literal.variant_name.clone(),
+                }
+                .at(source));
+            };
+
+            let resolved_name = resolved_name.clone();
 
             Ok(TypedExpr::new(
                 resolved_type,
                 resolved::Expr::new(
-                    resolved::ExprKind::EnumMemberLiteral(enum_member_literal.clone()),
+                    resolved::ExprKind::EnumMemberLiteral(Box::new(resolved::EnumMemberLiteral {
+                        enum_name: resolved_name,
+                        variant_name: enum_member_literal.variant_name.clone(),
+                        source,
+                    })),
                     source,
                 ),
             ))
