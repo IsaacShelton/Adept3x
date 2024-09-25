@@ -143,12 +143,11 @@ impl<'a> TypeSearchCtx<'a> {
 
     pub fn put_type_alias(
         &mut self,
-        name: impl ToString,
+        name: &Name,
         value: &'a ast::TypeAlias,
         source: Source,
     ) -> Result<(), ResolveError> {
-        eprintln!("warning: TypeSearchCtx::put_type_alias always puts at root");
-        let resolved_name = ResolvedName::Project(name.to_string().into_boxed_str());
+        let resolved_name = ResolvedName::new(&name);
 
         if self
             .types

@@ -104,7 +104,7 @@ pub fn resolve<'a>(
         });
 
         for (alias_name, alias) in file.type_aliases.iter() {
-            type_aliases.put_type_alias(alias_name.clone(), alias, alias.source)?;
+            type_aliases.put_type_alias(&alias_name, alias, alias.source)?;
         }
     }
 
