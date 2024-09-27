@@ -32,3 +32,7 @@ Adept 3.x will have:
 - New documentation generator
 - No more support for old alternative syntaxes
 - Additional fixes for previous design mistakes
+
+## Thank you for sponsoring Adept ❤️
+
+- Spoiledpay

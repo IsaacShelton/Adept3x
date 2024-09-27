@@ -85,6 +85,7 @@ pub enum ParseErrorKind {
     },
     GenericsNotSupportedHere,
     NamespaceNotAllowedHere,
+    CharLiteralCannotBeLargerThanOneByte,
     Other {
         message: String,
     },
@@ -210,6 +211,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::NamespaceNotAllowedHere => {
                 write!(f, "Namespace not allowed here")?;
+            }
+            ParseErrorKind::CharLiteralCannotBeLargerThanOneByte => {
+                write!(f, "char literal cannot be larger than 1 byte")?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;

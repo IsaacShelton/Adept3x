@@ -147,7 +147,6 @@ pub fn resolve_expr(
                     resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                         rigidity: known.rigidity.clone(),
                         value: known.value.clone(),
-                        sign: known.sign,
                     }))
                     .at(source),
                 ),
@@ -158,6 +157,18 @@ pub fn resolve_expr(
             };
 
             Ok(TypedExpr::new(resolved_type, expr))
+        }
+        ast::ExprKind::CharLiteral(value) => {
+            let expr = resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                rigidity: ast::IntegerRigidity::Loose(CInteger::Char, None),
+                value: (*value).into(),
+            }))
+            .at(source);
+
+            Ok(TypedExpr::new(
+                resolved::TypeKind::CInteger(CInteger::Char, None).at(source),
+                expr,
+            ))
         }
         ast::ExprKind::Float(value) => Ok(TypedExpr::new(
             resolved::TypeKind::FloatLiteral(*value).at(source),

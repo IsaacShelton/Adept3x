@@ -14,6 +14,7 @@ pub enum ExprKind {
     Float(f64),
     String(String),
     NullTerminatedString(CString),
+    CharLiteral(u8),
     Call(Box<Call>),
     DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),

@@ -472,13 +472,17 @@ fn lower_expr(
         }
         ExprKind::IntegerKnown(integer) => {
             let value = &integer.value;
-            let sign = &integer.sign;
 
-            let bits = match &integer.rigidity {
-                IntegerRigidity::Fixed(bits) => *bits,
-                IntegerRigidity::Loose(c_integer) => {
-                    IntegerBits::try_from(c_integer.bytes(&ir_module.target))
-                        .expect("supported integer size")
+            let (bits, sign) = match &integer.rigidity {
+                IntegerRigidity::Fixed(bits, sign) => (*bits, *sign),
+                IntegerRigidity::Loose(c_integer, sign) => {
+                    let bits = IntegerBits::try_from(c_integer.bytes(&ir_module.target))
+                        .expect("supported integer size");
+
+                    let sign =
+                        sign.unwrap_or_else(|| ir_module.target.default_c_integer_sign(*c_integer));
+
+                    (bits, sign)
                 }
             };
 

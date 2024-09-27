@@ -291,6 +291,16 @@ impl<T: Text + Send> Lexer<T> {
                 });
                 Waiting
             }
+            'c' if self.characters.peek().is('\'') => {
+                // C `char` literal
+                self.state = State::String(StringState {
+                    value: String::new(),
+                    closing_char: self.characters.next().unwrap().0,
+                    modifier: StringModifier::CharLiteral,
+                    start_source: source,
+                });
+                Waiting
+            }
             _ if c.is_alphabetic() || c == '_' => {
                 self.state = State::Identifier(IdentifierState {
                     identifier: String::from(c),
@@ -355,40 +365,46 @@ impl<T: Text + Send> Lexer<T> {
 
         let state = self.state.as_mut_string();
 
-        match self.characters.next() {
-            Character::At(c, c_source) => {
-                if c == state.closing_char {
-                    let value = std::mem::take(&mut state.value);
-                    let modifier = state.modifier;
-                    let start_source = state.start_source;
-                    self.state = State::Idle;
-
-                    Has(TokenKind::String(StringLiteral { value, modifier }).at(start_source))
-                } else if c == '\\' {
-                    if let Character::At(next_c, _) = self.characters.next() {
-                        match next_c {
-                            'n' => state.value.push('\n'),
-                            'r' => state.value.push('\r'),
-                            't' => state.value.push('\t'),
-                            _ => state.value.push(next_c),
-                        }
-
-                        Waiting
-                    } else {
-                        Has(
-                            TokenKind::Error("Expected character after string esacpe '\\'".into())
-                                .at(c_source),
-                        )
-                    }
-                } else {
-                    state.value.push(c);
-                    Waiting
+        let Character::At(c, c_source) = self.characters.next() else {
+            let message = match state.modifier {
+                StringModifier::Normal | StringModifier::NullTerminated => {
+                    "Unclosed string literal"
                 }
-            }
-            Character::End(_) => {
-                Has(TokenKind::Error("Unclosed string literal".into()).at(state.start_source))
-            }
+                StringModifier::CharLiteral => "Unclosed character literal",
+            };
+
+            return Has(TokenKind::Error(message.into()).at(state.start_source));
+        };
+
+        if c == state.closing_char {
+            let value = std::mem::take(&mut state.value);
+            let modifier = state.modifier;
+            let start_source = state.start_source;
+            self.state = State::Idle;
+
+            return Has(TokenKind::String(StringLiteral { value, modifier }).at(start_source));
         }
+
+        if c != '\\' {
+            state.value.push(c);
+            return Waiting;
+        }
+
+        let Character::At(next_c, _) = self.characters.next() else {
+            return Has(
+                TokenKind::Error("Expected character after escaping '\\'".into()).at(c_source),
+            );
+        };
+
+        match next_c {
+            'n' => state.value.push('\n'),
+            'r' => state.value.push('\r'),
+            't' => state.value.push('\t'),
+            '"' | '\'' => state.value.push(next_c),
+            _ => return Has(TokenKind::Error("Unrecognized escape sequence".into()).at(c_source)),
+        }
+
+        Waiting
     }
 
     fn feed_number(&mut self) -> FeedResult<Token> {

@@ -47,9 +47,8 @@ fn from_integer_literal_to_integer(
         TypedExpr::new(
             TypeKind::Integer(to_bits, to_sign).at(source),
             ExprKind::IntegerKnown(Box::new(IntegerKnown {
-                rigidity: IntegerRigidity::Fixed(to_bits),
+                rigidity: IntegerRigidity::Fixed(to_bits, to_sign),
                 value: value.clone(),
-                sign: to_sign,
             }))
             .at(source),
         )
@@ -70,9 +69,8 @@ fn from_integer_literal_to_c_integer(
         TypedExpr::new(
             TypeKind::CInteger(to_c_integer, to_sign).at(source),
             ExprKind::IntegerKnown(Box::new(IntegerKnown {
-                rigidity: IntegerRigidity::Loose(to_c_integer),
+                rigidity: IntegerRigidity::Loose(to_c_integer, to_sign),
                 value: value.clone(),
-                sign: to_sign.unwrap_or(IntegerSign::Signed),
             }))
             .at(source),
         )

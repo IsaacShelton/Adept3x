@@ -67,6 +67,21 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 },
                 source,
             )),
+            TokenKind::String(StringLiteral {
+                modifier: StringModifier::CharLiteral,
+                ..
+            }) => {
+                let content = self.input.advance().kind.unwrap_string().value;
+
+                if content.len() != 1 {
+                    return Err(ParseErrorKind::CharLiteralCannotBeLargerThanOneByte.at(source));
+                }
+
+                Ok(Expr::new(
+                    ExprKind::CharLiteral(content.as_bytes()[0]),
+                    source,
+                ))
+            }
             TokenKind::OpenParen => {
                 self.input.advance().kind.unwrap_open_paren();
                 let inner = self.parse_expr()?;

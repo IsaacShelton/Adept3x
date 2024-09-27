@@ -38,6 +38,7 @@ impl InflowEnd for Token {
 pub enum StringModifier {
     Normal,
     NullTerminated,
+    CharLiteral,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -16,15 +16,14 @@ pub enum Integer {
 pub struct IntegerKnown {
     pub rigidity: IntegerRigidity,
     pub value: BigInt,
-    pub sign: IntegerSign,
 }
 
 impl IntegerKnown {
     pub fn make_type(&self, source: Source) -> resolved::Type {
         match self.rigidity {
-            IntegerRigidity::Fixed(bits) => resolved::TypeKind::Integer(bits, self.sign),
-            IntegerRigidity::Loose(c_integer) => {
-                resolved::TypeKind::CInteger(c_integer, Some(self.sign))
+            IntegerRigidity::Fixed(bits, sign) => resolved::TypeKind::Integer(bits, sign),
+            IntegerRigidity::Loose(c_integer, sign) => {
+                resolved::TypeKind::CInteger(c_integer, sign)
             }
         }
         .at(source)
@@ -33,8 +32,8 @@ impl IntegerKnown {
 
 #[derive(Clone, Debug)]
 pub enum IntegerRigidity {
-    Fixed(IntegerBits),
-    Loose(CInteger),
+    Fixed(IntegerBits, IntegerSign),
+    Loose(CInteger, Option<IntegerSign>),
 }
 
 impl Integer {

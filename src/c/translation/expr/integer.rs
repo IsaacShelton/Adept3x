@@ -8,34 +8,28 @@ use crate::{
 pub fn translate_expr_integer(integer: &Integer, source: Source) -> Result<ast::Expr, ParseError> {
     let known = match integer {
         Integer::Int(x) => IntegerKnown {
-            rigidity: IntegerRigidity::Loose(CInteger::Int),
+            rigidity: IntegerRigidity::Loose(CInteger::Int, Some(IntegerSign::Signed)),
             value: (*x).into(),
-            sign: IntegerSign::Signed,
         },
         Integer::UnsignedInt(x) => IntegerKnown {
-            rigidity: IntegerRigidity::Loose(CInteger::Int),
+            rigidity: IntegerRigidity::Loose(CInteger::Int, Some(IntegerSign::Unsigned)),
             value: (*x).into(),
-            sign: IntegerSign::Unsigned,
         },
         Integer::Long(x) => IntegerKnown {
-            rigidity: IntegerRigidity::Loose(CInteger::Long),
+            rigidity: IntegerRigidity::Loose(CInteger::Long, Some(IntegerSign::Signed)),
             value: (*x).into(),
-            sign: IntegerSign::Signed,
         },
         Integer::UnsignedLong(x) => IntegerKnown {
-            rigidity: IntegerRigidity::Loose(CInteger::Long),
+            rigidity: IntegerRigidity::Loose(CInteger::Long, Some(IntegerSign::Unsigned)),
             value: (*x).into(),
-            sign: IntegerSign::Unsigned,
         },
         Integer::LongLong(x) => IntegerKnown {
-            rigidity: IntegerRigidity::Loose(CInteger::LongLong),
+            rigidity: IntegerRigidity::Loose(CInteger::LongLong, Some(IntegerSign::Signed)),
             value: (*x).into(),
-            sign: IntegerSign::Signed,
         },
         Integer::UnsignedLongLong(x) => IntegerKnown {
-            rigidity: IntegerRigidity::Loose(CInteger::LongLong),
+            rigidity: IntegerRigidity::Loose(CInteger::LongLong, Some(IntegerSign::Unsigned)),
             value: (*x).into(),
-            sign: IntegerSign::Unsigned,
         },
     };
 
