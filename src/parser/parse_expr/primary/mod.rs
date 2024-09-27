@@ -82,6 +82,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     source,
                 ))
             }
+            TokenKind::String(StringLiteral {
+                modifier: StringModifier::RuneLiteral,
+                ..
+            }) => {
+                let content = self.input.advance().kind.unwrap_string().value;
+                Ok(Expr::new(ExprKind::Char(content), source))
+            }
             TokenKind::OpenParen => {
                 self.input.advance().kind.unwrap_open_paren();
                 let inner = self.parse_expr()?;

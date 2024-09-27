@@ -163,6 +163,7 @@ pub enum ResolveErrorKind {
     AmbiguousSymbol {
         name: String,
     },
+    UndeterminedCharacterLiteral,
     Other {
         message: String,
     },
@@ -417,6 +418,12 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::AmbiguousSymbol { name } => {
                 write!(f, "Ambiguous symbol '{name}'")?;
+            }
+            ResolveErrorKind::UndeterminedCharacterLiteral => {
+                write!(
+                    f,
+                    "Undetermined character literal, consider using c'A' if you want a 'char'"
+                )?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

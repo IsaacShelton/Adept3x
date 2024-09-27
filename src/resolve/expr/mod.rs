@@ -129,7 +129,7 @@ impl<'a> PreferredType<'a> {
 }
 
 pub fn resolve_expr(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     ast_expr: &ast::Expr,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
@@ -139,6 +139,28 @@ pub fn resolve_expr(
     let resolved_expr = match &ast_expr.kind {
         ast::ExprKind::Variable(name) => {
             resolve_variable_expr(ctx, name, preferred_type, initialized, source)
+        }
+        ast::ExprKind::Char(content) => {
+            if content.len() == 1 {
+                if let Some(preferred_type) = preferred_type {
+                    if let TypeKind::CInteger(CInteger::Char, _) =
+                        preferred_type.view(ctx.resolved_ast).kind
+                    {
+                        let expr = resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                            rigidity: ast::IntegerRigidity::Loose(CInteger::Char, None),
+                            value: content.as_bytes()[0].into(),
+                        }))
+                        .at(source);
+
+                        return Ok(TypedExpr::new(
+                            resolved::TypeKind::CInteger(CInteger::Char, None).at(source),
+                            expr,
+                        ));
+                    }
+                }
+            }
+
+            Err(ResolveErrorKind::UndeterminedCharacterLiteral.at(source))
         }
         ast::ExprKind::Integer(value) => {
             let (resolved_type, expr) = match value {

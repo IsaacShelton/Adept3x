@@ -301,6 +301,16 @@ impl<T: Text + Send> Lexer<T> {
                 });
                 Waiting
             }
+            '\'' => {
+                // Rune Literal
+                self.state = State::String(StringState {
+                    value: String::new(),
+                    closing_char: '\'',
+                    modifier: StringModifier::RuneLiteral,
+                    start_source: source,
+                });
+                Waiting
+            }
             _ if c.is_alphabetic() || c == '_' => {
                 self.state = State::Identifier(IdentifierState {
                     identifier: String::from(c),
@@ -370,7 +380,9 @@ impl<T: Text + Send> Lexer<T> {
                 StringModifier::Normal | StringModifier::NullTerminated => {
                     "Unclosed string literal"
                 }
-                StringModifier::CharLiteral => "Unclosed character literal",
+                StringModifier::RuneLiteral | StringModifier::CharLiteral => {
+                    "Unclosed character literal"
+                }
             };
 
             return Has(TokenKind::Error(message.into()).at(state.start_source));

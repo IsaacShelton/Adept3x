@@ -24,6 +24,7 @@ compile annotation_groups
 compile array_access
 compile bitwise_operators
 compile c_printf
+compile character_literals
 compile comparison_operators
 compile defines
 compile enums

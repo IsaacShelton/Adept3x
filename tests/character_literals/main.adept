@@ -1,0 +1,12 @@
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    letter char = 'A'       // Generic character literal
+    another_letter := c'B'  // C `char` literal
+
+    printf(c"letter = %c\n", letter)
+    printf(c"another_letter = %c\n", another_letter)
+}
+

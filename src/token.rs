@@ -39,6 +39,7 @@ pub enum StringModifier {
     Normal,
     NullTerminated,
     CharLiteral,
+    RuneLiteral,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -12,6 +12,7 @@ pub enum ExprKind {
     Boolean(bool),
     Integer(Integer),
     Float(f64),
+    Char(String),
     String(String),
     NullTerminatedString(CString),
     CharLiteral(u8),
