@@ -1,3 +1,4 @@
+use super::{Objective, ObjectiveResult};
 use crate::{
     ast::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerKnown, IntegerRigidity},
     data_units::BitUnits,
@@ -8,30 +9,34 @@ use crate::{
 use num::{BigInt, Zero};
 use num_traits::ToPrimitive;
 
-pub fn from_integer_literal(
+pub fn from_integer_literal<O: Objective>(
     value: &BigInt,
     assumptions: CIntegerAssumptions,
     source: Source,
     to_type: &Type,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     match &to_type.kind {
-        TypeKind::Floating(to_size) => from_integer_literal_to_float(value, *to_size, source),
-        TypeKind::CInteger(to_c_integer, to_sign) => {
-            from_integer_literal_to_c_integer(value, *to_c_integer, *to_sign, assumptions, source)
-        }
+        TypeKind::Floating(to_size) => from_integer_literal_to_float::<O>(value, *to_size, source),
+        TypeKind::CInteger(to_c_integer, to_sign) => from_integer_literal_to_c_integer::<O>(
+            value,
+            *to_c_integer,
+            *to_sign,
+            assumptions,
+            source,
+        ),
         TypeKind::Integer(to_bits, to_sign) => {
-            from_integer_literal_to_integer(value, *to_bits, *to_sign, source)
+            from_integer_literal_to_integer::<O>(value, *to_bits, *to_sign, source)
         }
-        _ => None,
+        _ => O::fail(),
     }
 }
 
-fn from_integer_literal_to_integer(
+fn from_integer_literal_to_integer<O: Objective>(
     value: &BigInt,
     to_bits: IntegerBits,
     to_sign: IntegerSign,
     source: Source,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     let does_fit = match (to_bits, to_sign) {
         (IntegerBits::Bits8, IntegerSign::Signed) => i8::try_from(value).is_ok(),
         (IntegerBits::Bits8, IntegerSign::Unsigned) => u8::try_from(value).is_ok(),
@@ -43,49 +48,60 @@ fn from_integer_literal_to_integer(
         (IntegerBits::Bits64, IntegerSign::Unsigned) => u64::try_from(value).is_ok(),
     };
 
-    does_fit.then(|| {
-        TypedExpr::new(
-            TypeKind::Integer(to_bits, to_sign).at(source),
-            ExprKind::IntegerKnown(Box::new(IntegerKnown {
-                rigidity: IntegerRigidity::Fixed(to_bits, to_sign),
-                value: value.clone(),
-            }))
-            .at(source),
-        )
-    })
+    if does_fit {
+        return O::success(|| {
+            TypedExpr::new(
+                TypeKind::Integer(to_bits, to_sign).at(source),
+                ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                    rigidity: IntegerRigidity::Fixed(to_bits, to_sign),
+                    value: value.clone(),
+                }))
+                .at(source),
+            )
+        });
+    }
+
+    O::fail()
 }
 
-fn from_integer_literal_to_c_integer(
+fn from_integer_literal_to_c_integer<O: Objective>(
     value: &BigInt,
     to_c_integer: CInteger,
     to_sign: Option<IntegerSign>,
     assumptions: CIntegerAssumptions,
     source: Source,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     let needs_bits =
         BitUnits::of(value.bits() + (*value < BigInt::zero()).then_some(1).unwrap_or(0));
 
-    (needs_bits <= to_c_integer.min_bits(assumptions).bits()).then(|| {
-        TypedExpr::new(
-            TypeKind::CInteger(to_c_integer, to_sign).at(source),
-            ExprKind::IntegerKnown(Box::new(IntegerKnown {
-                rigidity: IntegerRigidity::Loose(to_c_integer, to_sign),
-                value: value.clone(),
-            }))
-            .at(source),
-        )
-    })
+    if needs_bits <= to_c_integer.min_bits(assumptions).bits() {
+        return O::success(|| {
+            TypedExpr::new(
+                TypeKind::CInteger(to_c_integer, to_sign).at(source),
+                ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                    rigidity: IntegerRigidity::Loose(to_c_integer, to_sign),
+                    value: value.clone(),
+                }))
+                .at(source),
+            )
+        });
+    }
+
+    O::fail()
 }
 
-fn from_integer_literal_to_float(
+fn from_integer_literal_to_float<O: Objective>(
     value: &BigInt,
     to_size: FloatSize,
     source: Source,
-) -> Option<TypedExpr> {
-    value.to_f64().map(|literal| {
-        TypedExpr::new(
-            TypeKind::Floating(to_size).at(source),
-            Expr::new(ExprKind::FloatingLiteral(to_size, literal), source),
-        )
-    })
+) -> ObjectiveResult<O> {
+    match value.to_f64() {
+        Some(literal) => O::success(|| {
+            TypedExpr::new(
+                TypeKind::Floating(to_size).at(source),
+                Expr::new(ExprKind::FloatingLiteral(to_size, literal), source),
+            )
+        }),
+        None => O::fail(),
+    }
 }

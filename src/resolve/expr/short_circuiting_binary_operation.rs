@@ -32,7 +32,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         ctx.adept_conform_behavior(),
         source,
     )
-    .ok_or_else(|| {
+    .map_err(|_| {
         ResolveErrorKind::ExpectedTypeForSide {
             side: "left-hand side".to_string(),
             operator: binary_operation.operator.to_string(),
@@ -58,7 +58,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         ctx.adept_conform_behavior(),
         source,
     )
-    .ok_or_else(|| {
+    .map_err(|_| {
         ResolveErrorKind::ExpectedTypeForSide {
             side: "right-hand side".to_string(),
             operator: binary_operation.operator.to_string(),

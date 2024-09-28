@@ -22,6 +22,11 @@ pub fn resolve_call_expr(
         .at(source));
     }
 
+    let mut arguments = Vec::with_capacity(call.arguments.len());
+    for argument in call.arguments.iter() {
+        arguments.push(resolve_expr(ctx, argument, None, Initialized::Require)?);
+    }
+
     let function_ref = match ctx.function_search_ctx.find_function(&call.function_name) {
         Ok(function_ref) => function_ref,
         Err(reason) => {
@@ -65,27 +70,23 @@ pub fn resolve_call_expr(
         .at(source));
     }
 
-    let mut arguments = Vec::with_capacity(call.arguments.len());
+    for (i, argument) in arguments.iter_mut().enumerate() {
+        let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
 
-    for (i, argument) in call.arguments.iter().enumerate() {
         let preferred_type =
             (i < num_required).then_some(PreferredType::of_parameter(function_ref, i));
-
-        let mut argument = resolve_expr(ctx, argument, preferred_type, Initialized::Require)?;
-
-        let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
 
         if let Some(preferred_type) =
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
         {
-            if let Some(conformed_argument) = conform_expr(
+            if let Ok(conformed_argument) = conform_expr(
                 &argument,
                 preferred_type,
                 ConformMode::ParameterPassing,
                 ctx.adept_conform_behavior(),
                 source,
             ) {
-                argument = conformed_argument;
+                *argument = conformed_argument;
             } else {
                 return Err(ResolveErrorKind::BadTypeForArgumentToFunction {
                     expected: preferred_type.to_string(),
@@ -96,13 +97,16 @@ pub fn resolve_call_expr(
                 .at(source));
             }
         } else {
-            match conform_expr_to_default(argument, ctx.c_integer_assumptions()) {
-                Ok(conformed_argument) => argument = conformed_argument,
-                Err(error) => return Err(error),
+            match conform_expr_to_default(argument.clone(), ctx.c_integer_assumptions()) {
+                Ok(arg) => *argument = arg,
+                Err(_) => {
+                    return Err(ResolveErrorKind::Other {
+                        message: "Failed to conform argument to default value".into(),
+                    }
+                    .at(source));
+                }
             }
         }
-
-        arguments.push(argument);
     }
 
     Ok(TypedExpr::new(

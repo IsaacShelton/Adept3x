@@ -1,4 +1,4 @@
-use super::ConformMode;
+use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
     ast::{CInteger, ConformBehavior, IntegerBits},
     ir::IntegerSign,
@@ -6,17 +6,17 @@ use crate::{
     source_files::Source,
 };
 
-pub fn from_integer(
+pub fn from_integer<O: Objective>(
     expr: &TypedExpr,
     mode: ConformMode,
     behavior: ConformBehavior,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
     to_type: &Type,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     match &to_type.kind {
         TypeKind::Integer(to_bits, to_sign) => match behavior {
-            ConformBehavior::Adept(_) => from_integer_adept_mode(
+            ConformBehavior::Adept(_) => from_integer_adept_mode::<O>(
                 &expr.expr,
                 from_bits,
                 from_sign,
@@ -24,7 +24,7 @@ pub fn from_integer(
                 *to_sign,
                 to_type.source,
             ),
-            ConformBehavior::C => from_integer_c_mode(
+            ConformBehavior::C => from_integer_c_mode::<O>(
                 &expr.expr,
                 mode,
                 from_bits,
@@ -34,7 +34,7 @@ pub fn from_integer(
                 to_type.source,
             ),
         },
-        TypeKind::CInteger(to_c_integer, to_sign) => conform_from_integer_to_c_integer(
+        TypeKind::CInteger(to_c_integer, to_sign) => conform_from_integer_to_c_integer::<O>(
             expr,
             mode,
             behavior,
@@ -44,11 +44,11 @@ pub fn from_integer(
             *to_sign,
             to_type.source,
         ),
-        _ => None,
+        _ => O::fail(),
     }
 }
 
-fn from_integer_c_mode(
+fn from_integer_c_mode<O: Objective>(
     expr: &Expr,
     conform_mode: ConformMode,
     from_bits: IntegerBits,
@@ -56,11 +56,11 @@ fn from_integer_c_mode(
     to_bits: IntegerBits,
     to_sign: IntegerSign,
     type_source: Source,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     let target_type = TypeKind::Integer(to_bits, to_sign).at(type_source);
 
     if from_bits == to_bits && from_sign == to_sign {
-        return Some(TypedExpr::new(target_type, expr.clone()));
+        return O::success(|| TypedExpr::new(target_type, expr.clone()));
     }
 
     if conform_mode.allow_lossy_integer() {
@@ -72,19 +72,21 @@ fn from_integer_c_mode(
             ExprKind::IntegerTruncate(Box::new(cast))
         };
 
-        return Some(TypedExpr::new(
-            target_type,
-            Expr {
-                kind,
-                source: expr.source,
-            },
-        ));
+        return O::success(|| {
+            TypedExpr::new(
+                target_type,
+                Expr {
+                    kind,
+                    source: expr.source,
+                },
+            )
+        });
     }
 
     todo!("conform_integer_value_c {:?}", conform_mode);
 }
 
-fn conform_from_integer_to_c_integer(
+fn conform_from_integer_to_c_integer<O: Objective>(
     expr: &TypedExpr,
     mode: ConformMode,
     behavior: ConformBehavior,
@@ -93,7 +95,7 @@ fn conform_from_integer_to_c_integer(
     to_c_integer: CInteger,
     to_sign: Option<IntegerSign>,
     source: Source,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     let target_type = TypeKind::CInteger(to_c_integer, to_sign).at(source);
     let assumptions = behavior.c_integer_assumptions();
 
@@ -109,35 +111,39 @@ fn conform_from_integer_to_c_integer(
             from_type: expr.resolved_type.clone(),
         };
 
-        Some(TypedExpr::new(
-            target_type,
-            ExprKind::IntegerCast(Box::new(cast_from)).at(source),
-        ))
-    } else {
-        None
+        return O::success(|| {
+            TypedExpr::new(
+                target_type,
+                ExprKind::IntegerCast(Box::new(cast_from)).at(source),
+            )
+        });
     }
+
+    O::fail()
 }
 
-fn from_integer_adept_mode(
+fn from_integer_adept_mode<O: Objective>(
     expr: &Expr,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
     to_bits: IntegerBits,
     to_sign: IntegerSign,
     type_source: Source,
-) -> Option<TypedExpr> {
+) -> ObjectiveResult<O> {
     if to_bits < from_bits || (from_sign != to_sign && to_bits == from_bits) {
-        return None;
+        return O::fail();
     }
 
     let target_type = TypeKind::Integer(to_bits, to_sign).at(type_source);
 
     if to_sign == from_sign && to_bits == from_bits {
-        return Some(TypedExpr::new(target_type, expr.clone()));
+        return O::success(|| TypedExpr::new(target_type, expr.clone()));
     }
 
-    Some(TypedExpr::new(
-        target_type.clone(),
-        ExprKind::IntegerExtend(Box::new(Cast::new(target_type, expr.clone()))).at(expr.source),
-    ))
+    O::success(|| {
+        TypedExpr::new(
+            target_type.clone(),
+            ExprKind::IntegerExtend(Box::new(Cast::new(target_type, expr.clone()))).at(expr.source),
+        )
+    })
 }

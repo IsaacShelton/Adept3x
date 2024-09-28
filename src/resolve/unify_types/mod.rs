@@ -30,8 +30,8 @@ pub fn unify_types(
             behavior,
             conform_source,
         ) {
-            Some(conformed) => conformed,
-            None => {
+            Ok(conformed) => conformed,
+            Err(_) => {
                 panic!(
                     "cannot conform from '{}' to unified type '{unified_type}'",
                     expr.resolved_type,

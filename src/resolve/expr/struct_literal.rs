@@ -103,7 +103,7 @@ pub fn resolve_struct_literal_expr(
             conform_behavior,
             source,
         )
-        .ok_or_else(|| {
+        .map_err(|_| {
             ResolveErrorKind::ExpectedTypeForField {
                 structure: ast_type.to_string(),
                 field_name: field_name.to_string(),

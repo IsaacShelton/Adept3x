@@ -43,7 +43,7 @@ pub fn resolve_stmt(
                     .unwrap()
                     .return_type;
 
-                if let Some(result) = conform_expr(
+                if let Ok(result) = conform_expr(
                     &result,
                     return_type,
                     ConformMode::Normal,
@@ -105,20 +105,21 @@ pub fn resolve_stmt(
                 .transpose()?
                 .as_ref()
                 .map(|value| {
-                    match conform_expr(
+                    conform_expr(
                         value,
                         &resolved_type,
                         ConformMode::Normal,
                         ctx.adept_conform_behavior(),
                         source,
-                    ) {
-                        Some(value) => Ok(value.expr),
-                        None => Err(ResolveErrorKind::CannotAssignValueOfType {
+                    )
+                    .map(|value| value.expr)
+                    .map_err(|_| {
+                        ResolveErrorKind::CannotAssignValueOfType {
                             from: value.resolved_type.to_string(),
                             to: resolved_type.to_string(),
                         }
-                        .at(source)),
-                    }
+                        .at(source)
+                    })
                 })
                 .transpose()?;
 
@@ -173,7 +174,7 @@ pub fn resolve_stmt(
                 ctx.adept_conform_behavior(),
                 source,
             )
-            .ok_or_else(|| {
+            .map_err(|_| {
                 ResolveErrorKind::CannotAssignValueOfType {
                     from: value.resolved_type.to_string(),
                     to: destination_expr.resolved_type.to_string(),
