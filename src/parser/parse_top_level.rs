@@ -1,5 +1,5 @@
 use super::{
-    annotation::Annotation,
+    annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
     Parser,
 };
@@ -25,6 +25,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         while self.input.peek().is_hash() {
             annotations.push(self.parse_annotation()?);
             self.ignore_newlines();
+        }
+
+        // Parse pub keyword
+        if self.input.peek().is_pub_keyword() {
+            annotations.push(AnnotationKind::Pub.at(self.input.advance().source));
         }
 
         // Ignore newlines after annotations

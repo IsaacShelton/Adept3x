@@ -42,6 +42,7 @@ impl IdentifierState {
             "define" => TokenKind::DefineKeyword,
             "zeroed" => TokenKind::ZeroedKeyword,
             "pragma" => TokenKind::PragmaKeyword,
+            "pub" => TokenKind::PubKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)

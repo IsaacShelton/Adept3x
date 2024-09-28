@@ -28,6 +28,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let namespace = self.parse_identifier(Some("for namespace name"))?;
                 AnnotationKind::Namespace(namespace)
             }
+            "pub" => AnnotationKind::Pub,
             _ => {
                 return Err(ParseErrorKind::UnrecognizedAnnotation {
                     name: annotation_name,

@@ -37,21 +37,22 @@ impl FunctionSearchCtx {
         }
 
         if name.namespace.is_empty() {
-            let mut matches = self.imported_namespaces.iter().filter_map(|namespace| {
-                self.available
-                    .get(&ResolvedName::new(&Name::new(
+            let mut matches = self
+                .imported_namespaces
+                .iter()
+                .filter_map(|namespace| {
+                    self.available.get(&ResolvedName::new(&Name::new(
                         Some(namespace.to_string()),
                         name.basename.clone(),
                     )))
-                    .and_then(|list| list.first())
-                    .copied()
-            });
+                })
+                .flatten();
 
             if let Some(found) = matches.next() {
                 if matches.next().is_some() {
                     return Err(FindFunctionError::Ambiguous);
                 } else {
-                    return Ok(found);
+                    return Ok(*found);
                 }
             }
         }

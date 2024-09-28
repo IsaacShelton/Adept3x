@@ -1,6 +1,6 @@
 mod parameters;
 
-use super::{Stmt, Type};
+use super::{Privacy, Stmt, Type};
 use crate::{name::Name, source_files::Source, tag::Tag};
 pub use parameters::{Parameter, Parameters};
 
@@ -14,4 +14,5 @@ pub struct Function {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
+    pub privacy: Privacy,
 }

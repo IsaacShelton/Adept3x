@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Function, Parameters, TypeKind},
+    ast::{Function, Parameters, Privacy, TypeKind},
     inflow::Inflow,
     name::Name,
     token::{Token, TokenKind},
@@ -18,12 +18,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let mut is_foreign = false;
         let mut abide_abi = false;
         let mut namespace = None;
+        let mut privacy = Privacy::Private;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
+                AnnotationKind::Pub => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
         }
@@ -66,6 +68,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             source,
             abide_abi,
             tag: None,
+            privacy,
         })
     }
 }
