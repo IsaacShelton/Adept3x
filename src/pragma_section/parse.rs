@@ -1,6 +1,6 @@
 use super::PragmaSection;
 use crate::{
-    ast::{AstFile, Expr, ExprKind, Function, Parameters, Stmt, StmtKind, TypeKind},
+    ast::{AstFile, Expr, ExprKind, Function, Parameters, Privacy, Stmt, StmtKind, TypeKind},
     diagnostics::ErrorDiagnostic,
     inflow::Inflow,
     name::Name,
@@ -91,6 +91,7 @@ impl PragmaSection {
                 source,
                 abide_abi: false,
                 tag: None,
+                privacy: Privacy::Public,
             });
         } else {
             return Err(Box::new(ParseError::expected(
