@@ -71,6 +71,10 @@ pub fn from_c_integer_to_c_integer<O: Objective>(
     to_sign: Option<IntegerSign>,
     source: Source,
 ) -> ObjectiveResult<O> {
+    if !mode.allow_lossless_integer() {
+        return O::fail();
+    }
+
     let target_type = TypeKind::CInteger(to_c_integer, to_sign).at(source);
 
     let is_smaller_likeness = from_sign == to_sign && from_c_integer <= to_c_integer;

@@ -18,4 +18,12 @@ impl ConformMode {
     pub fn allow_lossy_integer(&self) -> bool {
         matches!(self, Self::Explicit)
     }
+
+    pub fn allow_lossless_integer(&self) -> bool {
+        matches!(self, Self::Normal | Self::Explicit)
+    }
+
+    pub fn allow_lossless_float(&self) -> bool {
+        matches!(self, Self::Normal | Self::Explicit)
+    }
 }

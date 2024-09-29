@@ -76,7 +76,7 @@ pub fn conform_expr<O: Objective>(
             from_integer::<O>(expr, mode, behavior, *from_bits, *from_sign, to_type)
         }
         TypeKind::FloatLiteral(from) => from_float_literal::<O>(*from, to_type, conform_source),
-        TypeKind::Floating(from_size) => from_float::<O>(expr, *from_size, to_type),
+        TypeKind::Floating(from_size) => from_float::<O>(expr, mode, *from_size, to_type),
         TypeKind::Pointer(from_inner) => from_pointer::<O>(expr, mode, from_inner, to_type),
         TypeKind::CInteger(from_size, from_sign) => {
             from_c_integer::<O>(expr, mode, *from_size, *from_sign, to_type, conform_source)

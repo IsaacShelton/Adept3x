@@ -18,6 +18,7 @@ pub fn from_integer<O: Objective>(
         TypeKind::Integer(to_bits, to_sign) => match behavior {
             ConformBehavior::Adept(_) => from_integer_adept_mode::<O>(
                 &expr.expr,
+                mode,
                 from_bits,
                 from_sign,
                 *to_bits,
@@ -50,20 +51,24 @@ pub fn from_integer<O: Objective>(
 
 fn from_integer_c_mode<O: Objective>(
     expr: &Expr,
-    conform_mode: ConformMode,
+    mode: ConformMode,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
     to_bits: IntegerBits,
     to_sign: IntegerSign,
     type_source: Source,
 ) -> ObjectiveResult<O> {
+    if !mode.allow_lossless_integer() {
+        return O::fail();
+    }
+
     let target_type = TypeKind::Integer(to_bits, to_sign).at(type_source);
 
     if from_bits == to_bits && from_sign == to_sign {
         return O::success(|| TypedExpr::new(target_type, expr.clone()));
     }
 
-    if conform_mode.allow_lossy_integer() {
+    if mode.allow_lossy_integer() {
         let cast = Cast::new(target_type.clone(), expr.clone());
 
         let kind = if from_bits < to_bits {
@@ -83,7 +88,7 @@ fn from_integer_c_mode<O: Objective>(
         });
     }
 
-    todo!("conform_integer_value_c {:?}", conform_mode);
+    todo!("conform_integer_value_c {:?}", mode);
 }
 
 fn conform_from_integer_to_c_integer<O: Objective>(
@@ -96,6 +101,10 @@ fn conform_from_integer_to_c_integer<O: Objective>(
     to_sign: Option<IntegerSign>,
     source: Source,
 ) -> ObjectiveResult<O> {
+    if !mode.allow_lossless_integer() {
+        return O::fail();
+    }
+
     let target_type = TypeKind::CInteger(to_c_integer, to_sign).at(source);
     let assumptions = behavior.c_integer_assumptions();
 
@@ -124,12 +133,17 @@ fn conform_from_integer_to_c_integer<O: Objective>(
 
 fn from_integer_adept_mode<O: Objective>(
     expr: &Expr,
+    mode: ConformMode,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
     to_bits: IntegerBits,
     to_sign: IntegerSign,
     type_source: Source,
 ) -> ObjectiveResult<O> {
+    if !mode.allow_lossless_integer() {
+        return O::fail();
+    }
+
     if to_bits < from_bits || (from_sign != to_sign && to_bits == from_bits) {
         return O::fail();
     }

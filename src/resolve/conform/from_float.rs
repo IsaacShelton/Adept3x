@@ -1,4 +1,4 @@
-use super::{Objective, ObjectiveResult};
+use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
     ast::FloatSize,
     resolved::{Cast, Expr, ExprKind, Type, TypeKind, TypedExpr},
@@ -7,9 +7,14 @@ use crate::{
 
 pub fn from_float<O: Objective>(
     expr: &TypedExpr,
+    mode: ConformMode,
     from_size: FloatSize,
     to_type: &Type,
 ) -> ObjectiveResult<O> {
+    if !mode.allow_lossless_float() {
+        return O::fail();
+    }
+
     match &to_type.kind {
         TypeKind::Floating(to_size) => {
             from_float_to_float::<O>(&expr.expr, from_size, *to_size, to_type.source)
