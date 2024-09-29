@@ -1,5 +1,5 @@
 use super::{
-    conform::{conform_expr, ConformMode},
+    conform::{conform_expr, ConformMode, Perform},
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
     expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
@@ -43,7 +43,7 @@ pub fn resolve_stmt(
                     .unwrap()
                     .return_type;
 
-                if let Ok(result) = conform_expr(
+                if let Ok(result) = conform_expr::<Perform>(
                     &result,
                     return_type,
                     ConformMode::Normal,
@@ -105,7 +105,7 @@ pub fn resolve_stmt(
                 .transpose()?
                 .as_ref()
                 .map(|value| {
-                    conform_expr(
+                    conform_expr::<Perform>(
                         value,
                         &resolved_type,
                         ConformMode::Normal,
@@ -167,7 +167,7 @@ pub fn resolve_stmt(
                 Initialized::Require,
             )?;
 
-            let value = conform_expr(
+            let value = conform_expr::<Perform>(
                 &value,
                 &destination_expr.resolved_type,
                 ConformMode::Normal,

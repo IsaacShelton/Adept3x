@@ -1,7 +1,9 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast::{self},
-    resolve::{conform::to_default::conform_expr_to_default, error::ResolveError, Initialized},
+    resolve::{
+        conform::to_default::conform_expr_to_default_or_error, error::ResolveError, Initialized,
+    },
     resolved::{self, TypedExpr},
     source_files::Source,
 };
@@ -13,7 +15,7 @@ pub fn resolve_declare_assign_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let c_integer_assumptions = ctx.c_integer_assumptions();
 
-    let value = conform_expr_to_default(
+    let value = conform_expr_to_default_or_error(
         resolve_expr(ctx, &declare_assign.value, None, Initialized::Require)?,
         c_integer_assumptions,
     )?;

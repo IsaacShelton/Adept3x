@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast,
     resolve::{
-        conform::to_default::conform_expr_to_default,
+        conform::to_default::conform_expr_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -18,7 +18,7 @@ pub fn resolve_array_access_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let c_integer_assumptions = ctx.c_integer_assumptions();
 
-    let subject = conform_expr_to_default(
+    let subject = conform_expr_to_default_or_error(
         resolve_expr(
             ctx,
             &array_access.subject,
@@ -28,7 +28,7 @@ pub fn resolve_array_access_expr(
         c_integer_assumptions,
     )?;
 
-    let index = conform_expr_to_default(
+    let index = conform_expr_to_default_or_error(
         resolve_expr(
             ctx,
             &array_access.index,

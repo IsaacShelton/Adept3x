@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
     resolve::{
-        conform::{conform_expr, ConformMode},
+        conform::{conform_expr, ConformMode, Perform},
         core_structure_info::get_core_structure_info,
         error::{ResolveError, ResolveErrorKind},
         resolve_type, Initialized,
@@ -96,7 +96,7 @@ pub fn resolve_struct_literal_expr(
             ConformBehavior::C => ConformMode::Explicit,
         };
 
-        let resolved_expr = conform_expr(
+        let resolved_expr = conform_expr::<Perform>(
             &resolved_expr,
             &field.resolved_type,
             mode,

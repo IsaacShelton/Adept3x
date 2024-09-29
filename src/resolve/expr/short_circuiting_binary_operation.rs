@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast,
     resolve::{
-        conform::{conform_expr, ConformMode},
+        conform::{conform_expr, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -25,7 +25,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         Initialized::Require,
     )?;
 
-    let left = conform_expr(
+    let left = conform_expr::<Perform>(
         &left,
         &local_bool_type,
         ConformMode::Normal,
@@ -51,7 +51,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         Initialized::Require,
     )?;
 
-    let right = conform_expr(
+    let right = conform_expr::<Perform>(
         &right,
         &local_bool_type,
         ConformMode::Normal,

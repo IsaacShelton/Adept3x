@@ -287,6 +287,9 @@ pub fn resolve<'a>(
             function_search_context
                 .available
                 .entry(name)
+                .and_modify(|funcs| {
+                    funcs.push(function_ref);
+                })
                 .or_insert_with(|| vec![function_ref]);
         }
     }

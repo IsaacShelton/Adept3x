@@ -1,7 +1,7 @@
 mod compute;
 mod integer_literals;
 
-use super::conform::{conform_expr, ConformMode};
+use super::conform::{conform_expr, ConformMode, Perform};
 use crate::{
     ast::ConformBehavior,
     resolved::{self, TypedExpr},
@@ -23,7 +23,7 @@ pub fn unify_types(
 
     // Conform the supplied expressions if a unifying type was found
     for expr in exprs {
-        **expr = match conform_expr(
+        **expr = match conform_expr::<Perform>(
             expr,
             &unified_type,
             ConformMode::Normal,

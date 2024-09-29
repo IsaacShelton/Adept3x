@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast,
     resolve::{
-        conform::{conform_expr, to_default::conform_expr_to_default, ConformMode},
+        conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
         resolve_type, Initialized,
     },
@@ -27,7 +27,12 @@ pub fn resolve_call_expr(
         arguments.push(resolve_expr(ctx, argument, None, Initialized::Require)?);
     }
 
-    let function_ref = match ctx.function_search_ctx.find_function(&call.function_name) {
+    let function_ref = match ctx.function_search_ctx.find_function(
+        ctx,
+        &call.function_name,
+        &arguments[..],
+        source,
+    ) {
         Ok(function_ref) => function_ref,
         Err(reason) => {
             return Err(ResolveErrorKind::FailedToFindFunction {
@@ -41,34 +46,7 @@ pub fn resolve_call_expr(
     let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
     let return_type = function.return_type.clone();
 
-    if let Some(required_ty) = &call.expected_to_return {
-        let resolved_required_ty =
-            resolve_type(ctx.type_search_ctx, required_ty, &mut Default::default())?;
-
-        if resolved_required_ty != return_type {
-            return Err(ResolveErrorKind::FunctionMustReturnType {
-                of: required_ty.to_string(),
-                function_name: function.name.to_string(),
-            }
-            .at(function.return_type.source));
-        }
-    }
-
-    if call.arguments.len() < function.parameters.required.len() {
-        return Err(ResolveErrorKind::NotEnoughArgumentsToFunction {
-            name: function.name.to_string(),
-        }
-        .at(source));
-    }
-
     let num_required = function.parameters.required.len();
-
-    if call.arguments.len() > num_required && !function.parameters.is_cstyle_vararg {
-        return Err(ResolveErrorKind::TooManyArgumentsToFunction {
-            name: function.name.to_string(),
-        }
-        .at(source));
-    }
 
     for (i, argument) in arguments.iter_mut().enumerate() {
         let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
@@ -79,7 +57,7 @@ pub fn resolve_call_expr(
         if let Some(preferred_type) =
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
         {
-            if let Ok(conformed_argument) = conform_expr(
+            if let Ok(conformed_argument) = conform_expr::<Perform>(
                 &argument,
                 preferred_type,
                 ConformMode::ParameterPassing,
@@ -97,7 +75,7 @@ pub fn resolve_call_expr(
                 .at(source));
             }
         } else {
-            match conform_expr_to_default(argument.clone(), ctx.c_integer_assumptions()) {
+            match conform_expr_to_default::<Perform>(&*argument, ctx.c_integer_assumptions()) {
                 Ok(arg) => *argument = arg,
                 Err(_) => {
                     return Err(ResolveErrorKind::Other {
@@ -106,6 +84,19 @@ pub fn resolve_call_expr(
                     .at(source));
                 }
             }
+        }
+    }
+
+    if let Some(required_ty) = &call.expected_to_return {
+        let resolved_required_ty =
+            resolve_type(ctx.type_search_ctx, required_ty, &mut Default::default())?;
+
+        if resolved_required_ty != return_type {
+            return Err(ResolveErrorKind::FunctionMustReturnType {
+                of: required_ty.to_string(),
+                function_name: function.name.to_string(),
+            }
+            .at(function.return_type.source));
         }
     }
 

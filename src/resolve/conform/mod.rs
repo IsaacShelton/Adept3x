@@ -54,36 +54,34 @@ impl Objective for Validate {
     }
 }
 
-pub fn conform_expr(
+pub fn conform_expr<O: Objective>(
     expr: &TypedExpr,
     to_type: &Type,
     mode: ConformMode,
     behavior: ConformBehavior,
     conform_source: Source,
-) -> ObjectiveResult<Perform> {
+) -> ObjectiveResult<O> {
     if expr.resolved_type == *to_type {
-        return Ok(expr.clone());
+        return O::success(|| expr.clone());
     }
 
     match &expr.resolved_type.kind {
-        TypeKind::IntegerLiteral(from) => from_integer_literal::<Perform>(
+        TypeKind::IntegerLiteral(from) => from_integer_literal::<O>(
             from,
             behavior.c_integer_assumptions(),
             expr.expr.source,
             to_type,
         ),
         TypeKind::Integer(from_bits, from_sign) => {
-            from_integer::<Perform>(expr, mode, behavior, *from_bits, *from_sign, to_type)
+            from_integer::<O>(expr, mode, behavior, *from_bits, *from_sign, to_type)
         }
-        TypeKind::FloatLiteral(from) => {
-            from_float_literal::<Perform>(*from, to_type, conform_source)
-        }
-        TypeKind::Floating(from_size) => from_float::<Perform>(expr, *from_size, to_type),
-        TypeKind::Pointer(from_inner) => from_pointer::<Perform>(expr, mode, from_inner, to_type),
+        TypeKind::FloatLiteral(from) => from_float_literal::<O>(*from, to_type, conform_source),
+        TypeKind::Floating(from_size) => from_float::<O>(expr, *from_size, to_type),
+        TypeKind::Pointer(from_inner) => from_pointer::<O>(expr, mode, from_inner, to_type),
         TypeKind::CInteger(from_size, from_sign) => {
-            from_c_integer::<Perform>(expr, mode, *from_size, *from_sign, to_type, conform_source)
+            from_c_integer::<O>(expr, mode, *from_size, *from_sign, to_type, conform_source)
         }
-        _ => <Perform as Objective>::fail(),
+        _ => O::fail(),
     }
 }
 
@@ -94,7 +92,7 @@ pub fn conform_expr_or_error(
     behavior: ConformBehavior,
     conform_source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    conform_expr(expr, target_type, mode, behavior, conform_source).or_else(|_| {
+    conform_expr::<Perform>(expr, target_type, mode, behavior, conform_source).or_else(|_| {
         Err(ResolveErrorKind::TypeMismatch {
             left: expr.resolved_type.to_string(),
             right: target_type.to_string(),

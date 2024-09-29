@@ -2,7 +2,7 @@ use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, UnaryMathOperator},
     resolve::{
-        conform::to_default::conform_expr_to_default,
+        conform::to_default::conform_expr_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -18,7 +18,7 @@ pub fn resolve_unary_math_operation_expr(
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_expr = resolve_expr(ctx, inner, preferred_type, Initialized::Require)
-        .and_then(|expr| conform_expr_to_default(expr, ctx.c_integer_assumptions()))?;
+        .and_then(|expr| conform_expr_to_default_or_error(expr, ctx.c_integer_assumptions()))?;
 
     if resolved_expr.resolved_type.is_ambiguous() {
         return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
