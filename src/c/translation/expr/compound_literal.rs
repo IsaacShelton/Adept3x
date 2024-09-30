@@ -42,13 +42,11 @@ pub fn translate_compound_literal(
         fields.push(ast::FieldInitializer { name: None, value });
     }
 
-    Ok(
-        ast::ExprKind::StructureLiteral(Box::new(ast::StructureLiteral {
-            ast_type,
-            fields,
-            fill_behavior: FillBehavior::Zeroed,
-            language: Language::C,
-        }))
-        .at(source),
-    )
+    Ok(ast::ExprKind::StructLiteral(Box::new(ast::StructLiteral {
+        ast_type,
+        fields,
+        fill_behavior: FillBehavior::Zeroed,
+        language: Language::C,
+    }))
+    .at(source))
 }

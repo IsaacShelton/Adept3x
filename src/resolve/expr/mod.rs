@@ -238,14 +238,14 @@ pub fn resolve_expr(
                 source,
             )
         }
-        ast::ExprKind::Member(subject, field_name) => {
-            resolve_member_expr(ctx, subject, field_name, source)
+        ast::ExprKind::Member(subject, field_name, min_privacy) => {
+            resolve_member_expr(ctx, subject, field_name, *min_privacy, source)
         }
         ast::ExprKind::ArrayAccess(array_access) => {
             resolve_array_access_expr(ctx, array_access, source)
         }
-        ast::ExprKind::StructureLiteral(literal) => {
-            let ast::StructureLiteral {
+        ast::ExprKind::StructLiteral(literal) => {
+            let ast::StructLiteral {
                 ast_type,
                 fields,
                 fill_behavior,

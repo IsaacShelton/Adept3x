@@ -23,13 +23,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         // Parse annotations
         while self.input.peek().is_hash() {
-            annotations.push(self.parse_annotation()?);
+            annotations.extend(self.parse_annotation()?);
             self.ignore_newlines();
         }
 
         // Parse pub keyword
         if self.input.peek().is_pub_keyword() {
-            annotations.push(AnnotationKind::Pub.at(self.input.advance().source));
+            annotations.push(AnnotationKind::Public.at(self.input.advance().source));
         }
 
         // Ignore newlines after annotations

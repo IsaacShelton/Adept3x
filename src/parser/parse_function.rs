@@ -25,7 +25,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
-                AnnotationKind::Pub => privacy = Privacy::Public,
+                AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
         }

@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{Expr, ExprKind, FieldInitializer, FillBehavior, Language, StructureLiteral, Type},
+    ast::{Expr, ExprKind, FieldInitializer, FillBehavior, Language, StructLiteral, Type},
     inflow::Inflow,
     name::Name,
     parser::error::ParseError,
@@ -63,7 +63,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
         Ok(Expr::new(
-            ExprKind::StructureLiteral(Box::new(StructureLiteral {
+            ExprKind::StructLiteral(Box::new(StructLiteral {
                 ast_type,
                 fields,
                 fill_behavior,

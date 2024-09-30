@@ -20,7 +20,7 @@ pub enum AnnotationKind {
     Packed,
     AbideAbi,
     Namespace(String),
-    Pub,
+    Public,
 }
 
 impl AnnotationKind {
@@ -37,7 +37,7 @@ impl Display for AnnotationKind {
             Self::Packed => "packed",
             Self::AbideAbi => "abide_abi",
             Self::Namespace(_) => "namespace",
-            Self::Pub => "pub",
+            Self::Public => "public",
         })
     }
 }

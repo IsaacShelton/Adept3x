@@ -1,6 +1,6 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
-    ast,
+    ast::{self, Privacy},
     resolve::{
         core_structure_info::get_core_structure_info,
         destination::resolve_expr_to_destination,
@@ -15,6 +15,7 @@ pub fn resolve_member_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     subject: &ast::Expr,
     field_name: &str,
+    min_privacy: Privacy,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
@@ -38,12 +39,14 @@ pub fn resolve_member_expr(
     };
 
     match found_field.privacy {
-        resolved::Privacy::Public => (),
-        resolved::Privacy::Private => {
-            return Err(ResolveErrorKind::FieldIsPrivate {
-                field_name: field_name.to_string(),
+        Privacy::Public => (),
+        Privacy::Private => {
+            if min_privacy != Privacy::Private {
+                return Err(ResolveErrorKind::FieldIsPrivate {
+                    field_name: field_name.to_string(),
+                }
+                .at(subject.source));
             }
-            .at(subject.source))
         }
     }
 

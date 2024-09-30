@@ -2,7 +2,7 @@ use super::Expr;
 use crate::ast::{Language, Type};
 
 #[derive(Clone, Debug)]
-pub struct StructureLiteral {
+pub struct StructLiteral {
     pub ast_type: Type,
     pub fields: Vec<FieldInitializer>,
     pub fill_behavior: FillBehavior,

@@ -9,7 +9,7 @@ use crate::{
     ir::{self, BasicBlocks, Global, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, FloatSize, Member,
-        NumericMode, SignOrIndeterminate, StmtKind, StructureLiteral, UnaryMathOperation,
+        NumericMode, SignOrIndeterminate, StmtKind, StructLiteral, UnaryMathOperation,
         VariableStorageKey,
     },
     tag::Tag,
@@ -724,8 +724,8 @@ fn lower_expr(
 
             Ok(builder.push(ir::Instruction::Load((item, item_type))))
         }
-        ExprKind::StructureLiteral(structure_literal) => {
-            let StructureLiteral {
+        ExprKind::StructLiteral(structure_literal) => {
+            let StructLiteral {
                 structure_type,
                 fields,
             } = &**structure_literal;
@@ -745,7 +745,7 @@ fn lower_expr(
             // Drop the index part of the values
             let values = values.drain(..).map(|(_, value)| value).collect();
 
-            Ok(builder.push(ir::Instruction::StructureLiteral(result_ir_type, values)))
+            Ok(builder.push(ir::Instruction::StructLiteral(result_ir_type, values)))
         }
         ExprKind::UnaryMathOperation(operation) => {
             let UnaryMathOperation { operator, inner } = &**operation;

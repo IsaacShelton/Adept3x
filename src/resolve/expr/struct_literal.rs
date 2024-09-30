@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         resolve_type, Initialized,
     },
-    resolved::{self, StructureLiteral, StructureRef, TypedExpr},
+    resolved::{self, StructLiteral, StructureRef, TypedExpr},
     source_files::Source,
 };
 use indexmap::IndexMap;
@@ -163,7 +163,7 @@ pub fn resolve_struct_literal_expr(
     Ok(TypedExpr::new(
         resolved_type.clone(),
         resolved::Expr::new(
-            resolved::ExprKind::StructureLiteral(Box::new(StructureLiteral {
+            resolved::ExprKind::StructLiteral(Box::new(StructLiteral {
                 structure_type,
                 fields: resolved_fields,
             })),

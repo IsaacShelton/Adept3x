@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{Expr, ExprKind},
+    ast::{Expr, ExprKind, Privacy},
     inflow::Inflow,
     parser::{error::ParseError, parse_util::into_plain_name},
     token::{Token, TokenKind},
@@ -18,10 +18,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             let generics = self.parse_generics()?;
             self.parse_call_with(member_name, generics, vec![subject], source)
         } else {
-            Ok(
-                ExprKind::Member(Box::new(subject), into_plain_name(member_name, source)?)
-                    .at(source),
+            Ok(ExprKind::Member(
+                Box::new(subject),
+                into_plain_name(member_name, source)?,
+                Privacy::Public,
             )
+            .at(source))
         }
     }
 }

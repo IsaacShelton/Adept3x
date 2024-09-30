@@ -9,36 +9,45 @@ use crate::{
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_annotation(&mut self) -> Result<Annotation, ParseError> {
+    pub fn parse_annotation(&mut self) -> Result<Vec<Annotation>, ParseError> {
         // #[annotation_name]
         // ^
 
         self.parse_token(TokenKind::Hash, Some("to begin annotation"))?;
         self.parse_token(TokenKind::OpenBracket, Some("to begin annotation body"))?;
+        let mut annotations = Vec::with_capacity(2);
 
-        let (annotation_name, source) =
-            self.parse_identifier_keep_location(Some("for annotation name"))?;
+        loop {
+            let (annotation_name, source) =
+                self.parse_identifier_keep_location(Some("for annotation name"))?;
 
-        let annotation = match annotation_name.as_str() {
-            "foreign" => AnnotationKind::Foreign,
-            "thread_local" => AnnotationKind::ThreadLocal,
-            "packed" => AnnotationKind::Packed,
-            "abide_abi" => AnnotationKind::AbideAbi,
-            "namespace" => {
-                let namespace = self.parse_identifier(Some("for namespace name"))?;
-                AnnotationKind::Namespace(namespace)
-            }
-            "pub" => AnnotationKind::Pub,
-            _ => {
-                return Err(ParseErrorKind::UnrecognizedAnnotation {
-                    name: annotation_name,
+            let annotation = match annotation_name.as_str() {
+                "foreign" => AnnotationKind::Foreign,
+                "thread_local" => AnnotationKind::ThreadLocal,
+                "packed" => AnnotationKind::Packed,
+                "abide_abi" => AnnotationKind::AbideAbi,
+                "namespace" => {
+                    let namespace = self.parse_identifier(Some("for namespace name"))?;
+                    AnnotationKind::Namespace(namespace)
                 }
-                .at(source))
+                "public" => AnnotationKind::Public,
+                _ => {
+                    return Err(ParseErrorKind::UnrecognizedAnnotation {
+                        name: annotation_name,
+                    }
+                    .at(source))
+                }
+            }
+            .at(source);
+
+            annotations.push(annotation);
+
+            if !self.input.eat(TokenKind::Comma) {
+                break;
             }
         }
-        .at(source);
 
         self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
-        Ok(annotation)
+        Ok(annotations)
     }
 }

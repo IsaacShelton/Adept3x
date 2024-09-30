@@ -10,7 +10,7 @@ pub struct Structure {
     pub source: Source,
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Privacy {
     #[default]
     Public,

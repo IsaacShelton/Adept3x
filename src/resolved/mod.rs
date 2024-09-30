@@ -427,7 +427,7 @@ pub enum ExprKind {
     IntegerTruncate(Box<Cast>),
     FloatExtend(Box<Cast>),
     Member(Box<Member>),
-    StructureLiteral(Box<StructureLiteral>),
+    StructLiteral(Box<StructLiteral>),
     UnaryMathOperation(Box<UnaryMathOperation>),
     Dereference(Box<TypedExpr>),
     AddressOf(Box<Destination>),
@@ -467,7 +467,7 @@ pub struct Member {
 }
 
 #[derive(Clone, Debug)]
-pub struct StructureLiteral {
+pub struct StructLiteral {
     pub structure_type: Type,
     pub fields: IndexMap<String, (Expr, usize)>,
 }

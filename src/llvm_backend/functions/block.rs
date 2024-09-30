@@ -550,7 +550,7 @@ pub unsafe fn create_function_block(
                     cstr!("").as_ptr(),
                 ))
             }
-            Instruction::StructureLiteral(ir_type, values) => {
+            Instruction::StructLiteral(ir_type, values) => {
                 let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
                 let mut literal = LLVMGetPoison(backend_type);
 

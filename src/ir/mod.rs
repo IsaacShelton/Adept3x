@@ -125,7 +125,7 @@ pub enum Instruction {
         subject_pointer: Value,
         index: Value,
     },
-    StructureLiteral(Type, Vec<Value>),
+    StructLiteral(Type, Vec<Value>),
     IsZero(Value),
     IsNonZero(Value),
     Negate(Value),
@@ -147,6 +147,7 @@ pub enum InterpreterSyscallKind {
     Experimental,
     ImportNamespace,
     DontAssumeIntAtLeast32Bits,
+    UseDependency,
 }
 
 #[derive(Clone, Debug)]
@@ -567,7 +568,7 @@ impl Instruction {
             Self::TruncateFloat(..) => false,
             Self::Member { .. } => false,
             Self::ArrayAccess { .. } => false,
-            Self::StructureLiteral(..) => false,
+            Self::StructLiteral(..) => false,
             Self::IsZero(..) => false,
             Self::IsNonZero(..) => false,
             Self::Negate(..) => false,

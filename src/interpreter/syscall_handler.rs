@@ -144,6 +144,17 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                 self.assume_int_at_least_32_bits = false;
                 Value::Literal(ir::Literal::Void)
             }
+            ir::InterpreterSyscallKind::UseDependency => {
+                assert_eq!(args.len(), 2);
+
+                let as_namespace = read_cstring(memory, &args[0]);
+                let dependency_name = read_cstring(memory, &args[1]);
+
+                todo!("UseDependency {} {}", as_namespace, dependency_name);
+
+                #[allow(unreachable_code)]
+                Value::Literal(ir::Literal::Void)
+            }
         }
     }
 }

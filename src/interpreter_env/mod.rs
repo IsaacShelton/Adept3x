@@ -1,7 +1,8 @@
 use crate::{
     ast::{
-        AstFile, Call, Enum, EnumMember, ExprKind, Field, Function, InterpreterSyscall, Parameter,
-        Parameters, Privacy, StmtKind, Structure, TypeKind,
+        AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Function,
+        InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind, StructLiteral,
+        Structure, TypeKind,
     },
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
@@ -143,6 +144,20 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         source,
     });
 
+    file.structures.push(Structure {
+        name: Name::plain("Dependency"),
+        fields: IndexMap::from_iter([(
+            "name".into(),
+            Field {
+                ast_type: ptr_char.clone(),
+                privacy: Privacy::Private,
+                source,
+            },
+        )]),
+        is_packed: false,
+        source,
+    });
+
     file.functions.push(thin_cstring_function(
         "println",
         "message",
@@ -210,6 +225,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                         ExprKind::Member(
                             Box::new(ExprKind::Variable(Name::plain("project")).at(source)),
                             "kind".into(),
+                            Privacy::Public,
                         )
                         .at(source),
                     ),
@@ -218,6 +234,76 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             }))
             .at(source),
         )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+        privacy: Privacy::Public,
+    });
+
+    file.functions.push(Function {
+        name: Name::plain("use"),
+        parameters: Parameters {
+            required: vec![
+                Parameter::new("as_namespace".into(), ptr_char.clone()),
+                Parameter::new(
+                    "dependency".into(),
+                    TypeKind::Named(Name::plain("Dependency")).at(source),
+                ),
+            ],
+            is_cstyle_vararg: false,
+        },
+        return_type: void.clone(),
+        stmts: vec![StmtKind::Expr(
+            ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
+                kind: InterpreterSyscallKind::UseDependency,
+                args: vec![
+                    (
+                        ptr_char.clone(),
+                        ExprKind::Variable(Name::plain("as_namespace")).at(source),
+                    ),
+                    (
+                        TypeKind::Named(Name::plain("Dependency")).at(source),
+                        ExprKind::Member(
+                            Box::new(ExprKind::Variable(Name::plain("dependency")).at(source)),
+                            "name".into(),
+                            Privacy::Private,
+                        )
+                        .at(source),
+                    ),
+                ],
+                result_type: void.clone(),
+            }))
+            .at(source),
+        )
+        .at(source)],
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+        privacy: Privacy::Public,
+    });
+
+    file.functions.push(Function {
+        name: Name::plain("import"),
+        parameters: Parameters {
+            required: vec![Parameter::new("namespace".into(), ptr_char.clone())],
+            is_cstyle_vararg: false,
+        },
+        return_type: TypeKind::Named(Name::plain("Dependency")).at(source),
+        stmts: vec![StmtKind::Return(Some(
+            ExprKind::StructLiteral(Box::new(StructLiteral {
+                ast_type: TypeKind::Named(Name::plain("Dependency")).at(source),
+                fields: vec![FieldInitializer {
+                    name: None,
+                    value: ExprKind::Variable(Name::plain("namespace")).at(source),
+                }],
+                fill_behavior: FillBehavior::Forbid,
+                language: Language::Adept,
+            }))
+            .at(source),
+        ))
         .at(source)],
         abide_abi: false,
         is_foreign: false,

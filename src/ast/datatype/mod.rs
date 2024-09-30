@@ -30,6 +30,11 @@ impl Type {
     pub fn new(kind: TypeKind, source: Source) -> Self {
         Self { kind, source }
     }
+
+    pub fn pointer(self) -> Self {
+        let source = self.source;
+        Type::new(TypeKind::Pointer(Box::new(self)), source)
+    }
 }
 
 impl Display for Type {

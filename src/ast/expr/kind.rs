@@ -1,9 +1,9 @@
 use super::{
     ArrayAccess, BasicBinaryOperation, Call, Conditional, DeclareAssign, EnumMemberLiteral, Expr,
-    Integer, InterpreterSyscall, ShortCircuitingBinaryOperation, StructureLiteral, UnaryOperation,
+    Integer, InterpreterSyscall, ShortCircuitingBinaryOperation, StructLiteral, UnaryOperation,
     While,
 };
-use crate::{name::Name, source_files::Source};
+use crate::{ast::Privacy, name::Name, source_files::Source};
 use std::ffi::CString;
 
 #[derive(Clone, Debug)]
@@ -20,9 +20,9 @@ pub enum ExprKind {
     DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
-    Member(Box<Expr>, String),
+    Member(Box<Expr>, String, Privacy),
     ArrayAccess(Box<ArrayAccess>),
-    StructureLiteral(Box<StructureLiteral>),
+    StructLiteral(Box<StructLiteral>),
     UnaryOperation(Box<UnaryOperation>),
     Conditional(Conditional),
     While(Box<While>),
