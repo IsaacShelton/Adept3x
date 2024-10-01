@@ -14,6 +14,7 @@ impl PragmaSection {
     pub fn parse<'a, I: Inflow<Token>>(
         allow_experimental_pragma_features: bool,
         mut input: Input<'a, I>,
+        require_adept_version_first: bool,
     ) -> Result<(PragmaSection, Input<'a, I>), Box<dyn Show>> {
         // pragma ...
         //   ^
@@ -72,6 +73,27 @@ impl PragmaSection {
                 let expr_source = expr.source;
                 vec![StmtKind::Expr(expr).at(expr_source)]
             };
+
+            if require_adept_version_first {
+                let has_adept_first = stmts.first().map_or(false, |stmt| {
+                    if let StmtKind::Expr(e) = &stmt.kind {
+                        if let ExprKind::Call(c) = &e.kind {
+                            c.function_name.as_plain_str() == Some("adept")
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                });
+
+                if !has_adept_first {
+                    return Err(Box::new(ErrorDiagnostic::new(
+                        "First 'pragma' section must start with adept(\"3.0\") statement, i.e. pragma => adept(\"3.0\")",
+                        pragma_source,
+                    )));
+                }
+            }
 
             if !allow_experimental_pragma_features {
                 for stmt in stmts.iter() {

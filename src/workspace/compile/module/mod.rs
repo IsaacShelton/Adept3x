@@ -36,8 +36,11 @@ pub fn compile_module_file<'a>(
     let mut settings = None;
 
     while input.peek_is(TokenKind::PragmaKeyword) {
-        let (section, rest_input) =
-            PragmaSection::parse(compiler.options.allow_experimental_pragma_features, input)?;
+        let (section, rest_input) = PragmaSection::parse(
+            compiler.options.allow_experimental_pragma_features,
+            input,
+            settings.is_none(),
+        )?;
         input = rest_input;
         settings = Some(section.run(compiler, path, settings)?);
         input.ignore_newlines();

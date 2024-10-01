@@ -17,6 +17,11 @@ function expect_fail_compile() {
     ../target/debug/adept $1/main.adept
 }
 
+function expect_fail_compile_module() {
+    echo "[ ] Expecting failure to compile '$1'"
+    ../target/debug/adept $1
+}
+
 pushd "$self" > /dev/null
 cargo build
 compile and_or
@@ -72,6 +77,7 @@ compile zeroed
 echo "[!] RUNNING CASES WITH EXPECTED FAILURE"
 
 expect_fail_compile _should_fail/mismatching_yielded_types
+expect_fail_compile_module _should_fail/pragma_adept_first
 expect_fail_compile _should_fail/recursive_type_alias
 popd > /dev/null
 

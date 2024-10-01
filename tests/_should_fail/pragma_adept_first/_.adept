@@ -1,0 +1,13 @@
+
+pragma => {
+    println("This should be an error, since adept(\"3.0\") does not occur first")
+    adept("3.0")
+}
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    printf(c"Hello World!\n")
+}
+
