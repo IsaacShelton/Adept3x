@@ -37,6 +37,7 @@ pub struct BuildSystemSyscallHandler {
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
+    pub imported_folders: Vec<Box<str>>,
 }
 
 impl Default for BuildSystemSyscallHandler {
@@ -49,6 +50,7 @@ impl Default for BuildSystemSyscallHandler {
             debug_skip_merging_helper_exprs: false,
             imported_namespaces: vec![],
             assume_int_at_least_32_bits: true,
+            imported_folders: vec![],
         }
     }
 }
@@ -147,10 +149,10 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             ir::InterpreterSyscallKind::UseDependency => {
                 assert_eq!(args.len(), 2);
 
-                let as_namespace = read_cstring(memory, &args[0]);
+                let _as_namespace = read_cstring(memory, &args[0]);
                 let dependency_name = read_cstring(memory, &args[1]);
 
-                todo!("UseDependency {} {}", as_namespace, dependency_name);
+                self.imported_folders.push(dependency_name.into());
 
                 #[allow(unreachable_code)]
                 Value::Literal(ir::Literal::Void)

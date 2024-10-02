@@ -13,6 +13,7 @@ use super::{
 };
 use append_only_vec::AppendOnlyVec;
 use ignore::{WalkBuilder, WalkState};
+use path_absolutize::Absolutize;
 use std::{ffi::OsStr, fs::FileType, path::Path, time::UNIX_EPOCH};
 
 pub struct ExploreResult {
@@ -23,6 +24,10 @@ pub struct ExploreResult {
 pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
     let normal_files = AppendOnlyVec::new();
     let module_files = AppendOnlyVec::new();
+
+    let folder_path = folder_path
+        .absolutize()
+        .expect("failed to get absolute path");
 
     let walker = WalkBuilder::new(folder_path)
         .threads(NUM_THREADS)

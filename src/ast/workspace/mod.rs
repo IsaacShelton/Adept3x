@@ -113,6 +113,7 @@ pub struct Settings {
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
+    pub imported_folders: Vec<Box<str>>,
 }
 
 impl Default for Settings {
@@ -122,6 +123,7 @@ impl Default for Settings {
             debug_skip_merging_helper_exprs: false,
             imported_namespaces: vec![],
             assume_int_at_least_32_bits: true,
+            imported_folders: vec![],
         }
     }
 }

@@ -66,6 +66,10 @@ impl ResolvedName {
         Self::Project(name.fullname().into_boxed_str())
     }
 
+    pub fn new_remote(name: &Name) -> Self {
+        Self::Remote(name.fullname().into_boxed_str())
+    }
+
     pub fn plain(&self) -> &str {
         match self {
             ResolvedName::Remote(name) => &**name,

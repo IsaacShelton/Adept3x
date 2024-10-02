@@ -87,12 +87,12 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
 
     let ExploreResult {
         module_files,
-        mut normal_files,
+        normal_files,
     } = explore(&fs, project_folder);
 
     let num_threads = (normal_files.len() + module_files.len()).min(NUM_THREADS);
     let all_modules_done = Barrier::new(num_threads);
-    let code_files = Mutex::new(normal_files.drain(..).map(CodeFile::Normal).collect_vec());
+    let code_files = Mutex::new(normal_files.into_iter().map(CodeFile::Normal).collect_vec());
     let module_files = Mutex::new(module_files);
     let ast_files = AppendOnlyVec::new();
     let module_folders = AppendOnlyVec::new();
@@ -122,6 +122,33 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                                 continue;
                             }
                         };
+
+                    let imported_folders = &settings.imported_folders;
+
+                    for folder in imported_folders {
+                        compiler.diagnostics.push(WarningDiagnostic::plain(
+                            "Importing modules does not make their symbols available yet",
+                        ));
+
+                        let folder =
+                            Path::new("/Users/isaac/Projects/Adept3x/adept/infrastructure/import/")
+                                .join(&**folder);
+
+                        let ExploreResult {
+                            module_files: new_module_files,
+                            normal_files: new_normal_files,
+                        } = explore(&fs, &folder);
+
+                        module_files
+                            .lock()
+                            .unwrap()
+                            .extend(new_module_files.into_iter());
+
+                        code_files
+                            .lock()
+                            .unwrap()
+                            .extend(new_normal_files.into_iter().map(CodeFile::Normal));
+                    }
 
                     let folder_fs_node_id = fs
                         .get(module_file.fs_node_id)
