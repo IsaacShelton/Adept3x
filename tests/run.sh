@@ -58,7 +58,6 @@ compile object_mutation
 compile op_then_assign
 compile_module preprocessor_toggle
 compile pointers
-compile reference_counted
 compile return
 compile return_message
 compile signed_unsigned_promotion

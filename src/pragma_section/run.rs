@@ -113,6 +113,7 @@ impl PragmaSection {
             imported_namespaces: user_settings.imported_namespaces,
             assume_int_at_least_32_bits: user_settings.assume_int_at_least_32_bits,
             imported_folders: user_settings.imported_folders,
+            folders_as_namespaces: user_settings.folders_as_namespaces,
         })
     }
 }

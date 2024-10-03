@@ -271,9 +271,8 @@ pub fn resolve<'a>(
             ctx.jobs
                 .push_back(Job::Regular(*real_file_id, function_i, function_ref));
 
-            let imported_namespaces = file
-                .settings
-                .map(|id| &ast_workspace.settings[id.0].imported_namespaces);
+            let settings = file.settings.map(|id| &ast_workspace.settings[id.0]);
+            let imported_namespaces = settings.map(|settings| &settings.imported_namespaces);
 
             let function_search_context =
                 ctx.function_search_ctxs.get_or_insert_with(file_id, || {

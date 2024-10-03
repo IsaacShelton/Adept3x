@@ -114,6 +114,7 @@ pub struct Settings {
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
     pub imported_folders: Vec<Box<str>>,
+    pub folders_as_namespaces: HashMap<String, String>,
 }
 
 impl Default for Settings {
@@ -124,6 +125,7 @@ impl Default for Settings {
             imported_namespaces: vec![],
             assume_int_at_least_32_bits: true,
             imported_folders: vec![],
+            folders_as_namespaces: HashMap::new(),
         }
     }
 }

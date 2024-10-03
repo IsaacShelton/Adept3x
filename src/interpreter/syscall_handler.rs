@@ -5,7 +5,10 @@ use crate::{
 };
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 pub trait SyscallHandler {
     fn syscall<'a>(
@@ -38,6 +41,7 @@ pub struct BuildSystemSyscallHandler {
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
     pub imported_folders: Vec<Box<str>>,
+    pub folders_as_namespaces: HashMap<String, String>,
 }
 
 impl Default for BuildSystemSyscallHandler {
@@ -51,6 +55,7 @@ impl Default for BuildSystemSyscallHandler {
             imported_namespaces: vec![],
             assume_int_at_least_32_bits: true,
             imported_folders: vec![],
+            folders_as_namespaces: HashMap::new(),
         }
     }
 }
@@ -149,10 +154,14 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             ir::InterpreterSyscallKind::UseDependency => {
                 assert_eq!(args.len(), 2);
 
-                let _as_namespace = read_cstring(memory, &args[0]);
+                let as_namespace = read_cstring(memory, &args[0]);
                 let dependency_name = read_cstring(memory, &args[1]);
 
-                self.imported_folders.push(dependency_name.into());
+                self.imported_folders
+                    .push(dependency_name.to_string().into());
+
+                self.folders_as_namespaces
+                    .insert(as_namespace, dependency_name);
 
                 #[allow(unreachable_code)]
                 Value::Literal(ir::Literal::Void)

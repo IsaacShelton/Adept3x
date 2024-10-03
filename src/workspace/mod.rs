@@ -124,6 +124,7 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                         };
 
                     let imported_folders = &settings.imported_folders;
+                    let _folders_as_namespaces = &settings.folders_as_namespaces;
 
                     for folder in imported_folders {
                         compiler.diagnostics.push(WarningDiagnostic::plain(
