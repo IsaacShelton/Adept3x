@@ -41,7 +41,7 @@ pub struct BuildSystemSyscallHandler {
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
     pub imported_folders: Vec<Box<str>>,
-    pub folders_as_namespaces: HashMap<String, String>,
+    pub namespace_to_dependency: HashMap<String, String>,
 }
 
 impl Default for BuildSystemSyscallHandler {
@@ -55,7 +55,7 @@ impl Default for BuildSystemSyscallHandler {
             imported_namespaces: vec![],
             assume_int_at_least_32_bits: true,
             imported_folders: vec![],
-            folders_as_namespaces: HashMap::new(),
+            namespace_to_dependency: HashMap::new(),
         }
     }
 }
@@ -160,7 +160,7 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                 self.imported_folders
                     .push(dependency_name.to_string().into());
 
-                self.folders_as_namespaces
+                self.namespace_to_dependency
                     .insert(as_namespace, dependency_name);
 
                 #[allow(unreachable_code)]

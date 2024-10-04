@@ -61,6 +61,27 @@ impl Fs {
     pub fn get(&self, id: FsNodeId) -> &FsNode {
         &self.arena[id.0]
     }
+
+    pub fn find(&self, absolute_path: &Path) -> Option<FsNodeId> {
+        use std::path::Component;
+
+        let mut node_id = Self::ROOT;
+
+        for component in absolute_path.components() {
+            let component = match component {
+                Component::Prefix(name) => name.as_os_str(),
+                Component::RootDir => continue,
+                Component::CurDir | std::path::Component::ParentDir => {
+                    panic!("Fs::find got relative path, but only works with absolute paths");
+                }
+                Component::Normal(name) => name,
+            };
+
+            node_id = *self.get(node_id).children.read_only_view().get(component)?;
+        }
+
+        Some(node_id)
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

@@ -124,31 +124,42 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                         };
 
                     let imported_folders = &settings.imported_folders;
-                    let _folders_as_namespaces = &settings.folders_as_namespaces;
+                    let _namespace_to_dependency = &settings.namespace_to_dependency;
 
                     for folder in imported_folders {
-                        compiler.diagnostics.push(WarningDiagnostic::plain(
-                            "Importing modules does not make their symbols available yet",
-                        ));
-
-                        let folder =
+                        let absolute_folder =
                             Path::new("/Users/isaac/Projects/Adept3x/adept/infrastructure/import/")
                                 .join(&**folder);
 
-                        let ExploreResult {
-                            module_files: new_module_files,
-                            normal_files: new_normal_files,
-                        } = explore(&fs, &folder);
+                        let already_discovered = fs.find(&absolute_folder).is_some();
 
-                        module_files
-                            .lock()
-                            .unwrap()
-                            .extend(new_module_files.into_iter());
+                        if !already_discovered {
+                            let ExploreResult {
+                                module_files: new_module_files,
+                                normal_files: new_normal_files,
+                            } = explore(&fs, &absolute_folder);
 
-                        code_files
-                            .lock()
-                            .unwrap()
-                            .extend(new_normal_files.into_iter().map(CodeFile::Normal));
+                            module_files
+                                .lock()
+                                .unwrap()
+                                .extend(new_module_files.into_iter());
+
+                            code_files
+                                .lock()
+                                .unwrap()
+                                .extend(new_normal_files.into_iter().map(CodeFile::Normal));
+                        }
+
+                        let Some(module_fs_node_id) = fs.find(&absolute_folder) else {
+                            // TODO: Add proper error message
+                            panic!("Dependency '{}' could not be found", &**folder);
+                        };
+
+                        compiler.diagnostics.push(WarningDiagnostic::plain(format!(
+                            "Ignoring symbols for dependency '{}' (from module with fs_node_id = {:?}), as importing has not been implemented yet",
+                            folder,
+                            module_fs_node_id,
+                        )));
                     }
 
                     let folder_fs_node_id = fs
