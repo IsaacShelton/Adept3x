@@ -131,7 +131,7 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                             }
                         };
 
-                    for (_namespace, folder) in settings.namespace_to_dependency.iter() {
+                    for folder in settings.namespace_to_dependency.values().flatten() {
                         let infrastructure = compiler
                             .options
                             .infrastructure

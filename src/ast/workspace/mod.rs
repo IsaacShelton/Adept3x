@@ -113,7 +113,7 @@ pub struct Settings {
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
-    pub namespace_to_dependency: HashMap<String, String>,
+    pub namespace_to_dependency: HashMap<String, Vec<String>>,
     pub dependency_to_module: HashMap<String, FsNodeId>,
 }
 

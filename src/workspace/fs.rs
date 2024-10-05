@@ -33,6 +33,7 @@ impl Fs {
             last_modified_ms: 0.into(),
             parent: None,
             segment: OsString::new().into_boxed_os_str(),
+            filename: OsString::new().into(),
         };
 
         // We assume that the root is at index 0
@@ -55,6 +56,7 @@ impl Fs {
             &normalized_path_segments(path),
             last_modified_ms.unwrap_or(0),
             Some(Self::ROOT),
+            OsStr::new(""),
         )
     }
 
@@ -97,6 +99,7 @@ pub struct FsNode {
     pub last_modified_ms: AtomicU64,
     pub parent: Option<FsNodeId>,
     pub segment: Box<OsStr>,
+    pub filename: Box<OsStr>,
 }
 
 impl FsNode {
@@ -110,6 +113,7 @@ impl FsNode {
         components: &[&OsStr],
         last_modified_ms: u64,
         parent: Option<FsNodeId>,
+        parent_filename: &OsStr,
     ) -> Option<FsNodeId> {
         let Some((path_segment, rest)) = components.split_first() else {
             return None;
@@ -127,6 +131,10 @@ impl FsNode {
 
         let make_value = |path_segment: &OsString| {
             let segment = path_segment.clone().into_boxed_os_str();
+            let filename = Path::new(parent_filename)
+                .join(&*segment)
+                .into_os_string()
+                .into_boxed_os_str();
 
             fs.new_node(FsNode {
                 last_modified_ms: last_modified_ms.into(),
@@ -137,6 +145,7 @@ impl FsNode {
                 children: OnceMap::new(),
                 parent,
                 segment,
+                filename,
             })
         };
 
@@ -148,7 +157,7 @@ impl FsNode {
             node.last_modified_ms
                 .fetch_max(last_modified_ms, Ordering::Relaxed);
 
-            node.deep_insert(fs, rest, last_modified_ms, Some(*id))
+            node.deep_insert(fs, rest, last_modified_ms, Some(*id), &node.filename)
                 .unwrap_or(*id)
         };
 

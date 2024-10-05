@@ -61,11 +61,17 @@ impl FunctionSearchCtx {
                     .get(name.namespace.as_ref())
             })
             .flatten()
-            .and_then(|dependency| ctx.settings.dependency_to_module.get(dependency))
-            .and_then(|module_fs_node_id| ctx.public.get(module_fs_node_id))
-            .and_then(|public| public.get(name.basename.as_ref()))
             .into_iter()
-            .flat_map(|f| f.iter())
+            .flatten()
+            .flat_map(|dependency| {
+                ctx.settings
+                    .dependency_to_module
+                    .get(dependency)
+                    .and_then(|module_fs_node_id| ctx.public.get(module_fs_node_id))
+                    .and_then(|public| public.get(name.basename.as_ref()))
+                    .into_iter()
+            })
+            .flatten()
             .filter(|f| Self::fits(ctx, **f, arguments, source));
 
         if let Some(found) = remote_matches.next() {

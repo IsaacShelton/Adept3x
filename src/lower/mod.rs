@@ -197,6 +197,8 @@ fn lower_function(
         function.name.to_string()
     };
 
+    let is_main = mangled_name == "main";
+
     ir_module.functions.insert(
         function_ref,
         ir::Function {
@@ -205,8 +207,8 @@ fn lower_function(
             parameters,
             return_type,
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
-            is_foreign: true,
-            is_exposed: true,
+            is_foreign: function.is_foreign,
+            is_exposed: is_main,
             abide_abi: function.abide_abi && ir_module.target.arch().is_some(),
         },
     );

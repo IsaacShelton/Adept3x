@@ -274,8 +274,9 @@ pub fn resolve<'a>(
                 .push_back(Job::Regular(*real_file_id, function_i, function_ref));
 
             if function.privacy.is_public() {
-                let public_of_module = ctx.public.entry(file_id).or_insert_with(|| HashMap::new());
+                let public_of_module = ctx.public.entry(file_id).or_insert_with(HashMap::new);
 
+                // TODO: Add proper error message
                 let function_name = function
                     .name
                     .as_plain_str()
