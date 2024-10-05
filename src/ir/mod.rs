@@ -7,16 +7,20 @@ use crate::{
 };
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
-use std::{collections::HashMap, ffi::CString};
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::CString,
+    sync::RwLock,
+};
 
 pub type Structures = HashMap<StructureRef, Structure>;
 
-#[derive(Clone)]
 pub struct Module<'a> {
     pub target: &'a Target,
     pub functions: HashMap<FunctionRef, Function>,
     pub structures: Structures,
     pub globals: HashMap<GlobalVarRef, Global>,
+    pub function_uses: RwLock<HashSet<FunctionRef>>, // TODO: Use a concurrent set instead
 }
 
 impl<'a> std::fmt::Debug for Module<'a> {
@@ -474,6 +478,7 @@ impl<'a> Module<'a> {
             functions: HashMap::new(),
             structures: HashMap::new(),
             globals: HashMap::new(),
+            function_uses: RwLock::new(HashSet::new()),
         }
     }
 }

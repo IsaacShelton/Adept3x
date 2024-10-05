@@ -20,6 +20,17 @@ use std::ffi::CString;
 
 pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
+        // Skip unused functions
+        if !ctx
+            .ir_module
+            .function_uses
+            .read()
+            .unwrap()
+            .contains(function_ref)
+        {
+            continue;
+        }
+
         let mut abi_function = function
             .abide_abi
             .then(|| {

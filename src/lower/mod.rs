@@ -198,6 +198,16 @@ fn lower_function(
     };
 
     let is_main = mangled_name == "main";
+    let is_exposed = is_main;
+
+    // Ensure `main` is referenced
+    if is_exposed {
+        ir_module
+            .function_uses
+            .write()
+            .unwrap()
+            .insert(function_ref);
+    }
 
     ir_module.functions.insert(
         function_ref,
@@ -208,7 +218,7 @@ fn lower_function(
             return_type,
             is_cstyle_variadic: function.parameters.is_cstyle_vararg,
             is_foreign: function.is_foreign,
-            is_exposed: is_main,
+            is_exposed,
             abide_abi: function.abide_abi && ir_module.target.arch().is_some(),
         },
     );
@@ -571,6 +581,12 @@ fn lower_expr(
                 .functions
                 .get(call.function)
                 .expect("referenced function to exist");
+
+            ir_module
+                .function_uses
+                .write()
+                .unwrap()
+                .insert(call.function);
 
             let arguments = call
                 .arguments
