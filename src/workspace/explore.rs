@@ -14,14 +14,20 @@ use super::{
 use append_only_vec::AppendOnlyVec;
 use ignore::{WalkBuilder, WalkState};
 use path_absolutize::Absolutize;
-use std::{ffi::OsStr, fs::FileType, path::Path, time::UNIX_EPOCH};
+use std::{
+    ffi::OsStr,
+    fs::FileType,
+    path::Path,
+    sync::atomic::{self, AtomicBool},
+    time::UNIX_EPOCH,
+};
 
 pub struct ExploreResult {
     pub normal_files: Vec<NormalFile>,
     pub module_files: Vec<ModuleFile>,
 }
 
-pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
+pub fn explore(fs: &Fs, folder_path: &Path) -> Option<ExploreResult> {
     let normal_files = AppendOnlyVec::new();
     let module_files = AppendOnlyVec::new();
 
@@ -35,12 +41,19 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
         .hidden(true) // Ignore hidden files
         .build_parallel();
 
+    let ok = AtomicBool::new(true);
+
     walker.run(|| {
         let normal_files = &normal_files;
         let module_files = &module_files;
+        let ok = &ok;
 
         Box::new(move |entry| {
-            let entry = entry.unwrap();
+            let Ok(entry) = entry else {
+                ok.store(false, atomic::Ordering::SeqCst);
+                return WalkState::Quit;
+            };
+
             let basename = entry.file_name();
             let is_file = entry.file_type().as_ref().map_or(false, FileType::is_file);
 
@@ -86,8 +99,8 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> ExploreResult {
         })
     });
 
-    ExploreResult {
+    ok.load(atomic::Ordering::SeqCst).then(|| ExploreResult {
         normal_files: normal_files.into_vec(),
         module_files: module_files.into_vec(),
-    }
+    })
 }

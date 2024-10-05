@@ -5,12 +5,10 @@ mod into_inflow_stream;
 mod tools;
 mod try_peek;
 
-pub use self::inflow_end::InflowEnd;
-pub use self::inflow_stream::InflowStream;
-pub use self::into_inflow::IntoInflow;
-pub use self::into_inflow_stream::IntoInflowStream;
-pub use self::tools::InflowTools;
-pub use self::try_peek::TryPeek;
+pub use self::{
+    inflow_end::InflowEnd, inflow_stream::InflowStream, into_inflow::IntoInflow,
+    into_inflow_stream::IntoInflowStream, tools::InflowTools, try_peek::TryPeek,
+};
 
 pub trait Inflow<T>: InflowStream<Item = T> {
     fn un_next(&mut self, item: Self::Item);

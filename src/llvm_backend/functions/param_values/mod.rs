@@ -6,6 +6,7 @@ mod inalloca;
 mod indirect;
 mod value;
 
+pub use self::value::ParamValue;
 use super::params_mapping::ParamRange;
 use crate::{
     ir,
@@ -15,8 +16,6 @@ use crate::{
     },
 };
 use llvm_sys::prelude::LLVMValueRef;
-
-pub use self::value::ParamValue;
 
 pub struct ParamValues {
     values: Vec<ParamValue>,

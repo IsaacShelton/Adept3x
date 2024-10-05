@@ -33,7 +33,7 @@ use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
 use std::{
     borrow::Borrow,
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
 };
 
 enum Job {
@@ -46,6 +46,7 @@ struct ResolveCtx<'a> {
     pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
     pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx>,
     pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
+    pub public: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
 }
 
 impl<'a> ResolveCtx<'a> {
@@ -56,6 +57,7 @@ impl<'a> ResolveCtx<'a> {
             function_search_ctxs: Default::default(),
             global_search_ctxs: Default::default(),
             helper_exprs,
+            public: HashMap::new(),
         }
     }
 }
@@ -271,6 +273,24 @@ pub fn resolve<'a>(
             ctx.jobs
                 .push_back(Job::Regular(*real_file_id, function_i, function_ref));
 
+            if function.privacy.is_public() {
+                let public_of_module = ctx.public.entry(file_id).or_insert_with(|| HashMap::new());
+
+                let function_name = function
+                    .name
+                    .as_plain_str()
+                    .expect("cannot make public symbol with existing namespace");
+
+                if public_of_module.get(function_name).is_none() {
+                    public_of_module.insert(function_name.to_string(), vec![]);
+                }
+
+                let functions_of_name = public_of_module
+                    .get_mut(function_name)
+                    .expect("function list inserted");
+                functions_of_name.push(function_ref);
+            }
+
             let settings = file.settings.map(|id| &ast_workspace.settings[id.0]);
             let imported_namespaces = settings.map(|settings| &settings.imported_namespaces);
 
@@ -366,6 +386,7 @@ pub fn resolve<'a>(
                         resolved_function_ref,
                         helper_exprs: &ctx.helper_exprs,
                         settings,
+                        public: &ctx.public,
                     };
 
                     resolve_stmts(&mut ctx, &ast_function.stmts)?

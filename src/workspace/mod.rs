@@ -43,6 +43,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use module_file::ModuleFile;
 use normal_file::{NormalFile, NormalFileKind};
+use path_absolutize::Absolutize;
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -85,10 +86,17 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
 
     let fs = Fs::new();
 
-    let ExploreResult {
+    let Some(ExploreResult {
         module_files,
         normal_files,
-    } = explore(&fs, project_folder);
+    }) = explore(&fs, project_folder)
+    else {
+        eprintln!(
+            "error: Could not locate workspace folder '{}'",
+            project_folder.display()
+        );
+        exit(1);
+    };
 
     let num_threads = (normal_files.len() + module_files.len()).min(NUM_THREADS);
     let all_modules_done = Barrier::new(num_threads);
@@ -107,7 +115,7 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                         break;
                     };
 
-                    let (did_bytes, rest_input, settings) =
+                    let (did_bytes, rest_input, mut settings, source_file_key) =
                         match compile_module_file(compiler, &fs, &module_file.path) {
                             Ok(values) => values,
                             Err(err) => {
@@ -123,21 +131,43 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                             }
                         };
 
-                    let imported_folders = &settings.imported_folders;
-                    let _namespace_to_dependency = &settings.namespace_to_dependency;
+                    for (_namespace, folder) in settings.namespace_to_dependency.iter() {
+                        let infrastructure = compiler
+                            .options
+                            .infrastructure
+                            .as_ref()
+                            .expect("must have infrastructure specified in order to import")
+                            .absolutize()
+                            .expect("failed to get absolute path for compiler infrastructure");
 
-                    for folder in imported_folders {
-                        let absolute_folder =
-                            Path::new("/Users/isaac/Projects/Adept3x/adept/infrastructure/import/")
-                                .join(&**folder);
+                        let absolute_folder = infrastructure.join("import").join(&**folder);
 
                         let already_discovered = fs.find(&absolute_folder).is_some();
 
                         if !already_discovered {
-                            let ExploreResult {
+                            let Some(ExploreResult {
                                 module_files: new_module_files,
                                 normal_files: new_normal_files,
-                            } = explore(&fs, &absolute_folder);
+                            }) = explore(&fs, &absolute_folder)
+                            else {
+                                // TODO: CLEANUP: Clean up this error message code
+
+                                let top_source = Source::new(source_file_key, Location::new(1, 1));
+                                let err = ErrorDiagnostic::new(
+                                    format!("Dependency '{}' could not be found", &**folder),
+                                    top_source,
+                                );
+
+                                let mut message = String::new();
+                                err.show(&mut message, compiler.source_files)
+                                    .expect("failed to print error");
+                                eprintln!("{}", message);
+
+                                // SAFETY: This is okay, since we never need to read this until the
+                                // threads have been synchronized
+                                num_module_files_failed.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            };
 
                             module_files
                                 .lock()
@@ -150,16 +180,11 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                                 .extend(new_normal_files.into_iter().map(CodeFile::Normal));
                         }
 
-                        let Some(module_fs_node_id) = fs.find(&absolute_folder) else {
-                            // TODO: Add proper error message
-                            panic!("Dependency '{}' could not be found", &**folder);
-                        };
+                        let module_fs_node_id = fs.find(&absolute_folder).expect("module loaded");
 
-                        compiler.diagnostics.push(WarningDiagnostic::plain(format!(
-                            "Ignoring symbols for dependency '{}' (from module with fs_node_id = {:?}), as importing has not been implemented yet",
-                            folder,
-                            module_fs_node_id,
-                        )));
+                        settings
+                            .dependency_to_module
+                            .insert(folder.to_string(), module_fs_node_id);
                     }
 
                     let folder_fs_node_id = fs

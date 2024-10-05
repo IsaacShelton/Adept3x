@@ -1,4 +1,3 @@
-
 macro_rules! speculate {
     ($input:expr, $expression:expr) => {{
         $input.speculate();

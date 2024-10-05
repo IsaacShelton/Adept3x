@@ -19,10 +19,9 @@ use llvm_sys::{
     },
     prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMTypeRef, LLVMValueRef},
 };
-use std::{ffi::CStr, ptr::null_mut};
-
 pub use load::Volatility;
 pub use phi_relocation::PhiRelocation;
+use std::{ffi::CStr, ptr::null_mut};
 
 pub struct Builder {
     builder: LLVMBuilderRef,

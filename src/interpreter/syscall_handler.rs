@@ -40,7 +40,6 @@ pub struct BuildSystemSyscallHandler {
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
     pub assume_int_at_least_32_bits: bool,
-    pub imported_folders: Vec<Box<str>>,
     pub namespace_to_dependency: HashMap<String, String>,
 }
 
@@ -54,7 +53,6 @@ impl Default for BuildSystemSyscallHandler {
             debug_skip_merging_helper_exprs: false,
             imported_namespaces: vec![],
             assume_int_at_least_32_bits: true,
-            imported_folders: vec![],
             namespace_to_dependency: HashMap::new(),
         }
     }
@@ -156,9 +154,6 @@ impl SyscallHandler for BuildSystemSyscallHandler {
 
                 let as_namespace = read_cstring(memory, &args[0]);
                 let dependency_name = read_cstring(memory, &args[1]);
-
-                self.imported_folders
-                    .push(dependency_name.to_string().into());
 
                 self.namespace_to_dependency
                     .insert(as_namespace, dependency_name);

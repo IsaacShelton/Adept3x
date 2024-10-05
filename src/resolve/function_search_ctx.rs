@@ -54,6 +54,28 @@ impl FunctionSearchCtx {
             };
         }
 
+        let mut remote_matches = (!name.namespace.is_empty())
+            .then(|| {
+                ctx.settings
+                    .namespace_to_dependency
+                    .get(name.namespace.as_ref())
+            })
+            .flatten()
+            .and_then(|dependency| ctx.settings.dependency_to_module.get(dependency))
+            .and_then(|module_fs_node_id| ctx.public.get(module_fs_node_id))
+            .and_then(|public| public.get(name.basename.as_ref()))
+            .into_iter()
+            .flat_map(|f| f.iter())
+            .filter(|f| Self::fits(ctx, **f, arguments, source));
+
+        if let Some(found) = remote_matches.next() {
+            return if remote_matches.next().is_some() {
+                Err(FindFunctionError::Ambiguous)
+            } else {
+                Ok(*found)
+            };
+        }
+
         if name.namespace.is_empty() {
             let mut matches = self
                 .imported_namespaces

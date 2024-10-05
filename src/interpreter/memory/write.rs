@@ -1,7 +1,8 @@
-use super::super::{error::InterpreterError, size_of::size_of, value::Value};
-use super::Memory;
-use crate::interpreter::value::StructLiteral;
-use crate::ir;
+use super::{
+    super::{error::InterpreterError, size_of::size_of, value::Value},
+    Memory,
+};
+use crate::{interpreter::value::StructLiteral, ir};
 
 impl Memory {
     pub fn write(

@@ -1,5 +1,6 @@
 use super::Type;
 use crate::{name::Name, source_files::Source};
+use derive_more::IsVariant;
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
@@ -10,7 +11,7 @@ pub struct Structure {
     pub source: Source,
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, IsVariant)]
 pub enum Privacy {
     #[default]
     Public,

@@ -41,11 +41,13 @@ use crate::{
         resolve_stmts, resolve_type,
     },
     resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr},
+    workspace::fs::FsNodeId,
 };
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
 use indexmap::IndexMap;
 use resolved::IntegerKnown;
+use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
@@ -56,6 +58,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_function_ref: resolved::FunctionRef,
     pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub settings: &'b Settings,
+    pub public: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {

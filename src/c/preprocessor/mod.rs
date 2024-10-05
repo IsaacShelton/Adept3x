@@ -19,8 +19,10 @@ mod stdc;
    - __DATE__
    - etc.
 */
-pub use self::ast::{Define, DefineKind};
-pub use self::pre_token::{PreToken, PreTokenKind};
+pub use self::{
+    ast::{Define, DefineKind},
+    pre_token::{PreToken, PreTokenKind},
+};
 use self::{
     error::PreprocessorError,
     expand::expand_ast,

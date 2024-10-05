@@ -8,7 +8,7 @@ use crate::{
     parser::Input,
     pragma_section::PragmaSection,
     show::{into_show, Show},
-    source_files::Source,
+    source_files::{Source, SourceFileKey},
     text::{IntoText, IntoTextStream},
     token::{Token, TokenKind},
     workspace::fs::Fs,
@@ -19,7 +19,15 @@ pub fn compile_module_file<'a>(
     compiler: &Compiler<'a>,
     _fs: &Fs,
     path: &Path,
-) -> Result<(usize, Input<'a, impl Inflow<Token> + 'a>, Settings), Box<dyn Show + 'a>> {
+) -> Result<
+    (
+        usize,
+        Input<'a, impl Inflow<Token> + 'a>,
+        Settings,
+        SourceFileKey,
+    ),
+    Box<dyn Show + 'a>,
+> {
     let content = std::fs::read_to_string(path)
         .map_err(ErrorDiagnostic::plain)
         .map_err(into_show)?;
@@ -56,5 +64,5 @@ pub fn compile_module_file<'a>(
         )));
     };
 
-    Ok((content.len(), input, settings))
+    Ok((content.len(), input, settings, key))
 }
