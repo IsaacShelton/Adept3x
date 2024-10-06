@@ -58,7 +58,8 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_function_ref: resolved::FunctionRef,
     pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub settings: &'b Settings,
-    pub public: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
+    pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
+    pub module_fs_node_id: FsNodeId,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {

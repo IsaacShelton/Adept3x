@@ -69,7 +69,7 @@ pub fn resolve_call_expr(
                 return Err(ResolveErrorKind::BadTypeForArgumentToFunction {
                     expected: preferred_type.to_string(),
                     got: argument.resolved_type.to_string(),
-                    name: function.name.to_string(),
+                    name: function.name.display(ctx.resolved_ast.fs).to_string(),
                     i,
                 }
                 .at(source));
@@ -94,7 +94,7 @@ pub fn resolve_call_expr(
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
                 of: required_ty.to_string(),
-                function_name: function.name.to_string(),
+                function_name: function.name.display(ctx.resolved_ast.fs).to_string(),
             }
             .at(function.return_type.source));
         }

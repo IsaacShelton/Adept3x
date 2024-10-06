@@ -3,6 +3,7 @@ use crate::{
     name::ResolvedName,
     resolved::{self, GlobalVarRef},
     source_files::Source,
+    workspace::fs::Fs,
 };
 use std::collections::HashMap;
 
@@ -21,12 +22,13 @@ impl GlobalSearchCtx {
     pub fn find_global_or_error(
         &self,
         name: &ResolvedName,
+        fs: &Fs,
         source: Source,
     ) -> Result<(&resolved::Type, &GlobalVarRef), ResolveError> {
         match self.find_global(name) {
             Some(global) => Ok(global),
             None => Err(ResolveErrorKind::UndeclaredVariable {
-                name: name.to_string(),
+                name: name.display(fs).to_string(),
             }
             .at(source)),
         }

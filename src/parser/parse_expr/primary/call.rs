@@ -28,13 +28,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         prefix_args: Vec<Expr>,
         source: Source,
     ) -> Result<Expr, ParseError> {
+        let starting_args_len = prefix_args.len();
         let mut args = prefix_args;
 
         self.parse_token(TokenKind::OpenParen, Some("to begin call argument list"))?;
         self.ignore_newlines();
 
         while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
-            if !args.is_empty() {
+            if args.len() > starting_args_len {
                 self.parse_token(TokenKind::Comma, Some("to separate arguments"))?;
                 self.ignore_newlines();
             }

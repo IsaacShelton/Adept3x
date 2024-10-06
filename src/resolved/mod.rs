@@ -12,6 +12,7 @@ use crate::{
     source_files::{Source, SourceFiles},
     tag::Tag,
     target::Target,
+    workspace::fs::Fs,
 };
 use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
@@ -38,10 +39,11 @@ pub struct Ast<'a> {
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: IndexMap<ResolvedName, Enum>,
+    pub fs: &'a Fs,
 }
 
 impl<'a> Ast<'a> {
-    pub fn new(source_files: &'a SourceFiles) -> Self {
+    pub fn new(source_files: &'a SourceFiles, fs: &'a Fs) -> Self {
         Self {
             source_files,
             entry_point: None,
@@ -49,6 +51,7 @@ impl<'a> Ast<'a> {
             structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
             enums: IndexMap::new(),
+            fs,
         }
     }
 }
@@ -323,7 +326,7 @@ impl Display for TypeKind {
                 write!(f, "ptr<{}>", inner.kind)?;
             }
             TypeKind::Void => f.write_str("void")?,
-            TypeKind::Structure(name, _) => write!(f, "{}", name)?,
+            TypeKind::Structure(name, _) => write!(f, "{}", name.plain())?,
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
             TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
@@ -331,7 +334,7 @@ impl Display for TypeKind {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
             TypeKind::FunctionPointer(..) => f.write_str("(function pointer type)")?,
-            TypeKind::Enum(enum_name) => write!(f, "(enum) {}", enum_name)?,
+            TypeKind::Enum(enum_name) => write!(f, "(enum) {}", enum_name.plain())?,
         }
 
         Ok(())

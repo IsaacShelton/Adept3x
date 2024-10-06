@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub fn resolve_variable_expr(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     name: &Name,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
@@ -48,7 +48,7 @@ pub fn resolve_variable_expr(
         ));
     }
 
-    let resolved_name = ResolvedName::new(name);
+    let resolved_name = ResolvedName::new(ctx.module_fs_node_id, name);
 
     if let Some((resolved_type, reference)) = ctx.global_search_ctx.find_global(&resolved_name) {
         return Ok(resolve_global_variable(resolved_type, *reference, source));
@@ -64,10 +64,10 @@ pub fn resolve_variable_expr(
             .imported_namespaces
             .iter()
             .flat_map(|namespace| {
-                let resolved_name = ResolvedName::new(&Name::new(
-                    Some(namespace.to_string()),
-                    name.basename.to_string(),
-                ));
+                let resolved_name = ResolvedName::new(
+                    ctx.module_fs_node_id,
+                    &Name::new(Some(namespace.to_string()), name.basename.to_string()),
+                );
 
                 let global = ctx
                     .global_search_ctx

@@ -7,6 +7,7 @@ use crate::{
     name::{Name, ResolvedName},
     resolved::{self, TypedExpr},
     source_files::Source,
+    workspace::fs::FsNodeId,
 };
 use std::collections::HashMap;
 
@@ -14,6 +15,7 @@ use std::collections::HashMap;
 pub struct FunctionSearchCtx {
     pub available: HashMap<ResolvedName, Vec<resolved::FunctionRef>>,
     pub imported_namespaces: Vec<Box<str>>,
+    pub fs_node_id: FsNodeId,
 }
 
 #[derive(Clone, Debug)]
@@ -23,10 +25,11 @@ pub enum FindFunctionError {
 }
 
 impl FunctionSearchCtx {
-    pub fn new(imported_namespaces: Vec<Box<str>>) -> Self {
+    pub fn new(imported_namespaces: Vec<Box<str>>, fs_node_id: FsNodeId) -> Self {
         Self {
             available: Default::default(),
             imported_namespaces,
+            fs_node_id,
         }
     }
 
@@ -37,7 +40,7 @@ impl FunctionSearchCtx {
         arguments: &[TypedExpr],
         source: Source,
     ) -> Result<FunctionRef, FindFunctionError> {
-        let resolved_name = ResolvedName::new(name);
+        let resolved_name = ResolvedName::new(self.fs_node_id, name);
 
         let mut local_matches = self
             .available
@@ -67,7 +70,7 @@ impl FunctionSearchCtx {
                 ctx.settings
                     .dependency_to_module
                     .get(dependency)
-                    .and_then(|module_fs_node_id| ctx.public.get(module_fs_node_id))
+                    .and_then(|module_fs_node_id| ctx.public_functions.get(module_fs_node_id))
                     .and_then(|public| public.get(name.basename.as_ref()))
                     .into_iter()
             })
@@ -87,10 +90,10 @@ impl FunctionSearchCtx {
                 .imported_namespaces
                 .iter()
                 .filter_map(|namespace| {
-                    self.available.get(&ResolvedName::new(&Name::new(
-                        Some(namespace.to_string()),
-                        name.basename.clone(),
-                    )))
+                    self.available.get(&ResolvedName::new(
+                        self.fs_node_id,
+                        &Name::new(Some(namespace.to_string()), name.basename.clone()),
+                    ))
                 })
                 .flatten()
                 .filter(|f| Self::fits(ctx, **f, arguments, source));

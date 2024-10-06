@@ -12,7 +12,7 @@ impl<S: InflowStream> InflowPeeker<S> {
     pub fn new(stream: S) -> Self {
         Self {
             stream,
-            queue: VecDeque::new(),
+            queue: VecDeque::with_capacity(8),
         }
     }
 }

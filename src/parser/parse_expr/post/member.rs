@@ -14,8 +14,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.parse_token(TokenKind::Member, Some("for member expression"))?;
         let member_name = self.parse_name(Some("for member name"))?;
 
-        if self.input.peek_is(TokenKind::OpenParen) || self.input.peek_is(TokenKind::OpenAngle) {
-            let generics = self.parse_generics()?;
+        let generics = self.parse_generics()?;
+
+        if !generics.is_empty()
+            || self.input.peek_is(TokenKind::OpenParen)
+            || self.input.peek_is(TokenKind::OpenAngle)
+        {
             self.parse_call_with(member_name, generics, vec![subject], source)
         } else {
             Ok(ExprKind::Member(

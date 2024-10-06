@@ -81,10 +81,16 @@ fn lower_global(
     global: &resolved::GlobalVar,
     resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
+    let mangled_name = if global.is_foreign {
+        global.name.plain().to_string()
+    } else {
+        global.name.display(resolved_ast.fs).to_string()
+    };
+
     ir_module.globals.insert(
         global_ref,
         Global {
-            mangled_name: global.name.to_string(),
+            mangled_name,
             ir_type: lower_type(&ir_module.target, &global.resolved_type, resolved_ast)?,
             is_foreign: global.is_foreign,
             is_thread_local: global.is_thread_local,
@@ -161,7 +167,7 @@ fn lower_function(
             } else {
                 return Err(LowerErrorKind::MustReturnValueOfTypeBeforeExitingFunction {
                     return_type: function.return_type.to_string(),
-                    function: function.name.to_string(),
+                    function: function.name.display(resolved_ast.fs).to_string(),
                 }
                 .at(function.source));
             }
@@ -194,7 +200,7 @@ fn lower_function(
     } else if function.is_foreign {
         function.name.plain().to_string()
     } else {
-        function.name.to_string()
+        function.name.display(resolved_ast.fs).to_string()
     };
 
     let is_main = mangled_name == "main";
@@ -890,7 +896,10 @@ fn lower_expr(
                 .get(&enum_member_literal.variant_name)
                 .ok_or_else(|| {
                     LowerErrorKind::NoSuchEnumMember {
-                        enum_name: enum_member_literal.enum_name.to_string(),
+                        enum_name: enum_member_literal
+                            .enum_name
+                            .display(resolved_ast.fs)
+                            .to_string(),
                         variant_name: enum_member_literal.variant_name.clone(),
                     }
                     .at(enum_member_literal.source)
@@ -907,7 +916,10 @@ fn lower_expr(
             let make_error = |_| {
                 LowerErrorKind::CannotFit {
                     value: value.to_string(),
-                    expected_type: enum_member_literal.enum_name.to_string(),
+                    expected_type: enum_member_literal
+                        .enum_name
+                        .display(resolved_ast.fs)
+                        .to_string(),
                 }
                 .at(enum_definition.source)
             };
@@ -939,7 +951,10 @@ fn lower_expr(
                 }
                 _ => {
                     return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
-                        enum_name: enum_member_literal.enum_name.to_string(),
+                        enum_name: enum_member_literal
+                            .enum_name
+                            .display(resolved_ast.fs)
+                            .to_string(),
                     }
                     .at(enum_definition.source))
                 }

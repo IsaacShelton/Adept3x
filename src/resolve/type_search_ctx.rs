@@ -7,6 +7,7 @@ use crate::{
     name::{Name, ResolvedName},
     resolved,
     source_files::{Source, SourceFiles},
+    workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
 use std::{borrow::Cow, collections::HashSet};
@@ -16,6 +17,7 @@ pub struct TypeSearchCtx<'a> {
     types: IndexMap<ResolvedName, TypeMapping<'a>>,
     imported_namespaces: Vec<Box<str>>,
     source_files: &'a SourceFiles,
+    fs_node_id: FsNodeId,
 }
 
 #[derive(Clone, Debug)]
@@ -55,11 +57,16 @@ impl FindTypeError {
 }
 
 impl<'a> TypeSearchCtx<'a> {
-    pub fn new(imported_namespaces: Vec<Box<str>>, source_files: &'a SourceFiles) -> Self {
+    pub fn new(
+        imported_namespaces: Vec<Box<str>>,
+        source_files: &'a SourceFiles,
+        fs_node_id: FsNodeId,
+    ) -> Self {
         Self {
             types: Default::default(),
             imported_namespaces,
             source_files,
+            fs_node_id,
         }
     }
 
@@ -68,7 +75,7 @@ impl<'a> TypeSearchCtx<'a> {
         name: &Name,
         used_aliases_stack: &mut HashSet<ResolvedName>,
     ) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
-        let resolved_name = ResolvedName::new(name);
+        let resolved_name = ResolvedName::new(self.fs_node_id, name);
 
         if let Some(mapping) = self.types.get(&resolved_name) {
             return self.resolve_mapping(&resolved_name, mapping, used_aliases_stack);
@@ -76,8 +83,10 @@ impl<'a> TypeSearchCtx<'a> {
 
         if name.namespace.is_empty() {
             let mut matches = self.imported_namespaces.iter().filter_map(|namespace| {
-                let resolved_name =
-                    ResolvedName::new(&Name::new(Some(namespace.clone()), name.basename.clone()));
+                let resolved_name = ResolvedName::new(
+                    self.fs_node_id,
+                    &Name::new(Some(namespace.clone()), name.basename.clone()),
+                );
                 self.types.get(&resolved_name)
             });
 
@@ -120,7 +129,7 @@ impl<'a> TypeSearchCtx<'a> {
         value: resolved::TypeKind,
         source: Source,
     ) -> Result<(), ResolveError> {
-        let resolved_name = ResolvedName::new(name);
+        let resolved_name = ResolvedName::new(self.fs_node_id, name);
 
         if self
             .types
@@ -137,7 +146,7 @@ impl<'a> TypeSearchCtx<'a> {
     }
 
     pub fn override_type(&mut self, name: &Name, value: resolved::TypeKind) {
-        let resolved_name = ResolvedName::new(name);
+        let resolved_name = ResolvedName::new(self.fs_node_id, name);
         self.types.insert(resolved_name, TypeMapping::Normal(value));
     }
 
@@ -147,7 +156,7 @@ impl<'a> TypeSearchCtx<'a> {
         value: &'a ast::TypeAlias,
         source: Source,
     ) -> Result<(), ResolveError> {
-        let resolved_name = ResolvedName::new(&name);
+        let resolved_name = ResolvedName::new(self.fs_node_id, &name);
 
         if self
             .types

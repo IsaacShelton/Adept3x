@@ -1,3 +1,4 @@
+use crate::workspace::fs::{Fs, FsNodeId};
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -56,33 +57,47 @@ impl Display for Name {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ResolvedName {
-    Remote(Box<str>),
-    Project(Box<str>),
+pub struct ResolvedName {
+    fs_node_id: FsNodeId,
+    name: Box<str>,
 }
 
 impl ResolvedName {
-    pub fn new(name: &Name) -> Self {
-        Self::Project(name.fullname().into_boxed_str())
-    }
-
-    pub fn new_remote(name: &Name) -> Self {
-        Self::Remote(name.fullname().into_boxed_str())
+    pub fn new(fs_node_id: FsNodeId, name: &Name) -> Self {
+        Self {
+            fs_node_id,
+            name: name.fullname().into_boxed_str(),
+        }
     }
 
     pub fn plain(&self) -> &str {
-        match self {
-            ResolvedName::Remote(name) => &**name,
-            ResolvedName::Project(name) => &**name,
-        }
+        &*self.name
+    }
+
+    pub fn display<'a>(&'a self, fs: &'a Fs) -> DisplayResolvedName<'a> {
+        DisplayResolvedName { name: self, fs }
     }
 }
 
-impl Display for ResolvedName {
+pub struct DisplayResolvedName<'a> {
+    name: &'a ResolvedName,
+    fs: &'a Fs,
+}
+
+impl Display for DisplayResolvedName<'_> {
+    #[allow(dead_code)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ResolvedName::Remote(name) => write!(f, "<remote>/{}", name),
-            ResolvedName::Project(name) => write!(f, "{}", name),
-        }
+        let filename = &self.fs.get(self.name.fs_node_id).filename;
+        let prefix = if cfg!(target_os = "windows") { "/" } else { "" };
+
+        write!(
+            f,
+            "{}{} ::: {}",
+            prefix,
+            filename.to_string_lossy(),
+            self.name.plain()
+        )?;
+
+        Ok(())
     }
 }

@@ -117,7 +117,7 @@ pub fn resolve_struct_literal_expr(
             .is_some()
         {
             return Err(ResolveErrorKind::FieldSpecifiedMoreThanOnce {
-                struct_name: struct_name.to_string(),
+                struct_name: struct_name.display(ctx.resolved_ast.fs).to_string(),
                 field_name: field_name.to_string(),
             }
             .at(ast_type.source));
