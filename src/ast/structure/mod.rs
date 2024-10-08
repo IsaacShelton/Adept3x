@@ -9,6 +9,7 @@ pub struct Structure {
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
     pub source: Source,
+    pub privacy: Privacy,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, IsVariant)]

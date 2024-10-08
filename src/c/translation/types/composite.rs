@@ -97,6 +97,7 @@ pub fn make_composite(
                     fields,
                     is_packed,
                     source: composite.source,
+                    privacy: Privacy::Private,
                 });
 
                 Ok(TypeKind::Named(name))

@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Field, Structure},
+    ast::{Field, Privacy, Structure},
     inflow::Inflow,
     name::Name,
     token::{Token, TokenKind},
@@ -24,11 +24,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let mut is_packed = false;
         let mut namespace = None;
+        let mut privacy = Privacy::Private;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Packed => is_packed = true,
                 AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
+                AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for struct"))),
             }
         }
@@ -68,6 +70,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             fields,
             is_packed,
             source,
+            privacy,
         })
     }
 }

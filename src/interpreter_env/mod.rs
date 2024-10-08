@@ -142,6 +142,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         )]),
         is_packed: false,
         source,
+        privacy: Privacy::Private,
     });
 
     file.structures.push(Structure {
@@ -156,6 +157,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         )]),
         is_packed: false,
         source,
+        privacy: Privacy::Private,
     });
 
     file.functions.push(thin_cstring_function(
