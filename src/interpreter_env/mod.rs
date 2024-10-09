@@ -127,6 +127,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                     },
                 ),
             ]),
+            privacy: Privacy::Private,
         },
     );
 

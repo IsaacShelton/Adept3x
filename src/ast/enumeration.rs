@@ -1,4 +1,4 @@
-use super::Type;
+use super::{Privacy, Type};
 use crate::source_files::Source;
 use indexmap::IndexMap;
 use num::BigInt;
@@ -8,6 +8,7 @@ pub struct Enum {
     pub backing_type: Option<Type>,
     pub source: Source,
     pub members: IndexMap<String, EnumMember>,
+    pub privacy: Privacy,
 }
 
 #[derive(Clone, Debug, PartialEq)]
