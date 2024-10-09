@@ -23,7 +23,7 @@ use crate::{
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
     name::ResolvedName,
-    resolved::{self, Enum, TypedExpr, VariableStorage},
+    resolved::{self, new_type_resolution, Enum, TypedExpr, VariableStorage},
     source_files::Source,
     tag::Tag,
     workspace::fs::FsNodeId,
@@ -102,6 +102,77 @@ pub fn resolve<'a>(
     let mut ctx = ResolveCtx::new(helper_exprs);
     let source_files = ast_workspace.source_files;
     let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace.fs);
+
+    // Pre-resolve types for new type resolution system
+    #[allow(unreachable_code, unused_variables)]
+    for (physical_file_id, file) in ast_workspace.files.iter() {
+        let file_id = ast_workspace
+            .get_owning_module(*physical_file_id)
+            .unwrap_or(*physical_file_id);
+
+        let decls = resolved_ast.types_per_module.entry(file_id).or_default();
+
+        for structure in file.structures.iter() {
+            let privacy = structure.privacy;
+            let source = structure.source;
+            let resolved_name = ResolvedName::new(file_id, &structure.name);
+
+            let structure_ref = resolved_ast.structures.insert(resolved::Structure {
+                name: resolved_name.clone(),
+                fields: IndexMap::new(),
+                is_packed: structure.is_packed,
+                source: structure.source,
+            });
+
+            let struct_type_kind = new_type_resolution::TypeKind::Structure(
+                new_type_resolution::HumanName(structure.name.to_string()),
+                structure_ref,
+            );
+
+            let Some(name) = structure.name.as_plain_str() else {
+                eprintln!(
+                    "warning: internal namespaced structures ignored by new type resolution system"
+                );
+                continue;
+            };
+
+            decls.insert(
+                name.to_string(),
+                new_type_resolution::TypeDecl {
+                    kind: struct_type_kind.clone(),
+                    source,
+                    privacy,
+                },
+            );
+        }
+
+        for (name, definition) in file.enums.iter() {
+            eprintln!("warning: enums not implemented for new type resolution system yet");
+            continue;
+
+            let representation_type_ref = todo!();
+
+            let kind = new_type_resolution::TypeKind::Enum(
+                new_type_resolution::HumanName(name.to_string()),
+                representation_type_ref,
+            );
+            let source = definition.source;
+            let privacy = todo!("can't use enums with new type resolution system yet, since enums don't have privacy yet"); // definition.privacy;
+
+            decls.insert(
+                name.to_string(),
+                new_type_resolution::TypeDecl {
+                    kind,
+                    source,
+                    privacy,
+                },
+            );
+        }
+
+        for (name, definition) in file.type_aliases.iter() {
+            eprintln!("warning: type aliases not implemented for new type resolution system yet");
+        }
+    }
 
     // Unify type aliases into single map
     for (real_file_id, file) in ast_workspace.files.iter() {

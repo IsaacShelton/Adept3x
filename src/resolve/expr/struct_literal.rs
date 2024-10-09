@@ -14,7 +14,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 fn get_field_info<'a>(
-    ctx: &'a ResolveExprCtx<'_, '_>,
+    ctx: &'a ResolveExprCtx,
     structure_ref: StructureRef,
     field_name: &str,
 ) -> (usize, &'a resolved::Field) {
@@ -30,7 +30,7 @@ fn get_field_info<'a>(
 }
 
 pub fn resolve_struct_literal_expr(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     ast_type: &ast::Type,
     fields: &[FieldInitializer],
     fill_behavior: FillBehavior,

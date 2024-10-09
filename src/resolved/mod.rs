@@ -1,5 +1,6 @@
 mod variable_storage;
 
+pub mod new_type_resolution;
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{
     CInteger, EnumMember, FloatSize, IntegerBits, IntegerKnown, IntegerSign,
@@ -12,7 +13,7 @@ use crate::{
     source_files::{Source, SourceFiles},
     tag::Tag,
     target::Target,
-    workspace::fs::Fs,
+    workspace::fs::{Fs, FsNodeId},
 };
 use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
@@ -20,6 +21,7 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use slotmap::{new_key_type, SlotMap};
 use std::{
+    collections::HashMap,
     ffi::CString,
     fmt::{Debug, Display},
 };
@@ -40,6 +42,9 @@ pub struct Ast<'a> {
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: IndexMap<ResolvedName, Enum>,
     pub fs: &'a Fs,
+    // New Experimental Type Resolution System
+    pub all_types: SlotMap<new_type_resolution::TypeRef, new_type_resolution::TypeKind>,
+    pub types_per_module: HashMap<FsNodeId, HashMap<String, new_type_resolution::TypeDecl>>,
 }
 
 impl<'a> Ast<'a> {
@@ -52,6 +57,8 @@ impl<'a> Ast<'a> {
             globals: SlotMap::with_key(),
             enums: IndexMap::new(),
             fs,
+            all_types: SlotMap::with_key(),
+            types_per_module: HashMap::new(),
         }
     }
 }
