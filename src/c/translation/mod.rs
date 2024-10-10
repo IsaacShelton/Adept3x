@@ -7,7 +7,7 @@ mod types;
 use self::types::get_name_and_type;
 pub use self::{expr::translate_expr, function::declare_function};
 use crate::{
-    ast::{self, AstFile},
+    ast::{self, AstFile, Privacy},
     c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError},
     diagnostics::Diagnostics,
     name::Name,
@@ -37,6 +37,7 @@ pub fn declare_named_declaration(
             ast::TypeAlias {
                 value: ast_type.clone(),
                 source: declarator.source,
+                privacy: Privacy::Public,
             },
         );
 

@@ -1,6 +1,6 @@
 use super::{annotation::Annotation, error::ParseError, Parser};
 use crate::{
-    ast::{Named, TypeAlias},
+    ast::{Named, Privacy, TypeAlias},
     inflow::Inflow,
     name::Name,
     parser::annotation::AnnotationKind,
@@ -16,6 +16,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         assert!(self.input.advance().is_type_alias_keyword());
 
         let mut namespace = None;
+        let mut privacy = Privacy::Private;
         let name = self.parse_identifier(Some("for alias name after 'typealias' keyword"))?;
         self.ignore_newlines();
 
@@ -23,6 +24,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
+                AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for type alias"))),
             }
         }
@@ -36,6 +38,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             value: TypeAlias {
                 value: becomes_type,
                 source,
+                privacy,
             },
         })
     }
