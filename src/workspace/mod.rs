@@ -11,7 +11,7 @@ mod module_file;
 mod normal_file;
 
 use crate::{
-    ast::{self, AstFile, AstWorkspace, Settings},
+    ast::{self, AstFile, AstWorkspace, Privacy, Settings},
     c::{
         self,
         lexer::lex_c_code,
@@ -451,6 +451,7 @@ fn header(
                             value,
                             source: define.source,
                             is_file_local_only: define.is_file_local_only,
+                            privacy: Privacy::Public,
                         },
                     );
                 }

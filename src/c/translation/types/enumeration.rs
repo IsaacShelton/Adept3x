@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, AnonymousEnum, AstFile, EnumMember, TypeKind},
+    ast::{self, AnonymousEnum, AstFile, EnumMember, Privacy, TypeKind},
     c::{
         parser::{error::ParseErrorKind, Enumeration, ParseError},
         translation::eval::evaluate_to_const_integer,
@@ -67,6 +67,7 @@ pub fn make_anonymous_enum(
                             value: aka_value,
                             source: enumerator.source,
                             is_file_local_only: false,
+                            privacy: Privacy::Public,
                         },
                         |name| {
                             ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol {
