@@ -9,7 +9,6 @@ use slotmap::new_key_type;
 
 new_key_type! {
     pub struct TypeRef;
-    pub struct EnumRef;
 }
 
 #[derive(Clone, Debug)]
@@ -44,7 +43,7 @@ pub enum TypeKind {
     AnonymousEnum(AnonymousEnum),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
-    Enum(HumanName, TypeRef),
+    Enum(HumanName, Option<TypeRef>),
     Structure(HumanName, StructureRef),
     TypeAlias(HumanName, TypeRef),
 }

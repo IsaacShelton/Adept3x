@@ -22,8 +22,12 @@ use crate::{
     ast::{self, AstWorkspace, Type},
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
-    name::ResolvedName,
-    resolved::{self, new_type_resolution, Enum, TypedExpr, VariableStorage},
+    name::{Name, ResolvedName},
+    resolved::{
+        self,
+        new_type_resolution::{self, TypeRef},
+        Enum, StructureRef, TypedExpr, VariableStorage,
+    },
     source_files::Source,
     tag::Tag,
     workspace::fs::FsNodeId,
@@ -103,12 +107,28 @@ pub fn resolve<'a>(
     let source_files = ast_workspace.source_files;
     let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace.fs);
 
+    #[derive(Clone, Debug)]
+    struct TypeJob<'a> {
+        physical_file_id: FsNodeId,
+        type_aliases: HashMap<&'a Name, TypeRef>,
+        structures: Vec<StructureRef>,
+        enums: HashMap<&'a Name, TypeRef>,
+    }
+
+    let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
+
     // Pre-resolve types for new type resolution system
-    #[allow(unreachable_code, unused_variables)]
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let file_id = ast_workspace
             .get_owning_module(*physical_file_id)
             .unwrap_or(*physical_file_id);
+
+        let mut job = TypeJob {
+            physical_file_id: *physical_file_id,
+            type_aliases: HashMap::with_capacity(file.type_aliases.len()),
+            structures: Vec::with_capacity(file.structures.len()),
+            enums: HashMap::with_capacity(file.enums.len()),
+        };
 
         let decls = resolved_ast.types_per_module.entry(file_id).or_default();
 
@@ -144,20 +164,52 @@ pub fn resolve<'a>(
                     privacy,
                 },
             );
+
+            job.structures.push(structure_ref);
         }
 
         for (name, definition) in file.enums.iter() {
-            eprintln!("warning: enums not implemented for new type resolution system yet");
-            continue;
-
-            let representation_type_ref = todo!();
+            let backing_type = definition.backing_type.is_some().then(|| {
+                resolved_ast
+                    .all_types
+                    .insert(new_type_resolution::TypeKind::Unresolved)
+            });
 
             let kind = new_type_resolution::TypeKind::Enum(
                 new_type_resolution::HumanName(name.to_string()),
-                representation_type_ref,
+                backing_type,
             );
             let source = definition.source;
-            let privacy = todo!("can't use enums with new type resolution system yet, since enums don't have privacy yet"); // definition.privacy;
+            let privacy = definition.privacy;
+
+            decls.insert(
+                name.to_string(),
+                new_type_resolution::TypeDecl {
+                    kind,
+                    source,
+                    privacy,
+                },
+            );
+
+            if let Some(backing_type) = backing_type {
+                job.enums.insert(name, backing_type);
+            }
+        }
+
+        for (name, definition) in file.type_aliases.iter() {
+            let source = definition.source;
+            let privacy = definition.privacy;
+
+            let becomes_type = resolved_ast
+                .all_types
+                .insert(new_type_resolution::TypeKind::Unresolved);
+
+            let kind = new_type_resolution::TypeKind::TypeAlias(
+                new_type_resolution::HumanName(name.to_string()),
+                becomes_type,
+            );
+
+            job.type_aliases.insert(name, becomes_type);
 
             decls.insert(
                 name.to_string(),
@@ -169,8 +221,36 @@ pub fn resolve<'a>(
             );
         }
 
-        for (name, definition) in file.type_aliases.iter() {
-            eprintln!("warning: type aliases not implemented for new type resolution system yet");
+        type_jobs.push(job);
+    }
+
+    // Create edges between types
+    #[allow(dead_code, unused_variables)]
+    for job in type_jobs.iter() {
+        let file = ast_workspace
+            .files
+            .get(&job.physical_file_id)
+            .expect("valid ast file");
+
+        let module_file_id = ast_workspace
+            .get_owning_module(job.physical_file_id)
+            .unwrap_or(job.physical_file_id);
+
+        let types = resolved_ast
+            .types_per_module
+            .get(&module_file_id)
+            .expect("valid module");
+
+        for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
+            eprintln!("warning - new type resolution does not handle struct fields yet");
+        }
+
+        for (name, type_ref) in job.enums.iter() {
+            eprintln!("warning - new type resolution does not handle enum backing types yet");
+        }
+
+        for (name, type_ref) in job.type_aliases.iter() {
+            eprintln!("warning - new type resolution does not handle enum type aliases yet");
         }
     }
 

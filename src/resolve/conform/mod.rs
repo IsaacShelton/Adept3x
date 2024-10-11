@@ -62,7 +62,11 @@ pub fn conform_expr<O: Objective>(
     conform_source: Source,
 ) -> ObjectiveResult<O> {
     if expr.resolved_type == *to_type {
-        return O::success(|| expr.clone());
+        return O::success(|| TypedExpr {
+            resolved_type: to_type.clone(),
+            expr: expr.expr.clone(),
+            is_initialized: expr.is_initialized,
+        });
     }
 
     match &expr.resolved_type.kind {
