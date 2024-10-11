@@ -96,7 +96,7 @@ jobs:
           cargo build --release
         env:
           CC: /opt/homebrew/opt/llvm/bin/clang
-          LLVM_SYS_181_PREFIX: /opt/homebrew/opt/llvm
+          LLVM_SYS_181_PREFIX: /opt/homebrew/opt/llvm@18
           zstd_DIR: /usr/local/opt/zstd
           CFLAGS: -static-libstdc++
           CXXFLAGS: -static-libstdc++
