@@ -68,7 +68,7 @@ jobs:
       - name: Install LLVM and dependencies (macOS)
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
-          export PATH=/opt/homebrew/opt/llvm@18/bin:$PATH
+          brew install llvm # For clang
           brew install llvm@18
           brew install zstd
       - name: Install LLVM and dependencies (Ubuntu)
