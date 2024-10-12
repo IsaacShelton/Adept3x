@@ -7,7 +7,7 @@ use crate::{
 };
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct GlobalSearchCtx {
     globals: HashMap<ResolvedName, (resolved::Type, GlobalVarRef)>,
 }

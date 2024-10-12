@@ -21,7 +21,7 @@ use super::{
     function_search_ctx::FunctionSearchCtx,
     global_search_ctx::GlobalSearchCtx,
     variable_search_ctx::VariableSearchCtx,
-    Initialized,
+    Initialized, ResolveTypeCtx,
 };
 use crate::{
     ast::{
@@ -37,7 +37,7 @@ use crate::{
             struct_literal::resolve_struct_literal_expr,
             unary_operation::resolve_unary_math_operation_expr, variable::resolve_variable_expr,
         },
-        resolve_stmts, resolve_type,
+        resolve_stmts,
     },
     resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr},
     workspace::fs::FsNodeId,
@@ -57,6 +57,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub settings: &'b Settings,
     pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
+    pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub module_fs_node_id: FsNodeId,
 }
 
@@ -390,22 +391,22 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let resolved_type = resolve_type(
-                ctx.resolved_ast,
+            let resolved_type = ResolveTypeCtx::new(
+                &ctx.resolved_ast,
                 ctx.module_fs_node_id,
-                result_type,
-                &mut Default::default(),
-            )?;
+                ctx.types_in_modules,
+            )
+            .resolve(result_type)?;
 
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
-                let preferred_type = resolve_type(
-                    ctx.resolved_ast,
+                let type_ctx = ResolveTypeCtx::new(
+                    &ctx.resolved_ast,
                     ctx.module_fs_node_id,
-                    expected_arg_type,
-                    &mut Default::default(),
-                )?;
+                    ctx.types_in_modules,
+                );
+                let preferred_type = type_ctx.resolve(expected_arg_type)?;
 
                 resolved_args.push(
                     resolve_expr(

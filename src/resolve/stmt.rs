@@ -3,7 +3,7 @@ use super::{
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
     expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
-    resolve_type, Initialized,
+    Initialized, ResolveTypeCtx,
 };
 use crate::{ast, resolved};
 
@@ -85,12 +85,13 @@ pub fn resolve_stmt(
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
-            let resolved_type = resolve_type(
-                ctx.resolved_ast,
+            let type_ctx = ResolveTypeCtx::new(
+                &ctx.resolved_ast,
                 ctx.module_fs_node_id,
-                &declaration.ast_type,
-                &mut Default::default(),
-            )?;
+                ctx.types_in_modules,
+            );
+
+            let resolved_type = type_ctx.resolve(&declaration.ast_type)?;
 
             let value = declaration
                 .initial_value
