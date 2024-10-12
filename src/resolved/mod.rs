@@ -1,19 +1,18 @@
 mod variable_storage;
 
-pub mod new_type_resolution;
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{
     CInteger, EnumMember, FloatSize, IntegerBits, IntegerKnown, IntegerSign,
     ShortCircuitingBinaryOperator, UnaryMathOperator,
 };
 use crate::{
-    ast::fmt_c_integer,
+    ast::{fmt_c_integer, AstWorkspace},
     ir::InterpreterSyscallKind,
     name::ResolvedName,
     source_files::{Source, SourceFiles},
     tag::Tag,
     target::Target,
-    workspace::fs::{Fs, FsNodeId},
+    workspace::fs::FsNodeId,
 };
 use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
@@ -31,6 +30,7 @@ new_key_type! {
     pub struct FunctionRef;
     pub struct GlobalVarRef;
     pub struct StructureRef;
+    pub struct TypeRef;
 }
 
 #[derive(Clone, Debug)]
@@ -41,14 +41,14 @@ pub struct Ast<'a> {
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: IndexMap<ResolvedName, Enum>,
-    pub fs: &'a Fs,
+    pub workspace: &'a AstWorkspace<'a>,
     // New Experimental Type Resolution System
-    pub all_types: SlotMap<new_type_resolution::TypeRef, new_type_resolution::TypeKind>,
-    pub types_per_module: HashMap<FsNodeId, HashMap<String, new_type_resolution::TypeDecl>>,
+    pub all_types: SlotMap<TypeRef, TypeKind>,
+    pub types_per_module: HashMap<FsNodeId, HashMap<String, TypeDecl>>,
 }
 
 impl<'a> Ast<'a> {
-    pub fn new(source_files: &'a SourceFiles, fs: &'a Fs) -> Self {
+    pub fn new(source_files: &'a SourceFiles, workspace: &'a AstWorkspace) -> Self {
         Self {
             source_files,
             entry_point: None,
@@ -56,7 +56,7 @@ impl<'a> Ast<'a> {
             structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
             enums: IndexMap::new(),
-            fs,
+            workspace,
             all_types: SlotMap::with_key(),
             types_per_module: HashMap::new(),
         }
@@ -127,6 +127,12 @@ pub struct Field {
     pub source: Source,
 }
 
+impl Display for TypeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TypeRef(???)")
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Type {
     pub kind: TypeKind,
@@ -135,7 +141,10 @@ pub struct Type {
 
 impl Type {
     pub fn pointer(self, source: Source) -> Self {
-        TypeKind::Pointer(Box::new(self)).at(source)
+        Self {
+            kind: TypeKind::Pointer(Box::new(self)),
+            source,
+        }
     }
 
     pub fn is_ambiguous(&self) -> bool {
@@ -155,8 +164,25 @@ impl PartialEq for Type {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct TypeDecl {
+    pub kind: TypeKind,
+    pub source: Source,
+    pub privacy: Privacy,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HumanName(pub String);
+
+impl Display for HumanName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum TypeKind {
+    Unresolved,
     Boolean,
     Integer(IntegerBits, IntegerSign),
     CInteger(CInteger, Option<IntegerSign>),
@@ -164,14 +190,15 @@ pub enum TypeKind {
     FloatLiteral(f64),
     Floating(FloatSize),
     Pointer(Box<Type>),
-    Structure(ResolvedName, StructureRef),
     Void,
     AnonymousStruct(),
     AnonymousUnion(),
     AnonymousEnum(AnonymousEnum),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
-    Enum(ResolvedName),
+    Enum(HumanName, Option<TypeRef>),
+    Structure(HumanName, StructureRef),
+    TypeAlias(HumanName, TypeRef),
 }
 
 impl TypeKind {
@@ -243,7 +270,7 @@ pub struct AnonymousEnum {
 
 impl PartialEq for AnonymousEnum {
     fn eq(&self, other: &Self) -> bool {
-        self.resolved_type.kind.eq(&other.resolved_type.kind) && self.members.eq(&other.members)
+        self.resolved_type.eq(&other.resolved_type) && self.members.eq(&other.members)
     }
 }
 
@@ -281,6 +308,8 @@ impl TypeKind {
                     target.map(|target| target.default_c_integer_sign(*integer))
                 }
             }
+            TypeKind::TypeAlias(_, _type_ref) => todo!(),
+            TypeKind::Unresolved => panic!(),
             TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Pointer(_)
@@ -290,7 +319,7 @@ impl TypeKind {
             | TypeKind::AnonymousUnion(..)
             | TypeKind::FixedArray(..)
             | TypeKind::FunctionPointer(..)
-            | TypeKind::Enum(_)
+            | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum(_) => None,
         }
     }
@@ -303,6 +332,8 @@ impl TypeKind {
 impl Display for TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            TypeKind::Unresolved => panic!(),
+            TypeKind::TypeAlias(_, _type_ref) => todo!(),
             TypeKind::Boolean => {
                 write!(f, "bool")?;
             }
@@ -330,10 +361,10 @@ impl Display for TypeKind {
             },
             TypeKind::FloatLiteral(value) => write!(f, "float {}", value)?,
             TypeKind::Pointer(inner) => {
-                write!(f, "ptr<{}>", inner.kind)?;
+                write!(f, "ptr<{}>", **inner)?;
             }
             TypeKind::Void => f.write_str("void")?,
-            TypeKind::Structure(name, _) => write!(f, "{}", name.plain())?,
+            TypeKind::Structure(name, _) => write!(f, "{}", name)?,
             TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
             TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
             TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
@@ -341,7 +372,7 @@ impl Display for TypeKind {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
             TypeKind::FunctionPointer(..) => f.write_str("(function pointer type)")?,
-            TypeKind::Enum(enum_name) => write!(f, "(enum) {}", enum_name.plain())?,
+            TypeKind::Enum(_, type_ref) => write!(f, "(enum) {:?}", type_ref)?,
         }
 
         Ok(())

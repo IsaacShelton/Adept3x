@@ -20,7 +20,6 @@ use super::{
     error::ResolveError,
     function_search_ctx::FunctionSearchCtx,
     global_search_ctx::GlobalSearchCtx,
-    type_search_ctx::TypeSearchCtx,
     variable_search_ctx::VariableSearchCtx,
     Initialized,
 };
@@ -52,7 +51,6 @@ use std::collections::HashMap;
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
     pub function_search_ctx: &'b FunctionSearchCtx,
-    pub type_search_ctx: &'b TypeSearchCtx<'a>,
     pub global_search_ctx: &'b GlobalSearchCtx,
     pub variable_search_ctx: VariableSearchCtx,
     pub resolved_function_ref: resolved::FunctionRef,
@@ -351,7 +349,10 @@ pub fn resolve_expr(
             resolved::TypeKind::Boolean.at(source),
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
-        ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
+        ast::ExprKind::EnumMemberLiteral(_enum_member_literal) => {
+            todo!("resolve enum member literal");
+
+            /*
             let resolved_type = resolve_type(
                 ctx.type_search_ctx,
                 &ast::TypeKind::Named(enum_member_literal.enum_name.clone())
@@ -359,7 +360,7 @@ pub fn resolve_expr(
                 &mut Default::default(),
             )?;
 
-            let TypeKind::Enum(resolved_name) = &resolved_type.kind else {
+            let TypeKind::Enum(_, _) = &resolved_type.kind else {
                 return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
                     ty: enum_member_literal.enum_name.to_string(),
                     member: enum_member_literal.variant_name.clone(),
@@ -379,7 +380,8 @@ pub fn resolve_expr(
                     })),
                     source,
                 ),
-            ))
+                ))
+            */
         }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {
@@ -388,14 +390,19 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let resolved_type =
-                resolve_type(ctx.type_search_ctx, result_type, &mut Default::default())?;
+            let resolved_type = resolve_type(
+                ctx.resolved_ast,
+                ctx.module_fs_node_id,
+                result_type,
+                &mut Default::default(),
+            )?;
 
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
                 let preferred_type = resolve_type(
-                    ctx.type_search_ctx,
+                    ctx.resolved_ast,
+                    ctx.module_fs_node_id,
                     expected_arg_type,
                     &mut Default::default(),
                 )?;

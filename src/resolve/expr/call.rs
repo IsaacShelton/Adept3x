@@ -69,7 +69,10 @@ pub fn resolve_call_expr(
                 return Err(ResolveErrorKind::BadTypeForArgumentToFunction {
                     expected: preferred_type.to_string(),
                     got: argument.resolved_type.to_string(),
-                    name: function.name.display(ctx.resolved_ast.fs).to_string(),
+                    name: function
+                        .name
+                        .display(&ctx.resolved_ast.workspace.fs)
+                        .to_string(),
                     i,
                 }
                 .at(source));
@@ -88,13 +91,20 @@ pub fn resolve_call_expr(
     }
 
     if let Some(required_ty) = &call.expected_to_return {
-        let resolved_required_ty =
-            resolve_type(ctx.type_search_ctx, required_ty, &mut Default::default())?;
+        let resolved_required_ty = resolve_type(
+            ctx.resolved_ast,
+            ctx.module_fs_node_id,
+            required_ty,
+            &mut Default::default(),
+        )?;
 
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
                 of: required_ty.to_string(),
-                function_name: function.name.display(ctx.resolved_ast.fs).to_string(),
+                function_name: function
+                    .name
+                    .display(&ctx.resolved_ast.workspace.fs)
+                    .to_string(),
             }
             .at(function.return_type.source));
         }

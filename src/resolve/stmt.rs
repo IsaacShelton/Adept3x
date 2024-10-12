@@ -86,7 +86,8 @@ pub fn resolve_stmt(
         )),
         ast::StmtKind::Declaration(declaration) => {
             let resolved_type = resolve_type(
-                ctx.type_search_ctx,
+                ctx.resolved_ast,
+                ctx.module_fs_node_id,
                 &declaration.ast_type,
                 &mut Default::default(),
             )?;

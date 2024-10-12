@@ -15,7 +15,6 @@ use self::{
     expr::ResolveExprCtx,
     global_search_ctx::GlobalSearchCtx,
     stmt::resolve_stmts,
-    type_search_ctx::TypeSearchCtx,
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
@@ -24,9 +23,7 @@ use crate::{
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
     resolved::{
-        self,
-        new_type_resolution::{self, TypeRef},
-        Enum, StructureRef, TypedExpr, VariableStorage,
+        self, HumanName, StructureRef, TypeDecl, TypeKind, TypeRef, TypedExpr, VariableStorage,
     },
     source_files::Source,
     tag::Tag,
@@ -39,7 +36,7 @@ use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet, VecDeque},
 };
-use type_search_ctx::TypeMapping;
+use type_search_ctx::find_type;
 
 enum Job {
     Regular(FsNodeId, usize, resolved::FunctionRef),
@@ -47,24 +44,20 @@ enum Job {
 
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
-    pub type_search_ctxs: IndexMap<FsNodeId, TypeSearchCtx<'a>>,
     pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
     pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx>,
     pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
-    pub public_types: HashMap<FsNodeId, HashMap<String, Vec<TypeMapping<'a>>>>,
 }
 
 impl<'a> ResolveCtx<'a> {
     fn new(helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>) -> Self {
         Self {
             jobs: Default::default(),
-            type_search_ctxs: Default::default(),
             function_search_ctxs: Default::default(),
             global_search_ctxs: Default::default(),
             helper_exprs,
             public_functions: HashMap::new(),
-            public_types: HashMap::new(),
         }
     }
 }
@@ -105,7 +98,7 @@ pub fn resolve<'a>(
 
     let mut ctx = ResolveCtx::new(helper_exprs);
     let source_files = ast_workspace.source_files;
-    let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace.fs);
+    let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
 
     #[derive(Clone, Debug)]
     struct TypeJob<'a> {
@@ -144,10 +137,8 @@ pub fn resolve<'a>(
                 source: structure.source,
             });
 
-            let struct_type_kind = new_type_resolution::TypeKind::Structure(
-                new_type_resolution::HumanName(structure.name.to_string()),
-                structure_ref,
-            );
+            let struct_type_kind =
+                TypeKind::Structure(HumanName(structure.name.to_string()), structure_ref);
 
             let Some(name) = structure.name.as_plain_str() else {
                 eprintln!(
@@ -158,7 +149,7 @@ pub fn resolve<'a>(
 
             decls.insert(
                 name.to_string(),
-                new_type_resolution::TypeDecl {
+                TypeDecl {
                     kind: struct_type_kind.clone(),
                     source,
                     privacy,
@@ -169,22 +160,18 @@ pub fn resolve<'a>(
         }
 
         for (name, definition) in file.enums.iter() {
-            let backing_type = definition.backing_type.is_some().then(|| {
-                resolved_ast
-                    .all_types
-                    .insert(new_type_resolution::TypeKind::Unresolved)
-            });
+            let backing_type = definition
+                .backing_type
+                .is_some()
+                .then(|| resolved_ast.all_types.insert(TypeKind::Unresolved));
 
-            let kind = new_type_resolution::TypeKind::Enum(
-                new_type_resolution::HumanName(name.to_string()),
-                backing_type,
-            );
+            let kind = TypeKind::Enum(HumanName(name.to_string()), backing_type);
             let source = definition.source;
             let privacy = definition.privacy;
 
             decls.insert(
                 name.to_string(),
-                new_type_resolution::TypeDecl {
+                TypeDecl {
                     kind,
                     source,
                     privacy,
@@ -199,21 +186,14 @@ pub fn resolve<'a>(
         for (name, definition) in file.type_aliases.iter() {
             let source = definition.source;
             let privacy = definition.privacy;
-
-            let becomes_type = resolved_ast
-                .all_types
-                .insert(new_type_resolution::TypeKind::Unresolved);
-
-            let kind = new_type_resolution::TypeKind::TypeAlias(
-                new_type_resolution::HumanName(name.to_string()),
-                becomes_type,
-            );
+            let becomes_type = resolved_ast.all_types.insert(TypeKind::Unresolved);
+            let kind = TypeKind::TypeAlias(HumanName(name.to_string()), becomes_type);
 
             job.type_aliases.insert(name, becomes_type);
 
             decls.insert(
                 name.to_string(),
-                new_type_resolution::TypeDecl {
+                TypeDecl {
                     kind,
                     source,
                     privacy,
@@ -242,6 +222,29 @@ pub fn resolve<'a>(
             .expect("valid module");
 
         for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
+            for (field_name, field) in structure.fields.iter() {
+                let resolved_type = resolve_type_or_undeclared(
+                    &resolved_ast,
+                    module_file_id,
+                    &field.ast_type,
+                    &mut Default::default(),
+                )?;
+
+                let resolved_struct = resolved_ast
+                    .structures
+                    .get_mut(*structure_ref)
+                    .expect("valid struct");
+
+                resolved_struct.fields.insert(
+                    field_name.clone(),
+                    resolved::Field {
+                        resolved_type,
+                        privacy: field.privacy,
+                        source: field.source,
+                    },
+                );
+            }
+
             eprintln!("warning - new type resolution does not handle struct fields yet");
         }
 
@@ -254,136 +257,23 @@ pub fn resolve<'a>(
         }
     }
 
-    // Unify type aliases into single map
-    for (real_file_id, file) in ast_workspace.files.iter() {
-        let file_id = ast_workspace
-            .get_owning_module(*real_file_id)
-            .unwrap_or(*real_file_id);
-
-        let imported_namespaces =
-            &ast_workspace.settings[file.settings.unwrap_or_default().0].imported_namespaces;
-
-        let type_search_ctx = ctx.type_search_ctxs.get_or_insert_with(file_id, || {
-            TypeSearchCtx::new(imported_namespaces.clone(), source_files, file_id)
-        });
-
-        for (alias_name, alias) in file.type_aliases.iter() {
-            type_search_ctx.put_type_alias(&alias_name, alias, alias.source)?;
-        }
-    }
-
-    // Temporarily used stack to keep track of used type aliases
-    let mut used_aliases = HashSet::<ResolvedName>::new();
-
-    // Pre-compute resolved enum types
-    for (physical_file_id, file) in ast_workspace.files.iter() {
-        let file_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
-
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
-
-        for (enum_name, enum_definition) in file.enums.iter() {
-            let resolved_type = resolve_enum_backing_type(
-                type_search_ctx,
-                enum_definition.backing_type.as_ref(),
-                &mut used_aliases,
-                enum_definition.source,
-            )?;
-
-            let members = enum_definition.members.clone();
-
-            resolved_ast.enums.insert(
-                ResolvedName::new(file_id, enum_name),
-                Enum {
-                    resolved_type,
-                    source: enum_definition.source,
-                    members,
-                },
-            );
-
-            type_search_ctx.put_type(
-                enum_name,
-                resolved::TypeKind::Enum(ResolvedName::new(file_id, enum_name)),
-                enum_definition.source,
-            )?;
-        }
-    }
-
-    // Precompute resolved struct types
-    for (physical_file_id, file) in ast_workspace.files.iter() {
-        let file_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
-
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
-
-        for structure in file.structures.iter() {
-            let mut fields = IndexMap::new();
-
-            for (field_name, field) in structure.fields.iter() {
-                fields.insert(
-                    field_name.into(),
-                    resolved::Field {
-                        resolved_type: resolve_type(
-                            type_search_ctx,
-                            &field.ast_type,
-                            &mut used_aliases,
-                        )?,
-                        privacy: field.privacy,
-                        source: field.source,
-                    },
-                );
-            }
-
-            let resolved_name = ResolvedName::new(file_id, &structure.name);
-
-            let structure_key = resolved_ast.structures.insert(resolved::Structure {
-                name: resolved_name.clone(),
-                fields,
-                is_packed: structure.is_packed,
-                source: structure.source,
-            });
-
-            type_search_ctx.put_type(
-                &structure.name,
-                resolved::TypeKind::Structure(resolved_name, structure_key),
-                structure.source,
-            )?;
-        }
-    }
-
-    // Resolve type aliases
-    for (real_file_id, file) in ast_workspace.files.iter() {
-        let file_id = ast_workspace
-            .get_owning_module(*real_file_id)
-            .unwrap_or(*real_file_id);
-
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
-
-        for (alias_name, alias) in file.type_aliases.iter() {
-            let resolved_type =
-                resolve_type_or_undeclared(type_search_ctx, &alias.value, &mut used_aliases)?;
-
-            type_search_ctx.override_type(&alias_name, resolved_type.kind);
-        }
-    }
-
     // Resolve global variables
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let file_id = ast_workspace
             .get_owning_module(*physical_file_id)
             .unwrap_or(*physical_file_id);
 
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
-
         let global_search_context = ctx
             .global_search_ctxs
             .get_or_insert_with(file_id, || GlobalSearchCtx::new());
 
         for global in file.global_variables.iter() {
-            let resolved_type =
-                resolve_type(type_search_ctx, &global.ast_type, &mut Default::default())?;
+            let resolved_type = resolve_type(
+                &resolved_ast,
+                file_id,
+                &global.ast_type,
+                &mut Default::default(),
+            )?;
 
             let resolved_name = ResolvedName::new(file_id, &global.name);
 
@@ -405,16 +295,15 @@ pub fn resolve<'a>(
             .get_owning_module(*physical_file_id)
             .unwrap_or(*physical_file_id);
 
-        let type_search_ctx = ctx.type_search_ctxs.get_mut(&file_id).unwrap();
-
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(file_id, &function.name);
 
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: name.clone(),
-                parameters: resolve_parameters(type_search_ctx, &function.parameters)?,
+                parameters: resolve_parameters(&resolved_ast, file_id, &function.parameters)?,
                 return_type: resolve_type(
-                    type_search_ctx,
+                    &resolved_ast,
+                    file_id,
                     &function.return_type,
                     &mut Default::default(),
                 )?,
@@ -491,11 +380,6 @@ pub fn resolve<'a>(
                     .get(&file_id)
                     .expect("function search context to exist for file");
 
-                let type_search_ctx = ctx
-                    .type_search_ctxs
-                    .get(&file_id)
-                    .expect("type search context to exist for file");
-
                 let global_search_ctx = ctx
                     .global_search_ctxs
                     .get(&file_id)
@@ -514,17 +398,18 @@ pub fn resolve<'a>(
                 let mut variable_search_ctx = VariableSearchCtx::new();
 
                 {
-                    let function = resolved_ast
-                        .functions
-                        .get_mut(resolved_function_ref)
-                        .unwrap();
-
                     for parameter in ast_function.parameters.required.iter() {
                         let resolved_type = resolve_type(
-                            type_search_ctx,
+                            &resolved_ast,
+                            file_id,
                             &parameter.ast_type,
                             &mut Default::default(),
                         )?;
+
+                        let function = resolved_ast
+                            .functions
+                            .get_mut(resolved_function_ref)
+                            .unwrap();
 
                         let variable_key = function.variables.add_parameter(resolved_type.clone());
 
@@ -547,7 +432,6 @@ pub fn resolve<'a>(
                     let mut ctx = ResolveExprCtx {
                         resolved_ast: &mut resolved_ast,
                         function_search_ctx,
-                        type_search_ctx,
                         global_search_ctx,
                         variable_search_ctx,
                         resolved_function_ref,
@@ -580,11 +464,17 @@ enum Initialized {
 }
 
 fn resolve_type_or_undeclared<'a>(
-    type_search_ctx: &'a TypeSearchCtx<'_>,
+    resolved_ast: &resolved::Ast,
+    module_fs_node_id: FsNodeId,
     ast_type: &'a ast::Type,
     used_aliases_stack: &mut HashSet<ResolvedName>,
 ) -> Result<resolved::Type, ResolveError> {
-    match resolve_type(type_search_ctx, ast_type, used_aliases_stack) {
+    match resolve_type(
+        resolved_ast,
+        module_fs_node_id,
+        ast_type,
+        used_aliases_stack,
+    ) {
         Ok(inner) => Ok(inner),
         Err(_) if ast_type.kind.allow_indirect_undefined() => {
             Ok(resolved::TypeKind::Void.at(ast_type.source))
@@ -594,7 +484,8 @@ fn resolve_type_or_undeclared<'a>(
 }
 
 fn resolve_type<'a>(
-    type_search_ctx: &'a TypeSearchCtx<'_>,
+    resolved_ast: &resolved::Ast,
+    module_fs_node_id: FsNodeId,
     ast_type: &'a ast::Type,
     used_aliases_stack: &mut HashSet<ResolvedName>,
 ) -> Result<resolved::Type, ResolveError> {
@@ -603,12 +494,17 @@ fn resolve_type<'a>(
         ast::TypeKind::Integer(bits, sign) => Ok(resolved::TypeKind::Integer(*bits, *sign)),
         ast::TypeKind::CInteger(integer, sign) => Ok(resolved::TypeKind::CInteger(*integer, *sign)),
         ast::TypeKind::Pointer(inner) => {
-            let inner = resolve_type_or_undeclared(type_search_ctx, inner, used_aliases_stack)?;
+            let inner = resolve_type_or_undeclared(
+                resolved_ast,
+                module_fs_node_id,
+                inner,
+                used_aliases_stack,
+            )?;
 
             Ok(resolved::TypeKind::Pointer(Box::new(inner)))
         }
         ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
-        ast::TypeKind::Named(name) => match type_search_ctx.find_type(name, used_aliases_stack) {
+        ast::TypeKind::Named(name) => match find_type(resolved_ast, module_fs_node_id, name) {
             Ok(found) => Ok(found.into_owned()),
             Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
         },
@@ -617,7 +513,8 @@ fn resolve_type<'a>(
         ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
         ast::TypeKind::AnonymousEnum(anonymous_enum) => {
             let resolved_type = Box::new(resolve_enum_backing_type(
-                type_search_ctx,
+                resolved_ast,
+                module_fs_node_id,
                 anonymous_enum.backing_type.as_deref(),
                 &mut Default::default(),
                 ast_type.source,
@@ -634,8 +531,12 @@ fn resolve_type<'a>(
         ast::TypeKind::FixedArray(fixed_array) => {
             if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
                 if let Ok(size) = integer.value().try_into() {
-                    let inner =
-                        resolve_type(type_search_ctx, &fixed_array.ast_type, used_aliases_stack)?;
+                    let inner = resolve_type(
+                        resolved_ast,
+                        module_fs_node_id,
+                        &fixed_array.ast_type,
+                        used_aliases_stack,
+                    )?;
 
                     Ok(resolved::TypeKind::FixedArray(Box::new(
                         resolved::FixedArray { size, inner },
@@ -651,8 +552,12 @@ fn resolve_type<'a>(
             let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
 
             for parameter in function_pointer.parameters.iter() {
-                let resolved_type =
-                    resolve_type(type_search_ctx, &parameter.ast_type, used_aliases_stack)?;
+                let resolved_type = resolve_type(
+                    resolved_ast,
+                    module_fs_node_id,
+                    &parameter.ast_type,
+                    used_aliases_stack,
+                )?;
 
                 parameters.push(resolved::Parameter {
                     name: parameter.name.clone(),
@@ -661,7 +566,8 @@ fn resolve_type<'a>(
             }
 
             let return_type = Box::new(resolve_type(
-                type_search_ctx,
+                resolved_ast,
+                module_fs_node_id,
                 &function_pointer.return_type,
                 used_aliases_stack,
             )?);
@@ -679,7 +585,8 @@ fn resolve_type<'a>(
 }
 
 fn resolve_parameters(
-    type_search_ctx: &TypeSearchCtx<'_>,
+    resolved_ast: &resolved::Ast,
+    module_fs_node_id: FsNodeId,
     parameters: &ast::Parameters,
 ) -> Result<resolved::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
@@ -688,7 +595,8 @@ fn resolve_parameters(
         required.push(resolved::Parameter {
             name: parameter.name.clone(),
             resolved_type: resolve_type(
-                type_search_ctx,
+                resolved_ast,
+                module_fs_node_id,
                 &parameter.ast_type,
                 &mut Default::default(),
             )?,
@@ -721,13 +629,14 @@ fn ensure_initialized(
 }
 
 fn resolve_enum_backing_type(
-    type_search_ctx: &TypeSearchCtx,
+    resolved_ast: &resolved::Ast,
+    module_fs_node_id: FsNodeId,
     backing_type: Option<impl Borrow<Type>>,
     used_aliases: &mut HashSet<ResolvedName>,
     source: Source,
 ) -> Result<resolved::Type, ResolveError> {
     if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {
-        resolve_type(type_search_ctx, backing_type, used_aliases)
+        resolve_type(resolved_ast, module_fs_node_id, backing_type, used_aliases)
     } else {
         Ok(resolved::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source))
     }
