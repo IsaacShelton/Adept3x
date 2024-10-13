@@ -9,6 +9,7 @@ use crate::{
     resolved::{self, TypedExpr},
     source_files::Source,
 };
+use itertools::Itertools;
 
 pub fn resolve_call_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
@@ -35,9 +36,21 @@ pub fn resolve_call_expr(
     ) {
         Ok(function_ref) => function_ref,
         Err(reason) => {
+            let args = arguments
+                .iter()
+                .map(|arg| arg.resolved_type.to_string())
+                .collect_vec();
+
+            let signature = format!("{}({})", call.function_name, args.join(", "));
+
+            let almost_matches = ctx
+                .function_search_ctx
+                .find_function_almost_matches(ctx, &call.function_name);
+
             return Err(ResolveErrorKind::FailedToFindFunction {
-                name: call.function_name.to_string(),
+                signature,
                 reason,
+                almost_matches,
             }
             .at(source));
         }

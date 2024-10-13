@@ -88,14 +88,14 @@ impl Display for DisplayResolvedName<'_> {
     #[allow(dead_code)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let filename = &self.fs.get(self.name.fs_node_id).filename;
-        let prefix = if cfg!(target_os = "windows") { "/" } else { "" };
+        let prefix = if cfg!(target_os = "windows") { "" } else { "/" };
 
         write!(
             f,
-            "{}{} ::: {}",
+            "{}{} - {}",
             prefix,
             filename.to_string_lossy(),
-            self.name.plain()
+            self.name.plain(),
         )?;
 
         Ok(())

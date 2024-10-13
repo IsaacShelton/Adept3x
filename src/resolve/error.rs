@@ -31,8 +31,9 @@ pub enum ResolveErrorKind {
         value: String,
     },
     FailedToFindFunction {
-        name: String,
+        signature: String,
         reason: FindFunctionError,
+        almost_matches: Vec<String>,
     },
     UndeclaredVariable {
         name: String,
@@ -211,12 +212,33 @@ impl Display for ResolveErrorKind {
                     value
                 )?;
             }
-            ResolveErrorKind::FailedToFindFunction { name, reason } => match reason {
-                FindFunctionError::NotDefined => write!(f, "Failed to find function '{}'", name)?,
-                FindFunctionError::Ambiguous => {
-                    write!(f, "Multiple possibilities for function '{}'", name)?
+            ResolveErrorKind::FailedToFindFunction {
+                signature,
+                reason,
+                almost_matches,
+            } => {
+                match reason {
+                    FindFunctionError::NotDefined => {
+                        write!(f, "Failed to find function '{}'", signature)?
+                    }
+                    FindFunctionError::Ambiguous => {
+                        write!(f, "Multiple possibilities for function '{}'", signature)?
+                    }
                 }
-            },
+
+                if !almost_matches.is_empty() {
+                    write!(f, "\n    Did you mean?")?;
+
+                    for almost_match in almost_matches {
+                        write!(f, "\n    {}", almost_match)?;
+                    }
+                } else {
+                    write!(
+                        f,
+                        "\n    No available functions have that name, is it public?"
+                    )?;
+                }
+            }
             ResolveErrorKind::UndeclaredVariable { name } => {
                 write!(f, "Undeclared variable '{}'", name)?;
             }
