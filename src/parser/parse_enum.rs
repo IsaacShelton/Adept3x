@@ -1,8 +1,7 @@
 use super::{annotation::Annotation, error::ParseError, Parser};
 use crate::{
-    ast::{Enum, EnumMember, Named, Privacy},
+    ast::{Enum, EnumMember, Privacy},
     inflow::Inflow,
-    name::Name,
     parser::annotation::AnnotationKind,
     token::{Token, TokenKind},
 };
@@ -10,18 +9,16 @@ use indexmap::IndexMap;
 use num::{BigInt, Zero};
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Named<Enum>, ParseError> {
+    pub fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Enum, ParseError> {
         let source = self.source_here();
         assert!(self.input.advance().is_enum_keyword());
 
         let mut privacy = Privacy::Private;
-        let mut namespace = None;
         let name = self.parse_identifier(Some("for enum name after 'enum' keyword"))?;
         self.ignore_newlines();
 
         for annotation in annotations {
             match annotation.kind {
-                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for enum"))),
             }
@@ -58,14 +55,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseParen, Some("to close enum body"))?;
 
-        Ok(Named::<Enum> {
-            name: Name::new(namespace, name),
-            value: Enum {
-                backing_type: None,
-                members,
-                source,
-                privacy,
-            },
+        Ok(Enum {
+            name,
+            backing_type: None,
+            members,
+            source,
+            privacy,
         })
     }
 }

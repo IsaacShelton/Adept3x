@@ -347,8 +347,10 @@ fn lower_type(
     use resolved::{IntegerBits as Bits, IntegerSign as Sign};
 
     match &resolved_type.kind {
-        resolved::TypeKind::Unresolved => panic!(),
-        resolved::TypeKind::TypeAlias(_, _) => todo!("lower type ref"),
+        resolved::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
+        resolved::TypeKind::TypeAlias(_, _) => {
+            todo!("lower type ref for aliases not supported yet")
+        }
         resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
         resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
@@ -403,16 +405,13 @@ fn lower_type(
             })))
         }
         resolved::TypeKind::FunctionPointer(_function_pointer) => Ok(ir::Type::FunctionPointer),
-        resolved::TypeKind::Enum(_, _enum_name) => {
-            todo!("lower enum type");
-            /*
+        resolved::TypeKind::Enum(_human_name, enum_ref) => {
             let enum_definition = resolved_ast
                 .enums
-                .get(enum_name)
+                .get(*enum_ref)
                 .expect("referenced enum to exist");
 
             lower_type(target, &enum_definition.resolved_type, resolved_ast)
-            */
         }
     }
 }
@@ -899,7 +898,7 @@ fn lower_expr(
         ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let enum_definition = resolved_ast
                 .enums
-                .get(&enum_member_literal.enum_name)
+                .get(enum_member_literal.enum_ref)
                 .expect("referenced enum to exist for enum member literal");
 
             let member = enum_definition
@@ -907,10 +906,7 @@ fn lower_expr(
                 .get(&enum_member_literal.variant_name)
                 .ok_or_else(|| {
                     LowerErrorKind::NoSuchEnumMember {
-                        enum_name: enum_member_literal
-                            .enum_name
-                            .display(&resolved_ast.workspace.fs)
-                            .to_string(),
+                        enum_name: enum_member_literal.human_name.to_string(),
                         variant_name: enum_member_literal.variant_name.clone(),
                     }
                     .at(enum_member_literal.source)
@@ -927,10 +923,7 @@ fn lower_expr(
             let make_error = |_| {
                 LowerErrorKind::CannotFit {
                     value: value.to_string(),
-                    expected_type: enum_member_literal
-                        .enum_name
-                        .display(&resolved_ast.workspace.fs)
-                        .to_string(),
+                    expected_type: enum_member_literal.human_name.to_string(),
                 }
                 .at(enum_definition.source)
             };
@@ -962,10 +955,7 @@ fn lower_expr(
                 }
                 _ => {
                     return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
-                        enum_name: enum_member_literal
-                            .enum_name
-                            .display(&resolved_ast.workspace.fs)
-                            .to_string(),
+                        enum_name: enum_member_literal.human_name.to_string(),
                     }
                     .at(enum_definition.source))
                 }

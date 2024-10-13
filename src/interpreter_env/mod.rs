@@ -106,30 +106,28 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         privacy: Privacy::Public,
     });
 
-    file.enums.insert(
-        Name::plain("ProjectKind"),
-        Enum {
-            backing_type: Some(TypeKind::u64().at(source)),
-            source,
-            members: IndexMap::from_iter([
-                (
-                    "ConsoleApp".into(),
-                    EnumMember {
-                        value: (ProjectKind::ConsoleApp as u64).into(),
-                        explicit_value: true,
-                    },
-                ),
-                (
-                    "WindowedApp".into(),
-                    EnumMember {
-                        value: (ProjectKind::WindowedApp as u64).into(),
-                        explicit_value: true,
-                    },
-                ),
-            ]),
-            privacy: Privacy::Private,
-        },
-    );
+    file.enums.push(Enum {
+        name: "ProjectKind".into(),
+        backing_type: Some(TypeKind::u64().at(source)),
+        source,
+        members: IndexMap::from_iter([
+            (
+                "ConsoleApp".into(),
+                EnumMember {
+                    value: (ProjectKind::ConsoleApp as u64).into(),
+                    explicit_value: true,
+                },
+            ),
+            (
+                "WindowedApp".into(),
+                EnumMember {
+                    value: (ProjectKind::WindowedApp as u64).into(),
+                    explicit_value: true,
+                },
+            ),
+        ]),
+        privacy: Privacy::Private,
+    });
 
     file.structures.push(Structure {
         name: Name::plain("Project"),

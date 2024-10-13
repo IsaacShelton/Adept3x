@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{AstFile, Enum, HelperExpr, Named, TypeAlias},
+    ast::{AstFile, HelperExpr, Named, TypeAlias},
     index_map_ext::IndexMapExt,
     inflow::Inflow,
     token::{Token, TokenKind},
@@ -72,19 +72,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 })?;
             }
             TokenKind::EnumKeyword => {
-                let Named::<Enum> {
-                    name,
-                    value: enum_definition,
-                } = self.parse_enum(annotations)?;
+                let enum_definition = self.parse_enum(annotations)?;
 
-                let source = enum_definition.source;
-
-                ast_file.enums.try_insert(name, enum_definition, |name| {
-                    ParseErrorKind::EnumHasMultipleDefinitions {
-                        name: name.to_string(),
-                    }
-                    .at(source)
-                })?;
+                ast_file.enums.push(enum_definition);
             }
             TokenKind::DefineKeyword => {
                 let Named::<HelperExpr> {

@@ -11,7 +11,7 @@ pub struct AstFile {
     pub structures: Vec<Structure>,
     pub type_aliases: IndexMap<Name, TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
-    pub enums: IndexMap<Name, Enum>,
+    pub enums: Vec<Enum>,
     pub helper_exprs: IndexMap<Name, HelperExpr>,
     pub settings: Option<SettingsId>,
 }
@@ -23,7 +23,7 @@ impl AstFile {
             structures: vec![],
             type_aliases: IndexMap::default(),
             global_variables: vec![],
-            enums: IndexMap::default(),
+            enums: vec![],
             helper_exprs: IndexMap::default(),
             settings: None,
         }

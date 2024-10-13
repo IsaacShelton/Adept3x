@@ -70,11 +70,6 @@ impl<'a> AstWorkspace<'a> {
         None
     }
 
-    pub fn get_settings_for_module(&self, module_node_id: FsNodeId) -> &Settings {
-        let file = self.files.get(&module_node_id).expect("valid module id");
-        &self.settings[file.settings.unwrap_or_default().0]
-    }
-
     pub fn get_mut(&mut self, id: FsNodeId) -> Option<&mut AstFile> {
         self.files.get_mut(&id)
     }

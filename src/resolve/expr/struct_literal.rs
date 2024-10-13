@@ -1,10 +1,17 @@
-use super::ResolveExprCtx;
+use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
-    resolve::error::ResolveError,
-    resolved::{self, StructureRef, TypedExpr},
+    resolve::{
+        conform::{conform_expr, ConformMode, Perform},
+        core_structure_info::get_core_structure_info,
+        error::{ResolveError, ResolveErrorKind},
+        Initialized,
+    },
+    resolved::{self, StructLiteral, StructureRef, TypedExpr},
     source_files::Source,
 };
+use indexmap::IndexMap;
+use itertools::Itertools;
 
 fn get_field_info<'a>(
     ctx: &'a ResolveExprCtx,
@@ -23,17 +30,14 @@ fn get_field_info<'a>(
 }
 
 pub fn resolve_struct_literal_expr(
-    _ctx: &mut ResolveExprCtx,
-    _ast_type: &ast::Type,
-    _fields: &[FieldInitializer],
-    _fill_behavior: FillBehavior,
-    _conform_behavior: ConformBehavior,
-    _source: Source,
+    ctx: &mut ResolveExprCtx,
+    ast_type: &ast::Type,
+    fields: &[FieldInitializer],
+    fill_behavior: FillBehavior,
+    conform_behavior: ConformBehavior,
+    source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    todo!("resolve_struct_literal_expr");
-
-    /*
-    let resolved_type = resolve_type(ctx.type_search_ctx, ast_type, &mut Default::default())?;
+    let resolved_type = ctx.type_ctx().resolve(ast_type)?;
     let (struct_name, structure_ref) = get_core_structure_info(&resolved_type, source)?;
 
     let structure_type =
@@ -113,7 +117,7 @@ pub fn resolve_struct_literal_expr(
             .is_some()
         {
             return Err(ResolveErrorKind::FieldSpecifiedMoreThanOnce {
-                struct_name: struct_name.display(ctx.resolved_ast.fs).to_string(),
+                struct_name: struct_name.to_string(),
                 field_name: field_name.to_string(),
             }
             .at(ast_type.source));
@@ -166,5 +170,4 @@ pub fn resolve_struct_literal_expr(
             ast_type.source,
         ),
     ))
-    */
 }

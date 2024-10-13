@@ -22,7 +22,8 @@ use crate::{
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
     resolved::{
-        self, HumanName, StructureRef, TypeDecl, TypeKind, TypeRef, TypedExpr, VariableStorage,
+        self, EnumRef, HumanName, StructureRef, TypeDecl, TypeKind, TypeRef, TypedExpr,
+        VariableStorage,
     },
     source_files::Source,
     tag::Tag,
@@ -105,7 +106,7 @@ pub fn resolve<'a>(
         physical_file_id: FsNodeId,
         type_aliases: HashMap<&'a Name, TypeRef>,
         structures: Vec<StructureRef>,
-        enums: HashMap<&'a Name, TypeRef>,
+        enums: Vec<EnumRef>,
     }
 
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
@@ -120,7 +121,7 @@ pub fn resolve<'a>(
             physical_file_id: *physical_file_id,
             type_aliases: HashMap::with_capacity(file.type_aliases.len()),
             structures: Vec::with_capacity(file.structures.len()),
-            enums: HashMap::with_capacity(file.enums.len()),
+            enums: Vec::with_capacity(file.enums.len()),
         };
 
         for structure in file.structures.iter() {
@@ -162,13 +163,14 @@ pub fn resolve<'a>(
             job.structures.push(structure_ref);
         }
 
-        for (name, definition) in file.enums.iter() {
-            let backing_type = definition
-                .backing_type
-                .is_some()
-                .then(|| resolved_ast.all_types.insert(TypeKind::Unresolved));
+        for definition in file.enums.iter() {
+            let enum_ref = resolved_ast.enums.insert(resolved::Enum {
+                resolved_type: TypeKind::Unresolved.at(definition.source),
+                source: definition.source,
+                members: definition.members.clone(),
+            });
 
-            let kind = TypeKind::Enum(HumanName(name.to_string()), backing_type);
+            let kind = TypeKind::Enum(HumanName(definition.name.to_string()), enum_ref);
             let source = definition.source;
             let privacy = definition.privacy;
 
@@ -178,7 +180,7 @@ pub fn resolve<'a>(
                 .or_insert_with(HashMap::new);
 
             types_in_module.insert(
-                name.to_string(),
+                definition.name.to_string(),
                 TypeDecl {
                     kind,
                     source,
@@ -186,9 +188,7 @@ pub fn resolve<'a>(
                 },
             );
 
-            if let Some(backing_type) = backing_type {
-                job.enums.insert(name, backing_type);
-            }
+            job.enums.push(enum_ref);
         }
 
         for (name, definition) in file.type_aliases.iter() {
@@ -236,8 +236,12 @@ pub fn resolve<'a>(
 
         for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
             for (field_name, field) in structure.fields.iter() {
-                let type_ctx =
-                    ResolveTypeCtx::new(&resolved_ast, module_file_id, &ctx.types_in_modules);
+                let type_ctx = ResolveTypeCtx::new(
+                    &resolved_ast,
+                    module_file_id,
+                    job.physical_file_id,
+                    &ctx.types_in_modules,
+                );
 
                 let resolved_type = type_ctx.resolve_or_undeclared(&field.ast_type)?;
 
@@ -255,12 +259,26 @@ pub fn resolve<'a>(
                     },
                 );
             }
-
-            eprintln!("warning - new type resolution does not handle struct fields yet");
         }
 
-        for (name, type_ref) in job.enums.iter() {
-            eprintln!("warning - new type resolution does not handle enum backing types yet");
+        for (enum_ref, definition) in job.enums.iter().zip(file.enums.iter()) {
+            let type_ctx = ResolveTypeCtx::new(
+                &resolved_ast,
+                module_file_id,
+                job.physical_file_id,
+                &ctx.types_in_modules,
+            );
+
+            let ast_type = definition
+                .backing_type
+                .as_ref()
+                .map(Cow::Borrowed)
+                .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
+
+            let resolved_type = type_ctx.resolve_or_undeclared(&ast_type)?;
+
+            let definition = resolved_ast.enums.get_mut(*enum_ref).unwrap();
+            definition.resolved_type = resolved_type;
         }
 
         for (name, type_ref) in job.type_aliases.iter() {
@@ -275,8 +293,12 @@ pub fn resolve<'a>(
             .unwrap_or(*physical_file_id);
 
         for global in file.global_variables.iter() {
-            let type_ctx =
-                ResolveTypeCtx::new(&resolved_ast, module_file_id, &ctx.types_in_modules);
+            let type_ctx = ResolveTypeCtx::new(
+                &resolved_ast,
+                module_file_id,
+                *physical_file_id,
+                &ctx.types_in_modules,
+            );
             let resolved_type = type_ctx.resolve(&global.ast_type)?;
 
             let global_search_context = ctx
@@ -305,8 +327,12 @@ pub fn resolve<'a>(
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &function.name);
-            let type_ctx =
-                ResolveTypeCtx::new(&resolved_ast, module_file_id, &ctx.types_in_modules);
+            let type_ctx = ResolveTypeCtx::new(
+                &resolved_ast,
+                module_file_id,
+                *physical_file_id,
+                &ctx.types_in_modules,
+            );
             let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
             let return_type = type_ctx.resolve(&function.return_type)?;
 
@@ -408,6 +434,7 @@ pub fn resolve<'a>(
                         let type_ctx = ResolveTypeCtx::new(
                             &resolved_ast,
                             module_file_id,
+                            real_file_id,
                             &ctx.types_in_modules,
                         );
 
@@ -447,6 +474,7 @@ pub fn resolve<'a>(
                         public_functions: &ctx.public_functions,
                         types_in_modules: &ctx.types_in_modules,
                         module_fs_node_id: module_file_id,
+                        physical_fs_node_id: real_file_id,
                     };
 
                     resolve_stmts(&mut ctx, &ast_function.stmts)?
@@ -475,20 +503,34 @@ enum Initialized {
 pub struct ResolveTypeCtx<'a> {
     resolved_ast: &'a resolved::Ast<'a>,
     module_fs_node_id: FsNodeId,
+    file_fs_node_id: FsNodeId,
     types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     used_aliases_stack: HashSet<ResolvedName>,
+}
+
+impl<'a, 'b, 'c> From<&'c ResolveExprCtx<'a, 'b>> for ResolveTypeCtx<'c> {
+    fn from(ctx: &'c ResolveExprCtx<'a, 'b>) -> Self {
+        Self::new(
+            ctx.resolved_ast,
+            ctx.module_fs_node_id,
+            ctx.physical_fs_node_id,
+            ctx.types_in_modules,
+        )
+    }
 }
 
 impl<'a> ResolveTypeCtx<'a> {
     pub fn new(
         resolved_ast: &'a resolved::Ast,
         module_fs_node_id: FsNodeId,
-        public_types: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
+        file_fs_node_id: FsNodeId,
+        types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     ) -> Self {
         Self {
             resolved_ast,
             module_fs_node_id,
-            types_in_modules: public_types,
+            file_fs_node_id,
+            types_in_modules,
             used_aliases_stack: Default::default(),
         }
     }
@@ -582,52 +624,49 @@ impl<'a> ResolveTypeCtx<'a> {
     }
 
     pub fn find_type(&self, name: &Name) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
-        let _source_files = self.resolved_ast.source_files;
-        let _settings = self
+        let settings = &self.resolved_ast.workspace.settings[self
             .resolved_ast
             .workspace
-            .get_settings_for_module(self.module_fs_node_id);
-        let _all_types = &self.resolved_ast.all_types;
+            .files
+            .get(&self.file_fs_node_id)
+            .unwrap()
+            .settings
+            .expect("valid settings id")
+            .0];
 
         if let Some(name) = name.as_plain_str() {
-            if let Some(types_in_modules) = self.types_in_modules.get(&self.module_fs_node_id) {
-                if let Some(decl) = types_in_modules.get(name) {
+            if let Some(types_in_module) = self.types_in_modules.get(&self.module_fs_node_id) {
+                if let Some(decl) = types_in_module.get(name) {
                     return Ok(Cow::Borrowed(&decl.kind));
                 }
             }
         }
 
-        todo!("TypeSearchCtx find_type - {:?}", name);
+        if !name.namespace.is_empty() {
+            let Name {
+                namespace,
+                basename,
+                ..
+            } = name;
 
-        /*
-        let resolved_name = ResolvedName::new(self.fs_node_id, name);
-
-        if let Some(mapping) = self.types.get(&resolved_name) {
-            return self.resolve_mapping(&resolved_name, mapping, used_aliases_stack);
-        }
-
-        if name.namespace.is_empty() {
-            let mut matches = self
-                .settings
-                .imported_namespaces
-                .iter()
-                .filter_map(|namespace| {
-                    let resolved_name = ResolvedName::new(
-                        self.fs_node_id,
-                        &Name::new(Some(namespace.clone()), name.basename.clone()),
-                    );
-                    self.types.get(&resolved_name)
-                });
+            let mut matches = settings
+                .namespace_to_dependency
+                .get(namespace.as_ref())
+                .into_iter()
+                .flatten()
+                .flat_map(|dep| settings.dependency_to_module.get(dep))
+                .flat_map(|fs_node_id| self.types_in_modules.get(fs_node_id))
+                .flat_map(|decls| decls.get(basename.as_ref()))
+                .filter(|decl| decl.privacy.is_public());
 
             if let Some(found) = matches.next() {
                 if matches.next().is_some() {
                     return Err(FindTypeError::Ambiguous);
                 } else {
-                    return self.resolve_mapping(&resolved_name, found, used_aliases_stack);
+                    return Ok(Cow::Borrowed(&found.kind));
                 }
             }
         }
-        */
 
         Err(FindTypeError::NotDefined)
     }

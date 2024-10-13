@@ -31,6 +31,7 @@ new_key_type! {
     pub struct GlobalVarRef;
     pub struct StructureRef;
     pub struct TypeRef;
+    pub struct EnumRef;
 }
 
 #[derive(Clone, Debug)]
@@ -40,7 +41,7 @@ pub struct Ast<'a> {
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
-    pub enums: IndexMap<ResolvedName, Enum>,
+    pub enums: SlotMap<EnumRef, Enum>,
     pub workspace: &'a AstWorkspace<'a>,
     // New Experimental Type Resolution System
     pub all_types: SlotMap<TypeRef, TypeKind>,
@@ -55,7 +56,7 @@ impl<'a> Ast<'a> {
             functions: SlotMap::with_key(),
             structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
-            enums: IndexMap::new(),
+            enums: SlotMap::with_key(),
             workspace,
             all_types: SlotMap::with_key(),
             types_per_module: HashMap::new(),
@@ -171,7 +172,7 @@ pub struct TypeDecl {
     pub privacy: Privacy,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HumanName(pub String);
 
 impl Display for HumanName {
@@ -196,7 +197,7 @@ pub enum TypeKind {
     AnonymousEnum(AnonymousEnum),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
-    Enum(HumanName, Option<TypeRef>),
+    Enum(HumanName, EnumRef),
     Structure(HumanName, StructureRef),
     TypeAlias(HumanName, TypeRef),
 }
@@ -531,7 +532,8 @@ pub struct ArrayAccess {
 
 #[derive(Clone, Debug)]
 pub struct EnumMemberLiteral {
-    pub enum_name: ResolvedName,
+    pub human_name: HumanName,
+    pub enum_ref: EnumRef,
     pub variant_name: String,
     pub source: Source,
 }

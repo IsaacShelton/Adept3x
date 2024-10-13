@@ -59,9 +59,14 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub module_fs_node_id: FsNodeId,
+    pub physical_fs_node_id: FsNodeId,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {
+    pub fn type_ctx<'c>(&'c self) -> ResolveTypeCtx<'c> {
+        ResolveTypeCtx::from(self)
+    }
+
     pub fn adept_conform_behavior(&self) -> ConformBehavior {
         ConformBehavior::Adept(self.c_integer_assumptions())
     }
@@ -391,22 +396,11 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let resolved_type = ResolveTypeCtx::new(
-                &ctx.resolved_ast,
-                ctx.module_fs_node_id,
-                ctx.types_in_modules,
-            )
-            .resolve(result_type)?;
-
+            let resolved_type = ctx.type_ctx().resolve(result_type)?;
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
-                let type_ctx = ResolveTypeCtx::new(
-                    &ctx.resolved_ast,
-                    ctx.module_fs_node_id,
-                    ctx.types_in_modules,
-                );
-                let preferred_type = type_ctx.resolve(expected_arg_type)?;
+                let preferred_type = ctx.type_ctx().resolve(expected_arg_type)?;
 
                 resolved_args.push(
                     resolve_expr(

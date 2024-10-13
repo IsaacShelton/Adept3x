@@ -4,7 +4,7 @@ use crate::{
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
-        Initialized, ResolveTypeCtx,
+        Initialized,
     },
     resolved::{self, TypedExpr},
     source_files::Source,
@@ -91,13 +91,7 @@ pub fn resolve_call_expr(
     }
 
     if let Some(required_ty) = &call.expected_to_return {
-        let type_ctx = ResolveTypeCtx::new(
-            &ctx.resolved_ast,
-            ctx.module_fs_node_id,
-            ctx.types_in_modules,
-        );
-
-        let resolved_required_ty = type_ctx.resolve(required_ty)?;
+        let resolved_required_ty = ctx.type_ctx().resolve(required_ty)?;
 
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
