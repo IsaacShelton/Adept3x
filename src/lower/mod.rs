@@ -348,9 +348,6 @@ fn lower_type(
 
     match &resolved_type.kind {
         resolved::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
-        resolved::TypeKind::TypeAlias(_, _) => {
-            todo!("lower type ref for aliases not supported yet")
-        }
         resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
         resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
@@ -412,6 +409,14 @@ fn lower_type(
                 .expect("referenced enum to exist");
 
             lower_type(target, &enum_definition.resolved_type, resolved_ast)
+        }
+        resolved::TypeKind::TypeAlias(_, type_alias_ref) => {
+            let resolved_type = resolved_ast
+                .type_aliases
+                .get(*type_alias_ref)
+                .expect("referenced type alias to exist");
+
+            lower_type(target, resolved_type, resolved_ast)
         }
     }
 }

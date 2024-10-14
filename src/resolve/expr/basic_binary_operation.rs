@@ -45,6 +45,7 @@ pub fn resolve_basic_binary_operation_expr(
     }
 
     let unified_type = unify_types(
+        ctx,
         preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
         &mut [&mut left, &mut right],
         ctx.adept_conform_behavior(),

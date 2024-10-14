@@ -1,5 +1,6 @@
 use super::function_search_ctx::FindFunctionError;
 use crate::{
+    resolved::UnaliasError,
     show::Show,
     source_files::{Source, SourceFiles},
 };
@@ -15,6 +16,12 @@ pub struct ResolveError {
 impl ResolveError {
     pub fn new(kind: ResolveErrorKind, source: Source) -> Self {
         Self { kind, source }
+    }
+}
+
+impl From<UnaliasError> for ResolveErrorKind {
+    fn from(value: UnaliasError) -> Self {
+        Self::UnaliasError(value)
     }
 }
 
@@ -165,6 +172,7 @@ pub enum ResolveErrorKind {
         name: String,
     },
     UndeterminedCharacterLiteral,
+    UnaliasError(UnaliasError),
     Other {
         message: String,
     },
@@ -447,6 +455,12 @@ impl Display for ResolveErrorKind {
                     "Undetermined character literal, consider using c'A' if you want a 'char'"
                 )?;
             }
+            ResolveErrorKind::UnaliasError(details) => match details {
+                UnaliasError::MaxDepthExceeded => write!(
+                    f,
+                    "Maximum type alias depth exceeded, please ensure your type alias is not recursive"
+                )?,
+            },
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }

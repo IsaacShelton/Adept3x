@@ -1,8 +1,7 @@
 use super::{annotation::Annotation, error::ParseError, Parser};
 use crate::{
-    ast::{Named, Privacy, TypeAlias},
+    ast::{Privacy, TypeAlias},
     inflow::Inflow,
-    name::Name,
     parser::annotation::AnnotationKind,
     token::{Token, TokenKind},
 };
@@ -11,19 +10,16 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_type_alias(
         &mut self,
         annotations: Vec<Annotation>,
-    ) -> Result<Named<TypeAlias>, ParseError> {
+    ) -> Result<TypeAlias, ParseError> {
         let source = self.source_here();
         assert!(self.input.advance().is_type_alias_keyword());
 
-        let mut namespace = None;
         let mut privacy = Privacy::Private;
         let name = self.parse_identifier(Some("for alias name after 'typealias' keyword"))?;
         self.ignore_newlines();
 
-        #[allow(clippy::never_loop, clippy::match_single_binding)]
         for annotation in annotations {
             match annotation.kind {
-                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for type alias"))),
             }
@@ -33,13 +29,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let becomes_type = self.parse_type(None::<&str>, Some("for type alias"))?;
 
-        Ok(Named::<TypeAlias> {
-            name: Name::new(namespace, name),
-            value: TypeAlias {
-                value: becomes_type,
-                source,
-                privacy,
-            },
+        Ok(TypeAlias {
+            name,
+            value: becomes_type,
+            source,
+            privacy,
         })
     }
 }

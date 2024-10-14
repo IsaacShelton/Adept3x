@@ -12,7 +12,10 @@ use self::{
     from_integer::from_integer, from_integer_literal::from_integer_literal,
     from_pointer::from_pointer,
 };
-use super::error::{ResolveError, ResolveErrorKind};
+use super::{
+    error::{ResolveError, ResolveErrorKind},
+    expr::ResolveExprCtx,
+};
 use crate::{
     ast::ConformBehavior,
     resolved::{Type, TypeKind, TypedExpr},
@@ -54,14 +57,35 @@ impl Objective for Validate {
     }
 }
 
+pub fn warn_type_alias_depth_exceeded(resolved_type: &Type) {
+    // TODO: WARNING: When this happens, it might not be obvious why there
+    // wasn't a match. This should probably cause an error message
+    // TODO: Make this more transparent by adding a good error message
+    eprintln!(
+        "warning: ignoring type '{}' since it exceeds maximum type alias recursion depth",
+        resolved_type
+    );
+}
+
 pub fn conform_expr<O: Objective>(
+    ctx: &ResolveExprCtx,
     expr: &TypedExpr,
     to_type: &Type,
     mode: ConformMode,
     behavior: ConformBehavior,
     conform_source: Source,
 ) -> ObjectiveResult<O> {
-    if expr.resolved_type == *to_type {
+    let Ok(from_type) = ctx.resolved_ast.unalias(&expr.resolved_type) else {
+        warn_type_alias_depth_exceeded(&expr.resolved_type);
+        return O::fail();
+    };
+
+    let Ok(to_type) = ctx.resolved_ast.unalias(to_type) else {
+        warn_type_alias_depth_exceeded(&expr.resolved_type);
+        return O::fail();
+    };
+
+    if *from_type == *to_type {
         return O::success(|| TypedExpr {
             resolved_type: to_type.clone(),
             expr: expr.expr.clone(),
@@ -69,34 +93,43 @@ pub fn conform_expr<O: Objective>(
         });
     }
 
-    match &expr.resolved_type.kind {
+    match &from_type.kind {
         TypeKind::IntegerLiteral(from) => from_integer_literal::<O>(
             from,
             behavior.c_integer_assumptions(),
             expr.expr.source,
             to_type,
         ),
-        TypeKind::Integer(from_bits, from_sign) => {
-            from_integer::<O>(expr, mode, behavior, *from_bits, *from_sign, to_type)
-        }
+        TypeKind::Integer(from_bits, from_sign) => from_integer::<O>(
+            &expr.expr, from_type, mode, behavior, *from_bits, *from_sign, to_type,
+        ),
         TypeKind::FloatLiteral(from) => from_float_literal::<O>(*from, to_type, conform_source),
-        TypeKind::Floating(from_size) => from_float::<O>(expr, mode, *from_size, to_type),
-        TypeKind::Pointer(from_inner) => from_pointer::<O>(expr, mode, from_inner, to_type),
-        TypeKind::CInteger(from_size, from_sign) => {
-            from_c_integer::<O>(expr, mode, *from_size, *from_sign, to_type, conform_source)
+        TypeKind::Floating(from_size) => from_float::<O>(&expr.expr, mode, *from_size, to_type),
+        TypeKind::Pointer(from_inner) => {
+            from_pointer::<O>(ctx, &expr.expr, mode, from_inner, to_type)
         }
+        TypeKind::CInteger(from_size, from_sign) => from_c_integer::<O>(
+            &expr.expr,
+            from_type,
+            mode,
+            *from_size,
+            *from_sign,
+            to_type,
+            conform_source,
+        ),
         _ => O::fail(),
     }
 }
 
 pub fn conform_expr_or_error(
+    ctx: &ResolveExprCtx,
     expr: &TypedExpr,
     target_type: &Type,
     mode: ConformMode,
     behavior: ConformBehavior,
     conform_source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    conform_expr::<Perform>(expr, target_type, mode, behavior, conform_source).or_else(|_| {
+    conform_expr::<Perform>(ctx, expr, target_type, mode, behavior, conform_source).or_else(|_| {
         Err(ResolveErrorKind::TypeMismatch {
             left: expr.resolved_type.to_string(),
             right: target_type.to_string(),

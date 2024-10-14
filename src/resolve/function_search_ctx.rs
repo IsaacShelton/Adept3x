@@ -135,6 +135,7 @@ impl FunctionSearchCtx {
             let argument_conform =
                 if let Some(preferred_type) = preferred_type.map(|p| p.view(ctx.resolved_ast)) {
                     conform_expr::<Validate>(
+                        ctx,
                         argument,
                         preferred_type,
                         ConformMode::ParameterPassing,

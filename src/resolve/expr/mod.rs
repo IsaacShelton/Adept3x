@@ -326,13 +326,16 @@ pub fn resolve_expr(
         ast::ExprKind::While(while_loop) => {
             ctx.variable_search_ctx.begin_scope();
 
+            let expr = resolve_expr(
+                ctx,
+                &while_loop.condition,
+                Some(PreferredType::of(&resolved::TypeKind::Boolean.at(source))),
+                Initialized::Require,
+            )?;
+
             let condition = conform_expr_or_error(
-                &resolve_expr(
-                    ctx,
-                    &while_loop.condition,
-                    Some(PreferredType::of(&resolved::TypeKind::Boolean.at(source))),
-                    Initialized::Require,
-                )?,
+                ctx,
+                &expr,
                 &resolved::TypeKind::Boolean.at(source),
                 ConformMode::Normal,
                 ctx.adept_conform_behavior(),

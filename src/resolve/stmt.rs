@@ -44,6 +44,7 @@ pub fn resolve_stmt(
                     .return_type;
 
                 if let Ok(result) = conform_expr::<Perform>(
+                    ctx,
                     &result,
                     return_type,
                     ConformMode::Normal,
@@ -102,6 +103,7 @@ pub fn resolve_stmt(
                 .as_ref()
                 .map(|value| {
                     conform_expr::<Perform>(
+                        ctx,
                         value,
                         &resolved_type,
                         ConformMode::Normal,
@@ -164,6 +166,7 @@ pub fn resolve_stmt(
             )?;
 
             let value = conform_expr::<Perform>(
+                ctx,
                 &value,
                 &destination_expr.resolved_type,
                 ConformMode::Normal,

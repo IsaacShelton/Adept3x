@@ -71,6 +71,7 @@ pub fn resolve_call_expr(
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
         {
             if let Ok(conformed_argument) = conform_expr::<Perform>(
+                ctx,
                 &argument,
                 preferred_type,
                 ConformMode::ParameterPassing,

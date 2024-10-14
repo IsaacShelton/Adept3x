@@ -22,7 +22,7 @@ use crate::{
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
     resolved::{
-        self, EnumRef, HumanName, StructureRef, TypeDecl, TypeKind, TypeRef, TypedExpr,
+        self, EnumRef, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeKind, TypedExpr,
         VariableStorage,
     },
     source_files::Source,
@@ -102,9 +102,9 @@ pub fn resolve<'a>(
     let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
 
     #[derive(Clone, Debug)]
-    struct TypeJob<'a> {
+    struct TypeJob {
         physical_file_id: FsNodeId,
-        type_aliases: HashMap<&'a Name, TypeRef>,
+        type_aliases: Vec<TypeAliasRef>,
         structures: Vec<StructureRef>,
         enums: Vec<EnumRef>,
     }
@@ -119,7 +119,7 @@ pub fn resolve<'a>(
 
         let mut job = TypeJob {
             physical_file_id: *physical_file_id,
-            type_aliases: HashMap::with_capacity(file.type_aliases.len()),
+            type_aliases: Vec::with_capacity(file.type_aliases.len()),
             structures: Vec::with_capacity(file.structures.len()),
             enums: Vec::with_capacity(file.enums.len()),
         };
@@ -191,11 +191,14 @@ pub fn resolve<'a>(
             job.enums.push(enum_ref);
         }
 
-        for (name, definition) in file.type_aliases.iter() {
+        for definition in file.type_aliases.iter() {
+            let type_alias_ref = resolved_ast
+                .type_aliases
+                .insert(resolved::TypeKind::Unresolved.at(definition.value.source));
+
             let source = definition.source;
             let privacy = definition.privacy;
-            let becomes_type = resolved_ast.all_types.insert(TypeKind::Unresolved);
-            let kind = TypeKind::TypeAlias(HumanName(name.to_string()), becomes_type);
+            let kind = TypeKind::TypeAlias(HumanName(definition.name.to_string()), type_alias_ref);
 
             let types_in_module = ctx
                 .types_in_modules
@@ -203,7 +206,7 @@ pub fn resolve<'a>(
                 .or_insert_with(HashMap::new);
 
             types_in_module.insert(
-                name.to_string(),
+                definition.name.to_string(),
                 TypeDecl {
                     kind,
                     source,
@@ -211,7 +214,7 @@ pub fn resolve<'a>(
                 },
             );
 
-            job.type_aliases.insert(name, becomes_type);
+            job.type_aliases.push(type_alias_ref);
         }
 
         type_jobs.push(job);
@@ -281,8 +284,18 @@ pub fn resolve<'a>(
             definition.resolved_type = resolved_type;
         }
 
-        for (name, type_ref) in job.type_aliases.iter() {
-            eprintln!("warning - new type resolution does not handle enum type aliases yet");
+        for (type_alias_ref, definition) in job.type_aliases.iter().zip(file.type_aliases.iter()) {
+            let type_ctx = ResolveTypeCtx::new(
+                &resolved_ast,
+                module_file_id,
+                job.physical_file_id,
+                &ctx.types_in_modules,
+            );
+
+            let resolved_type = type_ctx.resolve_or_undeclared(&definition.value)?;
+
+            let binding = resolved_ast.type_aliases.get_mut(*type_alias_ref).unwrap();
+            *binding = resolved_type;
         }
     }
 

@@ -30,8 +30,8 @@ new_key_type! {
     pub struct FunctionRef;
     pub struct GlobalVarRef;
     pub struct StructureRef;
-    pub struct TypeRef;
     pub struct EnumRef;
+    pub struct TypeAliasRef;
 }
 
 #[derive(Clone, Debug)]
@@ -42,13 +42,14 @@ pub struct Ast<'a> {
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: SlotMap<EnumRef, Enum>,
+    pub type_aliases: SlotMap<TypeAliasRef, Type>,
     pub workspace: &'a AstWorkspace<'a>,
-    // New Experimental Type Resolution System
-    pub all_types: SlotMap<TypeRef, TypeKind>,
     pub types_per_module: HashMap<FsNodeId, HashMap<String, TypeDecl>>,
 }
 
 impl<'a> Ast<'a> {
+    const MAX_UNALIAS_DEPTH: usize = 1024;
+
     pub fn new(source_files: &'a SourceFiles, workspace: &'a AstWorkspace) -> Self {
         Self {
             source_files,
@@ -57,11 +58,35 @@ impl<'a> Ast<'a> {
             structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
             enums: SlotMap::with_key(),
+            type_aliases: SlotMap::with_key(),
             workspace,
-            all_types: SlotMap::with_key(),
             types_per_module: HashMap::new(),
         }
     }
+
+    pub fn unalias(&'a self, mut resolved_type: &'a Type) -> Result<&'a Type, UnaliasError> {
+        let mut depth = 0;
+
+        while let TypeKind::TypeAlias(_, type_alias_ref) = resolved_type.kind {
+            resolved_type = self
+                .type_aliases
+                .get(type_alias_ref)
+                .expect("valid type alias ref");
+
+            depth += 1;
+
+            if depth > Self::MAX_UNALIAS_DEPTH {
+                return Err(UnaliasError::MaxDepthExceeded);
+            }
+        }
+
+        Ok(resolved_type)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum UnaliasError {
+    MaxDepthExceeded,
 }
 
 #[derive(Clone, Debug)]
@@ -155,12 +180,6 @@ pub struct Field {
     pub source: Source,
 }
 
-impl Display for TypeRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "TypeRef(???)")
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Type {
     pub kind: TypeKind,
@@ -226,7 +245,7 @@ pub enum TypeKind {
     FunctionPointer(FunctionPointer),
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructureRef),
-    TypeAlias(HumanName, TypeRef),
+    TypeAlias(HumanName, TypeAliasRef),
 }
 
 impl TypeKind {
@@ -351,20 +370,14 @@ impl TypeKind {
             | TypeKind::AnonymousEnum(_) => None,
         }
     }
-
-    pub fn is_void_pointer(&self) -> bool {
-        matches!(self, TypeKind::Pointer(inner) if inner.kind.is_void())
-    }
 }
 
 impl Display for TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypeKind::Unresolved => panic!(),
-            TypeKind::TypeAlias(_, _type_ref) => todo!(),
-            TypeKind::Boolean => {
-                write!(f, "bool")?;
-            }
+            TypeKind::Unresolved => panic!("cannot display unresolved type"),
+            TypeKind::TypeAlias(name, _) => write!(f, "{}", name)?,
+            TypeKind::Boolean => write!(f, "bool")?,
             TypeKind::Integer(bits, sign) => {
                 f.write_str(match (bits, sign) {
                     (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
@@ -393,14 +406,14 @@ impl Display for TypeKind {
             }
             TypeKind::Void => f.write_str("void")?,
             TypeKind::Structure(name, _) => write!(f, "{}", name)?,
-            TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
-            TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
-            TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
+            TypeKind::AnonymousStruct() => f.write_str("anonymous-struct")?,
+            TypeKind::AnonymousUnion() => f.write_str("anonymous-union")?,
+            TypeKind::AnonymousEnum(..) => f.write_str("anonymous-enum")?,
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
-            TypeKind::FunctionPointer(..) => f.write_str("(function pointer type)")?,
-            TypeKind::Enum(_, type_ref) => write!(f, "(enum) {:?}", type_ref)?,
+            TypeKind::FunctionPointer(..) => f.write_str("function-pointer-type")?,
+            TypeKind::Enum(name, _) => write!(f, "{}", name)?,
         }
 
         Ok(())
