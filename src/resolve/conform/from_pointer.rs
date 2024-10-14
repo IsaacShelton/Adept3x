@@ -26,21 +26,11 @@ pub fn from_pointer<O: Objective>(
     };
 
     if from_inner_type.kind.is_void() {
-        return O::success(|| {
-            TypedExpr::new(
-                TypeKind::Pointer(Box::new(TypeKind::Void.at(to_type.source))).at(to_type.source),
-                expr.clone(),
-            )
-        });
+        return O::success(|| TypedExpr::new(to_type.clone(), expr.clone()));
     }
 
     if to_inner_type.kind.is_void() && mode.allow_pointer_into_void_pointer() {
-        return O::success(|| {
-            TypedExpr::new(
-                TypeKind::Pointer(Box::new(TypeKind::Void.at(to_type.source))).at(to_type.source),
-                expr.clone(),
-            )
-        });
+        return O::success(|| TypedExpr::new(to_type.clone(), expr.clone()));
     }
 
     O::fail()
