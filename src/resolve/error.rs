@@ -1,5 +1,6 @@
 use super::function_search_ctx::FindFunctionError;
 use crate::{
+    resolved::UnaliasError,
     show::Show,
     source_files::{Source, SourceFiles},
 };
@@ -18,6 +19,12 @@ impl ResolveError {
     }
 }
 
+impl From<UnaliasError> for ResolveErrorKind {
+    fn from(value: UnaliasError) -> Self {
+        Self::UnaliasError(value)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ResolveErrorKind {
     CannotReturnValueOfType {
@@ -31,8 +38,9 @@ pub enum ResolveErrorKind {
         value: String,
     },
     FailedToFindFunction {
-        name: String,
+        signature: String,
         reason: FindFunctionError,
+        almost_matches: Vec<String>,
     },
     UndeclaredVariable {
         name: String,
@@ -164,6 +172,7 @@ pub enum ResolveErrorKind {
         name: String,
     },
     UndeterminedCharacterLiteral,
+    UnaliasError(UnaliasError),
     Other {
         message: String,
     },
@@ -211,12 +220,33 @@ impl Display for ResolveErrorKind {
                     value
                 )?;
             }
-            ResolveErrorKind::FailedToFindFunction { name, reason } => match reason {
-                FindFunctionError::NotDefined => write!(f, "Failed to find function '{}'", name)?,
-                FindFunctionError::Ambiguous => {
-                    write!(f, "Multiple possibilities for function '{}'", name)?
+            ResolveErrorKind::FailedToFindFunction {
+                signature,
+                reason,
+                almost_matches,
+            } => {
+                match reason {
+                    FindFunctionError::NotDefined => {
+                        write!(f, "Failed to find function '{}'", signature)?
+                    }
+                    FindFunctionError::Ambiguous => {
+                        write!(f, "Multiple possibilities for function '{}'", signature)?
+                    }
                 }
-            },
+
+                if !almost_matches.is_empty() {
+                    write!(f, "\n    Did you mean?")?;
+
+                    for almost_match in almost_matches {
+                        write!(f, "\n    {}", almost_match)?;
+                    }
+                } else {
+                    write!(
+                        f,
+                        "\n    No available functions have that name, is it public?"
+                    )?;
+                }
+            }
             ResolveErrorKind::UndeclaredVariable { name } => {
                 write!(f, "Undeclared variable '{}'", name)?;
             }
@@ -425,6 +455,12 @@ impl Display for ResolveErrorKind {
                     "Undetermined character literal, consider using c'A' if you want a 'char'"
                 )?;
             }
+            ResolveErrorKind::UnaliasError(details) => match details {
+                UnaliasError::MaxDepthExceeded => write!(
+                    f,
+                    "Maximum type alias depth exceeded, please ensure your type alias is not recursive"
+                )?,
+            },
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }

@@ -21,24 +21,6 @@ pub struct AstWorkspace<'a> {
 impl<'a> AstWorkspace<'a> {
     pub const DEFAULT_SETTINGS_ID: SettingsId = SettingsId(0);
 
-    pub fn get_owning_module(&self, fs_node_id: FsNodeId) -> Option<FsNodeId> {
-        let mut fs_node_id = fs_node_id;
-
-        loop {
-            if self.module_folders.contains_key(&fs_node_id) {
-                return Some(fs_node_id);
-            }
-
-            if let Some(parent) = self.fs.get(fs_node_id).parent {
-                fs_node_id = parent;
-            } else {
-                break;
-            }
-        }
-
-        None
-    }
-
     pub fn new(
         fs: Fs,
         files: IndexMap<FsNodeId, AstFile>,
@@ -68,6 +50,24 @@ impl<'a> AstWorkspace<'a> {
         };
         workspace.configure();
         workspace
+    }
+
+    pub fn get_owning_module(&self, fs_node_id: FsNodeId) -> Option<FsNodeId> {
+        let mut fs_node_id = fs_node_id;
+
+        loop {
+            if self.module_folders.contains_key(&fs_node_id) {
+                return Some(fs_node_id);
+            }
+
+            if let Some(parent) = self.fs.get(fs_node_id).parent {
+                fs_node_id = parent;
+            } else {
+                break;
+            }
+        }
+
+        None
     }
 
     pub fn get_mut(&mut self, id: FsNodeId) -> Option<&mut AstFile> {

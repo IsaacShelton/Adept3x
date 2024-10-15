@@ -26,6 +26,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
     )?;
 
     let left = conform_expr::<Perform>(
+        ctx,
         &left,
         &local_bool_type,
         ConformMode::Normal,
@@ -52,6 +53,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
     )?;
 
     let right = conform_expr::<Perform>(
+        ctx,
         &right,
         &local_bool_type,
         ConformMode::Normal,

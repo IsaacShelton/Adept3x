@@ -3,14 +3,15 @@ use crate::{
     ast::{CInteger, IntegerBits, OptionIntegerSignExt},
     logic::implies,
     resolved::{
-        Cast, CastFrom, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryMathOperation,
+        Cast, CastFrom, Expr, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryMathOperation,
         UnaryMathOperator,
     },
     source_files::Source,
 };
 
 pub fn from_c_integer<O: Objective>(
-    expr: &TypedExpr,
+    expr: &Expr,
+    from_type: &Type,
     mode: ConformMode,
     from_c_integer: CInteger,
     from_sign: Option<IntegerSign>,
@@ -18,7 +19,7 @@ pub fn from_c_integer<O: Objective>(
     source: Source,
 ) -> ObjectiveResult<O> {
     match &to_type.kind {
-        TypeKind::Boolean => from_c_integer_to_bool::<O>(expr, mode, source),
+        TypeKind::Boolean => from_c_integer_to_bool::<O>(expr, from_type, mode, source),
         TypeKind::Integer(to_bits, to_sign) => from_c_integer_to_integer::<O>(
             expr,
             mode,
@@ -42,7 +43,8 @@ pub fn from_c_integer<O: Objective>(
 }
 
 fn from_c_integer_to_bool<O: Objective>(
-    expr: &TypedExpr,
+    expr: &Expr,
+    from_type: &Type,
     mode: ConformMode,
     source: Source,
 ) -> ObjectiveResult<O> {
@@ -55,7 +57,7 @@ fn from_c_integer_to_bool<O: Objective>(
             TypeKind::Boolean.at(source),
             ExprKind::UnaryMathOperation(Box::new(UnaryMathOperation {
                 operator: UnaryMathOperator::IsNonZero,
-                inner: expr.clone(),
+                inner: TypedExpr::new(from_type.clone(), expr.clone()),
             }))
             .at(source),
         )
@@ -63,7 +65,7 @@ fn from_c_integer_to_bool<O: Objective>(
 }
 
 pub fn from_c_integer_to_c_integer<O: Objective>(
-    expr: &TypedExpr,
+    expr: &Expr,
     mode: ConformMode,
     from_c_integer: CInteger,
     from_sign: Option<IntegerSign>,
@@ -89,7 +91,7 @@ pub fn from_c_integer_to_c_integer<O: Objective>(
             TypedExpr::new(
                 target_type.clone(),
                 ExprKind::IntegerCast(Box::new(CastFrom {
-                    cast: Cast::new(target_type, expr.expr.clone()),
+                    cast: Cast::new(target_type, expr.clone()),
                     from_type: TypeKind::CInteger(from_c_integer, from_sign).at(source),
                 }))
                 .at(source),
@@ -101,7 +103,7 @@ pub fn from_c_integer_to_c_integer<O: Objective>(
 }
 
 fn from_c_integer_to_integer<O: Objective>(
-    expr: &TypedExpr,
+    expr: &Expr,
     mode: ConformMode,
     from_c_integer: CInteger,
     from_sign: Option<IntegerSign>,
@@ -119,7 +121,7 @@ fn from_c_integer_to_integer<O: Objective>(
         TypedExpr::new(
             target_type.clone(),
             ExprKind::IntegerCast(Box::new(CastFrom {
-                cast: Cast::new(target_type, expr.expr.clone()),
+                cast: Cast::new(target_type, expr.clone()),
                 from_type: TypeKind::CInteger(from_c_integer, from_sign).at(source),
             }))
             .at(source),

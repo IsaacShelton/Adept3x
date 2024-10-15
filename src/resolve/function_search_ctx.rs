@@ -9,6 +9,7 @@ use crate::{
     source_files::Source,
     workspace::fs::FsNodeId,
 };
+use itertools::Itertools;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -134,6 +135,7 @@ impl FunctionSearchCtx {
             let argument_conform =
                 if let Some(preferred_type) = preferred_type.map(|p| p.view(ctx.resolved_ast)) {
                     conform_expr::<Validate>(
+                        ctx,
                         argument,
                         preferred_type,
                         ConformMode::ParameterPassing,
@@ -150,5 +152,43 @@ impl FunctionSearchCtx {
         }
 
         true
+    }
+
+    pub fn find_function_almost_matches(&self, ctx: &ResolveExprCtx, name: &Name) -> Vec<String> {
+        let resolved_name = ResolvedName::new(self.fs_node_id, name);
+
+        let local_matches = self.available.get(&resolved_name).into_iter().flatten();
+
+        let remote_matches = (!name.namespace.is_empty())
+            .then(|| {
+                ctx.settings
+                    .namespace_to_dependency
+                    .get(name.namespace.as_ref())
+            })
+            .flatten()
+            .into_iter()
+            .flatten()
+            .flat_map(|dependency| {
+                ctx.settings
+                    .dependency_to_module
+                    .get(dependency)
+                    .and_then(|module_fs_node_id| ctx.public_functions.get(module_fs_node_id))
+                    .and_then(|public| public.get(name.basename.as_ref()))
+                    .into_iter()
+            })
+            .flatten();
+
+        local_matches
+            .chain(remote_matches)
+            .map(|function_ref| {
+                let function = ctx.resolved_ast.functions.get(*function_ref).unwrap();
+
+                format!(
+                    "{}({})",
+                    function.name.display(&ctx.resolved_ast.workspace.fs),
+                    function.parameters
+                )
+            })
+            .collect_vec()
     }
 }

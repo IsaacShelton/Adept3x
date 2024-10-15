@@ -33,6 +33,7 @@ pub fn resolve_conditional_expr(
         let stmts = resolve_stmts(ctx, &block.stmts)?;
 
         let condition = conform_expr_or_error(
+            ctx,
             &condition,
             &resolved::TypeKind::Boolean.at(source),
             ConformMode::Normal,
@@ -103,6 +104,7 @@ pub fn resolve_conditional_expr(
             .collect_vec();
 
         unify_types(
+            ctx,
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
             &mut last_exprs[..],
             ctx.adept_conform_behavior(),

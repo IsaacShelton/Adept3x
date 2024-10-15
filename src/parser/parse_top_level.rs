@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{AstFile, Enum, HelperExpr, Named, TypeAlias},
+    ast::{AstFile, HelperExpr, Named},
     index_map_ext::IndexMapExt,
     inflow::Inflow,
     token::{Token, TokenKind},
@@ -60,31 +60,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 ast_file.structures.push(self.parse_structure(annotations)?)
             }
             TokenKind::TypeAliasKeyword => {
-                let Named::<TypeAlias> { name, value: alias } =
-                    self.parse_type_alias(annotations)?;
-                let source = alias.source;
-
-                ast_file.type_aliases.try_insert(name, alias, |name| {
-                    ParseErrorKind::TypeAliasHasMultipleDefinitions {
-                        name: name.to_string(),
-                    }
-                    .at(source)
-                })?;
+                let type_alias = self.parse_type_alias(annotations)?;
+                ast_file.type_aliases.push(type_alias);
             }
             TokenKind::EnumKeyword => {
-                let Named::<Enum> {
-                    name,
-                    value: enum_definition,
-                } = self.parse_enum(annotations)?;
+                let enum_definition = self.parse_enum(annotations)?;
 
-                let source = enum_definition.source;
-
-                ast_file.enums.try_insert(name, enum_definition, |name| {
-                    ParseErrorKind::EnumHasMultipleDefinitions {
-                        name: name.to_string(),
-                    }
-                    .at(source)
-                })?;
+                ast_file.enums.push(enum_definition);
             }
             TokenKind::DefineKeyword => {
                 let Named::<HelperExpr> {

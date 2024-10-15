@@ -20,9 +20,8 @@ use super::{
     error::ResolveError,
     function_search_ctx::FunctionSearchCtx,
     global_search_ctx::GlobalSearchCtx,
-    type_search_ctx::TypeSearchCtx,
     variable_search_ctx::VariableSearchCtx,
-    Initialized,
+    Initialized, ResolveTypeCtx,
 };
 use crate::{
     ast::{
@@ -38,7 +37,7 @@ use crate::{
             struct_literal::resolve_struct_literal_expr,
             unary_operation::resolve_unary_math_operation_expr, variable::resolve_variable_expr,
         },
-        resolve_stmts, resolve_type,
+        resolve_stmts,
     },
     resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr},
     workspace::fs::FsNodeId,
@@ -52,17 +51,22 @@ use std::collections::HashMap;
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
     pub function_search_ctx: &'b FunctionSearchCtx,
-    pub type_search_ctx: &'b TypeSearchCtx<'a>,
     pub global_search_ctx: &'b GlobalSearchCtx,
     pub variable_search_ctx: VariableSearchCtx,
     pub resolved_function_ref: resolved::FunctionRef,
     pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub settings: &'b Settings,
     pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
+    pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub module_fs_node_id: FsNodeId,
+    pub physical_fs_node_id: FsNodeId,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {
+    pub fn type_ctx<'c>(&'c self) -> ResolveTypeCtx<'c> {
+        ResolveTypeCtx::from(self)
+    }
+
     pub fn adept_conform_behavior(&self) -> ConformBehavior {
         ConformBehavior::Adept(self.c_integer_assumptions())
     }
@@ -322,13 +326,16 @@ pub fn resolve_expr(
         ast::ExprKind::While(while_loop) => {
             ctx.variable_search_ctx.begin_scope();
 
+            let expr = resolve_expr(
+                ctx,
+                &while_loop.condition,
+                Some(PreferredType::of(&resolved::TypeKind::Boolean.at(source))),
+                Initialized::Require,
+            )?;
+
             let condition = conform_expr_or_error(
-                &resolve_expr(
-                    ctx,
-                    &while_loop.condition,
-                    Some(PreferredType::of(&resolved::TypeKind::Boolean.at(source))),
-                    Initialized::Require,
-                )?,
+                ctx,
+                &expr,
                 &resolved::TypeKind::Boolean.at(source),
                 ConformMode::Normal,
                 ctx.adept_conform_behavior(),
@@ -352,14 +359,12 @@ pub fn resolve_expr(
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
-            let resolved_type = resolve_type(
-                ctx.type_search_ctx,
+            let resolved_type = ctx.type_ctx().resolve(
                 &ast::TypeKind::Named(enum_member_literal.enum_name.clone())
                     .at(enum_member_literal.source),
-                &mut Default::default(),
             )?;
 
-            let TypeKind::Enum(resolved_name) = &resolved_type.kind else {
+            let TypeKind::Enum(human_name, enum_ref) = &resolved_type.kind else {
                 return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
                     ty: enum_member_literal.enum_name.to_string(),
                     member: enum_member_literal.variant_name.clone(),
@@ -367,13 +372,12 @@ pub fn resolve_expr(
                 .at(source));
             };
 
-            let resolved_name = resolved_name.clone();
-
             Ok(TypedExpr::new(
-                resolved_type,
+                resolved_type.clone(),
                 resolved::Expr::new(
                     resolved::ExprKind::EnumMemberLiteral(Box::new(resolved::EnumMemberLiteral {
-                        enum_name: resolved_name,
+                        human_name: human_name.clone(),
+                        enum_ref: *enum_ref,
                         variant_name: enum_member_literal.variant_name.clone(),
                         source,
                     })),
@@ -388,17 +392,11 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let resolved_type =
-                resolve_type(ctx.type_search_ctx, result_type, &mut Default::default())?;
-
+            let resolved_type = ctx.type_ctx().resolve(result_type)?;
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
-                let preferred_type = resolve_type(
-                    ctx.type_search_ctx,
-                    expected_arg_type,
-                    &mut Default::default(),
-                )?;
+                let preferred_type = ctx.type_ctx().resolve(expected_arg_type)?;
 
                 resolved_args.push(
                     resolve_expr(

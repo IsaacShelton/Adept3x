@@ -6,13 +6,13 @@ pub use crate::ast::{
     ShortCircuitingBinaryOperator, UnaryMathOperator,
 };
 use crate::{
-    ast::fmt_c_integer,
+    ast::{fmt_c_integer, AstWorkspace},
     ir::InterpreterSyscallKind,
     name::ResolvedName,
     source_files::{Source, SourceFiles},
     tag::Tag,
     target::Target,
-    workspace::fs::Fs,
+    workspace::fs::FsNodeId,
 };
 use derive_more::{IsVariant, Unwrap};
 use indexmap::IndexMap;
@@ -20,6 +20,7 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use slotmap::{new_key_type, SlotMap};
 use std::{
+    collections::HashMap,
     ffi::CString,
     fmt::{Debug, Display},
 };
@@ -29,6 +30,8 @@ new_key_type! {
     pub struct FunctionRef;
     pub struct GlobalVarRef;
     pub struct StructureRef;
+    pub struct EnumRef;
+    pub struct TypeAliasRef;
 }
 
 #[derive(Clone, Debug)]
@@ -38,22 +41,52 @@ pub struct Ast<'a> {
     pub functions: SlotMap<FunctionRef, Function>,
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
-    pub enums: IndexMap<ResolvedName, Enum>,
-    pub fs: &'a Fs,
+    pub enums: SlotMap<EnumRef, Enum>,
+    pub type_aliases: SlotMap<TypeAliasRef, Type>,
+    pub workspace: &'a AstWorkspace<'a>,
+    pub types_per_module: HashMap<FsNodeId, HashMap<String, TypeDecl>>,
 }
 
 impl<'a> Ast<'a> {
-    pub fn new(source_files: &'a SourceFiles, fs: &'a Fs) -> Self {
+    const MAX_UNALIAS_DEPTH: usize = 1024;
+
+    pub fn new(source_files: &'a SourceFiles, workspace: &'a AstWorkspace) -> Self {
         Self {
             source_files,
             entry_point: None,
             functions: SlotMap::with_key(),
             structures: SlotMap::with_key(),
             globals: SlotMap::with_key(),
-            enums: IndexMap::new(),
-            fs,
+            enums: SlotMap::with_key(),
+            type_aliases: SlotMap::with_key(),
+            workspace,
+            types_per_module: HashMap::new(),
         }
     }
+
+    pub fn unalias(&'a self, mut resolved_type: &'a Type) -> Result<&'a Type, UnaliasError> {
+        let mut depth = 0;
+
+        while let TypeKind::TypeAlias(_, type_alias_ref) = resolved_type.kind {
+            resolved_type = self
+                .type_aliases
+                .get(type_alias_ref)
+                .expect("valid type alias ref");
+
+            depth += 1;
+
+            if depth > Self::MAX_UNALIAS_DEPTH {
+                return Err(UnaliasError::MaxDepthExceeded);
+            }
+        }
+
+        Ok(resolved_type)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum UnaliasError {
+    MaxDepthExceeded,
 }
 
 #[derive(Clone, Debug)]
@@ -91,10 +124,37 @@ pub struct Parameters {
     pub is_cstyle_vararg: bool,
 }
 
+impl Display for Parameters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, param) in self.required.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param)?;
+        }
+
+        if self.is_cstyle_vararg {
+            if !self.required.is_empty() {
+                write!(f, ", ")?;
+            }
+
+            write!(f, "...")?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Parameter {
     pub name: String,
     pub resolved_type: Type,
+}
+
+impl Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.name, self.resolved_type)
+    }
 }
 
 impl PartialEq for Parameter {
@@ -128,7 +188,10 @@ pub struct Type {
 
 impl Type {
     pub fn pointer(self, source: Source) -> Self {
-        TypeKind::Pointer(Box::new(self)).at(source)
+        Self {
+            kind: TypeKind::Pointer(Box::new(self)),
+            source,
+        }
     }
 
     pub fn is_ambiguous(&self) -> bool {
@@ -148,8 +211,25 @@ impl PartialEq for Type {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct TypeDecl {
+    pub kind: TypeKind,
+    pub source: Source,
+    pub privacy: Privacy,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HumanName(pub String);
+
+impl Display for HumanName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
 pub enum TypeKind {
+    Unresolved,
     Boolean,
     Integer(IntegerBits, IntegerSign),
     CInteger(CInteger, Option<IntegerSign>),
@@ -157,14 +237,15 @@ pub enum TypeKind {
     FloatLiteral(f64),
     Floating(FloatSize),
     Pointer(Box<Type>),
-    Structure(ResolvedName, StructureRef),
     Void,
     AnonymousStruct(),
     AnonymousUnion(),
     AnonymousEnum(AnonymousEnum),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
-    Enum(ResolvedName),
+    Enum(HumanName, EnumRef),
+    Structure(HumanName, StructureRef),
+    TypeAlias(HumanName, TypeAliasRef),
 }
 
 impl TypeKind {
@@ -236,7 +317,7 @@ pub struct AnonymousEnum {
 
 impl PartialEq for AnonymousEnum {
     fn eq(&self, other: &Self) -> bool {
-        self.resolved_type.kind.eq(&other.resolved_type.kind) && self.members.eq(&other.members)
+        self.resolved_type.eq(&other.resolved_type) && self.members.eq(&other.members)
     }
 }
 
@@ -274,6 +355,8 @@ impl TypeKind {
                     target.map(|target| target.default_c_integer_sign(*integer))
                 }
             }
+            TypeKind::TypeAlias(_, _type_ref) => todo!(),
+            TypeKind::Unresolved => panic!(),
             TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Pointer(_)
@@ -283,22 +366,18 @@ impl TypeKind {
             | TypeKind::AnonymousUnion(..)
             | TypeKind::FixedArray(..)
             | TypeKind::FunctionPointer(..)
-            | TypeKind::Enum(_)
+            | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum(_) => None,
         }
-    }
-
-    pub fn is_void_pointer(&self) -> bool {
-        matches!(self, TypeKind::Pointer(inner) if inner.kind.is_void())
     }
 }
 
 impl Display for TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypeKind::Boolean => {
-                write!(f, "bool")?;
-            }
+            TypeKind::Unresolved => panic!("cannot display unresolved type"),
+            TypeKind::TypeAlias(name, _) => write!(f, "{}", name)?,
+            TypeKind::Boolean => write!(f, "bool")?,
             TypeKind::Integer(bits, sign) => {
                 f.write_str(match (bits, sign) {
                     (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
@@ -323,18 +402,18 @@ impl Display for TypeKind {
             },
             TypeKind::FloatLiteral(value) => write!(f, "float {}", value)?,
             TypeKind::Pointer(inner) => {
-                write!(f, "ptr<{}>", inner.kind)?;
+                write!(f, "ptr<{}>", **inner)?;
             }
             TypeKind::Void => f.write_str("void")?,
-            TypeKind::Structure(name, _) => write!(f, "{}", name.plain())?,
-            TypeKind::AnonymousStruct() => f.write_str("(anonymous struct)")?,
-            TypeKind::AnonymousUnion() => f.write_str("(anonymous union)")?,
-            TypeKind::AnonymousEnum(..) => f.write_str("(anonymous enum)")?,
+            TypeKind::Structure(name, _) => write!(f, "{}", name)?,
+            TypeKind::AnonymousStruct() => f.write_str("anonymous-struct")?,
+            TypeKind::AnonymousUnion() => f.write_str("anonymous-union")?,
+            TypeKind::AnonymousEnum(..) => f.write_str("anonymous-enum")?,
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
-            TypeKind::FunctionPointer(..) => f.write_str("(function pointer type)")?,
-            TypeKind::Enum(enum_name) => write!(f, "(enum) {}", enum_name.plain())?,
+            TypeKind::FunctionPointer(..) => f.write_str("function-pointer-type")?,
+            TypeKind::Enum(name, _) => write!(f, "{}", name)?,
         }
 
         Ok(())
@@ -493,7 +572,8 @@ pub struct ArrayAccess {
 
 #[derive(Clone, Debug)]
 pub struct EnumMemberLiteral {
-    pub enum_name: ResolvedName,
+    pub human_name: HumanName,
+    pub enum_ref: EnumRef,
     pub variant_name: String,
     pub source: Source,
 }

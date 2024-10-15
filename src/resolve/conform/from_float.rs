@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub fn from_float<O: Objective>(
-    expr: &TypedExpr,
+    expr: &Expr,
     mode: ConformMode,
     from_size: FloatSize,
     to_type: &Type,
@@ -17,7 +17,7 @@ pub fn from_float<O: Objective>(
 
     match &to_type.kind {
         TypeKind::Floating(to_size) => {
-            from_float_to_float::<O>(&expr.expr, from_size, *to_size, to_type.source)
+            from_float_to_float::<O>(&expr, from_size, *to_size, to_type.source)
         }
         _ => O::fail(),
     }

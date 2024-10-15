@@ -4,11 +4,12 @@ use crate::{
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
-        resolve_type, Initialized,
+        Initialized,
     },
     resolved::{self, TypedExpr},
     source_files::Source,
 };
+use itertools::Itertools;
 
 pub fn resolve_call_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
@@ -35,9 +36,21 @@ pub fn resolve_call_expr(
     ) {
         Ok(function_ref) => function_ref,
         Err(reason) => {
+            let args = arguments
+                .iter()
+                .map(|arg| arg.resolved_type.to_string())
+                .collect_vec();
+
+            let signature = format!("{}({})", call.function_name, args.join(", "));
+
+            let almost_matches = ctx
+                .function_search_ctx
+                .find_function_almost_matches(ctx, &call.function_name);
+
             return Err(ResolveErrorKind::FailedToFindFunction {
-                name: call.function_name.to_string(),
+                signature,
                 reason,
+                almost_matches,
             }
             .at(source));
         }
@@ -58,6 +71,7 @@ pub fn resolve_call_expr(
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
         {
             if let Ok(conformed_argument) = conform_expr::<Perform>(
+                ctx,
                 &argument,
                 preferred_type,
                 ConformMode::ParameterPassing,
@@ -69,7 +83,10 @@ pub fn resolve_call_expr(
                 return Err(ResolveErrorKind::BadTypeForArgumentToFunction {
                     expected: preferred_type.to_string(),
                     got: argument.resolved_type.to_string(),
-                    name: function.name.display(ctx.resolved_ast.fs).to_string(),
+                    name: function
+                        .name
+                        .display(&ctx.resolved_ast.workspace.fs)
+                        .to_string(),
                     i,
                 }
                 .at(source));
@@ -88,13 +105,15 @@ pub fn resolve_call_expr(
     }
 
     if let Some(required_ty) = &call.expected_to_return {
-        let resolved_required_ty =
-            resolve_type(ctx.type_search_ctx, required_ty, &mut Default::default())?;
+        let resolved_required_ty = ctx.type_ctx().resolve(required_ty)?;
 
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
                 of: required_ty.to_string(),
-                function_name: function.name.display(ctx.resolved_ast.fs).to_string(),
+                function_name: function
+                    .name
+                    .display(&ctx.resolved_ast.workspace.fs)
+                    .to_string(),
             }
             .at(function.return_type.source));
         }

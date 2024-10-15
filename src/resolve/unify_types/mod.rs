@@ -1,7 +1,10 @@
 mod compute;
 mod integer_literals;
 
-use super::conform::{conform_expr, ConformMode, Perform};
+use super::{
+    conform::{conform_expr, ConformMode, Perform},
+    expr::ResolveExprCtx,
+};
 use crate::{
     ast::ConformBehavior,
     resolved::{self, TypedExpr},
@@ -10,6 +13,7 @@ use crate::{
 use compute::compute_unifying_type;
 
 pub fn unify_types(
+    ctx: &ResolveExprCtx,
     preferred_type: Option<&resolved::Type>,
     exprs: &mut [&mut TypedExpr],
     behavior: ConformBehavior,
@@ -24,6 +28,7 @@ pub fn unify_types(
     // Conform the supplied expressions if a unifying type was found
     for expr in exprs {
         **expr = match conform_expr::<Perform>(
+            ctx,
             expr,
             &unified_type,
             ConformMode::Normal,

@@ -20,7 +20,8 @@ pub fn resolve_member_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
-    let (_, structure_ref) = get_core_structure_info(&resolved_subject.resolved_type, source)?;
+    let (_, structure_ref) =
+        get_core_structure_info(ctx.resolved_ast, &resolved_subject.resolved_type, source)?;
 
     let structure = ctx
         .resolved_ast

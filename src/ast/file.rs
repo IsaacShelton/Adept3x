@@ -9,9 +9,9 @@ use indexmap::IndexMap;
 pub struct AstFile {
     pub functions: Vec<Function>,
     pub structures: Vec<Structure>,
-    pub type_aliases: IndexMap<Name, TypeAlias>,
+    pub type_aliases: Vec<TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
-    pub enums: IndexMap<Name, Enum>,
+    pub enums: Vec<Enum>,
     pub helper_exprs: IndexMap<Name, HelperExpr>,
     pub settings: Option<SettingsId>,
 }
@@ -21,9 +21,9 @@ impl AstFile {
         AstFile {
             functions: vec![],
             structures: vec![],
-            type_aliases: IndexMap::default(),
+            type_aliases: vec![],
             global_variables: vec![],
-            enums: IndexMap::default(),
+            enums: vec![],
             helper_exprs: IndexMap::default(),
             settings: None,
         }

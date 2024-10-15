@@ -5,7 +5,7 @@ use crate::{
         conform::{conform_expr, ConformMode, Perform},
         core_structure_info::get_core_structure_info,
         error::{ResolveError, ResolveErrorKind},
-        resolve_type, Initialized,
+        Initialized,
     },
     resolved::{self, StructLiteral, StructureRef, TypedExpr},
     source_files::Source,
@@ -14,7 +14,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 fn get_field_info<'a>(
-    ctx: &'a ResolveExprCtx<'_, '_>,
+    ctx: &'a ResolveExprCtx,
     structure_ref: StructureRef,
     field_name: &str,
 ) -> (usize, &'a resolved::Field) {
@@ -30,15 +30,16 @@ fn get_field_info<'a>(
 }
 
 pub fn resolve_struct_literal_expr(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     ast_type: &ast::Type,
     fields: &[FieldInitializer],
     fill_behavior: FillBehavior,
     conform_behavior: ConformBehavior,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_type = resolve_type(ctx.type_search_ctx, ast_type, &mut Default::default())?;
-    let (struct_name, structure_ref) = get_core_structure_info(&resolved_type, source)?;
+    let resolved_struct_type = ctx.type_ctx().resolve(ast_type)?;
+    let (struct_name, structure_ref) =
+        get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
 
     let structure_type =
         resolved::TypeKind::Structure(struct_name.clone(), structure_ref).at(source);
@@ -97,6 +98,7 @@ pub fn resolve_struct_literal_expr(
         };
 
         let resolved_expr = conform_expr::<Perform>(
+            ctx,
             &resolved_expr,
             &field.resolved_type,
             mode,
@@ -116,8 +118,11 @@ pub fn resolve_struct_literal_expr(
             .insert(field_name.to_string(), (resolved_expr.expr, index))
             .is_some()
         {
+            let (struct_name, _) =
+                get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
+
             return Err(ResolveErrorKind::FieldSpecifiedMoreThanOnce {
-                struct_name: struct_name.display(ctx.resolved_ast.fs).to_string(),
+                struct_name: struct_name.to_string(),
                 field_name: field_name.to_string(),
             }
             .at(ast_type.source));
@@ -161,7 +166,7 @@ pub fn resolve_struct_literal_expr(
     }
 
     Ok(TypedExpr::new(
-        resolved_type.clone(),
+        resolved_struct_type.clone(),
         resolved::Expr::new(
             resolved::ExprKind::StructLiteral(Box::new(StructLiteral {
                 structure_type,

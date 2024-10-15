@@ -3,7 +3,7 @@ use super::{
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
     expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
-    resolve_type, Initialized,
+    Initialized,
 };
 use crate::{ast, resolved};
 
@@ -44,6 +44,7 @@ pub fn resolve_stmt(
                     .return_type;
 
                 if let Ok(result) = conform_expr::<Perform>(
+                    ctx,
                     &result,
                     return_type,
                     ConformMode::Normal,
@@ -85,11 +86,7 @@ pub fn resolve_stmt(
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
-            let resolved_type = resolve_type(
-                ctx.type_search_ctx,
-                &declaration.ast_type,
-                &mut Default::default(),
-            )?;
+            let resolved_type = ctx.type_ctx().resolve(&declaration.ast_type)?;
 
             let value = declaration
                 .initial_value
@@ -106,6 +103,7 @@ pub fn resolve_stmt(
                 .as_ref()
                 .map(|value| {
                     conform_expr::<Perform>(
+                        ctx,
                         value,
                         &resolved_type,
                         ConformMode::Normal,
@@ -168,6 +166,7 @@ pub fn resolve_stmt(
             )?;
 
             let value = conform_expr::<Perform>(
+                ctx,
                 &value,
                 &destination_expr.resolved_type,
                 ConformMode::Normal,
