@@ -81,7 +81,7 @@ pub fn conform_expr<O: Objective>(
     };
 
     let Ok(to_type) = ctx.resolved_ast.unalias(to_type) else {
-        warn_type_alias_depth_exceeded(&expr.resolved_type);
+        warn_type_alias_depth_exceeded(to_type);
         return O::fail();
     };
 

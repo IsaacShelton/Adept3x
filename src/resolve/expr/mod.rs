@@ -358,18 +358,13 @@ pub fn resolve_expr(
             resolved::TypeKind::Boolean.at(source),
             resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
         )),
-        ast::ExprKind::EnumMemberLiteral(_enum_member_literal) => {
-            todo!("resolve enum member literal");
-
-            /*
-            let resolved_type = resolve_type(
-                ctx.type_search_ctx,
+        ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
+            let resolved_type = ctx.type_ctx().resolve(
                 &ast::TypeKind::Named(enum_member_literal.enum_name.clone())
                     .at(enum_member_literal.source),
-                &mut Default::default(),
             )?;
 
-            let TypeKind::Enum(_, _) = &resolved_type.kind else {
+            let TypeKind::Enum(human_name, enum_ref) = &resolved_type.kind else {
                 return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
                     ty: enum_member_literal.enum_name.to_string(),
                     member: enum_member_literal.variant_name.clone(),
@@ -377,20 +372,18 @@ pub fn resolve_expr(
                 .at(source));
             };
 
-            let resolved_name = resolved_name.clone();
-
             Ok(TypedExpr::new(
-                resolved_type,
+                resolved_type.clone(),
                 resolved::Expr::new(
                     resolved::ExprKind::EnumMemberLiteral(Box::new(resolved::EnumMemberLiteral {
-                        enum_name: resolved_name,
+                        human_name: human_name.clone(),
+                        enum_ref: *enum_ref,
                         variant_name: enum_member_literal.variant_name.clone(),
                         source,
                     })),
                     source,
                 ),
-                ))
-            */
+            ))
         }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {

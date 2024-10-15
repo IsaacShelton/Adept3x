@@ -111,7 +111,6 @@ pub fn resolve<'a>(
 
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
 
-    // Pre-resolve types for new type resolution system
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let file_id = ast_workspace
             .get_owning_module(*physical_file_id)
@@ -221,7 +220,6 @@ pub fn resolve<'a>(
     }
 
     // Create edges between types
-    #[allow(dead_code, unused_variables)]
     for job in type_jobs.iter() {
         let file = ast_workspace
             .files
@@ -231,11 +229,6 @@ pub fn resolve<'a>(
         let module_file_id = ast_workspace
             .get_owning_module(job.physical_file_id)
             .unwrap_or(job.physical_file_id);
-
-        let types = resolved_ast
-            .types_per_module
-            .entry(module_file_id)
-            .or_default();
 
         for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
             for (field_name, field) in structure.fields.iter() {
