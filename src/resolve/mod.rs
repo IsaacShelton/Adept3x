@@ -112,7 +112,7 @@ pub fn resolve<'a>(
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let file_id = ast_workspace
+        let module_fs_node_id = ast_workspace
             .get_owning_module(*physical_file_id)
             .unwrap_or(*physical_file_id);
 
@@ -126,7 +126,7 @@ pub fn resolve<'a>(
         for structure in file.structures.iter() {
             let privacy = structure.privacy;
             let source = structure.source;
-            let resolved_name = ResolvedName::new(file_id, &structure.name);
+            let resolved_name = ResolvedName::new(module_fs_node_id, &structure.name);
 
             let structure_ref = resolved_ast.structures.insert(resolved::Structure {
                 name: resolved_name.clone(),
@@ -147,7 +147,7 @@ pub fn resolve<'a>(
 
             let types_in_module = ctx
                 .types_in_modules
-                .entry(file_id)
+                .entry(module_fs_node_id)
                 .or_insert_with(HashMap::new);
 
             types_in_module.insert(
@@ -164,6 +164,7 @@ pub fn resolve<'a>(
 
         for definition in file.enums.iter() {
             let enum_ref = resolved_ast.enums.insert(resolved::Enum {
+                name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
                 resolved_type: TypeKind::Unresolved.at(definition.source),
                 source: definition.source,
                 members: definition.members.clone(),
@@ -175,7 +176,7 @@ pub fn resolve<'a>(
 
             let types_in_module = ctx
                 .types_in_modules
-                .entry(file_id)
+                .entry(module_fs_node_id)
                 .or_insert_with(HashMap::new);
 
             types_in_module.insert(
@@ -201,7 +202,7 @@ pub fn resolve<'a>(
 
             let types_in_module = ctx
                 .types_in_modules
-                .entry(file_id)
+                .entry(module_fs_node_id)
                 .or_insert_with(HashMap::new);
 
             types_in_module.insert(

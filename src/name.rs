@@ -58,8 +58,8 @@ impl Display for Name {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ResolvedName {
-    fs_node_id: FsNodeId,
-    name: Box<str>,
+    pub fs_node_id: FsNodeId,
+    pub name: Box<str>,
 }
 
 impl ResolvedName {

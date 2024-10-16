@@ -1,11 +1,14 @@
 use super::{
-    conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Validate},
+    conform::{
+        conform_expr, to_default::conform_expr_to_default, warn_type_alias_depth_exceeded,
+        ConformMode, Validate,
+    },
     expr::{PreferredType, ResolveExprCtx},
 };
 use crate::{
     ir::FunctionRef,
     name::{Name, ResolvedName},
-    resolved::{self, TypedExpr},
+    resolved::{self, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -87,16 +90,54 @@ impl FunctionSearchCtx {
         }
 
         if name.namespace.is_empty() {
-            let mut matches = self
-                .imported_namespaces
-                .iter()
-                .filter_map(|namespace| {
-                    self.available.get(&ResolvedName::new(
-                        self.fs_node_id,
-                        &Name::new(Some(namespace.to_string()), name.basename.clone()),
-                    ))
-                })
+            let imported_namespaces = ctx.settings.imported_namespaces.iter();
+
+            // TODO: CLEANUP: Clean up this code that gets the origin module of the callee
+            let subject_module_fs_node_id =
+                if let Some(first_type) = arguments.first().map(|arg| &arg.resolved_type) {
+                    if let Ok(first_type) = ctx.resolved_ast.unalias(first_type) {
+                        match &first_type.kind {
+                            TypeKind::Structure(_, structure_ref) => Some(
+                                ctx.resolved_ast
+                                    .structures
+                                    .get(*structure_ref)
+                                    .expect("valid struct")
+                                    .name
+                                    .fs_node_id,
+                            ),
+                            TypeKind::Enum(_, enum_ref) => Some(
+                                ctx.resolved_ast
+                                    .enums
+                                    .get(*enum_ref)
+                                    .expect("valid enum")
+                                    .name
+                                    .fs_node_id,
+                            ),
+                            _ => None,
+                        }
+                    } else {
+                        warn_type_alias_depth_exceeded(first_type);
+                        None
+                    }
+                } else {
+                    None
+                }
+                .into_iter();
+
+            let mut matches = imported_namespaces
+                .flat_map(|namespace| ctx.settings.namespace_to_dependency.get(namespace.as_ref()))
                 .flatten()
+                .flat_map(|dependency| ctx.settings.dependency_to_module.get(dependency))
+                .copied()
+                .chain(subject_module_fs_node_id)
+                .unique()
+                .flat_map(|module_fs_node_id| {
+                    ctx.public_functions
+                        .get(&module_fs_node_id)
+                        .and_then(|public| public.get(name.basename.as_ref()))
+                        .into_iter()
+                        .flatten()
+                })
                 .filter(|f| Self::fits(ctx, **f, arguments, source));
 
             if let Some(found) = matches.next() {

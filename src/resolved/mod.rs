@@ -91,6 +91,7 @@ pub enum UnaliasError {
 
 #[derive(Clone, Debug)]
 pub struct Enum {
+    pub name: ResolvedName,
     pub resolved_type: Type,
     pub source: Source,
     pub members: IndexMap<String, EnumMember>,
