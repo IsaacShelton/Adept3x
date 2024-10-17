@@ -8,7 +8,7 @@ use crate::{
         expr::resolve_expr,
         Initialized,
     },
-    resolved::{self, Type, TypedExpr},
+    resolved::{self, GlobalVarDecl, Type, TypedExpr},
     source_files::Source,
 };
 
@@ -50,57 +50,51 @@ pub fn resolve_variable_expr(
 
     let resolved_name = ResolvedName::new(ctx.module_fs_node_id, name);
 
-    if let Some((resolved_type, reference)) = ctx.global_search_ctx.find_global(&resolved_name) {
-        return Ok(resolve_global_variable(resolved_type, *reference, source));
+    if let Some(basename) = name.as_plain_str() {
+        if let Some(found) = ctx
+            .globals_in_modules
+            .get(&ctx.module_fs_node_id)
+            .and_then(|globals| globals.get(basename))
+        {
+            return Ok(resolve_global_variable(ctx, found, source));
+        }
     }
 
-    if let Some(helper_expr) = ctx.helper_exprs.get(&resolved_name) {
-        return resolve_helper_expr(ctx, helper_expr, preferred_type, initialized, source);
-    }
+    if !name.namespace.is_empty() {
+        let Name {
+            namespace,
+            basename,
+            ..
+        } = name;
 
-    if name.namespace.is_empty() {
         let mut matches = ctx
             .settings
-            .imported_namespaces
-            .iter()
-            .flat_map(|namespace| {
-                let resolved_name = ResolvedName::new(
-                    ctx.module_fs_node_id,
-                    &Name::new(Some(namespace.to_string()), name.basename.to_string()),
-                );
-
-                let global = ctx
-                    .global_search_ctx
-                    .find_global(&resolved_name)
-                    .map(GlobalOrHelper::Global);
-
-                let helper_expr = ctx
-                    .helper_exprs
-                    .get(&resolved_name)
-                    .copied()
-                    .map(GlobalOrHelper::HelperExpr);
-
-                [global, helper_expr]
+            .namespace_to_dependency
+            .get(namespace.as_ref())
+            .into_iter()
+            .flatten()
+            .flat_map(|dep| ctx.settings.dependency_to_module.get(dep))
+            .flat_map(|fs_node_id| {
+                ctx.globals_in_modules
+                    .get(fs_node_id)
+                    .and_then(|globals| globals.get(basename.as_ref()))
             })
-            .flatten();
+            .filter(|decl| decl.privacy.is_public());
 
         if let Some(found) = matches.next() {
             if matches.next().is_some() {
-                return Err(ResolveErrorKind::AmbiguousSymbol {
+                return Err(ResolveErrorKind::AmbiguousGlobal {
                     name: name.to_string(),
                 }
                 .at(source));
             }
 
-            return match found {
-                GlobalOrHelper::Global((ty, reference)) => {
-                    Ok(resolve_global_variable(ty, *reference, source))
-                }
-                GlobalOrHelper::HelperExpr(helper_expr) => {
-                    resolve_helper_expr(ctx, helper_expr, preferred_type, initialized, source)
-                }
-            };
+            return Ok(resolve_global_variable(ctx, found, source));
         }
+    }
+
+    if let Some(helper_expr) = ctx.helper_exprs.get(&resolved_name) {
+        return resolve_helper_expr(ctx, helper_expr, preferred_type, initialized, source);
     }
 
     Err(ResolveErrorKind::UndeclaredVariable {
@@ -115,16 +109,22 @@ enum GlobalOrHelper<'a> {
 }
 
 fn resolve_global_variable(
-    resolved_type: &Type,
-    reference: GlobalVarRef,
+    ctx: &ResolveExprCtx,
+    decl: &GlobalVarDecl,
     source: Source,
 ) -> TypedExpr {
+    let global = ctx
+        .resolved_ast
+        .globals
+        .get(decl.global_ref)
+        .expect("valid global");
+
     TypedExpr::new(
-        resolved_type.clone(),
+        global.resolved_type.clone(),
         resolved::Expr::new(
             resolved::ExprKind::GlobalVariable(Box::new(resolved::GlobalVariable {
-                reference,
-                resolved_type: resolved_type.clone(),
+                reference: decl.global_ref,
+                resolved_type: global.resolved_type.clone(),
             })),
             source,
         ),

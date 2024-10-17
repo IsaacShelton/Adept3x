@@ -51,6 +51,9 @@ pub enum ResolveErrorKind {
     AmbiguousType {
         name: String,
     },
+    AmbiguousGlobal {
+        name: String,
+    },
     NotEnoughArgumentsToFunction {
         name: String,
     },
@@ -235,7 +238,14 @@ impl Display for ResolveErrorKind {
                 }
 
                 if !almost_matches.is_empty() {
-                    write!(f, "\n    Did you mean?")?;
+                    match reason {
+                        FindFunctionError::NotDefined => {
+                            write!(f, "\n    Did you mean?")?;
+                        }
+                        FindFunctionError::Ambiguous => {
+                            write!(f, "\n    Possibilities include:")?;
+                        }
+                    }
 
                     for almost_match in almost_matches {
                         write!(f, "\n    {}", almost_match)?;
@@ -255,6 +265,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::AmbiguousType { name } => {
                 write!(f, "Ambiguous type '{}'", name)?;
+            }
+            ResolveErrorKind::AmbiguousGlobal { name } => {
+                write!(f, "Ambiguous global variable '{}'", name)?;
             }
             ResolveErrorKind::NotEnoughArgumentsToFunction { name } => {
                 write!(f, "Not enough arguments for call to function '{}'", name)?;

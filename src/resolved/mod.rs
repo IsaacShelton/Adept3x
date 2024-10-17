@@ -107,6 +107,12 @@ pub struct GlobalVar {
 }
 
 #[derive(Clone, Debug)]
+pub struct GlobalVarDecl {
+    pub global_ref: GlobalVarRef,
+    pub privacy: Privacy,
+}
+
+#[derive(Clone, Debug)]
 pub struct Function {
     pub name: ResolvedName,
     pub parameters: Parameters,

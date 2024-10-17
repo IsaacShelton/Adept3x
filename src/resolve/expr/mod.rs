@@ -19,7 +19,6 @@ use super::{
     destination::resolve_expr_to_destination,
     error::ResolveError,
     function_search_ctx::FunctionSearchCtx,
-    global_search_ctx::GlobalSearchCtx,
     variable_search_ctx::VariableSearchCtx,
     Initialized, ResolveTypeCtx,
 };
@@ -51,13 +50,13 @@ use std::collections::HashMap;
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
     pub function_search_ctx: &'b FunctionSearchCtx,
-    pub global_search_ctx: &'b GlobalSearchCtx,
     pub variable_search_ctx: VariableSearchCtx,
     pub resolved_function_ref: resolved::FunctionRef,
     pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub settings: &'b Settings,
     pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
+    pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
 }

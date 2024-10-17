@@ -4,7 +4,6 @@ mod destination;
 mod error;
 mod expr;
 mod function_search_ctx;
-mod global_search_ctx;
 mod stmt;
 mod unify_types;
 mod variable_search_ctx;
@@ -12,7 +11,6 @@ mod variable_search_ctx;
 use self::{
     error::{ResolveError, ResolveErrorKind},
     expr::ResolveExprCtx,
-    global_search_ctx::GlobalSearchCtx,
     stmt::resolve_stmts,
     variable_search_ctx::VariableSearchCtx,
 };
@@ -22,8 +20,8 @@ use crate::{
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
     resolved::{
-        self, EnumRef, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeKind, TypedExpr,
-        VariableStorage,
+        self, EnumRef, GlobalVarDecl, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeKind,
+        TypedExpr, VariableStorage,
     },
     source_files::Source,
     tag::Tag,
@@ -44,10 +42,10 @@ enum Job {
 struct ResolveCtx<'a> {
     pub jobs: VecDeque<Job>,
     pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
-    pub global_search_ctxs: IndexMap<FsNodeId, GlobalSearchCtx>,
     pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
+    pub globals_in_modules: HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
 }
 
 impl<'a> ResolveCtx<'a> {
@@ -55,10 +53,10 @@ impl<'a> ResolveCtx<'a> {
         Self {
             jobs: Default::default(),
             function_search_ctxs: Default::default(),
-            global_search_ctxs: Default::default(),
             helper_exprs,
             public_functions: HashMap::new(),
             types_in_modules: HashMap::new(),
+            globals_in_modules: HashMap::new(),
         }
     }
 }
@@ -308,21 +306,25 @@ pub fn resolve<'a>(
             );
             let resolved_type = type_ctx.resolve(&global.ast_type)?;
 
-            let global_search_context = ctx
-                .global_search_ctxs
-                .get_or_insert_with(module_file_id, || GlobalSearchCtx::new());
-
-            let resolved_name = ResolvedName::new(module_file_id, &global.name);
+            let resolved_name = ResolvedName::new(module_file_id, &Name::plain(&global.name));
 
             let global_ref = resolved_ast.globals.insert(resolved::GlobalVar {
-                name: resolved_name.clone(),
+                name: resolved_name,
                 resolved_type: resolved_type.clone(),
                 source: global.source,
                 is_foreign: global.is_foreign,
                 is_thread_local: global.is_thread_local,
             });
 
-            global_search_context.put(resolved_name, resolved_type, global_ref);
+            let globals = ctx.globals_in_modules.entry(module_file_id).or_default();
+
+            globals.insert(
+                global.name.clone(),
+                GlobalVarDecl {
+                    global_ref,
+                    privacy: global.privacy,
+                },
+            );
         }
     }
 
@@ -422,8 +424,6 @@ pub fn resolve<'a>(
                     .get(&module_file_id)
                     .expect("function search context to exist for file");
 
-                let global_search_ctx = &*ctx.global_search_ctxs.entry(module_file_id).or_default();
-
                 let ast_file = ast_workspace
                     .files
                     .get(&real_file_id)
@@ -473,13 +473,13 @@ pub fn resolve<'a>(
                     let mut ctx = ResolveExprCtx {
                         resolved_ast: &mut resolved_ast,
                         function_search_ctx,
-                        global_search_ctx,
                         variable_search_ctx,
                         resolved_function_ref,
                         helper_exprs: &ctx.helper_exprs,
                         settings,
                         public_functions: &ctx.public_functions,
                         types_in_modules: &ctx.types_in_modules,
+                        globals_in_modules: &ctx.globals_in_modules,
                         module_fs_node_id: module_file_id,
                         physical_fs_node_id: real_file_id,
                     };
