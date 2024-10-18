@@ -46,13 +46,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::NullTerminated,
                 ..
-            }) => Ok(Expr::new(
-                ExprKind::NullTerminatedString(
-                    CString::new(self.input.advance().kind.unwrap_string().value)
-                        .expect("valid null-terminated string"),
-                ),
-                source,
-            )),
+            }) => {
+                let Ok(content) = CString::new(self.input.advance().kind.unwrap_string().value)
+                else {
+                    return Err(ParseErrorKind::CannotContainNulInNullTerminatedString.at(source));
+                };
+
+                Ok(Expr::new(ExprKind::NullTerminatedString(content), source))
+            }
             TokenKind::String(StringLiteral {
                 modifier: StringModifier::Normal,
                 ..

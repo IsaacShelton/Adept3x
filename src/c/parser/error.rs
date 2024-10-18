@@ -47,6 +47,7 @@ pub enum ParseErrorKind {
     MustBeConstantInteger,
     EnumMemberNameConflictsWithExistingSymbol { name: String },
     UndefinedVariable(String),
+    CannotContainNulInNullTerminatedString,
     Misc(&'static str),
 }
 
@@ -79,6 +80,9 @@ impl Display for ParseErrorKind {
                 )
             }
             ParseErrorKind::UndefinedVariable(name) => write!(f, "Undefined variable '{name}'"),
+            ParseErrorKind::CannotContainNulInNullTerminatedString => {
+                write!(f, "Cannot contain NUL byte in C-String'")
+            }
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
     }

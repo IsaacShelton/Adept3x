@@ -86,6 +86,7 @@ pub enum ParseErrorKind {
     GenericsNotSupportedHere,
     NamespaceNotAllowedHere,
     CharLiteralCannotBeLargerThanOneByte,
+    CannotContainNulInNullTerminatedString,
     Other {
         message: String,
     },
@@ -214,6 +215,9 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::CharLiteralCannotBeLargerThanOneByte => {
                 write!(f, "char literal cannot be larger than 1 byte")?;
+            }
+            ParseErrorKind::CannotContainNulInNullTerminatedString => {
+                write!(f, "Cannot contain NUL byte in C-String'")?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;
