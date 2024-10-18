@@ -240,6 +240,7 @@ impl<'a> Parser<'a> {
         if let CTokenKind::StringLiteral(encoding, string) = &self.input.peek().kind {
             let string = string.clone();
             let encoding = encoding.clone();
+
             self.input.advance();
             return Ok(ExprKind::StringLiteral(encoding, string).at(source));
         }
