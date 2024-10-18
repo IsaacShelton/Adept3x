@@ -172,11 +172,23 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             TokenKind::Subtract => {
                 self.input.advance();
 
-                Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
-                    UnaryMathOperator::Negate,
-                    self.parse_expr_primary()?,
-                )))
-                .at(source))
+                let mut inside = self.parse_expr_primary()?;
+
+                match &mut inside.kind {
+                    ExprKind::Integer(Integer::Generic(value)) => {
+                        *value = -(&*value);
+                        Ok(inside)
+                    }
+                    ExprKind::Float(value) => {
+                        *value = -*value;
+                        Ok(inside)
+                    }
+                    _ => Ok(ExprKind::UnaryOperation(Box::new(UnaryOperation::new_math(
+                        UnaryMathOperator::Negate,
+                        inside,
+                    )))
+                    .at(source)),
+                }
             }
             TokenKind::AddressOf => {
                 self.input.advance();
