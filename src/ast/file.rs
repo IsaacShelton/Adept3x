@@ -2,8 +2,6 @@ use super::{
     enumeration::Enum, global_variable::GlobalVar, structure::Structure, type_alias::TypeAlias,
     Function, HelperExpr, SettingsId,
 };
-use crate::name::Name;
-use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct AstFile {
@@ -12,7 +10,7 @@ pub struct AstFile {
     pub type_aliases: Vec<TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
     pub enums: Vec<Enum>,
-    pub helper_exprs: IndexMap<Name, HelperExpr>,
+    pub helper_exprs: Vec<HelperExpr>,
     pub settings: Option<SettingsId>,
 }
 
@@ -24,7 +22,7 @@ impl AstFile {
             type_aliases: vec![],
             global_variables: vec![],
             enums: vec![],
-            helper_exprs: IndexMap::default(),
+            helper_exprs: vec![],
             settings: None,
         }
     }

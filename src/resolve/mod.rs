@@ -20,14 +20,15 @@ use crate::{
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
     resolved::{
-        self, EnumRef, GlobalVarDecl, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeKind,
-        TypedExpr, VariableStorage,
+        self, EnumRef, GlobalVarDecl, HelperExprDecl, HumanName, StructureRef, TypeAliasRef,
+        TypeDecl, TypeKind, TypedExpr, VariableStorage,
     },
     source_files::Source,
     tag::Tag,
     workspace::fs::FsNodeId,
 };
 use ast::{IntegerBits, IntegerSign};
+use expr::resolve_expr;
 use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
 use std::{
@@ -39,24 +40,25 @@ enum Job {
     Regular(FsNodeId, usize, resolved::FunctionRef),
 }
 
-struct ResolveCtx<'a> {
+struct ResolveCtx {
     pub jobs: VecDeque<Job>,
     pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
-    pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
+    // pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
     pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub globals_in_modules: HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
+    pub helper_exprs_in_modules: HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
 }
 
-impl<'a> ResolveCtx<'a> {
-    fn new(helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>) -> Self {
+impl ResolveCtx {
+    fn new() -> Self {
         Self {
             jobs: Default::default(),
             function_search_ctxs: Default::default(),
-            helper_exprs,
             public_functions: HashMap::new(),
             types_in_modules: HashMap::new(),
             globals_in_modules: HashMap::new(),
+            helper_exprs_in_modules: HashMap::new(),
         }
     }
 }
@@ -65,37 +67,7 @@ pub fn resolve<'a>(
     ast_workspace: &'a AstWorkspace,
     options: &BuildOptions,
 ) -> Result<resolved::Ast<'a>, ResolveError> {
-    let mut helper_exprs = IndexMap::new();
-
-    // Unify helper expressions into single map
-    for (physical_file_id, file) in ast_workspace.files.iter() {
-        let file_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
-
-        if let Some(settings) = file.settings.map(|id| &ast_workspace.settings[id.0]) {
-            if settings.debug_skip_merging_helper_exprs {
-                continue;
-            }
-        }
-
-        for (name, helper_expr) in file.helper_exprs.iter() {
-            if !helper_expr.is_file_local_only {
-                helper_exprs.try_insert(
-                    ResolvedName::new(file_id, name),
-                    helper_expr,
-                    |define_name| {
-                        ResolveErrorKind::MultipleDefinesNamed {
-                            name: define_name.display(&ast_workspace.fs).to_string(),
-                        }
-                        .at(helper_expr.source)
-                    },
-                )?;
-            }
-        }
-    }
-
-    let mut ctx = ResolveCtx::new(helper_exprs);
+    let mut ctx = ResolveCtx::new();
     let source_files = ast_workspace.source_files;
     let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
 
@@ -410,6 +382,55 @@ pub fn resolve<'a>(
         }
     }
 
+    // Resolve helper expressions
+    for (physical_file_id, file) in ast_workspace.files.iter() {
+        let module_file_id = ast_workspace
+            .get_owning_module(*physical_file_id)
+            .unwrap_or(*physical_file_id);
+
+        let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
+
+        // NOTE: This module should already have a function search context
+        let function_search_ctx = ctx
+            .function_search_ctxs
+            .get(&module_file_id)
+            .expect("function search context to exist for file");
+
+        for helper_expr in file.helper_exprs.iter() {
+            let value = {
+                let variable_search_ctx = VariableSearchCtx::new();
+                let mut ctx = ResolveExprCtx {
+                    resolved_ast: &mut resolved_ast,
+                    function_search_ctx,
+                    variable_search_ctx,
+                    resolved_function_ref: None,
+                    settings,
+                    public_functions: &ctx.public_functions,
+                    types_in_modules: &ctx.types_in_modules,
+                    globals_in_modules: &ctx.globals_in_modules,
+                    helper_exprs_in_modules: &ctx.helper_exprs_in_modules,
+                    module_fs_node_id: module_file_id,
+                    physical_fs_node_id: *physical_file_id,
+                };
+
+                resolve_expr(&mut ctx, &helper_expr.value, None, Initialized::Require)?
+            };
+
+            let helper_exprs = ctx
+                .helper_exprs_in_modules
+                .entry(module_file_id)
+                .or_default();
+
+            helper_exprs.insert(
+                helper_expr.name.clone(),
+                HelperExprDecl {
+                    value,
+                    privacy: helper_expr.privacy,
+                },
+            );
+        }
+    }
+
     // Resolve function bodies
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
@@ -474,12 +495,12 @@ pub fn resolve<'a>(
                         resolved_ast: &mut resolved_ast,
                         function_search_ctx,
                         variable_search_ctx,
-                        resolved_function_ref,
-                        helper_exprs: &ctx.helper_exprs,
+                        resolved_function_ref: Some(resolved_function_ref),
                         settings,
                         public_functions: &ctx.public_functions,
                         types_in_modules: &ctx.types_in_modules,
                         globals_in_modules: &ctx.globals_in_modules,
+                        helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
                         module_fs_node_id: module_file_id,
                         physical_fs_node_id: real_file_id,
                     };

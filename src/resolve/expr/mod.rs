@@ -26,7 +26,6 @@ use crate::{
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, Language, Settings, UnaryOperator,
     },
-    name::ResolvedName,
     resolve::{
         ensure_initialized,
         error::ResolveErrorKind,
@@ -43,7 +42,6 @@ use crate::{
 };
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
-use indexmap::IndexMap;
 use resolved::IntegerKnown;
 use std::collections::HashMap;
 
@@ -51,12 +49,12 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
     pub function_search_ctx: &'b FunctionSearchCtx,
     pub variable_search_ctx: VariableSearchCtx,
-    pub resolved_function_ref: resolved::FunctionRef,
-    pub helper_exprs: &'b IndexMap<ResolvedName, &'a ast::HelperExpr>,
+    pub resolved_function_ref: Option<resolved::FunctionRef>,
     pub settings: &'b Settings,
     pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
+    pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
 }

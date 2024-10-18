@@ -2,7 +2,7 @@ use super::{PreferredType, ResolveExprCtx};
 use crate::{
     ast::HelperExpr,
     ir::GlobalVarRef,
-    name::{Name, ResolvedName},
+    name::Name,
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         expr::resolve_expr,
@@ -15,48 +15,64 @@ use crate::{
 pub fn resolve_variable_expr(
     ctx: &mut ResolveExprCtx,
     name: &Name,
-    preferred_type: Option<PreferredType>,
-    initialized: Initialized,
+    _preferred_type: Option<PreferredType>,
+    _initialized: Initialized,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     if let Some(variable) = name
         .as_plain_str()
         .and_then(|name| ctx.variable_search_ctx.find_variable(name))
     {
-        let function = ctx
-            .resolved_ast
-            .functions
-            .get_mut(ctx.resolved_function_ref)
-            .unwrap();
+        if let Some(function) = ctx.resolved_function_ref.map(|function_ref| {
+            ctx.resolved_ast
+                .functions
+                .get_mut(function_ref)
+                .expect("valid function ref")
+        }) {
+            let is_initialized = function
+                .variables
+                .get(variable.key)
+                .expect("found variable to exist")
+                .is_initialized();
 
-        let is_initialized = function
-            .variables
-            .get(variable.key)
-            .expect("found variable to exist")
-            .is_initialized();
-
-        return Ok(TypedExpr::new_maybe_initialized(
-            variable.resolved_type.clone(),
-            resolved::Expr::new(
-                resolved::ExprKind::Variable(Box::new(resolved::Variable {
-                    key: variable.key,
-                    resolved_type: variable.resolved_type.clone(),
-                })),
-                source,
-            ),
-            is_initialized,
-        ));
+            return Ok(TypedExpr::new_maybe_initialized(
+                variable.resolved_type.clone(),
+                resolved::Expr::new(
+                    resolved::ExprKind::Variable(Box::new(resolved::Variable {
+                        key: variable.key,
+                        resolved_type: variable.resolved_type.clone(),
+                    })),
+                    source,
+                ),
+                is_initialized,
+            ));
+        }
     }
 
-    let resolved_name = ResolvedName::new(ctx.module_fs_node_id, name);
-
     if let Some(basename) = name.as_plain_str() {
-        if let Some(found) = ctx
+        let maybe_global = ctx
             .globals_in_modules
             .get(&ctx.module_fs_node_id)
-            .and_then(|globals| globals.get(basename))
-        {
+            .and_then(|globals| globals.get(basename));
+
+        let maybe_helper_expr = ctx
+            .helper_exprs_in_modules
+            .get(&ctx.module_fs_node_id)
+            .and_then(|helper_expr| helper_expr.get(basename));
+
+        if maybe_global.is_some() && maybe_helper_expr.is_some() {
+            return Err(ResolveErrorKind::AmbiguousSymbol {
+                name: basename.into(),
+            }
+            .at(source));
+        }
+
+        if let Some(found) = maybe_global {
             return Ok(resolve_global_variable(ctx, found, source));
+        }
+
+        if let Some(found) = maybe_helper_expr {
+            return Ok(found.value.clone());
         }
     }
 
@@ -67,13 +83,16 @@ pub fn resolve_variable_expr(
             ..
         } = name;
 
-        let mut matches = ctx
+        let modules = ctx
             .settings
             .namespace_to_dependency
             .get(namespace.as_ref())
             .into_iter()
             .flatten()
-            .flat_map(|dep| ctx.settings.dependency_to_module.get(dep))
+            .flat_map(|dep| ctx.settings.dependency_to_module.get(dep));
+
+        let mut global_var_matches = modules
+            .clone()
             .flat_map(|fs_node_id| {
                 ctx.globals_in_modules
                     .get(fs_node_id)
@@ -81,8 +100,26 @@ pub fn resolve_variable_expr(
             })
             .filter(|decl| decl.privacy.is_public());
 
-        if let Some(found) = matches.next() {
-            if matches.next().is_some() {
+        let mut helper_expr_matches = modules
+            .flat_map(|fs_node_id| {
+                ctx.helper_exprs_in_modules
+                    .get(fs_node_id)
+                    .and_then(|helper_expr| helper_expr.get(basename.as_ref()))
+            })
+            .filter(|decl| decl.privacy.is_public());
+
+        let maybe_global = global_var_matches.next();
+        let maybe_helper_expr = helper_expr_matches.next();
+
+        if maybe_global.is_some() && maybe_helper_expr.is_some() {
+            return Err(ResolveErrorKind::AmbiguousSymbol {
+                name: basename.to_string(),
+            }
+            .at(source));
+        }
+
+        if let Some(found) = maybe_global {
+            if global_var_matches.next().is_some() {
                 return Err(ResolveErrorKind::AmbiguousGlobal {
                     name: name.to_string(),
                 }
@@ -91,10 +128,17 @@ pub fn resolve_variable_expr(
 
             return Ok(resolve_global_variable(ctx, found, source));
         }
-    }
 
-    if let Some(helper_expr) = ctx.helper_exprs.get(&resolved_name) {
-        return resolve_helper_expr(ctx, helper_expr, preferred_type, initialized, source);
+        if let Some(found) = maybe_helper_expr {
+            if helper_expr_matches.next().is_some() {
+                return Err(ResolveErrorKind::AmbiguousHelperExpr {
+                    name: name.to_string(),
+                }
+                .at(source));
+            }
+
+            return Ok(found.value.clone());
+        }
     }
 
     Err(ResolveErrorKind::UndeclaredVariable {

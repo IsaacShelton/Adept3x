@@ -113,6 +113,12 @@ pub struct GlobalVarDecl {
 }
 
 #[derive(Clone, Debug)]
+pub struct HelperExprDecl {
+    pub value: TypedExpr,
+    pub privacy: Privacy,
+}
+
+#[derive(Clone, Debug)]
 pub struct Function {
     pub name: ResolvedName,
     pub parameters: Parameters,

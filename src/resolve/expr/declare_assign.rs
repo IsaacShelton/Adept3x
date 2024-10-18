@@ -2,7 +2,9 @@ use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast::{self},
     resolve::{
-        conform::to_default::conform_expr_to_default_or_error, error::ResolveError, Initialized,
+        conform::to_default::conform_expr_to_default_or_error,
+        error::{ResolveError, ResolveErrorKind},
+        Initialized,
     },
     resolved::{self, TypedExpr},
     source_files::Source,
@@ -20,10 +22,14 @@ pub fn resolve_declare_assign_expr(
         c_integer_assumptions,
     )?;
 
+    let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+        return Err(ResolveErrorKind::CannotDeclareVariableOutsideFunction.at(source));
+    };
+
     let function = ctx
         .resolved_ast
         .functions
-        .get_mut(ctx.resolved_function_ref)
+        .get_mut(resolved_function_ref)
         .unwrap();
 
     let key = function

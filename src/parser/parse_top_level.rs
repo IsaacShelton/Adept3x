@@ -1,11 +1,10 @@
 use super::{
     annotation::{Annotation, AnnotationKind},
-    error::{ParseError, ParseErrorKind},
+    error::ParseError,
     Parser,
 };
 use crate::{
-    ast::{AstFile, HelperExpr, Named},
-    index_map_ext::IndexMapExt,
+    ast::AstFile,
     inflow::Inflow,
     token::{Token, TokenKind},
 };
@@ -69,18 +68,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 ast_file.enums.push(enum_definition);
             }
             TokenKind::DefineKeyword => {
-                let Named::<HelperExpr> {
-                    name,
-                    value: named_expr,
-                } = self.parse_helper_expr(annotations)?;
-                let source = named_expr.source;
-
-                ast_file.helper_exprs.try_insert(name, named_expr, |name| {
-                    ParseErrorKind::DefineHasMultipleDefinitions {
-                        name: name.to_string(),
-                    }
-                    .at(source)
-                })?;
+                let helper_expr = self.parse_helper_expr(annotations)?;
+                ast_file.helper_exprs.push(helper_expr);
             }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations

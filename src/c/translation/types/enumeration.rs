@@ -4,7 +4,6 @@ use crate::{
         parser::{error::ParseErrorKind, Enumeration, ParseError},
         translation::eval::evaluate_to_const_integer,
     },
-    index_map_ext::IndexMapExt,
     name::Name,
 };
 use indexmap::IndexMap;
@@ -61,21 +60,13 @@ pub fn make_anonymous_enum(
                         }))
                         .at(enumerator.source);
 
-                    ast_file.helper_exprs.try_insert(
-                        Name::plain(enumerator.name.clone()),
-                        ast::HelperExpr {
-                            value: aka_value,
-                            source: enumerator.source,
-                            is_file_local_only: false,
-                            privacy: Privacy::Public,
-                        },
-                        |name| {
-                            ParseErrorKind::EnumMemberNameConflictsWithExistingSymbol {
-                                name: name.to_string(),
-                            }
-                            .at(enumerator.source)
-                        },
-                    )?;
+                    ast_file.helper_exprs.push(ast::HelperExpr {
+                        name: enumerator.name.clone(),
+                        value: aka_value,
+                        source: enumerator.source,
+                        is_file_local_only: false,
+                        privacy: Privacy::Public,
+                    });
                 }
             }
 

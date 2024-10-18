@@ -54,6 +54,9 @@ pub enum ResolveErrorKind {
     AmbiguousGlobal {
         name: String,
     },
+    AmbiguousHelperExpr {
+        name: String,
+    },
     NotEnoughArgumentsToFunction {
         name: String,
     },
@@ -176,6 +179,9 @@ pub enum ResolveErrorKind {
     },
     UndeterminedCharacterLiteral,
     UnaliasError(UnaliasError),
+    CannotDeclareVariableOutsideFunction,
+    CannotReturnOutsideFunction,
+    CannotAssignVariableOutsideFunction,
     Other {
         message: String,
     },
@@ -268,6 +274,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::AmbiguousGlobal { name } => {
                 write!(f, "Ambiguous global variable '{}'", name)?;
+            }
+            ResolveErrorKind::AmbiguousHelperExpr { name } => {
+                write!(f, "Ambiguous define '{}'", name)?;
             }
             ResolveErrorKind::NotEnoughArgumentsToFunction { name } => {
                 write!(f, "Not enough arguments for call to function '{}'", name)?;
@@ -474,6 +483,24 @@ impl Display for ResolveErrorKind {
                     "Maximum type alias depth exceeded, please ensure your type alias is not recursive"
                 )?,
             },
+            ResolveErrorKind::CannotDeclareVariableOutsideFunction => {
+                write!(
+                    f,
+                    "Cannot declare variable outside of function"
+                )?;
+            },
+            ResolveErrorKind::CannotReturnOutsideFunction => {
+                write!(
+                    f,
+                    "Cannot return outside of function"
+                )?;
+            }
+            ResolveErrorKind::CannotAssignVariableOutsideFunction => {
+                write!(
+                    f,
+                    "Cannot assign variable outside of function"
+                )?;
+            }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
             }

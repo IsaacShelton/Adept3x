@@ -28,18 +28,22 @@ pub fn resolve_stmt(
 
     match &ast_stmt.kind {
         ast::StmtKind::Return(value) => {
+            let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+                return Err(ResolveErrorKind::CannotReturnOutsideFunction.at(ast_stmt.source));
+            };
+
             let return_value = if let Some(value) = value {
                 let result = resolve_expr(
                     ctx,
                     value,
-                    Some(PreferredType::ReturnType(ctx.resolved_function_ref)),
+                    Some(PreferredType::ReturnType(resolved_function_ref)),
                     Initialized::Require,
                 )?;
 
                 let return_type = &ctx
                     .resolved_ast
                     .functions
-                    .get(ctx.resolved_function_ref)
+                    .get(resolved_function_ref)
                     .unwrap()
                     .return_type;
 
@@ -63,7 +67,7 @@ pub fn resolve_stmt(
                 let function = ctx
                     .resolved_ast
                     .functions
-                    .get(ctx.resolved_function_ref)
+                    .get(resolved_function_ref)
                     .unwrap();
 
                 if function.return_type.kind != resolved::TypeKind::Void {
@@ -132,10 +136,16 @@ pub fn resolve_stmt(
                 .at(source));
             }
 
+            let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+                return Err(
+                    ResolveErrorKind::CannotDeclareVariableOutsideFunction.at(ast_stmt.source)
+                );
+            };
+
             let function = ctx
                 .resolved_ast
                 .functions
-                .get_mut(ctx.resolved_function_ref)
+                .get_mut(resolved_function_ref)
                 .unwrap();
 
             let key = function
@@ -183,13 +193,19 @@ pub fn resolve_stmt(
 
             let destination = resolve_expr_to_destination(destination_expr)?;
 
+            let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+                return Err(
+                    ResolveErrorKind::CannotAssignVariableOutsideFunction.at(ast_stmt.source)
+                );
+            };
+
             // Mark destination as initialized
             match &destination.kind {
                 resolved::DestinationKind::Variable(variable) => {
                     let function = ctx
                         .resolved_ast
                         .functions
-                        .get_mut(ctx.resolved_function_ref)
+                        .get_mut(resolved_function_ref)
                         .unwrap();
 
                     function

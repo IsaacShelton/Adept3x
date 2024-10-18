@@ -8,7 +8,6 @@ mod function;
 mod global_variable;
 mod helper_expr;
 mod module;
-mod named;
 mod stmt;
 mod structure;
 mod type_alias;
@@ -25,7 +24,6 @@ pub use global_variable::*;
 pub use helper_expr::*;
 #[allow(unused_imports)]
 pub use module::*;
-pub use named::*;
 pub use stmt::*;
 pub use structure::*;
 pub use type_alias::*;
