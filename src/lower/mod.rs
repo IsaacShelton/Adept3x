@@ -717,6 +717,18 @@ fn lower_expr(
             let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
+        ExprKind::FloatToInteger(_cast) => {
+            todo!("lower ExprKind::FloatToInteger");
+        }
+        ExprKind::IntegerToFloat(cast) => {
+            let _sign = cast
+                .target_type
+                .kind
+                .sign(Some(ir_module.target))
+                .expect("must know signness in order to cast integer to float");
+
+            todo!("lower ExprKind::FloatToInteger");
+        }
         ExprKind::Member(member) => {
             let Member {
                 subject,

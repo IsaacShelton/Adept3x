@@ -28,6 +28,19 @@ pub fn resolve_call_expr(
         arguments.push(resolve_expr(ctx, argument, None, Initialized::Require)?);
     }
 
+    // Capture primitive casts
+    // TODO: CLEANUP: Clean up this code and add more types
+    if call.function_name.namespace.is_empty() && arguments.len() == 1 {
+        let name = &call.function_name.basename;
+        let argument = arguments.first().unwrap();
+
+        if name.as_ref() == "i32" {
+            if argument.resolved_type.kind.is_floating() {
+                todo!("cast to i32 to floating-point expression");
+            }
+        }
+    }
+
     let function_ref = match ctx.function_search_ctx.find_function(
         ctx,
         &call.function_name,

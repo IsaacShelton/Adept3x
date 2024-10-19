@@ -521,6 +521,8 @@ pub enum ExprKind {
     IntegerExtend(Box<Cast>),
     IntegerTruncate(Box<Cast>),
     FloatExtend(Box<Cast>),
+    FloatToInteger(Box<Cast>),
+    IntegerToFloat(Box<Cast>),
     Member(Box<Member>),
     StructLiteral(Box<StructLiteral>),
     UnaryMathOperation(Box<UnaryMathOperation>),

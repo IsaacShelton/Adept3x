@@ -180,6 +180,19 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 ir::Instruction::TruncateFloat(_, _) => {
                     todo!("Interpreter / ir::Instruction::TruncateFloat")
                 }
+                ir::Instruction::IntegerToPointer(..) => {
+                    todo!("Interpreter / ir::Instruction::IntegerToPointer");
+                }
+                ir::Instruction::PointerToInteger(..) => {
+                    todo!("Interpreter / ir::Instruction::PointerToInteger");
+                }
+
+                ir::Instruction::FloatToInteger(..) => {
+                    todo!("Interpreter / ir::Instruction::FloatToInteger");
+                }
+                ir::Instruction::IntegerToFloat(..) => {
+                    todo!("Interpreter / ir::Instruction::IntegerToFloat");
+                }
                 ir::Instruction::Member {
                     struct_type,
                     subject_pointer,

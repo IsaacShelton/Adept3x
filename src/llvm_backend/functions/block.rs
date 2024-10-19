@@ -632,6 +632,10 @@ pub unsafe fn create_function_block(
                     message: "Cannot use interpreter syscalls in native code".into(),
                 })
             }
+            Instruction::IntegerToPointer(_, _) => todo!(),
+            Instruction::PointerToInteger(_, _) => todo!(),
+            Instruction::FloatToInteger(_, _, _) => todo!(),
+            Instruction::IntegerToFloat(_, _, _) => todo!(),
         };
 
         value_catalog.push(ir_basicblock_id, result);
