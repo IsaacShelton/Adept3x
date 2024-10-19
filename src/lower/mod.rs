@@ -717,17 +717,24 @@ fn lower_expr(
             let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
-        ExprKind::FloatToInteger(_cast) => {
-            todo!("lower ExprKind::FloatToInteger");
-        }
-        ExprKind::IntegerToFloat(cast) => {
-            let _sign = cast
-                .target_type
-                .kind
-                .sign(Some(ir_module.target))
-                .expect("must know signness in order to cast integer to float");
+        ExprKind::FloatToInteger(cast) => {
+            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
+            let sign = if ir_type
+                .is_signed()
+                .expect("must know signness in order to cast float to integer")
+            {
+                IntegerSign::Signed
+            } else {
+                IntegerSign::Unsigned
+            };
 
-            todo!("lower ExprKind::FloatToInteger");
+            Ok(builder.push(ir::Instruction::FloatToInteger(value, ir_type, sign)))
+        }
+        ExprKind::IntegerToFloat(cast, from_sign) => {
+            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
+            Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, *from_sign)))
         }
         ExprKind::Member(member) => {
             let Member {

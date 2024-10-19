@@ -632,10 +632,52 @@ pub unsafe fn create_function_block(
                     message: "Cannot use interpreter syscalls in native code".into(),
                 })
             }
-            Instruction::IntegerToPointer(_, _) => todo!(),
-            Instruction::PointerToInteger(_, _) => todo!(),
-            Instruction::FloatToInteger(_, _, _) => todo!(),
-            Instruction::IntegerToFloat(_, _, _) => todo!(),
+            Instruction::IntegerToPointer(value, ir_type) => {
+                let value = build_value(ctx, value_catalog, builder, value)?;
+                let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
+                Some(LLVMBuildIntToPtr(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::PointerToInteger(value, ir_type) => {
+                let value = build_value(ctx, value_catalog, builder, value)?;
+                let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
+                Some(LLVMBuildPtrToInt(
+                    builder.get(),
+                    value,
+                    backend_type,
+                    cstr!("").as_ptr(),
+                ))
+            }
+            Instruction::FloatToInteger(value, ir_type, sign) => {
+                let value = build_value(ctx, value_catalog, builder, value)?;
+                let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
+
+                Some(match sign {
+                    IntegerSign::Signed => {
+                        LLVMBuildFPToSI(builder.get(), value, backend_type, cstr!("").as_ptr())
+                    }
+                    IntegerSign::Unsigned => {
+                        LLVMBuildFPToUI(builder.get(), value, backend_type, cstr!("").as_ptr())
+                    }
+                })
+            }
+            Instruction::IntegerToFloat(value, ir_type, sign) => {
+                let value = build_value(ctx, value_catalog, builder, value)?;
+                let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
+
+                Some(match sign {
+                    IntegerSign::Signed => {
+                        LLVMBuildSIToFP(builder.get(), value, backend_type, cstr!("").as_ptr())
+                    }
+                    IntegerSign::Unsigned => {
+                        LLVMBuildUIToFP(builder.get(), value, backend_type, cstr!("").as_ptr())
+                    }
+                })
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);

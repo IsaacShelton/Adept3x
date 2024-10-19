@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, TypedExpr},
+    resolved::{self, Cast, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -32,11 +32,35 @@ pub fn resolve_call_expr(
     // TODO: CLEANUP: Clean up this code and add more types
     if call.function_name.namespace.is_empty() && arguments.len() == 1 {
         let name = &call.function_name.basename;
-        let argument = arguments.first().unwrap();
 
-        if name.as_ref() == "i32" {
-            if argument.resolved_type.kind.is_floating() {
-                todo!("cast to i32 to floating-point expression");
+        let target_type_kind = match name.as_ref() {
+            "u8" => Some(resolved::TypeKind::u8()),
+            "u16" => Some(resolved::TypeKind::u16()),
+            "u32" => Some(resolved::TypeKind::u32()),
+            "u64" => Some(resolved::TypeKind::u64()),
+            "i8" => Some(resolved::TypeKind::i8()),
+            "i16" => Some(resolved::TypeKind::i16()),
+            "i32" => Some(resolved::TypeKind::i32()),
+            "i64" => Some(resolved::TypeKind::i64()),
+            _ => None,
+        };
+
+        if let Some(target_type_kind) = target_type_kind {
+            if arguments[0].resolved_type.kind.is_floating() {
+                let target_type = target_type_kind.at(source);
+                let argument = arguments.into_iter().next().unwrap();
+
+                let expr = resolved::ExprKind::FloatToInteger(Box::new(Cast {
+                    target_type: target_type.clone(),
+                    value: argument.expr,
+                }))
+                .at(source);
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type,
+                    expr,
+                    is_initialized: argument.is_initialized,
+                });
             }
         }
     }
