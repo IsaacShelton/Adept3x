@@ -1,12 +1,13 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast,
+    ast::{self, CInteger},
+    ir::IntegerSign,
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Cast, TypedExpr},
+    resolved::{self, Cast, CastFrom, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -42,6 +43,47 @@ pub fn resolve_call_expr(
             "i16" => Some(resolved::TypeKind::i16()),
             "i32" => Some(resolved::TypeKind::i32()),
             "i64" => Some(resolved::TypeKind::i64()),
+            "char" => Some(resolved::TypeKind::CInteger(CInteger::Char, None)),
+            "schar" => Some(resolved::TypeKind::CInteger(
+                CInteger::Char,
+                Some(IntegerSign::Signed),
+            )),
+            "uchar" => Some(resolved::TypeKind::CInteger(
+                CInteger::Char,
+                Some(IntegerSign::Unsigned),
+            )),
+            "short" => Some(resolved::TypeKind::CInteger(
+                CInteger::Char,
+                Some(IntegerSign::Signed),
+            )),
+            "ushort" => Some(resolved::TypeKind::CInteger(
+                CInteger::Char,
+                Some(IntegerSign::Unsigned),
+            )),
+            "int" => Some(resolved::TypeKind::CInteger(
+                CInteger::Int,
+                Some(IntegerSign::Signed),
+            )),
+            "uint" => Some(resolved::TypeKind::CInteger(
+                CInteger::Int,
+                Some(IntegerSign::Unsigned),
+            )),
+            "long" => Some(resolved::TypeKind::CInteger(
+                CInteger::Long,
+                Some(IntegerSign::Signed),
+            )),
+            "ulong" => Some(resolved::TypeKind::CInteger(
+                CInteger::Long,
+                Some(IntegerSign::Unsigned),
+            )),
+            "longlong" => Some(resolved::TypeKind::CInteger(
+                CInteger::LongLong,
+                Some(IntegerSign::Signed),
+            )),
+            "ulonglong" => Some(resolved::TypeKind::CInteger(
+                CInteger::LongLong,
+                Some(IntegerSign::Unsigned),
+            )),
             _ => None,
         };
 
@@ -53,6 +95,34 @@ pub fn resolve_call_expr(
                 let expr = resolved::ExprKind::FloatToInteger(Box::new(Cast {
                     target_type: target_type.clone(),
                     value: argument.expr,
+                }))
+                .at(source);
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type,
+                    expr,
+                    is_initialized: argument.is_initialized,
+                });
+            }
+        }
+
+        let target_type_kind = match name.as_ref() {
+            "f32" => Some(resolved::TypeKind::f32()),
+            "f64" => Some(resolved::TypeKind::f64()),
+            _ => None,
+        };
+
+        if let Some(target_type_kind) = target_type_kind {
+            if arguments[0].resolved_type.kind.is_integer_like() {
+                let target_type = target_type_kind.at(source);
+                let argument = arguments.into_iter().next().unwrap();
+
+                let expr = resolved::ExprKind::IntegerToFloat(Box::new(CastFrom {
+                    cast: Cast {
+                        target_type: target_type.clone(),
+                        value: argument.expr,
+                    },
+                    from_type: argument.resolved_type,
                 }))
                 .at(source);
 

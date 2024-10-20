@@ -731,10 +731,17 @@ fn lower_expr(
 
             Ok(builder.push(ir::Instruction::FloatToInteger(value, ir_type, sign)))
         }
-        ExprKind::IntegerToFloat(cast, from_sign) => {
+        ExprKind::IntegerToFloat(cast_from) => {
+            let cast = &cast_from.cast;
+            let from_sign = cast_from
+                .from_type
+                .kind
+                .sign(Some(ir_module.target))
+                .expect("integer to float must know sign");
+
             let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
             let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
-            Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, *from_sign)))
+            Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, from_sign)))
         }
         ExprKind::Member(member) => {
             let Member {
