@@ -53,11 +53,11 @@ pub fn resolve_call_expr(
                 Some(IntegerSign::Unsigned),
             )),
             "short" => Some(resolved::TypeKind::CInteger(
-                CInteger::Char,
+                CInteger::Short,
                 Some(IntegerSign::Signed),
             )),
             "ushort" => Some(resolved::TypeKind::CInteger(
-                CInteger::Char,
+                CInteger::Short,
                 Some(IntegerSign::Unsigned),
             )),
             "int" => Some(resolved::TypeKind::CInteger(
