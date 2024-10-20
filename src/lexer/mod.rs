@@ -89,82 +89,80 @@ impl<T: Text + Send> Lexer<T> {
             ')' => Has(TokenKind::CloseParen.at(source)),
             '[' => Has(TokenKind::OpenBracket.at(source)),
             ']' => Has(TokenKind::CloseBracket.at(source)),
-            '/' if self.characters.eat('*') => {
-                // Multi-line comment
+            '/' => {
+                if self.characters.eat('*') {
+                    let mut nesting = 0;
 
-                let mut nesting = 0;
+                    loop {
+                        if self.characters.eat("/*") {
+                            nesting += 1;
+                        }
 
-                loop {
-                    if self.characters.eat("/*") {
-                        nesting += 1;
-                    }
-
-                    if self.characters.eat("*/") {
-                        if nesting == 0 {
-                            break;
-                        } else {
+                        if self.characters.eat("*/") {
+                            if nesting == 0 {
+                                break;
+                            }
                             nesting -= 1;
                         }
+
+                        if self.characters.peek().is_end() {
+                            return Has(
+                                TokenKind::Error("Unterminated line comment".into()).at(source)
+                            );
+                        }
+
+                        self.characters.next();
                     }
 
-                    if self.characters.peek().is_end() {
-                        return Has(TokenKind::Error("Unterminated line comment".into()).at(source));
-                    }
-
-                    self.characters.next();
+                    return Waiting;
                 }
 
-                Waiting
-            }
-            '/' if self.characters.eat('/') => {
-                // Comment
-
                 if self.characters.eat('/') {
-                    // Documentation Comment
+                    if self.characters.eat('/') {
+                        // Documentation Comment, skip over leading spaces
+                        while self.characters.eat(' ') {}
 
-                    // Skip over leading spaces
-                    while self.characters.eat(' ') {}
+                        let mut comment = String::new();
 
-                    let mut comment = String::new();
+                        while let Character::At(c, _) = self.characters.next() {
+                            if c == '\n' {
+                                break;
+                            }
+                            comment.push(c);
+                        }
+
+                        return Has(TokenKind::DocComment(comment).at(source));
+                    }
 
                     while let Character::At(c, _) = self.characters.next() {
-                        match c {
-                            '\n' => break,
-                            _ => comment.push(c),
+                        if c == '\n' {
+                            break;
                         }
                     }
 
-                    Has(TokenKind::DocComment(comment).at(source))
+                    return Waiting;
+                }
+
+                if self.characters.eat('=') {
+                    Has(TokenKind::DivideAssign.at(source))
                 } else {
-                    // Regular line comment
-
-                    while let Character::At(c, _) = self.characters.next() {
-                        match c {
-                            '\n' => break,
-                            _ => (),
-                        }
-                    }
-
-                    Waiting
+                    Has(TokenKind::Divide.at(source))
                 }
             }
             '0'..='9' => {
-                self.state = match self.characters.peek() {
-                    Character::At('x' | 'X', hex_source) => {
-                        // Eat x of 0x
-                        self.characters.next();
+                self.state = if self.characters.eat('x') || self.characters.eat('X') {
+                    let Character::At(c, _) = self.characters.next() else {
+                        return Has(
+                            TokenKind::Error("Expected hex number after '0x'".into()).at(source)
+                        );
+                    };
 
-                        if let Character::At(c, _) = self.characters.next() {
-                            State::HexNumber(HexNumberState {
-                                value: String::from(c),
-                                start_source: source,
-                            })
-                        } else {
-                            return Has(TokenKind::Error("Expected hex number after '0x'".into())
-                                .at(hex_source));
-                        }
-                    }
-                    _ => State::Number(NumberState::new(String::from(c), source)),
+                    State::HexNumber(HexNumberState {
+                        value: String::from(c),
+                        start_source: source,
+                    })
+                } else {
+                    State::Number(NumberState::new(String::from(c), source))
                 };
 
                 Waiting
@@ -201,13 +199,6 @@ impl<T: Text + Send> Lexer<T> {
                     Has(TokenKind::Dereference.at(source))
                 }
             }
-            '/' => {
-                if self.characters.eat('=') {
-                    Has(TokenKind::DivideAssign.at(source))
-                } else {
-                    Has(TokenKind::Divide.at(source))
-                }
-            }
             '%' => {
                 if self.characters.eat('=') {
                     Has(TokenKind::ModulusAssign.at(source))
@@ -228,15 +219,21 @@ impl<T: Text + Send> Lexer<T> {
                 self.characters.next();
                 Has(TokenKind::NotEquals.at(source))
             }
-            '>' if self.characters.eat('=') => {
-                self.characters.next();
-                Has(TokenKind::GreaterThanEq.at(source))
+            '>' => {
+                if self.characters.eat('=') {
+                    Has(TokenKind::GreaterThanEq.at(source))
+                } else if self.characters.eat(">>=") {
+                    Has(TokenKind::LogicalRightShiftAssign.at(source))
+                } else if self.characters.eat(">>") {
+                    Has(TokenKind::LogicalRightShift.at(source))
+                } else if self.characters.eat(">=") {
+                    Has(TokenKind::RightShiftAssign.at(source))
+                } else if self.characters.eat('>') {
+                    Has(TokenKind::RightShift.at(source))
+                } else {
+                    Has(TokenKind::GreaterThan.at(source))
+                }
             }
-            '>' if self.characters.eat(">>=") => Has(TokenKind::LogicalRightShiftAssign.at(source)),
-            '>' if self.characters.eat(">>") => Has(TokenKind::LogicalRightShift.at(source)),
-            '>' if self.characters.eat(">=") => Has(TokenKind::RightShiftAssign.at(source)),
-            '>' if self.characters.eat('>') => Has(TokenKind::RightShift.at(source)),
-            '>' => Has(TokenKind::GreaterThan.at(source)),
             '<' => Has(TokenKind::OpenAngle.at(source)),
             '!' => Has(TokenKind::Not.at(source)),
             '~' => Has(TokenKind::BitComplement.at(source)),
@@ -268,35 +265,21 @@ impl<T: Text + Send> Lexer<T> {
                 }
             }
             ',' => Has(TokenKind::Comma.at(source)),
-            ':' if self.characters.eat('=') => Has(TokenKind::DeclareAssign.at(source)),
-            ':' if self.characters.eat(':') => Has(TokenKind::StaticMember.at(source)),
-            ':' => Has(TokenKind::Colon.at(source)),
+            ':' => {
+                if self.characters.eat('=') {
+                    Has(TokenKind::DeclareAssign.at(source))
+                } else if self.characters.eat(':') {
+                    Has(TokenKind::StaticMember.at(source))
+                } else {
+                    Has(TokenKind::Colon.at(source))
+                }
+            }
             '#' => Has(TokenKind::Hash.at(source)),
             '\"' => {
                 self.state = State::String(StringState {
                     value: String::new(),
                     closing_char: c,
                     modifier: StringModifier::Normal,
-                    start_source: source,
-                });
-                Waiting
-            }
-            'c' if self.characters.peek().is('\"') => {
-                // C-String
-                self.state = State::String(StringState {
-                    value: String::new(),
-                    closing_char: self.characters.next().unwrap().0,
-                    modifier: StringModifier::NullTerminated,
-                    start_source: source,
-                });
-                Waiting
-            }
-            'c' if self.characters.peek().is('\'') => {
-                // C `char` literal
-                self.state = State::String(StringState {
-                    value: String::new(),
-                    closing_char: self.characters.next().unwrap().0,
-                    modifier: StringModifier::CharLiteral,
                     start_source: source,
                 });
                 Waiting
@@ -308,6 +291,36 @@ impl<T: Text + Send> Lexer<T> {
                     closing_char: '\'',
                     modifier: StringModifier::RuneLiteral,
                     start_source: source,
+                });
+                Waiting
+            }
+            'c' => {
+                if self.characters.peek().is('\"') {
+                    // C-String
+                    self.state = State::String(StringState {
+                        value: String::new(),
+                        closing_char: self.characters.next().unwrap().0,
+                        modifier: StringModifier::NullTerminated,
+                        start_source: source,
+                    });
+                    return Waiting;
+                }
+
+                if self.characters.peek().is('\'') {
+                    // C `char` literal
+                    self.state = State::String(StringState {
+                        value: String::new(),
+                        closing_char: self.characters.next().unwrap().0,
+                        modifier: StringModifier::CharLiteral,
+                        start_source: source,
+                    });
+                    return Waiting;
+                }
+
+                self.state = State::Identifier(IdentifierState {
+                    identifier: String::from(c),
+                    start_source: source,
+                    last_slash: None,
                 });
                 Waiting
             }

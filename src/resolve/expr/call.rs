@@ -13,7 +13,7 @@ use crate::{
 use itertools::Itertools;
 
 pub fn resolve_call_expr(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     call: &ast::Call,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
