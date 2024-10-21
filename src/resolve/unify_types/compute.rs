@@ -39,6 +39,11 @@ pub fn compute_unifying_type(
         return Some(TypeKind::Integer(IntegerBits::Bits32, IntegerSign::Signed).at(source));
     }
 
+    // If all the values are float literals, the unifying type is f64
+    if types_iter.clone().all(|ty| ty.kind.is_integer_literal()) {
+        return Some(TypeKind::Floating(FloatSize::Bits64).at(source));
+    }
+
     // If all values are integer and floating literals, use the default floating-point type
     // NOTE: TODO: Handle case when `f32` is the preferred type?
     if types_iter.clone().all(|resolved_type| {
@@ -53,6 +58,26 @@ pub fn compute_unifying_type(
     // If all values are integers and integer literals
     if types_iter.clone().all(|ty| ty.kind.is_integer_like()) {
         return compute_unifying_integer_type(types_iter, behavior, source);
+    }
+
+    // If all values are f32's and float literals, the result should be f32
+    if types_iter.clone().all(|ty| {
+        matches!(
+            ty.kind,
+            TypeKind::Floating(FloatSize::Bits32) | TypeKind::FloatLiteral(_)
+        )
+    }) {
+        return Some(TypeKind::Floating(FloatSize::Bits32).at(source));
+    }
+
+    // Otherwise if all values floating points / integer literals, the result should be f64
+    if types_iter.clone().all(|ty| {
+        matches!(
+            ty.kind,
+            TypeKind::Floating(_) | TypeKind::FloatLiteral(_) | TypeKind::IntegerLiteral(_)
+        )
+    }) {
+        return Some(TypeKind::Floating(FloatSize::Bits64).at(source));
     }
 
     None

@@ -250,10 +250,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         Value::StructLiteral(_) => Value::Undefined,
                     }
                 }
-                ir::Instruction::Negate(_) => todo!("Interpreter / ir::Instruction::Negate"),
-                ir::Instruction::NegateFloat(_) => {
-                    todo!("Interpreter /ir::Instruction::NegateFloat")
-                }
+                ir::Instruction::Negate(..) => todo!("Interpreter / ir::Instruction::Negate"),
                 ir::Instruction::BitComplement(_) => {
                     todo!("Interpreter / ir::Instruction::BitComplement")
                 }

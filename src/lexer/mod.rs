@@ -425,6 +425,7 @@ impl<T: Text + Send> Lexer<T> {
             'n' => state.value.push('\n'),
             'r' => state.value.push('\r'),
             't' => state.value.push('\t'),
+            '0' => state.value.push('\0'),
             '"' | '\'' => state.value.push(next_c),
             _ => return Has(TokenKind::Error("Unrecognized escape sequence".into()).at(c_source)),
         }
@@ -441,7 +442,10 @@ impl<T: Text + Send> Lexer<T> {
             state.can_neg = false;
             state.value.push(self.characters.next().unwrap().0);
             Waiting
-        } else if state.can_dot && self.characters.eat('.') {
+        } else if state.can_dot
+            && self.characters.peek_nth(1).is_digit()
+            && self.characters.eat('.')
+        {
             state.can_dot = false;
             state.value.push('.');
             Waiting

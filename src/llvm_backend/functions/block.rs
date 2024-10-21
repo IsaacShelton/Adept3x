@@ -600,13 +600,17 @@ pub unsafe fn create_function_block(
                     ),
                 })
             }
-            Instruction::Negate(inner) => {
+            Instruction::Negate(inner, floating) => {
                 let value = build_value(ctx, value_catalog, builder, inner)?;
-                Some(LLVMBuildNeg(builder.get(), value, cstr!("").as_ptr()))
-            }
-            Instruction::NegateFloat(inner) => {
-                let value = build_value(ctx, value_catalog, builder, inner)?;
-                Some(LLVMBuildFNeg(builder.get(), value, cstr!("").as_ptr()))
+
+                Some(match floating {
+                    FloatOrInteger::Integer => {
+                        LLVMBuildNeg(builder.get(), value, cstr!("").as_ptr())
+                    }
+                    FloatOrInteger::Float => {
+                        LLVMBuildFNeg(builder.get(), value, cstr!("").as_ptr())
+                    }
+                })
             }
             Instruction::BitComplement(inner) => {
                 let value = build_value(ctx, value_catalog, builder, inner)?;

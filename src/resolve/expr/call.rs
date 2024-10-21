@@ -1,6 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
-    ast::{self, CInteger},
+    ast::{self, CInteger, FloatSize},
     ir::IntegerSign,
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
@@ -11,6 +11,7 @@ use crate::{
     source_files::Source,
 };
 use itertools::Itertools;
+use num::BigInt;
 
 pub fn resolve_call_expr(
     ctx: &mut ResolveExprCtx,
@@ -91,6 +92,21 @@ pub fn resolve_call_expr(
         let argument_type_kind = &arguments[0].resolved_type.kind;
 
         if let Some(target_type_kind) = target_type_kind {
+            if target_type_kind.is_boolean() && argument_type_kind.is_integer_literal() {
+                let argument = arguments.into_iter().next().unwrap();
+                let is_initialized = argument.is_initialized;
+
+                let resolved::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
+                    unreachable!();
+                };
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type_kind.at(source),
+                    expr: resolved::ExprKind::BooleanLiteral(*value != BigInt::ZERO).at(source),
+                    is_initialized,
+                });
+            }
+
             if target_type_kind.is_boolean()
                 && (argument_type_kind.is_integer_like() || argument_type_kind.is_float_like())
             {
@@ -151,34 +167,56 @@ pub fn resolve_call_expr(
             }
         }
 
-        let target_type_kind = match name.as_ref() {
-            "f32" | "float" => Some(resolved::TypeKind::f32()),
-            "f64" | "double" => Some(resolved::TypeKind::f64()),
+        let to_float = match name.as_ref() {
+            "f32" | "float" => Some((resolved::TypeKind::f32(), FloatSize::Bits32)),
+            "f64" | "double" => Some((resolved::TypeKind::f64(), FloatSize::Bits64)),
             _ => None,
         };
 
-        if let Some(target_type_kind) = target_type_kind {
-            if argument_type_kind.is_boolean() {
-                let target_type = target_type_kind.at(source);
+        if let Some((target_type_kind, float_size)) = to_float {
+            if argument_type_kind.is_integer_literal() {
                 let argument = arguments.into_iter().next().unwrap();
                 let is_initialized = argument.is_initialized;
 
-                let expr = resolved::ExprKind::UnaryMathOperation(Box::new(
-                    resolved::UnaryMathOperation {
-                        operator: resolved::UnaryMathOperator::IsNonZero,
-                        inner: argument,
-                    },
-                ))
-                .at(source);
+                let resolved::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
+                    unreachable!();
+                };
+
+                // TOOD: CLEANUP: This conversion could probably be cleaner
+                let Ok(value) = i64::try_from(value)
+                    .map(|x| x as f64)
+                    .or_else(|_| u64::try_from(value).map(|x| x as f64))
+                    .or_else(|_| value.to_string().parse::<f64>())
+                else {
+                    return Err(ResolveErrorKind::Other {
+                        message: format!("Cannot create out-of-range floating-point number"),
+                    }
+                    .at(source));
+                };
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type,
-                    expr,
+                    resolved_type: target_type_kind.at(source),
+                    expr: resolved::ExprKind::FloatingLiteral(float_size, value).at(source),
                     is_initialized,
                 });
             }
 
-            if argument_type_kind.is_integer_like() {
+            if argument_type_kind.is_float_literal() {
+                let argument = arguments.into_iter().next().unwrap();
+                let is_initialized = argument.is_initialized;
+
+                let resolved::ExprKind::FloatingLiteral(_size, value) = &argument.expr.kind else {
+                    unreachable!();
+                };
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type_kind.at(source),
+                    expr: resolved::ExprKind::FloatingLiteral(float_size, *value).at(source),
+                    is_initialized,
+                });
+            }
+
+            if argument_type_kind.is_integer_like() || argument_type_kind.is_boolean() {
                 let target_type = target_type_kind.at(source);
                 let argument = arguments.into_iter().next().unwrap();
 

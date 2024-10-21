@@ -706,8 +706,8 @@ fn lower_expr(
         ExprKind::IntegerCast(cast_from) => {
             integer_cast(builder, ir_module, function, resolved_ast, cast_from)
         }
-        ExprKind::IntegerExtend(cast) => {
-            integer_extend(builder, ir_module, function, resolved_ast, cast)
+        ExprKind::IntegerExtend(cast_from) => {
+            integer_extend(builder, ir_module, function, resolved_ast, cast_from)
         }
         ExprKind::IntegerTruncate(cast) => {
             integer_truncate(builder, ir_module, function, resolved_ast, cast)
@@ -826,7 +826,7 @@ fn lower_expr(
             let instruction = match operator {
                 resolved::UnaryMathOperator::Not => ir::Instruction::IsZero(value, float_or_int),
                 resolved::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
-                resolved::UnaryMathOperator::Negate => ir::Instruction::Negate(value),
+                resolved::UnaryMathOperator::Negate => ir::Instruction::Negate(value, float_or_int),
                 resolved::UnaryMathOperator::IsNonZero => {
                     ir::Instruction::IsNonZero(value, float_or_int)
                 }

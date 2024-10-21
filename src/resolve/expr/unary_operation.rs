@@ -20,19 +20,37 @@ pub fn resolve_unary_math_operation_expr(
     let resolved_expr = resolve_expr(ctx, inner, preferred_type, Initialized::Require)
         .and_then(|expr| conform_expr_to_default_or_error(expr, ctx.c_integer_assumptions()))?;
 
-    if resolved_expr.resolved_type.is_ambiguous() {
+    let from_type = &resolved_expr.resolved_type;
+
+    if from_type.is_ambiguous() {
         return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
             operator: operator.to_string(),
-            bad_type: resolved_expr.resolved_type.to_string(),
+            bad_type: from_type.to_string(),
         }
         .at(source));
     }
 
     let result_type = match operator {
-        UnaryMathOperator::Not | UnaryMathOperator::IsNonZero => TypeKind::Boolean.at(source),
-        UnaryMathOperator::BitComplement | UnaryMathOperator::Negate => {
-            resolved_expr.resolved_type.clone()
+        UnaryMathOperator::Not => (from_type.kind.is_boolean() || from_type.kind.is_integer_like())
+            .then(|| TypeKind::Boolean.at(source)),
+        UnaryMathOperator::IsNonZero => (from_type.kind.is_boolean()
+            || from_type.kind.is_integer_like()
+            || from_type.kind.is_float_like())
+        .then(|| TypeKind::Boolean.at(source)),
+        UnaryMathOperator::Negate => (from_type.kind.is_integer_like()
+            || from_type.kind.is_float_like())
+        .then(|| from_type.clone()),
+        UnaryMathOperator::BitComplement => {
+            (from_type.kind.is_integer_like()).then(|| from_type.clone())
         }
+    };
+
+    let Some(result_type) = result_type else {
+        return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
+            operator: operator.to_string(),
+            bad_type: from_type.to_string(),
+        }
+        .at(source));
     };
 
     Ok(TypedExpr::new(

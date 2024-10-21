@@ -19,6 +19,7 @@ pub fn from_integer<O: Objective>(
         TypeKind::Integer(to_bits, to_sign) => match behavior {
             ConformBehavior::Adept(_) => from_integer_adept_mode::<O>(
                 &expr,
+                from_type,
                 mode,
                 from_bits,
                 from_sign,
@@ -28,6 +29,7 @@ pub fn from_integer<O: Objective>(
             ),
             ConformBehavior::C => from_integer_c_mode::<O>(
                 &expr,
+                from_type,
                 mode,
                 from_bits,
                 from_sign,
@@ -53,6 +55,7 @@ pub fn from_integer<O: Objective>(
 
 fn from_integer_c_mode<O: Objective>(
     expr: &Expr,
+    from_type: &Type,
     mode: ConformMode,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
@@ -71,15 +74,18 @@ fn from_integer_c_mode<O: Objective>(
     }
 
     if mode.allow_lossy_integer() {
-        let cast = Cast::new(target_type.clone(), expr.clone());
-
-        let kind = if from_bits < to_bits {
-            ExprKind::IntegerExtend(Box::new(cast))
-        } else {
-            ExprKind::IntegerTruncate(Box::new(cast))
-        };
-
         return O::success(|| {
+            let cast = Cast::new(target_type.clone(), expr.clone());
+
+            let kind = if from_bits < to_bits {
+                ExprKind::IntegerExtend(Box::new(CastFrom {
+                    cast,
+                    from_type: from_type.clone(),
+                }))
+            } else {
+                ExprKind::IntegerTruncate(Box::new(cast))
+            };
+
             TypedExpr::new(
                 target_type,
                 Expr {
@@ -118,12 +124,12 @@ fn conform_from_integer_to_c_integer<O: Objective>(
     };
 
     if mode.allow_lossy_integer() || is_lossless {
-        let cast_from = CastFrom {
-            cast: Cast::new(target_type.clone(), expr.clone()),
-            from_type: from_type.clone(),
-        };
-
         return O::success(|| {
+            let cast_from = CastFrom {
+                cast: Cast::new(target_type.clone(), expr.clone()),
+                from_type: from_type.clone(),
+            };
+
             TypedExpr::new(
                 target_type,
                 ExprKind::IntegerCast(Box::new(cast_from)).at(source),
@@ -136,6 +142,7 @@ fn conform_from_integer_to_c_integer<O: Objective>(
 
 fn from_integer_adept_mode<O: Objective>(
     expr: &Expr,
+    from_type: &Type,
     mode: ConformMode,
     from_bits: IntegerBits,
     from_sign: IntegerSign,
@@ -158,9 +165,15 @@ fn from_integer_adept_mode<O: Objective>(
     }
 
     O::success(|| {
+        let cast = Cast::new(target_type.clone(), expr.clone());
+
         TypedExpr::new(
-            target_type.clone(),
-            ExprKind::IntegerExtend(Box::new(Cast::new(target_type, expr.clone()))).at(expr.source),
+            target_type,
+            ExprKind::IntegerExtend(Box::new(CastFrom {
+                cast,
+                from_type: from_type.clone(),
+            }))
+            .at(expr.source),
         )
     })
 }

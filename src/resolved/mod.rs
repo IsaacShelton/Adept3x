@@ -522,7 +522,7 @@ pub enum ExprKind {
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
     IntegerCast(Box<CastFrom>),
-    IntegerExtend(Box<Cast>),
+    IntegerExtend(Box<CastFrom>),
     IntegerTruncate(Box<Cast>),
     FloatExtend(Box<Cast>),
     FloatToInteger(Box<Cast>),

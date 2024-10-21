@@ -32,14 +32,20 @@ pub fn integer_extend(
     ir_module: &ir::Module,
     function: &resolved::Function,
     resolved_ast: &resolved::Ast,
-    cast: &Cast,
+    cast_from: &CastFrom,
 ) -> Result<Value, LowerError> {
-    let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-    let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
+    let value = lower_expr(
+        builder,
+        ir_module,
+        &cast_from.cast.value,
+        function,
+        resolved_ast,
+    )?;
+    let ir_type = lower_type(&ir_module.target, &cast_from.cast.target_type, resolved_ast)?;
 
     Ok(builder.push(
-        match cast
-            .target_type
+        match cast_from
+            .from_type
             .kind
             .sign(Some(&ir_module.target))
             .expect("integer extend result type to be an integer type")
@@ -63,7 +69,7 @@ pub fn integer_cast(
         .expect("to type to be an integer");
 
     if from_size < to_size {
-        integer_extend(builder, ir_module, function, resolved_ast, &cast_from.cast)
+        integer_extend(builder, ir_module, function, resolved_ast, &cast_from)
     } else if from_size > to_size {
         integer_truncate(builder, ir_module, function, resolved_ast, &cast_from.cast)
     } else {
