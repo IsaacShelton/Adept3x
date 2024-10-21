@@ -35,6 +35,7 @@ pub fn resolve_call_expr(
         let name = &call.function_name.basename;
 
         let target_type_kind = match name.as_ref() {
+            "bool" => Some(resolved::TypeKind::Boolean),
             "u8" => Some(resolved::TypeKind::u8()),
             "u16" => Some(resolved::TypeKind::u16()),
             "u32" => Some(resolved::TypeKind::u32()),
@@ -87,8 +88,32 @@ pub fn resolve_call_expr(
             _ => None,
         };
 
+        let argument_type_kind = &arguments[0].resolved_type.kind;
+
         if let Some(target_type_kind) = target_type_kind {
-            if arguments[0].resolved_type.kind.is_floating() {
+            if target_type_kind.is_boolean()
+                && (argument_type_kind.is_integer_like() || argument_type_kind.is_float_like())
+            {
+                let target_type = target_type_kind.at(source);
+                let argument = arguments.into_iter().next().unwrap();
+                let is_initialized = argument.is_initialized;
+
+                let expr = resolved::ExprKind::UnaryMathOperation(Box::new(
+                    resolved::UnaryMathOperation {
+                        operator: resolved::UnaryMathOperator::IsNonZero,
+                        inner: argument,
+                    },
+                ))
+                .at(source);
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type,
+                    expr,
+                    is_initialized,
+                });
+            }
+
+            if argument_type_kind.is_floating() {
                 let target_type = target_type_kind.at(source);
                 let argument = arguments.into_iter().next().unwrap();
 
@@ -104,16 +129,56 @@ pub fn resolve_call_expr(
                     is_initialized: argument.is_initialized,
                 });
             }
+
+            if argument_type_kind.is_integer_like() || argument_type_kind.is_boolean() {
+                let target_type = target_type_kind.at(source);
+                let argument = arguments.into_iter().next().unwrap();
+
+                let expr = resolved::ExprKind::IntegerCast(Box::new(CastFrom {
+                    cast: Cast {
+                        target_type: target_type.clone(),
+                        value: argument.expr,
+                    },
+                    from_type: argument.resolved_type,
+                }))
+                .at(source);
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type,
+                    expr,
+                    is_initialized: argument.is_initialized,
+                });
+            }
         }
 
         let target_type_kind = match name.as_ref() {
-            "f32" => Some(resolved::TypeKind::f32()),
-            "f64" => Some(resolved::TypeKind::f64()),
+            "f32" | "float" => Some(resolved::TypeKind::f32()),
+            "f64" | "double" => Some(resolved::TypeKind::f64()),
             _ => None,
         };
 
         if let Some(target_type_kind) = target_type_kind {
-            if arguments[0].resolved_type.kind.is_integer_like() {
+            if argument_type_kind.is_boolean() {
+                let target_type = target_type_kind.at(source);
+                let argument = arguments.into_iter().next().unwrap();
+                let is_initialized = argument.is_initialized;
+
+                let expr = resolved::ExprKind::UnaryMathOperation(Box::new(
+                    resolved::UnaryMathOperation {
+                        operator: resolved::UnaryMathOperator::IsNonZero,
+                        inner: argument,
+                    },
+                ))
+                .at(source);
+
+                return Ok(TypedExpr {
+                    resolved_type: target_type,
+                    expr,
+                    is_initialized,
+                });
+            }
+
+            if argument_type_kind.is_integer_like() {
                 let target_type = target_type_kind.at(source);
                 let argument = arguments.into_iter().next().unwrap();
 

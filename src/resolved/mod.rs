@@ -316,6 +316,10 @@ impl TypeKind {
         )
     }
 
+    pub fn is_float_like(&self) -> bool {
+        matches!(self, Self::Floating(..) | Self::FloatLiteral(..))
+    }
+
     pub fn is_ambiguous(&self) -> bool {
         self.is_integer_literal()
     }
@@ -354,7 +358,7 @@ impl TypeKind {
 
     pub fn sign(&self, target: Option<&Target>) -> Option<IntegerSign> {
         match self {
-            TypeKind::Boolean => None,
+            TypeKind::Boolean => Some(IntegerSign::Unsigned),
             TypeKind::Integer(_, sign) => Some(*sign),
             TypeKind::IntegerLiteral(value) => Some(if value >= &BigInt::zero() {
                 IntegerSign::Unsigned

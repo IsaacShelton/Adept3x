@@ -816,11 +816,20 @@ fn lower_expr(
             let UnaryMathOperation { operator, inner } = &**operation;
             let value = lower_expr(builder, ir_module, &inner.expr, function, resolved_ast)?;
 
+            let float_or_int = inner
+                .resolved_type
+                .kind
+                .is_float_like()
+                .then_some(FloatOrInteger::Float)
+                .unwrap_or(FloatOrInteger::Integer);
+
             let instruction = match operator {
-                resolved::UnaryMathOperator::Not => ir::Instruction::IsZero(value),
+                resolved::UnaryMathOperator::Not => ir::Instruction::IsZero(value, float_or_int),
                 resolved::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
                 resolved::UnaryMathOperator::Negate => ir::Instruction::Negate(value),
-                resolved::UnaryMathOperator::IsNonZero => ir::Instruction::IsNonZero(value),
+                resolved::UnaryMathOperator::IsNonZero => {
+                    ir::Instruction::IsNonZero(value, float_or_int)
+                }
             };
 
             Ok(builder.push(instruction))

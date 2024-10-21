@@ -221,8 +221,10 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         fields: ty.struct_fields(self.ir_module).unwrap(),
                     })
                 }
-                ir::Instruction::IsZero(_) => todo!("Interpreter / ir::Instruction::IsZero"),
-                ir::Instruction::IsNonZero(value) => {
+                ir::Instruction::IsZero(_value, _) => {
+                    todo!("Interpreter / ir::Instruction::IsZero")
+                }
+                ir::Instruction::IsNonZero(value, _) => {
                     let value = self.eval(&registers, value);
 
                     match value {

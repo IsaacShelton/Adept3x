@@ -44,7 +44,7 @@ use llvm_sys::{
     core::*,
     prelude::{LLVMTypeRef, LLVMValueRef},
     LLVMIntPredicate::*,
-    LLVMRealPredicate::*,
+    LLVMRealPredicate::{self, *},
 };
 use std::{borrow::Cow, ptr::null_mut, sync::atomic};
 
@@ -568,13 +568,37 @@ pub unsafe fn create_function_block(
 
                 Some(literal)
             }
-            Instruction::IsZero(inner) => {
+            Instruction::IsZero(inner, floating) => {
                 let value = build_value(ctx, value_catalog, builder, inner)?;
-                Some(LLVMBuildIsNull(builder.get(), value, cstr!("").as_ptr()))
+
+                Some(match floating {
+                    FloatOrInteger::Integer => {
+                        LLVMBuildIsNull(builder.get(), value, cstr!("").as_ptr())
+                    }
+                    FloatOrInteger::Float => LLVMBuildFCmp(
+                        builder.get(),
+                        LLVMRealPredicate::LLVMRealOEQ,
+                        value,
+                        LLVMConstNull(LLVMTypeOf(value)),
+                        cstr!("").as_ptr(),
+                    ),
+                })
             }
-            Instruction::IsNonZero(inner) => {
+            Instruction::IsNonZero(inner, floating) => {
                 let value = build_value(ctx, value_catalog, builder, inner)?;
-                Some(LLVMBuildIsNotNull(builder.get(), value, cstr!("").as_ptr()))
+
+                Some(match floating {
+                    FloatOrInteger::Integer => {
+                        LLVMBuildIsNotNull(builder.get(), value, cstr!("").as_ptr())
+                    }
+                    FloatOrInteger::Float => LLVMBuildFCmp(
+                        builder.get(),
+                        LLVMRealPredicate::LLVMRealONE,
+                        value,
+                        LLVMConstNull(LLVMTypeOf(value)),
+                        cstr!("").as_ptr(),
+                    ),
+                })
             }
             Instruction::Negate(inner) => {
                 let value = build_value(ctx, value_catalog, builder, inner)?;
