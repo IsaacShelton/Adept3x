@@ -124,20 +124,22 @@ impl<T: Text + Send> Lexer<T> {
 
                         let mut comment = String::new();
 
-                        while let Character::At(c, _) = self.characters.next() {
+                        while let Character::At(c, _) = self.characters.peek() {
                             if c == '\n' {
                                 break;
                             }
                             comment.push(c);
+                            self.characters.next();
                         }
 
                         return Has(TokenKind::DocComment(comment).at(source));
                     }
 
-                    while let Character::At(c, _) = self.characters.next() {
+                    while let Character::At(c, _) = self.characters.peek() {
                         if c == '\n' {
                             break;
                         }
+                        self.characters.next();
                     }
 
                     return Waiting;

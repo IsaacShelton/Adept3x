@@ -11,7 +11,14 @@ use crate::{
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_expr_primary_post(&mut self, mut base: Expr) -> Result<Expr, ParseError> {
+        let mut ate_newline;
+
         loop {
+            ate_newline = self
+                .input
+                .peek()
+                .is_newline()
+                .then(|| self.input.peek().clone());
             self.ignore_newlines();
 
             match self.input.peek().kind {
@@ -19,6 +26,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 TokenKind::OpenBracket => base = self.parse_array_access(base)?,
                 _ => break,
             }
+        }
+
+        if let Some(newline) = ate_newline {
+            self.input.unadvance(newline);
         }
 
         Ok(base)
