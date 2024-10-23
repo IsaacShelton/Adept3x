@@ -1,6 +1,7 @@
 use super::{
     compound_identifier_state::CompoundIdentifierState, hex_number_state::HexNumberState,
-    identifier_state::IdentifierState, number_state::NumberState, string_state::StringState,
+    identifier_state::IdentifierState, number_state::NumberState, polymorph_state::PolymorphState,
+    string_state::StringState,
 };
 use derive_more::Unwrap;
 
@@ -9,6 +10,7 @@ pub enum State {
     Idle,
     Identifier(IdentifierState),
     CompoundIdentifier(CompoundIdentifierState),
+    Polymorph(PolymorphState),
     String(StringState),
     Number(NumberState),
     HexNumber(HexNumberState),
@@ -25,6 +27,13 @@ impl State {
     pub fn as_mut_compound_identifier(&mut self) -> &mut CompoundIdentifierState {
         match self {
             State::CompoundIdentifier(compound_identifier) => compound_identifier,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_mut_polymorph(&mut self) -> &mut PolymorphState {
+        match self {
+            State::Polymorph(polymorph) => polymorph,
             _ => panic!(),
         }
     }

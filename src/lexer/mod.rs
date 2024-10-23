@@ -2,6 +2,7 @@ mod compound_identifier_state;
 mod hex_number_state;
 mod identifier_state;
 mod number_state;
+mod polymorph_state;
 mod state;
 mod string_state;
 
@@ -17,6 +18,7 @@ use crate::{
     token::{StringLiteral, StringModifier, Token, TokenKind},
 };
 use compound_identifier_state::CompoundIdentifierState;
+use polymorph_state::PolymorphState;
 
 pub struct Lexer<T: Text + Send> {
     characters: T,
@@ -36,6 +38,7 @@ impl<T: Text + Send> Lexer<T> {
             State::Idle => self.feed_idle(),
             State::Identifier(_) => self.feed_identifier(),
             State::CompoundIdentifier(_) => self.feed_compound_identifier(),
+            State::Polymorph(_) => self.feed_polymorph(),
             State::String(_) => self.feed_string(),
             State::Number(_) => self.feed_number(),
             State::HexNumber(_) => self.feed_hex_number(),
@@ -326,6 +329,13 @@ impl<T: Text + Send> Lexer<T> {
                 });
                 Waiting
             }
+            '$' => {
+                self.state = State::Polymorph(PolymorphState {
+                    identifier: String::new(),
+                    start_source: source,
+                });
+                Waiting
+            }
             _ if c.is_alphabetic() || c == '_' => {
                 self.state = State::Identifier(IdentifierState {
                     identifier: String::from(c),
@@ -382,6 +392,24 @@ impl<T: Text + Send> Lexer<T> {
             FeedResult::Has(token)
         } else {
             FeedResult::Waiting
+        }
+    }
+
+    fn feed_polymorph(&mut self) -> FeedResult<Token> {
+        use FeedResult::*;
+
+        let state = self.state.as_mut_polymorph();
+
+        match self.characters.peek() {
+            Character::At(c, _) if c.is_alphabetic() || c.is_ascii_digit() || c == '_' => {
+                state.identifier.push(self.characters.next().unwrap().0);
+                Waiting
+            }
+            _ => {
+                let token = state.finalize();
+                self.state = State::Idle;
+                Has(token)
+            }
         }
     }
 

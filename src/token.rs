@@ -54,6 +54,7 @@ pub enum TokenKind {
     Error(String),
     Newline,
     Identifier(String),
+    Polymorph(String),
     NamespacedIdentifier(Name),
     OpenCurly,
     CloseCurly,
@@ -139,6 +140,7 @@ impl Display for TokenKind {
             TokenKind::Error(message) => write!(f, "'lex error - {}'", message),
             TokenKind::Newline => f.write_str("'newline'"),
             TokenKind::Identifier(name) => write!(f, "(identifier) '{}'", name),
+            TokenKind::Polymorph(name) => write!(f, "'${}'", name),
             TokenKind::NamespacedIdentifier(name) => write!(
                 f,
                 "(namespaced identifier) '{}{}'",
@@ -272,6 +274,7 @@ impl TokenKind {
             | TokenKind::Error(_)
             | TokenKind::Newline
             | TokenKind::Identifier(_)
+            | TokenKind::Polymorph(_)
             | TokenKind::NamespacedIdentifier(_)
             | TokenKind::CloseCurly
             | TokenKind::OpenParen
