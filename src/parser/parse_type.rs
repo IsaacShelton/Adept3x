@@ -20,14 +20,18 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let token = self.input.peek().clone();
 
         let Ok(name) = self.parse_name(None::<&str>) else {
-            return Err(ParseError {
-                kind: ParseErrorKind::ExpectedType {
-                    prefix: prefix.map(|prefix| prefix.to_string()),
-                    for_reason: for_reason.map(|for_reason| for_reason.to_string()),
-                    got: token.to_string(),
-                },
-                source,
-            });
+            if !token.kind.is_polymorph() {
+                return Err(ParseError {
+                    kind: ParseErrorKind::ExpectedType {
+                        prefix: prefix.map(|prefix| prefix.to_string()),
+                        for_reason: for_reason.map(|for_reason| for_reason.to_string()),
+                        got: token.to_string(),
+                    },
+                    source,
+                });
+            }
+
+            return Ok(TypeKind::Polymorph(token.kind.unwrap_polymorph()).at(source));
         };
 
         let generics = self.parse_generics()?;

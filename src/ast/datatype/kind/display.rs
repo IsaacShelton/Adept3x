@@ -48,6 +48,9 @@ impl Display for &TypeKind {
             TypeKind::FunctionPointer(_function) => {
                 write!(f, "(function pointer type)")?;
             }
+            TypeKind::Polymorph(polymorph) => {
+                write!(f, "${}", polymorph)?;
+            }
         }
 
         Ok(())
