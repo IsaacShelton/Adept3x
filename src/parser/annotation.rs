@@ -19,7 +19,6 @@ pub enum AnnotationKind {
     ThreadLocal,
     Packed,
     AbideAbi,
-    Namespace(String),
     Public,
 }
 
@@ -36,7 +35,6 @@ impl Display for AnnotationKind {
             Self::ThreadLocal => "thread_local",
             Self::Packed => "packed",
             Self::AbideAbi => "abide_abi",
-            Self::Namespace(_) => "namespace",
             Self::Public => "public",
         })
     }

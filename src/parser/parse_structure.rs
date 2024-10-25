@@ -23,13 +23,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.ignore_newlines();
 
         let mut is_packed = false;
-        let mut namespace = None;
         let mut privacy = Privacy::Private;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Packed => is_packed = true,
-                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for struct"))),
             }
@@ -66,7 +64,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.parse_token(TokenKind::CloseParen, Some("to end struct fields"))?;
 
         Ok(Structure {
-            name: Name::new(namespace, name),
+            name: Name::plain(name),
             fields,
             is_packed,
             source,

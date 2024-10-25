@@ -26,10 +26,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 "thread_local" => AnnotationKind::ThreadLocal,
                 "packed" => AnnotationKind::Packed,
                 "abide_abi" => AnnotationKind::AbideAbi,
-                "namespace" => {
-                    let namespace = self.parse_identifier(Some("for namespace name"))?;
-                    AnnotationKind::Namespace(namespace)
-                }
                 "public" => AnnotationKind::Public,
                 _ => {
                     return Err(ParseErrorKind::UnrecognizedAnnotation {

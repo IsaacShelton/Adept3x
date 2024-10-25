@@ -17,14 +17,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let mut is_foreign = false;
         let mut abide_abi = false;
-        let mut namespace = None;
         let mut privacy = Privacy::Private;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
-                AnnotationKind::Namespace(new_namespace) => namespace = Some(new_namespace),
                 AnnotationKind::Public => privacy = Privacy::Public,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
@@ -60,7 +58,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .unwrap_or_default();
 
         Ok(Function {
-            name: Name::new(namespace, name),
+            name: Name::plain(name),
             parameters,
             return_type,
             stmts,
