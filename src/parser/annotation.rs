@@ -20,6 +20,7 @@ pub enum AnnotationKind {
     Packed,
     AbideAbi,
     Public,
+    Template,
 }
 
 impl AnnotationKind {
@@ -36,6 +37,7 @@ impl Display for AnnotationKind {
             Self::Packed => "packed",
             Self::AbideAbi => "abide_abi",
             Self::Public => "public",
+            Self::Template => "template",
         })
     }
 }

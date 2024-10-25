@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Function, Parameters, Privacy, TypeKind},
+    ast::{Function, Genericness, Parameters, Privacy, TypeKind},
     inflow::Inflow,
     name::Name,
     token::{Token, TokenKind},
@@ -18,12 +18,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let mut is_foreign = false;
         let mut abide_abi = false;
         let mut privacy = Privacy::Private;
+        let mut genericness = Genericness::Concrete;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Template => genericness = Genericness::Template,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
         }
@@ -67,6 +69,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             abide_abi,
             tag: None,
             privacy,
+            genericness,
         })
     }
 }

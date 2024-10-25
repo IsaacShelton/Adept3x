@@ -27,6 +27,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 "packed" => AnnotationKind::Packed,
                 "abide_abi" => AnnotationKind::AbideAbi,
                 "public" => AnnotationKind::Public,
+                "template" => AnnotationKind::Template,
                 _ => {
                     return Err(ParseErrorKind::UnrecognizedAnnotation {
                         name: annotation_name,

@@ -2,6 +2,7 @@ mod parameters;
 
 use super::{Privacy, Stmt, Type};
 use crate::{name::Name, source_files::Source, tag::Tag};
+use derive_more::IsVariant;
 pub use parameters::{Parameter, Parameters};
 
 #[derive(Clone, Debug)]
@@ -15,4 +16,12 @@ pub struct Function {
     pub abide_abi: bool,
     pub tag: Option<Tag>,
     pub privacy: Privacy,
+    pub genericness: Genericness,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, IsVariant)]
+pub enum Genericness {
+    Concrete,
+    Contract,
+    Template,
 }
