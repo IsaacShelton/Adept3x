@@ -27,7 +27,6 @@ use crate::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, Language, Settings, UnaryOperator,
     },
     resolve::{
-        ensure_initialized,
         error::ResolveErrorKind,
         expr::{
             call::resolve_call_expr, conditional::resolve_conditional_expr,
@@ -424,4 +423,23 @@ pub fn resolve_expr(
     }
 
     Ok(resolved_expr)
+}
+
+fn ensure_initialized(
+    subject: &ast::Expr,
+    resolved_subject: &TypedExpr,
+) -> Result<(), ResolveError> {
+    if resolved_subject.is_initialized {
+        Ok(())
+    } else {
+        Err(match &subject.kind {
+            ast::ExprKind::Variable(variable_name) => {
+                ResolveErrorKind::CannotUseUninitializedVariable {
+                    variable_name: variable_name.to_string(),
+                }
+            }
+            _ => ResolveErrorKind::CannotUseUninitializedValue,
+        }
+        .at(subject.source))
+    }
 }

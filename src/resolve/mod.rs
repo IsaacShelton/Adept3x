@@ -1,84 +1,45 @@
 mod conform;
 mod core_structure_info;
+mod ctx;
 mod destination;
 mod error;
 mod expr;
 mod function_search_ctx;
+mod initialized;
+mod job;
 mod stmt;
+mod type_ctx;
 mod unify_types;
 mod variable_search_ctx;
 
 use self::{
-    error::{ResolveError, ResolveErrorKind},
-    expr::ResolveExprCtx,
-    stmt::resolve_stmts,
+    error::ResolveError, expr::ResolveExprCtx, stmt::resolve_stmts,
     variable_search_ctx::VariableSearchCtx,
 };
 use crate::{
-    ast::{self, AstWorkspace, Type},
+    ast::{self, AstWorkspace},
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
     resolved::{
-        self, EnumRef, GlobalVarDecl, HelperExprDecl, HumanName, StructureRef, TypeAliasRef,
-        TypeDecl, TypeKind, TypedExpr, VariableStorage,
+        self, GlobalVarDecl, HelperExprDecl, HumanName, TypeDecl, TypeKind, VariableStorage,
     },
-    source_files::Source,
     tag::Tag,
-    workspace::fs::FsNodeId,
 };
-use ast::{IntegerBits, IntegerSign};
+use ctx::ResolveCtx;
 use expr::resolve_expr;
 use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
-use std::{
-    borrow::{Borrow, Cow},
-    collections::{HashMap, HashSet, VecDeque},
-};
+use initialized::Initialized;
+use job::{FuncJob, TypeJob};
+use std::{borrow::Cow, collections::HashMap};
+use type_ctx::ResolveTypeCtx;
 
-enum Job {
-    Regular(FsNodeId, usize, resolved::FunctionRef),
-}
-
-struct ResolveCtx {
-    pub jobs: VecDeque<Job>,
-    pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
-    // pub helper_exprs: IndexMap<ResolvedName, &'a ast::HelperExpr>,
-    pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
-    pub types_in_modules: HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
-    pub globals_in_modules: HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
-    pub helper_exprs_in_modules: HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
-}
-
-impl ResolveCtx {
-    fn new() -> Self {
-        Self {
-            jobs: Default::default(),
-            function_search_ctxs: Default::default(),
-            public_functions: HashMap::new(),
-            types_in_modules: HashMap::new(),
-            globals_in_modules: HashMap::new(),
-            helper_exprs_in_modules: HashMap::new(),
-        }
-    }
-}
-
-pub fn resolve<'a>(
-    ast_workspace: &'a AstWorkspace,
-    options: &BuildOptions,
-) -> Result<resolved::Ast<'a>, ResolveError> {
-    let mut ctx = ResolveCtx::new();
-    let source_files = ast_workspace.source_files;
-    let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
-
-    #[derive(Clone, Debug)]
-    struct TypeJob {
-        physical_file_id: FsNodeId,
-        type_aliases: Vec<TypeAliasRef>,
-        structures: Vec<StructureRef>,
-        enums: Vec<EnumRef>,
-    }
-
+pub fn prepare_type_jobs(
+    ctx: &mut ResolveCtx,
+    resolved_ast: &mut resolved::Ast,
+    ast_workspace: &AstWorkspace,
+) -> Result<Vec<TypeJob>, ResolveError> {
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
@@ -190,7 +151,15 @@ pub fn resolve<'a>(
         type_jobs.push(job);
     }
 
-    // Create edges between types
+    Ok(type_jobs)
+}
+
+pub fn process_type_jobs(
+    ctx: &mut ResolveCtx,
+    resolved_ast: &mut resolved::Ast,
+    ast_workspace: &AstWorkspace,
+    type_jobs: &[TypeJob],
+) -> Result<(), ResolveError> {
     for job in type_jobs.iter() {
         let file = ast_workspace
             .files
@@ -262,6 +231,26 @@ pub fn resolve<'a>(
             *binding = resolved_type;
         }
     }
+
+    Ok(())
+}
+
+pub fn resolve<'a>(
+    ast_workspace: &'a AstWorkspace,
+    options: &BuildOptions,
+) -> Result<resolved::Ast<'a>, ResolveError> {
+    let mut ctx = ResolveCtx::new();
+    let source_files = ast_workspace.source_files;
+    let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
+
+    prepare_type_jobs(&mut ctx, &mut resolved_ast, ast_workspace).and_then(|type_jobs| {
+        process_type_jobs(
+            &mut ctx,
+            &mut resolved_ast,
+            ast_workspace,
+            type_jobs.as_slice(),
+        )
+    })?;
 
     // Resolve global variables
     for (physical_file_id, file) in ast_workspace.files.iter() {
@@ -335,8 +324,11 @@ pub fn resolve<'a>(
                 }),
             });
 
-            ctx.jobs
-                .push_back(Job::Regular(*physical_file_id, function_i, function_ref));
+            ctx.jobs.push_back(FuncJob::Regular(
+                *physical_file_id,
+                function_i,
+                function_ref,
+            ));
 
             if function.privacy.is_public() {
                 let public_of_module = ctx
@@ -434,7 +426,7 @@ pub fn resolve<'a>(
     // Resolve function bodies
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
-            Job::Regular(real_file_id, function_index, resolved_function_ref) => {
+            FuncJob::Regular(real_file_id, function_index, resolved_function_ref) => {
                 let module_file_id = ast_workspace
                     .get_owning_module(real_file_id)
                     .unwrap_or(real_file_id);
@@ -521,219 +513,6 @@ pub fn resolve<'a>(
     Ok(resolved_ast)
 }
 
-#[derive(Copy, Clone, Debug)]
-enum Initialized {
-    Require,
-    AllowUninitialized,
-}
-
-#[derive(Debug)]
-pub struct ResolveTypeCtx<'a> {
-    resolved_ast: &'a resolved::Ast<'a>,
-    module_fs_node_id: FsNodeId,
-    file_fs_node_id: FsNodeId,
-    types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
-    used_aliases_stack: HashSet<ResolvedName>,
-}
-
-impl<'a, 'b, 'c> From<&'c ResolveExprCtx<'a, 'b>> for ResolveTypeCtx<'c> {
-    fn from(ctx: &'c ResolveExprCtx<'a, 'b>) -> Self {
-        Self::new(
-            ctx.resolved_ast,
-            ctx.module_fs_node_id,
-            ctx.physical_fs_node_id,
-            ctx.types_in_modules,
-        )
-    }
-}
-
-impl<'a> ResolveTypeCtx<'a> {
-    pub fn new(
-        resolved_ast: &'a resolved::Ast,
-        module_fs_node_id: FsNodeId,
-        file_fs_node_id: FsNodeId,
-        types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
-    ) -> Self {
-        Self {
-            resolved_ast,
-            module_fs_node_id,
-            file_fs_node_id,
-            types_in_modules,
-            used_aliases_stack: Default::default(),
-        }
-    }
-
-    pub fn resolve_or_undeclared(
-        &self,
-        ast_type: &'a ast::Type,
-    ) -> Result<resolved::Type, ResolveError> {
-        match self.resolve(ast_type) {
-            Ok(inner) => Ok(inner),
-            Err(_) if ast_type.kind.allow_indirect_undefined() => {
-                Ok(resolved::TypeKind::Void.at(ast_type.source))
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    pub fn resolve(&self, ast_type: &'a ast::Type) -> Result<resolved::Type, ResolveError> {
-        match &ast_type.kind {
-            ast::TypeKind::Boolean => Ok(resolved::TypeKind::Boolean),
-            ast::TypeKind::Integer(bits, sign) => Ok(resolved::TypeKind::Integer(*bits, *sign)),
-            ast::TypeKind::CInteger(integer, sign) => {
-                Ok(resolved::TypeKind::CInteger(*integer, *sign))
-            }
-            ast::TypeKind::Pointer(inner) => {
-                let inner = self.resolve_or_undeclared(inner)?;
-                Ok(resolved::TypeKind::Pointer(Box::new(inner)))
-            }
-            ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
-            ast::TypeKind::Named(name) => match self.find_type(name) {
-                Ok(found) => Ok(found.into_owned()),
-                Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
-            },
-            ast::TypeKind::Floating(size) => Ok(resolved::TypeKind::Floating(*size)),
-            ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
-            ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
-            ast::TypeKind::AnonymousEnum(anonymous_enum) => {
-                let resolved_type = Box::new(resolve_enum_backing_type(
-                    self,
-                    anonymous_enum.backing_type.as_deref(),
-                    ast_type.source,
-                )?);
-
-                let members = anonymous_enum.members.clone();
-
-                Ok(resolved::TypeKind::AnonymousEnum(resolved::AnonymousEnum {
-                    resolved_type,
-                    source: ast_type.source,
-                    members,
-                }))
-            }
-            ast::TypeKind::FixedArray(fixed_array) => {
-                if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
-                    if let Ok(size) = integer.value().try_into() {
-                        let inner = self.resolve(&fixed_array.ast_type)?;
-
-                        Ok(resolved::TypeKind::FixedArray(Box::new(
-                            resolved::FixedArray { size, inner },
-                        )))
-                    } else {
-                        Err(ResolveErrorKind::ArraySizeTooLarge.at(fixed_array.count.source))
-                    }
-                } else {
-                    todo!("resolve fixed array type with variable size")
-                }
-            }
-            ast::TypeKind::FunctionPointer(function_pointer) => {
-                let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
-
-                for parameter in function_pointer.parameters.iter() {
-                    let resolved_type = self.resolve(&parameter.ast_type)?;
-
-                    parameters.push(resolved::Parameter {
-                        name: parameter.name.clone(),
-                        resolved_type,
-                    });
-                }
-
-                let return_type = Box::new(self.resolve(&function_pointer.return_type)?);
-
-                Ok(resolved::TypeKind::FunctionPointer(
-                    resolved::FunctionPointer {
-                        parameters,
-                        return_type,
-                        is_cstyle_variadic: function_pointer.is_cstyle_variadic,
-                    },
-                ))
-            }
-            ast::TypeKind::Polymorph(polymorph) => Err(ResolveErrorKind::Other {
-                message: format!("Unresolved polymorphic type '${}'", polymorph),
-            }
-            .at(ast_type.source)),
-        }
-        .map(|kind| kind.at(ast_type.source))
-    }
-
-    pub fn find_type(&self, name: &Name) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
-        let settings = &self.resolved_ast.workspace.settings[self
-            .resolved_ast
-            .workspace
-            .files
-            .get(&self.file_fs_node_id)
-            .unwrap()
-            .settings
-            .expect("valid settings id")
-            .0];
-
-        if let Some(name) = name.as_plain_str() {
-            if let Some(types_in_module) = self.types_in_modules.get(&self.module_fs_node_id) {
-                if let Some(decl) = types_in_module.get(name) {
-                    return Ok(Cow::Borrowed(&decl.kind));
-                }
-            }
-        }
-
-        if !name.namespace.is_empty() {
-            let Name {
-                namespace,
-                basename,
-                ..
-            } = name;
-
-            let mut matches = settings
-                .namespace_to_dependency
-                .get(namespace.as_ref())
-                .into_iter()
-                .flatten()
-                .flat_map(|dep| settings.dependency_to_module.get(dep))
-                .flat_map(|fs_node_id| self.types_in_modules.get(fs_node_id))
-                .flat_map(|decls| decls.get(basename.as_ref()))
-                .filter(|decl| decl.privacy.is_public());
-
-            if let Some(found) = matches.next() {
-                if matches.next().is_some() {
-                    return Err(FindTypeError::Ambiguous);
-                } else {
-                    return Ok(Cow::Borrowed(&found.kind));
-                }
-            }
-        }
-
-        Err(FindTypeError::NotDefined)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum FindTypeError {
-    NotDefined,
-    Ambiguous,
-    RecursiveAlias(ResolvedName),
-    ResolveError(ResolveError),
-}
-
-impl FindTypeError {
-    pub fn into_resolve_error(self: FindTypeError, name: &Name, source: Source) -> ResolveError {
-        let name = name.to_string();
-
-        match self {
-            FindTypeError::NotDefined => ResolveErrorKind::UndeclaredType {
-                name: name.to_string(),
-            }
-            .at(source),
-            FindTypeError::Ambiguous => ResolveErrorKind::AmbiguousType {
-                name: name.to_string(),
-            }
-            .at(source),
-            FindTypeError::RecursiveAlias(_) => ResolveErrorKind::RecursiveTypeAlias {
-                name: name.to_string(),
-            }
-            .at(source),
-            FindTypeError::ResolveError(err) => err,
-        }
-    }
-}
-
 fn resolve_parameters(
     type_ctx: &ResolveTypeCtx,
     parameters: &ast::Parameters,
@@ -741,9 +520,11 @@ fn resolve_parameters(
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {
+        let resolved_type = type_ctx.resolve(&parameter.ast_type)?;
+
         required.push(resolved::Parameter {
             name: parameter.name.clone(),
-            resolved_type: type_ctx.resolve(&parameter.ast_type)?,
+            resolved_type,
         });
     }
 
@@ -751,35 +532,4 @@ fn resolve_parameters(
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
-}
-
-fn ensure_initialized(
-    subject: &ast::Expr,
-    resolved_subject: &TypedExpr,
-) -> Result<(), ResolveError> {
-    if resolved_subject.is_initialized {
-        Ok(())
-    } else {
-        Err(match &subject.kind {
-            ast::ExprKind::Variable(variable_name) => {
-                ResolveErrorKind::CannotUseUninitializedVariable {
-                    variable_name: variable_name.to_string(),
-                }
-            }
-            _ => ResolveErrorKind::CannotUseUninitializedValue,
-        }
-        .at(subject.source))
-    }
-}
-
-fn resolve_enum_backing_type(
-    ctx: &ResolveTypeCtx,
-    backing_type: Option<impl Borrow<Type>>,
-    source: Source,
-) -> Result<resolved::Type, ResolveError> {
-    if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {
-        ctx.resolve(backing_type)
-    } else {
-        Ok(resolved::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source))
-    }
 }
