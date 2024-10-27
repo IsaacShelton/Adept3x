@@ -1,8 +1,8 @@
 use crate::{
     ast::{
         AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Function,
-        Genericness, InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind,
-        StructLiteral, Structure, TypeKind,
+        InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind, StructLiteral,
+        Structure, TypeKind,
     },
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
@@ -41,7 +41,6 @@ fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallK
         source,
         tag: None,
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     }
 }
 
@@ -78,7 +77,6 @@ fn thin_cstring_function(
         source,
         tag: None,
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     }
 }
 
@@ -106,7 +104,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         abide_abi: false,
         tag: Some(Tag::InterpreterEntryPoint),
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     });
 
     file.enums.push(Enum {
@@ -244,7 +241,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         source,
         tag: None,
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     });
 
     file.functions.push(Function {
@@ -288,7 +284,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         source,
         tag: None,
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     });
 
     file.functions.push(Function {
@@ -316,7 +311,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         source,
         tag: None,
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     });
 }
 

@@ -24,7 +24,8 @@ use super::{
 };
 use crate::{
     ast::{
-        self, CInteger, CIntegerAssumptions, ConformBehavior, Language, Settings, UnaryOperator,
+        self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
+        UnaryOperator,
     },
     resolve::{
         error::ResolveErrorKind,
@@ -41,7 +42,6 @@ use crate::{
 };
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
-use resolved::IntegerKnown;
 use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {

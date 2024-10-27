@@ -9,10 +9,10 @@ mod structure;
 
 use self::error::{LowerError, LowerErrorKind};
 use crate::{
-    ast::CInteger,
+    ast::{CInteger, FloatSize},
     cli::BuildOptions,
     ir::{self, IntegerSign},
-    resolved::{self, FloatSize},
+    resolved,
     target::{Target, TargetOsExt},
 };
 use function::lower_function;

@@ -322,6 +322,7 @@ pub fn resolve<'a>(
                         None
                     }
                 }),
+                is_generic: false,
             });
 
             ctx.jobs.push_back(FuncJob::Regular(

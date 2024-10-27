@@ -1,6 +1,6 @@
 use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
-    ast::{self, AstFile, Function, Genericness, Parameter, Parameters, Privacy},
+    ast::{self, AstFile, Function, Parameter, Parameters, Privacy},
     c::parser::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError,
@@ -82,7 +82,6 @@ pub fn declare_function(
         abide_abi: true,
         tag: None,
         privacy: Privacy::Public,
-        genericness: Genericness::Concrete,
     });
 
     Ok(())
