@@ -3,6 +3,7 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 
+#[derive(Clone, Debug)]
 pub enum FuncJob {
     Regular(FsNodeId, usize, resolved::FunctionRef),
 }

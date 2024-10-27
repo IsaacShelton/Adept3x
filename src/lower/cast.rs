@@ -1,4 +1,4 @@
-use super::{builder::Builder, error::LowerError, lower_expr, lower_type};
+use super::{builder::Builder, error::LowerError, expr::lower_expr, lower_type};
 use crate::{
     data_units::ByteUnits,
     ir::{self, Value},
