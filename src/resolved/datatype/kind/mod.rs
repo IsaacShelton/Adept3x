@@ -35,6 +35,7 @@ pub enum TypeKind {
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructureRef),
     TypeAlias(HumanName, TypeAliasRef),
+    Polymorph(String),
 }
 
 impl TypeKind {
@@ -52,11 +53,7 @@ impl TypeKind {
                 IntegerSign::Signed
             }),
             TypeKind::CInteger(integer, sign) => {
-                if let Some(sign) = sign {
-                    Some(*sign)
-                } else {
-                    target.map(|target| target.default_c_integer_sign(*integer))
-                }
+                sign.or_else(|| target.map(|target| target.default_c_integer_sign(*integer)))
             }
             TypeKind::TypeAlias(_, _type_ref) => todo!(),
             TypeKind::Unresolved => panic!(),
@@ -70,7 +67,8 @@ impl TypeKind {
             | TypeKind::FixedArray(..)
             | TypeKind::FunctionPointer(..)
             | TypeKind::Enum(_, _)
-            | TypeKind::AnonymousEnum(_) => None,
+            | TypeKind::AnonymousEnum(_)
+            | TypeKind::Polymorph(_) => None,
         }
     }
 }
@@ -117,6 +115,7 @@ impl Display for TypeKind {
             }
             TypeKind::FunctionPointer(..) => f.write_str("function-pointer-type")?,
             TypeKind::Enum(name, _) => write!(f, "{}", name)?,
+            TypeKind::Polymorph(name) => write!(f, "${}", name)?,
         }
 
         Ok(())

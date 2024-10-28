@@ -12,16 +12,10 @@ impl Block {
     }
 
     pub fn get_result_type(&self, source: Source) -> Type {
-        if let Some(stmt) = self.stmts.last() {
-            match &stmt.kind {
-                StmtKind::Return(..) => None,
-                StmtKind::Expr(expr) => Some(expr.resolved_type.clone()),
-                StmtKind::Declaration(..) => None,
-                StmtKind::Assignment(..) => None,
-            }
-        } else {
-            None
+        match self.stmts.last().map(|stmt| &stmt.kind) {
+            Some(StmtKind::Expr(expr)) => expr.resolved_type.clone(),
+            Some(StmtKind::Return(..) | StmtKind::Declaration(..) | StmtKind::Assignment(..))
+            | None => TypeKind::Void.at(source),
         }
-        .unwrap_or(TypeKind::Void.at(source))
     }
 }

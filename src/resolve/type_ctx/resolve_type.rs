@@ -93,10 +93,9 @@ impl<'a> ResolveTypeCtx<'a> {
                     },
                 ))
             }
-            ast::TypeKind::Polymorph(polymorph) => Err(ResolveErrorKind::Other {
-                message: format!("Unresolved polymorphic type '${}'", polymorph),
+            ast::TypeKind::Polymorph(polymorph) => {
+                Ok(resolved::TypeKind::Polymorph(polymorph.clone()))
             }
-            .at(ast_type.source)),
         }
         .map(|kind| kind.at(ast_type.source))
     }
