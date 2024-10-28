@@ -10,6 +10,7 @@ mod helper_expr;
 mod module;
 mod stmt;
 mod structure;
+mod traits;
 mod type_alias;
 mod workspace;
 
@@ -26,5 +27,6 @@ pub use helper_expr::*;
 pub use module::*;
 pub use stmt::*;
 pub use structure::*;
+pub use traits::*;
 pub use type_alias::*;
 pub use workspace::*;

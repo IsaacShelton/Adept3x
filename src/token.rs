@@ -82,6 +82,7 @@ pub enum TokenKind {
     ZeroedKeyword,
     PragmaKeyword,
     PubKeyword,
+    TraitKeyword,
     Member,
     Add,
     Subtract,
@@ -172,6 +173,7 @@ impl Display for TokenKind {
             TokenKind::ZeroedKeyword => f.write_str("'zeroed' keyword"),
             TokenKind::PragmaKeyword => f.write_str("'pragma' keyword"),
             TokenKind::PubKeyword => f.write_str("'pub' keyword"),
+            TokenKind::TraitKeyword => f.write_str("'trait' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -300,6 +302,7 @@ impl TokenKind {
             | TokenKind::ZeroedKeyword
             | TokenKind::PragmaKeyword
             | TokenKind::PubKeyword
+            | TokenKind::TraitKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

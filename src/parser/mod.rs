@@ -13,6 +13,7 @@ mod parse_helper_expr;
 mod parse_stmt;
 mod parse_structure;
 mod parse_top_level;
+mod parse_trait;
 mod parse_type;
 mod parse_type_alias;
 mod parse_util;
