@@ -93,7 +93,11 @@ impl<'a> ResolveTypeCtx<'a> {
                     },
                 ))
             }
-            ast::TypeKind::Polymorph(polymorph) => {
+            ast::TypeKind::Polymorph(polymorph, constaints) => {
+                if !constaints.is_empty() {
+                    todo!("resolve polymorph constaints");
+                }
+
                 Ok(resolved::TypeKind::Polymorph(polymorph.clone()))
             }
         }

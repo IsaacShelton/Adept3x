@@ -21,7 +21,7 @@ pub enum TypeKind {
     AnonymousUnion(AnoymousUnion),
     AnonymousEnum(AnonymousEnum),
     FunctionPointer(FunctionPointer),
-    Polymorph(String),
+    Polymorph(String, Vec<Type>),
 }
 
 impl TypeKind {
