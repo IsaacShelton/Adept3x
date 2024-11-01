@@ -45,14 +45,19 @@ pub fn compute_unifying_type(
     }
 
     // If all values are integer and floating literals, use the default floating-point type
-    // NOTE: TODO: Handle case when `f32` is the preferred type?
     if types_iter.clone().all(|resolved_type| {
         matches!(
             resolved_type.kind,
             TypeKind::IntegerLiteral(..) | TypeKind::FloatLiteral(..)
         )
     }) {
-        return Some(TypeKind::Floating(FloatSize::Bits64).at(source));
+        if let Some(TypeKind::Floating(FloatSize::Bits32)) =
+            preferred_type.as_ref().map(|ty| &ty.kind)
+        {
+            return Some(TypeKind::Floating(FloatSize::Bits32).at(source));
+        } else {
+            return Some(TypeKind::Floating(FloatSize::Bits64).at(source));
+        }
     }
 
     // If all values are integers and integer literals
