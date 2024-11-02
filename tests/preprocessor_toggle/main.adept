@@ -1,4 +1,6 @@
 
+pragma => adept("3.0")
+
 func main {
     printf(c"Hello world, from protected printf!\n")
 }

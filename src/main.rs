@@ -120,7 +120,7 @@ fn build_project(build_command: BuildCommand) {
     };
 
     if metadata.is_dir() {
-        compile_workspace(&mut compiler, filepath);
+        compile_workspace(&mut compiler, filepath, None);
     } else {
         if filepath.extension().unwrap_or_default() == "h" {
             let source_files = compiler.source_files;
@@ -151,7 +151,7 @@ fn build_project(build_command: BuildCommand) {
         }
 
         let project_folder = filepath.parent().unwrap();
-        compile_single_file_only(&mut compiler, project_folder, &filename, filepath);
+        compile_single_file_only(&mut compiler, project_folder, filepath);
     }
 }
 

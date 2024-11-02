@@ -4,7 +4,7 @@
     ---------------------------------------------------------------------------
 */
 
-mod compile;
+pub mod compile;
 mod explore;
 pub mod fs;
 mod module_file;
@@ -22,6 +22,7 @@ use crate::{
     diagnostics::{ErrorDiagnostic, WarningDiagnostic},
     exit_unless,
     inflow::{Inflow, IntoInflow},
+    interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
     lexer::Lexer,
     line_column::Location,
     llvm_backend::llvm_backend,
@@ -47,7 +48,7 @@ use std::{
     collections::HashMap,
     ffi::OsString,
     fs::create_dir_all,
-    path::Path,
+    path::{Path, PathBuf},
     process::exit,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -74,7 +75,11 @@ impl<'a, I: Inflow<Token>> CodeFile<'a, I> {
     }
 }
 
-pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
+pub fn compile_workspace(
+    compiler: &mut Compiler,
+    project_folder: &Path,
+    single_file: Option<PathBuf>,
+) {
     let compiler = compiler;
 
     let start_time = Instant::now();
@@ -84,11 +89,28 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
     let num_module_files_failed = AtomicU64::new(0);
 
     let fs = Fs::new();
+    let mut guaranteed_entry = None;
 
     let Some(ExploreResult {
         module_files,
         normal_files,
-    }) = explore(&fs, project_folder)
+    }) = (if let Some(single_file) = single_file {
+        let fs_node_id = fs.insert(&single_file, None).expect("inserted");
+
+        let file = ModuleFile {
+            path: single_file,
+            fs_node_id,
+        };
+
+        guaranteed_entry = Some(fs_node_id);
+
+        Some(ExploreResult {
+            normal_files: vec![],
+            module_files: vec![file],
+        })
+    } else {
+        explore(&fs, project_folder)
+    })
     else {
         eprintln!(
             "error: Could not locate workspace folder '{}'",
@@ -274,7 +296,20 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
     };
 
     let module_folders = HashMap::<FsNodeId, Settings>::from_iter(module_folders.into_iter());
-    let files = IndexMap::from_iter(ast_files.into_iter());
+    let mut files = IndexMap::from_iter(ast_files.into_iter());
+
+    if compiler.options.interpret {
+        if let Some(guaranteed_entry) = guaranteed_entry {
+            let ast_file = files.get_mut(&guaranteed_entry).unwrap();
+            setup_build_system_interpreter_symbols(ast_file);
+        } else {
+            eprintln!(
+            "error: experimental manual interpreter does not properly handle multiple files yet"
+        );
+            exit(1);
+        }
+    }
+
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
 
     let resolved_ast = exit_unless(
@@ -300,6 +335,16 @@ pub fn compile_workspace(compiler: &mut Compiler, project_folder: &Path) {
                 })
                 .unwrap_or_else(|| OsString::from("main"))
         });
+
+    if compiler.options.interpret {
+        match run_build_system_interpreter(&resolved_ast, &ir_module) {
+            Ok(_) => return,
+            Err(err) => {
+                eprintln!("{}", err);
+                exit(1);
+            }
+        }
+    }
 
     let bin_folder = project_folder.join("bin");
     let obj_folder = project_folder.join("obj");

@@ -1,4 +1,6 @@
 
+pragma => adept("3.0")
+
 typealias Type1 = Type2
 typealias Type2 = Type3
 typealias Type3 = Type1

@@ -1,4 +1,6 @@
 
+pragma => adept("3.0")
+
 #[foreign]
 {
     // NOTE: This is only macOS (also type is incorrect but it's a pointer so doesn't matter)

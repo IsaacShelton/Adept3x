@@ -1,4 +1,6 @@
 
+pragma => adept("3.0")
+
 func main int {
     return 123
 }

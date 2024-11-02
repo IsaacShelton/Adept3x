@@ -65,7 +65,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
         let function = self.ir_module.functions.get(&function_ref).unwrap();
 
         if function.is_cstyle_variadic {
-            todo!("c-style variadic functions are not supported in interpreter yet");
+            todo!("c-style variadic functions are not supported in interpreter yet - (for function {:?})", function.mangled_name);
         }
 
         assert_eq!(function.parameters.len(), args.len());

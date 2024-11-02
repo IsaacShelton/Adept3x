@@ -1,0 +1,24 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    /*
+        This
+        is
+        a multi-line
+        comment
+    */
+
+    printf(c"Multi-Line ")
+
+    /*
+        They are also be /* nested
+        */
+    */
+
+    printf(c"Comments!\n")
+}
+

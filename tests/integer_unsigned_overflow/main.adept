@@ -1,4 +1,6 @@
 
+pragma => adept("3.0")
+
 func main {
     x u64 = 18446744073709551615
     x = x + 1

@@ -1,4 +1,6 @@
 
+pragma => adept("3.0")
+
 enum Color (Red, Green, Blue)
 
 #[foreign]
