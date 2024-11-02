@@ -75,6 +75,31 @@ impl<'a, I: Inflow<Token>> CodeFile<'a, I> {
     }
 }
 
+fn explore_constrained(
+    fs: &Fs,
+    project_folder: &Path,
+    single_file: Option<PathBuf>,
+) -> (Option<ExploreResult>, Option<FsNodeId>) {
+    if let Some(single_file) = single_file {
+        let fs_node_id = fs.insert(&single_file, None).expect("inserted");
+
+        let file = ModuleFile {
+            path: single_file,
+            fs_node_id,
+        };
+
+        return (
+            Some(ExploreResult {
+                normal_files: vec![],
+                module_files: vec![file],
+            }),
+            Some(fs_node_id),
+        );
+    }
+
+    (explore(&fs, project_folder), None)
+}
+
 pub fn compile_workspace(
     compiler: &mut Compiler,
     project_folder: &Path,
@@ -89,28 +114,12 @@ pub fn compile_workspace(
     let num_module_files_failed = AtomicU64::new(0);
 
     let fs = Fs::new();
-    let mut guaranteed_entry = None;
+    let (exploration, guaranteed_entry) = explore_constrained(&fs, project_folder, single_file);
 
     let Some(ExploreResult {
         module_files,
         normal_files,
-    }) = (if let Some(single_file) = single_file {
-        let fs_node_id = fs.insert(&single_file, None).expect("inserted");
-
-        let file = ModuleFile {
-            path: single_file,
-            fs_node_id,
-        };
-
-        guaranteed_entry = Some(fs_node_id);
-
-        Some(ExploreResult {
-            normal_files: vec![],
-            module_files: vec![file],
-        })
-    } else {
-        explore(&fs, project_folder)
-    })
+    }) = exploration
     else {
         eprintln!(
             "error: Could not locate workspace folder '{}'",
@@ -304,8 +313,8 @@ pub fn compile_workspace(
             setup_build_system_interpreter_symbols(ast_file);
         } else {
             eprintln!(
-            "error: experimental manual interpreter does not properly handle multiple files yet"
-        );
+                "error: experimental manual interpreter does not properly handle multiple files yet"
+            );
             exit(1);
         }
     }

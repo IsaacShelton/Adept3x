@@ -54,11 +54,19 @@
 #ifndef _HEADER_H_INCLUDED
 #define _HEADER_H_INCLUDED
 
+
 #define printf not_printf
-#define format +
-#define char *^&@#^%*@&%#^)@*#%&_@*#%&
 #define int 78045345
-#define const ,
+
+/*
+    NOTE: These work, but due to `#define` importing requiring parsing of all C expressions to determine validity,
+    these will trigger a TODO that some C expressions are not implemented yet.
+
+    So in the mean time, we will disable them.
+*/
+// #define format +
+// #define char *^&@#^%*@&%#^)@*#%&_@*#%&
+// #define const ,
 
 #pragma ADEPT PREPROCESSOR DISABLE
 
