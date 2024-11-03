@@ -1,8 +1,4 @@
-use super::error::{ResolveError, ResolveErrorKind};
-use crate::{
-    resolved::{self, VariableStorageKey},
-    source_files::Source,
-};
+use crate::resolved::{self, VariableStorageKey};
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone, Debug)]
@@ -18,33 +14,18 @@ impl ScopedVariable {
 }
 
 #[derive(Clone, Debug)]
-pub struct VariableSearchCtx {
+pub struct VariableHaystack {
     variables: VecDeque<HashMap<String, ScopedVariable>>,
 }
 
-impl VariableSearchCtx {
+impl VariableHaystack {
     pub fn new() -> Self {
         let mut variables = VecDeque::with_capacity(16);
         variables.push_front(HashMap::new());
-
         Self { variables }
     }
 
-    pub fn find_variable_or_error(
-        &self,
-        name: &str,
-        source: Source,
-    ) -> Result<&ScopedVariable, ResolveError> {
-        match self.find_variable(name) {
-            Some(variable) => Ok(variable),
-            None => Err(ResolveErrorKind::UndeclaredVariable {
-                name: name.to_string(),
-            }
-            .at(source)),
-        }
-    }
-
-    pub fn find_variable(&self, name: &str) -> Option<&ScopedVariable> {
+    pub fn find(&self, name: &str) -> Option<&ScopedVariable> {
         for variables in self.variables.iter() {
             if let Some(scoped_variable) = variables.get(name) {
                 return Some(scoped_variable);

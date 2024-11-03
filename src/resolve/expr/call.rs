@@ -238,33 +238,32 @@ pub fn resolve_call_expr(
         }
     }
 
-    let function_ref = match ctx.function_search_ctx.find_function(
-        ctx,
-        &call.function_name,
-        &arguments[..],
-        source,
-    ) {
-        Ok(function_ref) => function_ref,
-        Err(reason) => {
-            let args = arguments
-                .iter()
-                .map(|arg| arg.resolved_type.to_string())
-                .collect_vec();
+    let function_ref =
+        match ctx
+            .function_haystack
+            .find(ctx, &call.function_name, &arguments[..], source)
+        {
+            Ok(function_ref) => function_ref,
+            Err(reason) => {
+                let args = arguments
+                    .iter()
+                    .map(|arg| arg.resolved_type.to_string())
+                    .collect_vec();
 
-            let signature = format!("{}({})", call.function_name, args.join(", "));
+                let signature = format!("{}({})", call.function_name, args.join(", "));
 
-            let almost_matches = ctx
-                .function_search_ctx
-                .find_function_almost_matches(ctx, &call.function_name);
+                let almost_matches = ctx
+                    .function_haystack
+                    .find_near_matches(ctx, &call.function_name);
 
-            return Err(ResolveErrorKind::FailedToFindFunction {
-                signature,
-                reason,
-                almost_matches,
+                return Err(ResolveErrorKind::FailedToFindFunction {
+                    signature,
+                    reason,
+                    almost_matches,
+                }
+                .at(source));
             }
-            .at(source));
-        }
-    };
+        };
 
     let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
     let return_type = function.return_type.clone();

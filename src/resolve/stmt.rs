@@ -152,7 +152,7 @@ pub fn resolve_stmt(
                 .variables
                 .add_variable(resolved_type.clone(), value.is_some());
 
-            ctx.variable_search_ctx
+            ctx.variable_haystack
                 .put(&declaration.name, resolved_type.clone(), key);
 
             Ok(resolved::Stmt::new(

@@ -43,7 +43,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         .at(source)
     })?;
 
-    ctx.variable_search_ctx.begin_scope();
+    ctx.variable_haystack.begin_scope();
 
     let right = resolve_expr(
         ctx,
@@ -70,7 +70,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         .at(source)
     })?;
 
-    ctx.variable_search_ctx.end_scope();
+    ctx.variable_haystack.end_scope();
 
     Ok(TypedExpr::new(
         local_bool_type,

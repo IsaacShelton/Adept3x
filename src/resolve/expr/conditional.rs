@@ -27,7 +27,7 @@ pub fn resolve_conditional_expr(
     let mut branches_without_else = Vec::with_capacity(conditions.len());
 
     for (expr, block) in conditions.iter() {
-        ctx.variable_search_ctx.begin_scope();
+        ctx.variable_haystack.begin_scope();
         let condition = resolve_expr(ctx, expr, preferred_type, Initialized::Require)?;
 
         let stmts = resolve_stmts(ctx, &block.stmts)?;
@@ -46,15 +46,15 @@ pub fn resolve_conditional_expr(
             block: resolved::Block::new(stmts),
         });
 
-        ctx.variable_search_ctx.end_scope();
+        ctx.variable_haystack.end_scope();
     }
 
     let mut otherwise = otherwise
         .as_ref()
         .map(|otherwise| {
-            ctx.variable_search_ctx.begin_scope();
+            ctx.variable_haystack.begin_scope();
             let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(resolved::Block::new);
-            ctx.variable_search_ctx.end_scope();
+            ctx.variable_haystack.end_scope();
             maybe_block
         })
         .transpose()?;

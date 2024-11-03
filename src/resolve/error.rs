@@ -1,4 +1,4 @@
-use super::function_search_ctx::FindFunctionError;
+use super::function_haystack::FindFunctionError;
 use crate::{
     resolved::UnaliasError,
     show::Show,

@@ -18,8 +18,8 @@ use super::{
     conform::{conform_expr_or_error, ConformMode},
     destination::resolve_expr_to_destination,
     error::ResolveError,
-    function_search_ctx::FunctionSearchCtx,
-    variable_search_ctx::VariableSearchCtx,
+    function_haystack::FunctionHaystack,
+    variable_haystack::VariableHaystack,
     Initialized, ResolveTypeCtx,
 };
 use crate::{
@@ -46,8 +46,8 @@ use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub resolved_ast: &'b mut resolved::Ast<'a>,
-    pub function_search_ctx: &'b FunctionSearchCtx,
-    pub variable_search_ctx: VariableSearchCtx,
+    pub function_haystack: &'b FunctionHaystack,
+    pub variable_haystack: VariableHaystack,
     pub resolved_function_ref: Option<resolved::FunctionRef>,
     pub settings: &'b Settings,
     pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
@@ -320,7 +320,7 @@ pub fn resolve_expr(
             resolve_conditional_expr(ctx, conditional, preferred_type, source)
         }
         ast::ExprKind::While(while_loop) => {
-            ctx.variable_search_ctx.begin_scope();
+            ctx.variable_haystack.begin_scope();
 
             let expr = resolve_expr(
                 ctx,
@@ -340,7 +340,7 @@ pub fn resolve_expr(
             .expr;
 
             let block = resolved::Block::new(resolve_stmts(ctx, &while_loop.block.stmts)?);
-            ctx.variable_search_ctx.end_scope();
+            ctx.variable_haystack.end_scope();
 
             Ok(TypedExpr::new(
                 resolved::TypeKind::Void.at(source),

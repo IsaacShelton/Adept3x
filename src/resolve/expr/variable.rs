@@ -21,7 +21,7 @@ pub fn resolve_variable_expr(
 ) -> Result<TypedExpr, ResolveError> {
     if let Some(variable) = name
         .as_plain_str()
-        .and_then(|name| ctx.variable_search_ctx.find_variable(name))
+        .and_then(|name| ctx.variable_haystack.find(name))
     {
         if let Some(function) = ctx.resolved_function_ref.map(|function_ref| {
             ctx.resolved_ast

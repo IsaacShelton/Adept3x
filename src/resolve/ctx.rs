@@ -1,11 +1,11 @@
-use super::{function_search_ctx::FunctionSearchCtx, job::FuncJob};
+use super::{function_haystack::FunctionHaystack, job::FuncJob};
 use crate::{resolved, workspace::fs::FsNodeId};
 use indexmap::IndexMap;
 use std::collections::{HashMap, VecDeque};
 
 pub struct ResolveCtx {
     pub jobs: VecDeque<FuncJob>,
-    pub function_search_ctxs: IndexMap<FsNodeId, FunctionSearchCtx>,
+    pub function_haystacks: IndexMap<FsNodeId, FunctionHaystack>,
     pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub globals_in_modules: HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
@@ -16,7 +16,7 @@ impl ResolveCtx {
     pub fn new() -> Self {
         Self {
             jobs: Default::default(),
-            function_search_ctxs: Default::default(),
+            function_haystacks: Default::default(),
             public_functions: HashMap::new(),
             types_in_modules: HashMap::new(),
             globals_in_modules: HashMap::new(),

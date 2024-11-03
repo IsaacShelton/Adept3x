@@ -36,7 +36,7 @@ pub fn resolve_declare_assign_expr(
         .variables
         .add_variable(value.resolved_type.clone(), true);
 
-    ctx.variable_search_ctx
+    ctx.variable_haystack
         .put(&declare_assign.name, value.resolved_type.clone(), key);
 
     Ok(TypedExpr::new(

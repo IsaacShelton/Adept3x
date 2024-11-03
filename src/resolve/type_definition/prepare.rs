@@ -10,7 +10,6 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
-use std::collections::HashMap;
 
 pub fn prepare_type_jobs(
     ctx: &mut ResolveCtx,
@@ -84,7 +83,7 @@ fn prepare_structure(
 
     ctx.types_in_modules
         .entry(module_fs_node_id)
-        .or_insert_with(HashMap::new)
+        .or_default()
         .insert(
             structure.name.to_string(),
             TypeDecl {
@@ -116,7 +115,7 @@ fn prepare_enum(
 
     ctx.types_in_modules
         .entry(module_fs_node_id)
-        .or_insert_with(HashMap::new)
+        .or_default()
         .insert(
             definition.name.to_string(),
             TypeDecl {
@@ -149,7 +148,7 @@ fn prepare_type_alias(
 
     ctx.types_in_modules
         .entry(module_fs_node_id)
-        .or_insert_with(HashMap::new)
+        .or_default()
         .insert(
             definition.name.to_string(),
             TypeDecl {
