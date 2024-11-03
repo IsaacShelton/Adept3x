@@ -22,11 +22,11 @@ pub fn resolve_helper_expressions(
 
         let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
-        // NOTE: This module should already have a function search context
+        // NOTE: This module should already have a function haystack
         let function_haystack = ctx
             .function_haystacks
             .get(&module_file_id)
-            .expect("function search context to exist for file");
+            .expect("function haystack to exist for file");
 
         for helper_expr in file.helper_exprs.iter() {
             let value = {
