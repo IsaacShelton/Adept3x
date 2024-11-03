@@ -35,6 +35,24 @@ impl Type {
         let source = self.source;
         Type::new(TypeKind::Pointer(Box::new(self)), source)
     }
+
+    pub fn contains_polymorph(&self) -> Option<Source> {
+        match &self.kind {
+            TypeKind::Boolean
+            | TypeKind::Integer(_, _)
+            | TypeKind::CInteger(_, _)
+            | TypeKind::Floating(_) => None,
+            TypeKind::Pointer(inner) => inner.contains_polymorph(),
+            TypeKind::FixedArray(fixed_array) => fixed_array.ast_type.contains_polymorph(),
+            TypeKind::Void => None,
+            TypeKind::Named(_) => None,
+            TypeKind::AnonymousStruct(_) => todo!("contains_polymoph for AnonymousStruct"),
+            TypeKind::AnonymousUnion(_) => todo!("contains_polymorph for AnonymousUnion"),
+            TypeKind::AnonymousEnum(_) => todo!("contains_polymorph for AnonymousEnum"),
+            TypeKind::FunctionPointer(_) => todo!("contains_polymorph for FunctionPointer"),
+            TypeKind::Polymorph(_, _) => Some(self.source),
+        }
+    }
 }
 
 impl Display for Type {

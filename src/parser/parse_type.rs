@@ -85,7 +85,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     self.parse_type(None::<&str>, Some("for compile time argument"))?,
                 )
             } else {
-                CompileTimeArgument::Expr(self.parse_expr()?)
+                CompileTimeArgument::Expr(self.parse_expr_primary()?)
             });
         }
 

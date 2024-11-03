@@ -27,6 +27,7 @@ use crate::{
     tag::Tag,
 };
 use ctx::ResolveCtx;
+use error::ResolveErrorKind;
 use expr::resolve_expr;
 use function_search_ctx::FunctionSearchCtx;
 use indexmap::IndexMap;
@@ -144,6 +145,13 @@ pub fn prepare_type_jobs(
                     privacy,
                 },
             );
+
+            if let Some(source) = definition.value.contains_polymorph() {
+                return Err(ResolveErrorKind::Other {
+                    message: "Type aliases cannot contain polymorphs".into(),
+                }
+                .at(source));
+            }
 
             job.type_aliases.push(type_alias_ref);
         }
