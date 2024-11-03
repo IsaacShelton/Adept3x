@@ -1,11 +1,11 @@
 use super::Type;
-use crate::{name::Name, source_files::Source};
+use crate::source_files::Source;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct Structure {
-    pub name: Name,
+    pub name: String,
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
     pub source: Source,

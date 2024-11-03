@@ -130,7 +130,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     });
 
     file.structures.push(Structure {
-        name: Name::plain("Project"),
+        name: "Project".into(),
         fields: IndexMap::from_iter([(
             "kind".into(),
             Field {
@@ -145,7 +145,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     });
 
     file.structures.push(Structure {
-        name: Name::plain("Dependency"),
+        name: "Dependency".into(),
         fields: IndexMap::from_iter([(
             "name".into(),
             Field {

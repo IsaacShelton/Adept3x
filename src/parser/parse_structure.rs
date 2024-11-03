@@ -6,7 +6,6 @@ use super::{
 use crate::{
     ast::{Field, Privacy, Structure},
     inflow::Inflow,
-    name::Name,
     token::{Token, TokenKind},
 };
 use indexmap::IndexMap;
@@ -64,7 +63,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.parse_token(TokenKind::CloseParen, Some("to end struct fields"))?;
 
         Ok(Structure {
-            name: Name::plain(name),
+            name,
             fields,
             is_packed,
             source,

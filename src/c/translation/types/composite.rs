@@ -90,7 +90,7 @@ pub fn make_composite(
             let is_packed = false;
 
             if let Some(name) = &composite.name {
-                let name = Name::plain(format!("struct<{}>", name));
+                let name = format!("struct<{}>", name);
 
                 ast_file.structures.push(Structure {
                     name: name.clone(),
@@ -100,7 +100,7 @@ pub fn make_composite(
                     privacy: Privacy::Private,
                 });
 
-                Ok(TypeKind::Named(name))
+                Ok(TypeKind::Named(Name::plain(name)))
             } else {
                 let anonymous_struct = AnonymousStruct { fields, is_packed };
 

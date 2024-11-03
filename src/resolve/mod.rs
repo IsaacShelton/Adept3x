@@ -9,6 +9,7 @@ mod initialized;
 mod job;
 mod stmt;
 mod type_ctx;
+mod type_definition;
 mod unify_types;
 mod variable_search_ctx;
 
@@ -21,227 +22,17 @@ use crate::{
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
-    resolved::{
-        self, GlobalVarDecl, HelperExprDecl, HumanName, TypeDecl, TypeKind, VariableStorage,
-    },
+    resolved::{self, GlobalVarDecl, HelperExprDecl, VariableStorage},
     tag::Tag,
 };
 use ctx::ResolveCtx;
-use error::ResolveErrorKind;
 use expr::resolve_expr;
 use function_search_ctx::FunctionSearchCtx;
-use indexmap::IndexMap;
 use initialized::Initialized;
-use job::{FuncJob, TypeJob};
-use std::{borrow::Cow, collections::HashMap};
+use job::FuncJob;
+use std::collections::HashMap;
 use type_ctx::ResolveTypeCtx;
-
-pub fn prepare_type_jobs(
-    ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
-    ast_workspace: &AstWorkspace,
-) -> Result<Vec<TypeJob>, ResolveError> {
-    let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
-
-    for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_fs_node_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
-
-        let mut job = TypeJob {
-            physical_file_id: *physical_file_id,
-            type_aliases: Vec::with_capacity(file.type_aliases.len()),
-            structures: Vec::with_capacity(file.structures.len()),
-            enums: Vec::with_capacity(file.enums.len()),
-        };
-
-        for structure in file.structures.iter() {
-            let privacy = structure.privacy;
-            let source = structure.source;
-            let resolved_name = ResolvedName::new(module_fs_node_id, &structure.name);
-
-            let structure_ref = resolved_ast.structures.insert(resolved::Structure {
-                name: resolved_name.clone(),
-                fields: IndexMap::new(),
-                is_packed: structure.is_packed,
-                source: structure.source,
-            });
-
-            let struct_type_kind =
-                TypeKind::Structure(HumanName(structure.name.to_string()), structure_ref);
-
-            let Some(name) = structure.name.as_plain_str() else {
-                eprintln!(
-                    "warning: internal namespaced structures ignored by new type resolution system"
-                );
-                continue;
-            };
-
-            let types_in_module = ctx
-                .types_in_modules
-                .entry(module_fs_node_id)
-                .or_insert_with(HashMap::new);
-
-            types_in_module.insert(
-                name.to_string(),
-                TypeDecl {
-                    kind: struct_type_kind,
-                    source,
-                    privacy,
-                },
-            );
-
-            job.structures.push(structure_ref);
-        }
-
-        for definition in file.enums.iter() {
-            let enum_ref = resolved_ast.enums.insert(resolved::Enum {
-                name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
-                resolved_type: TypeKind::Unresolved.at(definition.source),
-                source: definition.source,
-                members: definition.members.clone(),
-            });
-
-            let kind = TypeKind::Enum(HumanName(definition.name.to_string()), enum_ref);
-            let source = definition.source;
-            let privacy = definition.privacy;
-
-            let types_in_module = ctx
-                .types_in_modules
-                .entry(module_fs_node_id)
-                .or_insert_with(HashMap::new);
-
-            types_in_module.insert(
-                definition.name.to_string(),
-                TypeDecl {
-                    kind,
-                    source,
-                    privacy,
-                },
-            );
-
-            job.enums.push(enum_ref);
-        }
-
-        for definition in file.type_aliases.iter() {
-            let type_alias_ref = resolved_ast
-                .type_aliases
-                .insert(resolved::TypeKind::Unresolved.at(definition.value.source));
-
-            let source = definition.source;
-            let privacy = definition.privacy;
-            let kind = TypeKind::TypeAlias(HumanName(definition.name.to_string()), type_alias_ref);
-
-            let types_in_module = ctx
-                .types_in_modules
-                .entry(module_fs_node_id)
-                .or_insert_with(HashMap::new);
-
-            types_in_module.insert(
-                definition.name.to_string(),
-                TypeDecl {
-                    kind,
-                    source,
-                    privacy,
-                },
-            );
-
-            if let Some(source) = definition.value.contains_polymorph() {
-                return Err(ResolveErrorKind::Other {
-                    message: "Type aliases cannot contain polymorphs".into(),
-                }
-                .at(source));
-            }
-
-            job.type_aliases.push(type_alias_ref);
-        }
-
-        type_jobs.push(job);
-    }
-
-    Ok(type_jobs)
-}
-
-pub fn process_type_jobs(
-    ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
-    ast_workspace: &AstWorkspace,
-    type_jobs: &[TypeJob],
-) -> Result<(), ResolveError> {
-    for job in type_jobs.iter() {
-        let file = ast_workspace
-            .files
-            .get(&job.physical_file_id)
-            .expect("valid ast file");
-
-        let module_file_id = ast_workspace
-            .get_owning_module(job.physical_file_id)
-            .unwrap_or(job.physical_file_id);
-
-        for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
-            for (field_name, field) in structure.fields.iter() {
-                let type_ctx = ResolveTypeCtx::new(
-                    &resolved_ast,
-                    module_file_id,
-                    job.physical_file_id,
-                    &ctx.types_in_modules,
-                );
-
-                let resolved_type = type_ctx.resolve_or_undeclared(&field.ast_type)?;
-
-                let resolved_struct = resolved_ast
-                    .structures
-                    .get_mut(*structure_ref)
-                    .expect("valid struct");
-
-                resolved_struct.fields.insert(
-                    field_name.clone(),
-                    resolved::Field {
-                        resolved_type,
-                        privacy: field.privacy,
-                        source: field.source,
-                    },
-                );
-            }
-        }
-
-        for (enum_ref, definition) in job.enums.iter().zip(file.enums.iter()) {
-            let type_ctx = ResolveTypeCtx::new(
-                &resolved_ast,
-                module_file_id,
-                job.physical_file_id,
-                &ctx.types_in_modules,
-            );
-
-            let ast_type = definition
-                .backing_type
-                .as_ref()
-                .map(Cow::Borrowed)
-                .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
-
-            let resolved_type = type_ctx.resolve_or_undeclared(&ast_type)?;
-
-            let definition = resolved_ast.enums.get_mut(*enum_ref).unwrap();
-            definition.resolved_type = resolved_type;
-        }
-
-        for (type_alias_ref, definition) in job.type_aliases.iter().zip(file.type_aliases.iter()) {
-            let type_ctx = ResolveTypeCtx::new(
-                &resolved_ast,
-                module_file_id,
-                job.physical_file_id,
-                &ctx.types_in_modules,
-            );
-
-            let resolved_type = type_ctx.resolve_or_undeclared(&definition.value)?;
-
-            let binding = resolved_ast.type_aliases.get_mut(*type_alias_ref).unwrap();
-            *binding = resolved_type;
-        }
-    }
-
-    Ok(())
-}
+use type_definition::resolve_type_definitions;
 
 pub fn resolve<'a>(
     ast_workspace: &'a AstWorkspace,
@@ -251,14 +42,7 @@ pub fn resolve<'a>(
     let source_files = ast_workspace.source_files;
     let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
 
-    prepare_type_jobs(&mut ctx, &mut resolved_ast, ast_workspace).and_then(|type_jobs| {
-        process_type_jobs(
-            &mut ctx,
-            &mut resolved_ast,
-            ast_workspace,
-            type_jobs.as_slice(),
-        )
-    })?;
+    resolve_type_definitions(&mut ctx, &mut resolved_ast, ast_workspace)?;
 
     // Resolve global variables
     for (physical_file_id, file) in ast_workspace.files.iter() {
