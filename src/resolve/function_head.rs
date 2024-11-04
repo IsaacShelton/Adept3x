@@ -30,6 +30,18 @@ pub fn create_function_heads(
                 *physical_file_id,
                 &ctx.types_in_modules,
             );
+
+            let is_generic = function.return_type.contains_polymorph().is_some()
+                || function
+                    .parameters
+                    .required
+                    .iter()
+                    .any(|param| param.ast_type.contains_polymorph().is_some());
+
+            if is_generic {
+                todo!("resolving generic functions is not implemented yet");
+            }
+
             let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
             let return_type = type_ctx.resolve(&function.return_type)?;
 
@@ -49,14 +61,8 @@ pub fn create_function_heads(
                         None
                     }
                 }),
-                is_generic: false,
+                is_generic,
             });
-
-            ctx.jobs.push_back(FuncJob::Regular(
-                *physical_file_id,
-                function_i,
-                function_ref,
-            ));
 
             if function.privacy.is_public() {
                 let public_of_module = ctx.public_functions.entry(module_file_id).or_default();
@@ -96,6 +102,12 @@ pub fn create_function_heads(
                 .entry(name)
                 .and_modify(|funcs| funcs.push(function_ref))
                 .or_insert_with(|| vec![function_ref]);
+
+            ctx.jobs.push_back(FuncJob::Regular(
+                *physical_file_id,
+                function_i,
+                function_ref,
+            ));
         }
     }
 

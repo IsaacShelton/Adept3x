@@ -21,7 +21,6 @@ pub fn resolve_function_bodies(
                     .get_owning_module(physical_file_id)
                     .unwrap_or(physical_file_id);
 
-                // NOTE: This module should already have a function haystack
                 let function_haystack = ctx
                     .function_haystacks
                     .get(&module_file_id)
