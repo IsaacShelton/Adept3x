@@ -3,7 +3,7 @@ use crate::{
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
-    resolved,
+    resolved::{self, Constraint},
     source_files::Source,
 };
 use std::borrow::Borrow;
@@ -93,12 +93,20 @@ impl<'a> ResolveTypeCtx<'a> {
                     },
                 ))
             }
-            ast::TypeKind::Polymorph(polymorph, constaints) => {
-                if !constaints.is_empty() {
-                    todo!("resolve polymorph constaints");
+            ast::TypeKind::Polymorph(polymorph, constraints) => {
+                let mut resolved_constraints = vec![];
+
+                if !constraints.is_empty() {
+                    eprintln!(
+                        "warning: resolving polymorph constaints not completely implemented yet"
+                    );
+                    resolved_constraints.push(Constraint::Add);
                 }
 
-                Ok(resolved::TypeKind::Polymorph(polymorph.clone()))
+                Ok(resolved::TypeKind::Polymorph(
+                    polymorph.clone(),
+                    resolved_constraints,
+                ))
             }
         }
         .map(|kind| kind.at(ast_type.source))

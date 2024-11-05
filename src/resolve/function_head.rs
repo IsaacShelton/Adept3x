@@ -38,10 +38,6 @@ pub fn create_function_heads(
                     .iter()
                     .any(|param| param.ast_type.contains_polymorph().is_some());
 
-            if is_generic {
-                todo!("resolving generic functions is not implemented yet");
-            }
-
             let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
             let return_type = type_ctx.resolve(&function.return_type)?;
 

@@ -56,7 +56,7 @@ fn lower_type(
 
     match &resolved_type.kind {
         resolved::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
-        resolved::TypeKind::Polymorph(_) => todo!("lower polymorph"),
+        resolved::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorpn"),
         resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
         resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,

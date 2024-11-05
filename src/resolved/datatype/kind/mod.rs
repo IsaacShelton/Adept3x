@@ -1,4 +1,5 @@
 mod anonymous_enum;
+mod constraint;
 mod fixed_array;
 mod function_pointer;
 
@@ -10,6 +11,7 @@ use crate::{
     target::Target,
 };
 pub use anonymous_enum::AnonymousEnum;
+pub use constraint::Constraint;
 use derive_more::{IsVariant, Unwrap};
 pub use fixed_array::FixedArray;
 pub use function_pointer::FunctionPointer;
@@ -35,7 +37,7 @@ pub enum TypeKind {
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructureRef),
     TypeAlias(HumanName, TypeAliasRef),
-    Polymorph(String),
+    Polymorph(String, Vec<Constraint>),
 }
 
 impl TypeKind {
@@ -68,7 +70,7 @@ impl TypeKind {
             | TypeKind::FunctionPointer(..)
             | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum(_)
-            | TypeKind::Polymorph(_) => None,
+            | TypeKind::Polymorph(_, _) => None,
         }
     }
 }
@@ -115,7 +117,17 @@ impl Display for TypeKind {
             }
             TypeKind::FunctionPointer(..) => f.write_str("function-pointer-type")?,
             TypeKind::Enum(name, _) => write!(f, "{}", name)?,
-            TypeKind::Polymorph(name) => write!(f, "${}", name)?,
+            TypeKind::Polymorph(name, constaints) => {
+                write!(f, "${}", name)?;
+
+                if !constaints.is_empty() {
+                    write!(f, ": ")?;
+                }
+
+                for constaint in constaints {
+                    write!(f, "{:?}", constaint)?;
+                }
+            }
         }
 
         Ok(())
