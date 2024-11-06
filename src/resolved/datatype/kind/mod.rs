@@ -45,6 +45,31 @@ impl TypeKind {
         Type { kind: self, source }
     }
 
+    pub fn contains_polymorph(&self) -> bool {
+        match self {
+            TypeKind::Unresolved => {
+                panic!("resolved::TypeKind::contains_polymorph was called on unresolved type")
+            }
+            TypeKind::Boolean
+            | TypeKind::Integer(_, _)
+            | TypeKind::CInteger(_, _)
+            | TypeKind::IntegerLiteral(_)
+            | TypeKind::FloatLiteral(_)
+            | TypeKind::Floating(_) => false,
+            TypeKind::Pointer(inner) => inner.kind.contains_polymorph(),
+            TypeKind::Void => false,
+            TypeKind::AnonymousStruct() => todo!(),
+            TypeKind::AnonymousUnion() => todo!(),
+            TypeKind::AnonymousEnum(_) => todo!(),
+            TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
+            TypeKind::FunctionPointer(_) => todo!(),
+            TypeKind::Enum(_, _) => false,
+            TypeKind::Structure(_, _) => false,
+            TypeKind::TypeAlias(_, _) => false,
+            TypeKind::Polymorph(_, _) => true,
+        }
+    }
+
     pub fn sign(&self, target: Option<&Target>) -> Option<IntegerSign> {
         match self {
             TypeKind::Boolean => Some(IntegerSign::Unsigned),

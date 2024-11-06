@@ -11,6 +11,7 @@ mod global_variable;
 mod helper_expr;
 mod initialized;
 mod job;
+mod polymorph;
 mod stmt;
 mod type_ctx;
 mod type_definition;

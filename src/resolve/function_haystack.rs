@@ -211,8 +211,13 @@ impl FunctionHaystack {
             let preferred_type = (i < parameters.required.len())
                 .then_some(PreferredType::of_parameter(function_ref, i));
 
-            let argument_conform =
-                if let Some(preferred_type) = preferred_type.map(|p| p.view(ctx.resolved_ast)) {
+            let argument_conforms = if let Some(preferred_type) =
+                preferred_type.map(|p| p.view(ctx.resolved_ast))
+            {
+                if preferred_type.kind.contains_polymorph() {
+                    eprintln!("warning: assuming parameter type that contains polymorph matches for function argument");
+                    true
+                } else {
                     conform_expr::<Validate>(
                         ctx,
                         argument,
@@ -221,11 +226,13 @@ impl FunctionHaystack {
                         ctx.adept_conform_behavior(),
                         source,
                     )
-                } else {
-                    conform_expr_to_default::<Validate>(argument, ctx.c_integer_assumptions())
-                };
+                    .is_ok()
+                }
+            } else {
+                conform_expr_to_default::<Validate>(argument, ctx.c_integer_assumptions()).is_ok()
+            };
 
-            if argument_conform.is_err() {
+            if !argument_conforms {
                 return false;
             }
         }
