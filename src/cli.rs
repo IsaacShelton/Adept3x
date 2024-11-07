@@ -65,7 +65,6 @@ impl Command {
         }
 
         let Some(filename) = filename else {
-            // TODO: Implement proper error handling and improve error message
             eprintln!("error: No folder or filename specified");
             return Err(());
         };
