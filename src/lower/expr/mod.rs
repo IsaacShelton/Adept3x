@@ -126,16 +126,20 @@ pub fn lower_expr(
             )
         }
         ExprKind::Call(call) => {
+            if call.callee.recipe.is_empty() {
+                eprintln!("warning: ignoring callee generics recipe");
+            }
+
             let callee = resolved_ast
                 .functions
-                .get(call.function)
+                .get(call.callee.function)
                 .expect("referenced function to exist");
 
             ir_module
                 .function_uses
                 .write()
                 .unwrap()
-                .insert(call.function);
+                .insert(call.callee.function);
 
             let arguments = call
                 .arguments
@@ -153,7 +157,7 @@ pub fn lower_expr(
                 .collect::<Result<Box<[_]>, _>>()?;
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
-                function: call.function,
+                function: call.callee.function,
                 arguments,
                 unpromoted_variadic_argument_types: variadic_argument_types,
             })))

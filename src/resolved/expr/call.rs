@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct Call {
-    pub function: FunctionRef,
+    pub callee: Callee,
     pub arguments: Vec<TypedExpr>,
 }
 

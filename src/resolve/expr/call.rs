@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Cast, CastFrom, TypedExpr},
+    resolved::{self, Callee, Cast, CastFrom, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -332,7 +332,10 @@ pub fn resolve_call_expr(
         return_type,
         resolved::Expr::new(
             resolved::ExprKind::Call(Box::new(resolved::Call {
-                function: function_ref,
+                callee: Callee {
+                    function: function_ref,
+                    recipe: Default::default(),
+                },
                 arguments,
             })),
             source,
