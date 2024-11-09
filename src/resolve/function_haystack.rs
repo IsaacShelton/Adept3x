@@ -46,115 +46,16 @@ impl FunctionHaystack {
     ) -> Result<FunctionRef, FindFunctionError> {
         let resolved_name = ResolvedName::new(self.fs_node_id, name);
 
-        let mut local_matches = self
-            .available
-            .get(&resolved_name)
-            .into_iter()
-            .flatten()
-            .filter(|f| Self::fits(ctx, **f, arguments, source));
-
-        if let Some(found) = local_matches.next() {
-            return if local_matches.next().is_some() {
-                Err(FindFunctionError::Ambiguous)
-            } else {
-                Ok(*found)
-            };
-        }
-
-        let mut remote_matches = (!name.namespace.is_empty())
-            .then(|| {
-                ctx.settings
-                    .namespace_to_dependency
-                    .get(name.namespace.as_ref())
-            })
-            .flatten()
-            .into_iter()
-            .flatten()
-            .flat_map(|dependency| {
-                ctx.settings
-                    .dependency_to_module
-                    .get(dependency)
-                    .and_then(|module_fs_node_id| ctx.public_functions.get(module_fs_node_id))
-                    .and_then(|public| public.get(name.basename.as_ref()))
-                    .into_iter()
-            })
-            .flatten()
-            .filter(|f| Self::fits(ctx, **f, arguments, source));
-
-        if let Some(found) = remote_matches.next() {
-            return if remote_matches.next().is_some() {
-                Err(FindFunctionError::Ambiguous)
-            } else {
-                Ok(*found)
-            };
-        }
-
-        if name.namespace.is_empty() {
-            let imported_namespaces = ctx.settings.imported_namespaces.iter();
-
-            // TODO: CLEANUP: Clean up this code that gets the origin module of the callee
-            let subject_module_fs_node_id =
-                if let Some(first_type) = arguments.first().map(|arg| &arg.resolved_type) {
-                    if let Ok(first_type) = ctx.resolved_ast.unalias(first_type) {
-                        match &first_type.kind {
-                            TypeKind::Structure(_, structure_ref) => Some(
-                                ctx.resolved_ast
-                                    .structures
-                                    .get(*structure_ref)
-                                    .expect("valid struct")
-                                    .name
-                                    .fs_node_id,
-                            ),
-                            TypeKind::Enum(_, enum_ref) => Some(
-                                ctx.resolved_ast
-                                    .enums
-                                    .get(*enum_ref)
-                                    .expect("valid enum")
-                                    .name
-                                    .fs_node_id,
-                            ),
-                            _ => None,
-                        }
-                    } else {
-                        warn_type_alias_depth_exceeded(first_type);
-                        None
-                    }
-                } else {
-                    None
-                }
-                .into_iter();
-
-            let mut matches = imported_namespaces
-                .flat_map(|namespace| ctx.settings.namespace_to_dependency.get(namespace.as_ref()))
-                .flatten()
-                .flat_map(|dependency| ctx.settings.dependency_to_module.get(dependency))
-                .copied()
-                .chain(subject_module_fs_node_id)
-                .unique()
-                .flat_map(|module_fs_node_id| {
-                    ctx.public_functions
-                        .get(&module_fs_node_id)
-                        .and_then(|public| public.get(name.basename.as_ref()))
-                        .into_iter()
-                        .flatten()
-                })
-                .filter(|f| Self::fits(ctx, **f, arguments, source));
-
-            if let Some(found) = matches.next() {
-                return if matches.next().is_some() {
-                    Err(FindFunctionError::Ambiguous)
-                } else {
-                    Ok(*found)
-                };
-            }
-        }
-
-        Err(FindFunctionError::NotDefined)
+        self.find_local(ctx, &resolved_name, arguments, source)
+            .or_else(|| self.find_remote(ctx, &name, arguments, source))
+            .or_else(|| self.find_imported(ctx, &name, arguments, source))
+            .unwrap_or(Err(FindFunctionError::NotDefined))
     }
 
     pub fn find_near_matches(&self, ctx: &ResolveExprCtx, name: &Name) -> Vec<String> {
-        let resolved_name = ResolvedName::new(self.fs_node_id, name);
+        // TODO: Clean up this function
 
+        let resolved_name = ResolvedName::new(self.fs_node_id, name);
         let local_matches = self.available.get(&resolved_name).into_iter().flatten();
 
         let remote_matches = (!name.namespace.is_empty())
@@ -238,5 +139,134 @@ impl FunctionHaystack {
         }
 
         true
+    }
+
+    fn find_local(
+        &self,
+        ctx: &ResolveExprCtx,
+        resolved_name: &ResolvedName,
+        arguments: &[TypedExpr],
+        source: Source,
+    ) -> Option<Result<FunctionRef, FindFunctionError>> {
+        let mut local_matches = self
+            .available
+            .get(&resolved_name)
+            .into_iter()
+            .flatten()
+            .filter(|f| Self::fits(ctx, **f, arguments, source));
+
+        local_matches.next().map(|found| {
+            if local_matches.next().is_some() {
+                Err(FindFunctionError::Ambiguous)
+            } else {
+                Ok(*found)
+            }
+        })
+    }
+
+    fn find_remote(
+        &self,
+        ctx: &ResolveExprCtx,
+        name: &Name,
+        arguments: &[TypedExpr],
+        source: Source,
+    ) -> Option<Result<FunctionRef, FindFunctionError>> {
+        let mut remote_matches = (!name.namespace.is_empty())
+            .then(|| {
+                ctx.settings
+                    .namespace_to_dependency
+                    .get(name.namespace.as_ref())
+            })
+            .flatten()
+            .into_iter()
+            .flatten()
+            .flat_map(|dependency| {
+                ctx.settings
+                    .dependency_to_module
+                    .get(dependency)
+                    .and_then(|module_fs_node_id| ctx.public_functions.get(module_fs_node_id))
+                    .and_then(|public| public.get(name.basename.as_ref()))
+                    .into_iter()
+            })
+            .flatten()
+            .filter(|f| Self::fits(ctx, **f, arguments, source));
+
+        remote_matches.next().map(|found| {
+            if remote_matches.next().is_some() {
+                Err(FindFunctionError::Ambiguous)
+            } else {
+                Ok(*found)
+            }
+        })
+    }
+
+    fn find_imported(
+        &self,
+        ctx: &ResolveExprCtx,
+        name: &Name,
+        arguments: &[TypedExpr],
+        source: Source,
+    ) -> Option<Result<FunctionRef, FindFunctionError>> {
+        if !name.namespace.is_empty() {
+            return None;
+        }
+
+        let subject_module = arguments
+            .first()
+            .map(|arg| &arg.resolved_type)
+            .and_then(|first_type| {
+                if let Ok(first_type) = ctx.resolved_ast.unalias(first_type) {
+                    match &first_type.kind {
+                        TypeKind::Structure(_, structure_ref) => Some(
+                            ctx.resolved_ast
+                                .structures
+                                .get(*structure_ref)
+                                .expect("valid struct")
+                                .name
+                                .fs_node_id,
+                        ),
+                        TypeKind::Enum(_, enum_ref) => Some(
+                            ctx.resolved_ast
+                                .enums
+                                .get(*enum_ref)
+                                .expect("valid enum")
+                                .name
+                                .fs_node_id,
+                        ),
+                        _ => None,
+                    }
+                } else {
+                    warn_type_alias_depth_exceeded(first_type);
+                    None
+                }
+            })
+            .into_iter();
+
+        let mut matches = ctx
+            .settings
+            .imported_namespaces
+            .iter()
+            .flat_map(|namespace| ctx.settings.namespace_to_dependency.get(namespace.as_ref()))
+            .flatten()
+            .flat_map(|dependency| ctx.settings.dependency_to_module.get(dependency))
+            .copied()
+            .chain(subject_module)
+            .unique()
+            .flat_map(|module_fs_node_id| {
+                ctx.public_functions
+                    .get(&module_fs_node_id)
+                    .and_then(|public| public.get(name.basename.as_ref()))
+                    .into_iter()
+                    .flatten()
+            })
+            .filter(|f| Self::fits(ctx, **f, arguments, source));
+
+        matches.next().map(|found| {
+            if matches.next().is_some() {
+                Err(FindFunctionError::Ambiguous)
+            } else {
+                Ok(*found)
+            }
+        })
     }
 }
