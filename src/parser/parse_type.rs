@@ -19,6 +19,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.input.peek().source;
         let token = self.input.peek().clone();
 
+        // TODO: CLEANUP: Clean up this obscure parsing recovery behavior
         let Ok(name) = self.parse_name(None::<&str>) else {
             if !token.kind.is_polymorph() {
                 return Err(ParseError {

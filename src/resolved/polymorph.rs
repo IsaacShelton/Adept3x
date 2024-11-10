@@ -1,11 +1,11 @@
-use crate::resolved::{self, Constraint};
+use super::Type;
+use crate::resolved;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
-use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
 pub struct PolyType {
-    constaints: HashSet<Constraint>,
+    pub resolved_type: Type,
 }
 
 #[derive(Clone, Debug)]
@@ -37,23 +37,66 @@ impl PolyCatalog {
         }
     }
 
-    pub fn put_type(
+    pub fn match_type(
         &mut self,
-        name: String,
-        new_constraints: impl Iterator<Item = Constraint>,
-    ) -> Result<(), PolyCatalogInsertError> {
-        if let Some(existing) = self.polymorphs.get_mut(&name) {
+        pattern_type: &Type,
+        concrete_type: &Type,
+    ) -> Result<(), Option<PolyCatalogInsertError>> {
+        match &pattern_type.kind {
+            resolved::TypeKind::Unresolved => panic!(),
+            resolved::TypeKind::Boolean
+            | resolved::TypeKind::Integer(_, _)
+            | resolved::TypeKind::CInteger(_, _)
+            | resolved::TypeKind::IntegerLiteral(_)
+            | resolved::TypeKind::FloatLiteral(_)
+            | resolved::TypeKind::Floating(_)
+            | resolved::TypeKind::Void
+            | resolved::TypeKind::Enum(_, _)
+            | resolved::TypeKind::Structure(_, _)
+            | resolved::TypeKind::TypeAlias(_, _) => {
+                if *pattern_type == *concrete_type {
+                    Ok(())
+                } else {
+                    Err(None)
+                }
+            }
+            resolved::TypeKind::Pointer(pattern_inner) => match &concrete_type.kind {
+                resolved::TypeKind::Pointer(concrete_inner) => {
+                    self.match_type(pattern_inner, concrete_inner)
+                }
+                _ => Err(None),
+            },
+            resolved::TypeKind::AnonymousStruct() => todo!(),
+            resolved::TypeKind::AnonymousUnion() => todo!(),
+            resolved::TypeKind::AnonymousEnum(_) => todo!(),
+            resolved::TypeKind::FixedArray(pattern_inner) => match &concrete_type.kind {
+                resolved::TypeKind::FixedArray(concrete_inner) => {
+                    self.match_type(&pattern_inner.inner, &concrete_inner.inner)
+                }
+                _ => Err(None),
+            },
+            resolved::TypeKind::FunctionPointer(_) => todo!(),
+            resolved::TypeKind::Polymorph(name, _constraints) => {
+                self.put_type(name, pattern_type).map_err(Some)
+            }
+        }
+    }
+
+    pub fn put_type(&mut self, name: &str, new_type: &Type) -> Result<(), PolyCatalogInsertError> {
+        if let Some(existing) = self.polymorphs.get_mut(name) {
             match existing {
                 PolyValue::PolyType(poly_type) => {
-                    poly_type.constaints.extend(new_constraints);
+                    if poly_type.resolved_type != *new_type {
+                        return Err(PolyCatalogInsertError::Incongruent);
+                    }
                 }
                 PolyValue::PolyExpr(_) => return Err(PolyCatalogInsertError::Incongruent),
             }
         } else {
             self.polymorphs.insert(
-                name,
+                name.to_string(),
                 PolyValue::PolyType(PolyType {
-                    constaints: HashSet::from_iter(new_constraints),
+                    resolved_type: new_type.clone(),
                 }),
             );
         }

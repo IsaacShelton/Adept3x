@@ -336,7 +336,7 @@ impl TokenKind {
     }
 
     pub fn could_start_type(&self) -> bool {
-        matches!(self, TokenKind::Identifier(_))
+        matches!(self, TokenKind::Identifier(_) | TokenKind::Polymorph(_))
     }
 
     pub fn at(self, source: Source) -> Token {

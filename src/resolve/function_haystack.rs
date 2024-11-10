@@ -143,12 +143,13 @@ impl FunctionHaystack {
     }
 
     fn conform_polymorph(
-        _catalog: &mut PolyCatalog,
-        _argument: &TypedExpr,
-        _param_type: &resolved::Type,
+        catalog: &mut PolyCatalog,
+        argument: &TypedExpr,
+        param_type: &resolved::Type,
     ) -> bool {
-        eprintln!("warning: conform_polymorph not fully implemented yet");
-        false
+        catalog
+            .match_type(param_type, &argument.resolved_type)
+            .is_ok()
     }
 
     fn find_local(
