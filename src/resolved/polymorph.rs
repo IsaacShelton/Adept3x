@@ -60,4 +60,8 @@ impl PolyCatalog {
 
         Ok(())
     }
+
+    pub fn get(&mut self, name: &str) -> Option<&PolyValue> {
+        self.polymorphs.get(name)
+    }
 }

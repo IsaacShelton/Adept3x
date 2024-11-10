@@ -8,7 +8,7 @@ use super::{
 use crate::{
     ir::FunctionRef,
     name::{Name, ResolvedName},
-    resolved::{self, TypeKind, TypedExpr},
+    resolved::{self, PolyCatalog, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -108,21 +108,22 @@ impl FunctionHaystack {
             return false;
         }
 
+        let mut catalog = PolyCatalog::new();
+
         for (i, argument) in arguments.iter().enumerate() {
             let preferred_type = (i < parameters.required.len())
                 .then_some(PreferredType::of_parameter(function_ref, i));
 
-            let argument_conforms = if let Some(preferred_type) =
+            let argument_conforms = if let Some(param_type) =
                 preferred_type.map(|p| p.view(ctx.resolved_ast))
             {
-                if preferred_type.kind.contains_polymorph() {
-                    eprintln!("warning: assuming parameter type that contains polymorph matches for function argument");
-                    true
+                if param_type.kind.contains_polymorph() {
+                    Self::conform_polymorph(&mut catalog, argument, param_type)
                 } else {
                     conform_expr::<Validate>(
                         ctx,
                         argument,
-                        preferred_type,
+                        param_type,
                         ConformMode::ParameterPassing,
                         ctx.adept_conform_behavior(),
                         source,
@@ -139,6 +140,15 @@ impl FunctionHaystack {
         }
 
         true
+    }
+
+    fn conform_polymorph(
+        _catalog: &mut PolyCatalog,
+        _argument: &TypedExpr,
+        _param_type: &resolved::Type,
+    ) -> bool {
+        eprintln!("warning: conform_polymorph not fully implemented yet");
+        false
     }
 
     fn find_local(
