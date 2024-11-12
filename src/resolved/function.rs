@@ -1,5 +1,5 @@
 use crate::{name::ResolvedName, resolved::*, source_files::Source, tag::Tag};
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 #[derive(Clone, Debug)]
 pub struct Function {
@@ -13,6 +13,7 @@ pub struct Function {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
+    pub constraints: HashSet<Constraint>,
 }
 
 #[derive(Clone, Debug, Default)]

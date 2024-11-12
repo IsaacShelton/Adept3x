@@ -7,9 +7,10 @@ use crate::{
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
     name::ResolvedName,
-    resolved::{self, VariableStorage},
+    resolved::{self, Constraint, VariableStorage},
     tag::Tag,
 };
+use std::collections::HashSet;
 
 pub fn create_function_heads(
     ctx: &mut ResolveCtx,
@@ -41,6 +42,19 @@ pub fn create_function_heads(
             let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
             let return_type = type_ctx.resolve(&function.return_type)?;
 
+            let constraints = if is_generic {
+                let mut set = HashSet::default();
+
+                for param in parameters.required.iter() {
+                    collect_constraints(&mut set, &param.resolved_type);
+                }
+
+                collect_constraints(&mut set, &return_type);
+                set
+            } else {
+                HashSet::default()
+            };
+
             let function_ref = resolved_ast.functions.insert(resolved::Function {
                 name: name.clone(),
                 parameters,
@@ -58,6 +72,7 @@ pub fn create_function_heads(
                     }
                 }),
                 is_generic,
+                constraints,
             });
 
             if function.privacy.is_public() {
@@ -108,6 +123,29 @@ pub fn create_function_heads(
     }
 
     Ok(())
+}
+
+fn collect_constraints(set: &mut HashSet<Constraint>, ty: &resolved::Type) {
+    match &ty.kind {
+        resolved::TypeKind::Unresolved => panic!(),
+        resolved::TypeKind::Boolean
+        | resolved::TypeKind::Integer(_, _)
+        | resolved::TypeKind::CInteger(_, _)
+        | resolved::TypeKind::IntegerLiteral(_)
+        | resolved::TypeKind::FloatLiteral(_)
+        | resolved::TypeKind::Floating(_) => (),
+        resolved::TypeKind::Pointer(inner) => collect_constraints(set, inner.as_ref()),
+        resolved::TypeKind::Void => (),
+        resolved::TypeKind::AnonymousStruct() => todo!(),
+        resolved::TypeKind::AnonymousUnion() => todo!(),
+        resolved::TypeKind::AnonymousEnum(_) => todo!(),
+        resolved::TypeKind::FixedArray(fixed_array) => collect_constraints(set, &fixed_array.inner),
+        resolved::TypeKind::FunctionPointer(_) => todo!(),
+        resolved::TypeKind::Enum(_, _) => (),
+        resolved::TypeKind::Structure(_, _) => (),
+        resolved::TypeKind::TypeAlias(_, _) => (),
+        resolved::TypeKind::Polymorph(_, constraints) => set.extend(constraints.iter().cloned()),
+    }
 }
 
 pub fn resolve_parameters(
