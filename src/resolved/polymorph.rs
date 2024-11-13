@@ -37,6 +37,10 @@ impl PolyCatalog {
         }
     }
 
+    pub fn bake(self) -> IndexMap<String, PolyValue> {
+        self.polymorphs
+    }
+
     pub fn match_type(
         &mut self,
         pattern_type: &Type,

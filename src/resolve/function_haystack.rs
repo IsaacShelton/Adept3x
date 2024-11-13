@@ -9,7 +9,7 @@ use crate::{
     ir::FunctionRef,
     name::{Name, ResolvedName},
     resolve::conform::Perform,
-    resolved::{self, PolyCatalog, TypeKind, TypedExpr},
+    resolved::{self, Callee, PolyCatalog, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -44,7 +44,7 @@ impl FunctionHaystack {
         name: &Name,
         arguments: &[TypedExpr],
         source: Source,
-    ) -> Result<FunctionRef, FindFunctionError> {
+    ) -> Result<Callee, FindFunctionError> {
         let resolved_name = ResolvedName::new(self.fs_node_id, name);
 
         self.find_local(ctx, &resolved_name, arguments, source)
@@ -97,16 +97,16 @@ impl FunctionHaystack {
         function_ref: FunctionRef,
         arguments: &[TypedExpr],
         source: Source,
-    ) -> bool {
+    ) -> Option<Callee> {
         let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
         let parameters = &function.parameters;
 
         if !parameters.is_cstyle_vararg && arguments.len() != parameters.required.len() {
-            return false;
+            return None;
         }
 
         if arguments.len() < parameters.required.len() {
-            return false;
+            return None;
         }
 
         let mut catalog = PolyCatalog::new();
@@ -128,7 +128,7 @@ impl FunctionHaystack {
                     let Ok(argument) =
                         conform_expr_to_default::<Perform>(argument, ctx.c_integer_assumptions())
                     else {
-                        return false;
+                        return None;
                     };
 
                     Self::conform_polymorph(&mut catalog, &argument, param_type)
@@ -148,11 +148,14 @@ impl FunctionHaystack {
             };
 
             if !argument_conforms {
-                return false;
+                return None;
             }
         }
 
-        true
+        Some(Callee {
+            function: function_ref,
+            recipe: catalog.bake(),
+        })
     }
 
     fn conform_polymorph(
@@ -171,19 +174,19 @@ impl FunctionHaystack {
         resolved_name: &ResolvedName,
         arguments: &[TypedExpr],
         source: Source,
-    ) -> Option<Result<FunctionRef, FindFunctionError>> {
+    ) -> Option<Result<Callee, FindFunctionError>> {
         let mut local_matches = self
             .available
             .get(&resolved_name)
             .into_iter()
             .flatten()
-            .filter(|f| Self::fits(ctx, **f, arguments, source));
+            .flat_map(|f| Self::fits(ctx, *f, arguments, source));
 
         local_matches.next().map(|found| {
             if local_matches.next().is_some() {
                 Err(FindFunctionError::Ambiguous)
             } else {
-                Ok(*found)
+                Ok(found)
             }
         })
     }
@@ -194,7 +197,7 @@ impl FunctionHaystack {
         name: &Name,
         arguments: &[TypedExpr],
         source: Source,
-    ) -> Option<Result<FunctionRef, FindFunctionError>> {
+    ) -> Option<Result<Callee, FindFunctionError>> {
         let mut remote_matches = (!name.namespace.is_empty())
             .then(|| {
                 ctx.settings
@@ -213,13 +216,13 @@ impl FunctionHaystack {
                     .into_iter()
             })
             .flatten()
-            .filter(|f| Self::fits(ctx, **f, arguments, source));
+            .flat_map(|f| Self::fits(ctx, *f, arguments, source));
 
         remote_matches.next().map(|found| {
             if remote_matches.next().is_some() {
                 Err(FindFunctionError::Ambiguous)
             } else {
-                Ok(*found)
+                Ok(found)
             }
         })
     }
@@ -230,7 +233,7 @@ impl FunctionHaystack {
         name: &Name,
         arguments: &[TypedExpr],
         source: Source,
-    ) -> Option<Result<FunctionRef, FindFunctionError>> {
+    ) -> Option<Result<Callee, FindFunctionError>> {
         if !name.namespace.is_empty() {
             return None;
         }
@@ -283,13 +286,13 @@ impl FunctionHaystack {
                     .into_iter()
                     .flatten()
             })
-            .filter(|f| Self::fits(ctx, **f, arguments, source));
+            .flat_map(|f| Self::fits(ctx, *f, arguments, source));
 
         matches.next().map(|found| {
             if matches.next().is_some() {
                 Err(FindFunctionError::Ambiguous)
             } else {
-                Ok(*found)
+                Ok(found)
             }
         })
     }

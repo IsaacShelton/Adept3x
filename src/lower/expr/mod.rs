@@ -126,8 +126,11 @@ pub fn lower_expr(
             )
         }
         ExprKind::Call(call) => {
-            if call.callee.recipe.is_empty() {
-                eprintln!("warning: ignoring callee generics recipe");
+            if !call.callee.recipe.is_empty() {
+                eprintln!(
+                    "warning: ignoring callee generics recipe - {:?}",
+                    call.callee.recipe
+                );
             }
 
             let callee = resolved_ast

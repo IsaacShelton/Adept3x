@@ -1,6 +1,6 @@
 use super::TypedExpr;
 use crate::resolved::{FunctionRef, PolyValue};
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct Call {
@@ -11,5 +11,5 @@ pub struct Call {
 #[derive(Clone, Debug)]
 pub struct Callee {
     pub function: FunctionRef,
-    pub recipe: HashMap<String, PolyValue>,
+    pub recipe: IndexMap<String, PolyValue>,
 }

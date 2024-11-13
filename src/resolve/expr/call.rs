@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Callee, Cast, CastFrom, TypedExpr},
+    resolved::{self, Cast, CastFrom, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -238,43 +238,49 @@ pub fn resolve_call_expr(
         }
     }
 
-    let function_ref =
-        match ctx
-            .function_haystack
-            .find(ctx, &call.function_name, &arguments[..], source)
-        {
-            Ok(function_ref) => function_ref,
-            Err(reason) => {
-                let args = arguments
-                    .iter()
-                    .map(|arg| arg.resolved_type.to_string())
-                    .collect_vec();
+    let callee = match ctx
+        .function_haystack
+        .find(ctx, &call.function_name, &arguments[..], source)
+    {
+        Ok(function_ref) => function_ref,
+        Err(reason) => {
+            let args = arguments
+                .iter()
+                .map(|arg| arg.resolved_type.to_string())
+                .collect_vec();
 
-                let signature = format!("{}({})", call.function_name, args.join(", "));
+            let signature = format!("{}({})", call.function_name, args.join(", "));
 
-                let almost_matches = ctx
-                    .function_haystack
-                    .find_near_matches(ctx, &call.function_name);
+            let almost_matches = ctx
+                .function_haystack
+                .find_near_matches(ctx, &call.function_name);
 
-                return Err(ResolveErrorKind::FailedToFindFunction {
-                    signature,
-                    reason,
-                    almost_matches,
-                }
-                .at(source));
+            return Err(ResolveErrorKind::FailedToFindFunction {
+                signature,
+                reason,
+                almost_matches,
             }
-        };
+            .at(source));
+        }
+    };
 
-    let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
+    let function = ctx.resolved_ast.functions.get(callee.function).unwrap();
     let return_type = function.return_type.clone();
 
     let num_required = function.parameters.required.len();
 
     for (i, argument) in arguments.iter_mut().enumerate() {
-        let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
+        let function = ctx.resolved_ast.functions.get(callee.function).unwrap();
 
         let preferred_type =
-            (i < num_required).then_some(PreferredType::of_parameter(function_ref, i));
+            (i < num_required).then_some(PreferredType::of_parameter(callee.function, i));
+
+        if preferred_type.map_or(false, |ty| {
+            ty.view(&ctx.resolved_ast).kind.contains_polymorph()
+        }) {
+            // Skip, as already conformed
+            continue;
+        }
 
         if let Some(preferred_type) =
             preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
@@ -331,13 +337,7 @@ pub fn resolve_call_expr(
     Ok(TypedExpr::new(
         return_type,
         resolved::Expr::new(
-            resolved::ExprKind::Call(Box::new(resolved::Call {
-                callee: Callee {
-                    function: function_ref,
-                    recipe: Default::default(),
-                },
-                arguments,
-            })),
+            resolved::ExprKind::Call(Box::new(resolved::Call { callee, arguments })),
             source,
         ),
     ))
