@@ -77,16 +77,6 @@ impl PolyCatalog {
             },
             resolved::TypeKind::FunctionPointer(_) => todo!(),
             resolved::TypeKind::Polymorph(name, _constraints) => {
-                if let Some(existing) = self.get(name) {
-                    match existing {
-                        PolyValue::PolyType(poly_type) => {
-                            if poly_type.resolved_type == *concrete_type {
-                                return Ok(());
-                            }
-                        }
-                        PolyValue::PolyExpr(_) => (),
-                    }
-                }
                 self.put_type(name, concrete_type).map_err(Some)
             }
         }
