@@ -8,6 +8,7 @@ use super::{
 use crate::{
     ir::FunctionRef,
     name::{Name, ResolvedName},
+    resolve::conform::Perform,
     resolved::{self, PolyCatalog, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
@@ -118,11 +119,23 @@ impl FunctionHaystack {
                 preferred_type.map(|p| p.view(ctx.resolved_ast))
             {
                 if param_type.kind.contains_polymorph() {
-                    Self::conform_polymorph(&mut catalog, argument, param_type)
+                    // NOTE: We probably dont't want arguments to always conform to the default
+                    // representation without taking the full function match into account, but
+                    // this will work for now.
+                    // This would require tracking each type match for each polymorph
+                    // and then unifying afterward
+
+                    let Ok(argument) =
+                        conform_expr_to_default::<Perform>(argument, ctx.c_integer_assumptions())
+                    else {
+                        return false;
+                    };
+
+                    Self::conform_polymorph(&mut catalog, &argument, param_type)
                 } else {
                     conform_expr::<Validate>(
                         ctx,
-                        argument,
+                        &argument,
                         param_type,
                         ConformMode::ParameterPassing,
                         ctx.adept_conform_behavior(),
