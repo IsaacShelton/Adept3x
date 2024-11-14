@@ -21,6 +21,31 @@ impl Type {
     pub fn is_ambiguous(&self) -> bool {
         self.kind.is_ambiguous()
     }
+
+    pub fn strip_constraints(&mut self) {
+        match &mut self.kind {
+            TypeKind::Unresolved => panic!(),
+            TypeKind::Boolean => (),
+            TypeKind::Integer(_, _) => (),
+            TypeKind::CInteger(_, _) => (),
+            TypeKind::IntegerLiteral(_) => (),
+            TypeKind::FloatLiteral(_) => (),
+            TypeKind::Floating(_) => (),
+            TypeKind::Pointer(inner) => inner.strip_constraints(),
+            TypeKind::Void => (),
+            TypeKind::AnonymousStruct() => todo!(),
+            TypeKind::AnonymousUnion() => todo!(),
+            TypeKind::AnonymousEnum(_) => todo!(),
+            TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
+            TypeKind::FunctionPointer(_) => todo!(),
+            TypeKind::Enum(_, _) => (),
+            TypeKind::Structure(_, _) => (),
+            TypeKind::TypeAlias(_, _) => (),
+            TypeKind::Polymorph(_, constraints) => {
+                constraints.drain(..);
+            }
+        }
+    }
 }
 
 impl PartialEq for Type {

@@ -98,7 +98,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
                 if !constraints.is_empty() {
                     eprintln!(
-                        "warning: resolving polymorph constaints not completely implemented yet"
+                        "warning: resolving polymorph constraints not completely implemented yet"
                     );
                     resolved_constraints.push(Constraint::Add);
                 }

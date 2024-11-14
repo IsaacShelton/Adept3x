@@ -6,6 +6,7 @@ use super::{
     Initialized,
 };
 use crate::{ast, resolved};
+use std::borrow::Cow;
 
 pub fn resolve_stmts(
     ctx: &mut ResolveExprCtx,
@@ -40,17 +41,24 @@ pub fn resolve_stmt(
                     Initialized::Require,
                 )?;
 
-                let return_type = &ctx
-                    .resolved_ast
-                    .functions
-                    .get(resolved_function_ref)
-                    .unwrap()
-                    .return_type;
+                let mut return_type = Cow::Borrowed(
+                    &ctx.resolved_ast
+                        .functions
+                        .get(resolved_function_ref)
+                        .unwrap()
+                        .return_type,
+                );
+
+                if return_type.kind.contains_polymorph() {
+                    let mut stripped = return_type.as_ref().clone();
+                    stripped.strip_constraints();
+                    return_type = Cow::Owned(stripped);
+                }
 
                 if let Ok(result) = conform_expr::<Perform>(
                     ctx,
                     &result,
-                    return_type,
+                    &return_type,
                     ConformMode::Normal,
                     ctx.adept_conform_behavior(),
                     source,

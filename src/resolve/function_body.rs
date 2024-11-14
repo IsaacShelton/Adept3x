@@ -99,7 +99,8 @@ fn resolve_parameter_variables(
             &ctx.types_in_modules,
         );
 
-        let resolved_type = type_ctx.resolve(&parameter.ast_type)?;
+        let mut resolved_type = type_ctx.resolve(&parameter.ast_type)?;
+        resolved_type.strip_constraints();
 
         let function = resolved_ast
             .functions
