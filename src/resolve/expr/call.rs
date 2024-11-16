@@ -278,7 +278,17 @@ pub fn resolve_call_expr(
         if preferred_type.map_or(false, |ty| {
             ty.view(&ctx.resolved_ast).kind.contains_polymorph()
         }) {
-            // Skip, as already conformed
+            match conform_expr_to_default::<Perform>(&*argument, ctx.c_integer_assumptions()) {
+                Ok(arg) => {
+                    *argument = arg;
+                }
+                Err(_) => {
+                    return Err(ResolveErrorKind::Other {
+                        message: "Failed to conform argument to default value".into(),
+                    }
+                    .at(source));
+                }
+            }
             continue;
         }
 
@@ -321,6 +331,9 @@ pub fn resolve_call_expr(
 
     if let Some(required_ty) = &call.expected_to_return {
         let resolved_required_ty = ctx.type_ctx().resolve(required_ty)?;
+
+        // TODO: Map return type according to polymorph catalog
+        // if applicable.
 
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {

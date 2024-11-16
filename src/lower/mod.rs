@@ -35,6 +35,10 @@ pub fn lower<'a>(
     }
 
     for (function_ref, function) in ast.functions.iter() {
+        if function.is_generic {
+            continue;
+        }
+
         lower_function(&mut ir_module, function_ref, function, ast)?;
     }
 
@@ -56,7 +60,7 @@ fn lower_type(
 
     match &resolved_type.kind {
         resolved::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
-        resolved::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorpn"),
+        resolved::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorph"),
         resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
         resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
