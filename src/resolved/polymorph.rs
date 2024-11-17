@@ -112,3 +112,4 @@ impl PolyCatalog {
         self.polymorphs.get(name)
     }
 }
+

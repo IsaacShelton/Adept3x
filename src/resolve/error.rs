@@ -182,6 +182,8 @@ pub enum ResolveErrorKind {
     CannotDeclareVariableOutsideFunction,
     CannotReturnOutsideFunction,
     CannotAssignVariableOutsideFunction,
+    NonExistentPolymorph(String),
+    PolymorphIsNotAType(String),
     Other {
         message: String,
     },
@@ -500,6 +502,12 @@ impl Display for ResolveErrorKind {
                     f,
                     "Cannot assign variable outside of function"
                 )?;
+            }
+            ResolveErrorKind::NonExistentPolymorph(name) => {
+                write!(f, "Non-existent polymorph '${}'", name)?;
+            }
+            ResolveErrorKind::PolymorphIsNotAType(name) => {
+                write!(f, "Polymorph '${}' is not a type", name)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
