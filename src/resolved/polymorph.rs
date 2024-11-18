@@ -4,6 +4,11 @@ use derive_more::IsVariant;
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
+pub struct PolyRecipe {
+    pub polymorphs: IndexMap<String, PolyValue>,
+}
+
+#[derive(Clone, Debug)]
 pub struct PolyType {
     pub resolved_type: Type,
 }
@@ -37,8 +42,10 @@ impl PolyCatalog {
         }
     }
 
-    pub fn bake(self) -> IndexMap<String, PolyValue> {
-        self.polymorphs
+    pub fn bake(self) -> PolyRecipe {
+        PolyRecipe {
+            polymorphs: self.polymorphs,
+        }
     }
 
     pub fn match_type(
@@ -112,4 +119,3 @@ impl PolyCatalog {
         self.polymorphs.get(name)
     }
 }
-

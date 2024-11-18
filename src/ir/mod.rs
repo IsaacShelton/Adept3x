@@ -1,7 +1,8 @@
-pub use crate::resolved::{FloatOrSign, FunctionRef, GlobalVarRef, IntegerSign};
+pub use crate::resolved::{FloatOrSign, GlobalVarRef, IntegerSign};
 use crate::{
     data_units::ByteUnits,
-    resolved::{FloatOrInteger, IntegerBits, StructureRef},
+    resolved,
+    resolved::{FloatOrInteger, IntegerBits, PolyRecipe, StructureRef},
     source_files::Source,
     target::Target,
 };
@@ -15,12 +16,16 @@ use std::{
 
 pub type Structures = HashMap<StructureRef, Structure>;
 
+// TODO: Separate resolved vs lowered function refs
+pub type FunctionRef = resolved::FunctionRef;
+
 pub struct Module<'a> {
     pub target: &'a Target,
     pub functions: HashMap<FunctionRef, Function>,
     pub structures: Structures,
     pub globals: HashMap<GlobalVarRef, Global>,
-    pub function_uses: RwLock<HashSet<FunctionRef>>, // TODO: Use a concurrent set instead
+    pub function_uses: RwLock<HashSet<resolved::FunctionRef>>, // TODO: Use a concurrent set instead
+    pub monomorphized: HashMap<(resolved::FunctionRef, PolyRecipe), FunctionRef>,
 }
 
 impl<'a> std::fmt::Debug for Module<'a> {
@@ -482,6 +487,7 @@ impl<'a> Module<'a> {
             structures: HashMap::new(),
             globals: HashMap::new(),
             function_uses: RwLock::new(HashSet::new()),
+            monomorphized: Default::default(),
         }
     }
 }

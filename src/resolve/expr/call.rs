@@ -7,10 +7,9 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Cast, CastFrom, PolyValue, TypedExpr},
+    resolved::{self, Cast, CastFrom, PolyRecipe, PolyValue, TypedExpr},
     source_files::Source,
 };
-use indexmap::IndexMap;
 use itertools::Itertools;
 use num::BigInt;
 
@@ -358,9 +357,11 @@ pub fn resolve_call_expr(
 }
 
 pub fn resolve_polymorphs<'a>(
-    polymorphs: &IndexMap<String, PolyValue>,
+    recipe: &PolyRecipe,
     ty: &resolved::Type,
 ) -> Result<resolved::Type, ResolveError> {
+    let polymorphs = &recipe.polymorphs;
+
     Ok(match &ty.kind {
         resolved::TypeKind::Unresolved => panic!(),
         resolved::TypeKind::Boolean
@@ -371,8 +372,7 @@ pub fn resolve_polymorphs<'a>(
         | resolved::TypeKind::Void
         | resolved::TypeKind::Floating(_) => ty.clone(),
         resolved::TypeKind::Pointer(inner) => {
-            resolved::TypeKind::Pointer(Box::new(resolve_polymorphs(polymorphs, inner)?))
-                .at(ty.source)
+            resolved::TypeKind::Pointer(Box::new(resolve_polymorphs(recipe, inner)?)).at(ty.source)
         }
         resolved::TypeKind::AnonymousStruct() => todo!(),
         resolved::TypeKind::AnonymousUnion() => todo!(),
@@ -380,7 +380,7 @@ pub fn resolve_polymorphs<'a>(
         resolved::TypeKind::FixedArray(fixed_array) => {
             resolved::TypeKind::FixedArray(Box::new(resolved::FixedArray {
                 size: fixed_array.size,
-                inner: resolve_polymorphs(polymorphs, &fixed_array.inner)?,
+                inner: resolve_polymorphs(recipe, &fixed_array.inner)?,
             }))
             .at(ty.source)
         }
