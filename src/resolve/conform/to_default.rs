@@ -6,6 +6,7 @@ use crate::{
     source_files::Source,
 };
 use num::BigInt;
+use ordered_float::NotNan;
 
 pub fn conform_expr_to_default_or_error(
     expr: impl TypedExprLike,
@@ -59,7 +60,7 @@ pub fn conform_expr_to_default_via_mut<O: Objective<Success = TypedExpr>>(
 }
 
 pub fn conform_float_literal_to_default<O: Objective>(
-    value: f64,
+    value: Option<NotNan<f64>>,
     source: Source,
 ) -> ObjectiveResult<O> {
     O::success(|| {

@@ -42,6 +42,7 @@ use crate::{
 };
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
+use ordered_float::NotNan;
 use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
@@ -197,9 +198,10 @@ pub fn resolve_expr(
             ))
         }
         ast::ExprKind::Float(value) => Ok(TypedExpr::new(
-            resolved::TypeKind::FloatLiteral(*value).at(source),
+            // TODO: Clean up this code
+            resolved::TypeKind::FloatLiteral(NotNan::new(*value).ok()).at(source),
             resolved::Expr::new(
-                resolved::ExprKind::FloatingLiteral(FloatSize::Bits32, *value),
+                resolved::ExprKind::FloatingLiteral(FloatSize::Bits32, NotNan::new(*value).ok()),
                 source,
             ),
         )),

@@ -12,6 +12,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num::BigInt;
+use ordered_float::NotNan;
 
 pub fn resolve_call_expr(
     ctx: &mut ResolveExprCtx,
@@ -196,7 +197,8 @@ pub fn resolve_call_expr(
 
                 return Ok(TypedExpr {
                     resolved_type: target_type_kind.at(source),
-                    expr: resolved::ExprKind::FloatingLiteral(float_size, value).at(source),
+                    expr: resolved::ExprKind::FloatingLiteral(float_size, NotNan::new(value).ok())
+                        .at(source),
                     is_initialized,
                 });
             }

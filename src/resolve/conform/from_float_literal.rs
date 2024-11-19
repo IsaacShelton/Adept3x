@@ -3,9 +3,10 @@ use crate::{
     resolved::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
+use ordered_float::NotNan;
 
 pub fn from_float_literal<O: Objective>(
-    from: f64,
+    from: Option<NotNan<f64>>,
     to_type: &Type,
     source: Source,
 ) -> ObjectiveResult<O> {

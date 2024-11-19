@@ -81,7 +81,11 @@ fn lower_type(
         }
         resolved::TypeKind::FloatLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedFloatLiteral {
-                value: value.to_string(),
+                value: if let Some(value) = value {
+                    value.to_string()
+                } else {
+                    "NaN".into()
+                },
             }
             .at(resolved_type.source))
         }

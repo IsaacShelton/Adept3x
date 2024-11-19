@@ -5,6 +5,7 @@ use crate::{
     source_files::Source,
 };
 use num::BigInt;
+use ordered_float::NotNan;
 use std::ffi::CString;
 
 #[derive(Clone, Debug)]
@@ -14,7 +15,7 @@ pub enum ExprKind {
     BooleanLiteral(bool),
     IntegerLiteral(BigInt),
     IntegerKnown(Box<IntegerKnown>),
-    FloatingLiteral(FloatSize, f64),
+    FloatingLiteral(FloatSize, Option<NotNan<f64>>),
     String(String),
     NullTerminatedString(CString),
     Call(Box<Call>),

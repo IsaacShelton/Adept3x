@@ -3,6 +3,8 @@ use crate::resolved;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
 
+// TODO: We probably want this to store some kind of internal hash
+// Also, it should itself implement hash
 #[derive(Clone, Debug)]
 pub struct PolyRecipe {
     pub polymorphs: IndexMap<String, PolyValue>,

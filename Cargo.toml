@@ -31,4 +31,5 @@ ignore = "0.4.22"
 humansize = "2.1.3"
 thousands = "0.2.0"
 path-absolutize = { version = "3.1.1", features = ["once_cell_cache"] }
+ordered-float = "4.5.0"
 

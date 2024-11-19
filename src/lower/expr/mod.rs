@@ -114,8 +114,12 @@ pub fn lower_expr(
             })
         }
         ExprKind::FloatingLiteral(size, value) => Ok(Value::Literal(match size {
-            FloatSize::Bits32 => Literal::Float32(*value as f32),
-            FloatSize::Bits64 => Literal::Float64(*value),
+            FloatSize::Bits32 => {
+                Literal::Float32(value.map(|x| x.as_f32().into_inner()).unwrap_or(f32::NAN))
+            }
+            FloatSize::Bits64 => {
+                Literal::Float64(value.map(|x| x.into_inner()).unwrap_or(f64::NAN))
+            }
         })),
         ExprKind::NullTerminatedString(value) => Ok(ir::Value::Literal(
             Literal::NullTerminatedString(value.clone()),

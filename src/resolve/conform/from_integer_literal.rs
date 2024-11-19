@@ -8,6 +8,7 @@ use crate::{
 };
 use num::{BigInt, Zero};
 use num_traits::ToPrimitive;
+use ordered_float::NotNan;
 
 pub fn from_integer_literal<O: Objective>(
     value: &BigInt,
@@ -99,7 +100,10 @@ fn from_integer_literal_to_float<O: Objective>(
         Some(literal) => O::success(|| {
             TypedExpr::new(
                 TypeKind::Floating(to_size).at(source),
-                Expr::new(ExprKind::FloatingLiteral(to_size, literal), source),
+                Expr::new(
+                    ExprKind::FloatingLiteral(to_size, NotNan::new(literal).ok()),
+                    source,
+                ),
             )
         }),
         None => O::fail(),

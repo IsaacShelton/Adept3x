@@ -16,6 +16,7 @@ use derive_more::{IsVariant, Unwrap};
 pub use fixed_array::FixedArray;
 pub use function_pointer::FunctionPointer;
 use num::{BigInt, Zero};
+use ordered_float::NotNan;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
@@ -25,7 +26,7 @@ pub enum TypeKind {
     Integer(IntegerBits, IntegerSign),
     CInteger(CInteger, Option<IntegerSign>),
     IntegerLiteral(BigInt),
-    FloatLiteral(f64),
+    FloatLiteral(Option<NotNan<f64>>),
     Floating(FloatSize),
     Pointer(Box<Type>),
     Void,
@@ -128,7 +129,13 @@ impl Display for TypeKind {
                 FloatSize::Bits32 => f.write_str("f32")?,
                 FloatSize::Bits64 => f.write_str("f64")?,
             },
-            TypeKind::FloatLiteral(value) => write!(f, "float {}", value)?,
+            TypeKind::FloatLiteral(value) => {
+                if let Some(value) = value {
+                    write!(f, "float {}", value)?
+                } else {
+                    write!(f, "float NaN")?;
+                }
+            }
             TypeKind::Pointer(inner) => {
                 write!(f, "ptr<{}>", **inner)?;
             }
