@@ -41,20 +41,8 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Floating(size) => Ok(resolved::TypeKind::Floating(*size)),
             ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
             ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
-            ast::TypeKind::AnonymousEnum(anonymous_enum) => {
-                let resolved_type = Box::new(resolve_enum_backing_type(
-                    self,
-                    anonymous_enum.backing_type.as_deref(),
-                    ast_type.source,
-                )?);
-
-                let members = anonymous_enum.members.clone();
-
-                Ok(resolved::TypeKind::AnonymousEnum(resolved::AnonymousEnum {
-                    resolved_type,
-                    source: ast_type.source,
-                    members,
-                }))
+            ast::TypeKind::AnonymousEnum(_) => {
+                todo!("resolve anonymous enum type")
             }
             ast::TypeKind::FixedArray(fixed_array) => {
                 if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {

@@ -81,7 +81,7 @@ impl PolyCatalog {
             },
             resolved::TypeKind::AnonymousStruct() => todo!(),
             resolved::TypeKind::AnonymousUnion() => todo!(),
-            resolved::TypeKind::AnonymousEnum(_) => todo!(),
+            resolved::TypeKind::AnonymousEnum() => todo!(),
             resolved::TypeKind::FixedArray(pattern_inner) => match &concrete_type.kind {
                 resolved::TypeKind::FixedArray(concrete_inner) => {
                     self.match_type(&pattern_inner.inner, &concrete_inner.inner)

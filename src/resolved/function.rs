@@ -43,7 +43,7 @@ impl Display for Parameters {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq)]
 pub struct Parameter {
     pub name: String,
     pub resolved_type: Type,

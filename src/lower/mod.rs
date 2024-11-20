@@ -106,8 +106,8 @@ fn lower_type(
         resolved::TypeKind::AnonymousUnion() => {
             todo!("lower anonymous union")
         }
-        resolved::TypeKind::AnonymousEnum(anonymous_enum) => {
-            lower_type(target, &anonymous_enum.resolved_type, resolved_ast)
+        resolved::TypeKind::AnonymousEnum() => {
+            todo!("lower anonymous enum")
         }
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;

@@ -10,8 +10,8 @@ use crate::{
     source_files::Source,
     target::Target,
 };
-pub use anonymous_enum::AnonymousEnum;
 pub use constraint::Constraint;
+use core::hash::Hash;
 use derive_more::{IsVariant, Unwrap};
 pub use fixed_array::FixedArray;
 pub use function_pointer::FunctionPointer;
@@ -19,7 +19,7 @@ use num::{BigInt, Zero};
 use ordered_float::NotNan;
 use std::fmt::Display;
 
-#[derive(Clone, Debug, PartialEq, IsVariant, Unwrap)]
+#[derive(Clone, Debug, Hash, PartialEq, IsVariant, Unwrap)]
 pub enum TypeKind {
     Unresolved,
     Boolean,
@@ -32,7 +32,7 @@ pub enum TypeKind {
     Void,
     AnonymousStruct(),
     AnonymousUnion(),
-    AnonymousEnum(AnonymousEnum),
+    AnonymousEnum(),
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
     Enum(HumanName, EnumRef),
@@ -61,7 +61,7 @@ impl TypeKind {
             TypeKind::Void => false,
             TypeKind::AnonymousStruct() => todo!(),
             TypeKind::AnonymousUnion() => todo!(),
-            TypeKind::AnonymousEnum(_) => todo!(),
+            TypeKind::AnonymousEnum() => todo!(),
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
             TypeKind::FunctionPointer(_) => todo!(),
             TypeKind::Enum(_, _) => false,
@@ -95,7 +95,7 @@ impl TypeKind {
             | TypeKind::FixedArray(..)
             | TypeKind::FunctionPointer(..)
             | TypeKind::Enum(_, _)
-            | TypeKind::AnonymousEnum(_)
+            | TypeKind::AnonymousEnum()
             | TypeKind::Polymorph(_, _) => None,
         }
     }

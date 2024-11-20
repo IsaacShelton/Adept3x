@@ -2,7 +2,7 @@ use super::description::{IntegerBits, IntegerSign};
 use crate::{ast::Settings, data_units::ByteUnits, target::Target};
 use derive_more::IsVariant;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IsVariant, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, IsVariant, PartialOrd, Ord)]
 pub enum CInteger {
     Char,
     Short,

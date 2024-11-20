@@ -378,7 +378,7 @@ pub fn resolve_polymorphs<'a>(
         }
         resolved::TypeKind::AnonymousStruct() => todo!(),
         resolved::TypeKind::AnonymousUnion() => todo!(),
-        resolved::TypeKind::AnonymousEnum(_) => todo!(),
+        resolved::TypeKind::AnonymousEnum() => todo!(),
         resolved::TypeKind::FixedArray(fixed_array) => {
             resolved::TypeKind::FixedArray(Box::new(resolved::FixedArray {
                 size: fixed_array.size,

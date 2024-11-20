@@ -138,7 +138,7 @@ fn collect_constraints(set: &mut HashSet<Constraint>, ty: &resolved::Type) {
         resolved::TypeKind::Void => (),
         resolved::TypeKind::AnonymousStruct() => todo!(),
         resolved::TypeKind::AnonymousUnion() => todo!(),
-        resolved::TypeKind::AnonymousEnum(_) => todo!(),
+        resolved::TypeKind::AnonymousEnum() => todo!(),
         resolved::TypeKind::FixedArray(fixed_array) => collect_constraints(set, &fixed_array.inner),
         resolved::TypeKind::FunctionPointer(_) => todo!(),
         resolved::TypeKind::Enum(_, _) => (),
