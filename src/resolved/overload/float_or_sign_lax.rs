@@ -1,7 +1,7 @@
 use super::FloatOrSign;
 use crate::{ast::CInteger, ir::IntegerSign, target::Target};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum FloatOrSignLax {
     Integer(IntegerSign),
     IndeterminateInteger(CInteger),

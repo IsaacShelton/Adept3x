@@ -8,7 +8,7 @@ pub struct UnaryMathOperation {
     pub inner: Expr,
 }
 
-#[derive(Copy, Clone, Debug, IsVariant)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, IsVariant)]
 pub enum UnaryMathOperator {
     Not,
     BitComplement,

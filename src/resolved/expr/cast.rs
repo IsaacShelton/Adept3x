@@ -1,7 +1,7 @@
 use super::Expr;
 use crate::resolved::Type;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Cast {
     pub target_type: Type,
     pub value: Expr,

@@ -1,6 +1,6 @@
 use crate::resolved::{Destination, StructureRef, Type};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Member {
     pub subject: Destination,
     pub structure_ref: StructureRef,

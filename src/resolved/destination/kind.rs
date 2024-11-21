@@ -1,6 +1,6 @@
 use crate::resolved::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum DestinationKind {
     Variable(Variable),
     GlobalVariable(GlobalVariable),

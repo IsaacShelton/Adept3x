@@ -1,9 +1,8 @@
 use super::Expr;
 use crate::resolved::Type;
-use indexmap::IndexMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct StructLiteral {
     pub structure_type: Type,
-    pub fields: IndexMap<String, (Expr, usize)>,
+    pub fields: Vec<(String, Expr, usize)>,
 }

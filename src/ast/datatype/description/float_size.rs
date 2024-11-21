@@ -1,4 +1,4 @@
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub enum FloatSize {
     Bits32,
     Bits64,

@@ -8,7 +8,7 @@ pub struct ShortCircuitingBinaryOperation {
     pub right: Expr,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ShortCircuitingBinaryOperator {
     And,
     Or,

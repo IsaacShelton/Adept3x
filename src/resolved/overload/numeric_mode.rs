@@ -3,7 +3,7 @@ use crate::{
     ir::IntegerSign,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum NumericMode {
     Integer(IntegerSign),
     LooseIndeterminateSignInteger(CInteger),

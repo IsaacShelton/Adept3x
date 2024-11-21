@@ -149,7 +149,7 @@ pub enum Instruction {
     InterpreterSyscall(InterpreterSyscallKind, Vec<Value>),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum InterpreterSyscallKind {
     Println,
     BuildAddProject,

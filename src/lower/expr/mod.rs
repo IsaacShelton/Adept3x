@@ -338,7 +338,7 @@ pub fn lower_expr(
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
-            for (expr, index) in fields.values() {
+            for (_, expr, index) in fields.iter() {
                 let ir_value = lower_expr(builder, ir_module, expr, function, resolved_ast)?;
                 values.push((index, ir_value));
             }

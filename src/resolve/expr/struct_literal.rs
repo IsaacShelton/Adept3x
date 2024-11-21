@@ -165,6 +165,11 @@ pub fn resolve_struct_literal_expr(
         assert_eq!(resolved_fields.len(), structure.fields.len());
     }
 
+    let resolved_fields = resolved_fields
+        .into_iter()
+        .map(|(x, (y, z))| (x, y, z))
+        .collect_vec();
+
     Ok(TypedExpr::new(
         resolved_struct_type.clone(),
         resolved::Expr::new(

@@ -12,7 +12,7 @@ pub enum Integer {
     Generic(BigInt),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct IntegerKnown {
     pub rigidity: IntegerRigidity,
     pub value: BigInt,
@@ -30,7 +30,7 @@ impl IntegerKnown {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum IntegerRigidity {
     Fixed(IntegerBits, IntegerSign),
     Loose(CInteger, Option<IntegerSign>),

@@ -8,7 +8,7 @@ use num::BigInt;
 use ordered_float::NotNan;
 use std::ffi::CString;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ExprKind {
     Variable(Box<Variable>),
     GlobalVariable(Box<GlobalVariable>),

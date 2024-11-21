@@ -22,6 +22,7 @@ pub use call::*;
 pub use cast::*;
 pub use cast_from::*;
 pub use conditional::*;
+use core::hash::Hash;
 pub use decl_assign::*;
 pub use enum_member::*;
 pub use global_variable::*;
@@ -38,6 +39,20 @@ pub struct Expr {
     pub kind: ExprKind,
     pub source: Source,
 }
+
+impl Hash for Expr {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind.hash(state)
+    }
+}
+
+impl PartialEq for Expr {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind.eq(&other.kind)
+    }
+}
+
+impl Eq for Expr {}
 
 impl Expr {
     pub fn new(kind: ExprKind, source: Source) -> Self {

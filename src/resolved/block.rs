@@ -1,7 +1,7 @@
 use super::{Stmt, StmtKind, Type, TypeKind};
 use crate::source_files::Source;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
 }

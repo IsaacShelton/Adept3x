@@ -1,26 +1,38 @@
 use super::Type;
 use crate::resolved;
+use core::hash::Hash;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
 
 // TODO: We probably want this to store some kind of internal hash
 // Also, it should itself implement hash
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolyRecipe {
     pub polymorphs: IndexMap<String, PolyValue>,
 }
 
-#[derive(Clone, Debug)]
+impl Hash for PolyRecipe {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.polymorphs.len().hash(state);
+
+        for (key, val) in self.polymorphs.iter() {
+            key.hash(state);
+            val.hash(state);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct PolyType {
     pub resolved_type: Type,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct PolyExpr {
     expr: resolved::Expr,
 }
 
-#[derive(Clone, Debug, IsVariant)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, IsVariant)]
 pub enum PolyValue {
     PolyType(PolyType),
     PolyExpr(PolyExpr),

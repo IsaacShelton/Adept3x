@@ -36,7 +36,7 @@ impl VariableInstance {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct VariableStorageKey {
     pub index: usize,
 }
