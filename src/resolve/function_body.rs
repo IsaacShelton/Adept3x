@@ -4,8 +4,7 @@ use super::{
 };
 use crate::{
     ast::{self, AstWorkspace},
-    ir::FunctionRef,
-    resolved,
+    resolved::{self, FunctionRef},
     workspace::fs::FsNodeId,
 };
 

@@ -6,7 +6,6 @@ use super::{
     expr::{PreferredType, ResolveExprCtx},
 };
 use crate::{
-    ir::FunctionRef,
     name::{Name, ResolvedName},
     resolve::conform::Perform,
     resolved::{self, Callee, PolyCatalog, TypeKind, TypedExpr},
@@ -94,7 +93,7 @@ impl FunctionHaystack {
 
     fn fits(
         ctx: &ResolveExprCtx,
-        function_ref: FunctionRef,
+        function_ref: resolved::FunctionRef,
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Callee> {

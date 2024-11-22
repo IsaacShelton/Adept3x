@@ -55,11 +55,7 @@ pub fn emit_epilogue(
         });
     };
 
-    let ir_function = ctx
-        .ir_module
-        .functions
-        .get(&skeleton.ir_function_ref)
-        .unwrap();
+    let ir_function = ctx.ir_module.functions.get(skeleton.ir_function_ref);
 
     let ir_return_type = &ir_function.return_type;
     let abi_return_info = &abi_function.return_type;

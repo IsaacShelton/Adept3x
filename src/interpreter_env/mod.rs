@@ -10,7 +10,7 @@ use crate::{
     },
     ir::{self, InterpreterSyscallKind},
     name::Name,
-    resolved,
+    resolved::{self, PolyRecipe},
     source_files::Source,
     tag::Tag,
 };
@@ -323,6 +323,10 @@ pub fn run_build_system_interpreter<'a>(
         .iter()
         .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))
         .unwrap();
+
+    let interpreter_entry_point = ir_module
+        .functions
+        .translate(interpreter_entry_point, PolyRecipe::default());
 
     let max_steps = Some(1_000_000);
     let handler = BuildSystemSyscallHandler::default();

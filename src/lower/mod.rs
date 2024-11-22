@@ -15,7 +15,7 @@ use crate::{
     resolved,
     target::{Target, TargetOsExt},
 };
-use function::lower_function;
+use function::{lower_function, lower_function_body};
 use global::lower_global;
 use structure::lower_structure;
 
@@ -40,6 +40,14 @@ pub fn lower<'a>(
         }
 
         lower_function(&mut ir_module, function_ref, function, ast)?;
+    }
+
+    for (function_ref, function) in ast.functions.iter() {
+        if function.is_generic {
+            continue;
+        }
+
+        lower_function_body(&mut ir_module, function_ref, function, ast)?;
     }
 
     if options.emit_ir {

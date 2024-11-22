@@ -142,12 +142,6 @@ pub fn lower_expr(
                 .get(call.callee.function)
                 .expect("referenced function to exist");
 
-            ir_module
-                .function_uses
-                .write()
-                .unwrap()
-                .insert(call.callee.function);
-
             let arguments = call
                 .arguments
                 .iter()
@@ -163,8 +157,12 @@ pub fn lower_expr(
                 })
                 .collect::<Result<Box<[_]>, _>>()?;
 
+            let function = ir_module
+                .functions
+                .translate(call.callee.function, &call.callee.recipe);
+
             Ok(builder.push(ir::Instruction::Call(ir::Call {
-                function: call.callee.function,
+                function,
                 arguments,
                 unpromoted_variadic_argument_types: variadic_argument_types,
             })))

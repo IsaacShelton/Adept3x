@@ -20,17 +20,6 @@ use std::ffi::CString;
 
 pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (function_ref, function) in ctx.ir_module.functions.iter() {
-        // Skip unused functions
-        if !ctx
-            .ir_module
-            .function_uses
-            .read()
-            .unwrap()
-            .contains(function_ref)
-        {
-            continue;
-        }
-
         let mut abi_function = function
             .abide_abi
             .then(|| {
@@ -89,12 +78,12 @@ pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendE
         }
 
         ctx.func_skeletons.insert(
-            *function_ref,
+            function_ref,
             FunctionSkeleton {
                 function: skeleton,
                 abi_function,
                 function_type,
-                ir_function_ref: *function_ref,
+                ir_function_ref: function_ref,
                 max_vector_width,
             },
         );
