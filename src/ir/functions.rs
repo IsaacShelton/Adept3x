@@ -10,11 +10,12 @@
 
 use super::Function;
 use crate::resolved::{self, PolyRecipe};
-use std::{borrow::Borrow, collections::HashMap};
+use append_only_vec::AppendOnlyVec;
+use std::{borrow::Borrow, collections::HashMap, sync::RwLock};
 
 pub struct Functions {
-    functions: Vec<Function>,
-    monomorphized: HashMap<(resolved::FunctionRef, PolyRecipe), FunctionRef>,
+    functions: AppendOnlyVec<Function>,
+    monomorphized: RwLock<HashMap<(resolved::FunctionRef, PolyRecipe), FunctionRef>>,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -25,8 +26,8 @@ pub struct FunctionRef {
 impl Functions {
     pub fn new() -> Self {
         Self {
-            functions: Vec::with_capacity(32),
-            monomorphized: HashMap::new(),
+            functions: AppendOnlyVec::new(),
+            monomorphized: RwLock::new(HashMap::new()),
         }
     }
 
@@ -38,7 +39,7 @@ impl Functions {
         let index = self.functions.len();
         self.functions.push(function);
         let ir_function_ref = FunctionRef { index };
-        self.monomorphized.insert(
+        self.monomorphized.write().unwrap().insert(
             (resolved_function_ref, PolyRecipe::default()),
             ir_function_ref,
         );
@@ -50,22 +51,27 @@ impl Functions {
         resolved_function_ref: resolved::FunctionRef,
         poly_recipe: impl Borrow<PolyRecipe>,
     ) -> FunctionRef {
-        // TODO: Fix this performance by creating a reference type or double lookup or
-        // something
-        let found = self
+        if let Some(found) = self
             .monomorphized
-            .get(&(resolved_function_ref, poly_recipe.borrow().clone()));
+            .read()
+            .unwrap()
+            .get(&(resolved_function_ref, poly_recipe.borrow().clone()))
+        {
+            return *found;
+        }
 
-        let Some(found) = found else {
-            panic!(
-                "ir::Functions::translate not implemented for generic functions yet - {:?} {:?} :: {:?}",
-                resolved_function_ref,
-                poly_recipe.borrow(),
-                self.monomorphized
-            );
+        let function_ref = FunctionRef {
+            index: self.functions.push(todo!(
+                "generate function head for polymorphic function monomorphization"
+            )),
         };
 
-        *found
+        self.monomorphized.write().unwrap().insert(
+            (resolved_function_ref, poly_recipe.borrow().clone()),
+            function_ref,
+        );
+
+        function_ref
     }
 
     pub fn get(&self, key: FunctionRef) -> &Function {
