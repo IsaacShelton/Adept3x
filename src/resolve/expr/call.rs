@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Cast, CastFrom, PolyRecipe, PolyValue, TypedExpr},
+    resolved::{self, Cast, CastFrom, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -329,7 +329,10 @@ pub fn resolve_call_expr(
         }
     }
 
-    let return_type = resolve_polymorphs(&callee.recipe, &function.return_type)?;
+    let return_type = callee
+        .recipe
+        .resolve_polymorphs(&function.return_type)
+        .map_err(ResolveError::from)?;
 
     if let Some(required_ty) = &call.expected_to_return {
         let resolved_required_ty = ctx.type_ctx().resolve(required_ty)?;
@@ -356,50 +359,4 @@ pub fn resolve_call_expr(
             source,
         ),
     ))
-}
-
-pub fn resolve_polymorphs<'a>(
-    recipe: &PolyRecipe,
-    ty: &resolved::Type,
-) -> Result<resolved::Type, ResolveError> {
-    let polymorphs = &recipe.polymorphs;
-
-    Ok(match &ty.kind {
-        resolved::TypeKind::Unresolved => panic!(),
-        resolved::TypeKind::Boolean
-        | resolved::TypeKind::Integer(_, _)
-        | resolved::TypeKind::CInteger(_, _)
-        | resolved::TypeKind::IntegerLiteral(_)
-        | resolved::TypeKind::FloatLiteral(_)
-        | resolved::TypeKind::Void
-        | resolved::TypeKind::Floating(_) => ty.clone(),
-        resolved::TypeKind::Pointer(inner) => {
-            resolved::TypeKind::Pointer(Box::new(resolve_polymorphs(recipe, inner)?)).at(ty.source)
-        }
-        resolved::TypeKind::AnonymousStruct() => todo!(),
-        resolved::TypeKind::AnonymousUnion() => todo!(),
-        resolved::TypeKind::AnonymousEnum() => todo!(),
-        resolved::TypeKind::FixedArray(fixed_array) => {
-            resolved::TypeKind::FixedArray(Box::new(resolved::FixedArray {
-                size: fixed_array.size,
-                inner: resolve_polymorphs(recipe, &fixed_array.inner)?,
-            }))
-            .at(ty.source)
-        }
-        resolved::TypeKind::FunctionPointer(_) => todo!(),
-        resolved::TypeKind::Enum(_, _) => todo!(),
-        resolved::TypeKind::Structure(_, _) => todo!(),
-        resolved::TypeKind::TypeAlias(_, _) => todo!(),
-        resolved::TypeKind::Polymorph(name, _) => {
-            let Some(value) = polymorphs.get(name) else {
-                return Err(ResolveErrorKind::NonExistentPolymorph(name.clone()).at(ty.source));
-            };
-
-            let PolyValue::PolyType(poly_type) = value else {
-                return Err(ResolveErrorKind::PolymorphIsNotAType(name.clone()).at(ty.source));
-            };
-
-            poly_type.resolved_type.clone()
-        }
-    })
 }

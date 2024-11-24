@@ -1,6 +1,6 @@
 use super::function_haystack::FindFunctionError;
 use crate::{
-    resolved::UnaliasError,
+    resolved::{PolymorphError, PolymorphErrorKind, UnaliasError},
     show::Show,
     source_files::{Source, SourceFiles},
 };
@@ -22,6 +22,18 @@ impl ResolveError {
 impl From<UnaliasError> for ResolveErrorKind {
     fn from(value: UnaliasError) -> Self {
         Self::UnaliasError(value)
+    }
+}
+
+impl From<PolymorphError> for ResolveError {
+    fn from(value: PolymorphError) -> Self {
+        ResolveErrorKind::from(value.kind).at(value.source)
+    }
+}
+
+impl From<PolymorphErrorKind> for ResolveErrorKind {
+    fn from(value: PolymorphErrorKind) -> Self {
+        Self::PolymorphError(value)
     }
 }
 
@@ -182,8 +194,7 @@ pub enum ResolveErrorKind {
     CannotDeclareVariableOutsideFunction,
     CannotReturnOutsideFunction,
     CannotAssignVariableOutsideFunction,
-    NonExistentPolymorph(String),
-    PolymorphIsNotAType(String),
+    PolymorphError(PolymorphErrorKind),
     Other {
         message: String,
     },
@@ -503,10 +514,10 @@ impl Display for ResolveErrorKind {
                     "Cannot assign variable outside of function"
                 )?;
             }
-            ResolveErrorKind::NonExistentPolymorph(name) => {
+            ResolveErrorKind::PolymorphError(PolymorphErrorKind::NonExistentPolymorph(name)) => {
                 write!(f, "Non-existent polymorph '${}'", name)?;
             }
-            ResolveErrorKind::PolymorphIsNotAType(name) => {
+            ResolveErrorKind::PolymorphError(PolymorphErrorKind::PolymorphIsNotAType(name)) => {
                 write!(f, "Polymorph '${}' is not a type", name)?;
             }
             ResolveErrorKind::Other { message } => {

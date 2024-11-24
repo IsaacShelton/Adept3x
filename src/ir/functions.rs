@@ -32,7 +32,7 @@ impl Functions {
     }
 
     pub fn insert(
-        &mut self,
+        &self,
         resolved_function_ref: resolved::FunctionRef,
         function: Function,
     ) -> FunctionRef {
@@ -46,32 +46,29 @@ impl Functions {
         ir_function_ref
     }
 
-    pub fn translate(
+    pub fn translate<E>(
         &self,
         resolved_function_ref: resolved::FunctionRef,
         poly_recipe: impl Borrow<PolyRecipe>,
-    ) -> FunctionRef {
+        monomorphize: impl Fn() -> Result<FunctionRef, E>,
+    ) -> Result<FunctionRef, E> {
         if let Some(found) = self
             .monomorphized
             .read()
             .unwrap()
             .get(&(resolved_function_ref, poly_recipe.borrow().clone()))
         {
-            return *found;
+            return Ok(*found);
         }
 
-        let function_ref = FunctionRef {
-            index: self.functions.push(todo!(
-                "generate function head for polymorphic function monomorphization"
-            )),
-        };
+        let function_ref = monomorphize()?;
 
         self.monomorphized.write().unwrap().insert(
             (resolved_function_ref, poly_recipe.borrow().clone()),
             function_ref,
         );
 
-        function_ref
+        Ok(function_ref)
     }
 
     pub fn get(&self, key: FunctionRef) -> &Function {

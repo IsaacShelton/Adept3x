@@ -15,7 +15,7 @@ pub fn resolve_function_bodies(
 ) -> Result<(), ResolveError> {
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
-            FuncJob::Regular(physical_file_id, function_index, resolved_function_ref) => {
+            FuncJob::Regular(physical_file_id, ast_function_index, resolved_function_ref) => {
                 let module_file_id = ast_workspace
                     .get_owning_module(physical_file_id)
                     .unwrap_or(physical_file_id);
@@ -32,7 +32,7 @@ pub fn resolve_function_bodies(
 
                 let ast_function = ast_file
                     .functions
-                    .get(function_index)
+                    .get(ast_function_index)
                     .expect("function referenced by job to exist");
 
                 let variable_haystack = resolve_parameter_variables(

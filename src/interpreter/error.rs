@@ -8,6 +8,7 @@ pub enum InterpreterError {
     SegfaultRead,
     DivideByZero,
     RemainderByZero,
+    PolymorphicEntryPoint,
 }
 
 impl Display for InterpreterError {
@@ -23,6 +24,7 @@ impl Display for InterpreterError {
             }
             InterpreterError::DivideByZero => "divide by zero",
             InterpreterError::RemainderByZero => "remainder by zero",
+            InterpreterError::PolymorphicEntryPoint => "polymorphic entry point",
         };
 
         f.write_str(message)

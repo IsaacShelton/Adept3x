@@ -13,9 +13,14 @@ use crate::{
 pub fn lower_function_body(
     ir_module: &mut ir::Module,
     function_ref: resolved::FunctionRef,
-    function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
 ) -> Result<(), LowerError> {
+    let function = resolved_ast
+        .functions
+        .get(function_ref)
+        .expect("valid function reference");
+
     if function.is_foreign {
         return Ok(());
     }
@@ -88,21 +93,36 @@ pub fn lower_function_body(
         }
     }
 
-    let ir_function_ref = ir_module
-        .functions
-        .translate(function_ref, PolyRecipe::default());
+    let ir_function_ref = {
+        let ir_module = &*ir_module;
+
+        ir_module
+            .functions
+            .translate(function_ref, PolyRecipe::default(), || {
+                lower_function_head(ir_module, function_ref, poly_recipe, resolved_ast)
+            })?
+    };
 
     let ir_function = ir_module.functions.get_mut(ir_function_ref);
     ir_function.basicblocks = builder.build();
     Ok(())
 }
 
-pub fn lower_function(
-    ir_module: &mut ir::Module,
+pub fn lower_function_head(
+    ir_module: &ir::Module,
     function_ref: resolved::FunctionRef,
-    function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
-) -> Result<(), LowerError> {
+) -> Result<ir::FunctionRef, LowerError> {
+    let function = resolved_ast
+        .functions
+        .get(function_ref)
+        .expect("valid function reference");
+
+    if !poly_recipe.polymorphs.is_empty() {
+        println!("warning: lower_function_head ignoring poly recipe");
+    }
+
     let basicblocks = BasicBlocks::default();
 
     let mut parameters = vec![];
@@ -136,7 +156,7 @@ pub fn lower_function(
     let is_main = mangled_name == "main";
     let is_exposed = is_main;
 
-    ir_module.functions.insert(
+    Ok(ir_module.functions.insert(
         function_ref,
         ir::Function {
             mangled_name,
@@ -148,7 +168,5 @@ pub fn lower_function(
             is_exposed,
             abide_abi: function.abide_abi && ir_module.target.arch().is_some(),
         },
-    );
-
-    Ok(())
+    ))
 }

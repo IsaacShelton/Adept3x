@@ -324,9 +324,12 @@ pub fn run_build_system_interpreter<'a>(
         .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))
         .unwrap();
 
-    let interpreter_entry_point = ir_module
-        .functions
-        .translate(interpreter_entry_point, PolyRecipe::default());
+    let interpreter_entry_point =
+        ir_module
+            .functions
+            .translate(interpreter_entry_point, PolyRecipe::default(), || {
+                Err(InterpreterError::PolymorphicEntryPoint)
+            })?;
 
     let max_steps = Some(1_000_000);
     let handler = BuildSystemSyscallHandler::default();

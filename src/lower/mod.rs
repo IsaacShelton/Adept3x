@@ -12,10 +12,10 @@ use crate::{
     ast::{CInteger, FloatSize},
     cli::BuildOptions,
     ir::{self, IntegerSign},
-    resolved,
+    resolved::{self, PolyRecipe},
     target::{Target, TargetOsExt},
 };
-use function::{lower_function, lower_function_body};
+use function::{lower_function_body, lower_function_head};
 use global::lower_global;
 use structure::lower_structure;
 
@@ -39,7 +39,7 @@ pub fn lower<'a>(
             continue;
         }
 
-        lower_function(&mut ir_module, function_ref, function, ast)?;
+        lower_function_head(&mut ir_module, function_ref, &PolyRecipe::default(), ast)?;
     }
 
     for (function_ref, function) in ast.functions.iter() {
@@ -47,7 +47,7 @@ pub fn lower<'a>(
             continue;
         }
 
-        lower_function_body(&mut ir_module, function_ref, function, ast)?;
+        lower_function_body(&mut ir_module, function_ref, &PolyRecipe::default(), ast)?;
     }
 
     if options.emit_ir {

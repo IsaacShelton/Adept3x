@@ -4,6 +4,7 @@ use super::{
     builder::Builder,
     cast::{integer_cast, integer_extend, integer_truncate},
     error::{LowerError, LowerErrorKind},
+    function::lower_function_head,
     lower_type,
     stmts::lower_stmts,
 };
@@ -157,9 +158,17 @@ pub fn lower_expr(
                 })
                 .collect::<Result<Box<[_]>, _>>()?;
 
-            let function = ir_module
-                .functions
-                .translate(call.callee.function, &call.callee.recipe);
+            let function =
+                ir_module
+                    .functions
+                    .translate(call.callee.function, &call.callee.recipe, || {
+                        lower_function_head(
+                            ir_module,
+                            call.callee.function,
+                            &call.callee.recipe,
+                            resolved_ast,
+                        )
+                    })?;
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
                 function,

@@ -1,5 +1,5 @@
 use super::Type;
-use crate::resolved;
+use crate::{resolved, source_files::Source};
 use core::hash::Hash;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
@@ -9,6 +9,74 @@ use indexmap::IndexMap;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PolyRecipe {
     pub polymorphs: IndexMap<String, PolyValue>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PolymorphError {
+    pub kind: PolymorphErrorKind,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub enum PolymorphErrorKind {
+    NonExistentPolymorph(String),
+    PolymorphIsNotAType(String),
+}
+
+impl PolymorphErrorKind {
+    pub fn at(self, source: Source) -> PolymorphError {
+        PolymorphError { kind: self, source }
+    }
+}
+
+impl PolyRecipe {
+    pub fn resolve_polymorphs<'a>(
+        &self,
+        ty: &resolved::Type,
+    ) -> Result<resolved::Type, PolymorphError> {
+        let polymorphs = &self.polymorphs;
+
+        Ok(match &ty.kind {
+            resolved::TypeKind::Unresolved => panic!(),
+            resolved::TypeKind::Boolean
+            | resolved::TypeKind::Integer(_, _)
+            | resolved::TypeKind::CInteger(_, _)
+            | resolved::TypeKind::IntegerLiteral(_)
+            | resolved::TypeKind::FloatLiteral(_)
+            | resolved::TypeKind::Void
+            | resolved::TypeKind::Floating(_) => ty.clone(),
+            resolved::TypeKind::Pointer(inner) => {
+                resolved::TypeKind::Pointer(Box::new(self.resolve_polymorphs(inner)?)).at(ty.source)
+            }
+            resolved::TypeKind::AnonymousStruct() => todo!(),
+            resolved::TypeKind::AnonymousUnion() => todo!(),
+            resolved::TypeKind::AnonymousEnum() => todo!(),
+            resolved::TypeKind::FixedArray(fixed_array) => {
+                resolved::TypeKind::FixedArray(Box::new(resolved::FixedArray {
+                    size: fixed_array.size,
+                    inner: self.resolve_polymorphs(&fixed_array.inner)?,
+                }))
+                .at(ty.source)
+            }
+            resolved::TypeKind::FunctionPointer(_) => todo!(),
+            resolved::TypeKind::Enum(_, _) => todo!(),
+            resolved::TypeKind::Structure(_, _) => todo!(),
+            resolved::TypeKind::TypeAlias(_, _) => todo!(),
+            resolved::TypeKind::Polymorph(name, _) => {
+                let Some(value) = polymorphs.get(name) else {
+                    return Err(
+                        PolymorphErrorKind::NonExistentPolymorph(name.clone()).at(ty.source)
+                    );
+                };
+
+                let PolyValue::PolyType(poly_type) = value else {
+                    return Err(PolymorphErrorKind::PolymorphIsNotAType(name.clone()).at(ty.source));
+                };
+
+                poly_type.resolved_type.clone()
+            }
+        })
+    }
 }
 
 impl Hash for PolyRecipe {
