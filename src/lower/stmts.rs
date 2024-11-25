@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     ir::{self, Literal, Value, ValueReference},
-    resolved::{self, StmtKind},
+    resolved::{self, PolyRecipe, StmtKind},
     tag::Tag,
 };
 
@@ -15,6 +15,7 @@ pub fn lower_stmts(
     ir_module: &ir::Module,
     stmts: &[resolved::Stmt],
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
 ) -> Result<Value, LowerError> {
     let mut result = Value::Literal(Literal::Void);
@@ -28,6 +29,7 @@ pub fn lower_stmts(
                         ir_module,
                         expr,
                         function,
+                        poly_recipe,
                         resolved_ast,
                     )?)
                 } else if function.tag == Some(Tag::Main) {
@@ -39,9 +41,14 @@ pub fn lower_stmts(
                 builder.push(instruction);
                 Value::Literal(Literal::Void)
             }
-            StmtKind::Expr(expr) => {
-                lower_expr(builder, ir_module, &expr.expr, function, resolved_ast)?
-            }
+            StmtKind::Expr(expr) => lower_expr(
+                builder,
+                ir_module,
+                &expr.expr,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?,
             StmtKind::Declaration(declaration) => {
                 let destination = Value::Reference(ValueReference {
                     basicblock_id: 0,
@@ -49,7 +56,14 @@ pub fn lower_stmts(
                 });
 
                 if let Some(value) = &declaration.value {
-                    let source = lower_expr(builder, ir_module, value, function, resolved_ast)?;
+                    let source = lower_expr(
+                        builder,
+                        ir_module,
+                        value,
+                        function,
+                        poly_recipe,
+                        resolved_ast,
+                    )?;
 
                     builder.push(ir::Instruction::Store(ir::Store {
                         new_value: source,
@@ -65,6 +79,7 @@ pub fn lower_stmts(
                     ir_module,
                     &assignment.destination,
                     function,
+                    poly_recipe,
                     resolved_ast,
                 )?;
 
@@ -73,6 +88,7 @@ pub fn lower_stmts(
                     ir_module,
                     &assignment.value,
                     function,
+                    poly_recipe,
                     resolved_ast,
                 )?;
 

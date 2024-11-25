@@ -3,6 +3,7 @@ use crate::{resolved, source_files::Source};
 use core::hash::Hash;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
+use std::fmt::Display;
 
 // TODO: We probably want this to store some kind of internal hash
 // Also, it should itself implement hash
@@ -29,11 +30,21 @@ impl PolymorphErrorKind {
     }
 }
 
+impl Display for PolymorphErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PolymorphErrorKind::NonExistentPolymorph(name) => {
+                write!(f, "Non-existent polymorph '${}'", name)
+            }
+            PolymorphErrorKind::PolymorphIsNotAType(name) => {
+                write!(f, "Polymorph '${}' is not a type", name)
+            }
+        }
+    }
+}
+
 impl PolyRecipe {
-    pub fn resolve_polymorphs<'a>(
-        &self,
-        ty: &resolved::Type,
-    ) -> Result<resolved::Type, PolymorphError> {
+    pub fn resolve_type<'a>(&self, ty: &resolved::Type) -> Result<resolved::Type, PolymorphError> {
         let polymorphs = &self.polymorphs;
 
         Ok(match &ty.kind {
@@ -46,7 +57,7 @@ impl PolyRecipe {
             | resolved::TypeKind::Void
             | resolved::TypeKind::Floating(_) => ty.clone(),
             resolved::TypeKind::Pointer(inner) => {
-                resolved::TypeKind::Pointer(Box::new(self.resolve_polymorphs(inner)?)).at(ty.source)
+                resolved::TypeKind::Pointer(Box::new(self.resolve_type(inner)?)).at(ty.source)
             }
             resolved::TypeKind::AnonymousStruct() => todo!(),
             resolved::TypeKind::AnonymousUnion() => todo!(),
@@ -54,14 +65,14 @@ impl PolyRecipe {
             resolved::TypeKind::FixedArray(fixed_array) => {
                 resolved::TypeKind::FixedArray(Box::new(resolved::FixedArray {
                     size: fixed_array.size,
-                    inner: self.resolve_polymorphs(&fixed_array.inner)?,
+                    inner: self.resolve_type(&fixed_array.inner)?,
                 }))
                 .at(ty.source)
             }
             resolved::TypeKind::FunctionPointer(_) => todo!(),
             resolved::TypeKind::Enum(_, _) => todo!(),
-            resolved::TypeKind::Structure(_, _) => todo!(),
-            resolved::TypeKind::TypeAlias(_, _) => todo!(),
+            resolved::TypeKind::Structure(_, _) => ty.clone(),
+            resolved::TypeKind::TypeAlias(_, _) => ty.clone(),
             resolved::TypeKind::Polymorph(name, _) => {
                 let Some(value) = polymorphs.get(name) else {
                     return Err(

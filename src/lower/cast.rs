@@ -2,7 +2,7 @@ use super::{builder::Builder, error::LowerError, expr::lower_expr, lower_type};
 use crate::{
     data_units::ByteUnits,
     ir::{self, Value},
-    resolved::{self, Cast, CastFrom},
+    resolved::{self, Cast, CastFrom, PolyRecipe},
     target::Target,
 };
 
@@ -19,10 +19,18 @@ pub fn integer_truncate(
     builder: &mut Builder,
     ir_module: &ir::Module,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
     cast: &Cast,
 ) -> Result<Value, LowerError> {
-    let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+    let value = lower_expr(
+        builder,
+        ir_module,
+        &cast.value,
+        function,
+        poly_recipe,
+        resolved_ast,
+    )?;
     let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
     Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
 }
@@ -31,6 +39,7 @@ pub fn integer_extend(
     builder: &mut Builder,
     ir_module: &ir::Module,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
     cast_from: &CastFrom,
 ) -> Result<Value, LowerError> {
@@ -39,6 +48,7 @@ pub fn integer_extend(
         ir_module,
         &cast_from.cast.value,
         function,
+        poly_recipe,
         resolved_ast,
     )?;
     let ir_type = lower_type(&ir_module.target, &cast_from.cast.target_type, resolved_ast)?;
@@ -60,6 +70,7 @@ pub fn integer_cast(
     builder: &mut Builder,
     ir_module: &ir::Module,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
     cast_from: &CastFrom,
 ) -> Result<Value, LowerError> {
@@ -69,15 +80,30 @@ pub fn integer_cast(
         .expect("to type to be an integer");
 
     if from_size < to_size {
-        integer_extend(builder, ir_module, function, resolved_ast, &cast_from)
+        integer_extend(
+            builder,
+            ir_module,
+            function,
+            poly_recipe,
+            resolved_ast,
+            &cast_from,
+        )
     } else if from_size > to_size {
-        integer_truncate(builder, ir_module, function, resolved_ast, &cast_from.cast)
+        integer_truncate(
+            builder,
+            ir_module,
+            function,
+            poly_recipe,
+            resolved_ast,
+            &cast_from.cast,
+        )
     } else {
         Ok(lower_expr(
             builder,
             ir_module,
             &cast_from.cast.value,
             function,
+            poly_recipe,
             resolved_ast,
         )?)
     }

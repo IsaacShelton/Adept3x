@@ -2,7 +2,7 @@ use super::lower_expr;
 use crate::{
     ir::{self, Literal, Value},
     lower::{builder::Builder, error::LowerError},
-    resolved,
+    resolved::{self, PolyRecipe},
 };
 
 #[derive(Debug)]
@@ -19,10 +19,17 @@ pub fn lower_short_circuiting_binary_operation(
     ir_module: &ir::Module,
     operation: &resolved::ShortCircuitingBinaryOperation,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
 ) -> Result<Value, LowerError> {
-    let short_circuit =
-        lower_pre_short_circuit(builder, ir_module, operation, function, resolved_ast)?;
+    let short_circuit = lower_pre_short_circuit(
+        builder,
+        ir_module,
+        operation,
+        function,
+        poly_recipe,
+        resolved_ast,
+    )?;
     let merge_block_id = builder.new_block();
     builder.continues_to(merge_block_id);
     builder.use_block(short_circuit.left_done_block_id);
@@ -70,6 +77,7 @@ pub fn lower_pre_short_circuit(
     ir_module: &ir::Module,
     operation: &resolved::ShortCircuitingBinaryOperation,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
 ) -> Result<BinaryShortCircuit, LowerError> {
     let left = lower_expr(
@@ -77,6 +85,7 @@ pub fn lower_pre_short_circuit(
         ir_module,
         &operation.left.expr,
         function,
+        poly_recipe,
         resolved_ast,
     )?;
 
@@ -89,6 +98,7 @@ pub fn lower_pre_short_circuit(
         ir_module,
         &operation.right.expr,
         function,
+        poly_recipe,
         resolved_ast,
     )?;
     let right_done_block_id = builder.current_block_id();

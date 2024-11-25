@@ -1,4 +1,5 @@
 use crate::{
+    resolved::{PolymorphError, PolymorphErrorKind},
     show::Show,
     source_files::{Source, SourceFiles},
 };
@@ -38,6 +39,13 @@ pub enum LowerErrorKind {
     EnumBackingTypeMustBeInteger {
         enum_name: String,
     },
+    PolymorphError(PolymorphErrorKind),
+}
+
+impl From<PolymorphError> for LowerError {
+    fn from(value: PolymorphError) -> Self {
+        LowerErrorKind::PolymorphError(value.kind).at(value.source)
+    }
 }
 
 impl LowerErrorKind {
@@ -93,6 +101,7 @@ impl Display for LowerErrorKind {
             LowerErrorKind::EnumBackingTypeMustBeInteger { enum_name } => {
                 write!(f, "Backing type must be integer for enum '{}'", enum_name)
             }
+            LowerErrorKind::PolymorphError(e) => e.fmt(f),
         }
     }
 }

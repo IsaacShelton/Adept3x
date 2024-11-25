@@ -514,11 +514,8 @@ impl Display for ResolveErrorKind {
                     "Cannot assign variable outside of function"
                 )?;
             }
-            ResolveErrorKind::PolymorphError(PolymorphErrorKind::NonExistentPolymorph(name)) => {
-                write!(f, "Non-existent polymorph '${}'", name)?;
-            }
-            ResolveErrorKind::PolymorphError(PolymorphErrorKind::PolymorphIsNotAType(name)) => {
-                write!(f, "Polymorph '${}' is not a type", name)?;
+            ResolveErrorKind::PolymorphError(e) => {
+                e.fmt(f)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

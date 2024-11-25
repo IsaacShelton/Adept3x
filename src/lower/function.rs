@@ -3,6 +3,7 @@ use super::{
     error::{LowerError, LowerErrorKind},
     lower_type,
     stmts::lower_stmts,
+    unpoly::unpoly,
 };
 use crate::{
     ir::{self, BasicBlocks, Literal},
@@ -35,11 +36,11 @@ pub fn lower_function_body(
         .map(|instance| {
             Ok(builder.push(ir::Instruction::Alloca(lower_type(
                 &ir_module.target,
-                &instance.resolved_type,
+                &unpoly(poly_recipe, &instance.resolved_type)?,
                 resolved_ast,
             )?)))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, LowerError>>()?;
 
     // Allocate non-parameter stack variables
     for variable_instance in function
@@ -50,7 +51,7 @@ pub fn lower_function_body(
     {
         builder.push(ir::Instruction::Alloca(lower_type(
             &ir_module.target,
-            &variable_instance.resolved_type,
+            &unpoly(poly_recipe, &variable_instance.resolved_type)?,
             resolved_ast,
         )?));
     }
@@ -69,6 +70,7 @@ pub fn lower_function_body(
         ir_module,
         &function.stmts,
         function,
+        poly_recipe,
         resolved_ast,
     )?;
 
@@ -119,22 +121,22 @@ pub fn lower_function_head(
         .get(function_ref)
         .expect("valid function reference");
 
-    if !poly_recipe.polymorphs.is_empty() {
-        println!("warning: lower_function_head ignoring poly recipe");
-    }
-
     let basicblocks = BasicBlocks::default();
 
     let mut parameters = vec![];
     for parameter in function.parameters.required.iter() {
         parameters.push(lower_type(
             &ir_module.target,
-            &parameter.resolved_type,
+            &unpoly(poly_recipe, &parameter.resolved_type)?,
             resolved_ast,
         )?);
     }
 
-    let mut return_type = lower_type(&ir_module.target, &function.return_type, resolved_ast)?;
+    let mut return_type = lower_type(
+        &ir_module.target,
+        &unpoly(poly_recipe, &function.return_type)?,
+        resolved_ast,
+    )?;
 
     if function.tag == Some(Tag::Main) {
         if let ir::Type::Void = return_type {

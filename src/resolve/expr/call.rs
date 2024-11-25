@@ -331,7 +331,7 @@ pub fn resolve_call_expr(
 
     let return_type = callee
         .recipe
-        .resolve_polymorphs(&function.return_type)
+        .resolve_type(&function.return_type)
         .map_err(ResolveError::from)?;
 
     if let Some(required_ty) = &call.expected_to_return {

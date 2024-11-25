@@ -13,7 +13,7 @@ use crate::{
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, Member, NumericMode,
-        SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
+        PolyRecipe, SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
     },
 };
 use short_circuit::lower_short_circuiting_binary_operation;
@@ -23,6 +23,7 @@ pub fn lower_expr(
     ir_module: &ir::Module,
     expr: &Expr,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
 ) -> Result<ir::Value, LowerError> {
     match &expr.kind {
@@ -147,7 +148,14 @@ pub fn lower_expr(
                 .arguments
                 .iter()
                 .map(|argument| {
-                    lower_expr(builder, ir_module, &argument.expr, function, resolved_ast)
+                    lower_expr(
+                        builder,
+                        ir_module,
+                        &argument.expr,
+                        function,
+                        poly_recipe,
+                        resolved_ast,
+                    )
                 })
                 .collect::<Result<Box<[_]>, _>>()?;
 
@@ -197,6 +205,7 @@ pub fn lower_expr(
                 ir_module,
                 &declare_assign.value,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
 
@@ -223,6 +232,7 @@ pub fn lower_expr(
                 ir_module,
                 &operation.left.expr,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
             let right = lower_expr(
@@ -230,6 +240,7 @@ pub fn lower_expr(
                 ir_module,
                 &operation.right.expr,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
 
@@ -246,25 +257,55 @@ pub fn lower_expr(
                 ir_module,
                 operation,
                 function,
+                poly_recipe,
                 resolved_ast,
             )
         }
-        ExprKind::IntegerCast(cast_from) => {
-            integer_cast(builder, ir_module, function, resolved_ast, cast_from)
-        }
-        ExprKind::IntegerExtend(cast_from) => {
-            integer_extend(builder, ir_module, function, resolved_ast, cast_from)
-        }
-        ExprKind::IntegerTruncate(cast) => {
-            integer_truncate(builder, ir_module, function, resolved_ast, cast)
-        }
+        ExprKind::IntegerCast(cast_from) => integer_cast(
+            builder,
+            ir_module,
+            function,
+            poly_recipe,
+            resolved_ast,
+            cast_from,
+        ),
+        ExprKind::IntegerExtend(cast_from) => integer_extend(
+            builder,
+            ir_module,
+            function,
+            poly_recipe,
+            resolved_ast,
+            cast_from,
+        ),
+        ExprKind::IntegerTruncate(cast) => integer_truncate(
+            builder,
+            ir_module,
+            function,
+            poly_recipe,
+            resolved_ast,
+            cast,
+        ),
         ExprKind::FloatExtend(cast) => {
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let value = lower_expr(
+                builder,
+                ir_module,
+                &cast.value,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
             let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
         ExprKind::FloatToInteger(cast) => {
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let value = lower_expr(
+                builder,
+                ir_module,
+                &cast.value,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
             let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
             let sign = if ir_type
                 .is_signed()
@@ -285,7 +326,14 @@ pub fn lower_expr(
                 .sign(Some(ir_module.target))
                 .expect("integer to float must know sign");
 
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
+            let value = lower_expr(
+                builder,
+                ir_module,
+                &cast.value,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
             let ir_type = lower_type(&ir_module.target, &cast.target_type, resolved_ast)?;
             Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, from_sign)))
         }
@@ -297,8 +345,14 @@ pub fn lower_expr(
                 field_type,
             } = &**member;
 
-            let subject_pointer =
-                lower_destination(builder, ir_module, subject, function, resolved_ast)?;
+            let subject_pointer = lower_destination(
+                builder,
+                ir_module,
+                subject,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
 
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
@@ -316,6 +370,7 @@ pub fn lower_expr(
                 ir_module,
                 &array_access.subject,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
             let index = lower_expr(
@@ -323,6 +378,7 @@ pub fn lower_expr(
                 ir_module,
                 &array_access.index,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
             let item_type = lower_type(&ir_module.target, &array_access.item_type, resolved_ast)?;
@@ -346,7 +402,14 @@ pub fn lower_expr(
 
             // Evaluate field values in the order specified by the struct literal
             for (_, expr, index) in fields.iter() {
-                let ir_value = lower_expr(builder, ir_module, expr, function, resolved_ast)?;
+                let ir_value = lower_expr(
+                    builder,
+                    ir_module,
+                    expr,
+                    function,
+                    poly_recipe,
+                    resolved_ast,
+                )?;
                 values.push((index, ir_value));
             }
 
@@ -360,7 +423,14 @@ pub fn lower_expr(
         }
         ExprKind::UnaryMathOperation(operation) => {
             let UnaryMathOperation { operator, inner } = &**operation;
-            let value = lower_expr(builder, ir_module, &inner.expr, function, resolved_ast)?;
+            let value = lower_expr(
+                builder,
+                ir_module,
+                &inner.expr,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
 
             let float_or_int = inner
                 .resolved_type
@@ -385,11 +455,19 @@ pub fn lower_expr(
             ir_module,
             destination,
             function,
+            poly_recipe,
             resolved_ast,
         )?),
         ExprKind::Dereference(subject) => {
             let ir_type = lower_type(ir_module.target, &subject.resolved_type, resolved_ast)?;
-            let value = lower_expr(builder, ir_module, &subject.expr, function, resolved_ast)?;
+            let value = lower_expr(
+                builder,
+                ir_module,
+                &subject.expr,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
             Ok(builder.push(ir::Instruction::Load((value, ir_type))))
         }
         ExprKind::Conditional(conditional) => {
@@ -398,8 +476,14 @@ pub fn lower_expr(
             let mut incoming = vec![];
 
             for resolved::Branch { condition, block } in conditional.branches.iter() {
-                let condition =
-                    lower_expr(builder, ir_module, &condition.expr, function, resolved_ast)?;
+                let condition = lower_expr(
+                    builder,
+                    ir_module,
+                    &condition.expr,
+                    function,
+                    poly_recipe,
+                    resolved_ast,
+                )?;
 
                 let true_basicblock_id = builder.new_block();
                 let false_basicblock_id = builder.new_block();
@@ -413,7 +497,14 @@ pub fn lower_expr(
                 ));
 
                 builder.use_block(true_basicblock_id);
-                let value = lower_stmts(builder, ir_module, &block.stmts, function, resolved_ast)?;
+                let value = lower_stmts(
+                    builder,
+                    ir_module,
+                    &block.stmts,
+                    function,
+                    poly_recipe,
+                    resolved_ast,
+                )?;
 
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
@@ -425,7 +516,14 @@ pub fn lower_expr(
             }
 
             if let Some(block) = &conditional.otherwise {
-                let value = lower_stmts(builder, ir_module, &block.stmts, function, resolved_ast)?;
+                let value = lower_stmts(
+                    builder,
+                    ir_module,
+                    &block.stmts,
+                    function,
+                    poly_recipe,
+                    resolved_ast,
+                )?;
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
                     value,
@@ -457,6 +555,7 @@ pub fn lower_expr(
                 ir_module,
                 &while_loop.condition,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
 
@@ -474,6 +573,7 @@ pub fn lower_expr(
                 ir_module,
                 &while_loop.block.stmts,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
             builder.continues_to(evaluate_basicblock_id);
@@ -547,9 +647,14 @@ pub fn lower_expr(
                 }
             })
         }
-        ExprKind::ResolvedNamedExpression(resolved_expr) => {
-            lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
-        }
+        ExprKind::ResolvedNamedExpression(resolved_expr) => lower_expr(
+            builder,
+            ir_module,
+            resolved_expr,
+            function,
+            poly_recipe,
+            resolved_ast,
+        ),
         ExprKind::Zeroed(resolved_type) => {
             let ir_type = lower_type(&ir_module.target, resolved_type, resolved_ast)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
@@ -558,7 +663,14 @@ pub fn lower_expr(
             let mut values = Vec::with_capacity(args.len());
 
             for arg in args {
-                values.push(lower_expr(builder, ir_module, arg, function, resolved_ast)?);
+                values.push(lower_expr(
+                    builder,
+                    ir_module,
+                    arg,
+                    function,
+                    poly_recipe,
+                    resolved_ast,
+                )?);
             }
 
             Ok(builder.push(ir::Instruction::InterpreterSyscall(*syscall, values)))
@@ -571,6 +683,7 @@ pub fn lower_destination(
     ir_module: &ir::Module,
     destination: &Destination,
     function: &resolved::Function,
+    poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
 ) -> Result<ir::Value, LowerError> {
     match &destination.kind {
@@ -585,8 +698,14 @@ pub fn lower_destination(
             index,
             ..
         } => {
-            let subject_pointer =
-                lower_destination(builder, ir_module, subject, function, resolved_ast)?;
+            let subject_pointer = lower_destination(
+                builder,
+                ir_module,
+                subject,
+                function,
+                poly_recipe,
+                resolved_ast,
+            )?;
 
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
@@ -600,6 +719,7 @@ pub fn lower_destination(
                 ir_module,
                 &array_access.subject,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
             let index = lower_expr(
@@ -607,6 +727,7 @@ pub fn lower_destination(
                 ir_module,
                 &array_access.index,
                 function,
+                poly_recipe,
                 resolved_ast,
             )?;
             let item_type = lower_type(&ir_module.target, &array_access.item_type, resolved_ast)?;
@@ -622,6 +743,7 @@ pub fn lower_destination(
             ir_module,
             lvalue,
             function,
+            poly_recipe,
             resolved_ast,
         )?),
     }

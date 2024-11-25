@@ -6,6 +6,7 @@ mod function;
 mod global;
 mod stmts;
 mod structure;
+mod unpoly;
 
 use self::error::{LowerError, LowerErrorKind};
 use crate::{
