@@ -1,7 +1,7 @@
-use super::{error::LowerError, lower_type};
+use super::{builder::unpoly, datatype::lower_type, error::LowerError};
 use crate::{
     ir::{self, Global},
-    resolved,
+    resolved::{self, PolyRecipe},
 };
 
 pub fn lower_global(
@@ -20,7 +20,11 @@ pub fn lower_global(
         global_ref,
         Global {
             mangled_name,
-            ir_type: lower_type(&ir_module.target, &global.resolved_type, resolved_ast)?,
+            ir_type: lower_type(
+                &ir_module.target,
+                &unpoly(&PolyRecipe::default(), &global.resolved_type)?,
+                resolved_ast,
+            )?,
             is_foreign: global.is_foreign,
             is_thread_local: global.is_thread_local,
         },

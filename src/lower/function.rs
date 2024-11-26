@@ -1,9 +1,8 @@
 use super::{
-    builder::Builder,
+    builder::{unpoly, Builder},
+    datatype::lower_type,
     error::{LowerError, LowerErrorKind},
-    lower_type,
     stmts::lower_stmts,
-    unpoly::unpoly,
 };
 use crate::{
     ir::{self, BasicBlocks, Literal},
@@ -25,7 +24,7 @@ pub fn lower_function_body(
     if function.is_foreign {
         return Ok(());
     }
-    let mut builder = Builder::new_with_starting_block();
+    let mut builder = Builder::new_with_starting_block(poly_recipe);
 
     // Allocate parameters
     let parameter_variables = function
@@ -36,7 +35,7 @@ pub fn lower_function_body(
         .map(|instance| {
             Ok(builder.push(ir::Instruction::Alloca(lower_type(
                 &ir_module.target,
-                &unpoly(poly_recipe, &instance.resolved_type)?,
+                &builder.unpoly(&instance.resolved_type)?,
                 resolved_ast,
             )?)))
         })
@@ -51,7 +50,7 @@ pub fn lower_function_body(
     {
         builder.push(ir::Instruction::Alloca(lower_type(
             &ir_module.target,
-            &unpoly(poly_recipe, &variable_instance.resolved_type)?,
+            &builder.unpoly(&variable_instance.resolved_type)?,
             resolved_ast,
         )?));
     }
@@ -70,7 +69,6 @@ pub fn lower_function_body(
         ir_module,
         &function.stmts,
         function,
-        poly_recipe,
         resolved_ast,
     )?;
 

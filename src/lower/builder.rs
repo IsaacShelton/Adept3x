@@ -1,18 +1,25 @@
-use crate::ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference};
+use super::{datatype::ConcreteType, error::LowerError};
+use crate::{
+    ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference},
+    resolved::{self, PolyRecipe},
+};
+use std::borrow::Cow;
 
-pub struct Builder {
+pub struct Builder<'a> {
     basicblocks: BasicBlocks,
     current_basicblock_id: usize,
+    poly_recipe: &'a PolyRecipe,
 }
 
-impl Builder {
-    pub fn new_with_starting_block() -> Self {
+impl<'a> Builder<'a> {
+    pub fn new_with_starting_block(poly_recipe: &'a PolyRecipe) -> Self {
         let mut basicblocks = BasicBlocks::new();
         basicblocks.push(BasicBlock::new());
 
         Self {
             basicblocks,
             current_basicblock_id: 0,
+            poly_recipe,
         }
     }
 
@@ -74,4 +81,21 @@ impl Builder {
             instruction_id: current_block.instructions.len() - 1,
         })
     }
+
+    pub fn unpoly(&self, ty: &resolved::Type) -> Result<ConcreteType, LowerError> {
+        self.poly_recipe
+            .resolve_type(ty)
+            .map(|x| ConcreteType(Cow::Owned(x)))
+            .map_err(LowerError::from)
+    }
+}
+
+pub fn unpoly<'a>(
+    poly_recipe: &PolyRecipe,
+    ty: &'a resolved::Type,
+) -> Result<ConcreteType<'a>, LowerError> {
+    poly_recipe
+        .resolve_type(ty)
+        .map(|x| ConcreteType(Cow::Owned(x)))
+        .map_err(LowerError::from)
 }

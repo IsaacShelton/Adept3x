@@ -70,7 +70,7 @@ impl PolyRecipe {
                 .at(ty.source)
             }
             resolved::TypeKind::FunctionPointer(_) => todo!(),
-            resolved::TypeKind::Enum(_, _) => todo!(),
+            resolved::TypeKind::Enum(_, _) => ty.clone(),
             resolved::TypeKind::Structure(_, _) => ty.clone(),
             resolved::TypeKind::TypeAlias(_, _) => ty.clone(),
             resolved::TypeKind::Polymorph(name, _) => {

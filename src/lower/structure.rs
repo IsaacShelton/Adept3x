@@ -1,5 +1,8 @@
-use super::{error::LowerError, lower_type};
-use crate::{ir, resolved};
+use super::{builder::unpoly, datatype::lower_type, error::LowerError};
+use crate::{
+    ir,
+    resolved::{self, PolyRecipe},
+};
 
 pub fn lower_structure(
     ir_module: &mut ir::Module,
@@ -11,7 +14,11 @@ pub fn lower_structure(
 
     for field in structure.fields.values() {
         fields.push(ir::Field {
-            ir_type: lower_type(&ir_module.target, &field.resolved_type, resolved_ast)?,
+            ir_type: lower_type(
+                &ir_module.target,
+                &unpoly(&PolyRecipe::default(), &field.resolved_type)?,
+                resolved_ast,
+            )?,
             properties: ir::FieldProperties::default(),
             source: field.source,
         });
