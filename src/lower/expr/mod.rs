@@ -159,12 +159,16 @@ pub fn lower_expr(
                 ir_module
                     .functions
                     .translate(call.callee.function, &call.callee.recipe, || {
-                        lower_function_head(
+                        let r = lower_function_head(
                             ir_module,
                             call.callee.function,
                             &call.callee.recipe,
                             resolved_ast,
-                        )
+                        )?;
+
+                        println!("added {}", ir_module.functions.get(r).mangled_name);
+
+                        Result::<ir::FunctionRef, LowerError>::Ok(r)
                     })?;
 
             Ok(builder.push(ir::Instruction::Call(ir::Call {
