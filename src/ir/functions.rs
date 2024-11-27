@@ -98,7 +98,7 @@ impl Functions {
     pub fn monomorphized<'a>(
         &'a self,
     ) -> impl Iterator<Item = &'a (resolved::FunctionRef, PolyRecipe, FunctionRef)> {
-        Monomorhized {
+        Monomorphized {
             vec: &self.jobs,
             i: 0,
         }
@@ -106,12 +106,12 @@ impl Functions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Monomorhized<'a> {
+pub struct Monomorphized<'a> {
     vec: &'a AppendOnlyVec<(resolved::FunctionRef, PolyRecipe, FunctionRef)>,
     i: usize,
 }
 
-impl<'a> Iterator for Monomorhized<'a> {
+impl<'a> Iterator for Monomorphized<'a> {
     type Item = &'a (resolved::FunctionRef, PolyRecipe, FunctionRef);
 
     fn next(&mut self) -> Option<Self::Item> {
