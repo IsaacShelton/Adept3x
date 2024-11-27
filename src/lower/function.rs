@@ -11,18 +11,18 @@ use crate::{
 };
 
 pub fn lower_function_body(
-    ir_module: &mut ir::Module,
+    ir_module: &ir::Module,
     function_ref: resolved::FunctionRef,
     poly_recipe: &PolyRecipe,
     resolved_ast: &resolved::Ast,
-) -> Result<(), LowerError> {
+) -> Result<BasicBlocks, LowerError> {
     let function = resolved_ast
         .functions
         .get(function_ref)
         .expect("valid function reference");
 
     if function.is_foreign {
-        return Ok(());
+        return Ok(BasicBlocks::new());
     }
     let mut builder = Builder::new_with_starting_block(poly_recipe);
 
@@ -93,19 +93,7 @@ pub fn lower_function_body(
         }
     }
 
-    let ir_function_ref = {
-        let ir_module = &*ir_module;
-
-        ir_module
-            .functions
-            .translate(function_ref, PolyRecipe::default(), || {
-                lower_function_head(ir_module, function_ref, poly_recipe, resolved_ast)
-            })?
-    };
-
-    let ir_function = ir_module.functions.get_mut(ir_function_ref);
-    ir_function.basicblocks = builder.build();
-    Ok(())
+    Ok(builder.build())
 }
 
 pub fn lower_function_head(
@@ -151,6 +139,7 @@ pub fn lower_function_head(
             .name
             .display(&resolved_ast.workspace.fs)
             .to_string()
+            + &poly_recipe.to_string()
     };
 
     let is_main = mangled_name == "main";

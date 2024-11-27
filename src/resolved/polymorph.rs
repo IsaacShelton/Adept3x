@@ -12,6 +12,32 @@ pub struct PolyRecipe {
     pub polymorphs: IndexMap<String, PolyValue>,
 }
 
+impl Display for PolyRecipe {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+
+        for (i, (name, value)) in self.polymorphs.iter().enumerate() {
+            write!(f, "${} :: ", name)?;
+
+            match value {
+                PolyValue::PolyType(ty) => {
+                    write!(f, "{}", ty.resolved_type.to_string())?;
+                }
+                PolyValue::PolyExpr(_) => {
+                    todo!("mangle name for polymorphic function with expr polymorph")
+                }
+            }
+
+            if i + 1 != self.polymorphs.len() {
+                write!(f, ", ")?;
+            }
+        }
+
+        write!(f, ")")?;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PolymorphError {
     pub kind: PolymorphErrorKind,

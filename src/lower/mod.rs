@@ -21,33 +21,42 @@ use structure::lower_structure;
 
 pub fn lower<'a>(
     options: &BuildOptions,
-    ast: &resolved::Ast,
+    rast: &resolved::Ast,
     target: &'a Target,
 ) -> Result<ir::Module<'a>, LowerError> {
     let mut ir_module = ir::Module::new(target);
 
-    for (structure_ref, structure) in ast.structures.iter() {
-        lower_structure(&mut ir_module, structure_ref, structure, ast)?;
+    for (structure_ref, structure) in rast.structures.iter() {
+        lower_structure(&mut ir_module, structure_ref, structure, rast)?;
     }
 
-    for (global_ref, global) in ast.globals.iter() {
-        lower_global(&mut ir_module, global_ref, global, ast)?;
+    for (global_ref, global) in rast.globals.iter() {
+        lower_global(&mut ir_module, global_ref, global, rast)?;
     }
 
-    for (function_ref, function) in ast.functions.iter() {
+    for (function_ref, function) in rast.functions.iter() {
         if function.is_generic {
             continue;
         }
 
-        lower_function_head(&mut ir_module, function_ref, &PolyRecipe::default(), ast)?;
+        ir_module
+            .functions
+            .translate(function_ref, PolyRecipe::default(), || {
+                lower_function_head(&ir_module, function_ref, &PolyRecipe::default(), rast)
+            })?;
     }
 
-    for (function_ref, function) in ast.functions.iter() {
-        if function.is_generic {
-            continue;
-        }
+    // Lower monomorphized functions
+    let mut bodies = Vec::new();
+    for (function_ref, poly_recipe, ir_function_ref) in ir_module.functions.monomorphized() {
+        bodies.push((
+            *ir_function_ref,
+            lower_function_body(&ir_module, *function_ref, &poly_recipe, rast)?,
+        ));
+    }
 
-        lower_function_body(&mut ir_module, function_ref, &PolyRecipe::default(), ast)?;
+    for (ir_function_ref, basicblocks) in bodies {
+        ir_module.functions.get_mut(ir_function_ref).basicblocks = basicblocks;
     }
 
     if options.emit_ir {

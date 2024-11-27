@@ -131,13 +131,6 @@ pub fn lower_expr(
             )
         }
         ExprKind::Call(call) => {
-            if !call.callee.recipe.polymorphs.is_empty() {
-                eprintln!(
-                    "warning: ignoring callee generics recipe - {:?}",
-                    call.callee.recipe
-                );
-            }
-
             let callee = resolved_ast
                 .functions
                 .get(call.callee.function)

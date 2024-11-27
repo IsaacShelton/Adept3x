@@ -16,6 +16,7 @@ use std::{borrow::Borrow, collections::HashMap, sync::RwLock};
 pub struct Functions {
     functions: AppendOnlyVec<Function>,
     monomorphized: RwLock<HashMap<(resolved::FunctionRef, PolyRecipe), FunctionRef>>,
+    jobs: AppendOnlyVec<(resolved::FunctionRef, PolyRecipe, FunctionRef)>,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -28,6 +29,7 @@ impl Functions {
         Self {
             functions: AppendOnlyVec::new(),
             monomorphized: RwLock::new(HashMap::new()),
+            jobs: AppendOnlyVec::new(),
         }
     }
 
@@ -52,21 +54,24 @@ impl Functions {
         poly_recipe: impl Borrow<PolyRecipe>,
         monomorphize: impl Fn() -> Result<FunctionRef, E>,
     ) -> Result<FunctionRef, E> {
-        if let Some(found) = self
-            .monomorphized
-            .read()
-            .unwrap()
-            .get(&(resolved_function_ref, poly_recipe.borrow().clone()))
-        {
+        let key = (resolved_function_ref, poly_recipe.borrow().clone());
+
+        if let Some(found) = self.monomorphized.read().unwrap().get(&key) {
             return Ok(*found);
         }
 
         let function_ref = monomorphize()?;
 
-        self.monomorphized.write().unwrap().insert(
-            (resolved_function_ref, poly_recipe.borrow().clone()),
+        self.monomorphized
+            .write()
+            .unwrap()
+            .insert(key, function_ref);
+
+        self.jobs.push((
+            resolved_function_ref,
+            poly_recipe.borrow().clone(),
             function_ref,
-        );
+        ));
 
         Ok(function_ref)
     }
@@ -88,5 +93,11 @@ impl Functions {
             .iter()
             .enumerate()
             .map(|(index, function)| (FunctionRef { index }, function))
+    }
+
+    pub fn monomorphized<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = &'a (resolved::FunctionRef, PolyRecipe, FunctionRef)> {
+        self.jobs.iter()
     }
 }
