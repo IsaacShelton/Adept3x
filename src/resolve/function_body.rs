@@ -51,6 +51,12 @@ pub fn resolve_function_bodies(
 
                 let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
+                let f = resolved_ast
+                    .functions
+                    .get(resolved_function_ref)
+                    .expect("referenced resolved function to exist");
+                let constraints = f.constraints.clone();
+
                 let resolved_stmts = resolve_stmts(
                     &mut ResolveExprCtx {
                         resolved_ast,
@@ -64,6 +70,7 @@ pub fn resolve_function_bodies(
                         helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
                         module_fs_node_id: module_file_id,
                         physical_fs_node_id: physical_file_id,
+                        constraints,
                     },
                     &ast_function.stmts,
                 )?;

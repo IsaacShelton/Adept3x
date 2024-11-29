@@ -232,7 +232,12 @@ pub fn resolve_stmt(
                 .operator
                 .as_ref()
                 .map(|ast_operator| {
-                    resolve_basic_binary_operator(ast_operator, &destination.resolved_type, source)
+                    resolve_basic_binary_operator(
+                        ctx,
+                        ast_operator,
+                        &destination.resolved_type,
+                        source,
+                    )
                 })
                 .transpose()?;
 

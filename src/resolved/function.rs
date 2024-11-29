@@ -1,6 +1,26 @@
 use crate::{name::ResolvedName, resolved::*, source_files::Source, tag::Tag};
 use std::{collections::HashSet, fmt::Display};
 
+#[derive(Debug, Clone)]
+pub struct CurrentConstraints {
+    pub constraints: HashMap<String, HashSet<Constraint>>,
+}
+
+impl CurrentConstraints {
+    pub fn satisfies(&self, ty: &Type, constraint: &Constraint) -> bool {
+        match constraint {
+            Constraint::PrimitiveAdd => match &ty.kind {
+                TypeKind::Integer(..) | TypeKind::CInteger(..) | TypeKind::Floating(..) => true,
+                TypeKind::Polymorph(name, _) => self
+                    .constraints
+                    .get(name)
+                    .map_or(false, |set| set.contains(constraint)),
+                _ => false,
+            },
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Function {
     pub name: ResolvedName,
@@ -13,7 +33,7 @@ pub struct Function {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
-    pub constraints: HashSet<Constraint>,
+    pub constraints: CurrentConstraints,
 }
 
 #[derive(Clone, Debug, Default)]

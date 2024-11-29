@@ -37,7 +37,9 @@ use crate::{
         },
         resolve_stmts,
     },
-    resolved::{self, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr},
+    resolved::{
+        self, CurrentConstraints, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr,
+    },
     workspace::fs::FsNodeId,
 };
 use ast::FloatSize;
@@ -57,6 +59,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
+    pub constraints: CurrentConstraints,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {

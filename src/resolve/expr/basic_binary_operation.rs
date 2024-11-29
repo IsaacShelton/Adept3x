@@ -64,7 +64,7 @@ pub fn resolve_basic_binary_operation_expr(
     })?;
 
     let operator =
-        resolve_basic_binary_operator(&binary_operation.operator, &unified_type, source)?;
+        resolve_basic_binary_operator(ctx, &binary_operation.operator, &unified_type, source)?;
 
     let result_type = if binary_operation.operator.returns_boolean() {
         resolved::TypeKind::Boolean.at(source)
@@ -85,11 +85,8 @@ pub fn resolve_basic_binary_operation_expr(
     ))
 }
 
-pub fn satisfies(constraint: Constraint) -> bool {
-    true
-}
-
 pub fn resolve_basic_binary_operator(
+    ctx: &ResolveExprCtx,
     ast_operator: &ast::BasicBinaryOperator,
     resolved_type: &resolved::Type,
     source: Source,
@@ -98,13 +95,9 @@ pub fn resolve_basic_binary_operator(
         ast::BasicBinaryOperator::Add => NumericMode::try_new(resolved_type)
             .map(resolved::BasicBinaryOperator::Add)
             .or_else(|| {
-                if satisfies(Constraint::PrimitiveAdd) {
-                    Some(resolved::BasicBinaryOperator::PrimitiveAdd(
-                        resolved_type.clone(),
-                    ))
-                } else {
-                    None
-                }
+                ctx.constraints
+                    .satisfies(resolved_type, &Constraint::PrimitiveAdd)
+                    .then(|| resolved::BasicBinaryOperator::PrimitiveAdd(resolved_type.clone()))
             }),
         ast::BasicBinaryOperator::Subtract => {
             NumericMode::try_new(resolved_type).map(resolved::BasicBinaryOperator::Subtract)

@@ -7,10 +7,10 @@ use crate::{
     cli::BuildOptions,
     index_map_ext::IndexMapExt,
     name::ResolvedName,
-    resolved::{self, Constraint, VariableStorage},
+    resolved::{self, Constraint, CurrentConstraints, VariableStorage},
     tag::Tag,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub fn create_function_heads(
     ctx: &mut ResolveCtx,
@@ -43,16 +43,16 @@ pub fn create_function_heads(
             let return_type = type_ctx.resolve(&function.return_type)?;
 
             let constraints = if is_generic {
-                let mut set = HashSet::default();
+                let mut map = HashMap::default();
 
                 for param in parameters.required.iter() {
-                    collect_constraints(&mut set, &param.resolved_type);
+                    collect_constraints(&mut map, &param.resolved_type);
                 }
 
-                collect_constraints(&mut set, &return_type);
-                set
+                collect_constraints(&mut map, &return_type);
+                map
             } else {
-                HashSet::default()
+                HashMap::default()
             };
 
             let function_ref = resolved_ast.functions.insert(resolved::Function {
@@ -72,7 +72,7 @@ pub fn create_function_heads(
                     }
                 }),
                 is_generic,
-                constraints,
+                constraints: CurrentConstraints { constraints },
             });
 
             if function.privacy.is_public() {
@@ -125,7 +125,7 @@ pub fn create_function_heads(
     Ok(())
 }
 
-fn collect_constraints(set: &mut HashSet<Constraint>, ty: &resolved::Type) {
+fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &resolved::Type) {
     match &ty.kind {
         resolved::TypeKind::Unresolved => panic!(),
         resolved::TypeKind::Boolean
@@ -134,17 +134,22 @@ fn collect_constraints(set: &mut HashSet<Constraint>, ty: &resolved::Type) {
         | resolved::TypeKind::IntegerLiteral(_)
         | resolved::TypeKind::FloatLiteral(_)
         | resolved::TypeKind::Floating(_) => (),
-        resolved::TypeKind::Pointer(inner) => collect_constraints(set, inner.as_ref()),
+        resolved::TypeKind::Pointer(inner) => collect_constraints(map, inner.as_ref()),
         resolved::TypeKind::Void => (),
         resolved::TypeKind::AnonymousStruct() => todo!(),
         resolved::TypeKind::AnonymousUnion() => todo!(),
         resolved::TypeKind::AnonymousEnum() => todo!(),
-        resolved::TypeKind::FixedArray(fixed_array) => collect_constraints(set, &fixed_array.inner),
+        resolved::TypeKind::FixedArray(fixed_array) => collect_constraints(map, &fixed_array.inner),
         resolved::TypeKind::FunctionPointer(_) => todo!(),
         resolved::TypeKind::Enum(_, _) => (),
         resolved::TypeKind::Structure(_, _) => (),
         resolved::TypeKind::TypeAlias(_, _) => (),
-        resolved::TypeKind::Polymorph(_, constraints) => set.extend(constraints.iter().cloned()),
+        resolved::TypeKind::Polymorph(name, constraints) => {
+            let set = map.entry(name.to_string()).or_default();
+            for constraint in constraints {
+                set.insert(constraint.clone());
+            }
+        }
     }
 }
 

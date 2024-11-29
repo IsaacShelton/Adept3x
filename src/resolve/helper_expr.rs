@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     ast::AstWorkspace,
-    resolved::{self, HelperExprDecl},
+    resolved::{self, CurrentConstraints, HelperExprDecl},
 };
 
 pub fn resolve_helper_expressions(
@@ -43,6 +43,9 @@ pub fn resolve_helper_expressions(
                     helper_exprs_in_modules: &ctx.helper_exprs_in_modules,
                     module_fs_node_id: module_file_id,
                     physical_fs_node_id: *physical_file_id,
+                    constraints: CurrentConstraints {
+                        constraints: Default::default(),
+                    },
                 };
 
                 resolve_expr(&mut ctx, &helper_expr.value, None, Initialized::Require)?
