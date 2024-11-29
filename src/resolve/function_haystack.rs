@@ -4,11 +4,12 @@ use super::{
         ConformMode, Validate,
     },
     expr::{PreferredType, ResolveExprCtx},
+    polymorph::PolyCatalog,
 };
 use crate::{
     name::{Name, ResolvedName},
     resolve::conform::Perform,
-    resolved::{self, Callee, PolyCatalog, TypeKind, TypedExpr},
+    resolved::{self, Callee, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -130,7 +131,7 @@ impl FunctionHaystack {
                         return None;
                     };
 
-                    Self::conform_polymorph(&mut catalog, &argument, param_type)
+                    Self::conform_polymorph(ctx, &mut catalog, &argument, param_type)
                 } else {
                     conform_expr::<Validate>(
                         ctx,
@@ -158,12 +159,13 @@ impl FunctionHaystack {
     }
 
     fn conform_polymorph(
+        ctx: &ResolveExprCtx,
         catalog: &mut PolyCatalog,
         argument: &TypedExpr,
         param_type: &resolved::Type,
     ) -> bool {
         catalog
-            .match_type(param_type, &argument.resolved_type)
+            .match_type(ctx, param_type, &argument.resolved_type)
             .is_ok()
     }
 

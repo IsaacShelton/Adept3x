@@ -10,7 +10,8 @@ use crate::{
     },
     ir::{self, InterpreterSyscallKind},
     name::Name,
-    resolved::{self, PolyRecipe},
+    resolve::PolyRecipe,
+    resolved,
     source_files::Source,
     tag::Tag,
 };

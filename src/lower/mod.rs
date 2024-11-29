@@ -12,7 +12,8 @@ use self::error::LowerError;
 use crate::{
     cli::BuildOptions,
     ir::{self},
-    resolved::{self, PolyRecipe},
+    resolve::PolyRecipe,
+    resolved,
     target::Target,
 };
 use function::{lower_function_body, lower_function_head};

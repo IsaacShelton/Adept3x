@@ -1,6 +1,9 @@
-use super::function_haystack::FindFunctionError;
+use super::{
+    function_haystack::FindFunctionError,
+    polymorph::{PolymorphError, PolymorphErrorKind},
+};
 use crate::{
-    resolved::{PolymorphError, PolymorphErrorKind, UnaliasError},
+    resolved::UnaliasError,
     show::Show,
     source_files::{Source, SourceFiles},
 };

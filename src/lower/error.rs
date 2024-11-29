@@ -1,5 +1,5 @@
 use crate::{
-    resolved::{PolymorphError, PolymorphErrorKind},
+    resolve::{PolymorphError, PolymorphErrorKind},
     show::Show,
     source_files::{Source, SourceFiles},
 };

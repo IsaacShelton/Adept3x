@@ -1,5 +1,5 @@
 use super::TypedExpr;
-use crate::resolved::{FunctionRef, PolyRecipe};
+use crate::{resolve::PolyRecipe, resolved::FunctionRef};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Call {

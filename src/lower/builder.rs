@@ -1,7 +1,8 @@
 use super::{datatype::ConcreteType, error::LowerError};
 use crate::{
     ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference},
-    resolved::{self, PolyRecipe},
+    resolve::PolyRecipe,
+    resolved,
 };
 use std::borrow::Cow;
 

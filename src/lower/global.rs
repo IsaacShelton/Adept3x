@@ -1,7 +1,8 @@
 use super::{builder::unpoly, datatype::lower_type, error::LowerError};
 use crate::{
     ir::{self, Global},
-    resolved::{self, PolyRecipe},
+    resolve::PolyRecipe,
+    resolved,
 };
 
 pub fn lower_global(

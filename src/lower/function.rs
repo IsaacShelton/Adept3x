@@ -6,7 +6,8 @@ use super::{
 };
 use crate::{
     ir::{self, BasicBlocks, Literal},
-    resolved::{self, PolyRecipe},
+    resolve::PolyRecipe,
+    resolved,
     tag::Tag,
 };
 

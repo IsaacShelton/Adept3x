@@ -1,5 +1,5 @@
-use super::Type;
-use crate::{resolved, source_files::Source};
+use super::expr::ResolveExprCtx;
+use crate::{resolved, resolved::Type, source_files::Source};
 use core::hash::Hash;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
@@ -169,6 +169,7 @@ impl PolyCatalog {
 
     pub fn match_type(
         &mut self,
+        ctx: &ResolveExprCtx,
         pattern_type: &Type,
         concrete_type: &Type,
     ) -> Result<(), Option<PolyCatalogInsertError>> {
@@ -192,7 +193,7 @@ impl PolyCatalog {
             }
             resolved::TypeKind::Pointer(pattern_inner) => match &concrete_type.kind {
                 resolved::TypeKind::Pointer(concrete_inner) => {
-                    self.match_type(pattern_inner, concrete_inner)
+                    self.match_type(ctx, pattern_inner, concrete_inner)
                 }
                 _ => Err(None),
             },
@@ -201,13 +202,21 @@ impl PolyCatalog {
             resolved::TypeKind::AnonymousEnum() => todo!(),
             resolved::TypeKind::FixedArray(pattern_inner) => match &concrete_type.kind {
                 resolved::TypeKind::FixedArray(concrete_inner) => {
-                    self.match_type(&pattern_inner.inner, &concrete_inner.inner)
+                    self.match_type(ctx, &pattern_inner.inner, &concrete_inner.inner)
                 }
                 _ => Err(None),
             },
             resolved::TypeKind::FunctionPointer(_) => todo!(),
-            resolved::TypeKind::Polymorph(name, _constraints) => {
-                self.put_type(name, concrete_type).map_err(Some)
+            resolved::TypeKind::Polymorph(name, constraints) => {
+                self.put_type(name, concrete_type).map_err(Some)?;
+
+                for constraint in constraints {
+                    if !ctx.constraints.satisfies(concrete_type, constraint) {
+                        return Err(None);
+                    }
+                }
+
+                Ok(())
             }
         }
     }

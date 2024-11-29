@@ -9,7 +9,7 @@
 */
 
 use super::Function;
-use crate::resolved::{self, PolyRecipe};
+use crate::{resolve::PolyRecipe, resolved};
 use append_only_vec::AppendOnlyVec;
 use std::{borrow::Borrow, collections::HashMap, sync::RwLock};
 

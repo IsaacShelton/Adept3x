@@ -1,8 +1,5 @@
 use super::{builder::unpoly, datatype::lower_type, error::LowerError};
-use crate::{
-    ir,
-    resolved::{self, PolyRecipe},
-};
+use crate::{ir, resolve::PolyRecipe, resolved};
 
 pub fn lower_structure(
     ir_module: &mut ir::Module,
