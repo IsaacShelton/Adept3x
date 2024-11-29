@@ -1,0 +1,19 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    value int = 0
+    p ptr<int> = &value
+    
+    // This will cause an error since no matching functions exist,
+    // (because the trait PrimitiveAdd is not satisfied for ptr<int>)
+    printf(c"p + p = %d\n", p.plus(p))
+}
+
+func plus(a $T: PrimitiveAdd, b $T) $T {
+    return a + b
+}
+
