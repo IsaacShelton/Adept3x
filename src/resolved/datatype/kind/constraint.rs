@@ -2,11 +2,13 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Constraint {
-    Add,
+    PrimitiveAdd,
 }
 
 impl Display for Constraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Add")
+        match self {
+            Constraint::PrimitiveAdd => write!(f, "PrimitiveAdd"),
+        }
     }
 }

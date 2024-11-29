@@ -84,11 +84,16 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Polymorph(polymorph, constraints) => {
                 let mut resolved_constraints = vec![];
 
-                if !constraints.is_empty() {
-                    eprintln!(
-                        "warning: resolving polymorph constraints not completely implemented yet"
-                    );
-                    resolved_constraints.push(Constraint::Add);
+                for constraint in constraints {
+                    if let ast::TypeKind::Named(name) = &constraint.kind {
+                        resolved_constraints.push(match name.as_plain_str() {
+                            Some("PrimitiveAdd") => Constraint::PrimitiveAdd,
+                            _ => {
+                                return Err(ResolveErrorKind::UndeclaredTrait(name.to_string())
+                                    .at(constraint.source))
+                            }
+                        });
+                    }
                 }
 
                 Ok(resolved::TypeKind::Polymorph(

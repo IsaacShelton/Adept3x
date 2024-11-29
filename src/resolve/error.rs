@@ -195,6 +195,7 @@ pub enum ResolveErrorKind {
     CannotReturnOutsideFunction,
     CannotAssignVariableOutsideFunction,
     PolymorphError(PolymorphErrorKind),
+    UndeclaredTrait(String),
     Other {
         message: String,
     },
@@ -516,6 +517,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::PolymorphError(e) => {
                 e.fmt(f)?;
+            }
+            ResolveErrorKind::UndeclaredTrait(trait_name) => {
+                write!(f, "Undeclared trait '{}'", trait_name)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
