@@ -673,6 +673,27 @@ fn lower_variable_to_value(key: VariableStorageKey) -> Value {
     })
 }
 
+fn lower_add(
+    builder: &mut Builder,
+    mode: &NumericMode,
+    operands: ir::BinaryOperands,
+) -> Result<Value, LowerError> {
+    Ok(builder.push(match mode {
+        NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
+            ir::Instruction::Add(operands, FloatOrInteger::Integer)
+        }
+        NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
+        NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
+            ir::OverflowOperation {
+                operator: OverflowOperator::Add,
+                bits: *bits,
+                sign: *sign,
+            },
+            operands,
+        ),
+    }))
+}
+
 pub fn lower_basic_binary_operation(
     builder: &mut Builder,
     ir_module: &ir::Module,
@@ -680,20 +701,12 @@ pub fn lower_basic_binary_operation(
     operands: ir::BinaryOperands,
 ) -> Result<Value, LowerError> {
     match operator {
-        resolved::BasicBinaryOperator::Add(mode) => Ok(builder.push(match mode {
-            NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
-                ir::Instruction::Add(operands, FloatOrInteger::Integer)
-            }
-            NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
-            NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
-                ir::OverflowOperation {
-                    operator: OverflowOperator::Add,
-                    bits: *bits,
-                    sign: *sign,
-                },
-                operands,
-            ),
-        })),
+        resolved::BasicBinaryOperator::PrimitiveAdd(resolved_type) => {
+            let ty = builder.unpoly(resolved_type)?;
+            let numeric_mode = NumericMode::try_new(&ty.0).expect("PrimitiveAdd to be addable");
+            lower_add(builder, &numeric_mode, operands)
+        }
+        resolved::BasicBinaryOperator::Add(mode) => lower_add(builder, mode, operands),
         resolved::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
                 ir::Instruction::Subtract(operands, FloatOrInteger::Integer)

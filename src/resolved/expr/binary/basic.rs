@@ -1,5 +1,5 @@
 use crate::resolved::{
-    FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate, TypedExpr,
+    self, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate, TypedExpr,
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -11,6 +11,7 @@ pub struct BasicBinaryOperation {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum BasicBinaryOperator {
+    PrimitiveAdd(resolved::Type),
     Add(NumericMode),
     Subtract(NumericMode),
     Multiply(NumericMode),

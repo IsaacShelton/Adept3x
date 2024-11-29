@@ -6,7 +6,10 @@ use crate::{
         unify_types::unify_types,
         Initialized,
     },
-    resolved::{self, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate, TypedExpr},
+    resolved::{
+        self, Constraint, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate,
+        TypedExpr,
+    },
     source_files::Source,
 };
 use ast::IntegerSign;
@@ -82,20 +85,32 @@ pub fn resolve_basic_binary_operation_expr(
     ))
 }
 
+pub fn satisfies(constraint: Constraint) -> bool {
+    true
+}
+
 pub fn resolve_basic_binary_operator(
     ast_operator: &ast::BasicBinaryOperator,
     resolved_type: &resolved::Type,
     source: Source,
 ) -> Result<resolved::BasicBinaryOperator, ResolveError> {
     let resolved_operator = match ast_operator {
-        ast::BasicBinaryOperator::Add => {
-            numeric_mode_from_type(resolved_type).map(resolved::BasicBinaryOperator::Add)
-        }
+        ast::BasicBinaryOperator::Add => NumericMode::try_new(resolved_type)
+            .map(resolved::BasicBinaryOperator::Add)
+            .or_else(|| {
+                if satisfies(Constraint::PrimitiveAdd) {
+                    Some(resolved::BasicBinaryOperator::PrimitiveAdd(
+                        resolved_type.clone(),
+                    ))
+                } else {
+                    None
+                }
+            }),
         ast::BasicBinaryOperator::Subtract => {
-            numeric_mode_from_type(resolved_type).map(resolved::BasicBinaryOperator::Subtract)
+            NumericMode::try_new(resolved_type).map(resolved::BasicBinaryOperator::Subtract)
         }
         ast::BasicBinaryOperator::Multiply => {
-            numeric_mode_from_type(resolved_type).map(resolved::BasicBinaryOperator::Multiply)
+            NumericMode::try_new(resolved_type).map(resolved::BasicBinaryOperator::Multiply)
         }
         ast::BasicBinaryOperator::Divide => float_or_sign_lax_from_type(resolved_type, false)
             .map(resolved::BasicBinaryOperator::Divide),
@@ -190,21 +205,6 @@ fn float_or_sign_lax_from_type(
             }
         }
         resolved::TypeKind::Floating(_) => Some(FloatOrSignLax::Float),
-        _ => None,
-    }
-}
-
-fn numeric_mode_from_type(unified_type: &resolved::Type) -> Option<NumericMode> {
-    match &unified_type.kind {
-        resolved::TypeKind::Integer(_, sign) => Some(NumericMode::Integer(*sign)),
-        resolved::TypeKind::CInteger(c_integer, sign) => {
-            if let Some(sign) = sign {
-                Some(NumericMode::Integer(*sign))
-            } else {
-                Some(NumericMode::LooseIndeterminateSignInteger(*c_integer))
-            }
-        }
-        resolved::TypeKind::Floating(_) => Some(NumericMode::Float),
         _ => None,
     }
 }
