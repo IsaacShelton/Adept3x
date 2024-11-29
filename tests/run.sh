@@ -36,6 +36,7 @@ compile enums
 compile float_literal
 compile function_parameters
 compile function_simple
+compile generics
 compile global_variables
 compile hello_world
 compile if
