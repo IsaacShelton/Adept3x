@@ -46,7 +46,7 @@ pub struct PolymorphError {
 
 #[derive(Clone, Debug)]
 pub enum PolymorphErrorKind {
-    NonExistentPolymorph(String),
+    UndefinedPolymorph(String),
     PolymorphIsNotAType(String),
 }
 
@@ -59,8 +59,8 @@ impl PolymorphErrorKind {
 impl Display for PolymorphErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PolymorphErrorKind::NonExistentPolymorph(name) => {
-                write!(f, "Non-existent polymorph '${}'", name)
+            PolymorphErrorKind::UndefinedPolymorph(name) => {
+                write!(f, "Undefined polymorph '${}'", name)
             }
             PolymorphErrorKind::PolymorphIsNotAType(name) => {
                 write!(f, "Polymorph '${}' is not a type", name)
@@ -101,9 +101,7 @@ impl PolyRecipe {
             resolved::TypeKind::TypeAlias(_, _) => ty.clone(),
             resolved::TypeKind::Polymorph(name, _) => {
                 let Some(value) = polymorphs.get(name) else {
-                    return Err(
-                        PolymorphErrorKind::NonExistentPolymorph(name.clone()).at(ty.source)
-                    );
+                    return Err(PolymorphErrorKind::UndefinedPolymorph(name.clone()).at(ty.source));
                 };
 
                 let PolyValue::PolyType(poly_type) = value else {

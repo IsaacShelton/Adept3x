@@ -10,7 +10,7 @@ func main {
     
     // This will cause an error since no matching functions exist,
     // (because the trait PrimitiveAdd is not satisfied for ptr<int>)
-    printf(c"p + p = %d\n", p.plus(p))
+    printf(c"p + p = %p\n", p.plus(p))
 }
 
 func plus(a $T: PrimitiveAdd, b $T) $T {
