@@ -87,6 +87,10 @@ pub enum ParseErrorKind {
     NamespaceNotAllowedHere,
     CharLiteralCannotBeLargerThanOneByte,
     CannotContainNulInNullTerminatedString,
+    PolymorphsCannotBeUsedAsConstraints,
+    GenericTypeParameterAlreadyExists {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -218,6 +222,12 @@ impl Display for ParseErrorKind {
             }
             ParseErrorKind::CannotContainNulInNullTerminatedString => {
                 write!(f, "Cannot contain NUL byte in C-String'")?;
+            }
+            ParseErrorKind::PolymorphsCannotBeUsedAsConstraints => {
+                write!(f, "Polymorphs cannot be used as constraints")?;
+            }
+            ParseErrorKind::GenericTypeParameterAlreadyExists { name } => {
+                write!(f, "Generic type parameter '{name}' already exists")?;
             }
             ParseErrorKind::Other { message } | ParseErrorKind::Lexical { message } => {
                 write!(f, "{}", message)?;

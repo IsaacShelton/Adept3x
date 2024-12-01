@@ -35,17 +35,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             let polymorph = token.kind.unwrap_polymorph();
             let mut constraints = vec![];
 
+            // TODO: Merge this parsing code with structure generic type parameter parsing
             if self.input.eat(TokenKind::Colon) {
                 loop {
                     constraints
                         .push(self.parse_type(None::<&str>, Some("for polymorph constraint"))?);
 
-                    // TODO: CLEANUP: Clean this code up
                     if let TypeKind::Polymorph(..) = constraints.last().unwrap().kind {
-                        return Err(ParseErrorKind::Other {
-                            message: "Polymorphs cannot be used as constraints".into(),
-                        }
-                        .at(constraints.last().unwrap().source));
+                        return Err(ParseErrorKind::PolymorphsCannotBeUsedAsConstraints
+                            .at(constraints.last().unwrap().source));
                     }
 
                     if !self.input.eat(TokenKind::Add) {

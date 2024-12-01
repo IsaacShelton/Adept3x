@@ -37,12 +37,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             loop {
                 constraints.push(self.parse_type(None::<&str>, Some("for polymorph constraint"))?);
 
-                // TODO: CLEANUP: Clean this code up
                 if let TypeKind::Polymorph(..) = constraints.last().unwrap().kind {
-                    return Err(ParseErrorKind::Other {
-                        message: "Polymorphs cannot be used as constraints".into(),
-                    }
-                    .at(constraints.last().unwrap().source));
+                    return Err(ParseErrorKind::PolymorphsCannotBeUsedAsConstraints
+                        .at(constraints.last().unwrap().source));
                 }
 
                 if !self.input.eat(TokenKind::Add) {
@@ -56,11 +53,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .insert(polymorph.clone(), TypeConstraint { constraints })
             .is_some()
         {
-            // TODO: Add proper error message
-            return Err(ParseErrorKind::Other {
-                message: format!("Generic type parameter '{}' already exists", polymorph),
-            }
-            .at(token.source));
+            return Err(
+                ParseErrorKind::GenericTypeParameterAlreadyExists { name: polymorph }
+                    .at(token.source),
+            );
         }
 
         Ok(())
