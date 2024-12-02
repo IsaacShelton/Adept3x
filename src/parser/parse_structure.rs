@@ -4,21 +4,16 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Field, Privacy, Structure, Type, TypeKind},
+    ast::{Field, Privacy, Structure, TypeKind, TypeParameter},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
 use indexmap::IndexMap;
 
-#[derive(Clone, Debug)]
-pub struct TypeConstraint {
-    constraints: Vec<Type>,
-}
-
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_type_constraint(
+    pub fn parse_type_parameter(
         &mut self,
-        generics: &mut IndexMap<String, TypeConstraint>,
+        generics: &mut IndexMap<String, TypeParameter>,
     ) -> Result<(), ParseError> {
         if !self.input.peek().is_polymorph() {
             return Err(ParseErrorKind::Expected {
@@ -50,7 +45,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         // TODO: CLEANUP: Clean up this part to not clone unless necessary
         if generics
-            .insert(polymorph.clone(), TypeConstraint { constraints })
+            .insert(polymorph.clone(), TypeParameter::new(constraints))
             .is_some()
         {
             return Err(
@@ -87,7 +82,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.ignore_newlines();
 
-        let mut generics = IndexMap::new();
+        let mut parameters = IndexMap::new();
 
         if self.input.eat(TokenKind::OpenAngle) {
             self.ignore_newlines();
@@ -97,7 +92,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     break;
                 }
 
-                self.parse_type_constraint(&mut generics)?;
+                self.parse_type_parameter(&mut parameters)?;
 
                 if !self.input.eat(TokenKind::Comma) {
                     continue;
@@ -148,6 +143,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             fields,
             is_packed,
+            parameters,
             source,
             privacy,
         })

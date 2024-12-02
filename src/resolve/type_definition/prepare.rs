@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         job::TypeJob,
     },
-    resolved::{self, EnumRef, HumanName, StructureRef, TypeAliasRef, TypeDecl},
+    resolved::{self, EnumRef, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeParameters},
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
@@ -71,10 +71,29 @@ fn prepare_structure(
 ) -> StructureRef {
     let source = structure.source;
 
+    let mut parameters = TypeParameters::default();
+
+    for (name, parameter) in structure.parameters.iter() {
+        let constraints = vec![];
+
+        if !parameter.constraints.is_empty() {
+            todo!("type parameters with constraints are not supported yet");
+        }
+
+        if parameters
+            .parameters
+            .insert(name.to_string(), resolved::TypeParameter { constraints })
+            .is_some()
+        {
+            todo!("Error message for duplicate type parameter names")
+        }
+    }
+
     let structure_ref = resolved_ast.structures.insert(resolved::Structure {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
+        parameters,
         source: structure.source,
     });
 

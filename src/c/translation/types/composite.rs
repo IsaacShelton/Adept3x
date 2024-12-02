@@ -96,6 +96,7 @@ pub fn make_composite(
                     name: name.clone(),
                     fields,
                     is_packed,
+                    parameters: IndexMap::default(),
                     source: composite.source,
                     privacy: Privacy::Private,
                 });

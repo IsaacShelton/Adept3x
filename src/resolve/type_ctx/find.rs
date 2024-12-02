@@ -1,9 +1,16 @@
 use super::{find_error::FindTypeError, ResolveTypeCtx};
-use crate::{name::Name, resolved};
+use crate::{
+    name::Name,
+    resolved::{self, Type},
+};
 use std::borrow::Cow;
 
 impl<'a> ResolveTypeCtx<'a> {
-    pub fn find(&self, name: &Name) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
+    pub fn find(
+        &self,
+        name: &Name,
+        arguments: Vec<Type>,
+    ) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
         let settings = &self.resolved_ast.workspace.settings[self
             .resolved_ast
             .workspace
@@ -17,6 +24,19 @@ impl<'a> ResolveTypeCtx<'a> {
         if let Some(name) = name.as_plain_str() {
             if let Some(types_in_module) = self.types_in_modules.get(&self.module_fs_node_id) {
                 if let Some(decl) = types_in_module.get(name) {
+                    if let resolved::TypeKind::Structure(_, structure_ref) = decl.kind {
+                        let parameters = &self
+                            .resolved_ast
+                            .structures
+                            .get(structure_ref)
+                            .unwrap()
+                            .parameters;
+
+                        if parameters.len() > 0 {
+                            todo!("Handle generics for generic type")
+                        }
+                    }
+
                     return Ok(Cow::Borrowed(&decl.kind));
                 }
             }

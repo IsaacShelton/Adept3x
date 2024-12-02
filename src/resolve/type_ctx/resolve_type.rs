@@ -34,7 +34,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 Ok(resolved::TypeKind::Pointer(Box::new(inner)))
             }
             ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
-            ast::TypeKind::Named(name) => match self.find(name) {
+            ast::TypeKind::Named(name) => match self.find(name, vec![]) {
                 Ok(found) => Ok(found.into_owned()),
                 Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
             },

@@ -7,9 +7,21 @@ use indexmap::IndexMap;
 pub struct Structure {
     pub name: String,
     pub fields: IndexMap<String, Field>,
+    pub parameters: IndexMap<String, TypeParameter>,
     pub is_packed: bool,
     pub source: Source,
     pub privacy: Privacy,
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeParameter {
+    pub constraints: Vec<Type>,
+}
+
+impl TypeParameter {
+    pub fn new(constraints: Vec<Type>) -> Self {
+        Self { constraints }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, IsVariant)]

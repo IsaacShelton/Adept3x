@@ -9,6 +9,11 @@ pub fn lower_structure(
 ) -> Result<(), LowerError> {
     let mut fields = Vec::with_capacity(structure.fields.len());
 
+    if !structure.parameters.parameters.is_empty() {
+        eprintln!("warning: lowering generic type parameters is not supported yet, skipping...");
+        return Ok(());
+    }
+
     for field in structure.fields.values() {
         fields.push(ir::Field {
             ir_type: lower_type(

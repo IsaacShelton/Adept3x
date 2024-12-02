@@ -15,7 +15,7 @@ mod variable_storage;
 
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{IntegerBits, IntegerSign};
-use crate::{ast::AstWorkspace, source_files::SourceFiles, workspace::fs::FsNodeId};
+use crate::{ast::AstWorkspace, source_files::SourceFiles};
 pub use block::*;
 pub use datatype::*;
 pub use destination::*;
@@ -51,7 +51,6 @@ pub struct Ast<'a> {
     pub enums: SlotMap<EnumRef, Enum>,
     pub type_aliases: SlotMap<TypeAliasRef, Type>,
     pub workspace: &'a AstWorkspace<'a>,
-    pub types_per_module: HashMap<FsNodeId, HashMap<String, TypeDecl>>,
 }
 
 impl<'a> Ast<'a> {
@@ -67,7 +66,6 @@ impl<'a> Ast<'a> {
             enums: SlotMap::with_key(),
             type_aliases: SlotMap::with_key(),
             workspace,
-            types_per_module: HashMap::new(),
         }
     }
 
