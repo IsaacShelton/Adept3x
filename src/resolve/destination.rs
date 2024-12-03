@@ -12,6 +12,7 @@ pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination,
                 let Member {
                     subject,
                     structure_ref,
+                    poly_recipe,
                     index,
                     field_type,
                 } = *member;
@@ -19,6 +20,7 @@ pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination,
                 DestinationKind::Member {
                     subject: Box::new(subject),
                     structure_ref,
+                    poly_recipe,
                     index,
                     field_type,
                 }

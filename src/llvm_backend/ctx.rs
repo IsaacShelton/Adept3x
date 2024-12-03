@@ -7,11 +7,7 @@ use super::{
     target_data::TargetData,
 };
 use crate::{
-    backend::BackendError,
-    data_units::ByteUnits,
-    diagnostics::Diagnostics,
-    ir,
-    resolved::{self, StructureRef},
+    backend::BackendError, data_units::ByteUnits, diagnostics::Diagnostics, ir, resolved,
     target::type_layout::TypeLayoutCache,
 };
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
@@ -36,14 +32,14 @@ pub struct StaticVariable {
 
 #[derive(Debug, Default)]
 pub struct StructureCache {
-    pub cache: OnceMap<StructureRef, LLVMTypeRef>,
+    pub cache: OnceMap<ir::StructureRef, LLVMTypeRef>,
 }
 
 #[derive(Debug)]
 pub struct ToBackendTypeCtx<'a> {
     pub structure_cache: &'a StructureCache,
     pub ir_module: &'a ir::Module<'a>,
-    pub visited: RefCell<HashSet<StructureRef>>,
+    pub visited: RefCell<HashSet<ir::StructureRef>>,
 }
 
 impl<'a> From<&'a BackendCtx<'a>> for ToBackendTypeCtx<'a> {

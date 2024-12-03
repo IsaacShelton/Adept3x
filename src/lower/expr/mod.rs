@@ -304,7 +304,8 @@ pub fn lower_expr(
         ExprKind::Member(member) => {
             let Member {
                 subject,
-                structure_ref,
+                structure_ref: resolved_structure_ref,
+                poly_recipe,
                 index,
                 field_type,
             } = &**member;
@@ -312,10 +313,26 @@ pub fn lower_expr(
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
+            let structure_ref =
+                ir_module
+                    .structures
+                    .translate(*resolved_structure_ref, poly_recipe, || {
+                        todo!("monomorphize structure for lowering member expression");
+
+                        #[allow(unreachable_code)]
+                        Err(LowerErrorKind::CannotFit {
+                            value: "oops".into(),
+                            expected_type:
+                                "lower_expr translate resolved structure reference is unimplemented"
+                                    .into(),
+                        }
+                        .at(expr.source))
+                    })?;
+
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
                 subject_pointer,
-                struct_type: ir::Type::Structure(*structure_ref),
+                struct_type: ir::Type::Structure(structure_ref),
                 index: *index,
             });
 
@@ -616,16 +633,33 @@ pub fn lower_destination(
         }
         DestinationKind::Member {
             subject,
-            structure_ref,
+            structure_ref: resolved_structure_ref,
+            poly_recipe,
             index,
             ..
         } => {
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
+            let structure_ref =
+                ir_module
+                    .structures
+                    .translate(*resolved_structure_ref, poly_recipe, || {
+                        todo!("monomorphize structure for lowering member expression 2");
+
+                        #[allow(unreachable_code)]
+                        Err(LowerErrorKind::CannotFit {
+                            value: "oops".into(),
+                            expected_type:
+                                "lower_destination translate resolved structure reference is unimplemented"
+                                    .into(),
+                        }
+                        .at(destination.source))
+                    })?;
+
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
-                struct_type: ir::Type::Structure(*structure_ref),
+                struct_type: ir::Type::Structure(structure_ref),
                 index: *index,
             }))
         }

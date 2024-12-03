@@ -51,6 +51,7 @@ pub fn resolve_member_expr(
         }
     }
 
+    let poly_recipe = todo!("obtain poly recipe for resolve_member_expr");
     let subject_destination = resolve_expr_to_destination(resolved_subject)?;
 
     Ok(TypedExpr::new(
@@ -59,6 +60,7 @@ pub fn resolve_member_expr(
             resolved::ExprKind::Member(Box::new(Member {
                 subject: subject_destination,
                 structure_ref,
+                poly_recipe,
                 index,
                 field_type: found_field.resolved_type.clone(),
             })),

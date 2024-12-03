@@ -39,10 +39,7 @@ pub fn is_homo_aggregate<'a>(
             })
         }
         ir::Type::Structure(structure_ref) => {
-            let structure = ir_module
-                .structures
-                .get(structure_ref)
-                .expect("referenced structure to exist for is_homo_aggregate");
+            let structure = ir_module.structures.get(*structure_ref);
 
             is_homo_aggregate_record(
                 decider,

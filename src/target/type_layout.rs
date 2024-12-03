@@ -97,19 +97,10 @@ impl<'a> TypeLayoutCache<'a> {
             },
             ir::Type::Union(_) => todo!("get_impl for ir::Type::Union"),
             ir::Type::Structure(structure_ref) => {
-                let structure = self
-                    .structures
-                    .get(structure_ref)
-                    .expect("referenced structure to exist");
-
-                let resolved_structure = self
-                    .resolved_ast
-                    .structures
-                    .get(*structure_ref)
-                    .expect("referenced structure to exist");
+                let structure = self.structures.get(*structure_ref);
 
                 let info = RecordInfo::from_structure(structure);
-                self.get_impl_record_layout(&info, Some(resolved_structure.name.plain()))
+                self.get_impl_record_layout(&info, structure.name.as_deref())
             }
             ir::Type::AnonymousComposite(type_composite) => {
                 let info = RecordInfo::from_composite(type_composite);

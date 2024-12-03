@@ -29,6 +29,7 @@ pub fn lower_structure(
     ir_module.structures.insert(
         structure_ref,
         ir::Structure {
+            name: Some(structure.name.plain().to_string()),
             fields,
             is_packed: structure.is_packed,
             source: structure.source,

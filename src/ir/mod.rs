@@ -1,19 +1,19 @@
 mod functions;
+mod structures;
 
 pub use crate::resolved::{FloatOrSign, GlobalVarRef, IntegerSign};
 use crate::{
     data_units::ByteUnits,
-    resolved::{FloatOrInteger, IntegerBits, StructureRef},
+    resolved::{FloatOrInteger, IntegerBits},
     source_files::Source,
     target::Target,
 };
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
+pub use functions::FunctionRef;
 use functions::Functions;
 use std::{collections::HashMap, ffi::CString};
-
-pub type Structures = HashMap<StructureRef, Structure>;
-pub use functions::FunctionRef;
+pub use structures::{StructureRef, Structures};
 
 pub struct Module<'a> {
     pub target: &'a Target,
@@ -55,6 +55,7 @@ pub struct Function {
 
 #[derive(Clone, Debug)]
 pub struct Structure {
+    pub name: Option<String>,
     pub fields: Vec<Field>,
     pub is_packed: bool,
     pub source: Source,
@@ -412,12 +413,7 @@ impl Type {
     pub fn struct_fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
         match self {
             Type::Structure(structure_ref) => {
-                let structure = ir_module
-                    .structures
-                    .get(structure_ref)
-                    .expect("referenced structure to exist");
-
-                Some(&structure.fields[..])
+                Some(&ir_module.structures.get(*structure_ref).fields[..])
             }
             Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
             _ => None,
@@ -478,7 +474,7 @@ impl<'a> Module<'a> {
         Self {
             target,
             functions: Functions::new(),
-            structures: HashMap::new(),
+            structures: Structures::new(),
             globals: HashMap::new(),
         }
     }
