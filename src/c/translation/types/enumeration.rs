@@ -86,10 +86,10 @@ pub fn make_anonymous_enum(
                 todo!("support enum type specifiers")
             }
 
-            Ok(TypeKind::Named(Name::plain(format!(
-                "enum<{}>",
-                named.name
-            ))))
+            Ok(TypeKind::Named(
+                Name::plain(format!("enum<{}>", named.name)),
+                vec![],
+            ))
         }
     }
 }

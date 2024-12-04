@@ -135,7 +135,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         fields: IndexMap::from_iter([(
             "kind".into(),
             Field {
-                ast_type: TypeKind::Named(Name::plain("ProjectKind")).at(source),
+                ast_type: TypeKind::Named(Name::plain("ProjectKind"), vec![]).at(source),
                 privacy: Privacy::Public,
                 source,
             },
@@ -210,7 +210,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                 Parameter::new("name".into(), ptr_char.clone()),
                 Parameter::new(
                     "project".into(),
-                    TypeKind::Named(Name::plain("Project")).at(source),
+                    TypeKind::Named(Name::plain("Project"), vec![]).at(source),
                 ),
             ],
             is_cstyle_vararg: false,
@@ -225,7 +225,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                         ExprKind::Variable(Name::plain("name")).at(source),
                     ),
                     (
-                        TypeKind::Named(Name::plain("ProjectKind")).at(source),
+                        TypeKind::Named(Name::plain("ProjectKind"), vec![]).at(source),
                         ExprKind::Member(
                             Box::new(ExprKind::Variable(Name::plain("project")).at(source)),
                             "kind".into(),
@@ -253,7 +253,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                 Parameter::new("as_namespace".into(), ptr_char.clone()),
                 Parameter::new(
                     "dependency".into(),
-                    TypeKind::Named(Name::plain("Dependency")).at(source),
+                    TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
                 ),
             ],
             is_cstyle_vararg: false,
@@ -268,7 +268,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                         ExprKind::Variable(Name::plain("as_namespace")).at(source),
                     ),
                     (
-                        TypeKind::Named(Name::plain("Dependency")).at(source),
+                        TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
                         ExprKind::Member(
                             Box::new(ExprKind::Variable(Name::plain("dependency")).at(source)),
                             "name".into(),
@@ -295,10 +295,10 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             required: vec![Parameter::new("namespace".into(), ptr_char.clone())],
             is_cstyle_vararg: false,
         },
-        return_type: TypeKind::Named(Name::plain("Dependency")).at(source),
+        return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
         stmts: vec![StmtKind::Return(Some(
             ExprKind::StructLiteral(Box::new(StructLiteral {
-                ast_type: TypeKind::Named(Name::plain("Dependency")).at(source),
+                ast_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
                 fields: vec![FieldInitializer {
                     name: None,
                     value: ExprKind::Variable(Name::plain("namespace")).at(source),

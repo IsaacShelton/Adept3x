@@ -361,7 +361,7 @@ pub fn resolve_expr(
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let resolved_type = ctx.type_ctx().resolve(
-                &ast::TypeKind::Named(enum_member_literal.enum_name.clone())
+                &ast::TypeKind::Named(enum_member_literal.enum_name.clone(), vec![])
                     .at(enum_member_literal.source),
             )?;
 

@@ -34,7 +34,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 Ok(resolved::TypeKind::Pointer(Box::new(inner)))
             }
             ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
-            ast::TypeKind::Named(name) => match self.find(name, vec![]) {
+            ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
                 Ok(found) => Ok(found.into_owned()),
                 Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
             },
@@ -85,9 +85,11 @@ impl<'a> ResolveTypeCtx<'a> {
                 let mut resolved_constraints = vec![];
 
                 for constraint in constraints {
-                    if let ast::TypeKind::Named(name) = &constraint.kind {
+                    if let ast::TypeKind::Named(name, arguments) = &constraint.kind {
                         resolved_constraints.push(match name.as_plain_str() {
-                            Some("PrimitiveAdd") => Constraint::PrimitiveAdd,
+                            Some("PrimitiveAdd") if !arguments.is_empty() => {
+                                Constraint::PrimitiveAdd
+                            }
                             _ => {
                                 return Err(ResolveErrorKind::UndeclaredTrait(name.to_string())
                                     .at(constraint.source))

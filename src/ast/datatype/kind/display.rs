@@ -1,6 +1,6 @@
 use super::TypeKind;
 use crate::{
-    ast::{fmt_c_integer, FloatSize, IntegerBits},
+    ast::{fmt_c_integer, CompileTimeArgument, FloatSize, IntegerBits},
     ir::IntegerSign,
 };
 use itertools::Itertools;
@@ -33,8 +33,25 @@ impl Display for &TypeKind {
             TypeKind::Void => {
                 write!(f, "void")?;
             }
-            TypeKind::Named(name) => {
+            TypeKind::Named(name, arguments) => {
                 write!(f, "{name}")?;
+
+                if !arguments.is_empty() {
+                    write!(f, "<")?;
+
+                    for (i, argument) in arguments.iter().enumerate() {
+                        match argument {
+                            CompileTimeArgument::Type(ty) => write!(f, "{}", ty)?,
+                            CompileTimeArgument::Expr(expr) => write!(f, "({:?})", expr)?, // TODO: Implement display for ast::Expr
+                        }
+
+                        if i + 1 < arguments.len() {
+                            write!(f, ", ")?;
+                        }
+                    }
+
+                    write!(f, ">")?;
+                }
             }
             TypeKind::Floating(size) => f.write_str(match size {
                 FloatSize::Bits32 => "f32",

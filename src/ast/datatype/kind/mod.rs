@@ -2,8 +2,8 @@ mod common;
 mod display;
 
 use super::{
-    AnonymousEnum, AnonymousStruct, AnoymousUnion, CInteger, FixedArray, FloatSize,
-    FunctionPointer, IntegerBits, IntegerSign, Type,
+    AnonymousEnum, AnonymousStruct, AnoymousUnion, CInteger, CompileTimeArgument, FixedArray,
+    FloatSize, FunctionPointer, IntegerBits, IntegerSign, Type,
 };
 use crate::{name::Name, source_files::Source};
 
@@ -16,7 +16,7 @@ pub enum TypeKind {
     Pointer(Box<Type>),
     FixedArray(Box<FixedArray>),
     Void,
-    Named(Name),
+    Named(Name, Vec<CompileTimeArgument>),
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(AnoymousUnion),
     AnonymousEnum(AnonymousEnum),
@@ -30,11 +30,12 @@ impl TypeKind {
     }
 
     pub fn allow_indirect_undefined(&self) -> bool {
-        if let TypeKind::Named(name) = self {
+        if let TypeKind::Named(name, arguments) = self {
             let basename = &name.basename;
-            if basename.starts_with("struct<")
-                || basename.starts_with("union<")
-                || basename.starts_with("enum<")
+            if arguments.len() == 0
+                && (basename.starts_with("struct<")
+                    || basename.starts_with("union<")
+                    || basename.starts_with("enum<"))
             {
                 return true;
             }

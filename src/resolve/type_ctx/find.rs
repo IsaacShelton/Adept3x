@@ -1,7 +1,8 @@
 use super::{find_error::FindTypeError, ResolveTypeCtx};
 use crate::{
+    ast::CompileTimeArgument,
     name::Name,
-    resolved::{self, Type},
+    resolved::{self},
 };
 use std::borrow::Cow;
 
@@ -9,7 +10,7 @@ impl<'a> ResolveTypeCtx<'a> {
     pub fn find(
         &self,
         name: &Name,
-        arguments: Vec<Type>,
+        arguments: &[CompileTimeArgument],
     ) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
         let settings = &self.resolved_ast.workspace.settings[self
             .resolved_ast

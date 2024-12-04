@@ -31,8 +31,12 @@ pub fn make_composite(
         })?;
 
         return Ok(match &composite.kind {
-            CompositeKind::Struct => TypeKind::Named(Name::plain(format!("struct<{}>", name))),
-            CompositeKind::Union => TypeKind::Named(Name::plain(format!("union<{}>", name))),
+            CompositeKind::Struct => {
+                TypeKind::Named(Name::plain(format!("struct<{}>", name)), vec![])
+            }
+            CompositeKind::Union => {
+                TypeKind::Named(Name::plain(format!("union<{}>", name)), vec![])
+            }
         });
     };
 
@@ -101,7 +105,7 @@ pub fn make_composite(
                     privacy: Privacy::Private,
                 });
 
-                Ok(TypeKind::Named(Name::plain(name)))
+                Ok(TypeKind::Named(Name::plain(name), vec![]))
             } else {
                 let anonymous_struct = AnonymousStruct { fields, is_packed };
 

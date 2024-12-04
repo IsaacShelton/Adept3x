@@ -154,7 +154,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 //     count,
                 // })))
             }
-            _ => Ok(TypeKind::Named(name)),
+            _ => Ok(TypeKind::Named(name, vec![])),
         }?;
 
         Ok(Type::new(type_kind, source))
