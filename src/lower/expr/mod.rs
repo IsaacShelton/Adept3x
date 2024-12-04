@@ -305,7 +305,6 @@ pub fn lower_expr(
             let Member {
                 subject,
                 structure_ref: resolved_structure_ref,
-                poly_recipe,
                 index,
                 field_type,
             } = &**member;
@@ -313,21 +312,22 @@ pub fn lower_expr(
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
-            let structure_ref =
-                ir_module
-                    .structures
-                    .translate(*resolved_structure_ref, poly_recipe, || {
-                        todo!("monomorphize structure for lowering member expression");
+            let structure_ref = ir_module.structures.translate(
+                *resolved_structure_ref,
+                builder.poly_recipe(),
+                || {
+                    todo!("monomorphize structure for lowering member expression");
 
-                        #[allow(unreachable_code)]
-                        Err(LowerErrorKind::CannotFit {
-                            value: "oops".into(),
-                            expected_type:
-                                "lower_expr translate resolved structure reference is unimplemented"
-                                    .into(),
-                        }
-                        .at(expr.source))
-                    })?;
+                    #[allow(unreachable_code)]
+                    Err(LowerErrorKind::CannotFit {
+                        value: "oops".into(),
+                        expected_type:
+                            "lower_expr translate resolved structure reference is unimplemented"
+                                .into(),
+                    }
+                    .at(expr.source))
+                },
+            )?;
 
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
@@ -634,7 +634,6 @@ pub fn lower_destination(
         DestinationKind::Member {
             subject,
             structure_ref: resolved_structure_ref,
-            poly_recipe,
             index,
             ..
         } => {
@@ -644,7 +643,7 @@ pub fn lower_destination(
             let structure_ref =
                 ir_module
                     .structures
-                    .translate(*resolved_structure_ref, poly_recipe, || {
+                    .translate(*resolved_structure_ref, builder.poly_recipe(), || {
                         todo!("monomorphize structure for lowering member expression 2");
 
                         #[allow(unreachable_code)]

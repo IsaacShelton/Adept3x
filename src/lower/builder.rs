@@ -89,6 +89,10 @@ impl<'a> Builder<'a> {
             .map(|x| ConcreteType(Cow::Owned(x)))
             .map_err(LowerError::from)
     }
+
+    pub fn poly_recipe(&self) -> &'a PolyRecipe {
+        self.poly_recipe
+    }
 }
 
 pub fn unpoly<'a>(

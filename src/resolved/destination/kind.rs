@@ -1,4 +1,4 @@
-use crate::{resolve::PolyRecipe, resolved::*};
+use crate::resolved::*;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum DestinationKind {
@@ -7,7 +7,6 @@ pub enum DestinationKind {
     Member {
         subject: Box<Destination>,
         structure_ref: StructureRef,
-        poly_recipe: PolyRecipe,
         index: usize,
         field_type: Type,
     },
