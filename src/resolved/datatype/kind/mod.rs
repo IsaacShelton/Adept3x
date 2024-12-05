@@ -6,7 +6,7 @@ mod function_pointer;
 use super::Type;
 use crate::{
     ast::{fmt_c_integer, CInteger, FloatSize, IntegerBits, IntegerSign},
-    resolved::{human_name::HumanName, EnumRef, StructureRef, TypeAliasRef},
+    resolved::{human_name::HumanName, Ast, EnumRef, StructureRef, TypeAliasRef},
     source_files::Source,
     target::Target,
 };
@@ -36,7 +36,7 @@ pub enum TypeKind {
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
     Enum(HumanName, EnumRef),
-    Structure(HumanName, StructureRef),
+    Structure(HumanName, StructureRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef),
     Polymorph(String, Vec<Constraint>),
 }
@@ -65,7 +65,9 @@ impl TypeKind {
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
             TypeKind::FunctionPointer(_) => todo!(),
             TypeKind::Enum(_, _) => false,
-            TypeKind::Structure(_, _) => false,
+            TypeKind::Structure(_, _, parameters) => parameters
+                .iter()
+                .any(|parameter| parameter.kind.contains_polymorph()),
             TypeKind::TypeAlias(_, _) => false,
             TypeKind::Polymorph(_, _) => true,
         }
@@ -88,7 +90,7 @@ impl TypeKind {
             TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Pointer(_)
-            | TypeKind::Structure(_, _)
+            | TypeKind::Structure(_, _, _)
             | TypeKind::Void
             | TypeKind::AnonymousStruct(..)
             | TypeKind::AnonymousUnion(..)
@@ -97,6 +99,18 @@ impl TypeKind {
             | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum()
             | TypeKind::Polymorph(_, _) => None,
+        }
+    }
+
+    pub fn num_target_parameters(&self, resolved_ast: &Ast) -> usize {
+        match self {
+            TypeKind::Structure(_, structure_ref, _) => resolved_ast
+                .structures
+                .get(*structure_ref)
+                .unwrap()
+                .parameters
+                .len(),
+            _ => 0,
         }
     }
 }
@@ -140,7 +154,23 @@ impl Display for TypeKind {
                 write!(f, "ptr<{}>", **inner)?;
             }
             TypeKind::Void => f.write_str("void")?,
-            TypeKind::Structure(name, _) => write!(f, "{}", name)?,
+            TypeKind::Structure(name, _, parameters) => {
+                write!(f, "{}", name)?;
+
+                if !parameters.is_empty() {
+                    write!(f, "<")?;
+
+                    for (i, parameter) in parameters.iter().enumerate() {
+                        write!(f, "{}", parameter)?;
+
+                        if i + 1 < parameters.len() {
+                            write!(f, ", ")?;
+                        }
+                    }
+
+                    write!(f, ">")?
+                }
+            }
             TypeKind::AnonymousStruct() => f.write_str("anonymous-struct")?,
             TypeKind::AnonymousUnion() => f.write_str("anonymous-union")?,
             TypeKind::AnonymousEnum(..) => f.write_str("anonymous-enum")?,

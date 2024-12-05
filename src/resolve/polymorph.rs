@@ -97,7 +97,7 @@ impl PolyRecipe {
             }
             resolved::TypeKind::FunctionPointer(_) => todo!(),
             resolved::TypeKind::Enum(_, _) => ty.clone(),
-            resolved::TypeKind::Structure(_, _) => ty.clone(),
+            resolved::TypeKind::Structure(_, _, _) => ty.clone(),
             resolved::TypeKind::TypeAlias(_, _) => ty.clone(),
             resolved::TypeKind::Polymorph(name, _) => {
                 let Some(value) = polymorphs.get(name) else {
@@ -181,12 +181,35 @@ impl PolyCatalog {
             | resolved::TypeKind::Floating(_)
             | resolved::TypeKind::Void
             | resolved::TypeKind::Enum(_, _)
-            | resolved::TypeKind::Structure(_, _)
             | resolved::TypeKind::TypeAlias(_, _) => {
                 if *pattern_type == *concrete_type {
                     Ok(())
                 } else {
                     Err(None)
+                }
+            }
+            resolved::TypeKind::Structure(_, structure_ref, parameters) => {
+                match &concrete_type.kind {
+                    resolved::TypeKind::Structure(
+                        _,
+                        concrete_structure_ref,
+                        concrete_parameters,
+                    ) => {
+                        if *structure_ref != *concrete_structure_ref
+                            || parameters.len() != concrete_parameters.len()
+                        {
+                            return Err(None);
+                        }
+
+                        for (pattern_parameter, concrete_parameter) in
+                            parameters.iter().zip(concrete_parameters.iter())
+                        {
+                            self.match_type(ctx, pattern_parameter, concrete_parameter)?;
+                        }
+
+                        Ok(())
+                    }
+                    _ => Err(None),
                 }
             }
             resolved::TypeKind::Pointer(pattern_inner) => match &concrete_type.kind {

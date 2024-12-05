@@ -38,11 +38,12 @@ pub fn resolve_struct_literal_expr(
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_struct_type = ctx.type_ctx().resolve(ast_type)?;
-    let (struct_name, structure_ref) =
+    let (struct_name, structure_ref, parameters) =
         get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
 
     let structure_type =
-        resolved::TypeKind::Structure(struct_name.clone(), structure_ref).at(source);
+        resolved::TypeKind::Structure(struct_name.clone(), structure_ref, parameters.to_vec())
+            .at(source);
 
     let mut next_index = 0;
     let mut resolved_fields = IndexMap::new();
@@ -118,7 +119,7 @@ pub fn resolve_struct_literal_expr(
             .insert(field_name.to_string(), (resolved_expr.expr, index))
             .is_some()
         {
-            let (struct_name, _) =
+            let (struct_name, _, _) =
                 get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
 
             return Err(ResolveErrorKind::FieldSpecifiedMoreThanOnce {

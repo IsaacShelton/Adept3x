@@ -142,7 +142,11 @@ fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &reso
         resolved::TypeKind::FixedArray(fixed_array) => collect_constraints(map, &fixed_array.inner),
         resolved::TypeKind::FunctionPointer(_) => todo!(),
         resolved::TypeKind::Enum(_, _) => (),
-        resolved::TypeKind::Structure(_, _) => (),
+        resolved::TypeKind::Structure(_, _, parameters) => {
+            for parameter in parameters {
+                collect_constraints(map, parameter);
+            }
+        }
         resolved::TypeKind::TypeAlias(_, _) => (),
         resolved::TypeKind::Polymorph(name, constraints) => {
             let set = map.entry(name.to_string()).or_default();

@@ -22,25 +22,23 @@ impl<'a> ResolveTypeCtx<'a> {
             .expect("valid settings id")
             .0];
 
-        if let Some(name) = name.as_plain_str() {
-            if let Some(types_in_module) = self.types_in_modules.get(&self.module_fs_node_id) {
-                if let Some(decl) = types_in_module.get(name) {
-                    if let resolved::TypeKind::Structure(_, structure_ref) = decl.kind {
-                        let parameters = &self
-                            .resolved_ast
-                            .structures
-                            .get(structure_ref)
-                            .unwrap()
-                            .parameters;
+        if !arguments.is_empty() {
+            eprintln!(
+                "warning: ResolveTypeCtx does not properly handle compile time arguments yet"
+            );
+        }
 
-                        if parameters.len() > 0 {
-                            todo!("Handle generics for generic type")
-                        }
-                    }
-
-                    return Ok(Cow::Borrowed(&decl.kind));
-                }
-            }
+        if let Some(decl) = name
+            .as_plain_str()
+            .and_then(|name| {
+                self.types_in_modules
+                    .get(&self.module_fs_node_id)
+                    .and_then(|types_in_module| types_in_module.get(name))
+            })
+            // NOTE: This will need to be map instead at some point
+            .filter(|decl| decl.num_parameters(self.resolved_ast) == arguments.len())
+        {
+            return Ok(Cow::Borrowed(&decl.kind));
         }
 
         if !name.namespace.is_empty() {
@@ -58,7 +56,9 @@ impl<'a> ResolveTypeCtx<'a> {
                 .flat_map(|dep| settings.dependency_to_module.get(dep))
                 .flat_map(|fs_node_id| self.types_in_modules.get(fs_node_id))
                 .flat_map(|decls| decls.get(basename.as_ref()))
-                .filter(|decl| decl.privacy.is_public());
+                .filter(|decl| decl.privacy.is_public())
+                // NOTE: This will need to be flat_map instead at some point
+                .filter(|decl| decl.num_parameters(self.resolved_ast) == arguments.len());
 
             if let Some(found) = matches.next() {
                 if matches.next().is_some() {

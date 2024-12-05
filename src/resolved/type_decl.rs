@@ -1,4 +1,4 @@
-use super::{Constraint, TypeKind};
+use super::{Ast, Constraint, TypeKind};
 use crate::{ast::Privacy, source_files::Source};
 use std::collections::HashMap;
 
@@ -7,6 +7,12 @@ pub struct TypeDecl {
     pub kind: TypeKind,
     pub source: Source,
     pub privacy: Privacy,
+}
+
+impl TypeDecl {
+    pub fn num_parameters(&self, resolved_ast: &Ast) -> usize {
+        self.kind.num_target_parameters(resolved_ast)
+    }
 }
 
 #[derive(Clone, Debug, Default)]

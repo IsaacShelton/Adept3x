@@ -245,7 +245,7 @@ impl FunctionHaystack {
             .and_then(|first_type| {
                 if let Ok(first_type) = ctx.resolved_ast.unalias(first_type) {
                     match &first_type.kind {
-                        TypeKind::Structure(_, structure_ref) => Some(
+                        TypeKind::Structure(_, structure_ref, _) => Some(
                             ctx.resolved_ast
                                 .structures
                                 .get(*structure_ref)

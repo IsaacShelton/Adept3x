@@ -46,7 +46,11 @@ impl Type {
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
             TypeKind::FunctionPointer(_) => todo!(),
             TypeKind::Enum(_, _) => (),
-            TypeKind::Structure(_, _) => (),
+            TypeKind::Structure(_, _, parameters) => {
+                for parameter in parameters {
+                    parameter.strip_constraints();
+                }
+            }
             TypeKind::TypeAlias(_, _) => (),
             TypeKind::Polymorph(_, constraints) => {
                 constraints.drain(..);

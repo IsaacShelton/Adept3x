@@ -10,6 +10,7 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
+use itertools::Itertools;
 
 pub fn prepare_type_jobs(
     ctx: &mut ResolveCtx,
@@ -97,8 +98,18 @@ fn prepare_structure(
         source: structure.source,
     });
 
-    let struct_type_kind =
-        resolved::TypeKind::Structure(HumanName(structure.name.to_string()), structure_ref);
+    // TODO: Improve the source tracking for these
+    let polymorphs = structure
+        .parameters
+        .keys()
+        .map(|name| resolved::TypeKind::Polymorph(name.into(), vec![]).at(structure.source))
+        .collect_vec();
+
+    let struct_type_kind = resolved::TypeKind::Structure(
+        HumanName(structure.name.to_string()),
+        structure_ref,
+        polymorphs,
+    );
 
     ctx.types_in_modules
         .entry(module_fs_node_id)

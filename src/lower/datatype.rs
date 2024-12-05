@@ -61,8 +61,8 @@ pub fn lower_type(
             resolved_ast,
         )?))),
         resolved::TypeKind::Void => Ok(ir::Type::Void),
-        resolved::TypeKind::Structure(_, structure_ref) => {
-            todo!("lower structure");
+        resolved::TypeKind::Structure(_, structure_ref, parameters) => {
+            todo!("instantiate structure");
             // Ok(ir::Type::Structure(*structure_ref))
         }
         resolved::TypeKind::AnonymousStruct() => {
