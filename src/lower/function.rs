@@ -35,7 +35,7 @@ pub fn lower_function_body(
         .take(function.variables.num_parameters)
         .map(|instance| {
             Ok(builder.push(ir::Instruction::Alloca(lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&instance.resolved_type)?,
                 resolved_ast,
             )?)))
@@ -50,7 +50,7 @@ pub fn lower_function_body(
         .skip(function.variables.num_parameters)
     {
         builder.push(ir::Instruction::Alloca(lower_type(
-            &ir_module.target,
+            ir_module,
             &builder.unpoly(&variable_instance.resolved_type)?,
             resolved_ast,
         )?));
@@ -113,14 +113,14 @@ pub fn lower_function_head(
     let mut parameters = vec![];
     for parameter in function.parameters.required.iter() {
         parameters.push(lower_type(
-            &ir_module.target,
+            ir_module,
             &unpoly(poly_recipe, &parameter.resolved_type)?,
             resolved_ast,
         )?);
     }
 
     let mut return_type = lower_type(
-        &ir_module.target,
+        ir_module,
         &unpoly(poly_recipe, &function.return_type)?,
         resolved_ast,
     )?;

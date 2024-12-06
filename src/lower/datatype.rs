@@ -2,7 +2,7 @@ use super::error::LowerError;
 use crate::{
     ast::{CInteger, FloatSize},
     ir::{self, IntegerSign},
-    lower::error::LowerErrorKind,
+    lower::{error::LowerErrorKind, structure::monomorphize_structure},
     resolved,
     target::{Target, TargetOsExt},
 };
@@ -12,12 +12,13 @@ use std::borrow::{Borrow, Cow};
 pub struct ConcreteType<'a>(pub Cow<'a, resolved::Type>);
 
 pub fn lower_type(
-    target: &Target,
+    ir_module: &ir::Module,
     concrete_type: &ConcreteType,
     resolved_ast: &resolved::Ast,
 ) -> Result<ir::Type, LowerError> {
     use resolved::{IntegerBits as Bits, IntegerSign as Sign};
 
+    let target = &ir_module.target;
     let resolved_type = &concrete_type.borrow().0;
 
     match &resolved_type.kind {
@@ -56,14 +57,23 @@ pub fn lower_type(
             FloatSize::Bits64 => ir::Type::F64,
         }),
         resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
-            target,
+            ir_module,
             &ConcreteType(Cow::Borrowed(inner)),
             resolved_ast,
         )?))),
         resolved::TypeKind::Void => Ok(ir::Type::Void),
         resolved::TypeKind::Structure(_, structure_ref, parameters) => {
-            todo!("instantiate structure");
-            // Ok(ir::Type::Structure(*structure_ref))
+            // NOTE: We can assume that all parameters have been resolved to concrete types by this
+            // point
+
+            let mut values = Vec::with_capacity(parameters.len());
+            for parameter in parameters {
+                assert!(!parameter.kind.contains_polymorph());
+                values.push(ConcreteType(Cow::Borrowed(parameter)));
+            }
+
+            monomorphize_structure(ir_module, *structure_ref, values.as_slice(), resolved_ast)
+                .map(|structure_ref| ir::Type::Structure(structure_ref))
         }
         resolved::TypeKind::AnonymousStruct() => {
             todo!("lower anonymous struct")
@@ -77,7 +87,7 @@ pub fn lower_type(
         resolved::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
             let inner = lower_type(
-                target,
+                ir_module,
                 &ConcreteType(Cow::Borrowed(&fixed_array.inner)),
                 resolved_ast,
             )?;
@@ -95,7 +105,7 @@ pub fn lower_type(
                 .expect("referenced enum to exist");
 
             lower_type(
-                target,
+                ir_module,
                 &ConcreteType(Cow::Borrowed(&enum_definition.resolved_type)),
                 resolved_ast,
             )
@@ -107,7 +117,7 @@ pub fn lower_type(
                 .expect("referenced type alias to exist");
 
             lower_type(
-                target,
+                ir_module,
                 &ConcreteType(Cow::Borrowed(resolved_type)),
                 resolved_ast,
             )

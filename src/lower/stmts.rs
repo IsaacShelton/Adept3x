@@ -78,7 +78,7 @@ pub fn lower_stmts(
 
                 let new_value = if let Some(operator) = &assignment.operator {
                     let destination_type = lower_type(
-                        &ir_module.target,
+                        ir_module,
                         &builder.unpoly(&assignment.destination.resolved_type)?,
                         resolved_ast,
                     )?;

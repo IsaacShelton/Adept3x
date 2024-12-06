@@ -1,7 +1,7 @@
 use super::Structure;
 use crate::{resolve::PolyRecipe, resolved};
 use append_only_vec::AppendOnlyVec;
-use std::{borrow::Borrow, collections::HashMap, sync::RwLock};
+use std::{collections::HashMap, sync::RwLock};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructureRef {
@@ -28,12 +28,13 @@ impl Structures {
         &self,
         resolved_structure_ref: resolved::StructureRef,
         structure: Structure,
+        poly_recipe: PolyRecipe,
     ) -> StructureRef {
         let structure_ref = StructureRef {
             index: self.structures.push(structure),
         };
 
-        let key = (resolved_structure_ref, PolyRecipe::default());
+        let key = (resolved_structure_ref, poly_recipe);
         self.monomorphized
             .write()
             .unwrap()
@@ -45,27 +46,25 @@ impl Structures {
     pub fn translate<E>(
         &self,
         resolved_structure_ref: resolved::StructureRef,
-        poly_recipe: impl Borrow<PolyRecipe>,
-        monomorphize: impl Fn() -> Result<StructureRef, E>,
+        poly_recipe: PolyRecipe,
+        monomorphize: impl Fn(PolyRecipe) -> Result<StructureRef, E>,
     ) -> Result<StructureRef, E> {
-        let key = (resolved_structure_ref, poly_recipe.borrow().clone());
+        let key = (resolved_structure_ref, poly_recipe);
 
         if let Some(found) = self.monomorphized.read().unwrap().get(&key) {
             return Ok(*found);
         }
 
-        let function_ref = monomorphize()?;
+        let poly_recipe = key.1.clone();
+        let function_ref = monomorphize(poly_recipe.clone())?;
 
         self.monomorphized
             .write()
             .unwrap()
             .insert(key, function_ref);
 
-        self.jobs.push((
-            resolved_structure_ref,
-            poly_recipe.borrow().clone(),
-            function_ref,
-        ));
+        self.jobs
+            .push((resolved_structure_ref, poly_recipe.clone(), function_ref));
 
         Ok(function_ref)
     }

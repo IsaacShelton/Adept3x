@@ -23,11 +23,7 @@ pub fn integer_truncate(
     cast: &Cast,
 ) -> Result<Value, LowerError> {
     let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-    let ir_type = lower_type(
-        &ir_module.target,
-        &builder.unpoly(&cast.target_type)?,
-        resolved_ast,
-    )?;
+    let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
     Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
 }
 
@@ -47,7 +43,7 @@ pub fn integer_extend(
     )?;
 
     let ir_type = lower_type(
-        &ir_module.target,
+        ir_module,
         &builder.unpoly(&cast_from.cast.target_type)?,
         resolved_ast,
     )?;

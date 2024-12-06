@@ -148,7 +148,7 @@ pub fn lower_expr(
                 .iter()
                 .map(|argument| {
                     lower_type(
-                        &ir_module.target,
+                        ir_module,
                         &builder.unpoly(&argument.resolved_type)?,
                         resolved_ast,
                     )
@@ -176,7 +176,7 @@ pub fn lower_expr(
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
             let variable_type = lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&variable.resolved_type)?,
                 resolved_ast,
             )?;
@@ -185,7 +185,7 @@ pub fn lower_expr(
         ExprKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
             let ir_type = lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&global_variable.resolved_type)?,
                 resolved_ast,
             )?;
@@ -211,7 +211,7 @@ pub fn lower_expr(
             }));
 
             let ir_type = lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&declare_assign.resolved_type)?,
                 resolved_ast,
             )?;
@@ -260,20 +260,12 @@ pub fn lower_expr(
         }
         ExprKind::FloatExtend(cast) => {
             let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(
-                &ir_module.target,
-                &builder.unpoly(&cast.target_type)?,
-                resolved_ast,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
         ExprKind::FloatToInteger(cast) => {
             let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(
-                &ir_module.target,
-                &builder.unpoly(&cast.target_type)?,
-                resolved_ast,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
             let sign = if ir_type
                 .is_signed()
                 .expect("must know signness in order to cast float to integer")
@@ -294,11 +286,7 @@ pub fn lower_expr(
                 .expect("integer to float must know sign");
 
             let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(
-                &ir_module.target,
-                &builder.unpoly(&cast.target_type)?,
-                resolved_ast,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
             Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, from_sign)))
         }
         ExprKind::Member(member) => {
@@ -314,8 +302,8 @@ pub fn lower_expr(
 
             let structure_ref = ir_module.structures.translate(
                 *resolved_structure_ref,
-                builder.poly_recipe(),
-                || {
+                builder.poly_recipe().clone(),
+                |_poly_recipe| {
                     todo!("monomorphize structure for lowering member expression");
 
                     #[allow(unreachable_code)]
@@ -336,11 +324,7 @@ pub fn lower_expr(
                 index: *index,
             });
 
-            let ir_type = lower_type(
-                &ir_module.target,
-                &builder.unpoly(field_type)?,
-                resolved_ast,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(field_type)?, resolved_ast)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {
@@ -359,7 +343,7 @@ pub fn lower_expr(
                 resolved_ast,
             )?;
             let item_type = lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&array_access.item_type)?,
                 resolved_ast,
             )?;
@@ -378,11 +362,8 @@ pub fn lower_expr(
                 fields,
             } = &**structure_literal;
 
-            let result_ir_type = lower_type(
-                &ir_module.target,
-                &builder.unpoly(structure_type)?,
-                resolved_ast,
-            )?;
+            let result_ir_type =
+                lower_type(ir_module, &builder.unpoly(structure_type)?, resolved_ast)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
@@ -430,7 +411,7 @@ pub fn lower_expr(
         )?),
         ExprKind::Dereference(subject) => {
             let ir_type = lower_type(
-                ir_module.target,
+                ir_module,
                 &builder.unpoly(&subject.resolved_type)?,
                 resolved_ast,
             )?;
@@ -482,7 +463,7 @@ pub fn lower_expr(
 
             if conditional.otherwise.is_some() {
                 let ir_type = lower_type(
-                    &ir_module.target,
+                    ir_module,
                     &builder.unpoly(&conditional.result_type)?,
                     resolved_ast,
                 )?;
@@ -547,7 +528,7 @@ pub fn lower_expr(
                 })?;
 
             let ir_type = lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&enum_definition.resolved_type)?,
                 resolved_ast,
             )?;
@@ -599,11 +580,7 @@ pub fn lower_expr(
             lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
         }
         ExprKind::Zeroed(resolved_type) => {
-            let ir_type = lower_type(
-                &ir_module.target,
-                &builder.unpoly(resolved_type)?,
-                resolved_ast,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(resolved_type)?, resolved_ast)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
         }
         ExprKind::InterpreterSyscall(syscall, args) => {
@@ -643,7 +620,7 @@ pub fn lower_destination(
             let structure_ref =
                 ir_module
                     .structures
-                    .translate(*resolved_structure_ref, builder.poly_recipe(), || {
+                    .translate(*resolved_structure_ref, builder.poly_recipe().clone(), |_poly_recipe| {
                         todo!("monomorphize structure for lowering member expression 2");
 
                         #[allow(unreachable_code)]
@@ -678,7 +655,7 @@ pub fn lower_destination(
                 resolved_ast,
             )?;
             let item_type = lower_type(
-                &ir_module.target,
+                ir_module,
                 &builder.unpoly(&array_access.item_type)?,
                 resolved_ast,
             )?;

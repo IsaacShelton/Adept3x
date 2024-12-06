@@ -1,6 +1,6 @@
 use super::{Ast, Constraint, TypeKind};
 use crate::{ast::Privacy, source_files::Source};
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct TypeDecl {
@@ -17,12 +17,20 @@ impl TypeDecl {
 
 #[derive(Clone, Debug, Default)]
 pub struct TypeParameters {
-    pub parameters: HashMap<String, TypeParameter>,
+    pub parameters: IndexMap<String, TypeParameter>,
 }
 
 impl TypeParameters {
     pub fn len(&self) -> usize {
         self.parameters.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &TypeParameter)> {
+        self.parameters.iter()
+    }
+
+    pub fn names(&self) -> impl Iterator<Item = &String> {
+        self.parameters.keys()
     }
 }
 
