@@ -40,6 +40,7 @@ pub enum LowerErrorKind {
         enum_name: String,
     },
     PolymorphError(PolymorphErrorKind),
+    MismatchedTypeParameterLengths,
 }
 
 impl From<PolymorphError> for LowerError {
@@ -100,6 +101,9 @@ impl Display for LowerErrorKind {
             }
             LowerErrorKind::EnumBackingTypeMustBeInteger { enum_name } => {
                 write!(f, "Backing type must be integer for enum '{}'", enum_name)
+            }
+            LowerErrorKind::MismatchedTypeParameterLengths => {
+                write!(f, "Mismatched type parameters lengths")
             }
             LowerErrorKind::PolymorphError(e) => e.fmt(f),
         }

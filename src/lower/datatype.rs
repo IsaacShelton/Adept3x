@@ -72,8 +72,14 @@ pub fn lower_type(
                 values.push(ConcreteType(Cow::Borrowed(parameter)));
             }
 
-            monomorphize_structure(ir_module, *structure_ref, values.as_slice(), resolved_ast)
-                .map(|structure_ref| ir::Type::Structure(structure_ref))
+            monomorphize_structure(
+                ir_module,
+                *structure_ref,
+                values.as_slice(),
+                resolved_ast,
+                concrete_type.0.source,
+            )
+            .map(|structure_ref| ir::Type::Structure(structure_ref))
         }
         resolved::TypeKind::AnonymousStruct() => {
             todo!("lower anonymous struct")

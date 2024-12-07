@@ -1,12 +1,13 @@
 use super::{
     builder::unpoly,
     datatype::{lower_type, ConcreteType},
-    error::LowerError,
+    error::{LowerError, LowerErrorKind},
 };
 use crate::{
     ir,
     resolve::{PolyCatalog, PolyRecipe},
     resolved,
+    source_files::Source,
 };
 
 pub fn mono(
@@ -53,6 +54,7 @@ pub fn monomorphize_structure(
     resolved_structure_ref: resolved::StructureRef,
     parameters: &[ConcreteType],
     resolved_ast: &resolved::Ast,
+    source: Source,
 ) -> Result<ir::StructureRef, LowerError> {
     let structure = resolved_ast
         .structures
@@ -60,9 +62,7 @@ pub fn monomorphize_structure(
         .expect("referenced structure to exist");
 
     if structure.parameters.len() != parameters.len() {
-        return Err(todo!(
-            "error message for mismatching type parameter lengths during lowering"
-        ));
+        return Err(LowerErrorKind::MismatchedTypeParameterLengths.at(source));
     }
 
     let mut catalog = PolyCatalog::new();

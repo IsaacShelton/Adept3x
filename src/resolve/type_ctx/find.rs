@@ -2,8 +2,10 @@ use super::{find_error::FindTypeError, ResolveTypeCtx};
 use crate::{
     ast::CompileTimeArgument,
     name::Name,
+    resolve::error::ResolveErrorKind,
     resolved::{self},
 };
+use itertools::Itertools;
 use std::borrow::Cow;
 
 impl<'a> ResolveTypeCtx<'a> {
@@ -38,6 +40,25 @@ impl<'a> ResolveTypeCtx<'a> {
             // NOTE: This will need to be map instead at some point
             .filter(|decl| decl.num_parameters(self.resolved_ast) == arguments.len())
         {
+            if let resolved::TypeKind::Structure(human_name, structure_ref, _) = &decl.kind {
+                let arguments = arguments
+                    .iter()
+                    .flat_map(|arg| match arg {
+                        CompileTimeArgument::Type(ty) => self.resolve(ty),
+                        CompileTimeArgument::Expr(expr) => Err(ResolveErrorKind::Other {
+                            message:
+                                "Expressions cannot be used as type parameters to structueres yet"
+                                    .into(),
+                        }
+                        .at(expr.source)),
+                    })
+                    .collect_vec();
+
+                let ty =
+                    resolved::TypeKind::Structure(human_name.clone(), *structure_ref, arguments);
+                return Ok(Cow::Owned(ty));
+            }
+
             return Ok(Cow::Borrowed(&decl.kind));
         }
 
