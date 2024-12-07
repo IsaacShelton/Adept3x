@@ -54,9 +54,11 @@ impl<'a> ResolveTypeCtx<'a> {
                     })
                     .collect_vec();
 
-                let ty =
-                    resolved::TypeKind::Structure(human_name.clone(), *structure_ref, arguments);
-                return Ok(Cow::Owned(ty));
+                return Ok(Cow::Owned(resolved::TypeKind::Structure(
+                    human_name.clone(),
+                    *structure_ref,
+                    arguments,
+                )));
             }
 
             return Ok(Cow::Borrowed(&decl.kind));

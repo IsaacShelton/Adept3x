@@ -62,7 +62,7 @@ pub fn monomorphize_structure(
         .expect("referenced structure to exist");
 
     if structure.parameters.len() != parameters.len() {
-        return Err(LowerErrorKind::MismatchedTypeParameterLengths.at(source));
+        return Err(LowerErrorKind::IncorrectNumberOfTypeArguments.at(source));
     }
 
     let mut catalog = PolyCatalog::new();

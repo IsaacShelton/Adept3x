@@ -79,7 +79,7 @@ pub fn lower_type(
                 resolved_ast,
                 concrete_type.0.source,
             )
-            .map(|structure_ref| ir::Type::Structure(structure_ref))
+            .map(ir::Type::Structure)
         }
         resolved::TypeKind::AnonymousStruct() => {
             todo!("lower anonymous struct")
