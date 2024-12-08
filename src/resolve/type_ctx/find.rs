@@ -26,7 +26,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
         if !arguments.is_empty() {
             eprintln!(
-                "warning: ResolveTypeCtx does not properly handle compile time arguments yet"
+                "warning: ResolveTypeCtx does not properly handle constraints for compile time arguments yet"
             );
         }
 

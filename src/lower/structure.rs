@@ -95,8 +95,8 @@ pub fn lower_structure(
 ) -> Result<(), LowerError> {
     let mut fields = Vec::with_capacity(structure.fields.len());
 
+    // NOTE: We only lower polymorphic structures on-demand, so skip them for now
     if !structure.parameters.parameters.is_empty() {
-        eprintln!("warning: lowering generic type parameters is not supported yet, skipping...");
         return Ok(());
     }
 

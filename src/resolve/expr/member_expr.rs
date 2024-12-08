@@ -2,7 +2,7 @@ use super::{resolve_expr, ResolveExprCtx};
 use crate::{
     ast::{self, Privacy},
     resolve::{
-        core_structure_info::get_core_structure_info,
+        core_structure_info::{get_core_structure_info, CoreStructInfo},
         destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog,
@@ -20,8 +20,20 @@ pub fn resolve_member_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
-    let (_, structure_ref, arguments) =
-        get_core_structure_info(ctx.resolved_ast, &resolved_subject.resolved_type, source)?;
+    let CoreStructInfo {
+        structure_ref,
+        arguments,
+        ..
+    } = get_core_structure_info(ctx.resolved_ast, &resolved_subject.resolved_type, source)
+        .map_err(|e| {
+            e.unwrap_or_else(|| {
+                ResolveErrorKind::CannotUseOperator {
+                    operator: ".".into(),
+                    on_type: resolved_subject.resolved_type.to_string(),
+                }
+                .at(source)
+            })
+        })?;
 
     let structure = ctx
         .resolved_ast

@@ -3,7 +3,7 @@ use crate::{
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
     resolve::{
         conform::{conform_expr, ConformMode, Perform},
-        core_structure_info::get_core_structure_info,
+        core_structure_info::{get_core_structure_info, CoreStructInfo},
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog, PolymorphError,
     },
@@ -62,11 +62,22 @@ pub fn resolve_struct_literal_expr(
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_struct_type = ctx.type_ctx().resolve(ast_type)?;
-    let (struct_name, structure_ref, parameters) =
-        get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
+
+    let CoreStructInfo {
+        name: struct_name,
+        structure_ref,
+        arguments,
+    } = get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source).map_err(|e| {
+        e.unwrap_or_else(|| {
+            ResolveErrorKind::CannotCreateStructLiteralForNonStructure {
+                bad_type: resolved_struct_type.to_string(),
+            }
+            .at(resolved_struct_type.source)
+        })
+    })?;
 
     let struct_name = struct_name.clone();
-    let parameters = parameters.to_vec();
+    let arguments = arguments.to_vec();
 
     let mut next_index = 0;
     let mut resolved_fields = IndexMap::new();
@@ -114,7 +125,7 @@ pub fn resolve_struct_literal_expr(
         )?;
 
         // Lookup additional details required for resolution
-        let field_info = get_field_info(ctx, structure_ref, &parameters, &field_name)
+        let field_info = get_field_info(ctx, structure_ref, &arguments, &field_name)
             .map_err(ResolveError::from)?;
 
         let mode = match conform_behavior {
@@ -179,7 +190,7 @@ pub fn resolve_struct_literal_expr(
             }
             FillBehavior::Zeroed => {
                 for field_name in missing.iter() {
-                    let field_info = get_field_info(ctx, structure_ref, &parameters, field_name)
+                    let field_info = get_field_info(ctx, structure_ref, &arguments, field_name)
                         .map_err(ResolveError::from)?;
 
                     let zeroed =
@@ -200,7 +211,7 @@ pub fn resolve_struct_literal_expr(
         .collect_vec();
 
     let structure_type =
-        resolved::TypeKind::Structure(struct_name, structure_ref, parameters).at(source);
+        resolved::TypeKind::Structure(struct_name, structure_ref, arguments).at(source);
 
     Ok(TypedExpr::new(
         resolved_struct_type.clone(),

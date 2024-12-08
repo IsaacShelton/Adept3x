@@ -199,6 +199,10 @@ pub enum ResolveErrorKind {
     CannotAssignVariableOutsideFunction,
     PolymorphError(PolymorphErrorKind),
     UndeclaredTrait(String),
+    CannotUseOperator {
+        operator: String,
+        on_type: String,
+    },
     Other {
         message: String,
     },
@@ -523,6 +527,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::UndeclaredTrait(trait_name) => {
                 write!(f, "Undeclared trait '{}'", trait_name)?;
+            }
+            ResolveErrorKind::CannotUseOperator { operator, on_type } => {
+                write!(f, "Cannot use operator '{}' on type '{}'", operator, on_type)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
