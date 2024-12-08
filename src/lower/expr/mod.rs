@@ -11,6 +11,8 @@ use super::{
 use crate::{
     ast::{FloatSize, IntegerBits, IntegerRigidity},
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
+    lower::structure::mono,
+    resolve::PolyCatalog,
     resolved::{
         self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, Member, NumericMode,
         SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
@@ -297,23 +299,39 @@ pub fn lower_expr(
                 field_type,
             } = &**member;
 
+            let resolved::TypeKind::Structure(_name, _structure_ref, arguments) =
+                &subject.resolved_type.kind
+            else {
+                todo!("member operator only supports structure types for now");
+            };
+
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
+            let structure = resolved_ast
+                .structures
+                .get(*resolved_structure_ref)
+                .expect("referenced structure to exist");
+
+            assert!(structure.parameters.len() == arguments.len());
+            let mut catalog = PolyCatalog::new();
+            for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+                catalog
+                    .put_type(name, argument)
+                    .expect("unique type parameter names");
+            }
+            let poly_recipe = catalog.bake();
+
             let structure_ref = ir_module.structures.translate(
                 *resolved_structure_ref,
-                builder.poly_recipe().clone(),
-                |_poly_recipe| {
-                    todo!("monomorphize structure for lowering member expression");
-
-                    #[allow(unreachable_code)]
-                    Err(LowerErrorKind::CannotFit {
-                        value: "oops".into(),
-                        expected_type:
-                            "lower_expr translate resolved structure reference is unimplemented"
-                                .into(),
-                    }
-                    .at(expr.source))
+                poly_recipe,
+                |poly_recipe| {
+                    mono(
+                        ir_module,
+                        resolved_ast,
+                        *resolved_structure_ref,
+                        poly_recipe,
+                    )
                 },
             )?;
 
@@ -617,21 +635,38 @@ pub fn lower_destination(
             let subject_pointer =
                 lower_destination(builder, ir_module, subject, function, resolved_ast)?;
 
-            let structure_ref =
-                ir_module
-                    .structures
-                    .translate(*resolved_structure_ref, builder.poly_recipe().clone(), |_poly_recipe| {
-                        todo!("monomorphize structure for lowering member expression 2");
+            let resolved::TypeKind::Structure(_name, _structure_ref, arguments) =
+                &subject.resolved_type.kind
+            else {
+                todo!("member operator only supports structure types for now");
+            };
 
-                        #[allow(unreachable_code)]
-                        Err(LowerErrorKind::CannotFit {
-                            value: "oops".into(),
-                            expected_type:
-                                "lower_destination translate resolved structure reference is unimplemented"
-                                    .into(),
-                        }
-                        .at(destination.source))
-                    })?;
+            let structure = resolved_ast
+                .structures
+                .get(*resolved_structure_ref)
+                .expect("referenced structure to exist");
+
+            assert!(structure.parameters.len() == arguments.len());
+            let mut catalog = PolyCatalog::new();
+            for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+                catalog
+                    .put_type(name, argument)
+                    .expect("unique type parameter names");
+            }
+            let poly_recipe = catalog.bake();
+
+            let structure_ref = ir_module.structures.translate(
+                *resolved_structure_ref,
+                poly_recipe,
+                |poly_recipe| {
+                    mono(
+                        ir_module,
+                        resolved_ast,
+                        *resolved_structure_ref,
+                        poly_recipe,
+                    )
+                },
+            )?;
 
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,

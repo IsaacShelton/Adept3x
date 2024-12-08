@@ -14,8 +14,8 @@ pub fn get_core_structure_info<'a, 'b>(
         .map_err(|e| ResolveErrorKind::from(e).at(source))?
         .kind
     {
-        resolved::TypeKind::Structure(name, structure_ref, parameters) => {
-            Ok((name, *structure_ref, parameters.as_slice()))
+        resolved::TypeKind::Structure(name, structure_ref, arguments) => {
+            Ok((name, *structure_ref, arguments.as_slice()))
         }
         _ => Err(ResolveErrorKind::CannotCreateStructLiteralForNonStructure {
             bad_type: resolved_type.to_string(),

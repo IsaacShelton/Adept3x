@@ -5,7 +5,7 @@ use crate::{
         core_structure_info::get_core_structure_info,
         destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
-        Initialized,
+        Initialized, PolyCatalog,
     },
     resolved::{self, Member, TypedExpr},
     source_files::Source,
@@ -20,7 +20,7 @@ pub fn resolve_member_expr(
 ) -> Result<TypedExpr, ResolveError> {
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
-    let (_, structure_ref, parameters) =
+    let (_, structure_ref, arguments) =
         get_core_structure_info(ctx.resolved_ast, &resolved_subject.resolved_type, source)?;
 
     let structure = ctx
@@ -51,16 +51,28 @@ pub fn resolve_member_expr(
         }
     }
 
+    let mut catalog = PolyCatalog::new();
+    assert!(structure.parameters.len() == arguments.len());
+    for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+        catalog
+            .put_type(name, argument)
+            .expect("unique polymorph name");
+    }
+    let resolved_type = catalog
+        .bake()
+        .resolve_type(&found_field.resolved_type)
+        .map_err(ResolveError::from)?;
+
     let subject_destination = resolve_expr_to_destination(resolved_subject)?;
 
     Ok(TypedExpr::new(
-        found_field.resolved_type.clone(),
+        resolved_type.clone(),
         resolved::Expr::new(
             resolved::ExprKind::Member(Box::new(Member {
                 subject: subject_destination,
                 structure_ref,
                 index,
-                field_type: found_field.resolved_type.clone(),
+                field_type: resolved_type,
             })),
             source,
         ),

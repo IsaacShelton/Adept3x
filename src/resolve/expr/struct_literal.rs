@@ -15,8 +15,8 @@ use itertools::Itertools;
 
 #[derive(Clone, Debug)]
 pub struct FieldInfo {
-    index: usize,
-    resolved_type: resolved::Type,
+    pub index: usize,
+    pub resolved_type: resolved::Type,
 }
 
 fn get_field_info<'a>(
@@ -31,23 +31,21 @@ fn get_field_info<'a>(
         .get(structure_ref)
         .expect("referenced structure to exist");
 
-    let (index, _, field) = structure
+    let (index, _name, field) = structure
         .fields
         .get_full::<str>(field_name)
         .expect("referenced struct field to exist");
 
     let mut catalog = PolyCatalog::new();
-
     assert!(arguments.len() == structure.parameters.len());
 
     for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
         catalog
             .put_type(name, argument)
-            .expect("non-duplicate polymorphic type parameters for structure".into())
+            .expect("non-duplicate polymorphic type parameters for structure")
     }
 
-    let recipe = catalog.bake();
-    let resolved_type = recipe.resolve_type(&field.resolved_type)?;
+    let resolved_type = catalog.bake().resolve_type(&field.resolved_type)?;
 
     Ok(FieldInfo {
         index,
