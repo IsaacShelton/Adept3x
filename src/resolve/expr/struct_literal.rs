@@ -5,7 +5,7 @@ use crate::{
         conform::{conform_expr, ConformMode, Perform},
         core_structure_info::get_core_structure_info,
         error::{ResolveError, ResolveErrorKind},
-        Initialized,
+        Initialized, PolyCatalog, PolymorphError,
     },
     resolved::{self, StructLiteral, StructureRef, TypedExpr},
     source_files::Source,
@@ -13,20 +13,46 @@ use crate::{
 use indexmap::IndexMap;
 use itertools::Itertools;
 
+#[derive(Clone, Debug)]
+pub struct FieldInfo {
+    index: usize,
+    resolved_type: resolved::Type,
+}
+
 fn get_field_info<'a>(
     ctx: &'a ResolveExprCtx,
     structure_ref: StructureRef,
+    arguments: &[resolved::Type],
     field_name: &str,
-) -> (usize, &'a resolved::Field) {
-    let (index, _, field) = ctx
+) -> Result<FieldInfo, PolymorphError> {
+    let structure = ctx
         .resolved_ast
         .structures
         .get(structure_ref)
-        .expect("referenced structure to exist")
+        .expect("referenced structure to exist");
+
+    let (index, _, field) = structure
         .fields
         .get_full::<str>(field_name)
         .expect("referenced struct field to exist");
-    (index, field)
+
+    let mut catalog = PolyCatalog::new();
+
+    assert!(arguments.len() == structure.parameters.len());
+
+    for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+        catalog
+            .put_type(name, argument)
+            .expect("non-duplicate polymorphic type parameters for structure".into())
+    }
+
+    let recipe = catalog.bake();
+    let resolved_type = recipe.resolve_type(&field.resolved_type)?;
+
+    Ok(FieldInfo {
+        index,
+        resolved_type,
+    })
 }
 
 pub fn resolve_struct_literal_expr(
@@ -41,9 +67,8 @@ pub fn resolve_struct_literal_expr(
     let (struct_name, structure_ref, parameters) =
         get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
 
-    let structure_type =
-        resolved::TypeKind::Structure(struct_name.clone(), structure_ref, parameters.to_vec())
-            .at(source);
+    let struct_name = struct_name.clone();
+    let parameters = parameters.to_vec();
 
     let mut next_index = 0;
     let mut resolved_fields = IndexMap::new();
@@ -91,7 +116,8 @@ pub fn resolve_struct_literal_expr(
         )?;
 
         // Lookup additional details required for resolution
-        let (index, field) = get_field_info(ctx, structure_ref, &field_name);
+        let field_info = get_field_info(ctx, structure_ref, &parameters, &field_name)
+            .map_err(ResolveError::from)?;
 
         let mode = match conform_behavior {
             ConformBehavior::Adept(_) => ConformMode::Normal,
@@ -101,7 +127,7 @@ pub fn resolve_struct_literal_expr(
         let resolved_expr = conform_expr::<Perform>(
             ctx,
             &resolved_expr,
-            &field.resolved_type,
+            &field_info.resolved_type,
             mode,
             conform_behavior,
             source,
@@ -110,18 +136,18 @@ pub fn resolve_struct_literal_expr(
             ResolveErrorKind::ExpectedTypeForField {
                 structure: ast_type.to_string(),
                 field_name: field_name.to_string(),
-                expected: field.resolved_type.to_string(),
+                expected: field_info.resolved_type.to_string(),
             }
             .at(ast_type.source)
         })?;
 
         if resolved_fields
-            .insert(field_name.to_string(), (resolved_expr.expr, index))
+            .insert(
+                field_name.to_string(),
+                (resolved_expr.expr, field_info.index),
+            )
             .is_some()
         {
-            let (struct_name, _, _) =
-                get_core_structure_info(ctx.resolved_ast, &resolved_struct_type, source)?;
-
             return Err(ResolveErrorKind::FieldSpecifiedMoreThanOnce {
                 struct_name: struct_name.to_string(),
                 field_name: field_name.to_string(),
@@ -129,7 +155,7 @@ pub fn resolve_struct_literal_expr(
             .at(ast_type.source));
         }
 
-        next_index = index + 1;
+        next_index = field_info.index + 1;
     }
 
     let structure = ctx
@@ -155,10 +181,14 @@ pub fn resolve_struct_literal_expr(
             }
             FillBehavior::Zeroed => {
                 for field_name in missing.iter() {
-                    let (index, field) = get_field_info(ctx, structure_ref, field_name);
-                    let zeroed = resolved::ExprKind::Zeroed(Box::new(field.resolved_type.clone()))
-                        .at(source);
-                    resolved_fields.insert(field_name.to_string(), (zeroed, index));
+                    let field_info = get_field_info(ctx, structure_ref, &parameters, field_name)
+                        .map_err(ResolveError::from)?;
+
+                    let zeroed =
+                        resolved::ExprKind::Zeroed(Box::new(field_info.resolved_type.clone()))
+                            .at(source);
+
+                    resolved_fields.insert(field_name.to_string(), (zeroed, field_info.index));
                 }
             }
         }
@@ -170,6 +200,9 @@ pub fn resolve_struct_literal_expr(
         .into_iter()
         .map(|(x, (y, z))| (x, y, z))
         .collect_vec();
+
+    let structure_type =
+        resolved::TypeKind::Structure(struct_name, structure_ref, parameters).at(source);
 
     Ok(TypedExpr::new(
         resolved_struct_type.clone(),

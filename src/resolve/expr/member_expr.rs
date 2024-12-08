@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub fn resolve_member_expr(
-    ctx: &mut ResolveExprCtx<'_, '_>,
+    ctx: &mut ResolveExprCtx,
     subject: &ast::Expr,
     field_name: &str,
     min_privacy: Privacy,
