@@ -1,19 +1,20 @@
 use crate::{
-    ast::Settings,
+    ast::{AstFile, Settings},
     compiler::Compiler,
     data_units::ByteUnits,
     diagnostics::ErrorDiagnostic,
     inflow::{Inflow, IntoInflow},
     lexer::Lexer,
     line_column::Location,
-    parser::Input,
+    parser::{Input, Parser},
     pragma_section::PragmaSection,
     show::{into_show, Show},
     source_files::{Source, SourceFileKey},
     text::{IntoText, IntoTextStream},
     token::{Token, TokenKind},
-    workspace::fs::Fs,
+    workspace::{fs::FsNodeId, module_file::ModuleFile},
 };
+use append_only_vec::AppendOnlyVec;
 use std::path::Path;
 
 pub struct CompiledModule<'a, I: Inflow<Token> + 'a> {
@@ -25,7 +26,6 @@ pub struct CompiledModule<'a, I: Inflow<Token> + 'a> {
 
 pub fn compile_module_file<'a>(
     compiler: &Compiler<'a>,
-    _fs: &Fs,
     path: &Path,
 ) -> Result<CompiledModule<'a, impl Inflow<Token> + 'a>, Box<dyn Show + 'a>> {
     let content = std::fs::read_to_string(path)
@@ -70,4 +70,14 @@ pub fn compile_module_file<'a>(
         settings,
         source_file: key,
     })
+}
+
+pub fn compile_rest_module_file<'a, I: Inflow<Token>>(
+    module_file: &ModuleFile,
+    rest_input: Input<'a, I>,
+    out_ast_files: &AppendOnlyVec<(FsNodeId, AstFile)>,
+) -> Result<ByteUnits, Box<(dyn Show + 'static)>> {
+    let mut parser = Parser::new(rest_input);
+    out_ast_files.push((module_file.fs_node_id, parser.parse().map_err(into_show)?));
+    Ok(ByteUnits::ZERO) // No new bytes processed
 }

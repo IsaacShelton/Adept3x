@@ -87,7 +87,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 for constraint in constraints {
                     if let ast::TypeKind::Named(name, arguments) = &constraint.kind {
                         resolved_constraints.push(match name.as_plain_str() {
-                            Some("PrimitiveAdd") if !arguments.is_empty() => {
+                            Some("PrimitiveAdd") if arguments.is_empty() => {
                                 Constraint::PrimitiveAdd
                             }
                             _ => {
