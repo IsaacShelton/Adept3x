@@ -1,6 +1,7 @@
 use crate::{
     ast::Settings,
     compiler::Compiler,
+    data_units::ByteUnits,
     diagnostics::ErrorDiagnostic,
     inflow::{Inflow, IntoInflow},
     lexer::Lexer,
@@ -15,19 +16,18 @@ use crate::{
 };
 use std::path::Path;
 
+pub struct CompiledModule<'a, I: Inflow<Token> + 'a> {
+    pub total_file_size: ByteUnits,
+    pub remaining_input: Input<'a, I>,
+    pub settings: Settings,
+    pub source_file: SourceFileKey,
+}
+
 pub fn compile_module_file<'a>(
     compiler: &Compiler<'a>,
     _fs: &Fs,
     path: &Path,
-) -> Result<
-    (
-        usize,
-        Input<'a, impl Inflow<Token> + 'a>,
-        Settings,
-        SourceFileKey,
-    ),
-    Box<dyn Show + 'a>,
-> {
+) -> Result<CompiledModule<'a, impl Inflow<Token> + 'a>, Box<dyn Show + 'a>> {
     let content = std::fs::read_to_string(path)
         .map_err(ErrorDiagnostic::plain)
         .map_err(into_show)?;
@@ -64,5 +64,10 @@ pub fn compile_module_file<'a>(
         )));
     };
 
-    Ok((content.len(), input, settings, key))
+    Ok(CompiledModule {
+        total_file_size: ByteUnits::of(content.len().try_into().unwrap()),
+        remaining_input: input,
+        settings,
+        source_file: key,
+    })
 }

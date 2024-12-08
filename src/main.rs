@@ -121,38 +121,40 @@ fn build_project(build_command: BuildCommand) {
 
     if metadata.is_dir() {
         compile_workspace(&mut compiler, filepath, None);
-    } else {
-        if filepath.extension().unwrap_or_default() == "h" {
-            let source_files = compiler.source_files;
-
-            let content = std::fs::read_to_string(filepath)
-                .map_err(|err| {
-                    eprintln!("{}", err);
-                    exit(1);
-                })
-                .unwrap();
-
-            let header_key = source_files.add(filepath.into(), content);
-
-            let header_contents = source_files
-                .get(header_key)
-                .content()
-                .chars()
-                .into_text_stream(header_key)
-                .into_text();
-
-            let preprocessed = exit_unless(
-                c::preprocessor::preprocess(header_contents, &diagnostics),
-                &source_files,
-            );
-
-            println!("{preprocessed:?}");
-            return;
-        }
-
-        let project_folder = filepath.parent().unwrap();
-        compile_single_file_only(&mut compiler, project_folder, filepath);
+        return;
     }
+
+    // Experimental header parsing
+    if filepath.extension().unwrap_or_default() == "h" {
+        let source_files = compiler.source_files;
+
+        let content = std::fs::read_to_string(filepath)
+            .map_err(|err| {
+                eprintln!("{}", err);
+                exit(1);
+            })
+            .unwrap();
+
+        let header_key = source_files.add(filepath.into(), content);
+
+        let header_contents = source_files
+            .get(header_key)
+            .content()
+            .chars()
+            .into_text_stream(header_key)
+            .into_text();
+
+        let preprocessed = exit_unless(
+            c::preprocessor::preprocess(header_contents, &diagnostics),
+            &source_files,
+        );
+
+        println!("{preprocessed:?}");
+        return;
+    }
+
+    let project_folder = filepath.parent().unwrap();
+    compile_single_file_only(&mut compiler, project_folder, filepath);
 }
 
 fn exit_unless<T, E: Show>(result: Result<T, E>, source_files: &SourceFiles) -> T {
