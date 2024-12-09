@@ -94,7 +94,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
     Ok(queue)
 }
 
-fn process_module_file_output<'a, 'b: 'a, I: Inflow<Token>>(
+fn process_module_file_output<'a, I: Inflow<Token>>(
     compiler: &Compiler,
     fs: &Fs,
     module_file: ModuleFile,
