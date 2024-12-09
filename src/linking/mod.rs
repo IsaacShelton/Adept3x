@@ -114,11 +114,11 @@ pub fn link_result(
                         .join(&format!("from_{}_{}", host_arch.unwrap(), host_os.unwrap()))
                         .join("x86_64-w64-mingw32-ld")
                 } else {
-                    please_manually_link(args, diagnostics);
+                    return Err(please_manually_link(args, diagnostics));
                 }
             }
             Some(TargetOs::Mac | TargetOs::Linux | TargetOs::FreeBsd) | None => {
-                please_manually_link(args, diagnostics);
+                return Err(please_manually_link(args, diagnostics));
             }
         }
     };
@@ -143,7 +143,7 @@ pub fn link_result(
     Ok(start_time.elapsed())
 }
 
-fn please_manually_link(args: Vec<OsString>, diagnostics: &Diagnostics) -> ! {
+fn please_manually_link(args: Vec<OsString>, diagnostics: &Diagnostics) -> BackendError {
     let args = args.join(OsStr::new(" "));
 
     diagnostics.push(WarningDiagnostic::plain(
@@ -153,8 +153,7 @@ fn please_manually_link(args: Vec<OsString>, diagnostics: &Diagnostics) -> ! {
         )
     ));
 
-    eprintln!("Success, but requires manual linking, exiting with 1");
-    std::process::exit(1);
+    BackendError::plain("Success, but requires manual linking, exiting with 1")
 }
 
 fn is_flag_like(string: &str) -> bool {

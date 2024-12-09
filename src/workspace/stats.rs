@@ -1,7 +1,11 @@
 use crate::data_units::ByteUnits;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Instant,
+};
 
 pub struct CompilationStats {
+    pub start_time: Instant,
     files_processed: AtomicU64,
     bytes_processed: AtomicU64,
     num_files_failed: AtomicU64,
@@ -9,13 +13,18 @@ pub struct CompilationStats {
 }
 
 impl CompilationStats {
-    pub fn new() -> Self {
+    pub fn start() -> Self {
         Self {
+            start_time: Instant::now(),
             files_processed: AtomicU64::new(0),
             bytes_processed: AtomicU64::new(0),
             num_files_failed: AtomicU64::new(0),
             num_module_files_failed: AtomicU64::new(0),
         }
+    }
+
+    pub fn seconds_elapsed(&self) -> f64 {
+        self.start_time.elapsed().as_millis() as f64 / 1000.0
     }
 
     pub fn failed_files_estimate(&self) -> u64 {

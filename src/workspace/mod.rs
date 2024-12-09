@@ -6,6 +6,7 @@
 
 pub mod compile;
 mod explore;
+mod explore_within;
 mod file;
 pub mod fs;
 mod module_file;
@@ -17,7 +18,6 @@ use crate::{
     ast::{AstWorkspace, Settings},
     compiler::Compiler,
     diagnostics::ErrorDiagnostic,
-    exit_unless,
     inflow::Inflow,
     interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
     line_column::Location,
@@ -27,12 +27,14 @@ use crate::{
     show::Show,
     source_files::{Source, SourceFileKey},
     token::Token,
+    unerror,
 };
 use compile::{
     compile_code_file,
     module::{compile_module_file, CompiledModule},
 };
 use explore::{explore, ExploreResult};
+use explore_within::{explore_within, ExploreWithinResult};
 use file::CodeFile;
 use fs::{Fs, FsNodeId};
 use indexmap::IndexMap;
@@ -45,38 +47,11 @@ use std::{
     ffi::OsString,
     fs::create_dir_all,
     path::{Path, PathBuf},
-    process::exit,
     sync::Barrier,
-    time::Instant,
 };
 use thousands::Separable;
 
 const NUM_THREADS: usize = 8;
-
-fn explore_constrained(
-    fs: &Fs,
-    project_folder: &Path,
-    single_file: Option<PathBuf>,
-) -> (Option<ExploreResult>, Option<FsNodeId>) {
-    if let Some(single_file) = single_file {
-        let fs_node_id = fs.insert(&single_file, None).expect("inserted");
-
-        let file = ModuleFile {
-            path: single_file,
-            fs_node_id,
-        };
-
-        return (
-            Some(ExploreResult {
-                normal_files: vec![],
-                module_files: vec![file],
-            }),
-            Some(fs_node_id),
-        );
-    }
-
-    (explore(&fs, project_folder), None)
-}
 
 fn queue_dependencies<I: Inflow<Token>>(
     compiler: &Compiler,
@@ -159,23 +134,22 @@ pub fn compile_workspace(
     compiler: &mut Compiler,
     project_folder: &Path,
     single_file: Option<PathBuf>,
-) {
-    let start_time = Instant::now();
-    let stats = CompilationStats::new();
+) -> Result<(), ()> {
+    let stats = CompilationStats::start();
 
     let fs = Fs::new();
-    let (exploration, guaranteed_entry) = explore_constrained(&fs, project_folder, single_file);
+    let ExploreWithinResult { explored, entry } = explore_within(&fs, project_folder, single_file);
 
     let Some(ExploreResult {
         module_files,
         normal_files,
-    }) = exploration
+    }) = explored
     else {
         eprintln!(
             "error: Could not locate workspace folder '{}'",
             project_folder.display()
         );
-        exit(1);
+        return Err(());
     };
 
     let thread_count = (normal_files.len() + module_files.len()).min(NUM_THREADS);
@@ -234,7 +208,7 @@ pub fn compile_workspace(
         }
     });
 
-    let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
+    let in_how_many_seconds = stats.seconds_elapsed();
 
     // SAFETY: This is okay since all modifying threads were joined (and thereby synchronized)
     let num_module_files_failed = stats.failed_modules_estimate();
@@ -242,8 +216,7 @@ pub fn compile_workspace(
         eprintln!(
             "error: {num_module_files_failed} module file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
         );
-
-        exit(1);
+        return Err(());
     }
 
     // SAFETY: This is okay since all modifying threads were joined (and thereby synchronized)
@@ -252,40 +225,39 @@ pub fn compile_workspace(
         eprintln!(
             "error: {num_files_failed} file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
         );
-
-        exit(1);
+        return Err(());
     }
 
     let Some(_adept_version) = compiler.version.get() else {
         eprintln!("error: No Adept version was specified! Use `pragma => adept(\"3.0\")` at the top of the module file");
-        exit(1);
+        return Err(());
     };
 
     let module_folders = HashMap::<FsNodeId, Settings>::from_iter(queue.module_folders.into_iter());
     let mut files = IndexMap::from_iter(queue.ast_files.into_iter());
 
     if compiler.options.interpret {
-        if let Some(guaranteed_entry) = guaranteed_entry {
+        if let Some(guaranteed_entry) = entry {
             setup_build_system_interpreter_symbols(files.get_mut(&guaranteed_entry).unwrap());
         } else {
             eprintln!(
                 "error: experimental manual interpreter does not properly handle multiple files yet"
             );
-            exit(1);
+            return Err(());
         }
     }
 
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
 
-    let resolved_ast = exit_unless(
+    let resolved_ast = unerror(
         resolve(&workspace, &compiler.options),
         compiler.source_files,
-    );
+    )?;
 
-    let ir_module = exit_unless(
+    let ir_module = unerror(
         lower(&compiler.options, &resolved_ast, &compiler.target),
         compiler.source_files,
-    );
+    )?;
 
     let project_name = project_folder
         .file_name()
@@ -303,10 +275,10 @@ pub fn compile_workspace(
 
     if compiler.options.interpret {
         match run_build_system_interpreter(&resolved_ast, &ir_module) {
-            Ok(_) => return,
+            Ok(_) => return Ok(()),
             Err(err) => {
                 eprintln!("{}", err);
-                exit(1);
+                return Err(());
             }
         }
     }
@@ -320,7 +292,7 @@ pub fn compile_workspace(
     let exe_filepath = bin_folder.join(compiler.target.default_executable_name(&project_name));
     let obj_filepath = obj_folder.join(compiler.target.default_object_file_name(&project_name));
 
-    let linking_duration = exit_unless(
+    let linking_duration = unerror(
         unsafe {
             llvm_backend(
                 compiler,
@@ -332,11 +304,11 @@ pub fn compile_workspace(
             )
         },
         compiler.source_files,
-    );
+    )?;
 
     // Print summary:
 
-    let in_how_many_seconds = start_time.elapsed().as_millis() as f64 / 1000.0;
+    let in_how_many_seconds = stats.seconds_elapsed();
     let _linking_took = linking_duration.as_millis() as f64 / 1000.0;
 
     // SAFETY: This is okay, as we synchronized by joining
@@ -351,5 +323,5 @@ pub fn compile_workspace(
         bytes_processed, files_processed, in_how_many_seconds,
     );
 
-    compiler.maybe_execute_result(&exe_filepath);
+    compiler.maybe_execute_result(&exe_filepath)
 }

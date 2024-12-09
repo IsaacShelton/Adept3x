@@ -22,51 +22,53 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn maybe_execute_result(&self, output_binary_filepath: &Path) {
-        if self.options.excute_result {
-            println!("    ==== executing result ====");
+    pub fn maybe_execute_result(&self, output_binary_filepath: &Path) -> Result<(), ()> {
+        if !self.options.excute_result {
+            return Ok(());
+        }
 
-            // Avoid using a relative filename to invoke the resulting executable
-            let output_binary_filepath = if output_binary_filepath.is_relative() {
-                let Ok(absolute_filename) = absolute(&output_binary_filepath) else {
-                    eprintln!(
-                        "error: Failed to get absolute filename of resulting executable '{}'",
-                        output_binary_filepath.to_string_lossy().as_ref(),
-                    );
-                    std::process::exit(1);
-                };
+        println!("    ==== executing result ====");
 
-                Cow::Owned(absolute_filename)
-            } else {
-                Cow::Borrowed(output_binary_filepath)
+        // Avoid using a relative filename to invoke the resulting executable
+        let output_binary_filepath = if output_binary_filepath.is_relative() {
+            let Ok(absolute_filename) = absolute(&output_binary_filepath) else {
+                eprintln!(
+                    "error: Failed to get absolute filename of resulting executable '{}'",
+                    output_binary_filepath.to_string_lossy().as_ref(),
+                );
+                return Err(());
             };
 
-            let mut last_error = None;
+            Cow::Owned(absolute_filename)
+        } else {
+            Cow::Borrowed(output_binary_filepath)
+        };
 
-            for retry_duration in [10, 10, 10, 50, 100, 250].map(Duration::from_millis) {
-                match Command::new(output_binary_filepath.as_os_str())
-                    .args([] as [&str; 0])
-                    .spawn()
-                {
-                    Ok(mut process) => {
-                        let _ = process.wait();
-                        return;
-                    }
-                    Err(e) => {
-                        last_error = Some(e);
+        let mut last_error = None;
 
-                        // Try again in few milliseconds
-                        std::thread::sleep(retry_duration);
-                    }
+        for retry_duration in [10, 10, 10, 50, 100, 250].map(Duration::from_millis) {
+            match Command::new(output_binary_filepath.as_os_str())
+                .args([] as [&str; 0])
+                .spawn()
+            {
+                Ok(mut process) => {
+                    let _ = process.wait();
+                    return Ok(());
+                }
+                Err(e) => {
+                    last_error = Some(e);
+
+                    // Try again in few milliseconds
+                    std::thread::sleep(retry_duration);
                 }
             }
-
-            eprintln!(
-                "error: failed to run resulting executable '{}' - {}",
-                output_binary_filepath.to_string_lossy().as_ref(),
-                last_error.unwrap()
-            );
-            std::process::exit(1);
         }
+
+        eprintln!(
+            "error: failed to run resulting executable '{}' - {}",
+            output_binary_filepath.to_string_lossy().as_ref(),
+            last_error.unwrap()
+        );
+        return Err(());
     }
 }

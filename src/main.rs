@@ -48,27 +48,31 @@ mod version;
 mod workspace;
 
 use crate::{cli::BuildCommand, show::Show, source_files::SourceFiles, text::IntoText};
+use cli::CommandKind;
 use compiler::Compiler;
 use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
 use generate_workspace::new_project;
 use single_file_only::compile_single_file_only;
-use std::{fs::metadata, path::Path, process::exit};
+use std::{fs::metadata, path::Path, process::ExitCode};
 use target::{TargetArch, TargetOs};
 use text::IntoTextStream;
 use workspace::compile_workspace;
 
-fn main() {
+fn main() -> ExitCode {
     let Ok(args) = cli::Command::parse_env_args() else {
-        exit(1)
+        return ExitCode::FAILURE;
     };
 
-    match args.kind {
-        cli::CommandKind::Build(build_command) => build_project(build_command),
-        cli::CommandKind::New(new_command) => new_project(new_command),
+    match match args.kind {
+        CommandKind::Build(build_command) => build_project(build_command),
+        CommandKind::New(new_command) => new_project(new_command),
+    } {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(()) => ExitCode::FAILURE,
     }
 }
 
-fn build_project(build_command: BuildCommand) {
+fn build_project(build_command: BuildCommand) -> Result<(), ()> {
     let BuildCommand { filename, options } = build_command;
     let source_files = SourceFiles::new();
     let filepath = Path::new(&filename);
@@ -77,7 +81,7 @@ fn build_project(build_command: BuildCommand) {
 
     let Ok(metadata) = metadata(filepath) else {
         eprintln!("error: File or folder does not exist");
-        exit(1);
+        return Err(());
     };
 
     if target.arch().is_none() {
@@ -120,20 +124,17 @@ fn build_project(build_command: BuildCommand) {
     };
 
     if metadata.is_dir() {
-        compile_workspace(&mut compiler, filepath, None);
-        return;
+        return compile_workspace(&mut compiler, filepath, None);
     }
 
     // Experimental header parsing
     if filepath.extension().unwrap_or_default() == "h" {
         let source_files = compiler.source_files;
 
-        let content = std::fs::read_to_string(filepath)
-            .map_err(|err| {
-                eprintln!("{}", err);
-                exit(1);
-            })
-            .unwrap();
+        let content = std::fs::read_to_string(filepath).map_err(|err| {
+            eprintln!("{}", err);
+            ()
+        })?;
 
         let header_key = source_files.add(filepath.into(), content);
 
@@ -144,22 +145,22 @@ fn build_project(build_command: BuildCommand) {
             .into_text_stream(header_key)
             .into_text();
 
-        let preprocessed = exit_unless(
+        let preprocessed = unerror(
             c::preprocessor::preprocess(header_contents, &diagnostics),
             &source_files,
-        );
+        )?;
 
         println!("{preprocessed:?}");
-        return;
+        return Ok(());
     }
 
     let project_folder = filepath.parent().unwrap();
-    compile_single_file_only(&mut compiler, project_folder, filepath);
+    compile_single_file_only(&mut compiler, project_folder, filepath)
 }
 
-fn exit_unless<T, E: Show>(result: Result<T, E>, source_files: &SourceFiles) -> T {
+fn unerror<T, E: Show>(result: Result<T, E>, source_files: &SourceFiles) -> Result<T, ()> {
     match result {
-        Ok(value) => value,
+        Ok(value) => Ok(value),
         Err(err) => {
             let mut message = String::new();
 
@@ -167,7 +168,7 @@ fn exit_unless<T, E: Show>(result: Result<T, E>, source_files: &SourceFiles) -> 
                 .expect("show error message");
 
             eprintln!("{message}");
-            exit(1);
+            Err(())
         }
     }
 }

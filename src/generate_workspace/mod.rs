@@ -6,15 +6,15 @@
 
 use crate::cli::NewCommand;
 use indoc::indoc;
-use std::{borrow::Borrow, fs, path::Path, process::exit};
+use std::{borrow::Borrow, fs, path::Path};
 
-pub fn new_project(new_command: NewCommand) {
+pub fn new_project(new_command: NewCommand) -> Result<(), ()> {
     if std::fs::create_dir(&new_command.project_name).is_err() {
         eprintln!(
             "error: Failed to create project directory '{}'",
             &new_command.project_name
         );
-        exit(1);
+        return Err(());
     }
 
     let folder = Path::new(&new_command.project_name);
@@ -27,7 +27,7 @@ pub fn new_project(new_command: NewCommand) {
                 adept("3.0")
             }
         "#},
-    );
+    )?;
 
     put_file(
         folder.join("main.adept"),
@@ -37,12 +37,13 @@ pub fn new_project(new_command: NewCommand) {
                 println("Hello World!")
             }
         "#},
-    );
+    )?;
 
     println!("Project created!");
+    Ok(())
 }
 
-fn put_file(path: impl Borrow<Path>, content: &str) {
+fn put_file(path: impl Borrow<Path>, content: &str) -> Result<(), ()> {
     let path = path.borrow();
 
     if fs::write(path, content).is_err() {
@@ -52,6 +53,8 @@ fn put_file(path: impl Borrow<Path>, content: &str) {
             .unwrap_or("<invalid unicode filename>");
 
         eprintln!("error: Failed to create '{}' file", error_filename);
-        exit(1);
+        return Err(());
     }
+
+    Ok(())
 }

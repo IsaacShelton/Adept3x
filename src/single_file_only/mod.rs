@@ -7,6 +7,10 @@
 use crate::{compiler::Compiler, workspace::compile_workspace};
 use std::path::Path;
 
-pub fn compile_single_file_only(compiler: &mut Compiler, project_folder: &Path, filepath: &Path) {
+pub fn compile_single_file_only(
+    compiler: &mut Compiler,
+    project_folder: &Path,
+    filepath: &Path,
+) -> Result<(), ()> {
     compile_workspace(compiler, project_folder, Some(filepath.to_path_buf()))
 }

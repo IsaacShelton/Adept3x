@@ -1,5 +1,5 @@
 use crate::target::{Target, TargetOs};
-use std::{path::PathBuf, process::exit, str::FromStr};
+use std::{path::PathBuf, str::FromStr};
 
 pub struct Command {
     pub kind: CommandKind,
@@ -12,7 +12,7 @@ impl Command {
         match args.peek().map(|string| string.as_str()) {
             None | Some("-h" | "--help") => {
                 show_help();
-                exit(0);
+                Err(())
             }
             Some("new") => Self::parse_new_project(args),
             _ => Self::parse_build_project(args),
