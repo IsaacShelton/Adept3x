@@ -22,7 +22,7 @@ pub use value::Value;
 pub struct Interpreter<'a, S: SyscallHandler> {
     pub syscall_handler: S,
     max_steps_left: Option<u64>,
-    ir_module: &'a ir::Module<'a>,
+    ir_module: &'a ir::Module,
     memory: Memory,
     global_addresses: HashMap<ir::GlobalVarRef, ir::Literal>,
 }
@@ -103,7 +103,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     self.call(call.function, arguments)?
                 }
                 ir::Instruction::Alloca(ty) => {
-                    Value::Literal(self.memory.alloc_stack(self.size_of(ty))?)
+                    Value::Literal(self.memory.alloc_stack(self.size_of(&ty))?)
                 }
                 ir::Instruction::Store(store) => {
                     let new_value = self.eval(&registers, &store.new_value);
@@ -113,7 +113,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     Value::Undefined
                 }
                 ir::Instruction::Load((value, ty)) => {
-                    let address = self.eval(&registers, value).as_u64().unwrap();
+                    let address = self.eval(&registers, &value).as_u64().unwrap();
                     self.memory.read(address, ty)?
                 }
                 ir::Instruction::Malloc(ir_type) => {

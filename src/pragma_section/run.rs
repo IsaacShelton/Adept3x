@@ -33,7 +33,6 @@ impl PragmaSection {
                 target: Target::default(),
                 infrastructure: None,
             },
-            target: base_compiler.target,
             source_files: base_compiler.source_files,
             diagnostics: base_compiler.diagnostics,
             version: Default::default(),
@@ -50,8 +49,7 @@ impl PragmaSection {
 
         let resolved_ast = resolve(&workspace, &compiler.options).map_err(into_show)?;
 
-        let ir_module =
-            lower(&compiler.options, &resolved_ast, &compiler.target).map_err(into_show)?;
+        let ir_module = lower(&compiler.options, &resolved_ast).map_err(into_show)?;
 
         let mut user_settings = run_build_system_interpreter(&resolved_ast, &ir_module)
             .map_err(|interpretter_error| {

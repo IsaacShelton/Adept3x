@@ -15,7 +15,6 @@ mod cli;
 mod compiler;
 mod data_units;
 mod diagnostics;
-mod generate_workspace;
 mod index_map_ext;
 mod inflow;
 mod interpreter;
@@ -44,131 +43,16 @@ mod tag;
 mod target;
 mod text;
 mod token;
+mod unerror;
 mod version;
 mod workspace;
 
-use crate::{cli::BuildCommand, show::Show, source_files::SourceFiles, text::IntoText};
-use cli::CommandKind;
-use compiler::Compiler;
-use diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic};
-use generate_workspace::new_project;
-use single_file_only::compile_single_file_only;
-use std::{fs::metadata, path::Path, process::ExitCode};
-use target::{TargetArch, TargetOs};
-use text::IntoTextStream;
-use workspace::compile_workspace;
+use cli::{CliCommand, CliInvoke};
+use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let Ok(args) = cli::Command::parse_env_args() else {
-        return ExitCode::FAILURE;
-    };
-
-    match match args.kind {
-        CommandKind::Build(build_command) => build_project(build_command),
-        CommandKind::New(new_command) => new_project(new_command),
-    } {
+    match CliCommand::parse().and_then(CliInvoke::invoke) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => ExitCode::FAILURE,
-    }
-}
-
-fn build_project(build_command: BuildCommand) -> Result<(), ()> {
-    let BuildCommand { filename, options } = build_command;
-    let source_files = SourceFiles::new();
-    let filepath = Path::new(&filename);
-    let diagnostics = Diagnostics::new(&source_files, DiagnosticFlags::default());
-    let target = options.target;
-
-    let Ok(metadata) = metadata(filepath) else {
-        eprintln!("error: File or folder does not exist");
-        return Err(());
-    };
-
-    if target.arch().is_none() {
-        diagnostics.push(WarningDiagnostic::plain(
-            "Target architecture is not supported, falling back to best guess",
-        ));
-    }
-
-    if target.os().is_none() {
-        diagnostics.push(WarningDiagnostic::plain(
-            "Target os is not supported, falling back to best guess",
-        ));
-    }
-
-    match target.os().zip(target.arch()) {
-        Some((TargetOs::Windows, TargetArch::X86_64)) => (),
-        Some((TargetOs::Windows, TargetArch::Aarch64)) => (),
-        Some((TargetOs::Mac, TargetArch::X86_64)) => (),
-        Some((TargetOs::Mac, TargetArch::Aarch64)) => (),
-        Some((TargetOs::Linux, TargetArch::X86_64)) => (),
-        Some((TargetOs::Linux, TargetArch::Aarch64)) => (),
-        Some((TargetOs::FreeBsd, TargetArch::X86_64)) => (),
-        None => (),
-        #[allow(unreachable_patterns)]
-        _ => {
-            diagnostics.push(WarningDiagnostic::plain(
-                "Host os/architecture configuration is not officially supported, taking best guess",
-            ));
-        }
-    }
-
-    let mut compiler = Compiler {
-        options,
-        target: &target,
-        source_files: &source_files,
-        diagnostics: &diagnostics,
-        version: Default::default(),
-        link_filenames: Default::default(),
-        link_frameworks: Default::default(),
-    };
-
-    if metadata.is_dir() {
-        return compile_workspace(&mut compiler, filepath, None);
-    }
-
-    // Experimental header parsing
-    if filepath.extension().unwrap_or_default() == "h" {
-        let source_files = compiler.source_files;
-
-        let content = std::fs::read_to_string(filepath).map_err(|err| {
-            eprintln!("{}", err);
-            ()
-        })?;
-
-        let header_key = source_files.add(filepath.into(), content);
-
-        let header_contents = source_files
-            .get(header_key)
-            .content()
-            .chars()
-            .into_text_stream(header_key)
-            .into_text();
-
-        let preprocessed = unerror(
-            c::preprocessor::preprocess(header_contents, &diagnostics),
-            &source_files,
-        )?;
-
-        println!("{preprocessed:?}");
-        return Ok(());
-    }
-
-    let project_folder = filepath.parent().unwrap();
-    compile_single_file_only(&mut compiler, project_folder, filepath)
-}
-
-fn unerror<T, E: Show>(result: Result<T, E>, source_files: &SourceFiles) -> Result<T, ()> {
-    match result {
-        Ok(value) => Ok(value),
-        Err(err) => {
-            let mut message = String::new();
-
-            err.show(&mut message, source_files)
-                .expect("show error message");
-
-            eprintln!("{message}");
-            Err(())
-        }
     }
 }

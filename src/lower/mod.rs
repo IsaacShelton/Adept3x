@@ -14,18 +14,13 @@ use crate::{
     ir::{self},
     resolve::PolyRecipe,
     resolved,
-    target::Target,
 };
 use function::{lower_function_body, lower_function_head};
 use global::lower_global;
 use structure::lower_structure;
 
-pub fn lower<'a>(
-    options: &BuildOptions,
-    rast: &resolved::Ast,
-    target: &'a Target,
-) -> Result<ir::Module<'a>, LowerError> {
-    let mut ir_module = ir::Module::new(target);
+pub fn lower<'a>(options: &BuildOptions, rast: &resolved::Ast) -> Result<ir::Module, LowerError> {
+    let mut ir_module = ir::Module::new(options.target.clone());
 
     for (structure_ref, structure) in rast.structures.iter() {
         lower_structure(&mut ir_module, structure_ref, structure, rast)?;

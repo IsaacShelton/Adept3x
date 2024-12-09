@@ -15,14 +15,14 @@ use functions::Functions;
 use std::{collections::HashMap, ffi::CString};
 pub use structures::{StructureRef, Structures};
 
-pub struct Module<'a> {
-    pub target: &'a Target,
+pub struct Module {
+    pub target: Target,
     pub structures: Structures,
     pub globals: HashMap<GlobalVarRef, Global>,
     pub functions: Functions,
 }
 
-impl<'a> std::fmt::Debug for Module<'a> {
+impl std::fmt::Debug for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "SlotMap {{")?;
         for ir_function in self.functions.values() {
@@ -469,8 +469,8 @@ pub struct ValueReference {
     pub instruction_id: usize,
 }
 
-impl<'a> Module<'a> {
-    pub fn new(target: &'a Target) -> Self {
+impl Module {
+    pub fn new(target: Target) -> Self {
         Self {
             target,
             functions: Functions::new(),

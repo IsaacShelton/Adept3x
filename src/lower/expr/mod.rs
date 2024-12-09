@@ -284,7 +284,7 @@ pub fn lower_expr(
             let from_sign = cast_from
                 .from_type
                 .kind
-                .sign(Some(ir_module.target))
+                .sign(Some(&ir_module.target))
                 .expect("integer to float must know sign");
 
             let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
@@ -782,11 +782,11 @@ pub fn lower_basic_binary_operation(
         })),
         resolved::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instruction::Divide(
             operands,
-            mode.or_default_for(ir_module.target),
+            mode.or_default_for(&ir_module.target),
         ))),
         resolved::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instruction::Modulus(
             operands,
-            mode.or_default_for(ir_module.target),
+            mode.or_default_for(&ir_module.target),
         ))),
         resolved::BasicBinaryOperator::Equals(mode) => {
             Ok(builder.push(ir::Instruction::Equals(operands, *mode)))
@@ -795,16 +795,16 @@ pub fn lower_basic_binary_operation(
             Ok(builder.push(ir::Instruction::NotEquals(operands, *mode)))
         }
         resolved::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(
-            ir::Instruction::LessThan(operands, mode.or_default_for(ir_module.target)),
+            ir::Instruction::LessThan(operands, mode.or_default_for(&ir_module.target)),
         )),
         resolved::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(
-            ir::Instruction::LessThanEq(operands, mode.or_default_for(ir_module.target)),
+            ir::Instruction::LessThanEq(operands, mode.or_default_for(&ir_module.target)),
         )),
         resolved::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(
-            ir::Instruction::GreaterThan(operands, mode.or_default_for(ir_module.target)),
+            ir::Instruction::GreaterThan(operands, mode.or_default_for(&ir_module.target)),
         )),
         resolved::BasicBinaryOperator::GreaterThanEq(mode) => Ok(builder.push(
-            ir::Instruction::GreaterThanEq(operands, mode.or_default_for(ir_module.target)),
+            ir::Instruction::GreaterThanEq(operands, mode.or_default_for(&ir_module.target)),
         )),
         resolved::BasicBinaryOperator::BitwiseAnd => {
             Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))

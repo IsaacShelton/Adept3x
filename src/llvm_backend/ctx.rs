@@ -38,7 +38,7 @@ pub struct StructureCache {
 #[derive(Debug)]
 pub struct ToBackendTypeCtx<'a> {
     pub structure_cache: &'a StructureCache,
-    pub ir_module: &'a ir::Module<'a>,
+    pub ir_module: &'a ir::Module,
     pub visited: RefCell<HashSet<ir::StructureRef>>,
 }
 
@@ -58,7 +58,7 @@ pub struct FunctionSkeleton {
 
 pub struct BackendCtx<'a> {
     pub backend_module: &'a BackendModule,
-    pub ir_module: &'a ir::Module<'a>,
+    pub ir_module: &'a ir::Module,
     pub builder: Option<Builder>,
     pub func_skeletons: HashMap<ir::FunctionRef, FunctionSkeleton>,
     pub globals: HashMap<ir::GlobalVarRef, LLVMValueRef>,
@@ -87,7 +87,7 @@ impl<'a> BackendCtx<'a> {
             diagnostics,
         );
 
-        let arch = Arch::new(ir_module.target)
+        let arch = Arch::new(&ir_module.target)
             .ok_or_else(|| BackendError::plain("Target platform is not supported"))?;
 
         Ok(Self {

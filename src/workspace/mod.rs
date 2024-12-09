@@ -27,7 +27,7 @@ use crate::{
     show::Show,
     source_files::{Source, SourceFileKey},
     token::Token,
-    unerror,
+    unerror::unerror,
 };
 use compile::{
     compile_code_file,
@@ -255,7 +255,7 @@ pub fn compile_workspace(
     )?;
 
     let ir_module = unerror(
-        lower(&compiler.options, &resolved_ast, &compiler.target),
+        lower(&compiler.options, &resolved_ast),
         compiler.source_files,
     )?;
 
@@ -274,13 +274,9 @@ pub fn compile_workspace(
         });
 
     if compiler.options.interpret {
-        match run_build_system_interpreter(&resolved_ast, &ir_module) {
-            Ok(_) => return Ok(()),
-            Err(err) => {
-                eprintln!("{}", err);
-                return Err(());
-            }
-        }
+        return run_build_system_interpreter(&resolved_ast, &ir_module)
+            .map(|_state| ())
+            .map_err(|err| eprintln!("{}", err));
     }
 
     let bin_folder = project_folder.join("bin");
@@ -289,8 +285,18 @@ pub fn compile_workspace(
     create_dir_all(&bin_folder).expect("failed to create bin folder");
     create_dir_all(&obj_folder).expect("failed to create obj folder");
 
-    let exe_filepath = bin_folder.join(compiler.target.default_executable_name(&project_name));
-    let obj_filepath = obj_folder.join(compiler.target.default_object_file_name(&project_name));
+    let exe_filepath = bin_folder.join(
+        compiler
+            .options
+            .target
+            .default_executable_name(&project_name),
+    );
+    let obj_filepath = obj_folder.join(
+        compiler
+            .options
+            .target
+            .default_object_file_name(&project_name),
+    );
 
     let linking_duration = unerror(
         unsafe {
@@ -311,12 +317,10 @@ pub fn compile_workspace(
     let in_how_many_seconds = stats.seconds_elapsed();
     let _linking_took = linking_duration.as_millis() as f64 / 1000.0;
 
-    // SAFETY: This is okay, as we synchronized by joining
+    // SAFETY: These are okay, as we synchronized by joining
+    let files_processed = stats.files_processed_estimate().separate_with_commas();
     let bytes_processed =
         humansize::make_format(humansize::DECIMAL)(stats.bytes_processed_estimate());
-
-    // SAFETY: This is okay, as we synchronized by joining
-    let files_processed = stats.files_processed_estimate().separate_with_commas();
 
     println!(
         "Compiled {} from {} files in {:.2} seconds",

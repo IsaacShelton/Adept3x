@@ -68,7 +68,7 @@ pub unsafe fn llvm_backend(
 
     let options = &compiler.options;
     let module_name = CString::new(output_object_filepath.to_str().expect("valid utf8")).unwrap();
-    let triple = get_triple(&compiler.target)?;
+    let triple = get_triple(&options.target)?;
     let target = make_llvm_target(&triple)?;
     let cpu = CString::new("generic").unwrap();
     let features = CString::new("").unwrap();

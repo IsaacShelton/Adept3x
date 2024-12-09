@@ -13,7 +13,6 @@ use std::{
 
 pub struct Compiler<'a> {
     pub options: BuildOptions,
-    pub target: &'a Target,
     pub source_files: &'a SourceFiles,
     pub diagnostics: &'a Diagnostics<'a>,
     pub version: OnceLock<AdeptVersion>,
@@ -22,6 +21,10 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
+    pub fn target(&self) -> &Target {
+        &self.options.target
+    }
+
     pub fn maybe_execute_result(&self, output_binary_filepath: &Path) -> Result<(), ()> {
         if !self.options.excute_result {
             return Ok(());
