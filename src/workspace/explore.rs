@@ -27,7 +27,7 @@ pub struct ExploreResult {
     pub module_files: Vec<ModuleFile>,
 }
 
-pub fn explore(fs: &Fs, folder_path: &Path) -> Option<ExploreResult> {
+pub fn explore(fs: &Fs, folder_path: &Path) -> Result<ExploreResult, ()> {
     let normal_files = AppendOnlyVec::new();
     let module_files = AppendOnlyVec::new();
 
@@ -99,8 +99,10 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> Option<ExploreResult> {
         })
     });
 
-    ok.load(atomic::Ordering::SeqCst).then(|| ExploreResult {
-        normal_files: normal_files.into_vec(),
-        module_files: module_files.into_vec(),
-    })
+    ok.load(atomic::Ordering::SeqCst)
+        .then(|| ExploreResult {
+            normal_files: normal_files.into_vec(),
+            module_files: module_files.into_vec(),
+        })
+        .ok_or(())
 }

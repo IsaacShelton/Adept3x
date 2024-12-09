@@ -52,30 +52,20 @@ use thousands::Separable;
 
 const NUM_THREADS: usize = 8;
 
-pub fn compile_workspace(
-    compiler: &mut Compiler,
-    project_folder: &Path,
-    single_file: Option<PathBuf>,
-) -> Result<(), ()> {
-    let stats = CompilationStats::start();
-
-    let fs = Fs::new();
-    let source_files = compiler.source_files;
-    let ExploreWithinResult { explored, entry } = explore_within(&fs, project_folder, single_file);
-
-    let Some(ExploreResult {
-        module_files,
+fn lex_and_parse_workspace_in_parallel<'a>(
+    compiler: &Compiler<'a>,
+    fs: &Fs,
+    explored: ExploreResult,
+    stats: &CompilationStats,
+) -> Result<WorkspaceQueue<'a, impl Inflow<Token> + 'a>, ()> {
+    let ExploreResult {
         normal_files,
-    }) = explored
-    else {
-        eprintln!(
-            "error: Could not locate workspace folder '{}'",
-            project_folder.display()
-        );
-        return Err(());
-    };
+        module_files,
+    } = explored;
 
+    let source_files = compiler.source_files;
     let thread_count = (normal_files.len() + module_files.len()).min(NUM_THREADS);
+
     let all_modules_done = Barrier::new(thread_count);
     let queue = WorkspaceQueue::new(normal_files, module_files);
 
@@ -128,15 +118,38 @@ pub fn compile_workspace(
         }
     });
 
-    print_module_errors(compiler, &stats)?;
+    print_syntax_errors(compiler, &stats)?;
+    Ok(queue)
+}
 
+pub fn compile_workspace(
+    compiler: &mut Compiler,
+    project_folder: &Path,
+    single_file: Option<PathBuf>,
+) -> Result<(), ()> {
+    let stats = CompilationStats::start();
+
+    let fs = Fs::new();
+    let source_files = compiler.source_files;
+
+    // Find workspace files
+    let ExploreWithinResult { explored, entry } = explore_within(&fs, project_folder, single_file)
+        .map_err(|_| {
+            eprintln!("error: Failed to explore workspace folder");
+        })?;
+
+    // Lex, parse, apply per-file settings, and bring in dependencies as requested
+    let queue = lex_and_parse_workspace_in_parallel(compiler, &fs, explored, &stats)?;
+
+    // Collect lists of all needed ASTs and module folders
     let module_folders = HashMap::from_iter(queue.module_folders.into_iter());
     let mut files = IndexMap::from_iter(queue.ast_files.into_iter());
 
+    // Setup interpreter symbols if requesting to be run in interpreter
     if compiler.options.interpret {
         let Some(guaranteed_entry) = entry else {
             eprintln!(
-                "error: experimental manually-invoked interpreter does not properly handle multiple files yet"
+                "error: Experimental manually-invoked interpreter does not properly handle multiple files yet"
             );
             return Err(());
         };
@@ -144,16 +157,23 @@ pub fn compile_workspace(
         setup_build_system_interpreter_symbols(files.get_mut(&guaranteed_entry).unwrap());
     }
 
+    // Compile ASTs into workspace and propogate module setings to each module's contained files
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
+
+    // Resolve symbols and validate semantics for workspace
     let resolved_ast = unerror(resolve(&workspace, &compiler.options), source_files)?;
+
+    // Lower code to high level intermediate representation
     let ir_module = unerror(lower(&compiler.options, &resolved_ast), source_files)?;
 
+    // Run in interpreter if requesting to be run in interpreter
     if compiler.options.interpret {
         return run_build_system_interpreter(&resolved_ast, &ir_module)
             .map(|_state| ())
             .map_err(|err| eprintln!("{}", err));
     }
 
+    // Export and link to create executable
     let export_details = export_and_link(compiler, project_folder, &resolved_ast, &ir_module)?;
     print_summary(&stats);
     compiler.execute_result(&export_details.executable_filepath)
@@ -209,7 +229,7 @@ fn queue_dependencies<I: Inflow<Token>>(
         let already_discovered = fs.find(&absolute_folder).is_some();
 
         if !already_discovered {
-            let Some(ExploreResult {
+            let Ok(ExploreResult {
                 module_files: new_module_files,
                 normal_files: new_normal_files,
             }) = explore(&fs, &absolute_folder)
@@ -250,7 +270,7 @@ fn print_summary(stats: &CompilationStats) {
     );
 }
 
-fn print_module_errors(compiler: &Compiler, stats: &CompilationStats) -> Result<(), ()> {
+fn print_syntax_errors(compiler: &Compiler, stats: &CompilationStats) -> Result<(), ()> {
     let in_how_many_seconds = stats.seconds_elapsed();
 
     // SAFETY: This is okay since all modifying threads were joined (and thereby synchronized)
