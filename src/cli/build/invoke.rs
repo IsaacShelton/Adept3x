@@ -1,12 +1,11 @@
-use super::BuildCommand;
+use super::{supported_targets::warn_if_unsupported_target, BuildCommand};
 use crate::{
     c,
     cli::CliInvoke,
     compiler::Compiler,
-    diagnostics::{DiagnosticFlags, Diagnostics, WarningDiagnostic},
+    diagnostics::{DiagnosticFlags, Diagnostics},
     single_file_only::compile_single_file_only,
     source_files::SourceFiles,
-    target::{Target, TargetArch, TargetOs},
     text::{IntoText, IntoTextStream},
     unerror::unerror,
     workspace::compile_workspace,
@@ -26,7 +25,7 @@ impl CliInvoke for BuildCommand {
             return Err(());
         };
 
-        ensure_supported_target(&target, &diagnostics);
+        warn_if_unsupported_target(&target, &diagnostics);
 
         let mut compiler = Compiler {
             options,
@@ -43,37 +42,6 @@ impl CliInvoke for BuildCommand {
             compile_header(&compiler, filepath)
         } else {
             compile_single_file_only(&mut compiler, filepath.parent().unwrap(), filepath)
-        }
-    }
-}
-
-fn ensure_supported_target(target: &Target, diagnostics: &Diagnostics) {
-    if target.arch().is_none() {
-        diagnostics.push(WarningDiagnostic::plain(
-            "Target architecture is not supported, falling back to best guess",
-        ));
-    }
-
-    if target.os().is_none() {
-        diagnostics.push(WarningDiagnostic::plain(
-            "Target os is not supported, falling back to best guess",
-        ));
-    }
-
-    match target.os().zip(target.arch()) {
-        Some((TargetOs::Windows, TargetArch::X86_64)) => (),
-        Some((TargetOs::Windows, TargetArch::Aarch64)) => (),
-        Some((TargetOs::Mac, TargetArch::X86_64)) => (),
-        Some((TargetOs::Mac, TargetArch::Aarch64)) => (),
-        Some((TargetOs::Linux, TargetArch::X86_64)) => (),
-        Some((TargetOs::Linux, TargetArch::Aarch64)) => (),
-        Some((TargetOs::FreeBsd, TargetArch::X86_64)) => (),
-        None => (),
-        #[allow(unreachable_patterns)]
-        _ => {
-            diagnostics.push(WarningDiagnostic::plain(
-                "Host os/architecture configuration is not officially supported, taking best guess",
-            ));
         }
     }
 }

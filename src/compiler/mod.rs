@@ -25,7 +25,7 @@ impl<'a> Compiler<'a> {
         &self.options.target
     }
 
-    pub fn maybe_execute_result(&self, output_binary_filepath: &Path) -> Result<(), ()> {
+    pub fn execute_result(&self, output_binary_filepath: &Path) -> Result<(), ()> {
         if !self.options.excute_result {
             return Ok(());
         }

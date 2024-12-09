@@ -7,6 +7,7 @@
 pub mod compile;
 mod explore;
 mod explore_within;
+mod export_and_link;
 mod file;
 pub mod fs;
 mod module_file;
@@ -21,13 +22,13 @@ use crate::{
     inflow::Inflow,
     interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
     line_column::Location,
-    llvm_backend::llvm_backend,
     lower::lower,
     resolve::resolve,
     show::Show,
     source_files::{Source, SourceFileKey},
     token::Token,
     unerror::unerror,
+    workspace::export_and_link::export_and_link,
 };
 use compile::{
     compile_code_file,
@@ -36,7 +37,7 @@ use compile::{
 use explore::{explore, ExploreResult};
 use explore_within::{explore_within, ExploreWithinResult};
 use file::CodeFile;
-use fs::{Fs, FsNodeId};
+use fs::Fs;
 use indexmap::IndexMap;
 use module_file::ModuleFile;
 use path_absolutize::Absolutize;
@@ -44,14 +45,148 @@ use queue::WorkspaceQueue;
 use stats::CompilationStats;
 use std::{
     collections::HashMap,
-    ffi::OsString,
-    fs::create_dir_all,
     path::{Path, PathBuf},
     sync::Barrier,
 };
 use thousands::Separable;
 
 const NUM_THREADS: usize = 8;
+
+pub fn compile_workspace(
+    compiler: &mut Compiler,
+    project_folder: &Path,
+    single_file: Option<PathBuf>,
+) -> Result<(), ()> {
+    let stats = CompilationStats::start();
+
+    let fs = Fs::new();
+    let source_files = compiler.source_files;
+    let ExploreWithinResult { explored, entry } = explore_within(&fs, project_folder, single_file);
+
+    let Some(ExploreResult {
+        module_files,
+        normal_files,
+    }) = explored
+    else {
+        eprintln!(
+            "error: Could not locate workspace folder '{}'",
+            project_folder.display()
+        );
+        return Err(());
+    };
+
+    let thread_count = (normal_files.len() + module_files.len()).min(NUM_THREADS);
+    let all_modules_done = Barrier::new(thread_count);
+    let queue = WorkspaceQueue::new(normal_files, module_files);
+
+    std::thread::scope(|scope| {
+        for _ in 0..thread_count {
+            scope.spawn(|| {
+                // ===== Process module files =====
+                queue.for_module_files(|module_file| {
+                    match compile_module_file(compiler, &module_file.path) {
+                        Ok(compiled_module) => {
+                            process_module_file(
+                                compiler,
+                                &fs,
+                                module_file,
+                                compiled_module,
+                                &stats,
+                                &queue,
+                            );
+                        }
+                        Err(failed_module_message) => {
+                            failed_module_message.eprintln(source_files);
+                            stats.fail_module_file();
+                        }
+                    }
+                });
+
+                // NOTE: This synchronizes the threads, and marks the end of module-related modifications/processing
+                all_modules_done.wait();
+
+                // ==== Don't continue if module files had errors =====
+                // SAFETY: This is okay, as all the modifications happen before synchronizing the modifying threads
+                if stats.failed_modules_estimate() != 0 {
+                    return;
+                }
+
+                // ===== Process normal files =====
+                queue.for_code_files(|code_file| {
+                    match compile_code_file(compiler, code_file, &queue.ast_files) {
+                        Ok(did_bytes) => {
+                            stats.process_file();
+                            stats.process_bytes(did_bytes);
+                        }
+                        Err(error_message) => {
+                            error_message.eprintln(source_files);
+                            stats.fail_file();
+                        }
+                    };
+                });
+            });
+        }
+    });
+
+    print_module_errors(compiler, &stats)?;
+
+    let module_folders = HashMap::from_iter(queue.module_folders.into_iter());
+    let mut files = IndexMap::from_iter(queue.ast_files.into_iter());
+
+    if compiler.options.interpret {
+        let Some(guaranteed_entry) = entry else {
+            eprintln!(
+                "error: experimental manually-invoked interpreter does not properly handle multiple files yet"
+            );
+            return Err(());
+        };
+
+        setup_build_system_interpreter_symbols(files.get_mut(&guaranteed_entry).unwrap());
+    }
+
+    let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
+    let resolved_ast = unerror(resolve(&workspace, &compiler.options), source_files)?;
+    let ir_module = unerror(lower(&compiler.options, &resolved_ast), source_files)?;
+
+    if compiler.options.interpret {
+        return run_build_system_interpreter(&resolved_ast, &ir_module)
+            .map(|_state| ())
+            .map_err(|err| eprintln!("{}", err));
+    }
+
+    let export_details = export_and_link(compiler, project_folder, &resolved_ast, &ir_module)?;
+    print_summary(&stats);
+    compiler.execute_result(&export_details.executable_filepath)
+}
+
+fn process_module_file<'a, 'b: 'a, I: Inflow<Token>>(
+    compiler: &Compiler,
+    fs: &Fs,
+    module_file: ModuleFile,
+    compiled_module: CompiledModule<'a, I>,
+    stats: &CompilationStats,
+    queue: &WorkspaceQueue<'a, I>,
+) {
+    let folder_fs_node_id = fs
+        .get(module_file.fs_node_id)
+        .parent
+        .expect("module file has parent");
+
+    let CompiledModule {
+        settings,
+        source_file,
+        total_file_size,
+        remaining_input,
+    } = compiled_module;
+
+    let settings = queue_dependencies(compiler, fs, settings, source_file, stats, queue);
+
+    queue.push_module_folder(folder_fs_node_id, settings);
+    queue.push_code_file(CodeFile::Module(module_file, remaining_input));
+
+    stats.process_file();
+    stats.process_bytes(total_file_size);
+}
 
 fn queue_dependencies<I: Inflow<Token>>(
     compiler: &Compiler,
@@ -101,113 +236,21 @@ fn queue_dependencies<I: Inflow<Token>>(
     settings
 }
 
-fn process_module_file<'a, 'b: 'a, I: Inflow<Token>>(
-    compiler: &Compiler,
-    fs: &Fs,
-    module_file: ModuleFile,
-    compiled_module: CompiledModule<'a, I>,
-    stats: &CompilationStats,
-    queue: &WorkspaceQueue<'a, I>,
-) {
-    let folder_fs_node_id = fs
-        .get(module_file.fs_node_id)
-        .parent
-        .expect("module file has parent");
+fn print_summary(stats: &CompilationStats) {
+    let in_how_many_seconds = stats.seconds_elapsed();
 
-    let CompiledModule {
-        settings,
-        source_file,
-        total_file_size,
-        remaining_input,
-    } = compiled_module;
+    // SAFETY: These are okay, as we synchronized by joining
+    let files_processed = stats.files_processed_estimate().separate_with_commas();
+    let bytes_processed =
+        humansize::make_format(humansize::DECIMAL)(stats.bytes_processed_estimate());
 
-    let settings = queue_dependencies(compiler, fs, settings, source_file, stats, queue);
-
-    queue.push_module_folder(folder_fs_node_id, settings);
-    queue.push_code_file(CodeFile::Module(module_file, remaining_input));
-
-    stats.process_file();
-    stats.process_bytes(total_file_size);
+    println!(
+        "Compiled {} from {} files in {:.2} seconds",
+        bytes_processed, files_processed, in_how_many_seconds,
+    );
 }
 
-pub fn compile_workspace(
-    compiler: &mut Compiler,
-    project_folder: &Path,
-    single_file: Option<PathBuf>,
-) -> Result<(), ()> {
-    let stats = CompilationStats::start();
-
-    let fs = Fs::new();
-    let ExploreWithinResult { explored, entry } = explore_within(&fs, project_folder, single_file);
-
-    let Some(ExploreResult {
-        module_files,
-        normal_files,
-    }) = explored
-    else {
-        eprintln!(
-            "error: Could not locate workspace folder '{}'",
-            project_folder.display()
-        );
-        return Err(());
-    };
-
-    let thread_count = (normal_files.len() + module_files.len()).min(NUM_THREADS);
-    let all_modules_done = Barrier::new(thread_count);
-    let queue = WorkspaceQueue::new(normal_files, module_files);
-
-    std::thread::scope(|scope| {
-        for _ in 0..thread_count {
-            scope.spawn(|| {
-                // ===== Process module files =====
-                queue.for_module_files(|module_file| {
-                    let compiled_module = match compile_module_file(compiler, &module_file.path) {
-                        Ok(values) => values,
-                        Err(err) => {
-                            err.eprintln(compiler.source_files);
-                            stats.fail_module_file();
-                            return;
-                        }
-                    };
-
-                    process_module_file(
-                        compiler,
-                        &fs,
-                        module_file,
-                        compiled_module,
-                        &stats,
-                        &queue,
-                    );
-                });
-
-                // NOTE: This synchronizes the threads, and marks the end of module-related modifications/processing.
-                // `num_module_files_failed` can now be consistently read from...
-                all_modules_done.wait();
-
-                // ==== Don't continue if module files had errors =====
-                // SAFETY: This is okay, as all the modifications happened before we synchronized
-                // the modifying threads.
-                if stats.failed_modules_estimate() != 0 {
-                    return;
-                }
-
-                // ===== Process normal files =====
-                queue.for_code_files(|code_file| {
-                    match compile_code_file(compiler, code_file, &queue.ast_files) {
-                        Ok(did_bytes) => {
-                            stats.process_file();
-                            stats.process_bytes(did_bytes);
-                        }
-                        Err(err) => {
-                            err.eprintln(compiler.source_files);
-                            stats.fail_file();
-                        }
-                    };
-                });
-            });
-        }
-    });
-
+fn print_module_errors(compiler: &Compiler, stats: &CompilationStats) -> Result<(), ()> {
     let in_how_many_seconds = stats.seconds_elapsed();
 
     // SAFETY: This is okay since all modifying threads were joined (and thereby synchronized)
@@ -233,99 +276,5 @@ pub fn compile_workspace(
         return Err(());
     };
 
-    let module_folders = HashMap::<FsNodeId, Settings>::from_iter(queue.module_folders.into_iter());
-    let mut files = IndexMap::from_iter(queue.ast_files.into_iter());
-
-    if compiler.options.interpret {
-        if let Some(guaranteed_entry) = entry {
-            setup_build_system_interpreter_symbols(files.get_mut(&guaranteed_entry).unwrap());
-        } else {
-            eprintln!(
-                "error: experimental manual interpreter does not properly handle multiple files yet"
-            );
-            return Err(());
-        }
-    }
-
-    let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
-
-    let resolved_ast = unerror(
-        resolve(&workspace, &compiler.options),
-        compiler.source_files,
-    )?;
-
-    let ir_module = unerror(
-        lower(&compiler.options, &resolved_ast),
-        compiler.source_files,
-    )?;
-
-    let project_name = project_folder
-        .file_name()
-        .map(OsString::from)
-        .unwrap_or_else(|| {
-            std::env::current_dir()
-                .ok()
-                .map(|dir| {
-                    dir.file_name()
-                        .map(OsString::from)
-                        .unwrap_or_else(|| OsString::from("main"))
-                })
-                .unwrap_or_else(|| OsString::from("main"))
-        });
-
-    if compiler.options.interpret {
-        return run_build_system_interpreter(&resolved_ast, &ir_module)
-            .map(|_state| ())
-            .map_err(|err| eprintln!("{}", err));
-    }
-
-    let bin_folder = project_folder.join("bin");
-    let obj_folder = project_folder.join("obj");
-
-    create_dir_all(&bin_folder).expect("failed to create bin folder");
-    create_dir_all(&obj_folder).expect("failed to create obj folder");
-
-    let exe_filepath = bin_folder.join(
-        compiler
-            .options
-            .target
-            .default_executable_name(&project_name),
-    );
-    let obj_filepath = obj_folder.join(
-        compiler
-            .options
-            .target
-            .default_object_file_name(&project_name),
-    );
-
-    let linking_duration = unerror(
-        unsafe {
-            llvm_backend(
-                compiler,
-                &ir_module,
-                &resolved_ast,
-                &obj_filepath,
-                &exe_filepath,
-                &compiler.diagnostics,
-            )
-        },
-        compiler.source_files,
-    )?;
-
-    // Print summary:
-
-    let in_how_many_seconds = stats.seconds_elapsed();
-    let _linking_took = linking_duration.as_millis() as f64 / 1000.0;
-
-    // SAFETY: These are okay, as we synchronized by joining
-    let files_processed = stats.files_processed_estimate().separate_with_commas();
-    let bytes_processed =
-        humansize::make_format(humansize::DECIMAL)(stats.bytes_processed_estimate());
-
-    println!(
-        "Compiled {} from {} files in {:.2} seconds",
-        bytes_processed, files_processed, in_how_many_seconds,
-    );
-
-    compiler.maybe_execute_result(&exe_filepath)
+    Ok(())
 }

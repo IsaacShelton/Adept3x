@@ -1,6 +1,7 @@
 mod invoke;
 mod options;
 mod parse;
+mod supported_targets;
 
 pub use options::BuildOptions;
 
