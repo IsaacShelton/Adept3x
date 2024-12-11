@@ -45,7 +45,13 @@ impl Type {
             TypeKind::Pointer(inner) => inner.contains_polymorph(),
             TypeKind::FixedArray(fixed_array) => fixed_array.ast_type.contains_polymorph(),
             TypeKind::Void => None,
-            TypeKind::Named(_, _) => None,
+            TypeKind::Named(_, args) => args
+                .iter()
+                .flat_map(|arg| match arg {
+                    CompileTimeArgument::Type(ty) => ty.contains_polymorph(),
+                    CompileTimeArgument::Expr(_) => todo!("ast::Type::contains_polymorph"),
+                })
+                .next(),
             TypeKind::AnonymousStruct(_) => todo!("contains_polymoph for AnonymousStruct"),
             TypeKind::AnonymousUnion(_) => todo!("contains_polymorph for AnonymousUnion"),
             TypeKind::AnonymousEnum(_) => todo!("contains_polymorph for AnonymousEnum"),

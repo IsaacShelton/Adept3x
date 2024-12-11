@@ -97,7 +97,15 @@ impl PolyRecipe {
             }
             resolved::TypeKind::FunctionPointer(_) => todo!(),
             resolved::TypeKind::Enum(_, _) => ty.clone(),
-            resolved::TypeKind::Structure(_, _, _) => ty.clone(),
+            resolved::TypeKind::Structure(human_name, structure_ref, poly_args) => {
+                let args = poly_args
+                    .iter()
+                    .map(|arg| self.resolve_type(arg))
+                    .collect::<Result<_, _>>()?;
+
+                resolved::TypeKind::Structure(human_name.clone(), *structure_ref, args)
+                    .at(ty.source)
+            }
             resolved::TypeKind::TypeAlias(_, _) => ty.clone(),
             resolved::TypeKind::Polymorph(name, _) => {
                 let Some(value) = polymorphs.get(name) else {
