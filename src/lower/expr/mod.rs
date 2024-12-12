@@ -317,7 +317,7 @@ pub fn lower_expr(
             let mut catalog = PolyCatalog::new();
             for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
                 catalog
-                    .put_type(name, argument)
+                    .put_type(name, &builder.unpoly(argument)?.0)
                     .expect("unique type parameter names");
             }
             let poly_recipe = catalog.bake();
@@ -650,7 +650,7 @@ pub fn lower_destination(
             let mut catalog = PolyCatalog::new();
             for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
                 catalog
-                    .put_type(name, argument)
+                    .put_type(name, &builder.unpoly(argument)?.0)
                     .expect("unique type parameter names");
             }
             let poly_recipe = catalog.bake();
