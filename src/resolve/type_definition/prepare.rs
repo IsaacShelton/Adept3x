@@ -5,6 +5,7 @@ use crate::{
         ctx::ResolveCtx,
         error::{ResolveError, ResolveErrorKind},
         job::TypeJob,
+        type_ctx::resolve_constraints,
     },
     resolved::{self, EnumRef, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeParameters},
     workspace::fs::FsNodeId,
@@ -37,7 +38,7 @@ pub fn prepare_type_jobs(
                 resolved_ast,
                 module_fs_node_id,
                 structure,
-            ));
+            )?);
         }
 
         for definition in file.enums.iter() {
@@ -69,17 +70,13 @@ fn prepare_structure(
     resolved_ast: &mut resolved::Ast,
     module_fs_node_id: FsNodeId,
     structure: &ast::Structure,
-) -> StructureRef {
+) -> Result<StructureRef, ResolveError> {
     let source = structure.source;
 
     let mut parameters = TypeParameters::default();
 
     for (name, parameter) in structure.parameters.iter() {
-        let constraints = vec![];
-
-        if !parameter.constraints.is_empty() {
-            todo!("type parameters with constraints are not supported yet");
-        }
+        let constraints = resolve_constraints(&parameter.constraints)?;
 
         if parameters
             .parameters
@@ -123,7 +120,7 @@ fn prepare_structure(
             },
         );
 
-    structure_ref
+    Ok(structure_ref)
 }
 
 fn prepare_enum(

@@ -2,8 +2,16 @@ mod find;
 mod find_error;
 mod resolve_type;
 
-use super::expr::ResolveExprCtx;
-use crate::{name::ResolvedName, resolved, workspace::fs::FsNodeId};
+use super::{
+    error::{ResolveError, ResolveErrorKind},
+    expr::ResolveExprCtx,
+};
+use crate::{
+    ast,
+    name::ResolvedName,
+    resolved::{self, Constraint},
+    workspace::fs::FsNodeId,
+};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
@@ -41,4 +49,23 @@ impl<'a, 'b, 'c> From<&'c ResolveExprCtx<'a, 'b>> for ResolveTypeCtx<'c> {
             ctx.types_in_modules,
         )
     }
+}
+
+pub fn resolve_constraints(constraints: &[ast::Type]) -> Result<Vec<Constraint>, ResolveError> {
+    let mut resolved_constraints = vec![];
+
+    for constraint in constraints {
+        if let ast::TypeKind::Named(name, arguments) = &constraint.kind {
+            resolved_constraints.push(match name.as_plain_str() {
+                Some("PrimitiveAdd") if arguments.is_empty() => Constraint::PrimitiveAdd,
+                _ => {
+                    return Err(
+                        ResolveErrorKind::UndeclaredTrait(name.to_string()).at(constraint.source)
+                    )
+                }
+            });
+        }
+    }
+
+    Ok(resolved_constraints)
 }

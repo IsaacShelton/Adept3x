@@ -1,9 +1,9 @@
-use super::ResolveTypeCtx;
+use super::{resolve_constraints, ResolveTypeCtx};
 use crate::{
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
-    resolved::{self, Constraint},
+    resolved,
     source_files::Source,
 };
 use std::borrow::Borrow;
@@ -81,28 +81,10 @@ impl<'a> ResolveTypeCtx<'a> {
                     },
                 ))
             }
-            ast::TypeKind::Polymorph(polymorph, constraints) => {
-                let mut resolved_constraints = vec![];
-
-                for constraint in constraints {
-                    if let ast::TypeKind::Named(name, arguments) = &constraint.kind {
-                        resolved_constraints.push(match name.as_plain_str() {
-                            Some("PrimitiveAdd") if arguments.is_empty() => {
-                                Constraint::PrimitiveAdd
-                            }
-                            _ => {
-                                return Err(ResolveErrorKind::UndeclaredTrait(name.to_string())
-                                    .at(constraint.source))
-                            }
-                        });
-                    }
-                }
-
-                Ok(resolved::TypeKind::Polymorph(
-                    polymorph.clone(),
-                    resolved_constraints,
-                ))
-            }
+            ast::TypeKind::Polymorph(polymorph, constraints) => Ok(resolved::TypeKind::Polymorph(
+                polymorph.clone(),
+                resolve_constraints(constraints)?,
+            )),
         }
         .map(|kind| kind.at(ast_type.source))
     }
