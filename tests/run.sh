@@ -37,6 +37,7 @@ compile float_literal
 compile function_parameters
 compile function_simple
 compile generics
+compile generics_struct_simple
 compile global_variables
 compile hello_world
 compile if

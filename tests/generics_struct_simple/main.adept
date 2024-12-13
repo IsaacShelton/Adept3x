@@ -1,0 +1,23 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+struct RawOption<$T> (value $T, has bool)
+
+func main {
+    my_first_option := RawOption<int> { value: 10, has: true }
+    testing(my_first_option)
+}
+
+func testing(raw_option RawOption<$T>) {
+    // NOTE: The following would result in an error message,
+    // since it doesn't work in the general case:
+    /* raw_option.value = 10 */
+
+    printf(c"raw_option.has = %s\n", if raw_option.has { c"true" } else { c"false" })
+    raw_option.has = false
+    printf(c"raw_option.has = %s\n", if raw_option.has { c"true" } else { c"false" })
+}
+
