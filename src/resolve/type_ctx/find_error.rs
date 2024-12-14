@@ -10,6 +10,7 @@ pub enum FindTypeError {
     Ambiguous,
     RecursiveAlias(ResolvedName),
     ResolveError(ResolveError),
+    ConstraintsNotSatisfied,
 }
 
 impl FindTypeError {
@@ -29,6 +30,12 @@ impl FindTypeError {
                 name: name.to_string(),
             }
             .at(source),
+            FindTypeError::ConstraintsNotSatisfied => {
+                ResolveErrorKind::ConstraintsNotSatisfiedForType {
+                    name: name.to_string(),
+                }
+                .at(source)
+            }
             FindTypeError::ResolveError(err) => err,
         }
     }

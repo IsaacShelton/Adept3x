@@ -3,7 +3,7 @@ use crate::{
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
-    resolved,
+    resolved::{self, CurrentConstraints},
     source_files::Source,
 };
 use std::borrow::Borrow;
@@ -35,7 +35,25 @@ impl<'a> ResolveTypeCtx<'a> {
             }
             ast::TypeKind::Void => Ok(resolved::TypeKind::Void),
             ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
-                Ok(found) => Ok(found.into_owned()),
+                Ok(found) => {
+                    if let resolved::TypeKind::Structure(_, structure_ref, arguments) =
+                        found.borrow()
+                    {
+                        let structure = self
+                            .resolved_ast
+                            .structures
+                            .get(*structure_ref)
+                            .expect("referenced struct to exist");
+
+                        for (name, parameter) in structure.parameters.parameters.iter() {
+                            for constraint in &parameter.constraints {
+                                todo!("enforce type constraints for structure type usage")
+                            }
+                        }
+                    }
+
+                    Ok(found.into_owned())
+                }
                 Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
             },
             ast::TypeKind::Floating(size) => Ok(resolved::TypeKind::Floating(*size)),

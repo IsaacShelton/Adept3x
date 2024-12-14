@@ -203,6 +203,9 @@ pub enum ResolveErrorKind {
         operator: String,
         on_type: String,
     },
+    ConstraintsNotSatisfiedForType {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -530,6 +533,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::CannotUseOperator { operator, on_type } => {
                 write!(f, "Cannot use operator '{}' on type '{}'", operator, on_type)?;
+            }
+            ResolveErrorKind::ConstraintsNotSatisfiedForType { name } => {
+                write!(f, "Constraints not satisfied for type '{}'", name)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;
