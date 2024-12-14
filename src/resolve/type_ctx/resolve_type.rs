@@ -3,7 +3,7 @@ use crate::{
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
-    resolved::{self, CurrentConstraints},
+    resolved::{self},
     source_files::Source,
 };
 use std::borrow::Borrow;
@@ -45,9 +45,18 @@ impl<'a> ResolveTypeCtx<'a> {
                             .get(*structure_ref)
                             .expect("referenced struct to exist");
 
-                        for (name, parameter) in structure.parameters.parameters.iter() {
+                        assert!(arguments.len() == structure.parameters.len());
+
+                        for (parameter, argument) in
+                            structure.parameters.parameters.values().zip(arguments)
+                        {
                             for constraint in &parameter.constraints {
-                                todo!("enforce type constraints for structure type usage")
+                                if !self.current_constraints.satisfies(argument, constraint) {
+                                    return Err(ResolveErrorKind::ConstraintsNotSatisfiedForType {
+                                        name: name.to_string(),
+                                    }
+                                    .at(ast_type.source));
+                                }
                             }
                         }
                     }

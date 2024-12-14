@@ -9,7 +9,7 @@ use super::{
 use crate::{
     ast,
     name::ResolvedName,
-    resolved::{self, Constraint},
+    resolved::{self, Constraint, CurrentConstraints},
     workspace::fs::FsNodeId,
 };
 use std::collections::{HashMap, HashSet};
@@ -21,6 +21,7 @@ pub struct ResolveTypeCtx<'a> {
     file_fs_node_id: FsNodeId,
     types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     used_aliases_stack: HashSet<ResolvedName>,
+    current_constraints: &'a CurrentConstraints,
 }
 
 impl<'a> ResolveTypeCtx<'a> {
@@ -29,6 +30,7 @@ impl<'a> ResolveTypeCtx<'a> {
         module_fs_node_id: FsNodeId,
         file_fs_node_id: FsNodeId,
         types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
+        current_constraints: &'a CurrentConstraints,
     ) -> Self {
         Self {
             resolved_ast,
@@ -36,6 +38,7 @@ impl<'a> ResolveTypeCtx<'a> {
             file_fs_node_id,
             types_in_modules,
             used_aliases_stack: Default::default(),
+            current_constraints,
         }
     }
 }
@@ -47,6 +50,7 @@ impl<'a, 'b, 'c> From<&'c ResolveExprCtx<'a, 'b>> for ResolveTypeCtx<'c> {
             ctx.module_fs_node_id,
             ctx.physical_fs_node_id,
             ctx.types_in_modules,
+            &ctx.current_constraints,
         )
     }
 }

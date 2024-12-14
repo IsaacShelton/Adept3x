@@ -70,7 +70,7 @@ pub fn resolve_function_bodies(
                         helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
                         module_fs_node_id: module_file_id,
                         physical_fs_node_id: physical_file_id,
-                        constraints,
+                        current_constraints: constraints,
                     },
                     &ast_function.stmts,
                 )?;
@@ -98,11 +98,14 @@ fn resolve_parameter_variables(
     let mut variable_haystack = VariableHaystack::new();
 
     for parameter in ast_function.parameters.required.iter() {
+        let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
+
         let type_ctx = ResolveTypeCtx::new(
             &resolved_ast,
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
+            &function.constraints,
         );
 
         let mut resolved_type = type_ctx.resolve(&parameter.ast_type)?;

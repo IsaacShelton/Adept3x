@@ -25,11 +25,17 @@ pub fn create_function_heads(
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &function.name);
+
+            let fake_constraints = CurrentConstraints {
+                constraints: Default::default(),
+            };
+
             let type_ctx = ResolveTypeCtx::new(
                 &resolved_ast,
                 module_file_id,
                 *physical_file_id,
                 &ctx.types_in_modules,
+                &fake_constraints,
             );
 
             let is_generic = function.return_type.contains_polymorph().is_some()
@@ -125,7 +131,7 @@ pub fn create_function_heads(
     Ok(())
 }
 
-fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &resolved::Type) {
+pub fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &resolved::Type) {
     match &ty.kind {
         resolved::TypeKind::Unresolved => panic!(),
         resolved::TypeKind::Boolean

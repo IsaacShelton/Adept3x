@@ -1,10 +1,18 @@
 use crate::{
     ast::{self, AstWorkspace},
-    resolve::{ctx::ResolveCtx, error::ResolveError, job::TypeJob, type_ctx::ResolveTypeCtx},
-    resolved::{self, EnumRef, StructureRef, TypeAliasRef},
+    resolve::{
+        ctx::ResolveCtx,
+        error::ResolveError,
+        job::TypeJob,
+        type_ctx::{resolve_constraints, ResolveTypeCtx},
+    },
+    resolved::{self, CurrentConstraints, EnumRef, StructureRef, TypeAliasRef},
     workspace::fs::FsNodeId,
 };
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 pub fn resolve_type_jobs(
     ctx: &mut ResolveCtx,
@@ -68,11 +76,23 @@ fn resolve_structure(
     structure_ref: StructureRef,
 ) -> Result<(), ResolveError> {
     for (field_name, field) in structure.fields.iter() {
+        let mut constraints = HashMap::new();
+
+        for (name, parameter) in structure.parameters.iter() {
+            constraints.insert(
+                name.into(),
+                HashSet::from_iter(resolve_constraints(&parameter.constraints)?.drain(..)),
+            );
+        }
+
+        let constraints = CurrentConstraints { constraints };
+
         let type_ctx = ResolveTypeCtx::new(
             &resolved_ast,
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
+            &constraints,
         );
 
         let resolved_type = type_ctx.resolve_or_undeclared(&field.ast_type)?;
@@ -103,11 +123,13 @@ fn resolve_enum(
     definition: &ast::Enum,
     enum_ref: EnumRef,
 ) -> Result<(), ResolveError> {
+    let constraints = CurrentConstraints::default();
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
+        &constraints,
     );
 
     let ast_type = definition
@@ -129,11 +151,14 @@ fn resolve_type_alias(
     definition: &ast::TypeAlias,
     type_alias_ref: TypeAliasRef,
 ) -> Result<(), ResolveError> {
+    let constraints = CurrentConstraints::default();
+
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
+        &constraints,
     );
 
     let resolved_type = type_ctx.resolve_or_undeclared(&definition.value)?;

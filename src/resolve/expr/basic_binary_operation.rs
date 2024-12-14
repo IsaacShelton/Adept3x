@@ -95,7 +95,7 @@ pub fn resolve_basic_binary_operator(
         ast::BasicBinaryOperator::Add => NumericMode::try_new(resolved_type)
             .map(resolved::BasicBinaryOperator::Add)
             .or_else(|| {
-                ctx.constraints
+                ctx.current_constraints
                     .satisfies(resolved_type, &Constraint::PrimitiveAdd)
                     .then(|| resolved::BasicBinaryOperator::PrimitiveAdd(resolved_type.clone()))
             }),

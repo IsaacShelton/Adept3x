@@ -2,7 +2,7 @@ use super::{ctx::ResolveCtx, error::ResolveError, type_ctx::ResolveTypeCtx};
 use crate::{
     ast::AstWorkspace,
     name::{Name, ResolvedName},
-    resolved::{self, GlobalVarDecl},
+    resolved::{self, CurrentConstraints, GlobalVarDecl},
 };
 
 pub fn resolve_global_variables(
@@ -10,6 +10,8 @@ pub fn resolve_global_variables(
     resolved_ast: &mut resolved::Ast,
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
+    let constraints = CurrentConstraints::default();
+
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let module_file_id = ast_workspace
             .get_owning_module(*physical_file_id)
@@ -21,6 +23,7 @@ pub fn resolve_global_variables(
                 module_file_id,
                 *physical_file_id,
                 &ctx.types_in_modules,
+                &constraints,
             );
 
             let resolved_type = type_ctx.resolve(&global.ast_type)?;

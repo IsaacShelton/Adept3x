@@ -1,7 +1,7 @@
 use crate::{name::ResolvedName, resolved::*, source_files::Source, tag::Tag};
 use std::{collections::HashSet, fmt::Display};
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct CurrentConstraints {
     pub constraints: HashMap<String, HashSet<Constraint>>,
 }
@@ -11,10 +11,13 @@ impl CurrentConstraints {
         match constraint {
             Constraint::PrimitiveAdd => match &ty.kind {
                 TypeKind::Integer(..) | TypeKind::CInteger(..) | TypeKind::Floating(..) => true,
-                TypeKind::Polymorph(name, _) => self
-                    .constraints
-                    .get(name)
-                    .map_or(false, |set| set.contains(constraint)),
+                TypeKind::Polymorph(name, constraints) => {
+                    constraints.contains(constraint)
+                        || self
+                            .constraints
+                            .get(name)
+                            .map_or(false, |in_scope| in_scope.contains(constraint))
+                }
                 _ => false,
             },
         }

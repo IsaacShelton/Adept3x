@@ -240,7 +240,7 @@ impl PolyCatalog {
                 self.put_type(name, concrete_type).map_err(Some)?;
 
                 for constraint in constraints {
-                    if !ctx.constraints.satisfies(concrete_type, constraint) {
+                    if !ctx.current_constraints.satisfies(concrete_type, constraint) {
                         return Err(None);
                     }
                 }

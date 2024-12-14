@@ -24,12 +24,6 @@ impl<'a> ResolveTypeCtx<'a> {
             .expect("valid settings id")
             .0];
 
-        if !arguments.is_empty() {
-            eprintln!(
-                "warning: ResolveTypeCtx does not properly handle constraints for compile time arguments yet"
-            );
-        }
-
         if let Some(decl) = name
             .as_plain_str()
             .and_then(|name| {
