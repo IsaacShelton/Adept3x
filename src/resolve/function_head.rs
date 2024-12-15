@@ -157,6 +157,7 @@ pub fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &
                 set.insert(constraint.clone());
             }
         }
+        resolved::TypeKind::Trait(_, _) => (),
     }
 }
 

@@ -41,6 +41,9 @@ pub enum LowerErrorKind {
     },
     PolymorphError(PolymorphErrorKind),
     IncorrectNumberOfTypeArguments,
+    CannotUseTraitDirectly {
+        name: String,
+    },
 }
 
 impl From<PolymorphError> for LowerError {
@@ -106,6 +109,9 @@ impl Display for LowerErrorKind {
                 write!(f, "Incorrect number of type arguments")
             }
             LowerErrorKind::PolymorphError(e) => e.fmt(f),
+            LowerErrorKind::CannotUseTraitDirectly { name } => {
+                write!(f, "Cannot use trait '{}' directly", name)
+            }
         }
     }
 }

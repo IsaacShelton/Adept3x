@@ -10,6 +10,7 @@ mod human_name;
 mod overload;
 mod stmt;
 mod structure;
+mod trait_constraint;
 mod type_decl;
 mod variable_storage;
 
@@ -30,6 +31,7 @@ use slotmap::{new_key_type, SlotMap};
 use std::collections::HashMap;
 pub use stmt::*;
 pub use structure::*;
+pub use trait_constraint::Trait;
 pub use type_decl::*;
 pub use variable_storage::*;
 
@@ -39,6 +41,7 @@ new_key_type! {
     pub struct StructureRef;
     pub struct EnumRef;
     pub struct TypeAliasRef;
+    pub struct TraitRef;
 }
 
 #[derive(Clone, Debug)]
@@ -50,6 +53,7 @@ pub struct Ast<'a> {
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: SlotMap<EnumRef, Enum>,
     pub type_aliases: SlotMap<TypeAliasRef, Type>,
+    pub traits: SlotMap<TraitRef, Trait>,
     pub workspace: &'a AstWorkspace<'a>,
 }
 
@@ -65,6 +69,7 @@ impl<'a> Ast<'a> {
             globals: SlotMap::with_key(),
             enums: SlotMap::with_key(),
             type_aliases: SlotMap::with_key(),
+            traits: SlotMap::with_key(),
             workspace,
         }
     }

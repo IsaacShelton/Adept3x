@@ -5,9 +5,12 @@ use crate::{
         ctx::ResolveCtx,
         error::{ResolveError, ResolveErrorKind},
         job::TypeJob,
-        type_ctx::resolve_constraints,
+        type_ctx::{resolve_constraints, ResolveTypeCtx},
     },
-    resolved::{self, EnumRef, HumanName, StructureRef, TypeAliasRef, TypeDecl, TypeParameters},
+    resolved::{
+        self, CurrentConstraints, EnumRef, HumanName, StructureRef, TraitRef, TypeAliasRef,
+        TypeDecl, TypeParameters,
+    },
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
@@ -28,15 +31,26 @@ pub fn prepare_type_jobs(
         let mut job = TypeJob {
             physical_file_id: *physical_file_id,
             type_aliases: Vec::with_capacity(file.type_aliases.len()),
+            traits: Vec::with_capacity(file.traits.len()),
             structures: Vec::with_capacity(file.structures.len()),
             enums: Vec::with_capacity(file.enums.len()),
         };
+
+        for user_trait in file.traits.iter() {
+            job.traits.push(prepare_trait(
+                ctx,
+                resolved_ast,
+                module_fs_node_id,
+                user_trait,
+            ));
+        }
 
         for structure in file.structures.iter() {
             job.structures.push(prepare_structure(
                 ctx,
                 resolved_ast,
                 module_fs_node_id,
+                *physical_file_id,
                 structure,
             )?);
         }
@@ -69,6 +83,7 @@ fn prepare_structure(
     ctx: &mut ResolveCtx,
     resolved_ast: &mut resolved::Ast,
     module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     structure: &ast::Structure,
 ) -> Result<StructureRef, ResolveError> {
     let source = structure.source;
@@ -76,7 +91,17 @@ fn prepare_structure(
     let mut parameters = TypeParameters::default();
 
     for (name, parameter) in structure.parameters.iter() {
-        let constraints = resolve_constraints(&parameter.constraints)?;
+        let zero_current_constraints = CurrentConstraints::default();
+        let constraints = resolve_constraints(
+            &ResolveTypeCtx::new(
+                resolved_ast,
+                module_fs_node_id,
+                physical_fs_node_id,
+                &ctx.types_in_modules,
+                &zero_current_constraints,
+            ),
+            &parameter.constraints,
+        )?;
 
         if parameters
             .parameters
@@ -153,6 +178,36 @@ fn prepare_enum(
         );
 
     enum_ref
+}
+
+fn prepare_trait(
+    ctx: &mut ResolveCtx,
+    resolved_ast: &mut resolved::Ast,
+    module_fs_node_id: FsNodeId,
+    definition: &ast::Trait,
+) -> TraitRef {
+    let trait_ref = resolved_ast.traits.insert(resolved::Trait {
+        methods: vec![],
+        source: definition.source,
+    });
+
+    let kind = resolved::TypeKind::Trait(HumanName(definition.name.to_string()), trait_ref);
+    let source = definition.source;
+    let privacy = definition.privacy;
+
+    ctx.types_in_modules
+        .entry(module_fs_node_id)
+        .or_default()
+        .insert(
+            definition.name.to_string(),
+            TypeDecl {
+                kind,
+                source,
+                privacy,
+            },
+        );
+
+    trait_ref
 }
 
 fn prepare_type_alias(

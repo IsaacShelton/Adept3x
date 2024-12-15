@@ -6,7 +6,7 @@ mod function_pointer;
 use super::Type;
 use crate::{
     ast::{fmt_c_integer, CInteger, FloatSize, IntegerBits, IntegerSign},
-    resolved::{human_name::HumanName, Ast, EnumRef, StructureRef, TypeAliasRef},
+    resolved::{human_name::HumanName, Ast, EnumRef, StructureRef, TraitRef, TypeAliasRef},
     source_files::Source,
     target::Target,
 };
@@ -39,6 +39,7 @@ pub enum TypeKind {
     Structure(HumanName, StructureRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef),
     Polymorph(String, Vec<Constraint>),
+    Trait(HumanName, TraitRef),
 }
 
 impl TypeKind {
@@ -70,6 +71,7 @@ impl TypeKind {
                 .any(|parameter| parameter.kind.contains_polymorph()),
             TypeKind::TypeAlias(_, _) => false,
             TypeKind::Polymorph(_, _) => true,
+            TypeKind::Trait(_, _) => false,
         }
     }
 
@@ -98,7 +100,8 @@ impl TypeKind {
             | TypeKind::FunctionPointer(..)
             | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum()
-            | TypeKind::Polymorph(_, _) => None,
+            | TypeKind::Polymorph(_, _)
+            | TypeKind::Trait(_, _) => None,
         }
     }
 
@@ -189,6 +192,9 @@ impl Display for TypeKind {
                 for constaint in constaints {
                     write!(f, "{:?}", constaint)?;
                 }
+            }
+            TypeKind::Trait(name, _) => {
+                write!(f, "{}", name)?;
             }
         }
 

@@ -206,6 +206,9 @@ pub enum ResolveErrorKind {
     ConstraintsNotSatisfiedForType {
         name: String,
     },
+    TypeIsNotATrait {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -536,6 +539,11 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::ConstraintsNotSatisfiedForType { name } => {
                 write!(f, "Constraints not satisfied for type '{}'", name)?;
+            }
+            ResolveErrorKind::TypeIsNotATrait {
+                name
+            } => {
+                write!(f, "Type '{}' is not a trait", name)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

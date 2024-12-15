@@ -55,6 +55,7 @@ impl Type {
             TypeKind::Polymorph(_, constraints) => {
                 constraints.drain(..);
             }
+            TypeKind::Trait(_, _) => (),
         }
     }
 }

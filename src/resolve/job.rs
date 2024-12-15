@@ -1,5 +1,5 @@
 use crate::{
-    resolved::{self, EnumRef, StructureRef, TypeAliasRef},
+    resolved::{self, EnumRef, StructureRef, TraitRef, TypeAliasRef},
     workspace::fs::FsNodeId,
 };
 
@@ -12,6 +12,7 @@ pub enum FuncJob {
 pub struct TypeJob {
     pub physical_file_id: FsNodeId,
     pub type_aliases: Vec<TypeAliasRef>,
+    pub traits: Vec<TraitRef>,
     pub structures: Vec<StructureRef>,
     pub enums: Vec<EnumRef>,
 }

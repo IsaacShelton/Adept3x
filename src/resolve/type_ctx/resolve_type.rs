@@ -110,7 +110,7 @@ impl<'a> ResolveTypeCtx<'a> {
             }
             ast::TypeKind::Polymorph(polymorph, constraints) => Ok(resolved::TypeKind::Polymorph(
                 polymorph.clone(),
-                resolve_constraints(constraints)?,
+                resolve_constraints(self, constraints)?,
             )),
         }
         .map(|kind| kind.at(ast_type.source))

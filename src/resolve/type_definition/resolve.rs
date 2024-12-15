@@ -30,6 +30,10 @@ pub fn resolve_type_jobs(
             .get_owning_module(job.physical_file_id)
             .unwrap_or(job.physical_file_id);
 
+        for (_trait_ref, _user_trait) in job.traits.iter().zip(file.traits.iter()) {
+            resolve_trait()?;
+        }
+
         for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
             resolve_structure(
                 ctx,
@@ -76,12 +80,22 @@ fn resolve_structure(
     structure_ref: StructureRef,
 ) -> Result<(), ResolveError> {
     for (field_name, field) in structure.fields.iter() {
-        let mut constraints = HashMap::new();
+        let pre_constraints = CurrentConstraints::default();
+        let pre_type_ctx = ResolveTypeCtx::new(
+            &resolved_ast,
+            module_file_id,
+            physical_file_id,
+            &ctx.types_in_modules,
+            &pre_constraints,
+        );
 
+        let mut constraints = HashMap::new();
         for (name, parameter) in structure.parameters.iter() {
             constraints.insert(
                 name.into(),
-                HashSet::from_iter(resolve_constraints(&parameter.constraints)?.drain(..)),
+                HashSet::from_iter(
+                    resolve_constraints(&pre_type_ctx, &parameter.constraints)?.drain(..),
+                ),
             );
         }
 
@@ -163,5 +177,10 @@ fn resolve_type_alias(
 
     let resolved_type = type_ctx.resolve_or_undeclared(&definition.value)?;
     *resolved_ast.type_aliases.get_mut(type_alias_ref).unwrap() = resolved_type;
+    Ok(())
+}
+
+fn resolve_trait() -> Result<(), ResolveError> {
+    eprintln!("warning: trait methods are not resolved yet");
     Ok(())
 }

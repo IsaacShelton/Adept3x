@@ -118,6 +118,7 @@ impl PolyRecipe {
 
                 poly_type.resolved_type.clone()
             }
+            resolved::TypeKind::Trait(_, _) => ty.clone(),
         })
     }
 }
@@ -189,7 +190,8 @@ impl PolyCatalog {
             | resolved::TypeKind::Floating(_)
             | resolved::TypeKind::Void
             | resolved::TypeKind::Enum(_, _)
-            | resolved::TypeKind::TypeAlias(_, _) => {
+            | resolved::TypeKind::TypeAlias(_, _)
+            | resolved::TypeKind::Trait(_, _) => {
                 if *pattern_type == *concrete_type {
                     Ok(())
                 } else {

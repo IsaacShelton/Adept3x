@@ -9,7 +9,7 @@ pub struct CurrentConstraints {
 impl CurrentConstraints {
     pub fn satisfies(&self, ty: &Type, constraint: &Constraint) -> bool {
         match constraint {
-            Constraint::PrimitiveAdd => match &ty.kind {
+            Constraint::PrimitiveAdd | Constraint::Trait(..) => match &ty.kind {
                 TypeKind::Integer(..) | TypeKind::CInteger(..) | TypeKind::Floating(..) => true,
                 TypeKind::Polymorph(name, constraints) => {
                     constraints.contains(constraint)
