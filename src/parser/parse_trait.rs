@@ -4,10 +4,18 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Privacy, Trait},
+    ast::{Parameters, Privacy, Trait, Type},
     inflow::Inflow,
+    source_files::Source,
     token::{Token, TokenKind},
 };
+
+pub struct TraitMethod {
+    pub name: String,
+    pub parameters: Parameters,
+    pub return_type: Type,
+    pub source: Source,
+}
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_trait(&mut self, annotations: Vec<Annotation>) -> Result<Trait, ParseError> {
@@ -28,9 +36,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.ignore_newlines();
         self.parse_token(TokenKind::OpenCurly, Some("to begin trait body"))?;
+        self.ignore_newlines();
+
+        let mut methods = vec![];
 
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-            todo!("parse trait body");
+            methods.push(self.parse_trait_method()?);
+            self.ignore_newlines();
         }
 
         self.parse_token(TokenKind::CloseCurly, Some("to end trait body"))?;
@@ -39,6 +51,38 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             source,
             privacy,
+        })
+    }
+
+    fn parse_trait_method(&mut self) -> Result<TraitMethod, ParseError> {
+        let source = self.input.peek().source;
+
+        if !self.input.eat(TokenKind::FuncKeyword) {
+            return Err(ParseError::expected(
+                "'func' keyword",
+                Some("to begin trait method"),
+                self.input.peek(),
+            ));
+        }
+
+        let name = self.parse_identifier(Some("after 'func' keyword"))?;
+        self.ignore_newlines();
+
+        let parameters = if self.input.peek_is(TokenKind::OpenParen) {
+            self.parse_function_parameters()?
+        } else {
+            Parameters::default()
+        };
+
+        self.ignore_newlines();
+
+        let return_type = self.parse_type(Some("return "), Some("for trait method"))?;
+
+        Ok(TraitMethod {
+            name,
+            parameters,
+            return_type,
+            source,
         })
     }
 }

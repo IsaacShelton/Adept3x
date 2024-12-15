@@ -25,17 +25,14 @@ pub fn create_function_heads(
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &function.name);
-
-            let fake_constraints = CurrentConstraints {
-                constraints: Default::default(),
-            };
+            let pre_parameters_constraints = CurrentConstraints::default();
 
             let type_ctx = ResolveTypeCtx::new(
                 &resolved_ast,
                 module_file_id,
                 *physical_file_id,
                 &ctx.types_in_modules,
-                &fake_constraints,
+                &pre_parameters_constraints,
             );
 
             let is_generic = function.return_type.contains_polymorph().is_some()
