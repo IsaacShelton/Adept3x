@@ -4,18 +4,10 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Parameters, Privacy, Trait, Type},
+    ast::{Parameters, Privacy, Trait, TraitMethod},
     inflow::Inflow,
-    source_files::Source,
     token::{Token, TokenKind},
 };
-
-pub struct TraitMethod {
-    pub name: String,
-    pub parameters: Parameters,
-    pub return_type: Type,
-    pub source: Source,
-}
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_trait(&mut self, annotations: Vec<Annotation>) -> Result<Trait, ParseError> {
@@ -51,6 +43,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             source,
             privacy,
+            methods,
         })
     }
 
