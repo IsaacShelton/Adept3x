@@ -1,0 +1,25 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+struct PrimitiveAdditionPair<$T: PrimitiveAdd> (a $T, b $T)
+
+struct Another<$T: PrimitiveAdd> (a PrimitiveAdditionPair<$T>)
+
+func main {
+    pair := PrimitiveAdditionPair<int> { a: 8, b: 13 }
+
+    printf(c"Hello, world! From generic structs with constraints!\n")
+    printf(c"The result is: %d\n", pair.compute())
+
+    // The following is invalid, because `ptr<char>` does not satisfy `PrimitiveAdd`
+    /* invalid_pair := PrimitiveAdditionPair<ptr<char>> { a: c"arst", b: c"oien" } */
+    /* printf(c"The result is: %p\n", invalid_pair.compute()) */
+}
+
+func compute(pair PrimitiveAdditionPair<$T: PrimitiveAdd>) $T {
+    return pair.a + pair.b
+}
+

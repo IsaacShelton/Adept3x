@@ -38,6 +38,7 @@ compile function_parameters
 compile function_simple
 compile generics
 compile generics_struct_simple
+compile generics_struct_with_constraints
 compile global_variables
 compile hello_world
 compile if
