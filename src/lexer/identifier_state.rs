@@ -44,6 +44,8 @@ impl IdentifierState {
             "pragma" => TokenKind::PragmaKeyword,
             "pub" => TokenKind::PubKeyword,
             "trait" => TokenKind::TraitKeyword,
+            "impl" => TokenKind::ImplKeyword,
+            "for" => TokenKind::ForKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)

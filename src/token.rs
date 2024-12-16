@@ -83,6 +83,8 @@ pub enum TokenKind {
     PragmaKeyword,
     PubKeyword,
     TraitKeyword,
+    ImplKeyword,
+    ForKeyword,
     Member,
     Add,
     Subtract,
@@ -174,6 +176,8 @@ impl Display for TokenKind {
             TokenKind::PragmaKeyword => f.write_str("'pragma' keyword"),
             TokenKind::PubKeyword => f.write_str("'pub' keyword"),
             TokenKind::TraitKeyword => f.write_str("'trait' keyword"),
+            TokenKind::ImplKeyword => f.write_str("'impl' keyword"),
+            TokenKind::ForKeyword => f.write_str("'for' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -303,6 +307,8 @@ impl TokenKind {
             | TokenKind::PragmaKeyword
             | TokenKind::PubKeyword
             | TokenKind::TraitKeyword
+            | TokenKind::ImplKeyword
+            | TokenKind::ForKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon
