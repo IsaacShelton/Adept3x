@@ -1,6 +1,6 @@
 use super::{
-    enumeration::Enum, global_variable::GlobalVar, structure::Structure, type_alias::TypeAlias,
-    Function, HelperExpr, SettingsId, Trait,
+    enumeration::Enum, global_variable::GlobalVar, implementation::Impl, structure::Structure,
+    type_alias::TypeAlias, Function, HelperExpr, SettingsId, Trait,
 };
 
 #[derive(Clone, Debug)]
@@ -12,6 +12,7 @@ pub struct AstFile {
     pub enums: Vec<Enum>,
     pub helper_exprs: Vec<HelperExpr>,
     pub traits: Vec<Trait>,
+    pub impls: Vec<Impl>,
     pub settings: Option<SettingsId>,
 }
 
@@ -24,8 +25,9 @@ impl AstFile {
             global_variables: vec![],
             enums: vec![],
             helper_exprs: vec![],
-            settings: None,
             traits: vec![],
+            impls: vec![],
+            settings: None,
         }
     }
 }

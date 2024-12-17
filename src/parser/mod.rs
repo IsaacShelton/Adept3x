@@ -10,6 +10,7 @@ mod parse_function;
 mod parse_function_parameters;
 mod parse_global_variable;
 mod parse_helper_expr;
+mod parse_impl;
 mod parse_stmt;
 mod parse_structure;
 mod parse_top_level;

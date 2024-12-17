@@ -7,6 +7,7 @@ mod file;
 mod function;
 mod global_variable;
 mod helper_expr;
+mod implementation;
 mod module;
 mod stmt;
 mod structure;
@@ -23,6 +24,7 @@ pub use file::*;
 pub use function::*;
 pub use global_variable::*;
 pub use helper_expr::*;
+pub use implementation::*;
 #[allow(unused_imports)]
 pub use module::*;
 pub use stmt::*;
