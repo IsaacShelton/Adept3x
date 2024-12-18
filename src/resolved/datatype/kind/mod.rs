@@ -190,7 +190,7 @@ impl Display for TypeKind {
                 }
 
                 for constaint in constaints {
-                    write!(f, "{:?}", constaint)?;
+                    write!(f, "{}", constaint)?;
                 }
             }
             TypeKind::Trait(name, _) => {

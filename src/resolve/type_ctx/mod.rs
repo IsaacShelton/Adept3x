@@ -9,7 +9,7 @@ use super::{
 use crate::{
     ast,
     name::ResolvedName,
-    resolved::{self, Constraint, CurrentConstraints},
+    resolved::{self, Constraint, CurrentConstraints, HumanName},
     workspace::fs::FsNodeId,
 };
 use std::collections::{HashMap, HashSet};
@@ -91,7 +91,7 @@ pub fn resolve_constraint(
                     .at(resolved_type.source));
                 };
 
-                return Ok(Constraint::Trait(*trait_ref));
+                return Ok(Constraint::Trait(HumanName(name.to_string()), *trait_ref));
             }
         }
     }
