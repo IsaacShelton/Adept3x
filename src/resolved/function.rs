@@ -9,7 +9,7 @@ pub struct CurrentConstraints {
 impl CurrentConstraints {
     pub fn satisfies(&self, ty: &Type, constraint: &Constraint) -> bool {
         match constraint {
-            Constraint::PrimitiveAdd | Constraint::Trait(..) => match &ty.kind {
+            Constraint::PrimitiveAdd => match &ty.kind {
                 TypeKind::Integer(..) | TypeKind::CInteger(..) | TypeKind::Floating(..) => true,
                 TypeKind::Polymorph(name, constraints) => {
                     constraints.contains(constraint)
@@ -19,6 +19,18 @@ impl CurrentConstraints {
                             .map_or(false, |in_scope| in_scope.contains(constraint))
                 }
                 _ => false,
+            },
+            Constraint::Trait(name, _trait_ref) => match &ty.kind {
+                TypeKind::Polymorph(name, constraints) => {
+                    constraints.contains(constraint)
+                        || self
+                            .constraints
+                            .get(name)
+                            .map_or(false, |in_scope| in_scope.contains(constraint))
+                }
+                _ => {
+                    todo!("test if user-defined trait '{}' is satisfied", name)
+                }
             },
         }
     }
