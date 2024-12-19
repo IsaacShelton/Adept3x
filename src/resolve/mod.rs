@@ -22,7 +22,7 @@ use self::error::ResolveError;
 use crate::{
     ast::AstWorkspace,
     cli::BuildOptions,
-    resolved::{self},
+    resolved::{self, Implementations},
 };
 use ctx::ResolveCtx;
 use function_body::resolve_function_bodies;
@@ -37,9 +37,10 @@ use type_definition::resolve_type_definitions;
 
 pub fn resolve<'a>(
     ast_workspace: &'a AstWorkspace,
+    implementations: &'a Implementations,
     options: &BuildOptions,
 ) -> Result<resolved::Ast<'a>, ResolveError> {
-    let mut ctx = ResolveCtx::new();
+    let mut ctx = ResolveCtx::new(implementations);
     let source_files = ast_workspace.source_files;
     let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
 

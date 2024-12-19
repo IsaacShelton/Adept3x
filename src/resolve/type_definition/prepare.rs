@@ -91,7 +91,7 @@ fn prepare_structure(
     let mut parameters = TypeParameters::default();
 
     for (name, parameter) in structure.parameters.iter() {
-        let zero_current_constraints = CurrentConstraints::default();
+        let zero_current_constraints = CurrentConstraints::new_empty(ctx.implementations);
         let constraints = resolve_constraints(
             &ResolveTypeCtx::new(
                 resolved_ast,

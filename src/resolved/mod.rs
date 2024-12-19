@@ -48,7 +48,7 @@ new_key_type! {
 pub struct Ast<'a> {
     pub source_files: &'a SourceFiles,
     pub entry_point: Option<FunctionRef>,
-    pub functions: SlotMap<FunctionRef, Function>,
+    pub functions: SlotMap<FunctionRef, Function<'a>>,
     pub structures: SlotMap<StructureRef, Structure>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: SlotMap<EnumRef, Enum>,

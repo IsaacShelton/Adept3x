@@ -12,9 +12,9 @@ use crate::{
 };
 use std::collections::{HashMap, HashSet};
 
-pub fn create_function_heads(
-    ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+pub fn create_function_heads<'a>(
+    ctx: &mut ResolveCtx<'a>,
+    resolved_ast: &mut resolved::Ast<'a>,
     ast_workspace: &AstWorkspace,
     options: &BuildOptions,
 ) -> Result<(), ResolveError> {
@@ -25,7 +25,7 @@ pub fn create_function_heads(
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &function.name);
-            let pre_parameters_constraints = CurrentConstraints::default();
+            let pre_parameters_constraints = CurrentConstraints::new_empty(ctx.implementations);
 
             let type_ctx = ResolveTypeCtx::new(
                 &resolved_ast,
@@ -75,7 +75,10 @@ pub fn create_function_heads(
                     }
                 }),
                 is_generic,
-                constraints: CurrentConstraints { constraints },
+                constraints: CurrentConstraints {
+                    constraints,
+                    implementations: ctx.implementations,
+                },
             });
 
             if function.privacy.is_public() {

@@ -1,12 +1,33 @@
 use crate::{name::ResolvedName, resolved::*, source_files::Source, tag::Tag};
 use std::{collections::HashSet, fmt::Display};
 
-#[derive(Clone, Debug, Default)]
-pub struct CurrentConstraints {
+#[derive(Clone, Debug)]
+pub struct CurrentConstraints<'a> {
     pub constraints: HashMap<String, HashSet<Constraint>>,
+    pub implementations: &'a Implementations,
 }
 
-impl CurrentConstraints {
+#[derive(Clone, Debug, Default)]
+pub struct Implementations {
+    targeting_trait: HashMap<TraitRef, ()>,
+}
+
+impl Implementations {
+    pub fn new() -> Self {
+        Self {
+            targeting_trait: Default::default(),
+        }
+    }
+}
+
+impl<'a> CurrentConstraints<'a> {
+    pub fn new_empty(implementations: &'a Implementations) -> Self {
+        Self {
+            constraints: Default::default(),
+            implementations,
+        }
+    }
+
     pub fn satisfies(&self, ty: &Type, constraint: &Constraint) -> bool {
         match constraint {
             Constraint::PrimitiveAdd => match &ty.kind {
@@ -37,7 +58,7 @@ impl CurrentConstraints {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function {
+pub struct Function<'a> {
     pub name: ResolvedName,
     pub parameters: Parameters,
     pub return_type: Type,
@@ -48,7 +69,7 @@ pub struct Function {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
-    pub constraints: CurrentConstraints,
+    pub constraints: CurrentConstraints<'a>,
 }
 
 #[derive(Clone, Debug, Default)]

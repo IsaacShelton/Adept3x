@@ -59,7 +59,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
-    pub current_constraints: CurrentConstraints,
+    pub current_constraints: CurrentConstraints<'b>,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {

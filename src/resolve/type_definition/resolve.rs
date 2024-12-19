@@ -80,7 +80,7 @@ fn resolve_structure(
     structure_ref: StructureRef,
 ) -> Result<(), ResolveError> {
     for (field_name, field) in structure.fields.iter() {
-        let pre_constraints = CurrentConstraints::default();
+        let pre_constraints = CurrentConstraints::new_empty(ctx.implementations);
         let pre_type_ctx = ResolveTypeCtx::new(
             &resolved_ast,
             module_file_id,
@@ -99,7 +99,10 @@ fn resolve_structure(
             );
         }
 
-        let constraints = CurrentConstraints { constraints };
+        let constraints = CurrentConstraints {
+            constraints,
+            implementations: ctx.implementations,
+        };
 
         let type_ctx = ResolveTypeCtx::new(
             &resolved_ast,
@@ -137,7 +140,7 @@ fn resolve_enum(
     definition: &ast::Enum,
     enum_ref: EnumRef,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::default();
+    let constraints = CurrentConstraints::new_empty(ctx.implementations);
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,
         module_file_id,
@@ -165,7 +168,7 @@ fn resolve_type_alias(
     definition: &ast::TypeAlias,
     type_alias_ref: TypeAliasRef,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::default();
+    let constraints = CurrentConstraints::new_empty(ctx.implementations);
 
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,

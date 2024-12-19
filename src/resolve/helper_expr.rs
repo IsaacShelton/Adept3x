@@ -45,6 +45,7 @@ pub fn resolve_helper_expressions(
                     physical_fs_node_id: *physical_file_id,
                     current_constraints: CurrentConstraints {
                         constraints: Default::default(),
+                        implementations: ctx.implementations,
                     },
                 };
 
