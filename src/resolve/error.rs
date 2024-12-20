@@ -209,6 +209,9 @@ pub enum ResolveErrorKind {
     TypeIsNotATrait {
         name: String,
     },
+    DuplicateTypeName {
+        name: String,
+    },
     Other {
         message: String,
     },
@@ -544,6 +547,9 @@ impl Display for ResolveErrorKind {
                 name
             } => {
                 write!(f, "Type '{}' is not a trait", name)?;
+            }
+            ResolveErrorKind::DuplicateTypeName { name } => {
+                write!(f, "Duplicate type name '{}'", name)?;
             }
             ResolveErrorKind::Other { message } => {
                 write!(f, "{}", message)?;

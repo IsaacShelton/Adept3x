@@ -42,7 +42,7 @@ pub fn prepare_type_jobs(
                 resolved_ast,
                 module_fs_node_id,
                 user_trait,
-            ));
+            )?);
         }
 
         for structure in file.structures.iter() {
@@ -61,7 +61,7 @@ pub fn prepare_type_jobs(
                 resolved_ast,
                 module_fs_node_id,
                 definition,
-            ));
+            )?);
         }
 
         for definition in file.type_aliases.iter() {
@@ -133,7 +133,8 @@ fn prepare_structure(
         polymorphs,
     );
 
-    ctx.types_in_modules
+    if ctx
+        .types_in_modules
         .entry(module_fs_node_id)
         .or_default()
         .insert(
@@ -143,7 +144,14 @@ fn prepare_structure(
                 source,
                 privacy: structure.privacy,
             },
-        );
+        )
+        .is_some()
+    {
+        return Err(ResolveErrorKind::DuplicateTypeName {
+            name: structure.name.to_string(),
+        }
+        .at(structure.source));
+    };
 
     Ok(structure_ref)
 }
@@ -153,7 +161,7 @@ fn prepare_enum(
     resolved_ast: &mut resolved::Ast,
     module_fs_node_id: FsNodeId,
     definition: &ast::Enum,
-) -> EnumRef {
+) -> Result<EnumRef, ResolveError> {
     let enum_ref = resolved_ast.enums.insert(resolved::Enum {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
         resolved_type: resolved::TypeKind::Unresolved.at(definition.source),
@@ -165,7 +173,8 @@ fn prepare_enum(
     let source = definition.source;
     let privacy = definition.privacy;
 
-    ctx.types_in_modules
+    if ctx
+        .types_in_modules
         .entry(module_fs_node_id)
         .or_default()
         .insert(
@@ -175,9 +184,16 @@ fn prepare_enum(
                 source,
                 privacy,
             },
-        );
+        )
+        .is_some()
+    {
+        return Err(ResolveErrorKind::DuplicateTypeName {
+            name: definition.name.to_string(),
+        }
+        .at(definition.source));
+    };
 
-    enum_ref
+    Ok(enum_ref)
 }
 
 fn prepare_trait(
@@ -185,7 +201,7 @@ fn prepare_trait(
     resolved_ast: &mut resolved::Ast,
     module_fs_node_id: FsNodeId,
     definition: &ast::Trait,
-) -> TraitRef {
+) -> Result<TraitRef, ResolveError> {
     let trait_ref = resolved_ast.traits.insert(resolved::Trait {
         methods: vec![],
         source: definition.source,
@@ -195,7 +211,8 @@ fn prepare_trait(
     let source = definition.source;
     let privacy = definition.privacy;
 
-    ctx.types_in_modules
+    if ctx
+        .types_in_modules
         .entry(module_fs_node_id)
         .or_default()
         .insert(
@@ -205,9 +222,16 @@ fn prepare_trait(
                 source,
                 privacy,
             },
-        );
+        )
+        .is_some()
+    {
+        return Err(ResolveErrorKind::DuplicateTypeName {
+            name: definition.name.to_string(),
+        }
+        .at(definition.source));
+    };
 
-    trait_ref
+    Ok(trait_ref)
 }
 
 fn prepare_type_alias(
@@ -228,7 +252,8 @@ fn prepare_type_alias(
         .at(source));
     }
 
-    ctx.types_in_modules
+    if ctx
+        .types_in_modules
         .entry(module_fs_node_id)
         .or_default()
         .insert(
@@ -241,7 +266,14 @@ fn prepare_type_alias(
                 source,
                 privacy: definition.privacy,
             },
-        );
+        )
+        .is_some()
+    {
+        return Err(ResolveErrorKind::DuplicateTypeName {
+            name: definition.name.to_string(),
+        }
+        .at(definition.source));
+    };
 
     Ok(type_alias_ref)
 }
