@@ -1,0 +1,8 @@
+
+pragma => adept("3.0")
+
+struct Type1 ()
+enum Type1 ()
+
+func main {
+}

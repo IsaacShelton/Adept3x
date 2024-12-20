@@ -78,6 +78,7 @@ compile zeroed
 
 echo "[!] RUNNING CASES WITH EXPECTED FAILURE"
 
+expect_fail_compile _should_fail/duplicate_type_names
 expect_fail_compile _should_fail/generics_trait_unsatisfied
 expect_fail_compile _should_fail/mismatching_yielded_types
 expect_fail_compile_module _should_fail/pragma_adept_first

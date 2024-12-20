@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, AstWorkspace},
+    ast::{self, AstWorkspace, Privacy},
     name::{Name, ResolvedName},
     resolve::{
         ctx::ResolveCtx,
@@ -11,6 +11,7 @@ use crate::{
         self, CurrentConstraints, EnumRef, HumanName, StructureRef, TraitRef, TypeAliasRef,
         TypeDecl, TypeParameters,
     },
+    source_files::Source,
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
@@ -86,8 +87,6 @@ fn prepare_structure(
     physical_fs_node_id: FsNodeId,
     structure: &ast::Structure,
 ) -> Result<StructureRef, ResolveError> {
-    let source = structure.source;
-
     let mut parameters = TypeParameters::default();
 
     for (name, parameter) in structure.parameters.iter() {
@@ -127,31 +126,18 @@ fn prepare_structure(
         .map(|name| resolved::TypeKind::Polymorph(name.into(), vec![]).at(structure.source))
         .collect_vec();
 
-    let struct_type_kind = resolved::TypeKind::Structure(
-        HumanName(structure.name.to_string()),
-        structure_ref,
-        polymorphs,
-    );
-
-    if ctx
-        .types_in_modules
-        .entry(module_fs_node_id)
-        .or_default()
-        .insert(
-            structure.name.to_string(),
-            TypeDecl {
-                kind: struct_type_kind,
-                source,
-                privacy: structure.privacy,
-            },
-        )
-        .is_some()
-    {
-        return Err(ResolveErrorKind::DuplicateTypeName {
-            name: structure.name.to_string(),
-        }
-        .at(structure.source));
-    };
+    declare_type(
+        ctx,
+        module_fs_node_id,
+        &structure.name,
+        structure.source,
+        structure.privacy,
+        resolved::TypeKind::Structure(
+            HumanName(structure.name.to_string()),
+            structure_ref,
+            polymorphs,
+        ),
+    )?;
 
     Ok(structure_ref)
 }
@@ -169,29 +155,14 @@ fn prepare_enum(
         members: definition.members.clone(),
     });
 
-    let kind = resolved::TypeKind::Enum(HumanName(definition.name.to_string()), enum_ref);
-    let source = definition.source;
-    let privacy = definition.privacy;
-
-    if ctx
-        .types_in_modules
-        .entry(module_fs_node_id)
-        .or_default()
-        .insert(
-            definition.name.to_string(),
-            TypeDecl {
-                kind,
-                source,
-                privacy,
-            },
-        )
-        .is_some()
-    {
-        return Err(ResolveErrorKind::DuplicateTypeName {
-            name: definition.name.to_string(),
-        }
-        .at(definition.source));
-    };
+    declare_type(
+        ctx,
+        module_fs_node_id,
+        &definition.name,
+        definition.source,
+        definition.privacy,
+        resolved::TypeKind::Enum(HumanName(definition.name.to_string()), enum_ref),
+    )?;
 
     Ok(enum_ref)
 }
@@ -207,29 +178,14 @@ fn prepare_trait(
         source: definition.source,
     });
 
-    let kind = resolved::TypeKind::Trait(HumanName(definition.name.to_string()), trait_ref);
-    let source = definition.source;
-    let privacy = definition.privacy;
-
-    if ctx
-        .types_in_modules
-        .entry(module_fs_node_id)
-        .or_default()
-        .insert(
-            definition.name.to_string(),
-            TypeDecl {
-                kind,
-                source,
-                privacy,
-            },
-        )
-        .is_some()
-    {
-        return Err(ResolveErrorKind::DuplicateTypeName {
-            name: definition.name.to_string(),
-        }
-        .at(definition.source));
-    };
+    declare_type(
+        ctx,
+        module_fs_node_id,
+        &definition.name,
+        definition.source,
+        definition.privacy,
+        resolved::TypeKind::Trait(HumanName(definition.name.to_string()), trait_ref),
+    )?;
 
     Ok(trait_ref)
 }
@@ -240,7 +196,6 @@ fn prepare_type_alias(
     module_fs_node_id: FsNodeId,
     definition: &ast::TypeAlias,
 ) -> Result<TypeAliasRef, ResolveError> {
-    let source = definition.source;
     let type_alias_ref = resolved_ast
         .type_aliases
         .insert(resolved::TypeKind::Unresolved.at(definition.value.source));
@@ -252,28 +207,45 @@ fn prepare_type_alias(
         .at(source));
     }
 
+    declare_type(
+        ctx,
+        module_fs_node_id,
+        &definition.name,
+        definition.source,
+        definition.privacy,
+        resolved::TypeKind::TypeAlias(HumanName(definition.name.to_string()), type_alias_ref),
+    )?;
+
+    Ok(type_alias_ref)
+}
+
+fn declare_type(
+    ctx: &mut ResolveCtx,
+    module_fs_node_id: FsNodeId,
+    name: &str,
+    source: Source,
+    privacy: Privacy,
+    kind: resolved::TypeKind,
+) -> Result<(), ResolveError> {
     if ctx
         .types_in_modules
         .entry(module_fs_node_id)
         .or_default()
         .insert(
-            definition.name.to_string(),
+            name.to_string(),
             TypeDecl {
-                kind: resolved::TypeKind::TypeAlias(
-                    HumanName(definition.name.to_string()),
-                    type_alias_ref,
-                ),
+                kind,
                 source,
-                privacy: definition.privacy,
+                privacy,
             },
         )
         .is_some()
     {
         return Err(ResolveErrorKind::DuplicateTypeName {
-            name: definition.name.to_string(),
+            name: name.to_string(),
         }
-        .at(definition.source));
+        .at(source));
     };
 
-    Ok(type_alias_ref)
+    Ok(())
 }
