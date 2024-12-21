@@ -46,6 +46,7 @@ impl IdentifierState {
             "trait" => TokenKind::TraitKeyword,
             "impl" => TokenKind::ImplKeyword,
             "for" => TokenKind::ForKeyword,
+            "is" => TokenKind::IsKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)
