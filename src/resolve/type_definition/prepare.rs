@@ -201,10 +201,7 @@ fn prepare_type_alias(
         .insert(resolved::TypeKind::Unresolved.at(definition.value.source));
 
     if let Some(source) = definition.value.contains_polymorph() {
-        return Err(ResolveErrorKind::Other {
-            message: "Type aliases cannot contain polymorphs".into(),
-        }
-        .at(source));
+        return Err(ResolveErrorKind::TypeAliasesCannotContainPolymorphs.at(source));
     }
 
     declare_type(

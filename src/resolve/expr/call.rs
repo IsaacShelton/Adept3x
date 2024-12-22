@@ -189,10 +189,7 @@ pub fn resolve_call_expr(
                     .or_else(|_| u64::try_from(value).map(|x| x as f64))
                     .or_else(|_| value.to_string().parse::<f64>())
                 else {
-                    return Err(ResolveErrorKind::Other {
-                        message: format!("Cannot create out-of-range floating-point number"),
-                    }
-                    .at(source));
+                    return Err(ResolveErrorKind::CannotCreateOutOfRangeFloat.at(source));
                 };
 
                 return Ok(TypedExpr {
@@ -283,10 +280,7 @@ pub fn resolve_call_expr(
                     *argument = arg;
                 }
                 Err(_) => {
-                    return Err(ResolveErrorKind::Other {
-                        message: "Failed to conform argument to default value".into(),
-                    }
-                    .at(source));
+                    return Err(ResolveErrorKind::FailedToConformArgumentToDefaultValue.at(source));
                 }
             }
             continue;
