@@ -79,6 +79,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let impl_decl = self.parse_impl(annotations)?;
                 ast_file.impls.push(impl_decl);
             }
+            TokenKind::GivenKeyword => {
+                ast_file.givens.push(self.parse_given(annotations)?);
+            }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
                 if !annotations.is_empty() {

@@ -8,6 +8,7 @@ mod parse_enum;
 mod parse_expr;
 mod parse_function;
 mod parse_function_parameters;
+mod parse_given;
 mod parse_global_variable;
 mod parse_helper_expr;
 mod parse_impl;
@@ -17,6 +18,7 @@ mod parse_top_level;
 mod parse_trait;
 mod parse_type;
 mod parse_type_alias;
+mod parse_type_parameters;
 mod parse_util;
 
 use self::error::ParseError;
