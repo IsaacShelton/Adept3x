@@ -1,4 +1,4 @@
-use crate::source_files::Source;
+use crate::{ast, source_files::Source};
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -21,6 +21,13 @@ pub enum AnnotationKind {
     AbideAbi,
     Public,
     Template,
+    Using(Using),
+}
+
+#[derive(Clone, Debug)]
+pub struct Using {
+    pub name: Option<String>,
+    pub ty: ast::Type,
 }
 
 impl AnnotationKind {
@@ -38,6 +45,7 @@ impl Display for AnnotationKind {
             Self::AbideAbi => "abide_abi",
             Self::Public => "public",
             Self::Template => "template",
+            Self::Using(_) => "using",
         })
     }
 }

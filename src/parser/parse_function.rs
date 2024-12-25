@@ -18,12 +18,16 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let mut is_foreign = false;
         let mut abide_abi = false;
         let mut privacy = Privacy::Private;
+        let mut contextual_parameters = vec![];
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Using(using) => {
+                    contextual_parameters.push(using);
+                }
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
         }

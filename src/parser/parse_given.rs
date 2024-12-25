@@ -22,6 +22,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
         }
 
+        let name = self.parse_optional_name();
         let target = self.parse_type(None::<&str>, Some("trait"))?;
 
         let mut body = vec![];
@@ -55,6 +56,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
 
         Ok(Given {
+            name,
             target,
             source,
             body,
