@@ -16,22 +16,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         for annotation in annotations {
             match annotation.kind {
-                _ => return Err(self.unexpected_annotation(&annotation, Some("for impl"))),
+                _ => {
+                    return Err(self.unexpected_annotation(&annotation, Some("for implementation")))
+                }
             }
         }
 
-        let target_trait = self.parse_type(None::<&str>, Some("trait"))?;
-
-        if !self.input.eat(TokenKind::ForKeyword) {
-            return Err(ParseErrorKind::Expected {
-                expected: TokenKind::ForKeyword.to_string(),
-                for_reason: Some("after trait to implement".into()),
-                got: self.input.peek().to_string(),
-            }
-            .at(self.input.peek().source));
-        }
-
-        let for_type = self.parse_type(None::<&str>, Some("impl target"))?;
+        let name = self.parse_optional_name();
+        let target = self.parse_type(None::<&str>, Some("trait"))?;
 
         let mut body = vec![];
 
@@ -64,8 +56,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
 
         Ok(Impl {
-            for_type,
-            target_trait,
+            name,
+            target,
             source,
             body,
         })

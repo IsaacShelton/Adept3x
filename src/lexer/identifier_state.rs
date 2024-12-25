@@ -47,7 +47,6 @@ impl IdentifierState {
             "impl" => TokenKind::ImplKeyword,
             "for" => TokenKind::ForKeyword,
             "is" => TokenKind::IsKeyword,
-            "given" => TokenKind::GivenKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)

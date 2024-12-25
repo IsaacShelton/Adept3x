@@ -15,6 +15,16 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         // func functionName {
         //   ^
 
+        if !self.input.peek().is_func_keyword() {
+            return Err(ParseError::expected(
+                "function",
+                None::<&str>,
+                self.input.peek(),
+            ));
+        }
+
+        let source = self.input.advance().source;
+
         let mut is_foreign = false;
         let mut abide_abi = false;
         let mut privacy = Privacy::Private;
@@ -25,8 +35,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
-                AnnotationKind::Using(using) => {
-                    contextual_parameters.push(using);
+                AnnotationKind::Given(given) => {
+                    contextual_parameters.push(given);
                 }
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
@@ -36,8 +46,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         if is_foreign {
             abide_abi = true;
         }
-
-        let source = self.input.advance().source;
 
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();

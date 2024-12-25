@@ -78,6 +78,13 @@ where
             .then(|| self.advance().kind.unwrap_identifier())
     }
 
+    pub fn eat_polymorph(&mut self) -> Option<String> {
+        self.peek()
+            .kind
+            .is_polymorph()
+            .then(|| self.advance().kind.unwrap_polymorph())
+    }
+
     pub fn ignore_newlines(&mut self) {
         while self.eat(TokenKind::Newline) {}
     }

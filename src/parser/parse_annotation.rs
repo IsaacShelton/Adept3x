@@ -1,5 +1,5 @@
 use super::{
-    annotation::{Annotation, AnnotationKind, Using},
+    annotation::{Annotation, AnnotationKind, Given},
     error::{ParseError, ParseErrorKind},
     Parser,
 };
@@ -28,10 +28,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 "abide_abi" => AnnotationKind::AbideAbi,
                 "public" => AnnotationKind::Public,
                 "template" => AnnotationKind::Template,
-                "using" => AnnotationKind::Using(Using {
-                    name: self.parse_optional_name(),
-                    ty: self.parse_type(None::<&str>, Some("for context"))?,
-                }),
+                "given" => AnnotationKind::Given(self.parse_given()?),
                 _ => {
                     return Err(ParseErrorKind::UnrecognizedAnnotation {
                         name: annotation_name,
@@ -50,6 +47,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
         Ok(annotations)
+    }
+
+    fn parse_given(&mut self) -> Result<Given, ParseError> {
+        let name = self.input.eat_polymorph();
+
+        Ok(Given {
+            name,
+            ty: self.parse_type(None::<&str>, Some("for context"))?,
+        })
     }
 
     pub fn parse_optional_name(&mut self) -> Option<String> {

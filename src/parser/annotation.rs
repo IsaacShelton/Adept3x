@@ -21,11 +21,11 @@ pub enum AnnotationKind {
     AbideAbi,
     Public,
     Template,
-    Using(Using),
+    Given(Given),
 }
 
 #[derive(Clone, Debug)]
-pub struct Using {
+pub struct Given {
     pub name: Option<String>,
     pub ty: ast::Type,
 }
@@ -45,7 +45,7 @@ impl Display for AnnotationKind {
             Self::AbideAbi => "abide_abi",
             Self::Public => "public",
             Self::Template => "template",
-            Self::Using(_) => "using",
+            Self::Given(_) => "given",
         })
     }
 }
