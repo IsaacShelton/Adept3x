@@ -70,6 +70,10 @@ impl<'a> AstWorkspace<'a> {
         None
     }
 
+    pub fn get_owning_module_or_self(&self, fs_node_id: FsNodeId) -> FsNodeId {
+        self.get_owning_module(fs_node_id).unwrap_or(fs_node_id)
+    }
+
     pub fn get_mut(&mut self, id: FsNodeId) -> Option<&mut AstFile> {
         self.files.get_mut(&id)
     }

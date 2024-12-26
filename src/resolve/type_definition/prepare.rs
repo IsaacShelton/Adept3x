@@ -25,9 +25,7 @@ pub fn prepare_type_jobs(
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_fs_node_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
+        let module_fs_node_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
         let mut job = TypeJob {
             physical_file_id: *physical_file_id,

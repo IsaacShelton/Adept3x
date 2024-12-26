@@ -16,9 +16,7 @@ pub fn resolve_function_bodies(
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
             FuncJob::Regular(physical_file_id, ast_function_index, resolved_function_ref) => {
-                let module_file_id = ast_workspace
-                    .get_owning_module(physical_file_id)
-                    .unwrap_or(physical_file_id);
+                let module_file_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
                 let function_haystack = ctx
                     .function_haystacks

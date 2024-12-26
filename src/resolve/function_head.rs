@@ -21,9 +21,7 @@ pub fn create_function_heads<'a>(
     options: &BuildOptions,
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_file_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
+        let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));

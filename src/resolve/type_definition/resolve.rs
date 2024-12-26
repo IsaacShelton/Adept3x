@@ -29,9 +29,7 @@ pub fn resolve_type_jobs(
             .get(&job.physical_file_id)
             .expect("valid ast file");
 
-        let module_file_id = ast_workspace
-            .get_owning_module(job.physical_file_id)
-            .unwrap_or(job.physical_file_id);
+        let module_file_id = ast_workspace.get_owning_module_or_self(job.physical_file_id);
 
         for (trait_ref, user_trait) in job.traits.iter().zip(file.traits.iter()) {
             resolve_trait(

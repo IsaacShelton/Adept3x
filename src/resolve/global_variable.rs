@@ -13,9 +13,7 @@ pub fn resolve_global_variables(
     let constraints = CurrentConstraints::new_empty(ctx.implementations);
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_file_id = ast_workspace
-            .get_owning_module(*physical_file_id)
-            .unwrap_or(*physical_file_id);
+        let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
         for global in file.global_variables.iter() {
             let type_ctx = ResolveTypeCtx::new(
