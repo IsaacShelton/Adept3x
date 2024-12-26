@@ -22,3 +22,14 @@ pub struct FunctionHead {
     pub tag: Option<Tag>,
     pub privacy: Privacy,
 }
+
+impl FunctionHead {
+    pub fn is_generic(&self) -> bool {
+        self.return_type.contains_polymorph().is_some()
+            || self
+                .parameters
+                .required
+                .iter()
+                .any(|param| param.ast_type.contains_polymorph().is_some())
+    }
+}

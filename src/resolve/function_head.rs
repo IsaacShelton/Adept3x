@@ -97,28 +97,13 @@ pub fn create_function_head<'a>(
         &pre_parameters_constraints,
     );
 
-    let is_generic = head.return_type.contains_polymorph().is_some()
-        || head
-            .parameters
-            .required
-            .iter()
-            .any(|param| param.ast_type.contains_polymorph().is_some());
-
+    let is_generic = head.is_generic();
     let parameters = resolve_parameters(&type_ctx, &head.parameters)?;
     let return_type = type_ctx.resolve(&head.return_type)?;
 
-    let constraints = if is_generic {
-        let mut map = HashMap::default();
-
-        for param in parameters.required.iter() {
-            collect_constraints(&mut map, &param.resolved_type);
-        }
-
-        collect_constraints(&mut map, &return_type);
-        map
-    } else {
-        HashMap::default()
-    };
+    let constraints = is_generic
+        .then(|| collect_constraints(&parameters, &return_type))
+        .unwrap_or_default();
 
     Ok(resolved_ast.functions.insert(resolved::Function {
         name,
@@ -130,11 +115,7 @@ pub fn create_function_head<'a>(
         source: head.source,
         abide_abi: head.abide_abi,
         tag: head.tag.or_else(|| {
-            if options.coerce_main_signature && head.name == "main" {
-                Some(Tag::Main)
-            } else {
-                None
-            }
+            (options.coerce_main_signature && head.name == "main").then_some(Tag::Main)
         }),
         is_generic,
         constraints: CurrentConstraints {
@@ -142,39 +123,6 @@ pub fn create_function_head<'a>(
             implementations: ctx.implementations,
         },
     }))
-}
-
-pub fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &resolved::Type) {
-    match &ty.kind {
-        resolved::TypeKind::Unresolved => panic!(),
-        resolved::TypeKind::Boolean
-        | resolved::TypeKind::Integer(_, _)
-        | resolved::TypeKind::CInteger(_, _)
-        | resolved::TypeKind::IntegerLiteral(_)
-        | resolved::TypeKind::FloatLiteral(_)
-        | resolved::TypeKind::Floating(_) => (),
-        resolved::TypeKind::Pointer(inner) => collect_constraints(map, inner.as_ref()),
-        resolved::TypeKind::Void => (),
-        resolved::TypeKind::AnonymousStruct() => todo!(),
-        resolved::TypeKind::AnonymousUnion() => todo!(),
-        resolved::TypeKind::AnonymousEnum() => todo!(),
-        resolved::TypeKind::FixedArray(fixed_array) => collect_constraints(map, &fixed_array.inner),
-        resolved::TypeKind::FunctionPointer(_) => todo!(),
-        resolved::TypeKind::Enum(_, _) => (),
-        resolved::TypeKind::Structure(_, _, parameters) => {
-            for parameter in parameters {
-                collect_constraints(map, parameter);
-            }
-        }
-        resolved::TypeKind::TypeAlias(_, _) => (),
-        resolved::TypeKind::Polymorph(name, constraints) => {
-            let set = map.entry(name.to_string()).or_default();
-            for constraint in constraints {
-                set.insert(constraint.clone());
-            }
-        }
-        resolved::TypeKind::Trait(_, _) => (),
-    }
 }
 
 pub fn resolve_parameters(
@@ -196,4 +144,56 @@ pub fn resolve_parameters(
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
+}
+
+pub fn collect_constraints(
+    parameters: &resolved::Parameters,
+    return_type: &resolved::Type,
+) -> HashMap<String, HashSet<Constraint>> {
+    let mut map = HashMap::default();
+
+    for param in parameters.required.iter() {
+        collect_constraints_into(&mut map, &param.resolved_type);
+    }
+
+    collect_constraints_into(&mut map, &return_type);
+    map
+}
+
+pub fn collect_constraints_into(
+    map: &mut HashMap<String, HashSet<Constraint>>,
+    ty: &resolved::Type,
+) {
+    match &ty.kind {
+        resolved::TypeKind::Unresolved => panic!(),
+        resolved::TypeKind::Boolean
+        | resolved::TypeKind::Integer(_, _)
+        | resolved::TypeKind::CInteger(_, _)
+        | resolved::TypeKind::IntegerLiteral(_)
+        | resolved::TypeKind::FloatLiteral(_)
+        | resolved::TypeKind::Floating(_) => (),
+        resolved::TypeKind::Pointer(inner) => collect_constraints_into(map, inner.as_ref()),
+        resolved::TypeKind::Void => (),
+        resolved::TypeKind::AnonymousStruct() => todo!(),
+        resolved::TypeKind::AnonymousUnion() => todo!(),
+        resolved::TypeKind::AnonymousEnum() => todo!(),
+        resolved::TypeKind::FixedArray(fixed_array) => {
+            collect_constraints_into(map, &fixed_array.inner)
+        }
+        resolved::TypeKind::FunctionPointer(_) => todo!(),
+        resolved::TypeKind::Enum(_, _) => (),
+        resolved::TypeKind::Structure(_, _, parameters) => {
+            for parameter in parameters {
+                collect_constraints_into(map, parameter);
+            }
+        }
+        resolved::TypeKind::TypeAlias(_, _) => (),
+        resolved::TypeKind::Polymorph(name, constraints) => {
+            let set = map.entry(name.to_string()).or_default();
+            for constraint in constraints {
+                set.insert(constraint.clone());
+            }
+        }
+        resolved::TypeKind::Trait(_, _) => (),
+    }
 }
