@@ -3,10 +3,13 @@ use crate::{
     resolve::{
         ctx::ResolveCtx,
         error::ResolveError,
+        function_head::resolve_parameters,
         job::TypeJob,
         type_ctx::{resolve_constraints, ResolveTypeCtx},
     },
-    resolved::{self, CurrentConstraints, EnumRef, StructureRef, TypeAliasRef},
+    resolved::{
+        self, CurrentConstraints, EnumRef, StructureRef, TraitFunction, TraitRef, TypeAliasRef,
+    },
     workspace::fs::FsNodeId,
 };
 use std::{
@@ -30,8 +33,15 @@ pub fn resolve_type_jobs(
             .get_owning_module(job.physical_file_id)
             .unwrap_or(job.physical_file_id);
 
-        for (_trait_ref, _user_trait) in job.traits.iter().zip(file.traits.iter()) {
-            resolve_trait()?;
+        for (trait_ref, user_trait) in job.traits.iter().zip(file.traits.iter()) {
+            resolve_trait(
+                ctx,
+                resolved_ast,
+                module_file_id,
+                job.physical_file_id,
+                user_trait,
+                *trait_ref,
+            )?;
         }
 
         for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
@@ -169,7 +179,6 @@ fn resolve_type_alias(
     type_alias_ref: TypeAliasRef,
 ) -> Result<(), ResolveError> {
     let constraints = CurrentConstraints::new_empty(ctx.implementations);
-
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,
         module_file_id,
@@ -183,7 +192,37 @@ fn resolve_type_alias(
     Ok(())
 }
 
-fn resolve_trait() -> Result<(), ResolveError> {
-    eprintln!("warning: trait methods are not resolved yet");
+fn resolve_trait(
+    ctx: &mut ResolveCtx,
+    resolved_ast: &mut resolved::Ast,
+    module_file_id: FsNodeId,
+    physical_file_id: FsNodeId,
+    definition: &ast::Trait,
+    trait_ref: TraitRef,
+) -> Result<(), ResolveError> {
+    let constraints = CurrentConstraints::new_empty(ctx.implementations);
+    let type_ctx = ResolveTypeCtx::new(
+        &resolved_ast,
+        module_file_id,
+        physical_file_id,
+        &ctx.types_in_modules,
+        &constraints,
+    );
+
+    let mut functions = Vec::with_capacity(definition.functions.len());
+
+    for function in &definition.functions {
+        let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
+        let return_type = type_ctx.resolve(&function.return_type)?;
+
+        functions.push(TraitFunction {
+            name: function.name.clone(),
+            parameters,
+            return_type,
+            source: function.source,
+        });
+    }
+
+    resolved_ast.traits.get_mut(trait_ref).unwrap().functions = functions;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{EnumMemberLiteral, Expr, ExprKind},
+    ast::{CompileTimeArgument, EnumMemberLiteral, Expr, ExprKind},
     inflow::Inflow,
     name::Name,
     parser::error::{ParseError, ParseErrorKind},
@@ -9,13 +9,18 @@ use crate::{
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_enum_member_literal(
+    pub fn parse_static_member(
         &mut self,
         enum_name: Name,
+        generics: Vec<CompileTimeArgument>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // EnumName::EnumVariant
         //    ^
+
+        if !generics.is_empty() {
+            return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
+        }
 
         self.parse_token(TokenKind::StaticMember, Some("for enum member literal"))?;
 

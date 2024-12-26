@@ -31,7 +31,7 @@ use slotmap::{new_key_type, SlotMap};
 use std::collections::HashMap;
 pub use stmt::*;
 pub use structure::*;
-pub use trait_constraint::Trait;
+pub use trait_constraint::*;
 pub use type_decl::*;
 pub use variable_storage::*;
 

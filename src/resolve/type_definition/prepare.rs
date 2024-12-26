@@ -174,7 +174,7 @@ fn prepare_trait(
     definition: &ast::Trait,
 ) -> Result<TraitRef, ResolveError> {
     let trait_ref = resolved_ast.traits.insert(resolved::Trait {
-        methods: vec![],
+        functions: vec![],
         source: definition.source,
     });
 

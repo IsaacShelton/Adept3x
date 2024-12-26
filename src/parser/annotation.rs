@@ -1,4 +1,4 @@
-use crate::{ast, source_files::Source};
+use crate::{ast::Given, source_files::Source};
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -22,12 +22,6 @@ pub enum AnnotationKind {
     Public,
     Template,
     Given(Given),
-}
-
-#[derive(Clone, Debug)]
-pub struct Given {
-    pub name: Option<String>,
-    pub ty: ast::Type,
 }
 
 impl AnnotationKind {

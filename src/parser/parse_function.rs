@@ -28,7 +28,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let mut is_foreign = false;
         let mut abide_abi = false;
         let mut privacy = Privacy::Private;
-        let mut contextual_parameters = vec![];
+        let mut givens = vec![];
 
         for annotation in annotations {
             match annotation.kind {
@@ -36,7 +36,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Given(given) => {
-                    contextual_parameters.push(given);
+                    givens.push(given);
                 }
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
             }
@@ -71,6 +71,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         Ok(Function {
             name: Name::plain(name),
+            givens,
             parameters,
             return_type,
             stmts,

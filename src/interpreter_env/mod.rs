@@ -23,6 +23,7 @@ fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallK
 
     Function {
         name: Name::plain(name),
+        givens: vec![],
         parameters: Parameters {
             required: vec![],
             is_cstyle_vararg: false,
@@ -56,6 +57,7 @@ fn thin_cstring_function(
     let param_name = param_name.into();
     Function {
         name: Name::plain(name.into()),
+        givens: vec![],
         parameters: Parameters {
             required: vec![Parameter::new(param_name.clone(), ptr_char.clone())],
             is_cstyle_vararg: false,
@@ -97,6 +99,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.functions.push(Function {
         name: Name::plain("<interpreter entry point>"),
+        givens: vec![],
         parameters: Parameters::default(),
         return_type: void.clone(),
         stmts: vec![StmtKind::Return(Some(call)).at(Source::internal())],
@@ -205,6 +208,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.functions.push(Function {
         name: Name::plain("project"),
+        givens: vec![],
         parameters: Parameters {
             required: vec![
                 Parameter::new("name".into(), ptr_char.clone()),
@@ -248,6 +252,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.functions.push(Function {
         name: Name::plain("use"),
+        givens: vec![],
         parameters: Parameters {
             required: vec![
                 Parameter::new("as_namespace".into(), ptr_char.clone()),
@@ -291,6 +296,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.functions.push(Function {
         name: Name::plain("import"),
+        givens: vec![],
         parameters: Parameters {
             required: vec![Parameter::new("namespace".into(), ptr_char.clone())],
             is_cstyle_vararg: false,

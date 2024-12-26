@@ -8,11 +8,11 @@ pub struct Trait {
     pub parameters: IndexMap<String, TypeParameter>,
     pub source: Source,
     pub privacy: Privacy,
-    pub methods: Vec<TraitMethod>,
+    pub functions: Vec<TraitFunction>,
 }
 
 #[derive(Clone, Debug)]
-pub struct TraitMethod {
+pub struct TraitFunction {
     pub name: String,
     pub parameters: Parameters,
     pub return_type: Type,

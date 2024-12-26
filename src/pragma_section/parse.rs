@@ -103,6 +103,7 @@ impl PragmaSection {
 
             ast_file.functions.push(Function {
                 name: Name::plain("main"),
+                givens: vec![],
                 parameters: Parameters {
                     required: vec![],
                     is_cstyle_vararg: false,

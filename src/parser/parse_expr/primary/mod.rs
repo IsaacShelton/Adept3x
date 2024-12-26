@@ -1,7 +1,7 @@
 mod call;
 mod declare_assign;
-mod enum_member_literal;
 mod operator;
+mod static_member;
 mod structure_literal;
 
 use super::{super::error::ParseError, is_right_associative, is_terminating_token, Parser};
@@ -107,13 +107,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 let generics = self.parse_generics()?;
 
                 match self.input.peek().kind {
-                    TokenKind::StaticMember => {
-                        if !generics.is_empty() {
-                            return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
-                        }
-
-                        self.parse_enum_member_literal(name, source)
-                    }
+                    TokenKind::StaticMember => self.parse_static_member(name, generics, source),
                     TokenKind::OpenCurly => {
                         let peek = &self.input.peek_nth(1).kind;
 

@@ -74,6 +74,7 @@ pub fn declare_function(
 
     ast_file.functions.push(Function {
         name: Name::plain(name),
+        givens: vec![],
         parameters,
         return_type,
         stmts: vec![],
