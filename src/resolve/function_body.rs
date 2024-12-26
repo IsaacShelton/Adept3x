@@ -97,7 +97,7 @@ fn resolve_parameter_variables(
 ) -> Result<VariableHaystack, ResolveError> {
     let mut variable_haystack = VariableHaystack::new();
 
-    for parameter in ast_function.parameters.required.iter() {
+    for parameter in ast_function.head.parameters.required.iter() {
         let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
 
         let type_ctx = ResolveTypeCtx::new(

@@ -1,9 +1,11 @@
 use super::PragmaSection;
 use crate::{
-    ast::{AstFile, Expr, ExprKind, Function, Parameters, Privacy, Stmt, StmtKind, TypeKind},
+    ast::{
+        AstFile, Expr, ExprKind, Function, FunctionHead, Parameters, Privacy, Stmt, StmtKind,
+        TypeKind,
+    },
     diagnostics::ErrorDiagnostic,
     inflow::Inflow,
-    name::Name,
     parser::{self, error::ParseError, Input},
     show::{into_show, Show},
     source_files::Source,
@@ -102,19 +104,18 @@ impl PragmaSection {
             }
 
             ast_file.functions.push(Function {
-                name: Name::plain("main"),
-                givens: vec![],
-                parameters: Parameters {
-                    required: vec![],
-                    is_cstyle_vararg: false,
+                head: FunctionHead {
+                    name: "main".into(),
+                    givens: vec![],
+                    parameters: Parameters::default(),
+                    return_type: TypeKind::Void.at(source),
+                    is_foreign: false,
+                    source,
+                    abide_abi: false,
+                    tag: None,
+                    privacy: Privacy::Public,
                 },
-                return_type: TypeKind::Void.at(source),
                 stmts,
-                is_foreign: false,
-                source,
-                abide_abi: false,
-                tag: None,
-                privacy: Privacy::Public,
             });
         } else {
             return Err(Box::new(ParseError::expected(

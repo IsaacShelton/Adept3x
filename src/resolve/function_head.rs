@@ -3,12 +3,14 @@ use super::{
     type_ctx::ResolveTypeCtx,
 };
 use crate::{
-    ast::{self, AstWorkspace},
+    ast::{self, AstWorkspace, FunctionHead},
     cli::BuildOptions,
+    hash_map_ext::HashMapExt,
     index_map_ext::IndexMapExt,
-    name::ResolvedName,
-    resolved::{self, Constraint, CurrentConstraints, VariableStorage},
+    name::{Name, ResolvedName},
+    resolved::{self, Constraint, CurrentConstraints, FunctionRef, VariableStorage},
     tag::Tag,
+    workspace::fs::FsNodeId,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -24,80 +26,25 @@ pub fn create_function_heads<'a>(
             .unwrap_or(*physical_file_id);
 
         for (function_i, function) in file.functions.iter().enumerate() {
-            let name = ResolvedName::new(module_file_id, &function.name);
-            let pre_parameters_constraints = CurrentConstraints::new_empty(ctx.implementations);
+            let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));
 
-            let type_ctx = ResolveTypeCtx::new(
-                &resolved_ast,
+            let function_ref = create_function_head(
+                ctx,
+                resolved_ast,
+                options,
+                name.clone(),
+                &function.head,
                 module_file_id,
                 *physical_file_id,
-                &ctx.types_in_modules,
-                &pre_parameters_constraints,
-            );
+            )?;
 
-            let is_generic = function.return_type.contains_polymorph().is_some()
-                || function
-                    .parameters
-                    .required
-                    .iter()
-                    .any(|param| param.ast_type.contains_polymorph().is_some());
-
-            let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
-            let return_type = type_ctx.resolve(&function.return_type)?;
-
-            let constraints = if is_generic {
-                let mut map = HashMap::default();
-
-                for param in parameters.required.iter() {
-                    collect_constraints(&mut map, &param.resolved_type);
-                }
-
-                collect_constraints(&mut map, &return_type);
-                map
-            } else {
-                HashMap::default()
-            };
-
-            let function_ref = resolved_ast.functions.insert(resolved::Function {
-                name: name.clone(),
-                parameters,
-                return_type,
-                stmts: vec![],
-                is_foreign: function.is_foreign,
-                variables: VariableStorage::new(),
-                source: function.source,
-                abide_abi: function.abide_abi,
-                tag: function.tag.or_else(|| {
-                    if options.coerce_main_signature && &*function.name.basename == "main" {
-                        Some(Tag::Main)
-                    } else {
-                        None
-                    }
-                }),
-                is_generic,
-                constraints: CurrentConstraints {
-                    constraints,
-                    implementations: ctx.implementations,
-                },
-            });
-
-            if function.privacy.is_public() {
+            if function.head.privacy.is_public() {
+                let function_name = &function.head.name;
                 let public_of_module = ctx.public_functions.entry(module_file_id).or_default();
 
-                // TODO: Add proper error message
-                let function_name = function
-                    .name
-                    .as_plain_str()
-                    .expect("cannot make public symbol with existing namespace");
-
-                if public_of_module.get(function_name).is_none() {
-                    public_of_module.insert(function_name.to_string(), vec![]);
-                }
-
-                let functions_of_name = public_of_module
-                    .get_mut(function_name)
-                    .expect("function list inserted");
-                functions_of_name.push(function_ref);
+                public_of_module
+                    .get_or_insert_with(function_name, || Default::default())
+                    .push(function_ref);
             }
 
             let settings = file.settings.map(|id| &ast_workspace.settings[id.0]);
@@ -129,6 +76,72 @@ pub fn create_function_heads<'a>(
     }
 
     Ok(())
+}
+
+pub fn create_function_head<'a>(
+    ctx: &mut ResolveCtx<'a>,
+    resolved_ast: &mut resolved::Ast<'a>,
+    options: &BuildOptions,
+    name: ResolvedName,
+    head: &FunctionHead,
+    module_file_id: FsNodeId,
+    physical_file_id: FsNodeId,
+) -> Result<FunctionRef, ResolveError> {
+    let pre_parameters_constraints = CurrentConstraints::new_empty(ctx.implementations);
+
+    let type_ctx = ResolveTypeCtx::new(
+        &resolved_ast,
+        module_file_id,
+        physical_file_id,
+        &ctx.types_in_modules,
+        &pre_parameters_constraints,
+    );
+
+    let is_generic = head.return_type.contains_polymorph().is_some()
+        || head
+            .parameters
+            .required
+            .iter()
+            .any(|param| param.ast_type.contains_polymorph().is_some());
+
+    let parameters = resolve_parameters(&type_ctx, &head.parameters)?;
+    let return_type = type_ctx.resolve(&head.return_type)?;
+
+    let constraints = if is_generic {
+        let mut map = HashMap::default();
+
+        for param in parameters.required.iter() {
+            collect_constraints(&mut map, &param.resolved_type);
+        }
+
+        collect_constraints(&mut map, &return_type);
+        map
+    } else {
+        HashMap::default()
+    };
+
+    Ok(resolved_ast.functions.insert(resolved::Function {
+        name,
+        parameters,
+        return_type,
+        stmts: vec![],
+        is_foreign: head.is_foreign,
+        variables: VariableStorage::new(),
+        source: head.source,
+        abide_abi: head.abide_abi,
+        tag: head.tag.or_else(|| {
+            if options.coerce_main_signature && head.name == "main" {
+                Some(Tag::Main)
+            } else {
+                None
+            }
+        }),
+        is_generic,
+        constraints: CurrentConstraints {
+            constraints,
+            implementations: ctx.implementations,
+        },
+    }))
 }
 
 pub fn collect_constraints(map: &mut HashMap<String, HashSet<Constraint>>, ty: &resolved::Type) {

@@ -4,9 +4,8 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Function, Parameters, Privacy, TypeKind},
+    ast::{Function, FunctionHead, Parameters, Privacy, TypeKind},
     inflow::Inflow,
-    name::Name,
     token::{Token, TokenKind},
 };
 
@@ -70,16 +69,18 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .unwrap_or_default();
 
         Ok(Function {
-            name: Name::plain(name),
-            givens,
-            parameters,
-            return_type,
+            head: FunctionHead {
+                name,
+                givens,
+                parameters,
+                return_type,
+                is_foreign,
+                source,
+                abide_abi,
+                tag: None,
+                privacy,
+            },
             stmts,
-            is_foreign,
-            source,
-            abide_abi,
-            tag: None,
-            privacy,
         })
     }
 }

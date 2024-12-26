@@ -1,12 +1,11 @@
 use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
-    ast::{self, AstFile, Function, Parameter, Parameters, Privacy},
+    ast::{self, AstFile, Function, FunctionHead, Parameter, Parameters, Privacy},
     c::parser::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError,
     },
     diagnostics::Diagnostics,
-    name::Name,
 };
 use std::collections::HashMap;
 
@@ -72,17 +71,21 @@ pub fn declare_function(
         is_cstyle_vararg: parameter_type_list.is_variadic,
     };
 
-    ast_file.functions.push(Function {
-        name: Name::plain(name),
+    let head = FunctionHead {
+        name,
         givens: vec![],
         parameters,
         return_type,
-        stmts: vec![],
         is_foreign: true,
         source,
         abide_abi: true,
         tag: None,
         privacy: Privacy::Public,
+    };
+
+    ast_file.functions.push(Function {
+        head,
+        stmts: vec![],
     });
 
     Ok(())

@@ -15,6 +15,7 @@ mod cli;
 mod compiler;
 mod data_units;
 mod diagnostics;
+mod hash_map_ext;
 mod index_map_ext;
 mod inflow;
 mod interpreter;

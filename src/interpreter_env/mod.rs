@@ -1,8 +1,8 @@
 use crate::{
     ast::{
         AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Function,
-        InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind, StructLiteral,
-        Structure, TypeKind,
+        FunctionHead, InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind,
+        StructLiteral, Structure, TypeKind,
     },
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
@@ -21,14 +21,20 @@ fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallK
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
 
-    Function {
-        name: Name::plain(name),
+    let head = FunctionHead {
+        name: name.into(),
         givens: vec![],
-        parameters: Parameters {
-            required: vec![],
-            is_cstyle_vararg: false,
-        },
+        parameters: Parameters::default(),
         return_type: void.clone(),
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+        privacy: Privacy::Public,
+    };
+
+    Function {
+        head,
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: syscall_kind,
@@ -38,11 +44,6 @@ fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallK
             .at(source),
         )
         .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-        privacy: Privacy::Public,
     }
 }
 
@@ -55,14 +56,21 @@ fn thin_cstring_function(
     let void = TypeKind::Void.at(Source::internal());
     let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
     let param_name = param_name.into();
-    Function {
-        name: Name::plain(name.into()),
+
+    let head = FunctionHead {
+        name: name.into(),
         givens: vec![],
-        parameters: Parameters {
-            required: vec![Parameter::new(param_name.clone(), ptr_char.clone())],
-            is_cstyle_vararg: false,
-        },
+        parameters: Parameters::normal([Parameter::new(param_name.clone(), ptr_char.clone())]),
         return_type: void.clone(),
+        abide_abi: false,
+        is_foreign: false,
+        source,
+        tag: None,
+        privacy: Privacy::Public,
+    };
+
+    Function {
+        head,
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: syscall_kind,
@@ -75,11 +83,6 @@ fn thin_cstring_function(
             .at(source),
         )
         .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-        privacy: Privacy::Public,
     }
 }
 
@@ -98,16 +101,18 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     .at(Source::internal());
 
     file.functions.push(Function {
-        name: Name::plain("<interpreter entry point>"),
-        givens: vec![],
-        parameters: Parameters::default(),
-        return_type: void.clone(),
+        head: FunctionHead {
+            name: "<interpreter entry point>".into(),
+            givens: vec![],
+            parameters: Parameters::default(),
+            return_type: void.clone(),
+            is_foreign: false,
+            source,
+            abide_abi: false,
+            tag: Some(Tag::InterpreterEntryPoint),
+            privacy: Privacy::Public,
+        },
         stmts: vec![StmtKind::Return(Some(call)).at(Source::internal())],
-        is_foreign: false,
-        source,
-        abide_abi: false,
-        tag: Some(Tag::InterpreterEntryPoint),
-        privacy: Privacy::Public,
     });
 
     file.enums.push(Enum {
@@ -207,19 +212,23 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     ));
 
     file.functions.push(Function {
-        name: Name::plain("project"),
-        givens: vec![],
-        parameters: Parameters {
-            required: vec![
+        head: FunctionHead {
+            name: "project".into(),
+            givens: vec![],
+            parameters: Parameters::normal([
                 Parameter::new("name".into(), ptr_char.clone()),
                 Parameter::new(
                     "project".into(),
                     TypeKind::Named(Name::plain("Project"), vec![]).at(source),
                 ),
-            ],
-            is_cstyle_vararg: false,
+            ]),
+            return_type: void.clone(),
+            abide_abi: false,
+            is_foreign: false,
+            source,
+            tag: None,
+            privacy: Privacy::Public,
         },
-        return_type: void.clone(),
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: InterpreterSyscallKind::BuildAddProject,
@@ -243,27 +252,26 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             .at(source),
         )
         .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-        privacy: Privacy::Public,
     });
 
     file.functions.push(Function {
-        name: Name::plain("use"),
-        givens: vec![],
-        parameters: Parameters {
-            required: vec![
+        head: FunctionHead {
+            name: "use".into(),
+            givens: vec![],
+            parameters: Parameters::normal([
                 Parameter::new("as_namespace".into(), ptr_char.clone()),
                 Parameter::new(
                     "dependency".into(),
                     TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
                 ),
-            ],
-            is_cstyle_vararg: false,
+            ]),
+            return_type: void.clone(),
+            abide_abi: false,
+            is_foreign: false,
+            source,
+            tag: None,
+            privacy: Privacy::Public,
         },
-        return_type: void.clone(),
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                 kind: InterpreterSyscallKind::UseDependency,
@@ -287,21 +295,20 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             .at(source),
         )
         .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-        privacy: Privacy::Public,
     });
 
     file.functions.push(Function {
-        name: Name::plain("import"),
-        givens: vec![],
-        parameters: Parameters {
-            required: vec![Parameter::new("namespace".into(), ptr_char.clone())],
-            is_cstyle_vararg: false,
+        head: FunctionHead {
+            name: "import".into(),
+            givens: vec![],
+            parameters: Parameters::normal([Parameter::new("namespace".into(), ptr_char.clone())]),
+            return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
+            abide_abi: false,
+            is_foreign: false,
+            source,
+            tag: None,
+            privacy: Privacy::Public,
         },
-        return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
         stmts: vec![StmtKind::Return(Some(
             ExprKind::StructLiteral(Box::new(StructLiteral {
                 ast_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
@@ -315,11 +322,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             .at(source),
         ))
         .at(source)],
-        abide_abi: false,
-        is_foreign: false,
-        source,
-        tag: None,
-        privacy: Privacy::Public,
     });
 }
 

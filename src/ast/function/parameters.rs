@@ -6,6 +6,15 @@ pub struct Parameters {
     pub is_cstyle_vararg: bool,
 }
 
+impl Parameters {
+    pub fn normal(parameters: impl IntoIterator<Item = Parameter>) -> Self {
+        Self {
+            required: parameters.into_iter().collect(),
+            is_cstyle_vararg: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Parameter {
     pub name: String,
