@@ -15,13 +15,13 @@ use crate::{
 use std::collections::{HashMap, HashSet};
 
 fn create_impl_head<'a>(
-    ctx: &mut ResolveCtx<'a>,
+    ctx: &mut ResolveCtx,
     resolved_ast: &mut resolved::Ast<'a>,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     imp: &ast::Impl,
 ) -> Result<resolved::ImplRef, ResolveError> {
-    let pre_parameters_constraints = CurrentConstraints::new_empty(ctx.implementations);
+    let pre_parameters_constraints = CurrentConstraints::new_empty();
 
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,
@@ -42,7 +42,7 @@ fn create_impl_head<'a>(
 }
 
 pub fn create_function_heads<'a>(
-    ctx: &mut ResolveCtx<'a>,
+    ctx: &mut ResolveCtx,
     resolved_ast: &mut resolved::Ast<'a>,
     ast_workspace: &AstWorkspace,
     options: &BuildOptions,
@@ -130,7 +130,7 @@ pub fn create_function_heads<'a>(
 }
 
 pub fn create_function_head<'a>(
-    ctx: &mut ResolveCtx<'a>,
+    ctx: &mut ResolveCtx,
     resolved_ast: &mut resolved::Ast<'a>,
     options: &BuildOptions,
     name: ResolvedName,
@@ -138,7 +138,7 @@ pub fn create_function_head<'a>(
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
 ) -> Result<FunctionRef, ResolveError> {
-    let pre_parameters_constraints = CurrentConstraints::new_empty(ctx.implementations);
+    let pre_parameters_constraints = CurrentConstraints::new_empty();
 
     let type_ctx = ResolveTypeCtx::new(
         &resolved_ast,
@@ -169,10 +169,7 @@ pub fn create_function_head<'a>(
             (options.coerce_main_signature && head.name == "main").then_some(Tag::Main)
         }),
         is_generic,
-        constraints: CurrentConstraints {
-            constraints,
-            implementations: ctx.implementations,
-        },
+        constraints: CurrentConstraints::new(constraints),
     }))
 }
 

@@ -21,7 +21,7 @@ pub struct ResolveTypeCtx<'a> {
     file_fs_node_id: FsNodeId,
     types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     used_aliases_stack: HashSet<ResolvedName>,
-    current_constraints: &'a CurrentConstraints<'a>,
+    current_constraints: &'a CurrentConstraints,
 }
 
 impl<'a> ResolveTypeCtx<'a> {

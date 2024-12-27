@@ -2,29 +2,18 @@ use crate::{name::ResolvedName, resolved::*, source_files::Source, tag::Tag};
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Clone, Debug)]
-pub struct CurrentConstraints<'a> {
-    pub constraints: HashMap<String, HashSet<Constraint>>,
-    pub implementations: &'a Implementations,
+pub struct CurrentConstraints {
+    constraints: HashMap<String, HashSet<Constraint>>,
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct Implementations {
-    targeting_trait: HashMap<TraitRef, ()>,
-}
-
-impl Implementations {
-    pub fn new() -> Self {
-        Self {
-            targeting_trait: Default::default(),
-        }
+impl<'a> CurrentConstraints {
+    pub fn new(constraints: HashMap<String, HashSet<Constraint>>) -> Self {
+        Self { constraints }
     }
-}
 
-impl<'a> CurrentConstraints<'a> {
-    pub fn new_empty(implementations: &'a Implementations) -> Self {
+    pub fn new_empty() -> Self {
         Self {
             constraints: Default::default(),
-            implementations,
         }
     }
 
@@ -58,7 +47,7 @@ impl<'a> CurrentConstraints<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function<'a> {
+pub struct Function {
     pub name: ResolvedName,
     pub parameters: Parameters,
     pub return_type: Type,
@@ -69,7 +58,7 @@ pub struct Function<'a> {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
-    pub constraints: CurrentConstraints<'a>,
+    pub constraints: CurrentConstraints,
 }
 
 #[derive(Clone, Debug, Default)]

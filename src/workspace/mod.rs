@@ -22,7 +22,6 @@ use crate::{
     interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols},
     lower::lower,
     resolve::resolve,
-    resolved::Implementations,
     unerror::unerror,
     workspace::export_and_link::export_and_link,
 };
@@ -78,11 +77,7 @@ pub fn compile_workspace(
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
 
     // Resolve symbols and validate semantics for workspace
-    let implementations = Implementations::new();
-    let resolved_ast = unerror(
-        resolve(&workspace, &implementations, &compiler.options),
-        source_files,
-    )?;
+    let resolved_ast = unerror(resolve(&workspace, &compiler.options), source_files)?;
 
     // Lower code to high level intermediate representation
     let ir_module = unerror(lower(&compiler.options, &resolved_ast), source_files)?;

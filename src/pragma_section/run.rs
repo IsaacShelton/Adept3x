@@ -7,7 +7,6 @@ use crate::{
     lower::lower,
     parser::error::ParseErrorKind,
     resolve::resolve,
-    resolved::Implementations,
     show::{into_show, Show},
     target::Target,
     workspace::fs::Fs,
@@ -48,10 +47,7 @@ impl PragmaSection {
         let files = IndexMap::from_iter(std::iter::once((fs_node_id, self.ast_file)));
         let workspace = AstWorkspace::new(fs, files, base_compiler.source_files, None);
 
-        let implementations = Implementations::new();
-        let resolved_ast =
-            resolve(&workspace, &implementations, &compiler.options).map_err(into_show)?;
-
+        let resolved_ast = resolve(&workspace, &compiler.options).map_err(into_show)?;
         let ir_module = lower(&compiler.options, &resolved_ast).map_err(into_show)?;
 
         let mut user_settings = run_build_system_interpreter(&resolved_ast, &ir_module)

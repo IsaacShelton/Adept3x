@@ -10,7 +10,7 @@ pub fn resolve_global_variables(
     resolved_ast: &mut resolved::Ast,
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::new_empty(ctx.implementations);
+    let constraints = CurrentConstraints::new_empty();
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);

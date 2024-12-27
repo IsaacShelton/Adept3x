@@ -1,23 +1,21 @@
 use super::{function_haystack::FunctionHaystack, job::FuncJob};
-use crate::{
-    resolved::{self, Implementations},
-    workspace::fs::FsNodeId,
-};
+use crate::{resolved, workspace::fs::FsNodeId};
 use indexmap::IndexMap;
 use std::collections::{HashMap, VecDeque};
 
-pub struct ResolveCtx<'a> {
+pub struct ResolveCtx {
     pub jobs: VecDeque<FuncJob>,
     pub function_haystacks: IndexMap<FsNodeId, FunctionHaystack>,
     pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
     pub types_in_modules: HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
     pub globals_in_modules: HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
     pub helper_exprs_in_modules: HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
-    pub implementations: &'a Implementations,
+    pub trait_haystacks: HashMap<FsNodeId, HashMap<String, resolved::TraitRef>>,
+    pub impl_haystacks: HashMap<FsNodeId, HashMap<String, resolved::TraitRef>>,
 }
 
-impl<'a> ResolveCtx<'a> {
-    pub fn new(implementations: &'a Implementations) -> Self {
+impl ResolveCtx {
+    pub fn new() -> Self {
         Self {
             jobs: Default::default(),
             function_haystacks: Default::default(),
@@ -25,7 +23,8 @@ impl<'a> ResolveCtx<'a> {
             types_in_modules: HashMap::new(),
             globals_in_modules: HashMap::new(),
             helper_exprs_in_modules: HashMap::new(),
-            implementations,
+            trait_haystacks: HashMap::new(),
+            impl_haystacks: HashMap::new(),
         }
     }
 }
