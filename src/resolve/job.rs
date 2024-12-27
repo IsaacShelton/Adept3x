@@ -6,6 +6,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub enum FuncJob {
     Regular(FsNodeId, usize, resolved::FunctionRef),
+    Impling(FsNodeId, usize, usize, resolved::FunctionRef),
 }
 
 #[derive(Clone, Debug)]

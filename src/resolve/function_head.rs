@@ -14,6 +14,33 @@ use crate::{
 };
 use std::collections::{HashMap, HashSet};
 
+fn create_impl_head<'a>(
+    ctx: &mut ResolveCtx<'a>,
+    resolved_ast: &mut resolved::Ast<'a>,
+    module_file_id: FsNodeId,
+    physical_file_id: FsNodeId,
+    imp: &ast::Impl,
+) -> Result<resolved::ImplRef, ResolveError> {
+    let pre_parameters_constraints = CurrentConstraints::new_empty(ctx.implementations);
+
+    let type_ctx = ResolveTypeCtx::new(
+        &resolved_ast,
+        module_file_id,
+        physical_file_id,
+        &ctx.types_in_modules,
+        &pre_parameters_constraints,
+    );
+
+    // NOTE: This will need to be resolved to which trait to use instead of an actual type
+    let resolved_type = type_ctx.resolve(&imp.target)?;
+
+    Ok(resolved_ast.impls.insert(resolved::Impl {
+        resolved_type,
+        source: imp.source,
+        body: vec![],
+    }))
+}
+
 pub fn create_function_heads<'a>(
     ctx: &mut ResolveCtx<'a>,
     resolved_ast: &mut resolved::Ast<'a>,
@@ -22,6 +49,32 @@ pub fn create_function_heads<'a>(
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+
+        for (impl_i, imp) in file.impls.iter().enumerate() {
+            let impl_ref =
+                create_impl_head(ctx, resolved_ast, module_file_id, *physical_file_id, imp)?;
+
+            for (function_i, function) in imp.body.iter().enumerate() {
+                let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));
+
+                let function_ref = create_function_head(
+                    ctx,
+                    resolved_ast,
+                    options,
+                    name.clone(),
+                    &function.head,
+                    module_file_id,
+                    *physical_file_id,
+                )?;
+
+                ctx.jobs.push_back(FuncJob::Impling(
+                    *physical_file_id,
+                    impl_i,
+                    function_i,
+                    function_ref,
+                ));
+            }
+        }
 
         for (function_i, function) in file.functions.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));

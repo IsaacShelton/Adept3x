@@ -79,6 +79,17 @@ pub fn resolve_function_bodies(
                     .expect("resolved function head to exist")
                     .stmts = resolved_stmts;
             }
+            FuncJob::Impling(
+                _physical_file_id,
+                _ast_impl_index,
+                _ast_function_index,
+                resolved_function_ref,
+            ) => {
+                todo!(
+                    "resolve function body for function inside of impl - {:?}",
+                    resolved_function_ref
+                );
+            }
         }
     }
 

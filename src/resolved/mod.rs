@@ -7,6 +7,7 @@ mod function;
 mod global;
 mod helper_expr;
 mod human_name;
+mod implementation;
 mod overload;
 mod stmt;
 mod structure;
@@ -26,6 +27,7 @@ pub use function::*;
 pub use global::*;
 pub use helper_expr::*;
 pub use human_name::*;
+pub use implementation::*;
 pub use overload::*;
 use slotmap::{new_key_type, SlotMap};
 use std::collections::HashMap;
@@ -42,6 +44,7 @@ new_key_type! {
     pub struct EnumRef;
     pub struct TypeAliasRef;
     pub struct TraitRef;
+    pub struct ImplRef;
 }
 
 #[derive(Clone, Debug)]
@@ -54,6 +57,7 @@ pub struct Ast<'a> {
     pub enums: SlotMap<EnumRef, Enum>,
     pub type_aliases: SlotMap<TypeAliasRef, Type>,
     pub traits: SlotMap<TraitRef, Trait>,
+    pub impls: SlotMap<ImplRef, Impl>,
     pub workspace: &'a AstWorkspace<'a>,
 }
 
@@ -70,6 +74,7 @@ impl<'a> Ast<'a> {
             enums: SlotMap::with_key(),
             type_aliases: SlotMap::with_key(),
             traits: SlotMap::with_key(),
+            impls: SlotMap::with_key(),
             workspace,
         }
     }
