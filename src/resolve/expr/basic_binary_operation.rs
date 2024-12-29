@@ -36,8 +36,8 @@ pub fn resolve_basic_binary_operation_expr(
         Initialized::Require,
     )?;
 
-    if let asg::TypeKind::IntegerLiteral(left) = &left.resolved_type.kind {
-        if let asg::TypeKind::IntegerLiteral(right) = &right.resolved_type.kind {
+    if let asg::TypeKind::IntegerLiteral(left) = &left.ty.kind {
+        if let asg::TypeKind::IntegerLiteral(right) = &right.ty.kind {
             return resolve_basic_binary_operation_expr_on_literals(
                 &binary_operation.operator,
                 left,
@@ -57,8 +57,8 @@ pub fn resolve_basic_binary_operation_expr(
     .ok_or_else(|| {
         ResolveErrorKind::IncompatibleTypesForBinaryOperator {
             operator: binary_operation.operator.to_string(),
-            left: left.resolved_type.to_string(),
-            right: right.resolved_type.to_string(),
+            left: left.ty.to_string(),
+            right: right.ty.to_string(),
         }
         .at(source)
     })?;
@@ -88,57 +88,57 @@ pub fn resolve_basic_binary_operation_expr(
 pub fn resolve_basic_binary_operator(
     ctx: &ResolveExprCtx,
     ast_operator: &ast::BasicBinaryOperator,
-    resolved_type: &asg::Type,
+    ty: &asg::Type,
     source: Source,
 ) -> Result<asg::BasicBinaryOperator, ResolveError> {
     let resolved_operator = match ast_operator {
-        ast::BasicBinaryOperator::Add => NumericMode::try_new(resolved_type)
+        ast::BasicBinaryOperator::Add => NumericMode::try_new(ty)
             .map(asg::BasicBinaryOperator::Add)
             .or_else(|| {
                 ctx.current_constraints
-                    .satisfies(resolved_type, &Constraint::PrimitiveAdd)
-                    .then(|| asg::BasicBinaryOperator::PrimitiveAdd(resolved_type.clone()))
+                    .satisfies(ty, &Constraint::PrimitiveAdd)
+                    .then(|| asg::BasicBinaryOperator::PrimitiveAdd(ty.clone()))
             }),
         ast::BasicBinaryOperator::Subtract => {
-            NumericMode::try_new(resolved_type).map(asg::BasicBinaryOperator::Subtract)
+            NumericMode::try_new(ty).map(asg::BasicBinaryOperator::Subtract)
         }
         ast::BasicBinaryOperator::Multiply => {
-            NumericMode::try_new(resolved_type).map(asg::BasicBinaryOperator::Multiply)
+            NumericMode::try_new(ty).map(asg::BasicBinaryOperator::Multiply)
         }
-        ast::BasicBinaryOperator::Divide => float_or_sign_lax_from_type(resolved_type, false)
+        ast::BasicBinaryOperator::Divide => float_or_sign_lax_from_type(ty, false)
             .map(asg::BasicBinaryOperator::Divide),
-        ast::BasicBinaryOperator::Modulus => float_or_sign_lax_from_type(resolved_type, false)
+        ast::BasicBinaryOperator::Modulus => float_or_sign_lax_from_type(ty, false)
             .map(asg::BasicBinaryOperator::Modulus),
-        ast::BasicBinaryOperator::Equals => float_or_integer_from_type(resolved_type, true)
+        ast::BasicBinaryOperator::Equals => float_or_integer_from_type(ty, true)
             .map(asg::BasicBinaryOperator::Equals),
-        ast::BasicBinaryOperator::NotEquals => float_or_integer_from_type(resolved_type, true)
+        ast::BasicBinaryOperator::NotEquals => float_or_integer_from_type(ty, true)
             .map(asg::BasicBinaryOperator::NotEquals),
-        ast::BasicBinaryOperator::LessThan => float_or_sign_lax_from_type(resolved_type, false)
+        ast::BasicBinaryOperator::LessThan => float_or_sign_lax_from_type(ty, false)
             .map(asg::BasicBinaryOperator::LessThan),
-        ast::BasicBinaryOperator::LessThanEq => float_or_sign_lax_from_type(resolved_type, false)
+        ast::BasicBinaryOperator::LessThanEq => float_or_sign_lax_from_type(ty, false)
             .map(asg::BasicBinaryOperator::LessThanEq),
-        ast::BasicBinaryOperator::GreaterThan => float_or_sign_lax_from_type(resolved_type, false)
+        ast::BasicBinaryOperator::GreaterThan => float_or_sign_lax_from_type(ty, false)
             .map(asg::BasicBinaryOperator::GreaterThan),
         ast::BasicBinaryOperator::GreaterThanEq => {
-            float_or_sign_lax_from_type(resolved_type, false)
+            float_or_sign_lax_from_type(ty, false)
                 .map(asg::BasicBinaryOperator::GreaterThanEq)
         }
-        ast::BasicBinaryOperator::BitwiseAnd => (resolved_type.kind.is_integer()
-            || resolved_type.kind.is_c_integer()
-            || resolved_type.kind.is_boolean())
+        ast::BasicBinaryOperator::BitwiseAnd => (ty.kind.is_integer()
+            || ty.kind.is_c_integer()
+            || ty.kind.is_boolean())
         .then_some(asg::BasicBinaryOperator::BitwiseAnd),
-        ast::BasicBinaryOperator::BitwiseOr => (resolved_type.kind.is_integer()
-            || resolved_type.kind.is_c_integer()
-            || resolved_type.kind.is_boolean())
+        ast::BasicBinaryOperator::BitwiseOr => (ty.kind.is_integer()
+            || ty.kind.is_c_integer()
+            || ty.kind.is_boolean())
         .then_some(asg::BasicBinaryOperator::BitwiseOr),
-        ast::BasicBinaryOperator::BitwiseXor => (resolved_type.kind.is_integer()
-            || resolved_type.kind.is_c_integer())
+        ast::BasicBinaryOperator::BitwiseXor => (ty.kind.is_integer()
+            || ty.kind.is_c_integer())
         .then_some(asg::BasicBinaryOperator::BitwiseXor),
         ast::BasicBinaryOperator::LeftShift | ast::BasicBinaryOperator::LogicalLeftShift => {
-            (resolved_type.kind.is_integer() || resolved_type.kind.is_c_integer())
+            (ty.kind.is_integer() || ty.kind.is_c_integer())
                 .then_some(asg::BasicBinaryOperator::LogicalLeftShift)
         }
-        ast::BasicBinaryOperator::RightShift => match resolved_type.kind {
+        ast::BasicBinaryOperator::RightShift => match ty.kind {
             asg::TypeKind::Integer(_, sign) => {
                 Some(asg::BasicBinaryOperator::ArithmeticRightShift(
                     SignOrIndeterminate::Sign(sign),
@@ -153,15 +153,15 @@ pub fn resolve_basic_binary_operator(
             }),
             _ => None,
         },
-        ast::BasicBinaryOperator::LogicalRightShift => (resolved_type.kind.is_integer()
-            || resolved_type.kind.is_c_integer())
+        ast::BasicBinaryOperator::LogicalRightShift => (ty.kind.is_integer()
+            || ty.kind.is_c_integer())
         .then_some(asg::BasicBinaryOperator::LogicalRightShift),
     };
 
     resolved_operator.ok_or_else(|| {
         ResolveErrorKind::CannotPerformBinaryOperationForType {
             operator: ast_operator.to_string(),
-            bad_type: resolved_type.to_string(),
+            bad_type: ty.to_string(),
         }
         .at(source)
     })

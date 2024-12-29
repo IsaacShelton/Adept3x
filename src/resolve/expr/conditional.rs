@@ -78,7 +78,7 @@ pub fn resolve_conditional_expr(
                 ResolveErrorKind::MismatchingYieldedTypes {
                     got: block_results
                         .iter()
-                        .map(|resolved_type| resolved_type.kind.to_string())
+                        .map(|ty| ty.kind.to_string())
                         .collect_vec(),
                 }
                 .at(source)
@@ -114,7 +114,7 @@ pub fn resolve_conditional_expr(
             ResolveErrorKind::MismatchingYieldedTypes {
                 got: block_results
                     .iter()
-                    .map(|resolved_type| resolved_type.kind.to_string())
+                    .map(|ty| ty.kind.to_string())
                     .collect_vec(),
             }
             .at(source)

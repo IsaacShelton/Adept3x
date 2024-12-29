@@ -1,23 +1,23 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
-    asg::{self, Asg, HumanName, StructureRef},
+    asg::{self, Asg, HumanName, StructRef},
     source_files::Source,
 };
 
 #[derive(Clone, Debug)]
 pub struct CoreStructInfo<'a> {
     pub name: &'a HumanName,
-    pub structure_ref: StructureRef,
+    pub structure_ref: StructRef,
     pub arguments: &'a [asg::Type],
 }
 
 pub fn get_core_structure_info<'a, 'b>(
     asg: &'b Asg<'a>,
-    resolved_type: &'a asg::Type,
+    ty: &'a asg::Type,
     source: Source,
 ) -> Result<CoreStructInfo<'b>, Option<ResolveError>> {
     match &asg
-        .unalias(resolved_type)
+        .unalias(ty)
         .map_err(|e| ResolveErrorKind::from(e).at(source))
         .map_err(Some)?
         .kind

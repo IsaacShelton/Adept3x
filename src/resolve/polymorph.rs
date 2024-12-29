@@ -24,7 +24,7 @@ impl Display for PolyRecipe {
 
             match value {
                 PolyValue::PolyType(ty) => {
-                    write!(f, "{}", ty.resolved_type.to_string())?;
+                    write!(f, "{}", ty.ty.to_string())?;
                 }
                 PolyValue::PolyExpr(_) => {
                     todo!("mangle name for polymorphic function with expr polymorph")
@@ -118,7 +118,7 @@ impl PolyRecipe {
                     return Err(PolymorphErrorKind::PolymorphIsNotAType(name.clone()).at(ty.source));
                 };
 
-                poly_type.resolved_type.clone()
+                poly_type.ty.clone()
             }
             asg::TypeKind::Trait(_, _, _) => ty.clone(),
         })
@@ -138,7 +138,7 @@ impl Hash for PolyRecipe {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct PolyType {
-    pub resolved_type: Type,
+    pub ty: Type,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -269,7 +269,7 @@ impl PolyCatalog {
         if let Some(existing) = self.polymorphs.get_mut(name) {
             match existing {
                 PolyValue::PolyType(poly_type) => {
-                    if poly_type.resolved_type != *new_type {
+                    if poly_type.ty != *new_type {
                         return Err(PolyCatalogInsertError::Incongruent);
                     }
                 }
@@ -279,7 +279,7 @@ impl PolyCatalog {
             self.polymorphs.insert(
                 name.to_string(),
                 PolyValue::PolyType(PolyType {
-                    resolved_type: new_type.clone(),
+                    ty: new_type.clone(),
                 }),
             );
         }

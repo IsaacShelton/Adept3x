@@ -1,4 +1,4 @@
-use crate::{name::ResolvedName, asg::*, source_files::Source, tag::Tag};
+use crate::{asg::*, name::ResolvedName, source_files::Source, tag::Tag};
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Clone, Debug)]
@@ -47,7 +47,7 @@ impl<'a> CurrentConstraints {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function {
+pub struct Func {
     pub name: ResolvedName,
     pub parameters: Parameters,
     pub return_type: Type,
@@ -91,17 +91,17 @@ impl Display for Parameters {
 #[derive(Clone, Debug, Hash, Eq)]
 pub struct Parameter {
     pub name: String,
-    pub resolved_type: Type,
+    pub ty: Type,
 }
 
 impl Display for Parameter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.name, self.resolved_type)
+        write!(f, "{} {}", self.name, self.ty)
     }
 }
 
 impl PartialEq for Parameter {
     fn eq(&self, other: &Self) -> bool {
-        self.resolved_type.eq(&other.resolved_type)
+        self.ty.eq(&other.ty)
     }
 }

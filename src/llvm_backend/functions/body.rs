@@ -35,7 +35,7 @@ pub struct FnCtx {
 
 pub unsafe fn create_function_bodies(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (ir_function_ref, skeleton) in ctx.func_skeletons.iter() {
-        let ir_function = ctx.ir_module.functions.get(*ir_function_ref);
+        let ir_function = ctx.ir_module.funcs.get(*ir_function_ref);
 
         let mut builder = Builder::new();
         let mut value_catalog = ValueCatalog::new(ir_function.basicblocks.len());

@@ -3,8 +3,8 @@ use super::{
     type_ctx::ResolveTypeCtx,
 };
 use crate::{
-    asg::{self, Asg, Constraint, CurrentConstraints, FunctionRef, VariableStorage},
-    ast::{self, AstWorkspace, FunctionHead},
+    asg::{self, Asg, Constraint, CurrentConstraints, FuncRef, VariableStorage},
+    ast::{self, AstWorkspace, FuncHead},
     cli::BuildOptions,
     hash_map_ext::HashMapExt,
     index_map_ext::IndexMapExt,
@@ -32,10 +32,10 @@ fn create_impl_head<'a>(
     );
 
     // NOTE: This will need to be resolved to which trait to use instead of an actual type
-    let resolved_type = type_ctx.resolve(&imp.target)?;
+    let ty = type_ctx.resolve(&imp.target)?;
 
     Ok(asg.impls.insert(asg::Impl {
-        resolved_type,
+        ty,
         source: imp.source,
         body: HashMap::default(),
     }))
@@ -84,7 +84,7 @@ pub fn create_function_heads<'a>(
             }
         }
 
-        for (function_i, function) in file.functions.iter().enumerate() {
+        for (function_i, function) in file.funcs.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));
 
             let function_ref = create_function_head(
@@ -142,10 +142,10 @@ pub fn create_function_head<'a>(
     asg: &mut Asg<'a>,
     options: &BuildOptions,
     name: ResolvedName,
-    head: &FunctionHead,
+    head: &FuncHead,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
-) -> Result<FunctionRef, ResolveError> {
+) -> Result<FuncRef, ResolveError> {
     let pre_parameters_constraints = CurrentConstraints::new_empty();
 
     let type_ctx = ResolveTypeCtx::new(
@@ -157,14 +157,14 @@ pub fn create_function_head<'a>(
     );
 
     let is_generic = head.is_generic();
-    let parameters = resolve_parameters(&type_ctx, &head.parameters)?;
+    let parameters = resolve_parameters(&type_ctx, &head.params)?;
     let return_type = type_ctx.resolve(&head.return_type)?;
 
     let constraints = is_generic
         .then(|| collect_constraints(&parameters, &return_type))
         .unwrap_or_default();
 
-    Ok(asg.functions.insert(asg::Function {
+    Ok(asg.funcs.insert(asg::Func {
         name,
         parameters,
         return_type,
@@ -183,16 +183,16 @@ pub fn create_function_head<'a>(
 
 pub fn resolve_parameters(
     type_ctx: &ResolveTypeCtx,
-    parameters: &ast::Parameters,
+    parameters: &ast::Params,
 ) -> Result<asg::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {
-        let resolved_type = type_ctx.resolve(&parameter.ast_type)?;
+        let ty = type_ctx.resolve(&parameter.ast_type)?;
 
         required.push(asg::Parameter {
             name: parameter.name.clone(),
-            resolved_type,
+            ty,
         });
     }
 
@@ -209,7 +209,7 @@ pub fn collect_constraints(
     let mut map = HashMap::default();
 
     for param in parameters.required.iter() {
-        collect_constraints_into(&mut map, &param.resolved_type);
+        collect_constraints_into(&mut map, &param.ty);
     }
 
     collect_constraints_into(&mut map, &return_type);

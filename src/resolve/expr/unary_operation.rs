@@ -20,7 +20,7 @@ pub fn resolve_unary_math_operation_expr(
     let resolved_expr = resolve_expr(ctx, inner, preferred_type, Initialized::Require)
         .and_then(|expr| conform_expr_to_default_or_error(expr, ctx.c_integer_assumptions()))?;
 
-    let from_type = &resolved_expr.resolved_type;
+    let from_type = &resolved_expr.ty;
 
     if from_type.is_ambiguous() {
         return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {

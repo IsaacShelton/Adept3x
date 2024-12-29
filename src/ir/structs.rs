@@ -4,18 +4,18 @@ use append_only_vec::AppendOnlyVec;
 use std::{collections::HashMap, sync::RwLock};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StructureRef {
+pub struct StructRef {
     index: usize,
 }
 
 #[derive(Debug)]
-pub struct Structures {
+pub struct Structs {
     structures: AppendOnlyVec<Structure>,
-    monomorphized: RwLock<HashMap<(asg::StructureRef, PolyRecipe), StructureRef>>,
-    jobs: AppendOnlyVec<(asg::StructureRef, PolyRecipe, StructureRef)>,
+    monomorphized: RwLock<HashMap<(asg::StructRef, PolyRecipe), StructRef>>,
+    jobs: AppendOnlyVec<(asg::StructRef, PolyRecipe, StructRef)>,
 }
 
-impl Structures {
+impl Structs {
     pub fn new() -> Self {
         Self {
             structures: AppendOnlyVec::new(),
@@ -26,15 +26,15 @@ impl Structures {
 
     pub fn insert(
         &self,
-        resolved_structure_ref: asg::StructureRef,
+        struct_ref: asg::StructRef,
         structure: Structure,
         poly_recipe: PolyRecipe,
-    ) -> StructureRef {
-        let structure_ref = StructureRef {
+    ) -> StructRef {
+        let structure_ref = StructRef {
             index: self.structures.push(structure),
         };
 
-        let key = (resolved_structure_ref, poly_recipe);
+        let key = (struct_ref, poly_recipe);
         self.monomorphized
             .write()
             .unwrap()
@@ -45,11 +45,11 @@ impl Structures {
 
     pub fn translate<E>(
         &self,
-        resolved_structure_ref: asg::StructureRef,
+        struct_ref: asg::StructRef,
         poly_recipe: PolyRecipe,
-        monomorphize: impl Fn(PolyRecipe) -> Result<StructureRef, E>,
-    ) -> Result<StructureRef, E> {
-        let key = (resolved_structure_ref, poly_recipe);
+        monomorphize: impl Fn(PolyRecipe) -> Result<StructRef, E>,
+    ) -> Result<StructRef, E> {
+        let key = (struct_ref, poly_recipe);
 
         if let Some(found) = self.monomorphized.read().unwrap().get(&key) {
             return Ok(*found);
@@ -64,18 +64,18 @@ impl Structures {
             .insert(key, function_ref);
 
         self.jobs
-            .push((resolved_structure_ref, poly_recipe.clone(), function_ref));
+            .push((struct_ref, poly_recipe.clone(), function_ref));
 
         Ok(function_ref)
     }
 
-    pub fn get(&self, key: StructureRef) -> &Structure {
+    pub fn get(&self, key: StructRef) -> &Structure {
         &self.structures[key.index]
     }
 
     pub fn monomorphized<'a>(
         &'a self,
-    ) -> impl Iterator<Item = &'a (asg::StructureRef, PolyRecipe, StructureRef)> {
+    ) -> impl Iterator<Item = &'a (asg::StructRef, PolyRecipe, StructRef)> {
         Monomorphized {
             vec: &self.jobs,
             i: 0,
@@ -85,12 +85,12 @@ impl Structures {
 
 #[derive(Clone, Debug)]
 pub struct Monomorphized<'a> {
-    vec: &'a AppendOnlyVec<(asg::StructureRef, PolyRecipe, StructureRef)>,
+    vec: &'a AppendOnlyVec<(asg::StructRef, PolyRecipe, StructRef)>,
     i: usize,
 }
 
 impl<'a> Iterator for Monomorphized<'a> {
-    type Item = &'a (asg::StructureRef, PolyRecipe, StructureRef);
+    type Item = &'a (asg::StructRef, PolyRecipe, StructRef);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.i < self.vec.len() {

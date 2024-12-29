@@ -1,5 +1,5 @@
 use super::{
-    enumeration::Enum, function::Function, global_variable::GlobalVar, structure::Structure,
+    enumeration::Enum, func::Func, global_variable::GlobalVar, structs::Struct,
     type_alias::TypeAlias, HelperExpr,
 };
 use crate::version::AdeptVersion;
@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 #[derive(Clone, Debug)]
 pub struct AstModule {
     pub adept_version: AdeptVersion,
-    pub functions: Vec<Function>,
-    pub structures: Vec<Structure>,
+    pub functions: Vec<Func>,
+    pub structures: Vec<Struct>,
     pub type_aliases: IndexMap<String, TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
     pub enums: IndexMap<String, Enum>,

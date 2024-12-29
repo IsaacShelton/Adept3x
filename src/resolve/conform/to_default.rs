@@ -28,7 +28,7 @@ pub fn conform_expr_to_default<O: Objective>(
 ) -> ObjectiveResult<O> {
     let source = expr.view().expr.source;
 
-    match &expr.view().resolved_type.kind {
+    match &expr.view().ty.kind {
         TypeKind::IntegerLiteral(value) => {
             conform_integer_literal_to_default::<O>(value, c_integer_assumptions, source)
         }

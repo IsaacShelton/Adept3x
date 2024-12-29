@@ -29,7 +29,7 @@ impl ReturnLocation {
     pub fn indirect(
         ctx: &BackendCtx,
         builder: &Builder,
-        ir_function: &ir::Function,
+        ir_function: &ir::Func,
         function: LLVMValueRef,
         indirect: &Indirect,
         alloca_point: LLVMValueRef,
@@ -70,7 +70,7 @@ impl ReturnLocation {
         inalloca: &InAlloca,
         inalloca_subtypes: &[LLVMTypeRef],
     ) -> Result<Self, BackendError> {
-        let ir_function = ctx.ir_module.functions.get(skeleton.ir_function_ref);
+        let ir_function = ctx.ir_module.funcs.get(skeleton.ir_function_ref);
         let last_argument = unsafe { LLVMGetLastParam(skeleton.function) };
 
         let inalloca_combined_struct = skeleton

@@ -1,9 +1,9 @@
 use crate::{
     asg::Asg,
     ast::{
-        AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Function,
-        FunctionHead, InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind,
-        StructLiteral, Structure, TypeKind,
+        AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Func,
+        FuncHead, InterpreterSyscall, Language, Param, Params, Privacy, StmtKind, Struct,
+        StructLiteral, TypeKind,
     },
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
@@ -17,14 +17,14 @@ use crate::{
 };
 use indexmap::IndexMap;
 
-fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallKind) -> Function {
+fn thin_void_func(name: impl Into<String>, syscall_kind: InterpreterSyscallKind) -> Func {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
 
-    let head = FunctionHead {
+    let head = FuncHead {
         name: name.into(),
         givens: vec![],
-        parameters: Parameters::default(),
+        params: Params::default(),
         return_type: void.clone(),
         abide_abi: false,
         is_foreign: false,
@@ -33,7 +33,7 @@ fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallK
         privacy: Privacy::Public,
     };
 
-    Function {
+    Func {
         head,
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
@@ -47,20 +47,20 @@ fn thin_void_function(name: impl Into<String>, syscall_kind: InterpreterSyscallK
     }
 }
 
-fn thin_cstring_function(
+fn thin_cstring_func(
     name: impl Into<String>,
     param_name: impl Into<String>,
     syscall_kind: InterpreterSyscallKind,
-) -> Function {
+) -> Func {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
     let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
     let param_name = param_name.into();
 
-    let head = FunctionHead {
+    let head = FuncHead {
         name: name.into(),
         givens: vec![],
-        parameters: Parameters::normal([Parameter::new(param_name.clone(), ptr_char.clone())]),
+        params: Params::normal([Param::new(param_name.clone(), ptr_char.clone())]),
         return_type: void.clone(),
         abide_abi: false,
         is_foreign: false,
@@ -69,7 +69,7 @@ fn thin_cstring_function(
         privacy: Privacy::Public,
     };
 
-    Function {
+    Func {
         head,
         stmts: vec![StmtKind::Expr(
             ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
@@ -93,18 +93,18 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     // Call to function we actually care about
     let call = ExprKind::Call(Box::new(Call {
-        function_name: Name::plain("main"),
+        name: Name::plain("main"),
         arguments: vec![],
         expected_to_return: Some(void.clone()),
         generics: vec![],
     }))
     .at(Source::internal());
 
-    file.functions.push(Function {
-        head: FunctionHead {
+    file.funcs.push(Func {
+        head: FuncHead {
             name: "<interpreter entry point>".into(),
             givens: vec![],
-            parameters: Parameters::default(),
+            params: Params::default(),
             return_type: void.clone(),
             is_foreign: false,
             source,
@@ -138,7 +138,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         privacy: Privacy::Private,
     });
 
-    file.structures.push(Structure {
+    file.structures.push(Struct {
         name: "Project".into(),
         fields: IndexMap::from_iter([(
             "kind".into(),
@@ -154,7 +154,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         privacy: Privacy::Private,
     });
 
-    file.structures.push(Structure {
+    file.structures.push(Struct {
         name: "Dependency".into(),
         fields: IndexMap::from_iter([(
             "name".into(),
@@ -170,54 +170,54 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         privacy: Privacy::Private,
     });
 
-    file.functions.push(thin_cstring_function(
+    file.funcs.push(thin_cstring_func(
         "println",
         "message",
         InterpreterSyscallKind::Println,
     ));
 
-    file.functions.push(thin_cstring_function(
+    file.funcs.push(thin_cstring_func(
         "adept",
         "version_string",
         InterpreterSyscallKind::BuildSetAdeptVersion,
     ));
 
-    file.functions.push(thin_cstring_function(
+    file.funcs.push(thin_cstring_func(
         "link",
         "filename",
         InterpreterSyscallKind::BuildLinkFilename,
     ));
 
-    file.functions.push(thin_cstring_function(
+    file.funcs.push(thin_cstring_func(
         "linkFramework",
         "framework_name",
         InterpreterSyscallKind::BuildLinkFrameworkName,
     ));
 
-    file.functions.push(thin_cstring_function(
+    file.funcs.push(thin_cstring_func(
         "experimental",
         "experiment",
         InterpreterSyscallKind::Experimental,
     ));
 
-    file.functions.push(thin_cstring_function(
+    file.funcs.push(thin_cstring_func(
         "importNamespace",
         "namespace",
         InterpreterSyscallKind::ImportNamespace,
     ));
 
-    file.functions.push(thin_void_function(
+    file.funcs.push(thin_void_func(
         "dontAssumeIntAtLeast32Bits",
         InterpreterSyscallKind::DontAssumeIntAtLeast32Bits,
     ));
 
-    file.functions.push(Function {
-        head: FunctionHead {
+    file.funcs.push(Func {
+        head: FuncHead {
             name: "project".into(),
             givens: vec![],
-            parameters: Parameters::normal([
-                Parameter::new("name".into(), ptr_char.clone()),
-                Parameter::new(
+            params: Params::normal([
+                Param::new("name".into(), ptr_char.clone()),
+                Param::new(
                     "project".into(),
                     TypeKind::Named(Name::plain("Project"), vec![]).at(source),
                 ),
@@ -254,13 +254,13 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         .at(source)],
     });
 
-    file.functions.push(Function {
-        head: FunctionHead {
+    file.funcs.push(Func {
+        head: FuncHead {
             name: "use".into(),
             givens: vec![],
-            parameters: Parameters::normal([
-                Parameter::new("as_namespace".into(), ptr_char.clone()),
-                Parameter::new(
+            params: Params::normal([
+                Param::new("as_namespace".into(), ptr_char.clone()),
+                Param::new(
                     "dependency".into(),
                     TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
                 ),
@@ -297,11 +297,11 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         .at(source)],
     });
 
-    file.functions.push(Function {
-        head: FunctionHead {
+    file.funcs.push(Func {
+        head: FuncHead {
             name: "import".into(),
             givens: vec![],
-            parameters: Parameters::normal([Parameter::new("namespace".into(), ptr_char.clone())]),
+            params: Params::normal([Param::new("namespace".into(), ptr_char.clone())]),
             return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
             abide_abi: false,
             is_foreign: false,
@@ -330,14 +330,14 @@ pub fn run_build_system_interpreter<'a>(
     ir_module: &'a ir::Module,
 ) -> Result<Interpreter<'a, BuildSystemSyscallHandler>, InterpreterError> {
     let (interpreter_entry_point, _fn) = asg
-        .functions
+        .funcs
         .iter()
         .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))
         .unwrap();
 
     let interpreter_entry_point =
         ir_module
-            .functions
+            .funcs
             .translate(interpreter_entry_point, PolyRecipe::default(), || {
                 Err(InterpreterError::PolymorphicEntryPoint)
             })?;

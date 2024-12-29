@@ -11,7 +11,7 @@ use self::{
 };
 use super::parameters::has_parameters;
 use crate::{
-    ast::{AstFile, CInteger, FloatSize, IntegerSign, Parameter, Type, TypeKind},
+    ast::{AstFile, CInteger, FloatSize, IntegerSign, Param, Type, TypeKind},
     c::parser::{
         error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator,
         DeclaratorKind, Decorator, Decorators, FunctionQualifier, ParameterDeclarationCore,
@@ -266,7 +266,7 @@ fn get_name_and_decorators(
                         }
                     };
 
-                    parameters.push(Parameter {
+                    parameters.push(Param {
                         name: parameter_name,
                         ast_type: parameter_type,
                     });

@@ -50,7 +50,7 @@ impl TypeLayout {
 pub struct TypeLayoutCache<'a> {
     memo: OnceMap<ir::Type, TypeLayout>,
     pub target: &'a Target,
-    pub structures: &'a ir::Structures,
+    pub structures: &'a ir::Structs,
     pub asg: &'a Asg<'a>,
     pub diagnostics: &'a Diagnostics<'a>,
 }
@@ -58,7 +58,7 @@ pub struct TypeLayoutCache<'a> {
 impl<'a> TypeLayoutCache<'a> {
     pub fn new(
         target: &'a Target,
-        structures: &'a ir::Structures,
+        structures: &'a ir::Structs,
         asg: &'a Asg,
         diagnostics: &'a Diagnostics<'a>,
     ) -> Self {

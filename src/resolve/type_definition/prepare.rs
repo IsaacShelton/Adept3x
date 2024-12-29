@@ -1,6 +1,7 @@
 use crate::{
     asg::{
-        self, Asg, CurrentConstraints, EnumRef, HumanName, StructureRef, TraitRef, TypeAliasRef, TypeDecl, TypeParameters
+        self, Asg, CurrentConstraints, EnumRef, HumanName, StructRef, TraitRef, TypeAliasRef,
+        TypeDecl, TypeParameters,
     },
     ast::{self, AstWorkspace, Privacy},
     name::{Name, ResolvedName},
@@ -70,8 +71,8 @@ fn prepare_structure(
     asg: &mut Asg,
     module_fs_node_id: FsNodeId,
     physical_fs_node_id: FsNodeId,
-    structure: &ast::Structure,
-) -> Result<StructureRef, ResolveError> {
+    structure: &ast::Struct,
+) -> Result<StructRef, ResolveError> {
     let mut parameters = TypeParameters::default();
 
     for (name, parameter) in structure.parameters.iter() {
@@ -96,7 +97,7 @@ fn prepare_structure(
         }
     }
 
-    let structure_ref = asg.structures.insert(asg::Structure {
+    let structure_ref = asg.structs.insert(asg::Struct {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
@@ -135,7 +136,7 @@ fn prepare_enum(
 ) -> Result<EnumRef, ResolveError> {
     let enum_ref = asg.enums.insert(asg::Enum {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
-        resolved_type: asg::TypeKind::Unresolved.at(definition.source),
+        ty: asg::TypeKind::Unresolved.at(definition.source),
         source: definition.source,
         members: definition.members.clone(),
     });

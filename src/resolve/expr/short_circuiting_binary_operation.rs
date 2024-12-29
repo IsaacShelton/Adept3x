@@ -38,7 +38,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
             side: "left-hand side".to_string(),
             operator: binary_operation.operator.to_string(),
             expected: asg::TypeKind::Boolean.to_string(),
-            got: left.resolved_type.to_string(),
+            got: left.ty.to_string(),
         }
         .at(source)
     })?;
@@ -65,7 +65,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
             side: "right-hand side".to_string(),
             operator: binary_operation.operator.to_string(),
             expected: asg::TypeKind::Boolean.to_string(),
-            got: right.resolved_type.to_string(),
+            got: right.ty.to_string(),
         }
         .at(source)
     })?;

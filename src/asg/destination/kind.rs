@@ -6,7 +6,7 @@ pub enum DestinationKind {
     GlobalVariable(GlobalVariable),
     Member {
         subject: Box<Destination>,
-        structure_ref: StructureRef,
+        structure_ref: StructRef,
         index: usize,
         field_type: Type,
     },

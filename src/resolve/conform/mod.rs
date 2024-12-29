@@ -57,13 +57,13 @@ impl Objective for Validate {
     }
 }
 
-pub fn warn_type_alias_depth_exceeded(resolved_type: &Type) {
+pub fn warn_type_alias_depth_exceeded(ty: &Type) {
     // TODO: WARNING: When this happens, it might not be obvious why there
     // wasn't a match. This should probably cause an error message
     // TODO: Make this more transparent by adding a good error message
     eprintln!(
         "warning: ignoring type '{}' since it exceeds maximum type alias recursion depth",
-        resolved_type
+        ty
     );
 }
 
@@ -75,8 +75,8 @@ pub fn conform_expr<O: Objective>(
     behavior: ConformBehavior,
     conform_source: Source,
 ) -> ObjectiveResult<O> {
-    let Ok(from_type) = ctx.asg.unalias(&expr.resolved_type) else {
-        warn_type_alias_depth_exceeded(&expr.resolved_type);
+    let Ok(from_type) = ctx.asg.unalias(&expr.ty) else {
+        warn_type_alias_depth_exceeded(&expr.ty);
         return O::fail();
     };
 
@@ -87,7 +87,7 @@ pub fn conform_expr<O: Objective>(
 
     if *from_type == *to_type {
         return O::success(|| TypedExpr {
-            resolved_type: to_type.clone(),
+            ty: to_type.clone(),
             expr: expr.expr.clone(),
             is_initialized: expr.is_initialized,
         });
@@ -131,7 +131,7 @@ pub fn conform_expr_or_error(
 ) -> Result<TypedExpr, ResolveError> {
     conform_expr::<Perform>(ctx, expr, target_type, mode, behavior, conform_source).or_else(|_| {
         Err(ResolveErrorKind::TypeMismatch {
-            left: expr.resolved_type.to_string(),
+            left: expr.ty.to_string(),
             right: target_type.to_string(),
         }
         .at(expr.expr.source))

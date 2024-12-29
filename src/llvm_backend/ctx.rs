@@ -32,14 +32,14 @@ pub struct StaticVariable {
 
 #[derive(Debug, Default)]
 pub struct StructureCache {
-    pub cache: OnceMap<ir::StructureRef, LLVMTypeRef>,
+    pub cache: OnceMap<ir::StructRef, LLVMTypeRef>,
 }
 
 #[derive(Debug)]
 pub struct ToBackendTypeCtx<'a> {
     pub structure_cache: &'a StructureCache,
     pub ir_module: &'a ir::Module,
-    pub visited: RefCell<HashSet<ir::StructureRef>>,
+    pub visited: RefCell<HashSet<ir::StructRef>>,
 }
 
 impl<'a> From<&'a BackendCtx<'a>> for ToBackendTypeCtx<'a> {
@@ -52,7 +52,7 @@ pub struct FunctionSkeleton {
     pub function: LLVMValueRef,
     pub abi_function: Option<ABIFunction>,
     pub function_type: FunctionType,
-    pub ir_function_ref: ir::FunctionRef,
+    pub ir_function_ref: ir::FuncRef,
     pub max_vector_width: ByteUnits,
 }
 
@@ -60,7 +60,7 @@ pub struct BackendCtx<'a> {
     pub backend_module: &'a BackendModule,
     pub ir_module: &'a ir::Module,
     pub builder: Option<Builder>,
-    pub func_skeletons: HashMap<ir::FunctionRef, FunctionSkeleton>,
+    pub func_skeletons: HashMap<ir::FuncRef, FunctionSkeleton>,
     pub globals: HashMap<ir::GlobalVarRef, LLVMValueRef>,
     pub anon_global_variables: Vec<LLVMValueRef>,
     pub target_data: &'a TargetData,
@@ -81,7 +81,7 @@ impl<'a> BackendCtx<'a> {
         diagnostics: &'a Diagnostics,
     ) -> Result<Self, BackendError> {
         let type_layout_cache =
-            TypeLayoutCache::new(&ir_module.target, &ir_module.structures, asg, diagnostics);
+            TypeLayoutCache::new(&ir_module.target, &ir_module.structs, asg, diagnostics);
 
         let arch = Arch::new(&ir_module.target)
             .ok_or_else(|| BackendError::plain("Target platform is not supported"))?;

@@ -4,7 +4,7 @@ use derive_more::IsVariant;
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
-pub struct Structure {
+pub struct Struct {
     pub name: String,
     pub fields: IndexMap<String, Field>,
     pub parameters: IndexMap<String, TypeParameter>,

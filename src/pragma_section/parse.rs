@@ -1,9 +1,6 @@
 use super::PragmaSection;
 use crate::{
-    ast::{
-        AstFile, Expr, ExprKind, Function, FunctionHead, Parameters, Privacy, Stmt, StmtKind,
-        TypeKind,
-    },
+    ast::{AstFile, Expr, ExprKind, Func, FuncHead, Params, Privacy, Stmt, StmtKind, TypeKind},
     diagnostics::ErrorDiagnostic,
     inflow::Inflow,
     parser::{self, error::ParseError, Input},
@@ -80,7 +77,7 @@ impl PragmaSection {
                 let has_adept_first = stmts.first().map_or(false, |stmt| {
                     if let StmtKind::Expr(e) = &stmt.kind {
                         if let ExprKind::Call(c) = &e.kind {
-                            c.function_name.as_plain_str() == Some("adept")
+                            c.name.as_plain_str() == Some("adept")
                         } else {
                             false
                         }
@@ -103,11 +100,11 @@ impl PragmaSection {
                 }
             }
 
-            ast_file.functions.push(Function {
-                head: FunctionHead {
+            ast_file.funcs.push(Func {
+                head: FuncHead {
                     name: "main".into(),
                     givens: vec![],
-                    parameters: Parameters::default(),
+                    params: Params::default(),
                     return_type: TypeKind::Void.at(source),
                     is_foreign: false,
                     source,

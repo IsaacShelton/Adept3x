@@ -24,12 +24,12 @@ pub fn resolve_global_variables(
                 &constraints,
             );
 
-            let resolved_type = type_ctx.resolve(&global.ast_type)?;
+            let ty = type_ctx.resolve(&global.ast_type)?;
             let resolved_name = ResolvedName::new(module_file_id, &Name::plain(&global.name));
 
             let global_ref = asg.globals.insert(asg::GlobalVar {
                 name: resolved_name,
-                resolved_type: resolved_type.clone(),
+                ty: ty.clone(),
                 source: global.source,
                 is_foreign: global.is_foreign,
                 is_thread_local: global.is_thread_local,

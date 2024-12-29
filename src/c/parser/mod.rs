@@ -17,7 +17,7 @@ use super::{
     translation::{declare_function, declare_named_declaration},
 };
 use crate::{
-    ast::{AstFile, Parameter, Type, TypeKind},
+    ast::{AstFile, Param, Type, TypeKind},
     diagnostics::{Diagnostics, WarningDiagnostic},
     source_files::source::Source,
 };
@@ -167,7 +167,7 @@ pub struct ArrayQualifier {
 
 #[derive(Clone, Debug)]
 pub struct FunctionQualifier {
-    pub parameters: Vec<Parameter>,
+    pub parameters: Vec<Param>,
     pub is_cstyle_variadic: bool,
     pub source: Source,
 }

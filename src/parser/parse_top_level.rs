@@ -48,7 +48,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 self.parse_token(TokenKind::CloseCurly, Some("to close annotation group"))?;
             }
             TokenKind::FuncKeyword => {
-                ast_file.functions.push(self.parse_function(annotations)?);
+                ast_file.funcs.push(self.parse_function(annotations)?);
             }
             TokenKind::Identifier(_) => {
                 ast_file

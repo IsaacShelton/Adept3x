@@ -3,13 +3,13 @@ use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone, Debug)]
 pub struct ScopedVariable {
-    pub resolved_type: asg::Type,
+    pub ty: asg::Type,
     pub key: VariableStorageKey,
 }
 
 impl ScopedVariable {
-    pub fn new(resolved_type: asg::Type, key: VariableStorageKey) -> Self {
-        Self { resolved_type, key }
+    pub fn new(ty: asg::Type, key: VariableStorageKey) -> Self {
+        Self { ty, key }
     }
 }
 
@@ -38,13 +38,13 @@ impl VariableHaystack {
     pub fn put(
         &mut self,
         name: impl ToString,
-        resolved_type: asg::Type,
+        ty: asg::Type,
         key: VariableStorageKey,
     ) {
         self.variables
             .front_mut()
             .expect("at least one scope")
-            .insert(name.to_string(), ScopedVariable::new(resolved_type, key));
+            .insert(name.to_string(), ScopedVariable::new(ty, key));
     }
 
     pub fn begin_scope(&mut self) {

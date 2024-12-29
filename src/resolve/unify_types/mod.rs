@@ -39,7 +39,7 @@ pub fn unify_types(
             Err(_) => {
                 panic!(
                     "cannot conform from '{}' to unified type '{unified_type}'",
-                    expr.resolved_type,
+                    expr.ty,
                 );
             }
         }

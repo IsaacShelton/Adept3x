@@ -1,31 +1,31 @@
-mod functions;
-mod structures;
+mod funcs;
+mod structs;
 
 pub use crate::asg::{FloatOrSign, GlobalVarRef, IntegerSign};
 use crate::{
-    data_units::ByteUnits,
     asg::{FloatOrInteger, IntegerBits},
+    data_units::ByteUnits,
     source_files::Source,
     target::Target,
 };
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
-pub use functions::FunctionRef;
-use functions::Functions;
+pub use funcs::FuncRef;
+use funcs::Funcs;
 use std::{collections::HashMap, ffi::CString};
-pub use structures::{StructureRef, Structures};
+pub use structs::{StructRef, Structs};
 
 pub struct Module {
     pub target: Target,
-    pub structures: Structures,
+    pub structs: Structs,
     pub globals: HashMap<GlobalVarRef, Global>,
-    pub functions: Functions,
+    pub funcs: Funcs,
 }
 
 impl std::fmt::Debug for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "SlotMap {{")?;
-        for ir_function in self.functions.values() {
+        for ir_function in self.funcs.values() {
             ir_function.fmt(f)?;
         }
         write!(f, "SlotMap }}")?;
@@ -42,7 +42,7 @@ pub struct Global {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function {
+pub struct Func {
     pub mangled_name: String,
     pub parameters: Vec<Type>,
     pub return_type: Type,
@@ -194,7 +194,7 @@ impl BinaryOperands {
 
 #[derive(Clone, Debug)]
 pub struct Call {
-    pub function: FunctionRef,
+    pub function: FuncRef,
     pub arguments: Box<[Value]>,
     pub unpromoted_variadic_argument_types: Box<[Type]>,
 }
@@ -312,7 +312,7 @@ pub enum Type {
     F64,
     Void,
     Union(()),
-    Structure(StructureRef),
+    Structure(StructRef),
     AnonymousComposite(TypeComposite),
     FunctionPointer,
     FixedArray(Box<FixedArray>),
@@ -413,7 +413,7 @@ impl Type {
     pub fn struct_fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
         match self {
             Type::Structure(structure_ref) => {
-                Some(&ir_module.structures.get(*structure_ref).fields[..])
+                Some(&ir_module.structs.get(*structure_ref).fields[..])
             }
             Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
             _ => None,
@@ -473,8 +473,8 @@ impl Module {
     pub fn new(target: Target) -> Self {
         Self {
             target,
-            functions: Functions::new(),
-            structures: Structures::new(),
+            funcs: Funcs::new(),
+            structs: Structs::new(),
             globals: HashMap::new(),
         }
     }

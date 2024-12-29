@@ -7,9 +7,9 @@ use super::{
     polymorph::PolyCatalog,
 };
 use crate::{
+    asg::{self, Callee, TypeKind, TypedExpr},
     name::{Name, ResolvedName},
     resolve::conform::Perform,
-    asg::{self, Callee, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FunctionHaystack {
-    pub available: HashMap<ResolvedName, Vec<asg::FunctionRef>>,
+    pub available: HashMap<ResolvedName, Vec<asg::FuncRef>>,
     pub imported_namespaces: Vec<Box<str>>,
     pub fs_node_id: FsNodeId,
 }
@@ -81,7 +81,7 @@ impl FunctionHaystack {
         local_matches
             .chain(remote_matches)
             .map(|function_ref| {
-                let function = ctx.asg.functions.get(*function_ref).unwrap();
+                let function = ctx.asg.funcs.get(*function_ref).unwrap();
 
                 format!(
                     "{}({})",
@@ -94,11 +94,11 @@ impl FunctionHaystack {
 
     fn fits(
         ctx: &ResolveExprCtx,
-        function_ref: asg::FunctionRef,
+        function_ref: asg::FuncRef,
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Callee> {
-        let function = ctx.asg.functions.get(function_ref).unwrap();
+        let function = ctx.asg.funcs.get(function_ref).unwrap();
         let parameters = &function.parameters;
 
         if !parameters.is_cstyle_vararg && arguments.len() != parameters.required.len() {
@@ -164,9 +164,7 @@ impl FunctionHaystack {
         argument: &TypedExpr,
         param_type: &asg::Type,
     ) -> bool {
-        catalog
-            .match_type(ctx, param_type, &argument.resolved_type)
-            .is_ok()
+        catalog.match_type(ctx, param_type, &argument.ty).is_ok()
     }
 
     fn find_local(
@@ -241,13 +239,13 @@ impl FunctionHaystack {
 
         let subject_module = arguments
             .first()
-            .map(|arg| &arg.resolved_type)
+            .map(|arg| &arg.ty)
             .and_then(|first_type| {
                 if let Ok(first_type) = ctx.asg.unalias(first_type) {
                     match &first_type.kind {
                         TypeKind::Structure(_, structure_ref, _) => Some(
                             ctx.asg
-                                .structures
+                                .structs
                                 .get(*structure_ref)
                                 .expect("valid struct")
                                 .name

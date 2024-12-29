@@ -88,7 +88,7 @@ pub unsafe fn to_backend_types<'a, 't>(
 
 pub unsafe fn get_unabi_function_type<'a>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
-    function: &ir::Function,
+    function: &ir::Func,
 ) -> Result<LLVMTypeRef, BackendError> {
     get_function_pointer_type(
         ctx.borrow(),
@@ -100,7 +100,7 @@ pub unsafe fn get_unabi_function_type<'a>(
 
 pub unsafe fn get_abi_function_type(
     ctx: &BackendCtx,
-    function: &ir::Function,
+    function: &ir::Func,
     abi_function: &ABIFunction,
     params_mapping: &ParamsMapping,
 ) -> Result<LLVMTypeRef, BackendError> {

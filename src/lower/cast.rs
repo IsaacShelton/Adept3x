@@ -18,7 +18,7 @@ pub fn integer_like_type_size(target: &Target, ty: &asg::Type) -> Option<ByteUni
 pub fn integer_truncate(
     builder: &mut Builder,
     ir_module: &ir::Module,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
     cast: &Cast,
 ) -> Result<Value, LowerError> {
@@ -30,7 +30,7 @@ pub fn integer_truncate(
 pub fn integer_extend(
     builder: &mut Builder,
     ir_module: &ir::Module,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
     cast_from: &CastFrom,
 ) -> Result<Value, LowerError> {
@@ -58,7 +58,7 @@ pub fn integer_extend(
 pub fn integer_cast(
     builder: &mut Builder,
     ir_module: &ir::Module,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
     cast_from: &CastFrom,
 ) -> Result<Value, LowerError> {

@@ -1,6 +1,6 @@
 use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
-    ast::{self, AstFile, Function, FunctionHead, Parameter, Parameters, Privacy},
+    ast::{self, AstFile, Func, FuncHead, Param, Params, Privacy},
     c::parser::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError,
@@ -50,7 +50,7 @@ pub fn declare_function(
                 );
             }
 
-            required.push(Parameter { name, ast_type });
+            required.push(Param { name, ast_type });
         }
     }
 
@@ -66,15 +66,15 @@ pub fn declare_function(
         return Ok(());
     }
 
-    let parameters = Parameters {
+    let parameters = Params {
         required,
         is_cstyle_vararg: parameter_type_list.is_variadic,
     };
 
-    let head = FunctionHead {
+    let head = FuncHead {
         name,
         givens: vec![],
-        parameters,
+        params: parameters,
         return_type,
         is_foreign: true,
         source,
@@ -83,7 +83,7 @@ pub fn declare_function(
         privacy: Privacy::Public,
     };
 
-    ast_file.functions.push(Function {
+    ast_file.funcs.push(Func {
         head,
         stmts: vec![],
     });

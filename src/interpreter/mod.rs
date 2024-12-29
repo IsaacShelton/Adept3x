@@ -48,7 +48,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
 
     pub fn run(
         &mut self,
-        interpreter_entry_point: ir::FunctionRef,
+        interpreter_entry_point: ir::FuncRef,
     ) -> Result<Value<'a>, InterpreterError> {
         // The entry point for the interpreter always takes zero arguments
         // and can return anything. It is up to the producer of the ir::Module
@@ -59,10 +59,10 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
 
     pub fn call(
         &mut self,
-        function_ref: ir::FunctionRef,
+        function_ref: ir::FuncRef,
         args: Vec<Value<'a>>,
     ) -> Result<Value<'a>, InterpreterError> {
-        let function = self.ir_module.functions.get(function_ref);
+        let function = self.ir_module.funcs.get(function_ref);
 
         if function.is_cstyle_variadic {
             todo!("c-style variadic functions are not supported in interpreter yet - (for function {:?})", function.mangled_name);

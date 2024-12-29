@@ -9,12 +9,12 @@ pub struct VariableStorage {
 
 #[derive(Clone, Debug)]
 pub struct VariableInstance {
-    pub resolved_type: Type,
+    pub ty: Type,
     pub initialized: OnceCell<()>,
 }
 
 impl VariableInstance {
-    pub fn new(resolved_type: Type, is_initialized: bool) -> Self {
+    pub fn new(ty: Type, is_initialized: bool) -> Self {
         let initialized = if is_initialized {
             OnceCell::from(())
         } else {
@@ -22,7 +22,7 @@ impl VariableInstance {
         };
 
         Self {
-            resolved_type,
+            ty,
             initialized,
         }
     }
@@ -51,20 +51,20 @@ impl VariableStorage {
 
     pub fn add_variable(
         &mut self,
-        resolved_type: asg::Type,
+        ty: asg::Type,
         is_initialized: bool,
     ) -> VariableStorageKey {
         let index = self.instances.len();
         let key = VariableStorageKey { index };
         self.instances
-            .push(VariableInstance::new(resolved_type, is_initialized));
+            .push(VariableInstance::new(ty, is_initialized));
         key
     }
 
-    pub fn add_parameter(&mut self, resolved_type: asg::Type) -> VariableStorageKey {
+    pub fn add_parameter(&mut self, ty: asg::Type) -> VariableStorageKey {
         assert_eq!(self.num_parameters, self.instances.len());
         self.num_parameters += 1;
-        self.add_variable(resolved_type, true)
+        self.add_variable(ty, true)
     }
 
     pub fn get(&self, key: VariableStorageKey) -> Option<&VariableInstance> {

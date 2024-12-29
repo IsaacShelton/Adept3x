@@ -3,7 +3,7 @@ mod datatype;
 mod destination;
 mod enumeration;
 mod expr;
-mod function;
+mod func;
 mod global;
 mod helper_expr;
 mod human_name;
@@ -23,7 +23,7 @@ pub use datatype::*;
 pub use destination::*;
 pub use enumeration::*;
 pub use expr::*;
-pub use function::*;
+pub use func::*;
 pub use global::*;
 pub use helper_expr::*;
 pub use human_name::*;
@@ -38,9 +38,9 @@ pub use type_decl::*;
 pub use variable_storage::*;
 
 new_key_type! {
-    pub struct FunctionRef;
+    pub struct FuncRef;
     pub struct GlobalVarRef;
-    pub struct StructureRef;
+    pub struct StructRef;
     pub struct EnumRef;
     pub struct TypeAliasRef;
     pub struct TraitRef;
@@ -50,9 +50,9 @@ new_key_type! {
 #[derive(Clone, Debug)]
 pub struct Asg<'a> {
     pub source_files: &'a SourceFiles,
-    pub entry_point: Option<FunctionRef>,
-    pub functions: SlotMap<FunctionRef, Function>,
-    pub structures: SlotMap<StructureRef, Structure>,
+    pub entry_point: Option<FuncRef>,
+    pub funcs: SlotMap<FuncRef, Func>,
+    pub structs: SlotMap<StructRef, Struct>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: SlotMap<EnumRef, Enum>,
     pub type_aliases: SlotMap<TypeAliasRef, Type>,
@@ -68,8 +68,8 @@ impl<'a> Asg<'a> {
         Self {
             source_files,
             entry_point: None,
-            functions: SlotMap::with_key(),
-            structures: SlotMap::with_key(),
+            funcs: SlotMap::with_key(),
+            structs: SlotMap::with_key(),
             globals: SlotMap::with_key(),
             enums: SlotMap::with_key(),
             type_aliases: SlotMap::with_key(),
@@ -79,11 +79,11 @@ impl<'a> Asg<'a> {
         }
     }
 
-    pub fn unalias(&'a self, mut resolved_type: &'a Type) -> Result<&'a Type, UnaliasError> {
+    pub fn unalias(&'a self, mut ty: &'a Type) -> Result<&'a Type, UnaliasError> {
         let mut depth = 0;
 
-        while let TypeKind::TypeAlias(_, type_alias_ref) = resolved_type.kind {
-            resolved_type = self
+        while let TypeKind::TypeAlias(_, type_alias_ref) = ty.kind {
+            ty = self
                 .type_aliases
                 .get(type_alias_ref)
                 .expect("valid type alias ref");
@@ -95,7 +95,7 @@ impl<'a> Asg<'a> {
             }
         }
 
-        Ok(resolved_type)
+        Ok(ty)
     }
 }
 

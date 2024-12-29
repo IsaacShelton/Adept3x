@@ -27,12 +27,12 @@ pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination,
             ExprKind::Dereference(subject) => DestinationKind::Dereference(subject.expr),
             _ => {
                 return Err(ResolveErrorKind::CannotMutate {
-                    bad_type: typed_expr.resolved_type.to_string(),
+                    bad_type: typed_expr.ty.to_string(),
                 }
                 .at(source))
             }
         },
-        typed_expr.resolved_type,
+        typed_expr.ty,
         typed_expr.expr.source,
     ))
 }

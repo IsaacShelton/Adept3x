@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Parameters, Privacy, Trait, TraitFunction},
+    ast::{Params, Privacy, Trait, TraitFunc},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
@@ -59,11 +59,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             parameters,
             source,
             privacy,
-            functions: methods,
+            funcs: methods,
         })
     }
 
-    fn parse_trait_method(&mut self) -> Result<TraitFunction, ParseError> {
+    fn parse_trait_method(&mut self) -> Result<TraitFunc, ParseError> {
         let source = self.input.peek().source;
 
         if !self.input.eat(TokenKind::FuncKeyword) {
@@ -80,16 +80,16 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let parameters = if self.input.peek_is(TokenKind::OpenParen) {
             self.parse_function_parameters()?
         } else {
-            Parameters::default()
+            Params::default()
         };
 
         self.ignore_newlines();
 
         let return_type = self.parse_type(Some("return "), Some("for trait method"))?;
 
-        Ok(TraitFunction {
+        Ok(TraitFunc {
             name,
-            parameters,
+            params: parameters,
             return_type,
             source,
         })

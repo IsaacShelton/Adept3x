@@ -6,6 +6,7 @@ use super::{
     params_mapping::Param,
 };
 use crate::{
+    asg::FloatOrInteger,
     backend::BackendError,
     data_units::{BitUnits, ByteUnits},
     ir::{self, Call, FloatOrSign, Instruction, IntegerSign},
@@ -35,7 +36,6 @@ use crate::{
         value_catalog::ValueCatalog,
         values::build_value,
     },
-    asg::FloatOrInteger,
     target::Target,
 };
 use cstr::cstr;
@@ -783,7 +783,7 @@ unsafe fn emit_call(
     fn_ctx: &FnCtx,
     value_catalog: &mut ValueCatalog,
 ) -> Result<LLVMValueRef, BackendError> {
-    let ir_function = ctx.ir_module.functions.get(call.function);
+    let ir_function = ctx.ir_module.funcs.get(call.function);
 
     let skeleton = ctx
         .func_skeletons

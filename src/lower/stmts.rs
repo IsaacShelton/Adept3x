@@ -14,7 +14,7 @@ pub fn lower_stmts(
     builder: &mut Builder,
     ir_module: &ir::Module,
     stmts: &[asg::Stmt],
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
 ) -> Result<Value, LowerError> {
     let mut result = Value::Literal(Literal::Void);
@@ -58,11 +58,8 @@ pub fn lower_stmts(
                 let new_value = lower_expr(builder, ir_module, &assignment.value, function, asg)?;
 
                 let new_value = if let Some(operator) = &assignment.operator {
-                    let destination_type = lower_type(
-                        ir_module,
-                        &builder.unpoly(&assignment.destination.resolved_type)?,
-                        asg,
-                    )?;
+                    let destination_type =
+                        lower_type(ir_module, &builder.unpoly(&assignment.destination.ty)?, asg)?;
 
                     let existing_value = builder.push(ir::Instruction::Load((
                         destination.clone(),

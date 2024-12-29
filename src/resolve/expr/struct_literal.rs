@@ -1,5 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
+    asg::{self, StructLiteral, StructRef, TypedExpr},
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
     resolve::{
         conform::{conform_expr, ConformMode, Perform},
@@ -7,7 +8,6 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog, PolymorphError,
     },
-    asg::{self, StructLiteral, StructureRef, TypedExpr},
     source_files::Source,
 };
 use indexmap::IndexMap;
@@ -16,18 +16,18 @@ use itertools::Itertools;
 #[derive(Clone, Debug)]
 pub struct FieldInfo {
     pub index: usize,
-    pub resolved_type: asg::Type,
+    pub ty: asg::Type,
 }
 
 fn get_field_info<'a>(
     ctx: &'a ResolveExprCtx,
-    structure_ref: StructureRef,
+    structure_ref: StructRef,
     arguments: &[asg::Type],
     field_name: &str,
 ) -> Result<FieldInfo, PolymorphError> {
     let structure = ctx
         .asg
-        .structures
+        .structs
         .get(structure_ref)
         .expect("referenced structure to exist");
 
@@ -45,12 +45,9 @@ fn get_field_info<'a>(
             .expect("non-duplicate polymorphic type parameters for structure")
     }
 
-    let resolved_type = catalog.bake().resolve_type(&field.resolved_type)?;
+    let ty = catalog.bake().resolve_type(&field.ty)?;
 
-    Ok(FieldInfo {
-        index,
-        resolved_type,
-    })
+    Ok(FieldInfo { index, ty })
 }
 
 pub fn resolve_struct_literal_expr(
@@ -85,7 +82,7 @@ pub fn resolve_struct_literal_expr(
     for field_initializer in fields.iter() {
         let all_fields = &ctx
             .asg
-            .structures
+            .structs
             .get(structure_ref)
             .expect("referenced struct to exist")
             .fields;
@@ -104,7 +101,7 @@ pub fn resolve_struct_literal_expr(
         {
             let structure = ctx
                 .asg
-                .structures
+                .structs
                 .get(structure_ref)
                 .expect("referenced structure to exist");
 
@@ -136,7 +133,7 @@ pub fn resolve_struct_literal_expr(
         let resolved_expr = conform_expr::<Perform>(
             ctx,
             &resolved_expr,
-            &field_info.resolved_type,
+            &field_info.ty,
             mode,
             conform_behavior,
             source,
@@ -145,7 +142,7 @@ pub fn resolve_struct_literal_expr(
             ResolveErrorKind::ExpectedTypeForField {
                 structure: ast_type.to_string(),
                 field_name: field_name.to_string(),
-                expected: field_info.resolved_type.to_string(),
+                expected: field_info.ty.to_string(),
             }
             .at(ast_type.source)
         })?;
@@ -169,7 +166,7 @@ pub fn resolve_struct_literal_expr(
 
     let structure = ctx
         .asg
-        .structures
+        .structs
         .get(structure_ref)
         .expect("referenced structure to exist");
 
@@ -193,9 +190,7 @@ pub fn resolve_struct_literal_expr(
                     let field_info = get_field_info(ctx, structure_ref, &arguments, field_name)
                         .map_err(ResolveError::from)?;
 
-                    let zeroed =
-                        asg::ExprKind::Zeroed(Box::new(field_info.resolved_type.clone()))
-                            .at(source);
+                    let zeroed = asg::ExprKind::Zeroed(Box::new(field_info.ty.clone())).at(source);
 
                     resolved_fields.insert(field_name.to_string(), (zeroed, field_info.index));
                 }
@@ -210,8 +205,7 @@ pub fn resolve_struct_literal_expr(
         .map(|(x, (y, z))| (x, y, z))
         .collect_vec();
 
-    let structure_type =
-        asg::TypeKind::Structure(struct_name, structure_ref, arguments).at(source);
+    let structure_type = asg::TypeKind::Structure(struct_name, structure_ref, arguments).at(source);
 
     Ok(TypedExpr::new(
         resolved_struct_type.clone(),

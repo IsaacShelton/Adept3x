@@ -15,14 +15,14 @@ pub fn compute_unifying_type(
     behavior: ConformBehavior,
     source: Source,
 ) -> Option<Type> {
-    let types_iter = values.iter().map(|expr| &expr.borrow().resolved_type);
+    let types_iter = values.iter().map(|expr| &expr.borrow().ty);
 
     // If all the values have the same type, the unifying type is that type
     if types_iter.clone().all_equal() {
         return Some(
             values
                 .first()
-                .map(|expr| expr.borrow().resolved_type.clone())
+                .map(|expr| expr.borrow().ty.clone())
                 .unwrap_or_else(|| TypeKind::Void.at(source)),
         );
     }
@@ -45,9 +45,9 @@ pub fn compute_unifying_type(
     }
 
     // If all values are integer and floating literals, use the default floating-point type
-    if types_iter.clone().all(|resolved_type| {
+    if types_iter.clone().all(|ty| {
         matches!(
-            resolved_type.kind,
+            ty.kind,
             TypeKind::IntegerLiteral(..) | TypeKind::FloatLiteral(..)
         )
     }) {

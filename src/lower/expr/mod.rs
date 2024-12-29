@@ -10,7 +10,8 @@ use super::{
 };
 use crate::{
     asg::{
-        self, Asg, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, Member, NumericMode, SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey
+        self, Asg, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, Member,
+        NumericMode, SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
     },
     ast::{FloatSize, IntegerBits, IntegerRigidity},
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
@@ -23,7 +24,7 @@ pub fn lower_expr(
     builder: &mut Builder,
     ir_module: &ir::Module,
     expr: &Expr,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
 ) -> Result<ir::Value, LowerError> {
     match &expr.kind {
@@ -133,7 +134,7 @@ pub fn lower_expr(
         }
         ExprKind::Call(call) => {
             let callee = asg
-                .functions
+                .funcs
                 .get(call.callee.function)
                 .expect("referenced function to exist");
 
@@ -145,14 +146,12 @@ pub fn lower_expr(
 
             let variadic_argument_types = call.arguments[callee.parameters.required.len()..]
                 .iter()
-                .map(|argument| {
-                    lower_type(ir_module, &builder.unpoly(&argument.resolved_type)?, asg)
-                })
+                .map(|argument| lower_type(ir_module, &builder.unpoly(&argument.ty)?, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
 
             let function =
                 ir_module
-                    .functions
+                    .funcs
                     .translate(call.callee.function, &call.callee.recipe, || {
                         lower_function_head(
                             ir_module,
@@ -170,17 +169,12 @@ pub fn lower_expr(
         }
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
-            let variable_type =
-                lower_type(ir_module, &builder.unpoly(&variable.resolved_type)?, asg)?;
+            let variable_type = lower_type(ir_module, &builder.unpoly(&variable.ty)?, asg)?;
             Ok(builder.push(ir::Instruction::Load((pointer_to_variable, variable_type))))
         }
         ExprKind::GlobalVariable(global_variable) => {
             let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
-            let ir_type = lower_type(
-                ir_module,
-                &builder.unpoly(&global_variable.resolved_type)?,
-                asg,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&global_variable.ty)?, asg)?;
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
         ExprKind::DeclareAssign(declare_assign) => {
@@ -197,11 +191,7 @@ pub fn lower_expr(
                 destination: destination.clone(),
             }));
 
-            let ir_type = lower_type(
-                ir_module,
-                &builder.unpoly(&declare_assign.resolved_type)?,
-                asg,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&declare_assign.ty)?, asg)?;
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
         ExprKind::BasicBinaryOperation(operation) => {
@@ -261,13 +251,12 @@ pub fn lower_expr(
         ExprKind::Member(member) => {
             let Member {
                 subject,
-                structure_ref: resolved_structure_ref,
+                structure_ref: struct_ref,
                 index,
                 field_type,
             } = &**member;
 
-            let asg::TypeKind::Structure(_name, _structure_ref, arguments) =
-                &subject.resolved_type.kind
+            let asg::TypeKind::Structure(_name, _structure_ref, arguments) = &subject.ty.kind
             else {
                 todo!("member operator only supports structure types for now");
             };
@@ -275,8 +264,8 @@ pub fn lower_expr(
             let subject_pointer = lower_destination(builder, ir_module, subject, function, asg)?;
 
             let structure = asg
-                .structures
-                .get(*resolved_structure_ref)
+                .structs
+                .get(*struct_ref)
                 .expect("referenced structure to exist");
 
             assert!(structure.parameters.len() == arguments.len());
@@ -288,11 +277,12 @@ pub fn lower_expr(
             }
             let poly_recipe = catalog.bake();
 
-            let structure_ref = ir_module.structures.translate(
-                *resolved_structure_ref,
-                poly_recipe,
-                |poly_recipe| mono(ir_module, asg, *resolved_structure_ref, poly_recipe),
-            )?;
+            let structure_ref =
+                ir_module
+                    .structs
+                    .translate(*struct_ref, poly_recipe, |poly_recipe| {
+                        mono(ir_module, asg, *struct_ref, poly_recipe)
+                    })?;
 
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
@@ -345,7 +335,7 @@ pub fn lower_expr(
             let value = lower_expr(builder, ir_module, &inner.expr, function, asg)?;
 
             let float_or_int = inner
-                .resolved_type
+                .ty
                 .kind
                 .is_float_like()
                 .then_some(FloatOrInteger::Float)
@@ -370,7 +360,7 @@ pub fn lower_expr(
             asg,
         )?),
         ExprKind::Dereference(subject) => {
-            let ir_type = lower_type(ir_module, &builder.unpoly(&subject.resolved_type)?, asg)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&subject.ty)?, asg)?;
             let value = lower_expr(builder, ir_module, &subject.expr, function, asg)?;
             Ok(builder.push(ir::Instruction::Load((value, ir_type))))
         }
@@ -467,11 +457,7 @@ pub fn lower_expr(
                     .at(enum_member_literal.source)
                 })?;
 
-            let ir_type = lower_type(
-                ir_module,
-                &builder.unpoly(&enum_definition.resolved_type)?,
-                asg,
-            )?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&enum_definition.ty)?, asg)?;
 
             let value = &member.value;
 
@@ -519,8 +505,8 @@ pub fn lower_expr(
         ExprKind::ResolvedNamedExpression(resolved_expr) => {
             lower_expr(builder, ir_module, resolved_expr, function, asg)
         }
-        ExprKind::Zeroed(resolved_type) => {
-            let ir_type = lower_type(ir_module, &builder.unpoly(resolved_type)?, asg)?;
+        ExprKind::Zeroed(ty) => {
+            let ir_type = lower_type(ir_module, &builder.unpoly(ty)?, asg)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
         }
         ExprKind::InterpreterSyscall(syscall, args) => {
@@ -539,7 +525,7 @@ pub fn lower_destination(
     builder: &mut Builder,
     ir_module: &ir::Module,
     destination: &Destination,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
 ) -> Result<ir::Value, LowerError> {
     match &destination.kind {
@@ -550,21 +536,20 @@ pub fn lower_destination(
         }
         DestinationKind::Member {
             subject,
-            structure_ref: resolved_structure_ref,
+            structure_ref: struct_ref,
             index,
             ..
         } => {
             let subject_pointer = lower_destination(builder, ir_module, subject, function, asg)?;
 
-            let asg::TypeKind::Structure(_name, _structure_ref, arguments) =
-                &subject.resolved_type.kind
+            let asg::TypeKind::Structure(_name, _structure_ref, arguments) = &subject.ty.kind
             else {
                 todo!("member operator only supports structure types for now");
             };
 
             let structure = asg
-                .structures
-                .get(*resolved_structure_ref)
+                .structs
+                .get(*struct_ref)
                 .expect("referenced structure to exist");
 
             assert!(structure.parameters.len() == arguments.len());
@@ -576,11 +561,12 @@ pub fn lower_destination(
             }
             let poly_recipe = catalog.bake();
 
-            let structure_ref = ir_module.structures.translate(
-                *resolved_structure_ref,
-                poly_recipe,
-                |poly_recipe| mono(ir_module, asg, *resolved_structure_ref, poly_recipe),
-            )?;
+            let structure_ref =
+                ir_module
+                    .structs
+                    .translate(*struct_ref, poly_recipe, |poly_recipe| {
+                        mono(ir_module, asg, *struct_ref, poly_recipe)
+                    })?;
 
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
@@ -641,8 +627,8 @@ pub fn lower_basic_binary_operation(
     operands: ir::BinaryOperands,
 ) -> Result<Value, LowerError> {
     match operator {
-        asg::BasicBinaryOperator::PrimitiveAdd(resolved_type) => {
-            let ty = builder.unpoly(resolved_type)?;
+        asg::BasicBinaryOperator::PrimitiveAdd(ty) => {
+            let ty = builder.unpoly(ty)?;
             let numeric_mode = NumericMode::try_new(&ty.0).expect("PrimitiveAdd to be addable");
             lower_add(builder, &numeric_mode, operands)
         }

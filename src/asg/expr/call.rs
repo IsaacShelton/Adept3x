@@ -1,5 +1,5 @@
 use super::TypedExpr;
-use crate::{resolve::PolyRecipe, asg::FunctionRef};
+use crate::{asg::FuncRef, resolve::PolyRecipe};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Call {
@@ -9,6 +9,6 @@ pub struct Call {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Callee {
-    pub function: FunctionRef,
+    pub function: FuncRef,
     pub recipe: PolyRecipe,
 }

@@ -23,7 +23,7 @@ pub fn lower_global(
             mangled_name,
             ir_type: lower_type(
                 ir_module,
-                &unpoly(&PolyRecipe::default(), &global.resolved_type)?,
+                &unpoly(&PolyRecipe::default(), &global.ty)?,
                 asg,
             )?,
             is_foreign: global.is_foreign,

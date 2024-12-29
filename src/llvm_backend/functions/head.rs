@@ -19,7 +19,7 @@ use llvm_sys::{
 use std::ffi::CString;
 
 pub unsafe fn create_function_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
-    for (function_ref, function) in ctx.ir_module.functions.iter() {
+    for (function_ref, function) in ctx.ir_module.funcs.iter() {
         let mut abi_function = function
             .abide_abi
             .then(|| {

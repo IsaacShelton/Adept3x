@@ -1,20 +1,20 @@
-mod parameters;
+mod params;
 
 use super::{Given, Privacy, Stmt, Type};
 use crate::{source_files::Source, tag::Tag};
-pub use parameters::{Parameter, Parameters};
+pub use params::{Param, Params};
 
 #[derive(Clone, Debug)]
-pub struct Function {
-    pub head: FunctionHead,
+pub struct Func {
+    pub head: FuncHead,
     pub stmts: Vec<Stmt>,
 }
 
 #[derive(Clone, Debug)]
-pub struct FunctionHead {
+pub struct FuncHead {
     pub name: String,
     pub givens: Vec<Given>,
-    pub parameters: Parameters,
+    pub params: Params,
     pub return_type: Type,
     pub is_foreign: bool,
     pub source: Source,
@@ -23,11 +23,11 @@ pub struct FunctionHead {
     pub privacy: Privacy,
 }
 
-impl FunctionHead {
+impl FuncHead {
     pub fn is_generic(&self) -> bool {
         self.return_type.contains_polymorph().is_some()
             || self
-                .parameters
+                .params
                 .required
                 .iter()
                 .any(|param| param.ast_type.contains_polymorph().is_some())

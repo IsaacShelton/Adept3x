@@ -19,15 +19,15 @@ pub fn lower_type(
     use asg::{IntegerBits as Bits, IntegerSign as Sign};
 
     let target = &ir_module.target;
-    let resolved_type = &concrete_type.borrow().0;
+    let ty = &concrete_type.borrow().0;
 
-    match &resolved_type.kind {
+    match &ty.kind {
         asg::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
         asg::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorph"),
         asg::TypeKind::Trait(name, _, _) => Err(LowerErrorKind::CannotUseTraitDirectly {
             name: name.to_string(),
         }
-        .at(resolved_type.source)),
+        .at(ty.source)),
         asg::TypeKind::Boolean => Ok(ir::Type::Boolean),
         asg::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
@@ -44,7 +44,7 @@ pub fn lower_type(
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
                 value: value.to_string(),
             }
-            .at(resolved_type.source))
+            .at(ty.source))
         }
         asg::TypeKind::FloatLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedFloatLiteral {
@@ -54,7 +54,7 @@ pub fn lower_type(
                     "NaN".into()
                 },
             }
-            .at(resolved_type.source))
+            .at(ty.source))
         }
         asg::TypeKind::Floating(size) => Ok(match size {
             FloatSize::Bits32 => ir::Type::F32,
@@ -113,17 +113,17 @@ pub fn lower_type(
 
             lower_type(
                 ir_module,
-                &ConcreteType(Cow::Borrowed(&enum_definition.resolved_type)),
+                &ConcreteType(Cow::Borrowed(&enum_definition.ty)),
                 asg,
             )
         }
         asg::TypeKind::TypeAlias(_, type_alias_ref) => {
-            let resolved_type = asg
+            let ty = asg
                 .type_aliases
                 .get(*type_alias_ref)
                 .expect("referenced type alias to exist");
 
-            lower_type(ir_module, &ConcreteType(Cow::Borrowed(resolved_type)), asg)
+            lower_type(ir_module, &ConcreteType(Cow::Borrowed(ty)), asg)
         }
     }
 }

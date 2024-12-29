@@ -29,7 +29,7 @@ pub fn resolve_stmt(
 
     match &ast_stmt.kind {
         ast::StmtKind::Return(value) => {
-            let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+            let Some(func_ref) = ctx.func_ref else {
                 return Err(ResolveErrorKind::CannotReturnOutsideFunction.at(ast_stmt.source));
             };
 
@@ -37,14 +37,14 @@ pub fn resolve_stmt(
                 let result = resolve_expr(
                     ctx,
                     value,
-                    Some(PreferredType::ReturnType(resolved_function_ref)),
+                    Some(PreferredType::ReturnType(func_ref)),
                     Initialized::Require,
                 )?;
 
                 let mut return_type = Cow::Borrowed(
                     &ctx.asg
-                        .functions
-                        .get(resolved_function_ref)
+                        .funcs
+                        .get(func_ref)
                         .unwrap()
                         .return_type,
                 );
@@ -66,13 +66,13 @@ pub fn resolve_stmt(
                     Some(result.expr)
                 } else {
                     return Err(ResolveErrorKind::CannotReturnValueOfType {
-                        returning: result.resolved_type.to_string(),
+                        returning: result.ty.to_string(),
                         expected: return_type.to_string(),
                     }
                     .at(source));
                 }
             } else {
-                let function = ctx.asg.functions.get(resolved_function_ref).unwrap();
+                let function = ctx.asg.funcs.get(func_ref).unwrap();
 
                 if function.return_type.kind != asg::TypeKind::Void {
                     return Err(ResolveErrorKind::CannotReturnVoid {
@@ -91,7 +91,7 @@ pub fn resolve_stmt(
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
-            let resolved_type = ctx.type_ctx().resolve(&declaration.ast_type)?;
+            let ty = ctx.type_ctx().resolve(&declaration.ast_type)?;
 
             let value = declaration
                 .initial_value
@@ -100,7 +100,7 @@ pub fn resolve_stmt(
                     resolve_expr(
                         ctx,
                         value,
-                        Some(PreferredType::of(&resolved_type)),
+                        Some(PreferredType::of(&ty)),
                         Initialized::Require,
                     )
                 })
@@ -110,7 +110,7 @@ pub fn resolve_stmt(
                     conform_expr::<Perform>(
                         ctx,
                         value,
-                        &resolved_type,
+                        &ty,
                         ConformMode::Normal,
                         ctx.adept_conform_behavior(),
                         source,
@@ -118,8 +118,8 @@ pub fn resolve_stmt(
                     .map(|value| value.expr)
                     .map_err(|_| {
                         ResolveErrorKind::CannotAssignValueOfType {
-                            from: value.resolved_type.to_string(),
-                            to: resolved_type.to_string(),
+                            from: value.ty.to_string(),
+                            to: ty.to_string(),
                         }
                         .at(source)
                     })
@@ -137,20 +137,20 @@ pub fn resolve_stmt(
                 .at(source));
             }
 
-            let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+            let Some(func_ref) = ctx.func_ref else {
                 return Err(
                     ResolveErrorKind::CannotDeclareVariableOutsideFunction.at(ast_stmt.source)
                 );
             };
 
-            let function = ctx.asg.functions.get_mut(resolved_function_ref).unwrap();
+            let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
 
             let key = function
                 .variables
-                .add_variable(resolved_type.clone(), value.is_some());
+                .add_variable(ty.clone(), value.is_some());
 
             ctx.variable_haystack
-                .put(&declaration.name, resolved_type.clone(), key);
+                .put(&declaration.name, ty.clone(), key);
 
             Ok(asg::Stmt::new(
                 asg::StmtKind::Declaration(asg::Declaration { key, value }),
@@ -168,29 +168,29 @@ pub fn resolve_stmt(
             let value = resolve_expr(
                 ctx,
                 &assignment.value,
-                Some(PreferredType::of(&destination_expr.resolved_type)),
+                Some(PreferredType::of(&destination_expr.ty)),
                 Initialized::Require,
             )?;
 
             let value = conform_expr::<Perform>(
                 ctx,
                 &value,
-                &destination_expr.resolved_type,
+                &destination_expr.ty,
                 ConformMode::Normal,
                 ctx.adept_conform_behavior(),
                 source,
             )
             .map_err(|_| {
                 ResolveErrorKind::CannotAssignValueOfType {
-                    from: value.resolved_type.to_string(),
-                    to: destination_expr.resolved_type.to_string(),
+                    from: value.ty.to_string(),
+                    to: destination_expr.ty.to_string(),
                 }
                 .at(source)
             })?;
 
             let destination = resolve_expr_to_destination(destination_expr)?;
 
-            let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+            let Some(func_ref) = ctx.func_ref else {
                 return Err(
                     ResolveErrorKind::CannotAssignVariableOutsideFunction.at(ast_stmt.source)
                 );
@@ -199,7 +199,7 @@ pub fn resolve_stmt(
             // Mark destination as initialized
             match &destination.kind {
                 asg::DestinationKind::Variable(variable) => {
-                    let function = ctx.asg.functions.get_mut(resolved_function_ref).unwrap();
+                    let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
 
                     function
                         .variables
@@ -220,7 +220,7 @@ pub fn resolve_stmt(
                     resolve_basic_binary_operator(
                         ctx,
                         ast_operator,
-                        &destination.resolved_type,
+                        &destination.ty,
                         source,
                     )
                 })

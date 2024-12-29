@@ -1,5 +1,6 @@
 use super::{PreferredType, ResolveExprCtx};
 use crate::{
+    asg::{self, GlobalVarDecl, Type, TypedExpr},
     ast::HelperExpr,
     ir::GlobalVarRef,
     name::Name,
@@ -8,7 +9,6 @@ use crate::{
         expr::resolve_expr,
         Initialized,
     },
-    asg::{self, GlobalVarDecl, Type, TypedExpr},
     source_files::Source,
 };
 
@@ -23,9 +23,9 @@ pub fn resolve_variable_expr(
         .as_plain_str()
         .and_then(|name| ctx.variable_haystack.find(name))
     {
-        if let Some(function) = ctx.resolved_function_ref.map(|function_ref| {
+        if let Some(function) = ctx.func_ref.map(|function_ref| {
             ctx.asg
-                .functions
+                .funcs
                 .get_mut(function_ref)
                 .expect("valid function ref")
         }) {
@@ -36,11 +36,11 @@ pub fn resolve_variable_expr(
                 .is_initialized();
 
             return Ok(TypedExpr::new_maybe_initialized(
-                variable.resolved_type.clone(),
+                variable.ty.clone(),
                 asg::Expr::new(
                     asg::ExprKind::Variable(Box::new(asg::Variable {
                         key: variable.key,
-                        resolved_type: variable.resolved_type.clone(),
+                        ty: variable.ty.clone(),
                     })),
                     source,
                 ),
@@ -157,18 +157,14 @@ fn resolve_global_variable(
     decl: &GlobalVarDecl,
     source: Source,
 ) -> TypedExpr {
-    let global = ctx
-        .asg
-        .globals
-        .get(decl.global_ref)
-        .expect("valid global");
+    let global = ctx.asg.globals.get(decl.global_ref).expect("valid global");
 
     TypedExpr::new(
-        global.resolved_type.clone(),
+        global.ty.clone(),
         asg::Expr::new(
             asg::ExprKind::GlobalVariable(Box::new(asg::GlobalVariable {
                 reference: decl.global_ref,
-                resolved_type: global.resolved_type.clone(),
+                ty: global.ty.clone(),
             })),
             source,
         ),
@@ -183,13 +179,13 @@ fn resolve_helper_expr(
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let TypedExpr {
-        resolved_type,
+        ty,
         expr,
         is_initialized,
     } = resolve_expr(ctx, &helper_expr.value, preferred_type, initialized)?;
 
     return Ok(TypedExpr::new_maybe_initialized(
-        resolved_type,
+        ty,
         asg::Expr::new(
             asg::ExprKind::ResolvedNamedExpression(Box::new(expr)),
             source,

@@ -1,5 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
+    asg::{self, Cast, CastFrom, TypedExpr},
     ast::{self, CInteger, FloatSize},
     ir::IntegerSign,
     resolve::{
@@ -7,7 +8,6 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    asg::{self, Cast, CastFrom, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -33,8 +33,8 @@ pub fn resolve_call_expr(
 
     // Capture primitive casts
     // TODO: CLEANUP: Clean up this code and add more types
-    if call.function_name.namespace.is_empty() && arguments.len() == 1 {
-        let name = &call.function_name.basename;
+    if call.name.namespace.is_empty() && arguments.len() == 1 {
+        let name = &call.name.basename;
 
         let target_type_kind = match name.as_ref() {
             "bool" => Some(asg::TypeKind::Boolean),
@@ -90,7 +90,7 @@ pub fn resolve_call_expr(
             _ => None,
         };
 
-        let argument_type_kind = &arguments[0].resolved_type.kind;
+        let argument_type_kind = &arguments[0].ty.kind;
 
         if let Some(target_type_kind) = target_type_kind {
             if target_type_kind.is_boolean() && argument_type_kind.is_integer_literal() {
@@ -102,7 +102,7 @@ pub fn resolve_call_expr(
                 };
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type_kind.at(source),
+                    ty: target_type_kind.at(source),
                     expr: asg::ExprKind::BooleanLiteral(*value != BigInt::ZERO).at(source),
                     is_initialized,
                 });
@@ -115,16 +115,14 @@ pub fn resolve_call_expr(
                 let argument = arguments.into_iter().next().unwrap();
                 let is_initialized = argument.is_initialized;
 
-                let expr = asg::ExprKind::UnaryMathOperation(Box::new(
-                    asg::UnaryMathOperation {
-                        operator: asg::UnaryMathOperator::IsNonZero,
-                        inner: argument,
-                    },
-                ))
+                let expr = asg::ExprKind::UnaryMathOperation(Box::new(asg::UnaryMathOperation {
+                    operator: asg::UnaryMathOperator::IsNonZero,
+                    inner: argument,
+                }))
                 .at(source);
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type,
+                    ty: target_type,
                     expr,
                     is_initialized,
                 });
@@ -141,7 +139,7 @@ pub fn resolve_call_expr(
                 .at(source);
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type,
+                    ty: target_type,
                     expr,
                     is_initialized: argument.is_initialized,
                 });
@@ -156,12 +154,12 @@ pub fn resolve_call_expr(
                         target_type: target_type.clone(),
                         value: argument.expr,
                     },
-                    from_type: argument.resolved_type,
+                    from_type: argument.ty,
                 }))
                 .at(source);
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type,
+                    ty: target_type,
                     expr,
                     is_initialized: argument.is_initialized,
                 });
@@ -193,7 +191,7 @@ pub fn resolve_call_expr(
                 };
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type_kind.at(source),
+                    ty: target_type_kind.at(source),
                     expr: asg::ExprKind::FloatingLiteral(float_size, NotNan::new(value).ok())
                         .at(source),
                     is_initialized,
@@ -209,7 +207,7 @@ pub fn resolve_call_expr(
                 };
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type_kind.at(source),
+                    ty: target_type_kind.at(source),
                     expr: asg::ExprKind::FloatingLiteral(float_size, *value).at(source),
                     is_initialized,
                 });
@@ -224,12 +222,12 @@ pub fn resolve_call_expr(
                         target_type: target_type.clone(),
                         value: argument.expr,
                     },
-                    from_type: argument.resolved_type,
+                    from_type: argument.ty,
                 }))
                 .at(source);
 
                 return Ok(TypedExpr {
-                    resolved_type: target_type,
+                    ty: target_type,
                     expr,
                     is_initialized: argument.is_initialized,
                 });
@@ -239,20 +237,15 @@ pub fn resolve_call_expr(
 
     let callee = match ctx
         .function_haystack
-        .find(ctx, &call.function_name, &arguments[..], source)
+        .find(ctx, &call.name, &arguments[..], source)
     {
         Ok(function_ref) => function_ref,
         Err(reason) => {
-            let args = arguments
-                .iter()
-                .map(|arg| arg.resolved_type.to_string())
-                .collect_vec();
+            let args = arguments.iter().map(|arg| arg.ty.to_string()).collect_vec();
 
-            let signature = format!("{}({})", call.function_name, args.join(", "));
+            let signature = format!("{}({})", call.name, args.join(", "));
 
-            let almost_matches = ctx
-                .function_haystack
-                .find_near_matches(ctx, &call.function_name);
+            let almost_matches = ctx.function_haystack.find_near_matches(ctx, &call.name);
 
             return Err(ResolveErrorKind::FailedToFindFunction {
                 signature,
@@ -263,18 +256,16 @@ pub fn resolve_call_expr(
         }
     };
 
-    let function = ctx.asg.functions.get(callee.function).unwrap();
+    let function = ctx.asg.funcs.get(callee.function).unwrap();
     let num_required = function.parameters.required.len();
 
     for (i, argument) in arguments.iter_mut().enumerate() {
-        let function = ctx.asg.functions.get(callee.function).unwrap();
+        let function = ctx.asg.funcs.get(callee.function).unwrap();
 
         let preferred_type =
             (i < num_required).then_some(PreferredType::of_parameter(callee.function, i));
 
-        if preferred_type.map_or(false, |ty| {
-            ty.view(&ctx.asg).kind.contains_polymorph()
-        }) {
+        if preferred_type.map_or(false, |ty| ty.view(&ctx.asg).kind.contains_polymorph()) {
             match conform_expr_to_default::<Perform>(&*argument, ctx.c_integer_assumptions()) {
                 Ok(arg) => {
                     *argument = arg;
@@ -301,11 +292,8 @@ pub fn resolve_call_expr(
             } else {
                 return Err(ResolveErrorKind::BadTypeForArgumentToFunction {
                     expected: preferred_type.to_string(),
-                    got: argument.resolved_type.to_string(),
-                    name: function
-                        .name
-                        .display(&ctx.asg.workspace.fs)
-                        .to_string(),
+                    got: argument.ty.to_string(),
+                    name: function.name.display(&ctx.asg.workspace.fs).to_string(),
                     i,
                 }
                 .at(source));
@@ -337,10 +325,7 @@ pub fn resolve_call_expr(
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
                 of: required_ty.to_string(),
-                function_name: function
-                    .name
-                    .display(&ctx.asg.workspace.fs)
-                    .to_string(),
+                function_name: function.name.display(&ctx.asg.workspace.fs).to_string(),
             }
             .at(function.return_type.source));
         }

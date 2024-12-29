@@ -1,12 +1,12 @@
 use super::{error::ParseError, Parser};
 use crate::{
-    ast::{Parameter, Parameters},
+    ast::{Param, Params},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_function_parameters(&mut self) -> Result<Parameters, ParseError> {
+    pub fn parse_function_parameters(&mut self) -> Result<Params, ParseError> {
         // (arg1 Type1, arg2 Type2, arg3 Type3)
         // ^
 
@@ -35,12 +35,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             self.ignore_newlines();
             let ast_type = self.parse_type(None::<&str>, Some("for parameter"))?;
             self.ignore_newlines();
-            required.push(Parameter { name, ast_type });
+            required.push(Param { name, ast_type });
         }
 
         self.parse_token(TokenKind::CloseParen, Some("to end function parameters"))?;
 
-        Ok(Parameters {
+        Ok(Params {
             required,
             is_cstyle_vararg,
         })

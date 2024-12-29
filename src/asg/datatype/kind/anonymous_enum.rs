@@ -3,13 +3,13 @@ use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct AnonymousEnum {
-    pub resolved_type: Box<Type>,
+    pub ty: Box<Type>,
     pub source: Source,
     pub members: IndexMap<String, EnumMember>,
 }
 
 impl PartialEq for AnonymousEnum {
     fn eq(&self, other: &Self) -> bool {
-        self.resolved_type.eq(&other.resolved_type) && self.members.eq(&other.members)
+        self.ty.eq(&other.ty) && self.members.eq(&other.members)
     }
 }

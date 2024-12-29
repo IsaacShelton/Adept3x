@@ -23,10 +23,7 @@ use super::{
     Initialized, ResolveTypeCtx,
 };
 use crate::{
-    asg::{
-        self, Asg, CurrentConstraints, Expr, ExprKind, FunctionRef, StructureRef, TypeKind,
-        TypedExpr,
-    },
+    asg::{self, Asg, CurrentConstraints, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
         UnaryOperator,
@@ -52,9 +49,9 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub asg: &'b mut Asg<'a>,
     pub function_haystack: &'b FunctionHaystack,
     pub variable_haystack: VariableHaystack,
-    pub resolved_function_ref: Option<asg::FunctionRef>,
+    pub func_ref: Option<asg::FuncRef>,
     pub settings: &'b Settings,
-    pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<asg::FunctionRef>>>,
+    pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<asg::FuncRef>>>,
     pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
     pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
     pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
@@ -87,9 +84,9 @@ impl<'a, 'b> ResolveExprCtx<'a, 'b> {
 #[derive(Copy, Clone, Debug)]
 pub enum PreferredType<'a> {
     Reference(&'a asg::Type),
-    ParameterType(FunctionRef, usize),
-    ReturnType(FunctionRef),
-    FieldType(StructureRef, &'a str),
+    ParameterType(FuncRef, usize),
+    ReturnType(FuncRef),
+    FieldType(StructRef, &'a str),
 }
 
 impl<'a> PreferredType<'a> {
@@ -97,7 +94,7 @@ impl<'a> PreferredType<'a> {
         Self::Reference(reference)
     }
 
-    pub fn of_parameter(function_ref: FunctionRef, index: usize) -> Self {
+    pub fn of_parameter(function_ref: FuncRef, index: usize) -> Self {
         Self::ParameterType(function_ref, index)
     }
 
@@ -105,28 +102,28 @@ impl<'a> PreferredType<'a> {
         match self {
             PreferredType::Reference(reference) => reference,
             PreferredType::ParameterType(function_ref, index) => {
-                &asg.functions
+                &asg.funcs
                     .get(*function_ref)
                     .unwrap()
                     .parameters
                     .required
                     .get(*index)
                     .unwrap()
-                    .resolved_type
+                    .ty
             }
             PreferredType::ReturnType(function_ref) => {
-                &asg.functions.get(*function_ref).unwrap().return_type
+                &asg.funcs.get(*function_ref).unwrap().return_type
             }
             PreferredType::FieldType(structure_ref, field_name) => {
                 let (_, _, field) = asg
-                    .structures
+                    .structs
                     .get(*structure_ref)
                     .expect("referenced structure to exist")
                     .fields
                     .get_full::<str>(field_name)
                     .expect("referenced struct field type to exist");
 
-                &field.resolved_type
+                &field.ty
             }
         }
     }
@@ -166,7 +163,7 @@ pub fn resolve_expr(
             Err(ResolveErrorKind::UndeterminedCharacterLiteral.at(source))
         }
         ast::ExprKind::Integer(value) => {
-            let (resolved_type, expr) = match value {
+            let (ty, expr) = match value {
                 ast::Integer::Known(known) => (
                     known.make_type(source),
                     asg::ExprKind::IntegerKnown(Box::new(IntegerKnown {
@@ -181,7 +178,7 @@ pub fn resolve_expr(
                 ),
             };
 
-            Ok(TypedExpr::new(resolved_type, expr))
+            Ok(TypedExpr::new(ty, expr))
         }
         ast::ExprKind::CharLiteral(value) => {
             let expr = asg::ExprKind::IntegerKnown(Box::new(IntegerKnown {
@@ -279,7 +276,7 @@ pub fn resolve_expr(
                     preferred_type,
                     Initialized::Require,
                 )?;
-                let result_type = resolved_expr.resolved_type.clone().pointer(source);
+                let result_type = resolved_expr.ty.clone().pointer(source);
                 let destination = resolve_expr_to_destination(resolved_expr)?;
                 let expr = Expr::new(ExprKind::AddressOf(Box::new(destination)), source);
                 return Ok(TypedExpr::new(result_type, expr));
@@ -292,16 +289,14 @@ pub fn resolve_expr(
                     Initialized::Require,
                 )?;
 
-                let result_type = match &resolved_expr.resolved_type.kind {
-                    TypeKind::Pointer(inner)
-                        if !resolved_expr.resolved_type.kind.is_ambiguous() =>
-                    {
+                let result_type = match &resolved_expr.ty.kind {
+                    TypeKind::Pointer(inner) if !resolved_expr.ty.kind.is_ambiguous() => {
                         (**inner).clone()
                     }
                     _ => {
                         return Err(ResolveErrorKind::CannotPerformUnaryOperationForType {
                             operator: "(dereference) *".into(),
-                            bad_type: resolved_expr.resolved_type.to_string(),
+                            bad_type: resolved_expr.ty.to_string(),
                         }
                         .at(source));
                     }
@@ -352,12 +347,12 @@ pub fn resolve_expr(
             asg::Expr::new(asg::ExprKind::BooleanLiteral(*value), source),
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
-            let resolved_type = ctx.type_ctx().resolve(
+            let ty = ctx.type_ctx().resolve(
                 &ast::TypeKind::Named(enum_member_literal.enum_name.clone(), vec![])
                     .at(enum_member_literal.source),
             )?;
 
-            let TypeKind::Enum(human_name, enum_ref) = &resolved_type.kind else {
+            let TypeKind::Enum(human_name, enum_ref) = &ty.kind else {
                 return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
                     ty: enum_member_literal.enum_name.to_string(),
                     member: enum_member_literal.variant_name.clone(),
@@ -366,7 +361,7 @@ pub fn resolve_expr(
             };
 
             Ok(TypedExpr::new(
-                resolved_type.clone(),
+                ty.clone(),
                 asg::Expr::new(
                     asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
                         human_name: human_name.clone(),
@@ -385,7 +380,7 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let resolved_type = ctx.type_ctx().resolve(result_type)?;
+            let ty = ctx.type_ctx().resolve(result_type)?;
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
@@ -403,7 +398,7 @@ pub fn resolve_expr(
             }
 
             Ok(TypedExpr::new(
-                resolved_type,
+                ty,
                 asg::Expr::new(
                     asg::ExprKind::InterpreterSyscall(*kind, resolved_args),
                     source,

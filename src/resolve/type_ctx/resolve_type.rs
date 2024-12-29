@@ -1,9 +1,9 @@
 use super::{resolve_constraints, ResolveTypeCtx};
 use crate::{
+    asg::{self},
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
-    asg::{self},
     source_files::Source,
 };
 use std::borrow::Borrow;
@@ -26,9 +26,7 @@ impl<'a> ResolveTypeCtx<'a> {
         match &ast_type.kind {
             ast::TypeKind::Boolean => Ok(asg::TypeKind::Boolean),
             ast::TypeKind::Integer(bits, sign) => Ok(asg::TypeKind::Integer(*bits, *sign)),
-            ast::TypeKind::CInteger(integer, sign) => {
-                Ok(asg::TypeKind::CInteger(*integer, *sign))
-            }
+            ast::TypeKind::CInteger(integer, sign) => Ok(asg::TypeKind::CInteger(*integer, *sign)),
             ast::TypeKind::Pointer(inner) => {
                 let inner = self.resolve_or_undeclared(inner)?;
                 Ok(asg::TypeKind::Pointer(Box::new(inner)))
@@ -36,12 +34,10 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
             ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
                 Ok(found) => {
-                    if let asg::TypeKind::Structure(_, structure_ref, arguments) =
-                        found.borrow()
-                    {
+                    if let asg::TypeKind::Structure(_, structure_ref, arguments) = found.borrow() {
                         let structure = self
                             .asg
-                            .structures
+                            .structs
                             .get(*structure_ref)
                             .expect("referenced struct to exist");
 
@@ -76,9 +72,10 @@ impl<'a> ResolveTypeCtx<'a> {
                     if let Ok(size) = integer.value().try_into() {
                         let inner = self.resolve(&fixed_array.ast_type)?;
 
-                        Ok(asg::TypeKind::FixedArray(Box::new(
-                            asg::FixedArray { size, inner },
-                        )))
+                        Ok(asg::TypeKind::FixedArray(Box::new(asg::FixedArray {
+                            size,
+                            inner,
+                        })))
                     } else {
                         Err(ResolveErrorKind::ArraySizeTooLarge.at(fixed_array.count.source))
                     }
@@ -90,23 +87,21 @@ impl<'a> ResolveTypeCtx<'a> {
                 let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
 
                 for parameter in function_pointer.parameters.iter() {
-                    let resolved_type = self.resolve(&parameter.ast_type)?;
+                    let ty = self.resolve(&parameter.ast_type)?;
 
                     parameters.push(asg::Parameter {
                         name: parameter.name.clone(),
-                        resolved_type,
+                        ty,
                     });
                 }
 
                 let return_type = Box::new(self.resolve(&function_pointer.return_type)?);
 
-                Ok(asg::TypeKind::FunctionPointer(
-                    asg::FunctionPointer {
-                        parameters,
-                        return_type,
-                        is_cstyle_variadic: function_pointer.is_cstyle_variadic,
-                    },
-                ))
+                Ok(asg::TypeKind::FunctionPointer(asg::FunctionPointer {
+                    parameters,
+                    return_type,
+                    is_cstyle_variadic: function_pointer.is_cstyle_variadic,
+                }))
             }
             ast::TypeKind::Polymorph(polymorph, constraints) => Ok(asg::TypeKind::Polymorph(
                 polymorph.clone(),

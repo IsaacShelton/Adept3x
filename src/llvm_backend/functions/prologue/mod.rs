@@ -36,7 +36,7 @@ pub fn emit_prologue(
     alloca_point: LLVMValueRef,
     entry_basicblock: LLVMBasicBlockRef,
 ) -> Result<PrologueInfo, BackendError> {
-    let ir_function = ctx.ir_module.functions.get(skeleton.ir_function_ref);
+    let ir_function = ctx.ir_module.funcs.get(skeleton.ir_function_ref);
     let abi_return_info = &abi_function.return_type;
     let returns_ir_void = ir_function.return_type.is_void();
 
@@ -107,7 +107,7 @@ pub fn emit_prologue(
     }
 
     let mut param_values = ParamValues::new();
-    let ir_function = ctx.ir_module.functions.get(skeleton.ir_function_ref);
+    let ir_function = ctx.ir_module.funcs.get(skeleton.ir_function_ref);
 
     assert_eq!(
         abi_function.parameter_types.len(),

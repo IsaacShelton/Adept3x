@@ -1,12 +1,12 @@
 use super::{
-    enumeration::Enum, global_variable::GlobalVar, implementation::Impl, structure::Structure,
-    type_alias::TypeAlias, Function, HelperExpr, SettingsId, Trait,
+    enumeration::Enum, global_variable::GlobalVar, implementation::Impl, structs::Struct,
+    type_alias::TypeAlias, Func, HelperExpr, SettingsId, Trait,
 };
 
 #[derive(Clone, Debug)]
 pub struct AstFile {
-    pub functions: Vec<Function>,
-    pub structures: Vec<Structure>,
+    pub funcs: Vec<Func>,
+    pub structures: Vec<Struct>,
     pub type_aliases: Vec<TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
     pub enums: Vec<Enum>,
@@ -19,7 +19,7 @@ pub struct AstFile {
 impl AstFile {
     pub fn new() -> AstFile {
         AstFile {
-            functions: vec![],
+            funcs: vec![],
             structures: vec![],
             type_aliases: vec![],
             global_variables: vec![],

@@ -18,7 +18,7 @@ pub fn lower_short_circuiting_binary_operation(
     builder: &mut Builder,
     ir_module: &ir::Module,
     operation: &asg::ShortCircuitingBinaryOperation,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
 ) -> Result<Value, LowerError> {
     let short_circuit = lower_pre_short_circuit(builder, ir_module, operation, function, asg)?;
@@ -68,7 +68,7 @@ pub fn lower_pre_short_circuit(
     builder: &mut Builder,
     ir_module: &ir::Module,
     operation: &asg::ShortCircuitingBinaryOperation,
-    function: &asg::Function,
+    function: &asg::Func,
     asg: &Asg,
 ) -> Result<BinaryShortCircuit, LowerError> {
     let left = lower_expr(builder, ir_module, &operation.left.expr, function, asg)?;

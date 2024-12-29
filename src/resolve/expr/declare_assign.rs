@@ -1,12 +1,12 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
+    asg::{self, TypedExpr},
     ast::{self},
     resolve::{
         conform::to_default::conform_expr_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    asg::{self, TypedExpr},
     source_files::Source,
 };
 
@@ -22,30 +22,24 @@ pub fn resolve_declare_assign_expr(
         c_integer_assumptions,
     )?;
 
-    let Some(resolved_function_ref) = ctx.resolved_function_ref else {
+    let Some(func_ref) = ctx.func_ref else {
         return Err(ResolveErrorKind::CannotDeclareVariableOutsideFunction.at(source));
     };
 
-    let function = ctx
-        .asg
-        .functions
-        .get_mut(resolved_function_ref)
-        .unwrap();
+    let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
 
-    let key = function
-        .variables
-        .add_variable(value.resolved_type.clone(), true);
+    let key = function.variables.add_variable(value.ty.clone(), true);
 
     ctx.variable_haystack
-        .put(&declare_assign.name, value.resolved_type.clone(), key);
+        .put(&declare_assign.name, value.ty.clone(), key);
 
     Ok(TypedExpr::new(
-        value.resolved_type.clone(),
+        value.ty.clone(),
         asg::Expr::new(
             asg::ExprKind::DeclareAssign(Box::new(asg::DeclareAssign {
                 key,
                 value: value.expr,
-                resolved_type: value.resolved_type,
+                ty: value.ty,
             })),
             source,
         ),

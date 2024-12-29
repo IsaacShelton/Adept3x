@@ -41,7 +41,7 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
     pub preferred_non_virtual_alignment: ByteUnits,
     pub padded_field_size: BitUnits,
 
-    pub primary_base: Option<&'a asg::Structure>,
+    pub primary_base: Option<&'a asg::Struct>,
     pub has_packed_field: bool,
 
     // NOTE: We don't support using external layouts / inferring alignments yet

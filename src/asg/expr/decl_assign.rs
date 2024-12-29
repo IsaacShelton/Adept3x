@@ -5,5 +5,5 @@ use crate::asg::{Type, VariableStorageKey};
 pub struct DeclareAssign {
     pub key: VariableStorageKey,
     pub value: Expr,
-    pub resolved_type: Type,
+    pub ty: Type,
 }

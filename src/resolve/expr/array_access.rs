@@ -40,7 +40,7 @@ pub fn resolve_array_access_expr(
         c_integer_assumptions,
     )?;
 
-    let item_type = match &subject.resolved_type.kind {
+    let item_type = match &subject.ty.kind {
         asg::TypeKind::Pointer(inner) => Ok((**inner).clone()),
         bad_type => Err(ResolveErrorKind::CannotAccessMemberOf {
             bad_type: bad_type.to_string(),
@@ -48,10 +48,10 @@ pub fn resolve_array_access_expr(
         .at(source)),
     }?;
 
-    if !index.resolved_type.kind.is_integer() {
+    if !index.ty.kind.is_integer() {
         return Err(ResolveErrorKind::ExpectedIndexOfType {
             expected: "(any integer type)".to_string(),
-            got: index.resolved_type.to_string(),
+            got: index.ty.to_string(),
         }
         .at(source));
     }

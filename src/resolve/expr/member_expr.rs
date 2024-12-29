@@ -1,5 +1,6 @@
 use super::{resolve_expr, ResolveExprCtx};
 use crate::{
+    asg::{self, Member, TypedExpr},
     ast::{self, Privacy},
     resolve::{
         core_structure_info::{get_core_structure_info, CoreStructInfo},
@@ -7,7 +8,6 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog,
     },
-    asg::{self, Member, TypedExpr},
     source_files::Source,
 };
 
@@ -24,20 +24,19 @@ pub fn resolve_member_expr(
         structure_ref,
         arguments,
         ..
-    } = get_core_structure_info(ctx.asg, &resolved_subject.resolved_type, source)
-        .map_err(|e| {
-            e.unwrap_or_else(|| {
-                ResolveErrorKind::CannotUseOperator {
-                    operator: ".".into(),
-                    on_type: resolved_subject.resolved_type.to_string(),
-                }
-                .at(source)
-            })
-        })?;
+    } = get_core_structure_info(ctx.asg, &resolved_subject.ty, source).map_err(|e| {
+        e.unwrap_or_else(|| {
+            ResolveErrorKind::CannotUseOperator {
+                operator: ".".into(),
+                on_type: resolved_subject.ty.to_string(),
+            }
+            .at(source)
+        })
+    })?;
 
     let structure = ctx
         .asg
-        .structures
+        .structs
         .get(structure_ref)
         .expect("referenced struct to exist");
 
@@ -70,21 +69,21 @@ pub fn resolve_member_expr(
             .put_type(name, argument)
             .expect("unique polymorph name");
     }
-    let resolved_type = catalog
+    let ty = catalog
         .bake()
-        .resolve_type(&found_field.resolved_type)
+        .resolve_type(&found_field.ty)
         .map_err(ResolveError::from)?;
 
     let subject_destination = resolve_expr_to_destination(resolved_subject)?;
 
     Ok(TypedExpr::new(
-        resolved_type.clone(),
+        ty.clone(),
         asg::Expr::new(
             asg::ExprKind::Member(Box::new(Member {
                 subject: subject_destination,
                 structure_ref,
                 index,
-                field_type: resolved_type,
+                field_type: ty,
             })),
             source,
         ),

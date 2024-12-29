@@ -4,17 +4,14 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Field, Privacy, Structure},
+    ast::{Field, Privacy, Struct},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
 use indexmap::IndexMap;
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_structure(
-        &mut self,
-        annotations: Vec<Annotation>,
-    ) -> Result<Structure, ParseError> {
+    pub fn parse_structure(&mut self, annotations: Vec<Annotation>) -> Result<Struct, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -65,7 +62,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseParen, Some("to end struct fields"))?;
 
-        Ok(Structure {
+        Ok(Struct {
             name,
             fields,
             is_packed,

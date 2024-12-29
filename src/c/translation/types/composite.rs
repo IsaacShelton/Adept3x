@@ -1,6 +1,6 @@
 use super::get_name_and_type;
 use crate::{
-    ast::{AnonymousStruct, AstFile, Field, Privacy, Structure, TypeKind},
+    ast::{AnonymousStruct, AstFile, Field, Privacy, Struct, TypeKind},
     c::parser::{
         error::ParseErrorKind, CTypedef, Composite, CompositeKind, DeclarationSpecifiers,
         MemberDeclaration, MemberDeclarator, ParseError,
@@ -96,7 +96,7 @@ pub fn make_composite(
             if let Some(name) = &composite.name {
                 let name = format!("struct<{}>", name);
 
-                ast_file.structures.push(Structure {
+                ast_file.structures.push(Struct {
                     name: name.clone(),
                     fields,
                     is_packed,

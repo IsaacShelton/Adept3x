@@ -1,4 +1,4 @@
-use super::{Parameters, Privacy, Type};
+use super::{Params, Privacy, Type};
 use crate::source_files::Source;
 
 #[derive(Clone, Debug)]
@@ -7,13 +7,13 @@ pub struct Trait {
     pub parameters: Vec<String>,
     pub source: Source,
     pub privacy: Privacy,
-    pub functions: Vec<TraitFunction>,
+    pub funcs: Vec<TraitFunc>,
 }
 
 #[derive(Clone, Debug)]
-pub struct TraitFunction {
+pub struct TraitFunc {
     pub name: String,
-    pub parameters: Parameters,
+    pub params: Params,
     pub return_type: Type,
     pub source: Source,
 }

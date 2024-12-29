@@ -5,7 +5,7 @@ mod function_pointer;
 
 use super::Type;
 use crate::{
-    asg::{human_name::HumanName, Asg, EnumRef, StructureRef, TraitRef, TypeAliasRef},
+    asg::{human_name::HumanName, Asg, EnumRef, StructRef, TraitRef, TypeAliasRef},
     ast::{fmt_c_integer, CInteger, FloatSize, IntegerBits, IntegerSign},
     source_files::Source,
     target::Target,
@@ -36,7 +36,7 @@ pub enum TypeKind {
     FixedArray(Box<FixedArray>),
     FunctionPointer(FunctionPointer),
     Enum(HumanName, EnumRef),
-    Structure(HumanName, StructureRef, Vec<Type>),
+    Structure(HumanName, StructRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef),
     Polymorph(String, Vec<Constraint>),
     Trait(HumanName, TraitRef, Vec<Type>),
@@ -107,7 +107,7 @@ impl TypeKind {
     pub fn num_target_parameters(&self, asg: &Asg) -> usize {
         match self {
             TypeKind::Structure(_, structure_ref, _) => {
-                asg.structures.get(*structure_ref).unwrap().parameters.len()
+                asg.structs.get(*structure_ref).unwrap().parameters.len()
             }
             TypeKind::Trait(_, trait_ref, _) => {
                 asg.traits.get(*trait_ref).unwrap().parameters.len()

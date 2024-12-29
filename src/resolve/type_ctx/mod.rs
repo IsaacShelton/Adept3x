@@ -76,7 +76,7 @@ pub fn resolve_constraint(
         match name.as_plain_str() {
             Some("PrimitiveAdd") if arguments.is_empty() => return Ok(Constraint::PrimitiveAdd),
             _ => {
-                let resolved_type = type_ctx.resolve(constraint).map_err(|err| {
+                let ty = type_ctx.resolve(constraint).map_err(|err| {
                     if let ResolveErrorKind::UndeclaredType { name } = err.kind {
                         ResolveErrorKind::UndeclaredTrait(name).at(err.source)
                     } else {
@@ -84,11 +84,11 @@ pub fn resolve_constraint(
                     }
                 })?;
 
-                let asg::TypeKind::Trait(_, trait_ref, parameters) = &resolved_type.kind else {
+                let asg::TypeKind::Trait(_, trait_ref, parameters) = &ty.kind else {
                     return Err(ResolveErrorKind::TypeIsNotATrait {
-                        name: resolved_type.to_string(),
+                        name: ty.to_string(),
                     }
-                    .at(resolved_type.source));
+                    .at(ty.source));
                 };
 
                 return Ok(Constraint::Trait(

@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 pub struct ResolveCtx {
     pub jobs: VecDeque<FuncJob>,
     pub function_haystacks: IndexMap<FsNodeId, FunctionHaystack>,
-    pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<asg::FunctionRef>>>,
+    pub public_functions: HashMap<FsNodeId, HashMap<String, Vec<asg::FuncRef>>>,
     pub types_in_modules: HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
     pub globals_in_modules: HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
     pub helper_exprs_in_modules: HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,

@@ -1,5 +1,7 @@
 use crate::{
-    asg::{self, Asg, CurrentConstraints, EnumRef, StructureRef, TraitFunction, TraitRef, TypeAliasRef},
+    asg::{
+        self, Asg, CurrentConstraints, EnumRef, StructRef, TraitFunction, TraitRef, TypeAliasRef,
+    },
     ast::{self, AstWorkspace},
     resolve::{
         ctx::ResolveCtx,
@@ -82,8 +84,8 @@ fn resolve_structure(
     asg: &mut Asg,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
-    structure: &ast::Structure,
-    structure_ref: StructureRef,
+    structure: &ast::Struct,
+    structure_ref: StructRef,
 ) -> Result<(), ResolveError> {
     for (field_name, field) in structure.fields.iter() {
         let pre_constraints = CurrentConstraints::new_empty();
@@ -115,14 +117,14 @@ fn resolve_structure(
             &constraints,
         );
 
-        let resolved_type = type_ctx.resolve_or_undeclared(&field.ast_type)?;
+        let ty = type_ctx.resolve_or_undeclared(&field.ast_type)?;
 
-        let resolved_struct = asg.structures.get_mut(structure_ref).expect("valid struct");
+        let resolved_struct = asg.structs.get_mut(structure_ref).expect("valid struct");
 
         resolved_struct.fields.insert(
             field_name.clone(),
             asg::Field {
-                resolved_type,
+                ty,
                 privacy: field.privacy,
                 source: field.source,
             },
@@ -155,8 +157,8 @@ fn resolve_enum(
         .map(Cow::Borrowed)
         .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
 
-    let resolved_type = type_ctx.resolve_or_undeclared(&ast_type)?;
-    asg.enums.get_mut(enum_ref).unwrap().resolved_type = resolved_type;
+    let ty = type_ctx.resolve_or_undeclared(&ast_type)?;
+    asg.enums.get_mut(enum_ref).unwrap().ty = ty;
     Ok(())
 }
 
@@ -177,8 +179,8 @@ fn resolve_type_alias(
         &constraints,
     );
 
-    let resolved_type = type_ctx.resolve_or_undeclared(&definition.value)?;
-    *asg.type_aliases.get_mut(type_alias_ref).unwrap() = resolved_type;
+    let ty = type_ctx.resolve_or_undeclared(&definition.value)?;
+    *asg.type_aliases.get_mut(type_alias_ref).unwrap() = ty;
     Ok(())
 }
 
@@ -199,10 +201,10 @@ fn resolve_trait(
         &constraints,
     );
 
-    let mut functions = Vec::with_capacity(definition.functions.len());
+    let mut functions = Vec::with_capacity(definition.funcs.len());
 
-    for function in &definition.functions {
-        let parameters = resolve_parameters(&type_ctx, &function.parameters)?;
+    for function in &definition.funcs {
+        let parameters = resolve_parameters(&type_ctx, &function.params)?;
         let return_type = type_ctx.resolve(&function.return_type)?;
 
         functions.push(TraitFunction {

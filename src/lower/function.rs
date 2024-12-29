@@ -13,12 +13,12 @@ use crate::{
 
 pub fn lower_function_body(
     ir_module: &ir::Module,
-    function_ref: asg::FunctionRef,
+    function_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
     asg: &Asg,
 ) -> Result<BasicBlocks, LowerError> {
     let function = asg
-        .functions
+        .funcs
         .get(function_ref)
         .expect("valid function reference");
 
@@ -36,7 +36,7 @@ pub fn lower_function_body(
         .map(|instance| {
             Ok(builder.push(ir::Instruction::Alloca(lower_type(
                 ir_module,
-                &builder.unpoly(&instance.resolved_type)?,
+                &builder.unpoly(&instance.ty)?,
                 asg,
             )?)))
         })
@@ -51,7 +51,7 @@ pub fn lower_function_body(
     {
         builder.push(ir::Instruction::Alloca(lower_type(
             ir_module,
-            &builder.unpoly(&variable_instance.resolved_type)?,
+            &builder.unpoly(&variable_instance.ty)?,
             asg,
         )?));
     }
@@ -90,12 +90,12 @@ pub fn lower_function_body(
 
 pub fn lower_function_head(
     ir_module: &ir::Module,
-    function_ref: asg::FunctionRef,
+    function_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
     asg: &Asg,
-) -> Result<ir::FunctionRef, LowerError> {
+) -> Result<ir::FuncRef, LowerError> {
     let function = asg
-        .functions
+        .funcs
         .get(function_ref)
         .expect("valid function reference");
 
@@ -105,7 +105,7 @@ pub fn lower_function_head(
     for parameter in function.parameters.required.iter() {
         parameters.push(lower_type(
             ir_module,
-            &unpoly(poly_recipe, &parameter.resolved_type)?,
+            &unpoly(poly_recipe, &parameter.ty)?,
             asg,
         )?);
     }
@@ -129,9 +129,9 @@ pub fn lower_function_head(
     let is_main = mangled_name == "main";
     let is_exposed = is_main;
 
-    Ok(ir_module.functions.insert(
+    Ok(ir_module.funcs.insert(
         function_ref,
-        ir::Function {
+        ir::Func {
             mangled_name,
             basicblocks,
             parameters,

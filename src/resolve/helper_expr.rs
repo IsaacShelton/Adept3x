@@ -32,7 +32,7 @@ pub fn resolve_helper_expressions(
                     asg,
                     function_haystack,
                     variable_haystack,
-                    resolved_function_ref: None,
+                    func_ref: None,
                     settings,
                     public_functions: &ctx.public_functions,
                     types_in_modules: &ctx.types_in_modules,

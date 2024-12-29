@@ -13,7 +13,7 @@ impl Block {
 
     pub fn get_result_type(&self, source: Source) -> Type {
         match self.stmts.last().map(|stmt| &stmt.kind) {
-            Some(StmtKind::Expr(expr)) => expr.resolved_type.clone(),
+            Some(StmtKind::Expr(expr)) => expr.ty.clone(),
             Some(StmtKind::Return(..) | StmtKind::Declaration(..) | StmtKind::Assignment(..))
             | None => TypeKind::Void.at(source),
         }

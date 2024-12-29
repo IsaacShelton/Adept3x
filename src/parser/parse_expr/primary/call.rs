@@ -47,7 +47,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
         Ok(ExprKind::Call(Box::new(Call {
-            function_name,
+            name: function_name,
             arguments: args,
             expected_to_return: None,
             generics,
