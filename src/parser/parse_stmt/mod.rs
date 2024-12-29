@@ -20,8 +20,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             self.input.peek().kind,
             TokenKind::Newline | TokenKind::CloseCurly,
         ) {
-            return Err(ParseErrorKind::Other {
-                message: "Expected newline or '}' after statement".into(),
+            return Err(ParseErrorKind::Expected {
+                expected: "newline or '}' after statement".into(),
+                for_reason: None,
+                got: self.input.peek().to_string(),
             }
             .at(self.input.peek().source));
         }

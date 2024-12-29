@@ -15,10 +15,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         generics: Vec<CompileTimeArgument>,
         source: Source,
     ) -> Result<Expr, ParseError> {
-        // function_name(arg1, arg2, arg3)
-        //       ^
-
-        self.parse_call_with(name, generics, vec![], source)
+        self.parse_call_raw_with(name, generics, vec![])
+            .map(|call| ExprKind::Call(Box::new(call)).at(source))
     }
 
     pub fn parse_call_with(
@@ -28,6 +26,27 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         prefix_args: Vec<Expr>,
         source: Source,
     ) -> Result<Expr, ParseError> {
+        self.parse_call_raw_with(name, generics, prefix_args)
+            .map(|call| ExprKind::Call(Box::new(call)).at(source))
+    }
+
+    pub fn parse_call_raw(
+        &mut self,
+        name: Name,
+        generics: Vec<CompileTimeArgument>,
+    ) -> Result<Call, ParseError> {
+        self.parse_call_raw_with(name, generics, vec![])
+    }
+
+    pub fn parse_call_raw_with(
+        &mut self,
+        name: Name,
+        generics: Vec<CompileTimeArgument>,
+        prefix_args: Vec<Expr>,
+    ) -> Result<Call, ParseError> {
+        // function_name(arg1, arg2, arg3)
+        //       ^
+
         let starting_args_len = prefix_args.len();
         let mut args = prefix_args;
 
@@ -46,12 +65,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
-        Ok(ExprKind::Call(Box::new(Call {
+        Ok(Call {
             name,
             arguments: args,
             expected_to_return: None,
             generics,
-        }))
-        .at(source))
+        })
     }
 }

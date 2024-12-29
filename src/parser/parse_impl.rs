@@ -1,10 +1,10 @@
 use super::{
-    annotation::Annotation,
+    annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
     Parser,
 };
 use crate::{
-    ast::Impl,
+    ast::{Impl, Privacy},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
@@ -14,8 +14,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.input.peek().source;
         self.input.advance().kind.unwrap_impl_keyword();
 
+        let mut privacy = Privacy::Private;
+
         for annotation in annotations {
             match annotation.kind {
+                AnnotationKind::Public => privacy = Privacy::Public,
                 _ => {
                     return Err(self.unexpected_annotation(&annotation, Some("for implementation")))
                 }
@@ -59,6 +62,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             target,
             source,
+            privacy,
             body,
         })
     }

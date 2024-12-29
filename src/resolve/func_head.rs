@@ -73,14 +73,12 @@ pub fn create_func_heads<'a>(
                     func_ref,
                 ));
 
-                let funcs_with_name = asg
-                    .impls
+                asg.impls
                     .get_mut(impl_ref)
                     .unwrap()
                     .body
-                    .get_or_insert_with(&func.head.name, || Default::default());
-
-                funcs_with_name.push(func_ref);
+                    .get_or_insert_with(&func.head.name, || Default::default())
+                    .push(func_ref);
             }
         }
 

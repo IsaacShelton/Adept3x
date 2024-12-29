@@ -1,6 +1,9 @@
 use super::Parser;
 use crate::{
-    ast::{CompileTimeArgument, EnumMemberLiteral, Expr, ExprKind},
+    ast::{
+        CompileTimeArgument, Expr, ExprKind, StaticMember, StaticMemberAction,
+        StaticMemberActionKind,
+    },
     inflow::Inflow,
     name::Name,
     parser::error::{ParseError, ParseErrorKind},
@@ -11,28 +14,39 @@ use crate::{
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_static_member(
         &mut self,
-        enum_name: Name,
+        type_name: Name,
         generics: Vec<CompileTimeArgument>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // EnumName::EnumVariant
-        //    ^
+        //         ^
 
-        if !generics.is_empty() {
-            return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
-        }
+        let subject = self.parse_type_from_parts(type_name, generics, source)?;
 
-        self.parse_token(TokenKind::StaticMember, Some("for enum member literal"))?;
+        self.parse_token(TokenKind::StaticMember, Some("for static member access"))?;
 
-        let variant_source = self.source_here();
-        let variant_name = self
+        let action_source = self.source_here();
+        let action_name = self
             .input
             .eat_identifier()
-            .ok_or_else(|| ParseErrorKind::ExpectedEnumMemberName.at(variant_source))?;
+            .ok_or_else(|| ParseErrorKind::ExpectedEnumMemberName.at(action_source))?;
 
-        Ok(ExprKind::EnumMemberLiteral(Box::new(EnumMemberLiteral {
-            enum_name,
-            variant_name,
+        let action_kind = if self.input.peek_is(TokenKind::OpenParen)
+            || self.input.peek_is(TokenKind::OpenAngle)
+        {
+            let name = Name::plain(action_name);
+            let generics = self.parse_generics()?;
+            StaticMemberActionKind::Call(self.parse_call_raw(name, generics)?)
+        } else {
+            StaticMemberActionKind::Value(action_name)
+        };
+
+        Ok(ExprKind::StaticMember(Box::new(StaticMember {
+            subject,
+            action: StaticMemberAction {
+                kind: action_kind,
+                source: action_source,
+            },
             source,
         }))
         .at(source))

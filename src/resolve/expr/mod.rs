@@ -26,7 +26,7 @@ use crate::{
     asg::{self, Asg, CurrentConstraints, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
-        UnaryOperator,
+        StaticMemberActionKind, UnaryOperator,
     },
     resolve::{
         error::ResolveErrorKind,
@@ -344,32 +344,38 @@ pub fn resolve_expr(
             asg::TypeKind::Boolean.at(source),
             asg::Expr::new(asg::ExprKind::BooleanLiteral(*value), source),
         )),
-        ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
-            let ty = ctx.type_ctx().resolve(
-                &ast::TypeKind::Named(enum_member_literal.enum_name.clone(), vec![])
-                    .at(enum_member_literal.source),
-            )?;
+        ast::ExprKind::StaticMember(static_access) => {
+            let ty = ctx.type_ctx().resolve(&static_access.subject)?;
+            match &static_access.action.kind {
+                StaticMemberActionKind::Value(member) => {
+                    let TypeKind::Enum(human_name, enum_ref) = &ty.kind else {
+                        return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
+                            ty: static_access.subject.to_string(),
+                            member: member.clone(),
+                        }
+                        .at(source));
+                    };
 
-            let TypeKind::Enum(human_name, enum_ref) = &ty.kind else {
-                return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
-                    ty: enum_member_literal.enum_name.to_string(),
-                    member: enum_member_literal.variant_name.clone(),
+                    Ok(TypedExpr::new(
+                        ty.clone(),
+                        asg::Expr::new(
+                            asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
+                                human_name: human_name.clone(),
+                                enum_ref: *enum_ref,
+                                variant_name: member.clone(),
+                                source,
+                            })),
+                            source,
+                        ),
+                    ))
                 }
-                .at(source));
-            };
-
-            Ok(TypedExpr::new(
-                ty.clone(),
-                asg::Expr::new(
-                    asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
-                        human_name: human_name.clone(),
-                        enum_ref: *enum_ref,
-                        variant_name: enum_member_literal.variant_name.clone(),
-                        source,
-                    })),
-                    source,
-                ),
-            ))
+                StaticMemberActionKind::Call(_call) => {
+                    return Err(ResolveErrorKind::Other {
+                        message: "calling static members is not supported yet".into(),
+                    }
+                    .at(source))
+                }
+            }
         }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {
