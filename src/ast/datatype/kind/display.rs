@@ -63,7 +63,7 @@ impl Display for &TypeKind {
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<(amount), {}>", fixed_array.ast_type)?;
             }
-            TypeKind::FunctionPointer(_function) => {
+            TypeKind::FuncPointer(_function) => {
                 write!(f, "(function pointer type)")?;
             }
             TypeKind::Polymorph(polymorph, constraints) => {

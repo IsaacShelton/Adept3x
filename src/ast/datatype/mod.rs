@@ -55,7 +55,7 @@ impl Type {
             TypeKind::AnonymousStruct(_) => None,
             TypeKind::AnonymousUnion(_) => None,
             TypeKind::AnonymousEnum(_) => None,
-            TypeKind::FunctionPointer(func_pointer) => func_pointer
+            TypeKind::FuncPointer(func_pointer) => func_pointer
                 .parameters
                 .iter()
                 .flat_map(|param| param.ast_type.contains_polymorph())

@@ -55,7 +55,7 @@ pub fn declare_function(
     }
 
     if is_typedef {
-        let ast_type = ast::TypeKind::FunctionPointer(ast::FuncPtr {
+        let ast_type = ast::TypeKind::FuncPointer(ast::FuncPtr {
             parameters: required,
             return_type: Box::new(return_type),
             is_cstyle_variadic: parameter_type_list.is_variadic,

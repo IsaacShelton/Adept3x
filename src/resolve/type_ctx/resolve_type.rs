@@ -83,7 +83,7 @@ impl<'a> ResolveTypeCtx<'a> {
                     todo!("resolve fixed array type with variable size")
                 }
             }
-            ast::TypeKind::FunctionPointer(function_pointer) => {
+            ast::TypeKind::FuncPointer(function_pointer) => {
                 let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
 
                 for parameter in function_pointer.parameters.iter() {
