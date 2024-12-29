@@ -502,7 +502,7 @@ impl SysV {
 
         match ty {
             ir::Type::Pointer(_)
-            | ir::Type::FunctionPointer
+            | ir::Type::FuncPtr
             | ir::Type::Boolean
             | ir::Type::S8
             | ir::Type::S16
@@ -514,7 +514,7 @@ impl SysV {
             | ir::Type::U64 => *current = RegClass::Integer,
             ir::Type::F32 | ir::Type::F64 => *current = RegClass::Sse,
             ir::Type::Void => *current = RegClass::NoClass,
-            ir::Type::Union(_) | ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
+            ir::Type::Union(_) | ir::Type::Struct(_) | ir::Type::AnonymousComposite(_) => {
                 pair = self.classify_record(ctx, abi, ty, offset_base, is_required, pair)
             }
             ir::Type::FixedArray(fixed_array) => {
@@ -874,7 +874,7 @@ impl SysV {
         }
 
         match ir_type {
-            ir::Type::Union(_) | ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
+            ir::Type::Union(_) | ir::Type::Struct(_) | ir::Type::AnonymousComposite(_) => {
                 // record
 
                 Self::bits_contain_no_user_data_in_record(

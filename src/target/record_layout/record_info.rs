@@ -10,8 +10,8 @@ pub struct RecordInfo<'t> {
     pub source: Source,
 }
 
-impl<'t> RecordInfo<'t> {
-    pub fn from_structure(structure: &'t ir::Struct) -> Self {
+impl<'a> RecordInfo<'a> {
+    pub fn from_struct(structure: &'a ir::Struct) -> Self {
         RecordInfo {
             fields: &structure.fields[..],
             is_packed: structure.is_packed,
@@ -22,7 +22,7 @@ impl<'t> RecordInfo<'t> {
         }
     }
 
-    pub fn from_composite(composite: &'t ir::TypeComposite) -> Self {
+    pub fn from_composite(composite: &'a ir::TypeComposite) -> Self {
         RecordInfo {
             fields: &composite.fields[..],
             is_packed: composite.is_packed,
@@ -33,14 +33,14 @@ impl<'t> RecordInfo<'t> {
         }
     }
 
-    pub fn try_from_type(ir_type: &'t ir::Type, ir_module: &'t ir::Module) -> Option<Self> {
+    pub fn try_from_type(ir_type: &'a ir::Type, ir_module: &'a ir::Module) -> Option<Self> {
         match ir_type {
             ir::Type::Union(_) => {
                 todo!("RecordInfo::try_from_type for unions is not supported yet")
             }
-            ir::Type::Structure(struct_ref) => Some(RecordInfo::from_structure(
-                ir_module.structs.get(*struct_ref),
-            )),
+            ir::Type::Struct(struct_ref) => {
+                Some(RecordInfo::from_struct(ir_module.structs.get(*struct_ref)))
+            }
             ir::Type::AnonymousComposite(composite) => Some(RecordInfo::from_composite(composite)),
             _ => None,
         }

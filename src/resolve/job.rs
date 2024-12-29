@@ -14,6 +14,6 @@ pub struct TypeJob {
     pub physical_file_id: FsNodeId,
     pub type_aliases: Vec<TypeAliasRef>,
     pub traits: Vec<TraitRef>,
-    pub structures: Vec<StructRef>,
+    pub structs: Vec<StructRef>,
     pub enums: Vec<EnumRef>,
 }

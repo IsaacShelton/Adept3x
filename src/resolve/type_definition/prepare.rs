@@ -31,7 +31,7 @@ pub fn prepare_type_jobs(
             physical_file_id: *physical_file_id,
             type_aliases: Vec::with_capacity(file.type_aliases.len()),
             traits: Vec::with_capacity(file.traits.len()),
-            structures: Vec::with_capacity(file.structs.len()),
+            structs: Vec::with_capacity(file.structs.len()),
             enums: Vec::with_capacity(file.enums.len()),
         };
 
@@ -41,7 +41,7 @@ pub fn prepare_type_jobs(
         }
 
         for structure in file.structs.iter() {
-            job.structures.push(prepare_structure(
+            job.structs.push(prepare_structure(
                 ctx,
                 asg,
                 module_fs_node_id,

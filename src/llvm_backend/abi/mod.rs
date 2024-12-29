@@ -26,9 +26,9 @@ pub fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
         ir::Type::Complex(_)
         | ir::Type::Void
         | ir::Type::Union(_)
-        | ir::Type::Structure(_)
+        | ir::Type::Struct(_)
         | ir::Type::AnonymousComposite(_)
-        | ir::Type::FunctionPointer
+        | ir::Type::FuncPtr
         | ir::Type::FixedArray(_)
         | ir::Type::IncompleteArray(_) => false,
     }
@@ -52,9 +52,9 @@ pub fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
         | ir::Type::Pointer(_)
         | ir::Type::Void
         | ir::Type::Union(_)
-        | ir::Type::Structure(_)
+        | ir::Type::Struct(_)
         | ir::Type::AnonymousComposite(_)
-        | ir::Type::FunctionPointer
+        | ir::Type::FuncPtr
         | ir::Type::FixedArray(_)
         | ir::Type::Vector(_)
         | ir::Type::Complex(_)

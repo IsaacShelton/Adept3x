@@ -20,8 +20,8 @@ pub fn resolve_helper_expressions(
         let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
         // NOTE: This module should already have a function haystack
-        let function_haystack = ctx
-            .function_haystacks
+        let func_haystack = ctx
+            .func_haystacks
             .get(&module_file_id)
             .expect("function haystack to exist for file");
 
@@ -30,11 +30,11 @@ pub fn resolve_helper_expressions(
                 let variable_haystack = VariableHaystack::new();
                 let mut ctx = ResolveExprCtx {
                     asg,
-                    function_haystack,
+                    function_haystack: func_haystack,
                     variable_haystack,
                     func_ref: None,
                     settings,
-                    public_functions: &ctx.public_functions,
+                    public_funcs: &ctx.public_funcs,
                     types_in_modules: &ctx.types_in_modules,
                     globals_in_modules: &ctx.globals_in_modules,
                     helper_exprs_in_modules: &ctx.helper_exprs_in_modules,

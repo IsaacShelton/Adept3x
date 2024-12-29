@@ -6,7 +6,7 @@ use crate::{
     resolve::{
         ctx::ResolveCtx,
         error::ResolveError,
-        function_head::resolve_parameters,
+        func_head::resolve_parameters,
         job::TypeJob,
         type_ctx::{resolve_constraints, ResolveTypeCtx},
     },
@@ -42,7 +42,7 @@ pub fn resolve_type_jobs(
             )?;
         }
 
-        for (struct_ref, structure) in job.structures.iter().zip(file.structs.iter()) {
+        for (struct_ref, structure) in job.structs.iter().zip(file.structs.iter()) {
             resolve_structure(
                 ctx,
                 asg,

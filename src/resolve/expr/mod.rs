@@ -18,7 +18,7 @@ use super::{
     conform::{conform_expr_or_error, ConformMode},
     destination::resolve_expr_to_destination,
     error::ResolveError,
-    function_haystack::FunctionHaystack,
+    func_haystack::FuncHaystack,
     variable_haystack::VariableHaystack,
     Initialized, ResolveTypeCtx,
 };
@@ -47,11 +47,11 @@ use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub asg: &'b mut Asg<'a>,
-    pub function_haystack: &'b FunctionHaystack,
+    pub function_haystack: &'b FuncHaystack,
     pub variable_haystack: VariableHaystack,
     pub func_ref: Option<asg::FuncRef>,
     pub settings: &'b Settings,
-    pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<asg::FuncRef>>>,
+    pub public_funcs: &'b HashMap<FsNodeId, HashMap<String, Vec<asg::FuncRef>>>,
     pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
     pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
     pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
@@ -111,9 +111,7 @@ impl<'a> PreferredType<'a> {
                     .unwrap()
                     .ty
             }
-            PreferredType::ReturnType(func_ref) => {
-                &asg.funcs.get(*func_ref).unwrap().return_type
-            }
+            PreferredType::ReturnType(func_ref) => &asg.funcs.get(*func_ref).unwrap().return_type,
             PreferredType::FieldType(struct_ref, field_name) => {
                 let (_, _, field) = asg
                     .structs

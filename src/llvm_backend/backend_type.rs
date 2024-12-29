@@ -51,8 +51,8 @@ pub unsafe fn to_backend_type<'a>(
                 composite.is_packed.into(),
             )
         }
-        ir::Type::Structure(struct_ref) => to_backend_struct_type(ctx, *struct_ref)?,
-        ir::Type::FunctionPointer => LLVMPointerType(LLVMInt8Type(), 0),
+        ir::Type::Struct(struct_ref) => to_backend_struct_type(ctx, *struct_ref)?,
+        ir::Type::FuncPtr => LLVMPointerType(LLVMInt8Type(), 0),
         ir::Type::FixedArray(fixed_array) => {
             let element_type = to_backend_type(ctx, &fixed_array.inner)?;
             LLVMArrayType2(element_type, fixed_array.length)

@@ -286,7 +286,7 @@ pub fn lower_expr(
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
                 subject_pointer,
-                struct_type: ir::Type::Structure(struct_ref),
+                struct_type: ir::Type::Struct(struct_ref),
                 index: *index,
             });
 
@@ -568,7 +568,7 @@ pub fn lower_destination(
 
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
-                struct_type: ir::Type::Structure(struct_ref),
+                struct_type: ir::Type::Struct(struct_ref),
                 index: *index,
             }))
         }

@@ -510,7 +510,7 @@ pub unsafe fn create_function_block(
                 let pointer = build_value(ctx, value_catalog, builder, subject_pointer)?;
 
                 let backend_struct_type = match ir_struct_type {
-                    ir::Type::Structure(_) | ir::Type::AnonymousComposite(_) => {
+                    ir::Type::Struct(_) | ir::Type::AnonymousComposite(_) => {
                         to_backend_type(ctx.for_making_type(), ir_struct_type)?
                     }
                     _ => return Err("cannot use member instruction on non-structure".into()),

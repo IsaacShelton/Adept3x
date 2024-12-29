@@ -1,5 +1,5 @@
 use super::{
-    function_haystack::FindFunctionError,
+    func_haystack::FindFunctionError,
     polymorph::{PolymorphError, PolymorphErrorKind},
 };
 use crate::{

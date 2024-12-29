@@ -54,7 +54,7 @@ pub fn is_empty_field(
         }
     }
 
-    if !(field.is_structure() || field.is_anonymous_composite()) {
+    if !(field.is_struct() || field.is_anonymous_composite()) {
         return false;
     }
 

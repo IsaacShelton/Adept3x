@@ -58,14 +58,14 @@ pub struct TypeLayoutCache<'a> {
 impl<'a> TypeLayoutCache<'a> {
     pub fn new(
         target: &'a Target,
-        structures: &'a ir::Structs,
+        structs: &'a ir::Structs,
         asg: &'a Asg,
         diagnostics: &'a Diagnostics<'a>,
     ) -> Self {
         Self {
             memo: OnceMap::new(),
             target,
-            structs: structures,
+            structs,
             asg,
             diagnostics,
         }
@@ -82,7 +82,7 @@ impl<'a> TypeLayoutCache<'a> {
 
     fn get_impl(&self, ir_type: &ir::Type) -> TypeLayout {
         match ir_type {
-            ir::Type::Pointer(_) | ir::Type::FunctionPointer => self.target.pointer_layout(),
+            ir::Type::Pointer(_) | ir::Type::FuncPtr => self.target.pointer_layout(),
             ir::Type::Boolean => self.target.bool_layout(),
             ir::Type::S8 | ir::Type::U8 => TypeLayout::basic(ByteUnits::of(1)),
             ir::Type::S16 | ir::Type::U16 => TypeLayout::basic(ByteUnits::of(2)),
@@ -97,10 +97,10 @@ impl<'a> TypeLayoutCache<'a> {
                 alignment_requirement: AlignmentRequirement::None,
             },
             ir::Type::Union(_) => todo!("get_impl for ir::Type::Union"),
-            ir::Type::Structure(struct_ref) => {
+            ir::Type::Struct(struct_ref) => {
                 let structure = self.structs.get(*struct_ref);
 
-                let info = RecordInfo::from_structure(structure);
+                let info = RecordInfo::from_struct(structure);
                 self.get_impl_record_layout(&info, structure.name.as_deref())
             }
             ir::Type::AnonymousComposite(type_composite) => {

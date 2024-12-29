@@ -21,10 +21,7 @@ impl VariableInstance {
             OnceCell::new()
         };
 
-        Self {
-            ty,
-            initialized,
-        }
+        Self { ty, initialized }
     }
 
     pub fn is_initialized(&self) -> bool {
@@ -49,11 +46,7 @@ impl VariableStorage {
         }
     }
 
-    pub fn add_variable(
-        &mut self,
-        ty: asg::Type,
-        is_initialized: bool,
-    ) -> VariableStorageKey {
+    pub fn add_variable(&mut self, ty: asg::Type, is_initialized: bool) -> VariableStorageKey {
         let index = self.instances.len();
         let key = VariableStorageKey { index };
         self.instances
@@ -61,7 +54,7 @@ impl VariableStorage {
         key
     }
 
-    pub fn add_parameter(&mut self, ty: asg::Type) -> VariableStorageKey {
+    pub fn add_param(&mut self, ty: asg::Type) -> VariableStorageKey {
         assert_eq!(self.num_parameters, self.instances.len());
         self.num_parameters += 1;
         self.add_variable(ty, true)

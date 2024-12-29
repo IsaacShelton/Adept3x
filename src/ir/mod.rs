@@ -321,9 +321,9 @@ pub enum Type {
     F64,
     Void,
     Union(()),
-    Structure(StructRef),
+    Struct(StructRef),
     AnonymousComposite(TypeComposite),
-    FunctionPointer,
+    FuncPtr,
     FixedArray(Box<FixedArray>),
     Vector(Box<Vector>),
     Complex(Box<Complex>),
@@ -338,7 +338,7 @@ impl Type {
     }
 
     pub fn is_product_type(&self) -> bool {
-        self.is_structure() || self.is_anonymous_composite()
+        self.is_struct() || self.is_anonymous_composite()
     }
 
     pub fn has_flexible_array_member(&self) -> bool {
@@ -362,9 +362,9 @@ impl Type {
             Type::Pointer(_)
             | Type::Void
             | Type::Union(_)
-            | Type::Structure(_)
+            | Type::Struct(_)
             | Type::AnonymousComposite(_)
-            | Type::FunctionPointer
+            | Type::FuncPtr
             | Type::FixedArray(_)
             | Type::Vector(_)
             | Type::Complex(_)
@@ -421,7 +421,7 @@ impl Type {
 
     pub fn struct_fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
         match self {
-            Type::Structure(struct_ref) => Some(&ir_module.structs.get(*struct_ref).fields[..]),
+            Type::Struct(struct_ref) => Some(&ir_module.structs.get(*struct_ref).fields[..]),
             Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
             _ => None,
         }
