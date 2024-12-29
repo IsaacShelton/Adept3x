@@ -236,7 +236,7 @@ pub fn resolve_call_expr(
     }
 
     let callee = match ctx
-        .function_haystack
+        .func_haystack
         .find(ctx, &call.name, &arguments[..], source)
     {
         Ok(func_ref) => func_ref,
@@ -245,7 +245,7 @@ pub fn resolve_call_expr(
 
             let signature = format!("{}({})", call.name, args.join(", "));
 
-            let almost_matches = ctx.function_haystack.find_near_matches(ctx, &call.name);
+            let almost_matches = ctx.func_haystack.find_near_matches(ctx, &call.name);
 
             return Err(ResolveErrorKind::FailedToFindFunction {
                 signature,
@@ -325,7 +325,7 @@ pub fn resolve_call_expr(
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
                 of: required_ty.to_string(),
-                function_name: function.name.display(&ctx.asg.workspace.fs).to_string(),
+                func_name: function.name.display(&ctx.asg.workspace.fs).to_string(),
             }
             .at(function.return_type.source));
         }

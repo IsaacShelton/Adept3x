@@ -519,7 +519,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
-        if let Ok(_function_definition) = speculate!(self.input, self.parse_function_definition()) {
+        if let Ok(_func_definition) = speculate!(self.input, self.parse_function_definition()) {
             return Ok(todo!());
         }
 

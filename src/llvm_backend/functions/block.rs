@@ -801,7 +801,7 @@ unsafe fn emit_call(
         .enumerate()
         .map(|(i, argument)| {
             build_value(ctx, value_catalog, builder, argument).map(|value| {
-                if i >= ir_function.parameters.len() {
+                if i >= ir_function.params.len() {
                     promote_variadic_argument(builder, &ctx.ir_module.target, value)
                 } else {
                     value
@@ -822,11 +822,11 @@ unsafe fn emit_call(
             .collect_vec();
 
         let argument_types_iter = ir_function
-            .parameters
+            .params
             .iter()
             .chain(variadic_argument_types.iter());
 
-        let num_required = ir_function.parameters.len();
+        let num_required = ir_function.params.len();
 
         // If we're using variadic arguments, then we have to re-generate the ABI
         // function signature for the way we're calling it
@@ -983,14 +983,14 @@ unsafe fn emit_call(
             .inalloca_combined_struct
             .is_none());
 
-        let num_required = ir_function.parameters.len();
+        let num_required = ir_function.params.len();
 
         let actual_abi_function = ir_function
             .is_cstyle_variadic
             .then(|| {
                 ABIFunction::new(
                     ctx,
-                    ir_function.parameters.iter(),
+                    ir_function.params.iter(),
                     num_required,
                     &ir_function.return_type,
                     ir_function.is_cstyle_variadic,

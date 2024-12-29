@@ -1,7 +1,7 @@
 mod anonymous_enum;
 mod constraint;
 mod fixed_array;
-mod function_pointer;
+mod func_ptr;
 
 use super::Type;
 use crate::{
@@ -14,7 +14,7 @@ pub use constraint::Constraint;
 use core::hash::Hash;
 use derive_more::{IsVariant, Unwrap};
 pub use fixed_array::FixedArray;
-pub use function_pointer::FunctionPointer;
+pub use func_ptr::FuncPtr;
 use num::{BigInt, Zero};
 use ordered_float::NotNan;
 use std::fmt::Display;
@@ -34,7 +34,7 @@ pub enum TypeKind {
     AnonymousUnion(),
     AnonymousEnum(),
     FixedArray(Box<FixedArray>),
-    FunctionPointer(FunctionPointer),
+    FuncPointer(FuncPtr),
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef),
@@ -64,7 +64,7 @@ impl TypeKind {
             TypeKind::AnonymousUnion() => false,
             TypeKind::AnonymousEnum() => false,
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
-            TypeKind::FunctionPointer(_) => todo!(),
+            TypeKind::FuncPointer(_) => todo!(),
             TypeKind::Enum(_, _) => false,
             TypeKind::Structure(_, _, parameters) | TypeKind::Trait(_, _, parameters) => parameters
                 .iter()
@@ -96,7 +96,7 @@ impl TypeKind {
             | TypeKind::AnonymousStruct(..)
             | TypeKind::AnonymousUnion(..)
             | TypeKind::FixedArray(..)
-            | TypeKind::FunctionPointer(..)
+            | TypeKind::FuncPointer(..)
             | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum()
             | TypeKind::Polymorph(_, _)
@@ -107,7 +107,7 @@ impl TypeKind {
     pub fn num_target_parameters(&self, asg: &Asg) -> usize {
         match self {
             TypeKind::Structure(_, struct_ref, _) => {
-                asg.structs.get(*struct_ref).unwrap().parameters.len()
+                asg.structs.get(*struct_ref).unwrap().params.len()
             }
             TypeKind::Trait(_, trait_ref, _) => {
                 asg.traits.get(*trait_ref).unwrap().parameters.len()
@@ -166,7 +166,7 @@ impl Display for TypeKind {
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
-            TypeKind::FunctionPointer(..) => f.write_str("function-pointer-type")?,
+            TypeKind::FuncPointer(..) => f.write_str("function-pointer-type")?,
             TypeKind::Enum(name, _) => write!(f, "{}", name)?,
             TypeKind::Polymorph(name, constaints) => {
                 write!(f, "${}", name)?;

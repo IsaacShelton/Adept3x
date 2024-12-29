@@ -4,7 +4,7 @@ use crate::{
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
     resolve::{
         conform::{conform_expr, ConformMode, Perform},
-        core_structure_info::{get_core_structure_info, CoreStructInfo},
+        core_struct_info::{get_core_struct_info, CoreStructInfo},
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog, PolymorphError,
     },
@@ -21,14 +21,14 @@ pub struct FieldInfo {
 
 fn get_field_info<'a>(
     ctx: &'a ResolveExprCtx,
-    structure_ref: StructRef,
+    struct_ref: StructRef,
     arguments: &[asg::Type],
     field_name: &str,
 ) -> Result<FieldInfo, PolymorphError> {
     let structure = ctx
         .asg
         .structs
-        .get(structure_ref)
+        .get(struct_ref)
         .expect("referenced structure to exist");
 
     let (index, _name, field) = structure
@@ -37,9 +37,9 @@ fn get_field_info<'a>(
         .expect("referenced struct field to exist");
 
     let mut catalog = PolyCatalog::new();
-    assert!(arguments.len() == structure.parameters.len());
+    assert!(arguments.len() == structure.params.len());
 
-    for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+    for (name, argument) in structure.params.names().zip(arguments.iter()) {
         catalog
             .put_type(name, argument)
             .expect("non-duplicate polymorphic type parameters for structure")
@@ -64,7 +64,7 @@ pub fn resolve_struct_literal_expr(
         name: struct_name,
         struct_ref,
         arguments,
-    } = get_core_structure_info(ctx.asg, &struct_type, source).map_err(|e| {
+    } = get_core_struct_info(ctx.asg, &struct_type, source).map_err(|e| {
         e.unwrap_or_else(|| {
             ResolveErrorKind::CannotCreateStructLiteralForNonStructure {
                 bad_type: struct_type.to_string(),
@@ -205,13 +205,13 @@ pub fn resolve_struct_literal_expr(
         .map(|(x, (y, z))| (x, y, z))
         .collect_vec();
 
-    let structure_type = asg::TypeKind::Structure(struct_name, struct_ref, arguments).at(source);
+    let struct_type = asg::TypeKind::Structure(struct_name, struct_ref, arguments).at(source);
 
     Ok(TypedExpr::new(
         struct_type.clone(),
         asg::Expr::new(
             asg::ExprKind::StructLiteral(Box::new(StructLiteral {
-                structure_type,
+                struct_type,
                 fields: resolved_fields,
             })),
             ast_type.source,

@@ -8,7 +8,7 @@ mod enum_member;
 mod integer;
 mod interpreter_syscall;
 mod kind;
-mod structure_literal;
+mod struct_literal;
 mod unary;
 mod while_loop;
 
@@ -24,7 +24,7 @@ pub use enum_member::*;
 pub use integer::*;
 pub use interpreter_syscall::*;
 pub use kind::*;
-pub use structure_literal::*;
+pub use struct_literal::*;
 pub use unary::*;
 pub use while_loop::*;
 

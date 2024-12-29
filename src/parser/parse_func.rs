@@ -4,13 +4,13 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{Func, FuncHead, Params, Privacy, TypeKind},
+    ast::{Func, FuncHead, Privacy, TypeKind},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_function(&mut self, annotations: Vec<Annotation>) -> Result<Func, ParseError> {
+    pub fn parse_func(&mut self, annotations: Vec<Annotation>) -> Result<Func, ParseError> {
         // func functionName {
         //   ^
 
@@ -49,11 +49,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
 
-        let parameters = if self.input.peek_is(TokenKind::OpenParen) {
-            self.parse_function_parameters()?
-        } else {
-            Params::default()
-        };
+        let params = self
+            .input
+            .peek_is(TokenKind::OpenParen)
+            .then(|| self.parse_func_params())
+            .transpose()?
+            .unwrap_or_default();
 
         self.ignore_newlines();
 
@@ -72,7 +73,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             head: FuncHead {
                 name,
                 givens,
-                params: parameters,
+                params,
                 return_type,
                 is_foreign,
                 source,

@@ -262,9 +262,9 @@ pub fn lower_expr(
                 .get(*struct_ref)
                 .expect("referenced structure to exist");
 
-            assert!(structure.parameters.len() == arguments.len());
+            assert!(structure.params.len() == arguments.len());
             let mut catalog = PolyCatalog::new();
-            for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+            for (name, argument) in structure.params.names().zip(arguments.iter()) {
                 catalog
                     .put_type(name, &builder.unpoly(argument)?.0)
                     .expect("unique type parameter names");
@@ -301,13 +301,13 @@ pub fn lower_expr(
 
             Ok(builder.push(ir::Instr::Load((item, item_type))))
         }
-        ExprKind::StructLiteral(structure_literal) => {
+        ExprKind::StructLiteral(struct_literal) => {
             let StructLiteral {
-                structure_type,
+                struct_type,
                 fields,
-            } = &**structure_literal;
+            } = &**struct_literal;
 
-            let result_ir_type = lower_type(ir_module, &builder.unpoly(structure_type)?, asg)?;
+            let result_ir_type = lower_type(ir_module, &builder.unpoly(struct_type)?, asg)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
@@ -543,9 +543,9 @@ pub fn lower_destination(
                 .get(*struct_ref)
                 .expect("referenced structure to exist");
 
-            assert!(structure.parameters.len() == arguments.len());
+            assert!(structure.params.len() == arguments.len());
             let mut catalog = PolyCatalog::new();
-            for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+            for (name, argument) in structure.params.names().zip(arguments.iter()) {
                 catalog
                     .put_type(name, &builder.unpoly(argument)?.0)
                     .expect("unique type parameter names");

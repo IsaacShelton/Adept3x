@@ -109,12 +109,9 @@ pub fn emit_prologue(
     let mut param_values = ParamValues::new();
     let ir_function = ctx.ir_module.funcs.get(skeleton.ir_func_ref);
 
-    assert_eq!(
-        abi_function.parameter_types.len(),
-        ir_function.parameters.len()
-    );
+    assert_eq!(abi_function.parameter_types.len(), ir_function.params.len());
 
-    assert_eq!(params_mapping.params().len(), ir_function.parameters.len());
+    assert_eq!(params_mapping.params().len(), ir_function.params.len());
 
     for (abi_param, mapped_param) in abi_function
         .parameter_types

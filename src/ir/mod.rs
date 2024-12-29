@@ -43,7 +43,7 @@ pub struct Global {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub mangled_name: String,
-    pub parameters: Vec<Type>,
+    pub params: Vec<Type>,
     pub return_type: Type,
     pub basicblocks: BasicBlocks,
     pub is_cstyle_variadic: bool,
@@ -440,8 +440,8 @@ pub struct TypeComposite {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TypeFunction {
-    pub parameters: Vec<Type>,
+pub struct TypeFunc {
+    pub params: Vec<Type>,
     pub return_type: Box<Type>,
     pub is_cstyle_variadic: bool,
 }

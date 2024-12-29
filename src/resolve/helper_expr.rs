@@ -30,7 +30,7 @@ pub fn resolve_helper_expressions(
                 let variable_haystack = VariableHaystack::new();
                 let mut ctx = ResolveExprCtx {
                     asg,
-                    function_haystack: func_haystack,
+                    func_haystack,
                     variable_haystack,
                     func_ref: None,
                     settings,

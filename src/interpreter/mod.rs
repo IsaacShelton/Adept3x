@@ -68,7 +68,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
             todo!("c-style variadic functions are not supported in interpreter yet - (for function {:?})", function.mangled_name);
         }
 
-        assert_eq!(function.parameters.len(), args.len());
+        assert_eq!(function.params.len(), args.len());
 
         let mut registers = Registers::<'a>::new(&function.basicblocks);
         let mut ip = InstructionPointer::default();

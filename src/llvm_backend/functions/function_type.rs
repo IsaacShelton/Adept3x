@@ -27,7 +27,7 @@ pub struct FunctionType {
     pub is_cstyle_variadic: bool,
 }
 
-pub unsafe fn to_backend_function_type(
+pub unsafe fn to_backend_func_type(
     ctx: &BackendCtx,
     abi_function: &mut ABIFunction,
     is_cstyle_variadic: bool,

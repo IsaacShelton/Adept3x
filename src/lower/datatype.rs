@@ -107,7 +107,7 @@ pub fn lower_type(
                 inner,
             })))
         }
-        asg::TypeKind::FunctionPointer(_function_pointer) => Ok(ir::Type::FuncPtr),
+        asg::TypeKind::FuncPointer(_func_pointer) => Ok(ir::Type::FuncPtr),
         asg::TypeKind::Enum(_human_name, enum_ref) => {
             let enum_definition = asg.enums.get(*enum_ref).expect("referenced enum to exist");
 

@@ -226,7 +226,7 @@ pub fn collect_constraints_into(map: &mut HashMap<String, HashSet<Constraint>>, 
         asg::TypeKind::AnonymousUnion() => todo!(),
         asg::TypeKind::AnonymousEnum() => todo!(),
         asg::TypeKind::FixedArray(fixed_array) => collect_constraints_into(map, &fixed_array.inner),
-        asg::TypeKind::FunctionPointer(_) => todo!(),
+        asg::TypeKind::FuncPointer(_) => todo!(),
         asg::TypeKind::Enum(_, _) => (),
         asg::TypeKind::Structure(_, _, parameters) => {
             for parameter in parameters {

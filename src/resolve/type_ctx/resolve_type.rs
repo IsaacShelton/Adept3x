@@ -41,10 +41,10 @@ impl<'a> ResolveTypeCtx<'a> {
                             .get(*struct_ref)
                             .expect("referenced struct to exist");
 
-                        assert!(arguments.len() == structure.parameters.len());
+                        assert!(arguments.len() == structure.params.len());
 
                         for (parameter, argument) in
-                            structure.parameters.parameters.values().zip(arguments)
+                            structure.params.parameters.values().zip(arguments)
                         {
                             for constraint in &parameter.constraints {
                                 if !self.current_constraints.satisfies(argument, constraint) {
@@ -97,7 +97,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
                 let return_type = Box::new(self.resolve(&function_pointer.return_type)?);
 
-                Ok(asg::TypeKind::FunctionPointer(asg::FunctionPointer {
+                Ok(asg::TypeKind::FuncPointer(asg::FuncPtr {
                     parameters,
                     return_type,
                     is_cstyle_variadic: function_pointer.is_cstyle_variadic,

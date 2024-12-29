@@ -78,7 +78,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.ignore_newlines();
 
         let parameters = if self.input.peek_is(TokenKind::OpenParen) {
-            self.parse_function_parameters()?
+            self.parse_func_params()?
         } else {
             Params::default()
         };

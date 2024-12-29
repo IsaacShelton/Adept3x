@@ -31,13 +31,13 @@ pub struct StaticVariable {
 }
 
 #[derive(Debug, Default)]
-pub struct StructureCache {
+pub struct StructCache {
     pub cache: OnceMap<ir::StructRef, LLVMTypeRef>,
 }
 
 #[derive(Debug)]
 pub struct ToBackendTypeCtx<'a> {
-    pub structure_cache: &'a StructureCache,
+    pub struct_cache: &'a StructCache,
     pub ir_module: &'a ir::Module,
     pub visited: RefCell<HashSet<ir::StructRef>>,
 }
@@ -67,7 +67,7 @@ pub struct BackendCtx<'a> {
     pub intrinsics: Intrinsics,
     pub relocations: Vec<Phi2Relocation>,
     pub static_variables: Vec<StaticVariable>,
-    pub structure_cache: StructureCache,
+    pub struct_cache: StructCache,
     pub type_layout_cache: TypeLayoutCache<'a>,
     pub arch: Arch,
 }
@@ -97,7 +97,7 @@ impl<'a> BackendCtx<'a> {
             intrinsics: Intrinsics::new(backend_module),
             relocations: Vec::new(),
             static_variables: Vec::new(),
-            structure_cache: Default::default(),
+            struct_cache: Default::default(),
             type_layout_cache,
             arch,
         })
@@ -105,7 +105,7 @@ impl<'a> BackendCtx<'a> {
 
     pub fn for_making_type(&'a self) -> ToBackendTypeCtx<'a> {
         ToBackendTypeCtx {
-            structure_cache: &self.structure_cache,
+            struct_cache: &self.struct_cache,
             ir_module: self.ir_module,
             visited: RefCell::new(HashSet::default()),
         }

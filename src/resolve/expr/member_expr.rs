@@ -3,7 +3,7 @@ use crate::{
     asg::{self, Member, TypedExpr},
     ast::{self, Privacy},
     resolve::{
-        core_structure_info::{get_core_structure_info, CoreStructInfo},
+        core_struct_info::{get_core_struct_info, CoreStructInfo},
         destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog,
@@ -24,7 +24,7 @@ pub fn resolve_member_expr(
         struct_ref,
         arguments,
         ..
-    } = get_core_structure_info(ctx.asg, &resolved_subject.ty, source).map_err(|e| {
+    } = get_core_struct_info(ctx.asg, &resolved_subject.ty, source).map_err(|e| {
         e.unwrap_or_else(|| {
             ResolveErrorKind::CannotUseOperator {
                 operator: ".".into(),
@@ -63,8 +63,8 @@ pub fn resolve_member_expr(
     }
 
     let mut catalog = PolyCatalog::new();
-    assert!(structure.parameters.len() == arguments.len());
-    for (name, argument) in structure.parameters.names().zip(arguments.iter()) {
+    assert!(structure.params.len() == arguments.len());
+    for (name, argument) in structure.params.names().zip(arguments.iter()) {
         catalog
             .put_type(name, argument)
             .expect("unique polymorph name");

@@ -98,7 +98,7 @@ impl PolyRecipe {
                 }))
                 .at(ty.source)
             }
-            asg::TypeKind::FunctionPointer(_) => todo!(),
+            asg::TypeKind::FuncPointer(_) => todo!(),
             asg::TypeKind::Enum(_, _) => ty.clone(),
             asg::TypeKind::Structure(human_name, struct_ref, poly_args) => {
                 let args = poly_args
@@ -250,7 +250,7 @@ impl PolyCatalog {
                 }
                 _ => Err(None),
             },
-            asg::TypeKind::FunctionPointer(_) => todo!(),
+            asg::TypeKind::FuncPointer(_) => todo!(),
             asg::TypeKind::Polymorph(name, constraints) => {
                 self.put_type(name, concrete_type).map_err(Some)?;
 

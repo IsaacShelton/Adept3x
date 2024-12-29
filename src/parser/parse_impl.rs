@@ -41,7 +41,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     self.ignore_newlines();
                 }
 
-                body.push(self.parse_function(annotations)?);
+                body.push(self.parse_func(annotations)?);
                 self.input.ignore_newlines();
             }
 

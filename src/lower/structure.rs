@@ -57,13 +57,13 @@ pub fn monomorphize_structure(
         .get(struct_ref)
         .expect("referenced structure to exist");
 
-    if structure.parameters.len() != parameters.len() {
+    if structure.params.len() != parameters.len() {
         return Err(LowerErrorKind::IncorrectNumberOfTypeArguments.at(source));
     }
 
     let mut catalog = PolyCatalog::new();
 
-    for (name, concrete_type) in structure.parameters.names().zip(parameters.iter()) {
+    for (name, concrete_type) in structure.params.names().zip(parameters.iter()) {
         eprintln!("TODO: Ensure that type arguments satisfy constraints");
 
         catalog
@@ -91,7 +91,7 @@ pub fn lower_struct(
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     // NOTE: We only lower polymorphic structures on-demand, so skip them for now
-    if !structure.parameters.parameters.is_empty() {
+    if !structure.params.parameters.is_empty() {
         return Ok(());
     }
 

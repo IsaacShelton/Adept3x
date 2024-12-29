@@ -101,7 +101,7 @@ fn prepare_structure(
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
-        parameters,
+        params: parameters,
         source: structure.source,
     });
 

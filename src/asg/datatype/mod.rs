@@ -44,7 +44,7 @@ impl Type {
             TypeKind::AnonymousUnion() => todo!(),
             TypeKind::AnonymousEnum() => todo!(),
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
-            TypeKind::FunctionPointer(_) => todo!(),
+            TypeKind::FuncPointer(_) => todo!(),
             TypeKind::Enum(_, _) => (),
             TypeKind::Structure(_, _, parameters) => {
                 for parameter in parameters {

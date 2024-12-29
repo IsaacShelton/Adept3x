@@ -176,7 +176,7 @@ pub enum ResolveErrorKind {
     },
     FunctionMustReturnType {
         of: String,
-        function_name: String,
+        func_name: String,
     },
     DivideByZero,
     ModuloByZero,
@@ -480,8 +480,8 @@ impl Display for ResolveErrorKind {
                 write!(f, "Must provide initial value for variable '{}'", name)?;
             }
 
-            ResolveErrorKind::FunctionMustReturnType { of, function_name } => {
-                write!(f, "Function '{}' must return '{}'", function_name, of)?;
+            ResolveErrorKind::FunctionMustReturnType { of, func_name } => {
+                write!(f, "Function '{}' must return '{}'", func_name, of)?;
             }
             ResolveErrorKind::DivideByZero => {
                 write!(f, "Cannot divide by zero")?;

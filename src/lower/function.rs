@@ -122,7 +122,7 @@ pub fn lower_func_head(
         ir::Func {
             mangled_name,
             basicblocks,
-            parameters: params,
+            params,
             return_type,
             is_cstyle_variadic: func.params.is_cstyle_vararg,
             is_foreign: func.is_foreign,

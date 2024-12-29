@@ -11,19 +11,19 @@ use crate::{
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call(
         &mut self,
-        function_name: Name,
+        name: Name,
         generics: Vec<CompileTimeArgument>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // function_name(arg1, arg2, arg3)
         //       ^
 
-        self.parse_call_with(function_name, generics, vec![], source)
+        self.parse_call_with(name, generics, vec![], source)
     }
 
     pub fn parse_call_with(
         &mut self,
-        function_name: Name,
+        name: Name,
         generics: Vec<CompileTimeArgument>,
         prefix_args: Vec<Expr>,
         source: Source,
@@ -47,7 +47,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
         Ok(ExprKind::Call(Box::new(Call {
-            name: function_name,
+            name,
             arguments: args,
             expected_to_return: None,
             generics,

@@ -1,7 +1,7 @@
 mod c_integer;
 mod description;
 mod fixed_array;
-mod function_pointer;
+mod func_ptr;
 mod generics;
 mod kind;
 mod nameless_enumeration;
@@ -12,7 +12,7 @@ use crate::source_files::Source;
 pub use c_integer::*;
 pub use description::*;
 pub use fixed_array::*;
-pub use function_pointer::*;
+pub use func_ptr::*;
 pub use generics::*;
 pub use kind::*;
 pub use nameless_enumeration::*;

@@ -7,7 +7,7 @@ pub struct Struct {
     pub name: ResolvedName,
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
-    pub parameters: TypeParameters,
+    pub params: TypeParameters,
     pub source: Source,
 }
 

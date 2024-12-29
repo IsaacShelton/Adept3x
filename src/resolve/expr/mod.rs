@@ -47,7 +47,7 @@ use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
     pub asg: &'b mut Asg<'a>,
-    pub function_haystack: &'b FuncHaystack,
+    pub func_haystack: &'b FuncHaystack,
     pub variable_haystack: VariableHaystack,
     pub func_ref: Option<asg::FuncRef>,
     pub settings: &'b Settings,

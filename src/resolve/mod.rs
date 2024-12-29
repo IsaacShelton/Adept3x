@@ -1,5 +1,5 @@
 mod conform;
-mod core_structure_info;
+mod core_struct_info;
 mod ctx;
 mod destination;
 mod error;

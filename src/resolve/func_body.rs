@@ -15,7 +15,7 @@ pub fn resolve_func_bodies(
 ) -> Result<(), ResolveError> {
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
-            FuncJob::Regular(physical_file_id, ast_function_index, func_ref) => {
+            FuncJob::Regular(physical_file_id, ast_func_index, func_ref) => {
                 let module_file_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
                 let ast_file = ast_workspace
@@ -25,7 +25,7 @@ pub fn resolve_func_bodies(
 
                 let ast_function = ast_file
                     .funcs
-                    .get(ast_function_index)
+                    .get(ast_func_index)
                     .expect("function referenced by job to exist");
 
                 resolve_func_body(
@@ -84,7 +84,7 @@ fn resolve_func_body(
     ast_function: &ast::Func,
     func_ref: FuncRef,
 ) -> Result<(), ResolveError> {
-    let function_haystack = ctx
+    let func_haystack = ctx
         .func_haystacks
         .get(&module_file_id)
         .expect("function haystack to exist for file");
@@ -115,7 +115,7 @@ fn resolve_func_body(
     let resolved_stmts = resolve_stmts(
         &mut ResolveExprCtx {
             asg,
-            function_haystack,
+            func_haystack,
             variable_haystack,
             func_ref: Some(func_ref),
             settings,

@@ -21,7 +21,7 @@ mod variable_stack;
 
 use self::{
     ctx::BackendCtx,
-    functions::{body::create_function_bodies, head::create_function_heads},
+    functions::{body::create_function_bodies, head::create_func_heads},
     globals::{create_globals, create_static_variables},
     module::BackendModule,
     target_data::TargetData,
@@ -94,7 +94,7 @@ pub unsafe fn llvm_backend(
 
     create_static_variables()?;
     create_globals(&mut ctx)?;
-    create_function_heads(&mut ctx)?;
+    create_func_heads(&mut ctx)?;
     create_function_bodies(&mut ctx)?;
 
     if options.emit_llvm_ir {

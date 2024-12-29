@@ -3,7 +3,7 @@ mod display;
 
 use super::{
     AnonymousEnum, AnonymousStruct, AnoymousUnion, CInteger, CompileTimeArgument, FixedArray,
-    FloatSize, FunctionPointer, IntegerBits, IntegerSign, Type,
+    FloatSize, FuncPtr, IntegerBits, IntegerSign, Type,
 };
 use crate::{name::Name, source_files::Source};
 
@@ -20,7 +20,7 @@ pub enum TypeKind {
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(AnoymousUnion),
     AnonymousEnum(AnonymousEnum),
-    FunctionPointer(FunctionPointer),
+    FunctionPointer(FuncPtr),
     Polymorph(String, Vec<Type>),
 }
 

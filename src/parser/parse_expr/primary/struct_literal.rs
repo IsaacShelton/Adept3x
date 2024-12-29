@@ -8,15 +8,15 @@ use crate::{
 };
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_structure_literal(&mut self) -> Result<Expr, ParseError> {
+    pub fn parse_struct_literal(&mut self) -> Result<Expr, ParseError> {
         // Type { x: VALUE, b: VALUE, c: VALUE, :d, :e, ..SPECIFIER }
         //  ^
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of struct literal"))?;
-        self.parse_structure_literal_with(ast_type)
+        self.parse_struct_literal_with(ast_type)
     }
 
-    pub fn parse_structure_literal_with(&mut self, ast_type: Type) -> Result<Expr, ParseError> {
+    pub fn parse_struct_literal_with(&mut self, ast_type: Type) -> Result<Expr, ParseError> {
         // Type { x: VALUE, b: VALUE, c: VALUE, :d, :e, ..SPECIFIER }
         //      ^
 

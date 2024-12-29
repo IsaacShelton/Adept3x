@@ -92,7 +92,7 @@ pub unsafe fn get_unabi_function_type<'a>(
 ) -> Result<LLVMTypeRef, BackendError> {
     get_function_pointer_type(
         ctx.borrow(),
-        &function.parameters[..],
+        &function.params[..],
         &function.return_type,
         function.is_cstyle_variadic,
     )

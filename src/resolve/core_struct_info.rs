@@ -11,7 +11,7 @@ pub struct CoreStructInfo<'a> {
     pub arguments: &'a [asg::Type],
 }
 
-pub fn get_core_structure_info<'a, 'b>(
+pub fn get_core_struct_info<'a, 'b>(
     asg: &'b Asg<'a>,
     ty: &'a asg::Type,
     source: Source,

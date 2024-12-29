@@ -198,7 +198,7 @@ fn expand_macro_inner<'a>(
 fn expand_func_macro<'a>(
     token: &PreToken,
     tokens: &mut LookAhead<impl Iterator<Item = &'a PreToken>>,
-    function_macro: &FuncMacro,
+    func_macro: &FuncMacro,
     parent_environment: &Environment,
     parent_depleted: &mut Depleted,
 ) -> Result<Vec<PreToken>, PreprocessorError> {
@@ -276,16 +276,16 @@ fn expand_func_macro<'a>(
     }
 
     // Allow "zero arguments" when calling function-macros that only take a single argument.
-    if args.is_empty() && function_macro.params.len() == 1 {
+    if args.is_empty() && func_macro.params.len() == 1 {
         args.push(vec![]);
     }
 
     // Validate number of arguments
-    if args.len() != function_macro.params.len()
-        && !(args.len() > function_macro.params.len() && function_macro.is_variadic)
+    if args.len() != func_macro.params.len()
+        && !(args.len() > func_macro.params.len() && func_macro.is_variadic)
     {
         return Err(PreprocessorErrorKind::ParseError(
-            if !function_macro.is_variadic && args.len() > function_macro.params.len() {
+            if !func_macro.is_variadic && args.len() > func_macro.params.len() {
                 ParseErrorKind::TooManyArguments
             } else {
                 ParseErrorKind::NotEnoughArguments
@@ -295,7 +295,7 @@ fn expand_func_macro<'a>(
     }
 
     // Inject stringized arguments
-    let body = inject_stringized_arguments(function_macro, &args, start_of_macro_call);
+    let body = inject_stringized_arguments(func_macro, &args, start_of_macro_call);
 
     // Expand the values for each argument
     for arg in args.iter_mut() {
@@ -305,7 +305,7 @@ fn expand_func_macro<'a>(
     // Create environment to replace parameters with specified argument values
     let mut args_only_environment = Environment::default();
 
-    for (i, parameter_name) in function_macro.params.iter().enumerate() {
+    for (i, parameter_name) in func_macro.params.iter().enumerate() {
         // Replace all empty arg values with placeholder token
         if args[i].is_empty() {
             args[i].push(PreTokenKind::Placeholder.at(start_of_macro_call));
@@ -323,10 +323,10 @@ fn expand_func_macro<'a>(
     }
 
     // Create __VA__ARGS__ definition if applicable
-    if args.len() > function_macro.params.len() {
+    if args.len() > func_macro.params.len() {
         #[allow(unstable_name_collisions)]
         let rest = args
-            .splice(function_macro.params.len()..args.len(), std::iter::empty())
+            .splice(func_macro.params.len()..args.len(), std::iter::empty())
             .intersperse(vec![
                 // NOTE: The location information of inserted comma preprocessor tokens will be
                 // missing, but an error message caused by them is extremely rare in
@@ -365,7 +365,7 @@ fn expand_func_macro<'a>(
             source: Source::internal(),
             is_file_local_only: false,
         });
-    } else if function_macro.is_variadic {
+    } else if func_macro.is_variadic {
         // No variadic arguments passed, despite this function-macro
         // being variadic, so we must define __VA_ARGS__ to be empty (a placeholder token).
         args_only_environment.add_define(Define {
@@ -399,12 +399,12 @@ fn expand_func_macro<'a>(
 
 // Handles '# PARAMETER_NAME' sequences inside of function-macro bodies during expansion
 fn inject_stringized_arguments(
-    function_macro: &FuncMacro,
+    func_macro: &FuncMacro,
     args: &[Vec<PreToken>],
     start_of_macro_call: Source,
 ) -> Vec<PreToken> {
     let mut result = Vec::new();
-    let mut tokens = LookAhead::new(function_macro.body.iter());
+    let mut tokens = LookAhead::new(func_macro.body.iter());
 
     // TODO: CLEANUP: This part could be cleaned up
     while let Some(token) = tokens.next() {
@@ -414,7 +414,7 @@ fn inject_stringized_arguments(
                 ..
             }) = tokens.peek_nth(0)
             {
-                if let Some((index, _)) = function_macro
+                if let Some((index, _)) = func_macro
                     .params
                     .iter()
                     .find_position(|param| *param == param_name)

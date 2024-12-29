@@ -2,7 +2,7 @@ mod call;
 mod declare_assign;
 mod operator;
 mod static_member;
-mod structure_literal;
+mod struct_literal;
 
 use super::{super::error::ParseError, is_right_associative, is_terminating_token, Parser};
 use crate::{
@@ -97,7 +97,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 Ok(inner)
             }
             TokenKind::StructKeyword | TokenKind::UnionKeyword | TokenKind::EnumKeyword => {
-                self.parse_structure_literal()
+                self.parse_struct_literal()
             }
             TokenKind::Identifier(_) | TokenKind::NamespacedIdentifier(_) => {
                 // TODO: CLEANUP: This should be cleaned up once we have proper
@@ -113,7 +113,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
                         if peek.is_extend() || peek.is_colon() {
                             let ast_type = self.parse_type_from_parts(name, generics, source)?;
-                            self.parse_structure_literal_with(ast_type)
+                            self.parse_struct_literal_with(ast_type)
                         } else {
                             let last_two =
                                 array_last::<2, 4, _>(self.input.peek_n()).map(|token| &token.kind);
@@ -123,7 +123,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                                 | [TokenKind::Identifier(_), TokenKind::Colon, ..] => {
                                     let ast_type =
                                         self.parse_type_from_parts(name, generics, source)?;
-                                    self.parse_structure_literal_with(ast_type)
+                                    self.parse_struct_literal_with(ast_type)
                                 }
                                 _ => Ok(Expr::new(ExprKind::Variable(name), source)),
                             }
