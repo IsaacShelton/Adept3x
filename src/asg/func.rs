@@ -49,12 +49,12 @@ impl<'a> CurrentConstraints {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub name: ResolvedName,
-    pub parameters: Parameters,
+    pub params: Parameters,
     pub return_type: Type,
     pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
     pub is_generic: bool,
-    pub variables: VariableStorage,
+    pub vars: VariableStorage,
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,

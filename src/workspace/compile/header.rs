@@ -3,7 +3,7 @@ use crate::{
     c::{
         self,
         lexer::lex_c_code,
-        preprocessor::{DefineKind, Preprocessed},
+        preprocessor::{DefineKind, ObjMacro, Preprocessed},
         translate_expr,
     },
     compiler::Compiler,
@@ -35,10 +35,8 @@ pub fn header(
     // Translate preprocessor #define object macros
     for (define_name, define) in &defines {
         match &define.kind {
-            DefineKind::ObjectMacro(expanded_replacement, _placeholder_affinity) => {
-                let lexed_replacement =
-                    lex_c_code(expanded_replacement.clone(), Source::internal());
-                parser.switch_input(lexed_replacement);
+            DefineKind::ObjMacro(ObjMacro { replacement, .. }) => {
+                parser.switch_input(lex_c_code(replacement.clone(), Source::internal()));
 
                 if let Ok(value) = parser.parse_expr_singular().and_then(|expr| {
                     translate_expr(
@@ -57,7 +55,7 @@ pub fn header(
                     });
                 }
             }
-            DefineKind::FunctionMacro(_) => (),
+            DefineKind::FuncMacro(_) => (),
         }
     }
 

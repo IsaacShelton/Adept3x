@@ -98,7 +98,7 @@ fn resolve_structure(
         );
 
         let mut constraints = HashMap::new();
-        for (name, parameter) in structure.parameters.iter() {
+        for (name, parameter) in structure.params.iter() {
             constraints.insert(
                 name.into(),
                 HashSet::from_iter(

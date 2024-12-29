@@ -23,14 +23,12 @@ pub fn resolve_variable_expr(
         .as_plain_str()
         .and_then(|name| ctx.variable_haystack.find(name))
     {
-        if let Some(function) = ctx.func_ref.map(|func_ref| {
-            ctx.asg
-                .funcs
-                .get_mut(func_ref)
-                .expect("valid function ref")
-        }) {
+        if let Some(function) = ctx
+            .func_ref
+            .map(|func_ref| ctx.asg.funcs.get_mut(func_ref).expect("valid function ref"))
+        {
             let is_initialized = function
-                .variables
+                .vars
                 .get(variable.key)
                 .expect("found variable to exist")
                 .is_initialized();

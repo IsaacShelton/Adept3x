@@ -43,13 +43,13 @@ pub fn lower_short_circuiting_binary_operation(
         ),
     };
 
-    builder.push(ir::Instruction::ConditionalBreak(
+    builder.push(ir::Instr::ConditionalBreak(
         short_circuit.left,
         conditional_break,
     ));
     builder.use_block(merge_block_id);
 
-    Ok(builder.push(ir::Instruction::Phi(ir::Phi {
+    Ok(builder.push(ir::Instr::Phi(ir::Phi {
         ir_type: ir::Type::Boolean,
         incoming: vec![
             ir::PhiIncoming {

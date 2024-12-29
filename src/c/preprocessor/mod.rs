@@ -19,8 +19,9 @@ mod stdc;
    - __DATE__
    - etc.
 */
+#[allow(unused_imports)]
 pub use self::{
-    ast::{Define, DefineKind},
+    ast::{Define, DefineKind, FuncMacro, ObjMacro},
     pre_token::{PreToken, PreTokenKind},
 };
 use self::{

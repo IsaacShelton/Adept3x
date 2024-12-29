@@ -257,7 +257,7 @@ pub fn resolve_call_expr(
     };
 
     let function = ctx.asg.funcs.get(callee.function).unwrap();
-    let num_required = function.parameters.required.len();
+    let num_required = function.params.required.len();
 
     for (i, argument) in arguments.iter_mut().enumerate() {
         let function = ctx.asg.funcs.get(callee.function).unwrap();

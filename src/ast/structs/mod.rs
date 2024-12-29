@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 pub struct Struct {
     pub name: String,
     pub fields: IndexMap<String, Field>,
-    pub parameters: IndexMap<String, TypeParameter>,
+    pub params: IndexMap<String, TypeParameter>,
     pub is_packed: bool,
     pub source: Source,
     pub privacy: Privacy,

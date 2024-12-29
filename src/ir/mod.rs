@@ -72,7 +72,7 @@ pub struct StructRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct BasicBlock {
-    pub instructions: Vec<Instruction>,
+    pub instructions: Vec<Instr>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -90,7 +90,7 @@ pub struct OverflowOperation {
 }
 
 #[derive(Clone, Debug)]
-pub enum Instruction {
+pub enum Instr {
     Return(Option<Value>),
     Call(Call),
     Alloca(Type),
@@ -203,7 +203,7 @@ impl BinaryOperands {
 
 #[derive(Clone, Debug)]
 pub struct Call {
-    pub function: FuncRef,
+    pub func: FuncRef,
     pub arguments: Box<[Value]>,
     pub unpromoted_variadic_argument_types: Box<[Type]>,
 }
@@ -501,7 +501,7 @@ impl BasicBlock {
             .unwrap_or(false)
     }
 
-    pub fn push(&mut self, instruction: Instruction) {
+    pub fn push(&mut self, instruction: Instr) {
         if self.is_terminated() {
             panic!("Cannot push instruction onto basicblock when basicblock is already terminated, has already: {:#?}", self.instructions);
         } else {
@@ -509,7 +509,7 @@ impl BasicBlock {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Instruction> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = &Instr> + '_ {
         self.instructions.iter()
     }
 }
@@ -535,7 +535,7 @@ impl BasicBlocks {
     }
 }
 
-impl Instruction {
+impl Instr {
     pub fn is_terminating(&self) -> bool {
         match self {
             Self::Return(..) => true,

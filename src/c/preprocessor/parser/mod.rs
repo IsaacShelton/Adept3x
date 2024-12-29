@@ -3,7 +3,7 @@ mod error;
 use super::{
     ast::{
         ControlLine, ControlLineKind, Define, DefineKind, ElifGroup, Group, GroupPart, IfDefKind,
-        IfDefLike, IfGroup, IfLike, PlaceholderAffinity, PreprocessorAst, TextLine,
+        IfDefLike, IfGroup, IfLike, ObjMacro, PlaceholderAffinity, PreprocessorAst, TextLine,
     },
     error::PreprocessorErrorKind,
     lexer::{LexedLine, PreTokenLine},
@@ -11,7 +11,7 @@ use super::{
     PreprocessorError,
 };
 use crate::{
-    c::preprocessor::ast::{FunctionMacro, IfSection},
+    c::preprocessor::ast::{FuncMacro, IfSection},
     diagnostics::{Diagnostics, WarningDiagnostic},
     inflow::{Inflow, TryPeek},
     look_ahead::LookAhead,
@@ -166,7 +166,7 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
                             })
                         )
                     }) {
-                        Self::parse_define_function_macro(&entire_line, start_of_line)?
+                        Self::parse_define_func_macro(&entire_line, start_of_line)?
                     } else {
                         Self::parse_define_object_macro(&entire_line, start_of_line)?
                     },
@@ -210,7 +210,7 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
         }
     }
 
-    pub fn parse_define_function_macro(
+    pub fn parse_define_func_macro(
         entire_line: &[PreToken],
         start_of_line: Source,
     ) -> Result<Define, PreprocessorError> {
@@ -280,9 +280,9 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
         }
 
         Ok(Define {
-            kind: DefineKind::FunctionMacro(FunctionMacro {
+            kind: DefineKind::FuncMacro(FuncMacro {
                 affinity: PlaceholderAffinity::Discard,
-                parameters,
+                params: parameters,
                 is_variadic,
                 body: tokens.cloned().collect_vec(),
             }),
@@ -313,7 +313,10 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
         let replacement_tokens = line[3..].to_vec();
 
         Ok(Define {
-            kind: DefineKind::ObjectMacro(replacement_tokens, PlaceholderAffinity::Discard),
+            kind: DefineKind::ObjMacro(ObjMacro::new(
+                replacement_tokens,
+                PlaceholderAffinity::Discard,
+            )),
             name,
             source,
             is_file_local_only: false,

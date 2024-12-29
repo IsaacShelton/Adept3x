@@ -1,7 +1,7 @@
 use super::{datatype::ConcreteType, error::LowerError};
 use crate::{
     asg,
-    ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference},
+    ir::{self, BasicBlock, BasicBlocks, Instr, ValueReference},
     resolve::PolyRecipe,
 };
 use std::borrow::Cow;
@@ -35,13 +35,13 @@ impl<'a> Builder<'a> {
 
     pub fn continues_to(&mut self, basicblock_id: usize) {
         if !self.is_block_terminated() {
-            self.push(ir::Instruction::Break(ir::Break { basicblock_id }));
+            self.push(ir::Instr::Break(ir::Break { basicblock_id }));
         }
     }
 
     pub fn terminate(&mut self) {
         if !self.is_block_terminated() {
-            self.push(Instruction::Return(None));
+            self.push(Instr::Return(None));
         }
     }
 
@@ -69,7 +69,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn push(&mut self, instruction: Instruction) -> ir::Value {
+    pub fn push(&mut self, instruction: Instr) -> ir::Value {
         let current_block = self
             .basicblocks
             .get_mut(self.current_basicblock_id)

@@ -236,7 +236,7 @@ pub struct Define {
     pub is_file_local_only: bool,
 }
 
-#[derive(Clone, Debug, Hash, IsVariant)]
+#[derive(Copy, Clone, Debug, Hash, IsVariant)]
 pub enum PlaceholderAffinity {
     Keep,
     Discard,
@@ -244,14 +244,29 @@ pub enum PlaceholderAffinity {
 
 #[derive(Clone, Debug, Unwrap, IsVariant)]
 pub enum DefineKind {
-    ObjectMacro(Vec<PreToken>, PlaceholderAffinity),
-    FunctionMacro(FunctionMacro),
+    ObjMacro(ObjMacro),
+    FuncMacro(FuncMacro),
 }
 
 #[derive(Clone, Debug)]
-pub struct FunctionMacro {
+pub struct ObjMacro {
+    pub replacement: Vec<PreToken>,
     pub affinity: PlaceholderAffinity,
-    pub parameters: Vec<String>,
+}
+
+impl ObjMacro {
+    pub fn new(replacement_tokens: Vec<PreToken>, affinity: PlaceholderAffinity) -> Self {
+        Self {
+            replacement: replacement_tokens,
+            affinity,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FuncMacro {
+    pub affinity: PlaceholderAffinity,
+    pub params: Vec<String>,
     pub is_variadic: bool,
     pub body: Vec<PreToken>,
 }

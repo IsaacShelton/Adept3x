@@ -11,27 +11,27 @@ use crate::{
     tag::Tag,
 };
 
-pub fn lower_function_body(
+pub fn lower_func_body(
     ir_module: &ir::Module,
     func_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
     asg: &Asg,
 ) -> Result<BasicBlocks, LowerError> {
-    let function = asg.funcs.get(func_ref).expect("valid function reference");
+    let func = asg.funcs.get(func_ref).expect("valid function reference");
 
-    if function.is_foreign {
+    if func.is_foreign {
         return Ok(BasicBlocks::new());
     }
     let mut builder = Builder::new_with_starting_block(poly_recipe);
 
     // Allocate parameters
-    let parameter_variables = function
-        .variables
+    let param_vars = func
+        .vars
         .instances
         .iter()
-        .take(function.variables.num_parameters)
+        .take(func.vars.num_params)
         .map(|instance| {
-            Ok(builder.push(ir::Instruction::Alloca(lower_type(
+            Ok(builder.push(ir::Instr::Alloca(lower_type(
                 ir_module,
                 &builder.unpoly(&instance.ty)?,
                 asg,
@@ -40,34 +40,29 @@ pub fn lower_function_body(
         .collect::<Result<Vec<_>, LowerError>>()?;
 
     // Allocate non-parameter stack variables
-    for variable_instance in function
-        .variables
-        .instances
-        .iter()
-        .skip(function.variables.num_parameters)
-    {
-        builder.push(ir::Instruction::Alloca(lower_type(
+    for var in func.vars.instances.iter().skip(func.vars.num_params) {
+        builder.push(ir::Instr::Alloca(lower_type(
             ir_module,
-            &builder.unpoly(&variable_instance.ty)?,
+            &builder.unpoly(&var.ty)?,
             asg,
         )?));
     }
 
-    for (i, destination) in parameter_variables.into_iter().enumerate() {
-        let source = builder.push(ir::Instruction::Parameter(i.try_into().unwrap()));
+    for (i, destination) in param_vars.into_iter().enumerate() {
+        let source = builder.push(ir::Instr::Parameter(i.try_into().unwrap()));
 
-        builder.push(ir::Instruction::Store(ir::Store {
+        builder.push(ir::Instr::Store(ir::Store {
             new_value: source,
             destination,
         }));
     }
 
-    lower_stmts(&mut builder, ir_module, &function.stmts, function, asg)?;
+    lower_stmts(&mut builder, ir_module, &func.stmts, func, asg)?;
 
     if !builder.is_block_terminated() {
-        if function.return_type.kind.is_void() {
-            if function.tag == Some(Tag::Main) && !builder.is_block_terminated() {
-                builder.push(ir::Instruction::Return(Some(ir::Value::Literal(
+        if func.return_type.kind.is_void() {
+            if func.tag == Some(Tag::Main) && !builder.is_block_terminated() {
+                builder.push(ir::Instr::Return(Some(ir::Value::Literal(
                     Literal::Signed32(0),
                 ))));
             } else {
@@ -75,49 +70,48 @@ pub fn lower_function_body(
             }
         } else {
             return Err(LowerErrorKind::MustReturnValueOfTypeBeforeExitingFunction {
-                return_type: function.return_type.to_string(),
-                function: function.name.display(&asg.workspace.fs).to_string(),
+                return_type: func.return_type.to_string(),
+                function: func.name.display(&asg.workspace.fs).to_string(),
             }
-            .at(function.source));
+            .at(func.source));
         }
     }
 
     Ok(builder.build())
 }
 
-pub fn lower_function_head(
+pub fn lower_func_head(
     ir_module: &ir::Module,
     func_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
     asg: &Asg,
 ) -> Result<ir::FuncRef, LowerError> {
-    let function = asg.funcs.get(func_ref).expect("valid function reference");
-
+    let func = asg.funcs.get(func_ref).expect("valid function reference");
     let basicblocks = BasicBlocks::default();
 
-    let mut parameters = vec![];
-    for parameter in function.parameters.required.iter() {
-        parameters.push(lower_type(
+    let mut params = vec![];
+    for param in func.params.required.iter() {
+        params.push(lower_type(
             ir_module,
-            &unpoly(poly_recipe, &parameter.ty)?,
+            &unpoly(poly_recipe, &param.ty)?,
             asg,
         )?);
     }
 
-    let mut return_type = lower_type(ir_module, &unpoly(poly_recipe, &function.return_type)?, asg)?;
+    let mut return_type = lower_type(ir_module, &unpoly(poly_recipe, &func.return_type)?, asg)?;
 
-    if function.tag == Some(Tag::Main) {
+    if func.tag == Some(Tag::Main) {
         if let ir::Type::Void = return_type {
             return_type = ir::Type::S32;
         }
     }
 
-    let mangled_name = if function.name.plain() == "main" {
+    let mangled_name = if func.name.plain() == "main" {
         "main".into()
-    } else if function.is_foreign {
-        function.name.plain().to_string()
+    } else if func.is_foreign {
+        func.name.plain().to_string()
     } else {
-        function.name.display(&asg.workspace.fs).to_string() + &poly_recipe.to_string()
+        func.name.display(&asg.workspace.fs).to_string() + &poly_recipe.to_string()
     };
 
     let is_main = mangled_name == "main";
@@ -128,12 +122,12 @@ pub fn lower_function_head(
         ir::Func {
             mangled_name,
             basicblocks,
-            parameters,
+            parameters: params,
             return_type,
-            is_cstyle_variadic: function.parameters.is_cstyle_vararg,
-            is_foreign: function.is_foreign,
+            is_cstyle_variadic: func.params.is_cstyle_vararg,
+            is_foreign: func.is_foreign,
             is_exposed,
-            abide_abi: function.abide_abi && ir_module.target.arch().is_some(),
+            abide_abi: func.abide_abi && ir_module.target.arch().is_some(),
         },
     ))
 }

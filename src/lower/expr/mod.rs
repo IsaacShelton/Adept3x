@@ -5,7 +5,7 @@ use super::{
     cast::{integer_cast, integer_extend, integer_truncate},
     datatype::lower_type,
     error::{LowerError, LowerErrorKind},
-    function::lower_function_head,
+    function::lower_func_head,
     stmts::lower_stmts,
 };
 use crate::{
@@ -144,7 +144,7 @@ pub fn lower_expr(
                 .map(|argument| lower_expr(builder, ir_module, &argument.expr, function, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
 
-            let variadic_argument_types = call.arguments[callee.parameters.required.len()..]
+            let variadic_argument_types = call.arguments[callee.params.required.len()..]
                 .iter()
                 .map(|argument| lower_type(ir_module, &builder.unpoly(&argument.ty)?, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
@@ -153,16 +153,11 @@ pub fn lower_expr(
                 ir_module
                     .funcs
                     .translate(call.callee.function, &call.callee.recipe, || {
-                        lower_function_head(
-                            ir_module,
-                            call.callee.function,
-                            &call.callee.recipe,
-                            asg,
-                        )
+                        lower_func_head(ir_module, call.callee.function, &call.callee.recipe, asg)
                     })?;
 
-            Ok(builder.push(ir::Instruction::Call(ir::Call {
-                function,
+            Ok(builder.push(ir::Instr::Call(ir::Call {
+                func: function,
                 arguments,
                 unpromoted_variadic_argument_types: variadic_argument_types,
             })))
@@ -170,12 +165,12 @@ pub fn lower_expr(
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
             let variable_type = lower_type(ir_module, &builder.unpoly(&variable.ty)?, asg)?;
-            Ok(builder.push(ir::Instruction::Load((pointer_to_variable, variable_type))))
+            Ok(builder.push(ir::Instr::Load((pointer_to_variable, variable_type))))
         }
         ExprKind::GlobalVariable(global_variable) => {
-            let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
+            let pointer = builder.push(ir::Instr::GlobalVariable(global_variable.reference));
             let ir_type = lower_type(ir_module, &builder.unpoly(&global_variable.ty)?, asg)?;
-            Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
+            Ok(builder.push(ir::Instr::Load((pointer, ir_type))))
         }
         ExprKind::DeclareAssign(declare_assign) => {
             let initial_value =
@@ -186,13 +181,13 @@ pub fn lower_expr(
                 instruction_id: declare_assign.key.index,
             });
 
-            builder.push(ir::Instruction::Store(ir::Store {
+            builder.push(ir::Instr::Store(ir::Store {
                 new_value: initial_value,
                 destination: destination.clone(),
             }));
 
             let ir_type = lower_type(ir_module, &builder.unpoly(&declare_assign.ty)?, asg)?;
-            Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
+            Ok(builder.push(ir::Instr::Load((destination, ir_type))))
         }
         ExprKind::BasicBinaryOperation(operation) => {
             let left = lower_expr(builder, ir_module, &operation.left.expr, function, asg)?;
@@ -220,7 +215,7 @@ pub fn lower_expr(
         ExprKind::FloatExtend(cast) => {
             let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
             let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, asg)?;
-            Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
+            Ok(builder.push(ir::Instr::FloatExtend(value, ir_type)))
         }
         ExprKind::FloatToInteger(cast) => {
             let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
@@ -234,7 +229,7 @@ pub fn lower_expr(
                 IntegerSign::Unsigned
             };
 
-            Ok(builder.push(ir::Instruction::FloatToInteger(value, ir_type, sign)))
+            Ok(builder.push(ir::Instr::FloatToInteger(value, ir_type, sign)))
         }
         ExprKind::IntegerToFloat(cast_from) => {
             let cast = &cast_from.cast;
@@ -246,7 +241,7 @@ pub fn lower_expr(
 
             let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
             let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, asg)?;
-            Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, from_sign)))
+            Ok(builder.push(ir::Instr::IntegerToFloat(value, ir_type, from_sign)))
         }
         ExprKind::Member(member) => {
             let Member {
@@ -284,27 +279,27 @@ pub fn lower_expr(
                     })?;
 
             // Access member of structure
-            let member = builder.push(ir::Instruction::Member {
+            let member = builder.push(ir::Instr::Member {
                 subject_pointer,
                 struct_type: ir::Type::Struct(struct_ref),
                 index: *index,
             });
 
             let ir_type = lower_type(ir_module, &builder.unpoly(field_type)?, asg)?;
-            Ok(builder.push(ir::Instruction::Load((member, ir_type))))
+            Ok(builder.push(ir::Instr::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {
             let subject = lower_expr(builder, ir_module, &array_access.subject, function, asg)?;
             let index = lower_expr(builder, ir_module, &array_access.index, function, asg)?;
             let item_type = lower_type(ir_module, &builder.unpoly(&array_access.item_type)?, asg)?;
 
-            let item = builder.push(ir::Instruction::ArrayAccess {
+            let item = builder.push(ir::Instr::ArrayAccess {
                 item_type: item_type.clone(),
                 subject_pointer: subject,
                 index,
             });
 
-            Ok(builder.push(ir::Instruction::Load((item, item_type))))
+            Ok(builder.push(ir::Instr::Load((item, item_type))))
         }
         ExprKind::StructLiteral(structure_literal) => {
             let StructLiteral {
@@ -327,7 +322,7 @@ pub fn lower_expr(
             // Drop the index part of the values
             let values = values.drain(..).map(|(_, value)| value).collect();
 
-            Ok(builder.push(ir::Instruction::StructLiteral(result_ir_type, values)))
+            Ok(builder.push(ir::Instr::StructLiteral(result_ir_type, values)))
         }
         ExprKind::UnaryMathOperation(operation) => {
             let UnaryMathOperation { operator, inner } = &**operation;
@@ -341,12 +336,10 @@ pub fn lower_expr(
                 .unwrap_or(FloatOrInteger::Integer);
 
             let instruction = match operator {
-                asg::UnaryMathOperator::Not => ir::Instruction::IsZero(value, float_or_int),
-                asg::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
-                asg::UnaryMathOperator::Negate => ir::Instruction::Negate(value, float_or_int),
-                asg::UnaryMathOperator::IsNonZero => {
-                    ir::Instruction::IsNonZero(value, float_or_int)
-                }
+                asg::UnaryMathOperator::Not => ir::Instr::IsZero(value, float_or_int),
+                asg::UnaryMathOperator::BitComplement => ir::Instr::BitComplement(value),
+                asg::UnaryMathOperator::Negate => ir::Instr::Negate(value, float_or_int),
+                asg::UnaryMathOperator::IsNonZero => ir::Instr::IsNonZero(value, float_or_int),
             };
 
             Ok(builder.push(instruction))
@@ -361,7 +354,7 @@ pub fn lower_expr(
         ExprKind::Dereference(subject) => {
             let ir_type = lower_type(ir_module, &builder.unpoly(&subject.ty)?, asg)?;
             let value = lower_expr(builder, ir_module, &subject.expr, function, asg)?;
-            Ok(builder.push(ir::Instruction::Load((value, ir_type))))
+            Ok(builder.push(ir::Instr::Load((value, ir_type))))
         }
         ExprKind::Conditional(conditional) => {
             let resume_basicblock_id = builder.new_block();
@@ -374,7 +367,7 @@ pub fn lower_expr(
                 let true_basicblock_id = builder.new_block();
                 let false_basicblock_id = builder.new_block();
 
-                builder.push(ir::Instruction::ConditionalBreak(
+                builder.push(ir::Instr::ConditionalBreak(
                     condition,
                     ir::ConditionalBreak {
                         true_basicblock_id,
@@ -408,7 +401,7 @@ pub fn lower_expr(
             if conditional.otherwise.is_some() {
                 let ir_type =
                     lower_type(ir_module, &builder.unpoly(&conditional.result_type)?, asg)?;
-                Ok(builder.push(ir::Instruction::Phi(ir::Phi { ir_type, incoming })))
+                Ok(builder.push(ir::Instr::Phi(ir::Phi { ir_type, incoming })))
             } else {
                 Ok(Value::Literal(Literal::Void))
             }
@@ -424,7 +417,7 @@ pub fn lower_expr(
 
             let condition = lower_expr(builder, ir_module, &while_loop.condition, function, asg)?;
 
-            builder.push(ir::Instruction::ConditionalBreak(
+            builder.push(ir::Instr::ConditionalBreak(
                 condition,
                 ir::ConditionalBreak {
                     true_basicblock_id,
@@ -515,7 +508,7 @@ pub fn lower_expr(
                 values.push(lower_expr(builder, ir_module, arg, function, asg)?);
             }
 
-            Ok(builder.push(ir::Instruction::InterpreterSyscall(*syscall, values)))
+            Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
         }
     }
 }
@@ -530,7 +523,7 @@ pub fn lower_destination(
     match &destination.kind {
         DestinationKind::Variable(variable) => Ok(lower_variable_to_value(variable.key)),
         DestinationKind::GlobalVariable(global_variable) => {
-            let pointer = builder.push(ir::Instruction::GlobalVariable(global_variable.reference));
+            let pointer = builder.push(ir::Instr::GlobalVariable(global_variable.reference));
             Ok(pointer)
         }
         DestinationKind::Member {
@@ -566,7 +559,7 @@ pub fn lower_destination(
                         mono(ir_module, asg, *struct_ref, poly_recipe)
                     })?;
 
-            Ok(builder.push(ir::Instruction::Member {
+            Ok(builder.push(ir::Instr::Member {
                 subject_pointer,
                 struct_type: ir::Type::Struct(struct_ref),
                 index: *index,
@@ -578,7 +571,7 @@ pub fn lower_destination(
             let index = lower_expr(builder, ir_module, &array_access.index, function, asg)?;
             let item_type = lower_type(ir_module, &builder.unpoly(&array_access.item_type)?, asg)?;
 
-            Ok(builder.push(ir::Instruction::ArrayAccess {
+            Ok(builder.push(ir::Instr::ArrayAccess {
                 item_type,
                 subject_pointer,
                 index,
@@ -604,10 +597,10 @@ fn lower_add(
 ) -> Result<Value, LowerError> {
     Ok(builder.push(match mode {
         NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
-            ir::Instruction::Add(operands, FloatOrInteger::Integer)
+            ir::Instr::Add(operands, FloatOrInteger::Integer)
         }
-        NumericMode::Float => ir::Instruction::Add(operands, FloatOrInteger::Float),
-        NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
+        NumericMode::Float => ir::Instr::Add(operands, FloatOrInteger::Float),
+        NumericMode::CheckOverflow(bits, sign) => ir::Instr::Checked(
             ir::OverflowOperation {
                 operator: OverflowOperator::Add,
                 bits: *bits,
@@ -633,10 +626,10 @@ pub fn lower_basic_binary_operation(
         asg::BasicBinaryOperator::Add(mode) => lower_add(builder, mode, operands),
         asg::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
-                ir::Instruction::Subtract(operands, FloatOrInteger::Integer)
+                ir::Instr::Subtract(operands, FloatOrInteger::Integer)
             }
-            NumericMode::Float => ir::Instruction::Subtract(operands, FloatOrInteger::Float),
-            NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
+            NumericMode::Float => ir::Instr::Subtract(operands, FloatOrInteger::Float),
+            NumericMode::CheckOverflow(bits, sign) => ir::Instr::Checked(
                 ir::OverflowOperation {
                     operator: OverflowOperator::Subtract,
                     bits: *bits,
@@ -647,10 +640,10 @@ pub fn lower_basic_binary_operation(
         })),
         asg::BasicBinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
-                ir::Instruction::Multiply(operands, FloatOrInteger::Integer)
+                ir::Instr::Multiply(operands, FloatOrInteger::Integer)
             }
-            NumericMode::Float => ir::Instruction::Multiply(operands, FloatOrInteger::Float),
-            NumericMode::CheckOverflow(bits, sign) => ir::Instruction::Checked(
+            NumericMode::Float => ir::Instr::Multiply(operands, FloatOrInteger::Float),
+            NumericMode::CheckOverflow(bits, sign) => ir::Instr::Checked(
                 ir::OverflowOperation {
                     operator: OverflowOperator::Multiply,
                     bits: *bits,
@@ -659,44 +652,40 @@ pub fn lower_basic_binary_operation(
                 operands,
             ),
         })),
-        asg::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instruction::Divide(
+        asg::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instr::Divide(
             operands,
             mode.or_default_for(&ir_module.target),
         ))),
-        asg::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instruction::Modulus(
+        asg::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instr::Modulus(
             operands,
             mode.or_default_for(&ir_module.target),
         ))),
         asg::BasicBinaryOperator::Equals(mode) => {
-            Ok(builder.push(ir::Instruction::Equals(operands, *mode)))
+            Ok(builder.push(ir::Instr::Equals(operands, *mode)))
         }
         asg::BasicBinaryOperator::NotEquals(mode) => {
-            Ok(builder.push(ir::Instruction::NotEquals(operands, *mode)))
+            Ok(builder.push(ir::Instr::NotEquals(operands, *mode)))
         }
-        asg::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(ir::Instruction::LessThan(
+        asg::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(ir::Instr::LessThan(
             operands,
             mode.or_default_for(&ir_module.target),
         ))),
-        asg::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(
-            ir::Instruction::LessThanEq(operands, mode.or_default_for(&ir_module.target)),
-        )),
-        asg::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(
-            ir::Instruction::GreaterThan(operands, mode.or_default_for(&ir_module.target)),
-        )),
+        asg::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(ir::Instr::LessThanEq(
+            operands,
+            mode.or_default_for(&ir_module.target),
+        ))),
+        asg::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(ir::Instr::GreaterThan(
+            operands,
+            mode.or_default_for(&ir_module.target),
+        ))),
         asg::BasicBinaryOperator::GreaterThanEq(mode) => Ok(builder.push(
-            ir::Instruction::GreaterThanEq(operands, mode.or_default_for(&ir_module.target)),
+            ir::Instr::GreaterThanEq(operands, mode.or_default_for(&ir_module.target)),
         )),
-        asg::BasicBinaryOperator::BitwiseAnd => {
-            Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))
-        }
-        asg::BasicBinaryOperator::BitwiseOr => {
-            Ok(builder.push(ir::Instruction::BitwiseOr(operands)))
-        }
-        asg::BasicBinaryOperator::BitwiseXor => {
-            Ok(builder.push(ir::Instruction::BitwiseXor(operands)))
-        }
+        asg::BasicBinaryOperator::BitwiseAnd => Ok(builder.push(ir::Instr::BitwiseAnd(operands))),
+        asg::BasicBinaryOperator::BitwiseOr => Ok(builder.push(ir::Instr::BitwiseOr(operands))),
+        asg::BasicBinaryOperator::BitwiseXor => Ok(builder.push(ir::Instr::BitwiseXor(operands))),
         asg::BasicBinaryOperator::LogicalLeftShift | asg::BasicBinaryOperator::LeftShift => {
-            Ok(builder.push(ir::Instruction::LeftShift(operands)))
+            Ok(builder.push(ir::Instr::LeftShift(operands)))
         }
         asg::BasicBinaryOperator::ArithmeticRightShift(sign_or_indeterminate) => {
             let sign = match sign_or_indeterminate {
@@ -707,12 +696,12 @@ pub fn lower_basic_binary_operation(
             };
 
             Ok(builder.push(match sign {
-                IntegerSign::Signed => ir::Instruction::ArithmeticRightShift(operands),
-                IntegerSign::Unsigned => ir::Instruction::LogicalRightShift(operands),
+                IntegerSign::Signed => ir::Instr::ArithmeticRightShift(operands),
+                IntegerSign::Unsigned => ir::Instr::LogicalRightShift(operands),
             }))
         }
         asg::BasicBinaryOperator::LogicalRightShift => {
-            Ok(builder.push(ir::Instruction::LogicalRightShift(operands)))
+            Ok(builder.push(ir::Instr::LogicalRightShift(operands)))
         }
     }
 }

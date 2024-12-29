@@ -105,7 +105,7 @@ impl<'a> PreferredType<'a> {
                 &asg.funcs
                     .get(*func_ref)
                     .unwrap()
-                    .parameters
+                    .params
                     .required
                     .get(*index)
                     .unwrap()

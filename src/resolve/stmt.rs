@@ -41,13 +41,8 @@ pub fn resolve_stmt(
                     Initialized::Require,
                 )?;
 
-                let mut return_type = Cow::Borrowed(
-                    &ctx.asg
-                        .funcs
-                        .get(func_ref)
-                        .unwrap()
-                        .return_type,
-                );
+                let mut return_type =
+                    Cow::Borrowed(&ctx.asg.funcs.get(func_ref).unwrap().return_type);
 
                 if return_type.kind.contains_polymorph() {
                     let mut stripped = return_type.as_ref().clone();
@@ -145,9 +140,7 @@ pub fn resolve_stmt(
 
             let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
 
-            let key = function
-                .variables
-                .add_variable(ty.clone(), value.is_some());
+            let key = function.vars.add_variable(ty.clone(), value.is_some());
 
             ctx.variable_haystack
                 .put(&declaration.name, ty.clone(), key);
@@ -202,7 +195,7 @@ pub fn resolve_stmt(
                     let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
 
                     function
-                        .variables
+                        .vars
                         .get(variable.key)
                         .expect("variable being assigned to exists")
                         .set_initialized();
@@ -217,12 +210,7 @@ pub fn resolve_stmt(
                 .operator
                 .as_ref()
                 .map(|ast_operator| {
-                    resolve_basic_binary_operator(
-                        ctx,
-                        ast_operator,
-                        &destination.ty,
-                        source,
-                    )
+                    resolve_basic_binary_operator(ctx, ast_operator, &destination.ty, source)
                 })
                 .transpose()?;
 

@@ -22,7 +22,7 @@ use self::error::ResolveError;
 use crate::{asg::Asg, ast::AstWorkspace, cli::BuildOptions};
 use ctx::ResolveCtx;
 use func_body::resolve_func_bodies;
-use func_head::create_function_heads;
+use func_head::create_func_heads;
 use global_variable::resolve_global_variables;
 use helper_expr::resolve_helper_expressions;
 use initialized::Initialized;
@@ -41,7 +41,7 @@ pub fn resolve<'a>(
 
     resolve_type_definitions(&mut ctx, &mut asg, workspace)?;
     resolve_global_variables(&mut ctx, &mut asg, workspace)?;
-    create_function_heads(&mut ctx, &mut asg, workspace, options)?;
+    create_func_heads(&mut ctx, &mut asg, workspace, options)?;
     resolve_helper_expressions(&mut ctx, &mut asg, workspace)?;
     resolve_func_bodies(&mut ctx, &mut asg, workspace)?;
 

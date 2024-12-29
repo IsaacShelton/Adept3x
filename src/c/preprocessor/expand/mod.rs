@@ -14,7 +14,7 @@ use super::{
         PreprocessorAst, TextLine,
     },
     pre_token::PreToken,
-    PreprocessorError,
+    ObjMacro, PreprocessorError,
 };
 use crate::c::preprocessor::ast::GroupPart;
 use depleted::Depleted;
@@ -37,15 +37,20 @@ pub fn expand_ast(
 
     // Assemble preprocessed #define object macros
     let mut defines = HashMap::<String, Define>::with_capacity(environment.defines.len());
-    for (define_name, define) in environment.defines.iter() {
+
+    for (name, define) in environment.defines.iter() {
         match &define.kind {
-            DefineKind::ObjectMacro(replacement, placeholder_affinity) => {
+            DefineKind::ObjMacro(ObjMacro {
+                replacement,
+                affinity,
+            }) => {
                 let expanded = expand_region(replacement, &environment, &mut depleted)?;
+
                 defines.insert(
-                    define_name.clone(),
+                    name.clone(),
                     Define {
-                        name: define_name.clone(),
-                        kind: DefineKind::ObjectMacro(expanded, placeholder_affinity.clone()),
+                        name: name.clone(),
+                        kind: DefineKind::ObjMacro(ObjMacro::new(expanded, *affinity)),
                         source: define.source,
                         is_file_local_only: define.is_file_local_only,
                     },

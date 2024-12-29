@@ -24,7 +24,7 @@ pub fn integer_truncate(
 ) -> Result<Value, LowerError> {
     let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
     let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, asg)?;
-    Ok(builder.push(ir::Instruction::Truncate(value, ir_type)))
+    Ok(builder.push(ir::Instr::Truncate(value, ir_type)))
 }
 
 pub fn integer_extend(
@@ -49,8 +49,8 @@ pub fn integer_extend(
             .sign(Some(&ir_module.target))
             .expect("integer extend result type to be an integer type")
         {
-            asg::IntegerSign::Signed => ir::Instruction::SignExtend(value, ir_type),
-            asg::IntegerSign::Unsigned => ir::Instruction::ZeroExtend(value, ir_type),
+            asg::IntegerSign::Signed => ir::Instr::SignExtend(value, ir_type),
+            asg::IntegerSign::Unsigned => ir::Instr::ZeroExtend(value, ir_type),
         },
     ))
 }

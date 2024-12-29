@@ -14,7 +14,7 @@ pub fn lower_stmts(
     builder: &mut Builder,
     ir_module: &ir::Module,
     stmts: &[asg::Stmt],
-    function: &asg::Func,
+    func: &asg::Func,
     asg: &Asg,
 ) -> Result<Value, LowerError> {
     let mut result = Value::Literal(Literal::Void);
@@ -22,9 +22,9 @@ pub fn lower_stmts(
     for stmt in stmts.iter() {
         result = match &stmt.kind {
             StmtKind::Return(expr) => {
-                let instruction = ir::Instruction::Return(if let Some(expr) = expr {
-                    Some(lower_expr(builder, ir_module, expr, function, asg)?)
-                } else if function.tag == Some(Tag::Main) {
+                let instruction = ir::Instr::Return(if let Some(expr) = expr {
+                    Some(lower_expr(builder, ir_module, expr, func, asg)?)
+                } else if func.tag == Some(Tag::Main) {
                     Some(ir::Value::Literal(Literal::Signed32(0)))
                 } else {
                     None
@@ -33,7 +33,7 @@ pub fn lower_stmts(
                 builder.push(instruction);
                 Value::Literal(Literal::Void)
             }
-            StmtKind::Expr(expr) => lower_expr(builder, ir_module, &expr.expr, function, asg)?,
+            StmtKind::Expr(expr) => lower_expr(builder, ir_module, &expr.expr, func, asg)?,
             StmtKind::Declaration(declaration) => {
                 let destination = Value::Reference(ValueReference {
                     basicblock_id: 0,
@@ -41,9 +41,9 @@ pub fn lower_stmts(
                 });
 
                 if let Some(value) = &declaration.value {
-                    let source = lower_expr(builder, ir_module, value, function, asg)?;
+                    let source = lower_expr(builder, ir_module, value, func, asg)?;
 
-                    builder.push(ir::Instruction::Store(ir::Store {
+                    builder.push(ir::Instr::Store(ir::Store {
                         new_value: source,
                         destination,
                     }));
@@ -53,18 +53,16 @@ pub fn lower_stmts(
             }
             StmtKind::Assignment(assignment) => {
                 let destination =
-                    lower_destination(builder, ir_module, &assignment.destination, function, asg)?;
+                    lower_destination(builder, ir_module, &assignment.destination, func, asg)?;
 
-                let new_value = lower_expr(builder, ir_module, &assignment.value, function, asg)?;
+                let new_value = lower_expr(builder, ir_module, &assignment.value, func, asg)?;
 
                 let new_value = if let Some(operator) = &assignment.operator {
                     let destination_type =
                         lower_type(ir_module, &builder.unpoly(&assignment.destination.ty)?, asg)?;
 
-                    let existing_value = builder.push(ir::Instruction::Load((
-                        destination.clone(),
-                        destination_type,
-                    )));
+                    let existing_value =
+                        builder.push(ir::Instr::Load((destination.clone(), destination_type)));
 
                     lower_basic_binary_operation(
                         builder,
@@ -76,7 +74,7 @@ pub fn lower_stmts(
                     new_value
                 };
 
-                builder.push(ir::Instruction::Store(ir::Store {
+                builder.push(ir::Instr::Store(ir::Store {
                     new_value,
                     destination,
                 }));

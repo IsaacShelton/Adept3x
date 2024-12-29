@@ -66,7 +66,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             fields,
             is_packed,
-            parameters,
+            params: parameters,
             source,
             privacy,
         })

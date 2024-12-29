@@ -90,110 +90,108 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
             let mut new_ip = None;
 
             let result = match instruction {
-                ir::Instruction::Return(value) => {
+                ir::Instr::Return(value) => {
                     break value;
                 }
-                ir::Instruction::Call(call) => {
+                ir::Instr::Call(call) => {
                     let mut arguments = Vec::with_capacity(call.arguments.len());
 
                     for argument in call.arguments.iter() {
                         arguments.push(self.eval(&registers, argument));
                     }
 
-                    self.call(call.function, arguments)?
+                    self.call(call.func, arguments)?
                 }
-                ir::Instruction::Alloca(ty) => {
+                ir::Instr::Alloca(ty) => {
                     Value::Literal(self.memory.alloc_stack(self.size_of(&ty))?)
                 }
-                ir::Instruction::Store(store) => {
+                ir::Instr::Store(store) => {
                     let new_value = self.eval(&registers, &store.new_value);
                     let dest = self.eval(&registers, &store.destination).as_u64().unwrap();
 
                     self.memory.write(dest, new_value, self.ir_module)?;
                     Value::Undefined
                 }
-                ir::Instruction::Load((value, ty)) => {
+                ir::Instr::Load((value, ty)) => {
                     let address = self.eval(&registers, &value).as_u64().unwrap();
                     self.memory.read(address, ty)?
                 }
-                ir::Instruction::Malloc(ir_type) => {
+                ir::Instr::Malloc(ir_type) => {
                     let bytes = self.size_of(ir_type);
                     Value::Literal(self.memory.alloc_heap(bytes))
                 }
-                ir::Instruction::MallocArray(ir_type, count) => {
+                ir::Instr::MallocArray(ir_type, count) => {
                     let count = self.eval(&registers, count);
                     let count = count.as_u64().unwrap();
                     let bytes = self.size_of(ir_type);
                     Value::Literal(self.memory.alloc_heap(bytes * count))
                 }
-                ir::Instruction::Free(value) => {
+                ir::Instr::Free(value) => {
                     let value = self.eval(&registers, value).unwrap_literal();
                     self.memory.free_heap(value);
                     Value::Literal(ir::Literal::Void)
                 }
-                ir::Instruction::SizeOf(ty) => {
-                    Value::Literal(ir::Literal::Unsigned64(self.size_of(ty)))
-                }
-                ir::Instruction::Parameter(index) => args[usize::try_from(*index).unwrap()].clone(),
-                ir::Instruction::GlobalVariable(global_ref) => {
+                ir::Instr::SizeOf(ty) => Value::Literal(ir::Literal::Unsigned64(self.size_of(ty))),
+                ir::Instr::Parameter(index) => args[usize::try_from(*index).unwrap()].clone(),
+                ir::Instr::GlobalVariable(global_ref) => {
                     Value::Literal(self.global_addresses.get(global_ref).unwrap().clone())
                 }
-                ir::Instruction::Add(ops, _f_or_i) => self.add(ops, &registers),
-                ir::Instruction::Checked(_, _) => todo!(),
-                ir::Instruction::Subtract(ops, _f_or_i) => self.sub(ops, &registers),
-                ir::Instruction::Multiply(ops, _f_or_i) => self.mul(ops, &registers),
-                ir::Instruction::Divide(ops, _f_or_sign) => self.div(ops, &registers)?,
-                ir::Instruction::Modulus(ops, _f_or_sign) => self.rem(ops, &registers)?,
-                ir::Instruction::Equals(ops, _f_or_i) => self.eq(ops, &registers),
-                ir::Instruction::NotEquals(ops, _f_or_i) => self.neq(ops, &registers),
-                ir::Instruction::LessThan(ops, _f_or_i) => self.lt(ops, &registers),
-                ir::Instruction::LessThanEq(ops, _f_or_i) => self.lte(ops, &registers),
-                ir::Instruction::GreaterThan(ops, _f_or_i) => self.gt(ops, &registers),
-                ir::Instruction::GreaterThanEq(ops, _f_or_i) => self.gte(ops, &registers),
-                ir::Instruction::And(_) => todo!("Interpreter / ir::Instruction::And"),
-                ir::Instruction::Or(_) => todo!("Interpreter / ir::Instruction::Or"),
-                ir::Instruction::BitwiseAnd(_) => {
+                ir::Instr::Add(ops, _f_or_i) => self.add(ops, &registers),
+                ir::Instr::Checked(_, _) => todo!(),
+                ir::Instr::Subtract(ops, _f_or_i) => self.sub(ops, &registers),
+                ir::Instr::Multiply(ops, _f_or_i) => self.mul(ops, &registers),
+                ir::Instr::Divide(ops, _f_or_sign) => self.div(ops, &registers)?,
+                ir::Instr::Modulus(ops, _f_or_sign) => self.rem(ops, &registers)?,
+                ir::Instr::Equals(ops, _f_or_i) => self.eq(ops, &registers),
+                ir::Instr::NotEquals(ops, _f_or_i) => self.neq(ops, &registers),
+                ir::Instr::LessThan(ops, _f_or_i) => self.lt(ops, &registers),
+                ir::Instr::LessThanEq(ops, _f_or_i) => self.lte(ops, &registers),
+                ir::Instr::GreaterThan(ops, _f_or_i) => self.gt(ops, &registers),
+                ir::Instr::GreaterThanEq(ops, _f_or_i) => self.gte(ops, &registers),
+                ir::Instr::And(_) => todo!("Interpreter / ir::Instruction::And"),
+                ir::Instr::Or(_) => todo!("Interpreter / ir::Instruction::Or"),
+                ir::Instr::BitwiseAnd(_) => {
                     todo!("Interpreter / ir::Instruction::BitwiseAnd")
                 }
-                ir::Instruction::BitwiseOr(_) => todo!("Interpreter / ir::Instruction::BitwiseOr"),
-                ir::Instruction::BitwiseXor(_) => {
+                ir::Instr::BitwiseOr(_) => todo!("Interpreter / ir::Instruction::BitwiseOr"),
+                ir::Instr::BitwiseXor(_) => {
                     todo!("Interpreter / ir::Instruction::BitwiseXor")
                 }
-                ir::Instruction::LeftShift(_) => todo!("Interpreter / ir::Instruction::LeftShift"),
-                ir::Instruction::ArithmeticRightShift(_) => {
+                ir::Instr::LeftShift(_) => todo!("Interpreter / ir::Instruction::LeftShift"),
+                ir::Instr::ArithmeticRightShift(_) => {
                     todo!("Interpreter / ir::Instruction::ArithmeticRightShift")
                 }
-                ir::Instruction::LogicalRightShift(_) => {
+                ir::Instr::LogicalRightShift(_) => {
                     todo!("Interpreter / ir::Instruction::LogicalRightShift")
                 }
-                ir::Instruction::Bitcast(_, _) => todo!("Interpreter / ir::Instruction::BitCast"),
-                ir::Instruction::ZeroExtend(_, _) => {
+                ir::Instr::Bitcast(_, _) => todo!("Interpreter / ir::Instruction::BitCast"),
+                ir::Instr::ZeroExtend(_, _) => {
                     todo!("Interpreter / ir::Instruction::ZeroExtend")
                 }
-                ir::Instruction::SignExtend(_, _) => {
+                ir::Instr::SignExtend(_, _) => {
                     todo!("Interpreter / ir::Instruction::SignExtend")
                 }
-                ir::Instruction::FloatExtend(_, _) => {
+                ir::Instr::FloatExtend(_, _) => {
                     todo!("Interpreter / ir::Instruction::FloatExtend")
                 }
-                ir::Instruction::Truncate(_, _) => todo!("Interpreter / ir::Instruction::Truncate"),
-                ir::Instruction::TruncateFloat(_, _) => {
+                ir::Instr::Truncate(_, _) => todo!("Interpreter / ir::Instruction::Truncate"),
+                ir::Instr::TruncateFloat(_, _) => {
                     todo!("Interpreter / ir::Instruction::TruncateFloat")
                 }
-                ir::Instruction::IntegerToPointer(..) => {
+                ir::Instr::IntegerToPointer(..) => {
                     todo!("Interpreter / ir::Instruction::IntegerToPointer");
                 }
-                ir::Instruction::PointerToInteger(..) => {
+                ir::Instr::PointerToInteger(..) => {
                     todo!("Interpreter / ir::Instruction::PointerToInteger");
                 }
 
-                ir::Instruction::FloatToInteger(..) => {
+                ir::Instr::FloatToInteger(..) => {
                     todo!("Interpreter / ir::Instruction::FloatToInteger");
                 }
-                ir::Instruction::IntegerToFloat(..) => {
+                ir::Instr::IntegerToFloat(..) => {
                     todo!("Interpreter / ir::Instruction::IntegerToFloat");
                 }
-                ir::Instruction::Member {
+                ir::Instr::Member {
                     struct_type,
                     subject_pointer,
                     index,
@@ -208,8 +206,8 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
                     Value::Literal(ir::Literal::Unsigned64(subject_pointer + offset))
                 }
-                ir::Instruction::ArrayAccess { .. } => todo!(),
-                ir::Instruction::StructLiteral(ty, values) => {
+                ir::Instr::ArrayAccess { .. } => todo!(),
+                ir::Instr::StructLiteral(ty, values) => {
                     let mut field_values = Vec::with_capacity(values.len());
 
                     for value in values {
@@ -221,10 +219,10 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         fields: ty.struct_fields(self.ir_module).unwrap(),
                     })
                 }
-                ir::Instruction::IsZero(_value, _) => {
+                ir::Instr::IsZero(_value, _) => {
                     todo!("Interpreter / ir::Instruction::IsZero")
                 }
-                ir::Instruction::IsNonZero(value, _) => {
+                ir::Instr::IsNonZero(value, _) => {
                     let value = self.eval(&registers, value);
 
                     match value {
@@ -250,18 +248,18 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         Value::StructLiteral(_) => Value::Undefined,
                     }
                 }
-                ir::Instruction::Negate(..) => todo!("Interpreter / ir::Instruction::Negate"),
-                ir::Instruction::BitComplement(_) => {
+                ir::Instr::Negate(..) => todo!("Interpreter / ir::Instruction::Negate"),
+                ir::Instr::BitComplement(_) => {
                     todo!("Interpreter / ir::Instruction::BitComplement")
                 }
-                ir::Instruction::Break(break_info) => {
+                ir::Instr::Break(break_info) => {
                     new_ip = Some(InstructionPointer {
                         basicblock_id: break_info.basicblock_id,
                         instruction_id: 0,
                     });
                     Value::Undefined
                 }
-                ir::Instruction::ConditionalBreak(value, break_info) => {
+                ir::Instr::ConditionalBreak(value, break_info) => {
                     let value = self.eval(&registers, value);
 
                     let should = match value {
@@ -280,7 +278,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
 
                     Value::Undefined
                 }
-                ir::Instruction::Phi(phi) => {
+                ir::Instr::Phi(phi) => {
                     let mut found = None;
 
                     for incoming in phi.incoming.iter() {
@@ -292,7 +290,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
 
                     found.unwrap_or(Value::Undefined)
                 }
-                ir::Instruction::InterpreterSyscall(syscall, supplied_args) => {
+                ir::Instr::InterpreterSyscall(syscall, supplied_args) => {
                     let mut args = Vec::with_capacity(args.len());
 
                     for supplied_arg in supplied_args.iter() {

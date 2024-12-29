@@ -75,7 +75,7 @@ fn prepare_structure(
 ) -> Result<StructRef, ResolveError> {
     let mut parameters = TypeParameters::default();
 
-    for (name, parameter) in structure.parameters.iter() {
+    for (name, parameter) in structure.params.iter() {
         let zero_current_constraints = CurrentConstraints::new_empty();
         let constraints = resolve_constraints(
             &ResolveTypeCtx::new(
@@ -107,7 +107,7 @@ fn prepare_structure(
 
     // TODO: Improve the source tracking for these
     let polymorphs = structure
-        .parameters
+        .params
         .keys()
         .map(|name| asg::TypeKind::Polymorph(name.into(), vec![]).at(structure.source))
         .collect_vec();

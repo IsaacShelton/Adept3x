@@ -82,7 +82,7 @@ pub fn monomorphize_structure(
     Ok(struct_ref)
 }
 
-pub fn lower_structure(
+pub fn lower_struct(
     ir_module: &mut ir::Module,
     struct_ref: asg::StructRef,
     structure: &asg::Struct,

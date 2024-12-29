@@ -28,7 +28,7 @@ pub fn resolve_declare_assign_expr(
 
     let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
 
-    let key = function.variables.add_variable(value.ty.clone(), true);
+    let key = function.vars.add_variable(value.ty.clone(), true);
 
     ctx.variable_haystack
         .put(&declare_assign.name, value.ty.clone(), key);

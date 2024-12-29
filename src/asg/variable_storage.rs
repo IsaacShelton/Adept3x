@@ -4,7 +4,7 @@ use std::cell::OnceCell;
 #[derive(Clone, Debug)]
 pub struct VariableStorage {
     pub instances: Vec<VariableInstance>,
-    pub num_parameters: usize,
+    pub num_params: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -42,7 +42,7 @@ impl VariableStorage {
     pub fn new() -> Self {
         Self {
             instances: vec![],
-            num_parameters: 0,
+            num_params: 0,
         }
     }
 
@@ -55,8 +55,8 @@ impl VariableStorage {
     }
 
     pub fn add_param(&mut self, ty: asg::Type) -> VariableStorageKey {
-        assert_eq!(self.num_parameters, self.instances.len());
-        self.num_parameters += 1;
+        assert_eq!(self.num_params, self.instances.len());
+        self.num_params += 1;
         self.add_variable(ty, true)
     }
 

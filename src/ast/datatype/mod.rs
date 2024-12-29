@@ -52,10 +52,15 @@ impl Type {
                     CompileTimeArgument::Expr(_) => todo!("ast::Type::contains_polymorph"),
                 })
                 .next(),
-            TypeKind::AnonymousStruct(_) => todo!("contains_polymoph for AnonymousStruct"),
-            TypeKind::AnonymousUnion(_) => todo!("contains_polymorph for AnonymousUnion"),
-            TypeKind::AnonymousEnum(_) => todo!("contains_polymorph for AnonymousEnum"),
-            TypeKind::FunctionPointer(_) => todo!("contains_polymorph for FunctionPointer"),
+            TypeKind::AnonymousStruct(_) => None,
+            TypeKind::AnonymousUnion(_) => None,
+            TypeKind::AnonymousEnum(_) => None,
+            TypeKind::FunctionPointer(func_pointer) => func_pointer
+                .parameters
+                .iter()
+                .flat_map(|param| param.ast_type.contains_polymorph())
+                .next()
+                .or_else(|| func_pointer.return_type.contains_polymorph()),
             TypeKind::Polymorph(_, _) => Some(self.source),
         }
     }
