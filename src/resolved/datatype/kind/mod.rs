@@ -39,7 +39,7 @@ pub enum TypeKind {
     Structure(HumanName, StructureRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef),
     Polymorph(String, Vec<Constraint>),
-    Trait(HumanName, TraitRef),
+    Trait(HumanName, TraitRef, Vec<Type>),
 }
 
 impl TypeKind {
@@ -66,12 +66,11 @@ impl TypeKind {
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
             TypeKind::FunctionPointer(_) => todo!(),
             TypeKind::Enum(_, _) => false,
-            TypeKind::Structure(_, _, parameters) => parameters
+            TypeKind::Structure(_, _, parameters) | TypeKind::Trait(_, _, parameters) => parameters
                 .iter()
                 .any(|parameter| parameter.kind.contains_polymorph()),
             TypeKind::TypeAlias(_, _) => false,
             TypeKind::Polymorph(_, _) => true,
-            TypeKind::Trait(_, _) => false,
         }
     }
 
@@ -101,7 +100,7 @@ impl TypeKind {
             | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum()
             | TypeKind::Polymorph(_, _)
-            | TypeKind::Trait(_, _) => None,
+            | TypeKind::Trait(_, _, _) => None,
         }
     }
 
@@ -110,6 +109,12 @@ impl TypeKind {
             TypeKind::Structure(_, structure_ref, _) => resolved_ast
                 .structures
                 .get(*structure_ref)
+                .unwrap()
+                .parameters
+                .len(),
+            TypeKind::Trait(_, trait_ref, _) => resolved_ast
+                .traits
+                .get(*trait_ref)
                 .unwrap()
                 .parameters
                 .len(),
@@ -159,20 +164,7 @@ impl Display for TypeKind {
             TypeKind::Void => f.write_str("void")?,
             TypeKind::Structure(name, _, parameters) => {
                 write!(f, "{}", name)?;
-
-                if !parameters.is_empty() {
-                    write!(f, "<")?;
-
-                    for (i, parameter) in parameters.iter().enumerate() {
-                        write!(f, "{}", parameter)?;
-
-                        if i + 1 < parameters.len() {
-                            write!(f, ", ")?;
-                        }
-                    }
-
-                    write!(f, ">")?
-                }
+                write_parameters(f, parameters)?;
             }
             TypeKind::AnonymousStruct() => f.write_str("anonymous-struct")?,
             TypeKind::AnonymousUnion() => f.write_str("anonymous-union")?,
@@ -193,13 +185,32 @@ impl Display for TypeKind {
                     write!(f, "{}", constaint)?;
                 }
             }
-            TypeKind::Trait(name, _) => {
+            TypeKind::Trait(name, _, parameters) => {
                 write!(f, "{}", name)?;
+                write_parameters(f, parameters)?;
             }
         }
 
         Ok(())
     }
+}
+
+fn write_parameters(f: &mut std::fmt::Formatter<'_>, parameters: &[Type]) -> std::fmt::Result {
+    if !parameters.is_empty() {
+        write!(f, "<")?;
+
+        for (i, parameter) in parameters.iter().enumerate() {
+            write!(f, "{}", parameter)?;
+
+            if i + 1 < parameters.len() {
+                write!(f, ", ")?;
+            }
+        }
+
+        write!(f, ">")?;
+    }
+
+    Ok(())
 }
 
 impl TypeKind {

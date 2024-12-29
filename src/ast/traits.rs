@@ -1,11 +1,10 @@
-use super::{Parameters, Privacy, Type, TypeParameter};
+use super::{Parameters, Privacy, Type};
 use crate::source_files::Source;
-use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct Trait {
     pub name: String,
-    pub parameters: IndexMap<String, TypeParameter>,
+    pub parameters: Vec<String>,
     pub source: Source,
     pub privacy: Privacy,
     pub functions: Vec<TraitFunction>,

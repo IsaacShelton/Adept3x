@@ -84,14 +84,19 @@ pub fn resolve_constraint(
                     }
                 })?;
 
-                let resolved::TypeKind::Trait(_, trait_ref) = &resolved_type.kind else {
+                let resolved::TypeKind::Trait(_, trait_ref, parameters) = &resolved_type.kind
+                else {
                     return Err(ResolveErrorKind::TypeIsNotATrait {
                         name: resolved_type.to_string(),
                     }
                     .at(resolved_type.source));
                 };
 
-                return Ok(Constraint::Trait(HumanName(name.to_string()), *trait_ref));
+                return Ok(Constraint::Trait(
+                    HumanName(name.to_string()),
+                    *trait_ref,
+                    parameters.clone(),
+                ));
             }
         }
     }

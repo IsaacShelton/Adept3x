@@ -30,7 +30,7 @@ impl<'a> CurrentConstraints {
                 }
                 _ => false,
             },
-            Constraint::Trait(name, _trait_ref) => match &ty.kind {
+            Constraint::Trait(name, _trait_ref, _trait_arguments) => match &ty.kind {
                 TypeKind::Polymorph(name, constraints) => {
                     constraints.contains(constraint)
                         || self

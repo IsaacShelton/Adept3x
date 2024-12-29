@@ -18,11 +18,6 @@ pub fn resolve_function_bodies(
             FuncJob::Regular(physical_file_id, ast_function_index, resolved_function_ref) => {
                 let module_file_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-                let function_haystack = ctx
-                    .function_haystacks
-                    .get(&module_file_id)
-                    .expect("function haystack to exist for file");
-
                 let ast_file = ast_workspace
                     .files
                     .get(&physical_file_id)
@@ -33,65 +28,113 @@ pub fn resolve_function_bodies(
                     .get(ast_function_index)
                     .expect("function referenced by job to exist");
 
-                let variable_haystack = resolve_parameter_variables(
+                resolve_function_body(
                     ctx,
                     resolved_ast,
+                    ast_workspace,
                     module_file_id,
                     physical_file_id,
                     ast_function,
                     resolved_function_ref,
                 )?;
-
-                let file = ast_workspace
-                    .files
-                    .get(&physical_file_id)
-                    .expect("referenced file exists");
-
-                let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
-
-                let f = resolved_ast
-                    .functions
-                    .get(resolved_function_ref)
-                    .expect("referenced resolved function to exist");
-                let constraints = f.constraints.clone();
-
-                let resolved_stmts = resolve_stmts(
-                    &mut ResolveExprCtx {
-                        resolved_ast,
-                        function_haystack,
-                        variable_haystack,
-                        resolved_function_ref: Some(resolved_function_ref),
-                        settings,
-                        public_functions: &ctx.public_functions,
-                        types_in_modules: &ctx.types_in_modules,
-                        globals_in_modules: &ctx.globals_in_modules,
-                        helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
-                        module_fs_node_id: module_file_id,
-                        physical_fs_node_id: physical_file_id,
-                        current_constraints: constraints,
-                    },
-                    &ast_function.stmts,
-                )?;
-
-                resolved_ast
-                    .functions
-                    .get_mut(resolved_function_ref)
-                    .expect("resolved function head to exist")
-                    .stmts = resolved_stmts;
             }
             FuncJob::Impling(
-                _physical_file_id,
-                _ast_impl_index,
-                _ast_function_index,
+                physical_file_id,
+                ast_impl_index,
+                ast_impl_function_index,
                 resolved_function_ref,
             ) => {
-                todo!(
-                    "resolve function body for function inside of impl - {:?}",
-                    resolved_function_ref
-                );
+                let module_file_id = ast_workspace.get_owning_module_or_self(physical_file_id);
+
+                let ast_file = ast_workspace
+                    .files
+                    .get(&physical_file_id)
+                    .expect("file referenced by job to exist");
+
+                let ast_function = ast_file
+                    .impls
+                    .get(ast_impl_index)
+                    .expect("referenced impl to exist")
+                    .body
+                    .get(ast_impl_function_index)
+                    .expect("referenced impl function to exist");
+
+                resolve_function_body(
+                    ctx,
+                    resolved_ast,
+                    ast_workspace,
+                    module_file_id,
+                    physical_file_id,
+                    ast_function,
+                    resolved_function_ref,
+                )?;
             }
         }
     }
+
+    Ok(())
+}
+
+fn resolve_function_body(
+    ctx: &mut ResolveCtx,
+    resolved_ast: &mut resolved::Ast,
+    ast_workspace: &AstWorkspace,
+    module_file_id: FsNodeId,
+    physical_file_id: FsNodeId,
+    ast_function: &ast::Function,
+    resolved_function_ref: FunctionRef,
+) -> Result<(), ResolveError> {
+    let function_haystack = ctx
+        .function_haystacks
+        .get(&module_file_id)
+        .expect("function haystack to exist for file");
+
+    let variable_haystack = resolve_parameter_variables(
+        ctx,
+        resolved_ast,
+        module_file_id,
+        physical_file_id,
+        ast_function,
+        resolved_function_ref,
+    )?;
+
+    let file = ast_workspace
+        .files
+        .get(&physical_file_id)
+        .expect("referenced file exists");
+
+    let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
+
+    let f = resolved_ast
+        .functions
+        .get(resolved_function_ref)
+        .expect("referenced resolved function to exist");
+
+    let constraints = f.constraints.clone();
+
+    let resolved_stmts = resolve_stmts(
+        &mut ResolveExprCtx {
+            resolved_ast,
+            function_haystack,
+            variable_haystack,
+            resolved_function_ref: Some(resolved_function_ref),
+            settings,
+            public_functions: &ctx.public_functions,
+            types_in_modules: &ctx.types_in_modules,
+            globals_in_modules: &ctx.globals_in_modules,
+            helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
+            module_fs_node_id: module_file_id,
+            physical_fs_node_id: physical_file_id,
+            current_constraints: constraints,
+        },
+        &ast_function.stmts,
+    )?;
+
+    resolved_ast
+        .functions
+        .get_mut(resolved_function_ref)
+        .expect("resolved function head to exist")
+        .stmts = resolved_stmts;
 
     Ok(())
 }

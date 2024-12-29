@@ -41,7 +41,7 @@ impl<'a> ResolveTypeCtx<'a> {
                         CompileTimeArgument::Type(ty) => self.resolve(ty),
                         CompileTimeArgument::Expr(expr) => Err(ResolveErrorKind::Other {
                             message:
-                                "Expressions cannot be used as type parameters to structueres yet"
+                                "Expressions cannot be used as type parameters to structures yet"
                                     .into(),
                         }
                         .at(expr.source)),
@@ -51,6 +51,26 @@ impl<'a> ResolveTypeCtx<'a> {
                 return Ok(Cow::Owned(resolved::TypeKind::Structure(
                     human_name.clone(),
                     *structure_ref,
+                    arguments,
+                )));
+            }
+
+            if let resolved::TypeKind::Trait(human_name, trait_ref, _) = &decl.kind {
+                let arguments = arguments
+                    .iter()
+                    .flat_map(|arg| match arg {
+                        CompileTimeArgument::Type(ty) => self.resolve(ty),
+                        CompileTimeArgument::Expr(expr) => Err(ResolveErrorKind::Other {
+                            message: "Expressions cannot be used as type parameters to traits yet"
+                                .into(),
+                        }
+                        .at(expr.source)),
+                    })
+                    .collect_vec();
+
+                return Ok(Cow::Owned(resolved::TypeKind::Trait(
+                    human_name.clone(),
+                    *trait_ref,
                     arguments,
                 )));
             }

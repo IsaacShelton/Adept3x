@@ -37,7 +37,7 @@ fn create_impl_head<'a>(
     Ok(resolved_ast.impls.insert(resolved::Impl {
         resolved_type,
         source: imp.source,
-        body: vec![],
+        body: HashMap::default(),
     }))
 }
 
@@ -73,6 +73,15 @@ pub fn create_function_heads<'a>(
                     function_i,
                     function_ref,
                 ));
+
+                let functions_with_name = resolved_ast
+                    .impls
+                    .get_mut(impl_ref)
+                    .unwrap()
+                    .body
+                    .get_or_insert_with(&function.head.name, || Default::default());
+
+                functions_with_name.push(function_ref);
             }
         }
 
@@ -242,6 +251,10 @@ pub fn collect_constraints_into(
                 set.insert(constraint.clone());
             }
         }
-        resolved::TypeKind::Trait(_, _) => (),
+        resolved::TypeKind::Trait(_, _, parameters) => {
+            for parameter in parameters {
+                collect_constraints_into(map, parameter);
+            }
+        }
     }
 }

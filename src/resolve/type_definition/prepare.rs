@@ -173,8 +173,15 @@ fn prepare_trait(
 ) -> Result<TraitRef, ResolveError> {
     let trait_ref = resolved_ast.traits.insert(resolved::Trait {
         functions: vec![],
+        parameters: definition.parameters.clone(),
         source: definition.source,
     });
+
+    let parameters = definition
+        .parameters
+        .iter()
+        .map(|name| resolved::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
+        .collect_vec();
 
     declare_type(
         ctx,
@@ -182,7 +189,11 @@ fn prepare_trait(
         &definition.name,
         definition.source,
         definition.privacy,
-        resolved::TypeKind::Trait(HumanName(definition.name.to_string()), trait_ref),
+        resolved::TypeKind::Trait(
+            HumanName(definition.name.to_string()),
+            trait_ref,
+            parameters,
+        ),
     )?;
 
     Ok(trait_ref)

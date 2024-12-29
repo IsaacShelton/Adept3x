@@ -1,6 +1,6 @@
 use super::{
     annotation::{Annotation, AnnotationKind},
-    error::ParseError,
+    error::{ParseError, ParseErrorKind},
     Parser,
 };
 use crate::{
@@ -8,6 +8,7 @@ use crate::{
     inflow::Inflow,
     token::{Token, TokenKind},
 };
+use itertools::Itertools;
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_trait(&mut self, annotations: Vec<Annotation>) -> Result<Trait, ParseError> {
@@ -31,6 +32,18 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let parameters = self.parse_type_parameters()?;
         self.parse_token(TokenKind::OpenCurly, Some("to begin trait body"))?;
         self.ignore_newlines();
+
+        if parameters
+            .values()
+            .any(|constraints| !constraints.constraints.is_empty())
+        {
+            return Err(ParseErrorKind::Other {
+                message: "Constraints not supported on traits yet".into(),
+            }
+            .at(source));
+        }
+
+        let parameters = parameters.into_keys().collect_vec();
 
         let mut methods = vec![];
 

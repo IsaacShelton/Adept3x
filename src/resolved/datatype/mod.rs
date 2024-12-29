@@ -55,7 +55,11 @@ impl Type {
             TypeKind::Polymorph(_, constraints) => {
                 constraints.drain(..);
             }
-            TypeKind::Trait(_, _) => (),
+            TypeKind::Trait(_, _, parameters) => {
+                for parameter in parameters {
+                    parameter.strip_constraints();
+                }
+            }
         }
     }
 }

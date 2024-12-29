@@ -118,7 +118,7 @@ impl PolyRecipe {
 
                 poly_type.resolved_type.clone()
             }
-            resolved::TypeKind::Trait(_, _) => ty.clone(),
+            resolved::TypeKind::Trait(_, _, _) => ty.clone(),
         })
     }
 }
@@ -190,14 +190,31 @@ impl PolyCatalog {
             | resolved::TypeKind::Floating(_)
             | resolved::TypeKind::Void
             | resolved::TypeKind::Enum(_, _)
-            | resolved::TypeKind::TypeAlias(_, _)
-            | resolved::TypeKind::Trait(_, _) => {
+            | resolved::TypeKind::TypeAlias(_, _) => {
                 if *pattern_type == *concrete_type {
                     Ok(())
                 } else {
                     Err(None)
                 }
             }
+            resolved::TypeKind::Trait(_, trait_ref, parameters) => match &concrete_type.kind {
+                resolved::TypeKind::Trait(_, concrete_trait_ref, concrete_parameters) => {
+                    if *trait_ref == *concrete_trait_ref
+                        || parameters.len() != concrete_parameters.len()
+                    {
+                        return Err(None);
+                    }
+
+                    for (pattern_parameter, concrete_parameter) in
+                        parameters.iter().zip(concrete_parameters.iter())
+                    {
+                        self.match_type(ctx, pattern_parameter, concrete_parameter)?;
+                    }
+
+                    Ok(())
+                }
+                _ => Err(None),
+            },
             resolved::TypeKind::Structure(_, structure_ref, parameters) => {
                 match &concrete_type.kind {
                     resolved::TypeKind::Structure(

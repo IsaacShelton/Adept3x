@@ -24,7 +24,7 @@ pub fn lower_type(
     match &resolved_type.kind {
         resolved::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
         resolved::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorph"),
-        resolved::TypeKind::Trait(name, _) => Err(LowerErrorKind::CannotUseTraitDirectly {
+        resolved::TypeKind::Trait(name, _, _) => Err(LowerErrorKind::CannotUseTraitDirectly {
             name: name.to_string(),
         }
         .at(resolved_type.source)),
