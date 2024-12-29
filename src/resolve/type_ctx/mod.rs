@@ -7,33 +7,33 @@ use super::{
     expr::ResolveExprCtx,
 };
 use crate::{
+    asg::{self, Asg, Constraint, CurrentConstraints, HumanName},
     ast,
     name::ResolvedName,
-    resolved::{self, Constraint, CurrentConstraints, HumanName},
     workspace::fs::FsNodeId,
 };
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub struct ResolveTypeCtx<'a> {
-    resolved_ast: &'a resolved::Ast<'a>,
+    asg: &'a Asg<'a>,
     module_fs_node_id: FsNodeId,
     file_fs_node_id: FsNodeId,
-    types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
+    types_in_modules: &'a HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
     used_aliases_stack: HashSet<ResolvedName>,
     current_constraints: &'a CurrentConstraints,
 }
 
 impl<'a> ResolveTypeCtx<'a> {
     pub fn new(
-        resolved_ast: &'a resolved::Ast,
+        asg: &'a Asg,
         module_fs_node_id: FsNodeId,
         file_fs_node_id: FsNodeId,
-        types_in_modules: &'a HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
+        types_in_modules: &'a HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
         current_constraints: &'a CurrentConstraints,
     ) -> Self {
         Self {
-            resolved_ast,
+            asg,
             module_fs_node_id,
             file_fs_node_id,
             types_in_modules,
@@ -46,7 +46,7 @@ impl<'a> ResolveTypeCtx<'a> {
 impl<'a, 'b, 'c> From<&'c ResolveExprCtx<'a, 'b>> for ResolveTypeCtx<'c> {
     fn from(ctx: &'c ResolveExprCtx<'a, 'b>) -> Self {
         Self::new(
-            ctx.resolved_ast,
+            ctx.asg,
             ctx.module_fs_node_id,
             ctx.physical_fs_node_id,
             ctx.types_in_modules,
@@ -84,8 +84,7 @@ pub fn resolve_constraint(
                     }
                 })?;
 
-                let resolved::TypeKind::Trait(_, trait_ref, parameters) = &resolved_type.kind
-                else {
+                let asg::TypeKind::Trait(_, trait_ref, parameters) = &resolved_type.kind else {
                     return Err(ResolveErrorKind::TypeIsNotATrait {
                         name: resolved_type.to_string(),
                     }

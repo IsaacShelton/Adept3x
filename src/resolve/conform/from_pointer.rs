@@ -1,7 +1,7 @@
 use super::{warn_type_alias_depth_exceeded, ConformMode, Objective, ObjectiveResult};
 use crate::{
     resolve::expr::ResolveExprCtx,
-    resolved::{Expr, Type, TypeKind, TypedExpr},
+    asg::{Expr, Type, TypeKind, TypedExpr},
 };
 
 pub fn from_pointer<O: Objective>(
@@ -11,7 +11,7 @@ pub fn from_pointer<O: Objective>(
     from_inner_type: &Type,
     to_type: &Type,
 ) -> ObjectiveResult<O> {
-    let Ok(from_inner_type) = ctx.resolved_ast.unalias(from_inner_type) else {
+    let Ok(from_inner_type) = ctx.asg.unalias(from_inner_type) else {
         warn_type_alias_depth_exceeded(from_inner_type);
         return O::fail();
     };
@@ -20,7 +20,7 @@ pub fn from_pointer<O: Objective>(
         return O::fail();
     };
 
-    let Ok(to_inner_type) = ctx.resolved_ast.unalias(to_inner_type) else {
+    let Ok(to_inner_type) = ctx.asg.unalias(to_inner_type) else {
         warn_type_alias_depth_exceeded(to_inner_type);
         return O::fail();
     };

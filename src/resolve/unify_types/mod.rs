@@ -7,18 +7,18 @@ use super::{
 };
 use crate::{
     ast::ConformBehavior,
-    resolved::{self, TypedExpr},
+    asg::{self, TypedExpr},
     source_files::Source,
 };
 use compute::compute_unifying_type;
 
 pub fn unify_types(
     ctx: &ResolveExprCtx,
-    preferred_type: Option<&resolved::Type>,
+    preferred_type: Option<&asg::Type>,
     exprs: &mut [&mut TypedExpr],
     behavior: ConformBehavior,
     conform_source: Source,
-) -> Option<resolved::Type> {
+) -> Option<asg::Type> {
     // Compute the unifying type for the supplied expressions
     let Some(unified_type) = compute_unifying_type(preferred_type, exprs, behavior, conform_source)
     else {

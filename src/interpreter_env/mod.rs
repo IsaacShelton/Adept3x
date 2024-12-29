@@ -1,4 +1,5 @@
 use crate::{
+    asg::Asg,
     ast::{
         AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Function,
         FunctionHead, InterpreterSyscall, Language, Parameter, Parameters, Privacy, StmtKind,
@@ -11,7 +12,6 @@ use crate::{
     ir::{self, InterpreterSyscallKind},
     name::Name,
     resolve::PolyRecipe,
-    resolved,
     source_files::Source,
     tag::Tag,
 };
@@ -326,10 +326,10 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 }
 
 pub fn run_build_system_interpreter<'a>(
-    resolved_ast: &'a resolved::Ast<'_>,
+    asg: &'a Asg<'_>,
     ir_module: &'a ir::Module,
 ) -> Result<Interpreter<'a, BuildSystemSyscallHandler>, InterpreterError> {
-    let (interpreter_entry_point, _fn) = resolved_ast
+    let (interpreter_entry_point, _fn) = asg
         .functions
         .iter()
         .find(|(_, f)| f.tag == Some(Tag::InterpreterEntryPoint))

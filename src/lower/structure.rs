@@ -4,19 +4,18 @@ use super::{
     error::{LowerError, LowerErrorKind},
 };
 use crate::{
-    ir,
+    asg::{self, Asg}, ir,
     resolve::{PolyCatalog, PolyRecipe},
-    resolved,
     source_files::Source,
 };
 
 pub fn mono(
     ir_module: &ir::Module,
-    resolved_ast: &resolved::Ast,
-    resolved_structure_ref: resolved::StructureRef,
+    asg: &Asg,
+    resolved_structure_ref: asg::StructureRef,
     poly_recipe: PolyRecipe,
 ) -> Result<ir::StructureRef, LowerError> {
-    let structure = resolved_ast
+    let structure = asg
         .structures
         .get(resolved_structure_ref)
         .expect("referenced structure exists");
@@ -25,11 +24,7 @@ pub fn mono(
 
     for field in structure.fields.values() {
         fields.push(ir::Field {
-            ir_type: lower_type(
-                ir_module,
-                &unpoly(&poly_recipe, &field.resolved_type)?,
-                resolved_ast,
-            )?,
+            ir_type: lower_type(ir_module, &unpoly(&poly_recipe, &field.resolved_type)?, asg)?,
             properties: ir::FieldProperties::default(),
             source: field.source,
         });
@@ -51,12 +46,12 @@ pub fn mono(
 
 pub fn monomorphize_structure(
     ir_module: &ir::Module,
-    resolved_structure_ref: resolved::StructureRef,
+    resolved_structure_ref: asg::StructureRef,
     parameters: &[ConcreteType],
-    resolved_ast: &resolved::Ast,
+    asg: &Asg,
     source: Source,
 ) -> Result<ir::StructureRef, LowerError> {
-    let structure = resolved_ast
+    let structure = asg
         .structures
         .get(resolved_structure_ref)
         .expect("referenced structure to exist");
@@ -81,7 +76,7 @@ pub fn monomorphize_structure(
         ir_module
             .structures
             .translate(resolved_structure_ref, poly_recipe, |poly_recipe| {
-                mono(ir_module, resolved_ast, resolved_structure_ref, poly_recipe)
+                mono(ir_module, asg, resolved_structure_ref, poly_recipe)
             })?;
 
     Ok(structure_ref)
@@ -89,9 +84,9 @@ pub fn monomorphize_structure(
 
 pub fn lower_structure(
     ir_module: &mut ir::Module,
-    structure_ref: resolved::StructureRef,
-    structure: &resolved::Structure,
-    resolved_ast: &resolved::Ast,
+    structure_ref: asg::StructureRef,
+    structure: &asg::Structure,
+    asg: &Asg,
 ) -> Result<(), LowerError> {
     let mut fields = Vec::with_capacity(structure.fields.len());
 
@@ -105,7 +100,7 @@ pub fn lower_structure(
             ir_type: lower_type(
                 ir_module,
                 &unpoly(&PolyRecipe::default(), &field.resolved_type)?,
-                resolved_ast,
+                asg,
             )?,
             properties: ir::FieldProperties::default(),
             source: field.source,

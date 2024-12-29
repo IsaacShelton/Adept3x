@@ -23,6 +23,10 @@ use super::{
     Initialized, ResolveTypeCtx,
 };
 use crate::{
+    asg::{
+        self, Asg, CurrentConstraints, Expr, ExprKind, FunctionRef, StructureRef, TypeKind,
+        TypedExpr,
+    },
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
         UnaryOperator,
@@ -37,9 +41,6 @@ use crate::{
         },
         resolve_stmts,
     },
-    resolved::{
-        self, CurrentConstraints, Expr, ExprKind, FunctionRef, StructureRef, TypeKind, TypedExpr,
-    },
     workspace::fs::FsNodeId,
 };
 use ast::FloatSize;
@@ -48,15 +49,15 @@ use ordered_float::NotNan;
 use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
-    pub resolved_ast: &'b mut resolved::Ast<'a>,
+    pub asg: &'b mut Asg<'a>,
     pub function_haystack: &'b FunctionHaystack,
     pub variable_haystack: VariableHaystack,
-    pub resolved_function_ref: Option<resolved::FunctionRef>,
+    pub resolved_function_ref: Option<asg::FunctionRef>,
     pub settings: &'b Settings,
-    pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<resolved::FunctionRef>>>,
-    pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::TypeDecl>>,
-    pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::GlobalVarDecl>>,
-    pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, resolved::HelperExprDecl>>,
+    pub public_functions: &'b HashMap<FsNodeId, HashMap<String, Vec<asg::FunctionRef>>>,
+    pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
+    pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
+    pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
     pub current_constraints: CurrentConstraints,
@@ -85,14 +86,14 @@ impl<'a, 'b> ResolveExprCtx<'a, 'b> {
 
 #[derive(Copy, Clone, Debug)]
 pub enum PreferredType<'a> {
-    Reference(&'a resolved::Type),
+    Reference(&'a asg::Type),
     ParameterType(FunctionRef, usize),
     ReturnType(FunctionRef),
     FieldType(StructureRef, &'a str),
 }
 
 impl<'a> PreferredType<'a> {
-    pub fn of(reference: &'a resolved::Type) -> Self {
+    pub fn of(reference: &'a asg::Type) -> Self {
         Self::Reference(reference)
     }
 
@@ -100,12 +101,11 @@ impl<'a> PreferredType<'a> {
         Self::ParameterType(function_ref, index)
     }
 
-    pub fn view(&self, resolved_ast: &'a resolved::Ast) -> &'a resolved::Type {
+    pub fn view(&self, asg: &'a Asg) -> &'a asg::Type {
         match self {
             PreferredType::Reference(reference) => reference,
             PreferredType::ParameterType(function_ref, index) => {
-                &resolved_ast
-                    .functions
+                &asg.functions
                     .get(*function_ref)
                     .unwrap()
                     .parameters
@@ -115,14 +115,10 @@ impl<'a> PreferredType<'a> {
                     .resolved_type
             }
             PreferredType::ReturnType(function_ref) => {
-                &resolved_ast
-                    .functions
-                    .get(*function_ref)
-                    .unwrap()
-                    .return_type
+                &asg.functions.get(*function_ref).unwrap().return_type
             }
             PreferredType::FieldType(structure_ref, field_name) => {
-                let (_, _, field) = resolved_ast
+                let (_, _, field) = asg
                     .structures
                     .get(*structure_ref)
                     .expect("referenced structure to exist")
@@ -141,7 +137,7 @@ pub fn resolve_expr(
     ast_expr: &ast::Expr,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
-) -> Result<resolved::TypedExpr, ResolveError> {
+) -> Result<asg::TypedExpr, ResolveError> {
     let source = ast_expr.source;
 
     let resolved_expr = match &ast_expr.kind {
@@ -151,17 +147,16 @@ pub fn resolve_expr(
         ast::ExprKind::Char(content) => {
             if content.len() == 1 {
                 if let Some(preferred_type) = preferred_type {
-                    if let TypeKind::CInteger(CInteger::Char, _) =
-                        preferred_type.view(ctx.resolved_ast).kind
+                    if let TypeKind::CInteger(CInteger::Char, _) = preferred_type.view(ctx.asg).kind
                     {
-                        let expr = resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                        let expr = asg::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                             rigidity: ast::IntegerRigidity::Loose(CInteger::Char, None),
                             value: content.as_bytes()[0].into(),
                         }))
                         .at(source);
 
                         return Ok(TypedExpr::new(
-                            resolved::TypeKind::CInteger(CInteger::Char, None).at(source),
+                            asg::TypeKind::CInteger(CInteger::Char, None).at(source),
                             expr,
                         ));
                     }
@@ -174,49 +169,46 @@ pub fn resolve_expr(
             let (resolved_type, expr) = match value {
                 ast::Integer::Known(known) => (
                     known.make_type(source),
-                    resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                    asg::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                         rigidity: known.rigidity.clone(),
                         value: known.value.clone(),
                     }))
                     .at(source),
                 ),
                 ast::Integer::Generic(value) => (
-                    resolved::TypeKind::IntegerLiteral(value.clone()).at(source),
-                    resolved::Expr::new(resolved::ExprKind::IntegerLiteral(value.clone()), source),
+                    asg::TypeKind::IntegerLiteral(value.clone()).at(source),
+                    asg::Expr::new(asg::ExprKind::IntegerLiteral(value.clone()), source),
                 ),
             };
 
             Ok(TypedExpr::new(resolved_type, expr))
         }
         ast::ExprKind::CharLiteral(value) => {
-            let expr = resolved::ExprKind::IntegerKnown(Box::new(IntegerKnown {
+            let expr = asg::ExprKind::IntegerKnown(Box::new(IntegerKnown {
                 rigidity: ast::IntegerRigidity::Loose(CInteger::Char, None),
                 value: (*value).into(),
             }))
             .at(source);
 
             Ok(TypedExpr::new(
-                resolved::TypeKind::CInteger(CInteger::Char, None).at(source),
+                asg::TypeKind::CInteger(CInteger::Char, None).at(source),
                 expr,
             ))
         }
         ast::ExprKind::Float(value) => Ok(TypedExpr::new(
             // TODO: Clean up this code
-            resolved::TypeKind::FloatLiteral(NotNan::new(*value).ok()).at(source),
-            resolved::Expr::new(
-                resolved::ExprKind::FloatingLiteral(FloatSize::Bits32, NotNan::new(*value).ok()),
+            asg::TypeKind::FloatLiteral(NotNan::new(*value).ok()).at(source),
+            asg::Expr::new(
+                asg::ExprKind::FloatingLiteral(FloatSize::Bits32, NotNan::new(*value).ok()),
                 source,
             ),
         )),
         ast::ExprKind::NullTerminatedString(value) => Ok(TypedExpr::new(
-            resolved::TypeKind::Pointer(Box::new(
-                resolved::TypeKind::CInteger(CInteger::Char, None).at(source),
+            asg::TypeKind::Pointer(Box::new(
+                asg::TypeKind::CInteger(CInteger::Char, None).at(source),
             ))
             .at(source),
-            resolved::Expr::new(
-                resolved::ExprKind::NullTerminatedString(value.clone()),
-                source,
-            ),
+            asg::Expr::new(asg::ExprKind::NullTerminatedString(value.clone()), source),
         )),
         ast::ExprKind::String(_value) => {
             return Err(ResolveErrorKind::StringTypeNotDefined.at(source));
@@ -228,8 +220,8 @@ pub fn resolve_expr(
             let type_kind = ctx.type_search_ctx.find_type_or_error("String", source)?;
 
             Ok(TypedExpr::new(
-                resolved::TypeKind::Structure("String".into(), *structure_ref).at(source),
-                resolved::Expr::new(resolved::ExprKind::String(value.clone()), source),
+                asg::TypeKind::Structure("String".into(), *structure_ref).at(source),
+                asg::Expr::new(asg::ExprKind::String(value.clone()), source),
             ))
             */
         }
@@ -330,34 +322,34 @@ pub fn resolve_expr(
             let expr = resolve_expr(
                 ctx,
                 &while_loop.condition,
-                Some(PreferredType::of(&resolved::TypeKind::Boolean.at(source))),
+                Some(PreferredType::of(&asg::TypeKind::Boolean.at(source))),
                 Initialized::Require,
             )?;
 
             let condition = conform_expr_or_error(
                 ctx,
                 &expr,
-                &resolved::TypeKind::Boolean.at(source),
+                &asg::TypeKind::Boolean.at(source),
                 ConformMode::Normal,
                 ctx.adept_conform_behavior(),
                 source,
             )?
             .expr;
 
-            let block = resolved::Block::new(resolve_stmts(ctx, &while_loop.block.stmts)?);
+            let block = asg::Block::new(resolve_stmts(ctx, &while_loop.block.stmts)?);
             ctx.variable_haystack.end_scope();
 
             Ok(TypedExpr::new(
-                resolved::TypeKind::Void.at(source),
-                resolved::Expr::new(
-                    resolved::ExprKind::While(Box::new(resolved::While { condition, block })),
+                asg::TypeKind::Void.at(source),
+                asg::Expr::new(
+                    asg::ExprKind::While(Box::new(asg::While { condition, block })),
                     source,
                 ),
             ))
         }
         ast::ExprKind::Boolean(value) => Ok(TypedExpr::new(
-            resolved::TypeKind::Boolean.at(source),
-            resolved::Expr::new(resolved::ExprKind::BooleanLiteral(*value), source),
+            asg::TypeKind::Boolean.at(source),
+            asg::Expr::new(asg::ExprKind::BooleanLiteral(*value), source),
         )),
         ast::ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let resolved_type = ctx.type_ctx().resolve(
@@ -375,8 +367,8 @@ pub fn resolve_expr(
 
             Ok(TypedExpr::new(
                 resolved_type.clone(),
-                resolved::Expr::new(
-                    resolved::ExprKind::EnumMemberLiteral(Box::new(resolved::EnumMemberLiteral {
+                asg::Expr::new(
+                    asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
                         human_name: human_name.clone(),
                         enum_ref: *enum_ref,
                         variant_name: enum_member_literal.variant_name.clone(),
@@ -412,8 +404,8 @@ pub fn resolve_expr(
 
             Ok(TypedExpr::new(
                 resolved_type,
-                resolved::Expr::new(
-                    resolved::ExprKind::InterpreterSyscall(*kind, resolved_args),
+                asg::Expr::new(
+                    asg::ExprKind::InterpreterSyscall(*kind, resolved_args),
                     source,
                 ),
             ))

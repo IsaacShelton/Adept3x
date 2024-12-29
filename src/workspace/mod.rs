@@ -77,20 +77,20 @@ pub fn compile_workspace(
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
 
     // Resolve symbols and validate semantics for workspace
-    let resolved_ast = unerror(resolve(&workspace, &compiler.options), source_files)?;
+    let asg = unerror(resolve(&workspace, &compiler.options), source_files)?;
 
     // Lower code to high level intermediate representation
-    let ir_module = unerror(lower(&compiler.options, &resolved_ast), source_files)?;
+    let ir_module = unerror(lower(&compiler.options, &asg), source_files)?;
 
     // Run in interpreter if requesting to be run in interpreter
     if compiler.options.interpret {
-        return run_build_system_interpreter(&resolved_ast, &ir_module)
+        return run_build_system_interpreter(&asg, &ir_module)
             .map(|_state| ())
             .map_err(|err| eprintln!("{}", err));
     }
 
     // Export and link to create executable
-    let export_details = export_and_link(compiler, project_folder, &resolved_ast, &ir_module)?;
+    let export_details = export_and_link(compiler, project_folder, &asg, &ir_module)?;
     print_summary(&stats);
     compiler.execute_result(&export_details.executable_filepath)
 }

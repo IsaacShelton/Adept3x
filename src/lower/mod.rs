@@ -10,16 +10,16 @@ mod structure;
 
 use self::error::LowerError;
 use crate::{
+    asg::Asg,
     cli::BuildOptions,
     ir::{self},
     resolve::PolyRecipe,
-    resolved,
 };
 use function::{lower_function_body, lower_function_head};
 use global::lower_global;
 use structure::lower_structure;
 
-pub fn lower<'a>(options: &BuildOptions, rast: &resolved::Ast) -> Result<ir::Module, LowerError> {
+pub fn lower<'a>(options: &BuildOptions, rast: &Asg) -> Result<ir::Module, LowerError> {
     let mut ir_module = ir::Module::new(options.target.clone());
 
     for (structure_ref, structure) in rast.structures.iter() {

@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{Expr, ExprKind, TypeKind, TypedExpr, UnaryMathOperation},
+    asg::{Expr, ExprKind, TypeKind, TypedExpr, UnaryMathOperation},
     source_files::Source,
 };
 

@@ -1,6 +1,6 @@
 use super::{Objective, ObjectiveResult};
 use crate::{
-    resolved::{Expr, ExprKind, Type, TypeKind, TypedExpr},
+    asg::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 use ordered_float::NotNan;

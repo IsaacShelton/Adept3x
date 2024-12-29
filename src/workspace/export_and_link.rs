@@ -1,4 +1,4 @@
-use crate::{compiler::Compiler, ir, llvm_backend::llvm_backend, resolved, unerror::unerror};
+use crate::{asg::Asg, compiler::Compiler, ir, llvm_backend::llvm_backend, unerror::unerror};
 use std::{
     ffi::OsString,
     fs::create_dir_all,
@@ -15,7 +15,7 @@ pub struct ExportDetails {
 pub fn export_and_link(
     compiler: &mut Compiler,
     project_folder: &Path,
-    resolved_ast: &resolved::Ast,
+    asg: &Asg,
     ir_module: &ir::Module,
 ) -> Result<ExportDetails, ()> {
     let target = &compiler.options.target;
@@ -37,7 +37,7 @@ pub fn export_and_link(
             llvm_backend(
                 compiler,
                 &ir_module,
-                &resolved_ast,
+                &asg,
                 &object_file_filepath,
                 &executable_filepath,
                 &compiler.diagnostics,

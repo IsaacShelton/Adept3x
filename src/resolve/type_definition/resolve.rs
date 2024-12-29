@@ -1,4 +1,5 @@
 use crate::{
+    asg::{self, Asg, CurrentConstraints, EnumRef, StructureRef, TraitFunction, TraitRef, TypeAliasRef},
     ast::{self, AstWorkspace},
     resolve::{
         ctx::ResolveCtx,
@@ -6,9 +7,6 @@ use crate::{
         function_head::resolve_parameters,
         job::TypeJob,
         type_ctx::{resolve_constraints, ResolveTypeCtx},
-    },
-    resolved::{
-        self, CurrentConstraints, EnumRef, StructureRef, TraitFunction, TraitRef, TypeAliasRef,
     },
     workspace::fs::FsNodeId,
 };
@@ -19,7 +17,7 @@ use std::{
 
 pub fn resolve_type_jobs(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     ast_workspace: &AstWorkspace,
     type_jobs: &[TypeJob],
 ) -> Result<(), ResolveError> {
@@ -34,7 +32,7 @@ pub fn resolve_type_jobs(
         for (trait_ref, user_trait) in job.traits.iter().zip(file.traits.iter()) {
             resolve_trait(
                 ctx,
-                resolved_ast,
+                asg,
                 module_file_id,
                 job.physical_file_id,
                 user_trait,
@@ -45,7 +43,7 @@ pub fn resolve_type_jobs(
         for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
             resolve_structure(
                 ctx,
-                resolved_ast,
+                asg,
                 module_file_id,
                 job.physical_file_id,
                 structure,
@@ -56,7 +54,7 @@ pub fn resolve_type_jobs(
         for (enum_ref, definition) in job.enums.iter().zip(file.enums.iter()) {
             resolve_enum(
                 ctx,
-                resolved_ast,
+                asg,
                 module_file_id,
                 job.physical_file_id,
                 definition,
@@ -67,7 +65,7 @@ pub fn resolve_type_jobs(
         for (type_alias_ref, definition) in job.type_aliases.iter().zip(file.type_aliases.iter()) {
             resolve_type_alias(
                 ctx,
-                resolved_ast,
+                asg,
                 module_file_id,
                 job.physical_file_id,
                 definition,
@@ -81,7 +79,7 @@ pub fn resolve_type_jobs(
 
 fn resolve_structure(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     structure: &ast::Structure,
@@ -90,7 +88,7 @@ fn resolve_structure(
     for (field_name, field) in structure.fields.iter() {
         let pre_constraints = CurrentConstraints::new_empty();
         let pre_type_ctx = ResolveTypeCtx::new(
-            &resolved_ast,
+            &asg,
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
@@ -110,7 +108,7 @@ fn resolve_structure(
         let constraints = CurrentConstraints::new(constraints);
 
         let type_ctx = ResolveTypeCtx::new(
-            &resolved_ast,
+            &asg,
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
@@ -119,14 +117,11 @@ fn resolve_structure(
 
         let resolved_type = type_ctx.resolve_or_undeclared(&field.ast_type)?;
 
-        let resolved_struct = resolved_ast
-            .structures
-            .get_mut(structure_ref)
-            .expect("valid struct");
+        let resolved_struct = asg.structures.get_mut(structure_ref).expect("valid struct");
 
         resolved_struct.fields.insert(
             field_name.clone(),
-            resolved::Field {
+            asg::Field {
                 resolved_type,
                 privacy: field.privacy,
                 source: field.source,
@@ -139,7 +134,7 @@ fn resolve_structure(
 
 fn resolve_enum(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     definition: &ast::Enum,
@@ -147,7 +142,7 @@ fn resolve_enum(
 ) -> Result<(), ResolveError> {
     let constraints = CurrentConstraints::new_empty();
     let type_ctx = ResolveTypeCtx::new(
-        &resolved_ast,
+        &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
@@ -161,13 +156,13 @@ fn resolve_enum(
         .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
 
     let resolved_type = type_ctx.resolve_or_undeclared(&ast_type)?;
-    resolved_ast.enums.get_mut(enum_ref).unwrap().resolved_type = resolved_type;
+    asg.enums.get_mut(enum_ref).unwrap().resolved_type = resolved_type;
     Ok(())
 }
 
 fn resolve_type_alias(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     definition: &ast::TypeAlias,
@@ -175,7 +170,7 @@ fn resolve_type_alias(
 ) -> Result<(), ResolveError> {
     let constraints = CurrentConstraints::new_empty();
     let type_ctx = ResolveTypeCtx::new(
-        &resolved_ast,
+        &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
@@ -183,13 +178,13 @@ fn resolve_type_alias(
     );
 
     let resolved_type = type_ctx.resolve_or_undeclared(&definition.value)?;
-    *resolved_ast.type_aliases.get_mut(type_alias_ref).unwrap() = resolved_type;
+    *asg.type_aliases.get_mut(type_alias_ref).unwrap() = resolved_type;
     Ok(())
 }
 
 fn resolve_trait(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     definition: &ast::Trait,
@@ -197,7 +192,7 @@ fn resolve_trait(
 ) -> Result<(), ResolveError> {
     let constraints = CurrentConstraints::new_empty();
     let type_ctx = ResolveTypeCtx::new(
-        &resolved_ast,
+        &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
@@ -218,6 +213,6 @@ fn resolve_trait(
         });
     }
 
-    resolved_ast.traits.get_mut(trait_ref).unwrap().functions = functions;
+    asg.traits.get_mut(trait_ref).unwrap().functions = functions;
     Ok(())
 }

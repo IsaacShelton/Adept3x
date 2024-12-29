@@ -5,19 +5,19 @@ use super::{
     stmts::lower_stmts,
 };
 use crate::{
+    asg::{self, Asg},
     ir::{self, BasicBlocks, Literal},
     resolve::PolyRecipe,
-    resolved,
     tag::Tag,
 };
 
 pub fn lower_function_body(
     ir_module: &ir::Module,
-    function_ref: resolved::FunctionRef,
+    function_ref: asg::FunctionRef,
     poly_recipe: &PolyRecipe,
-    resolved_ast: &resolved::Ast,
+    asg: &Asg,
 ) -> Result<BasicBlocks, LowerError> {
-    let function = resolved_ast
+    let function = asg
         .functions
         .get(function_ref)
         .expect("valid function reference");
@@ -37,7 +37,7 @@ pub fn lower_function_body(
             Ok(builder.push(ir::Instruction::Alloca(lower_type(
                 ir_module,
                 &builder.unpoly(&instance.resolved_type)?,
-                resolved_ast,
+                asg,
             )?)))
         })
         .collect::<Result<Vec<_>, LowerError>>()?;
@@ -52,7 +52,7 @@ pub fn lower_function_body(
         builder.push(ir::Instruction::Alloca(lower_type(
             ir_module,
             &builder.unpoly(&variable_instance.resolved_type)?,
-            resolved_ast,
+            asg,
         )?));
     }
 
@@ -65,13 +65,7 @@ pub fn lower_function_body(
         }));
     }
 
-    lower_stmts(
-        &mut builder,
-        ir_module,
-        &function.stmts,
-        function,
-        resolved_ast,
-    )?;
+    lower_stmts(&mut builder, ir_module, &function.stmts, function, asg)?;
 
     if !builder.is_block_terminated() {
         if function.return_type.kind.is_void() {
@@ -85,10 +79,7 @@ pub fn lower_function_body(
         } else {
             return Err(LowerErrorKind::MustReturnValueOfTypeBeforeExitingFunction {
                 return_type: function.return_type.to_string(),
-                function: function
-                    .name
-                    .display(&resolved_ast.workspace.fs)
-                    .to_string(),
+                function: function.name.display(&asg.workspace.fs).to_string(),
             }
             .at(function.source));
         }
@@ -99,11 +90,11 @@ pub fn lower_function_body(
 
 pub fn lower_function_head(
     ir_module: &ir::Module,
-    function_ref: resolved::FunctionRef,
+    function_ref: asg::FunctionRef,
     poly_recipe: &PolyRecipe,
-    resolved_ast: &resolved::Ast,
+    asg: &Asg,
 ) -> Result<ir::FunctionRef, LowerError> {
-    let function = resolved_ast
+    let function = asg
         .functions
         .get(function_ref)
         .expect("valid function reference");
@@ -115,15 +106,11 @@ pub fn lower_function_head(
         parameters.push(lower_type(
             ir_module,
             &unpoly(poly_recipe, &parameter.resolved_type)?,
-            resolved_ast,
+            asg,
         )?);
     }
 
-    let mut return_type = lower_type(
-        ir_module,
-        &unpoly(poly_recipe, &function.return_type)?,
-        resolved_ast,
-    )?;
+    let mut return_type = lower_type(ir_module, &unpoly(poly_recipe, &function.return_type)?, asg)?;
 
     if function.tag == Some(Tag::Main) {
         if let ir::Type::Void = return_type {
@@ -136,11 +123,7 @@ pub fn lower_function_head(
     } else if function.is_foreign {
         function.name.plain().to_string()
     } else {
-        function
-            .name
-            .display(&resolved_ast.workspace.fs)
-            .to_string()
-            + &poly_recipe.to_string()
+        function.name.display(&asg.workspace.fs).to_string() + &poly_recipe.to_string()
     };
 
     let is_main = mangled_name == "main";

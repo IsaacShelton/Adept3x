@@ -1,8 +1,8 @@
 use super::{datatype::ConcreteType, error::LowerError};
 use crate::{
+    asg,
     ir::{self, BasicBlock, BasicBlocks, Instruction, ValueReference},
     resolve::PolyRecipe,
-    resolved,
 };
 use std::borrow::Cow;
 
@@ -83,7 +83,7 @@ impl<'a> Builder<'a> {
         })
     }
 
-    pub fn unpoly(&self, ty: &resolved::Type) -> Result<ConcreteType, LowerError> {
+    pub fn unpoly(&self, ty: &asg::Type) -> Result<ConcreteType, LowerError> {
         self.poly_recipe
             .resolve_type(ty)
             .map(|x| ConcreteType(Cow::Owned(x)))
@@ -97,7 +97,7 @@ impl<'a> Builder<'a> {
 
 pub fn unpoly<'a>(
     poly_recipe: &PolyRecipe,
-    ty: &'a resolved::Type,
+    ty: &'a asg::Type,
 ) -> Result<ConcreteType<'a>, LowerError> {
     poly_recipe
         .resolve_type(ty)

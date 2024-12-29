@@ -1,35 +1,35 @@
 use super::error::LowerError;
 use crate::{
+    asg::{self, Asg},
     ast::{CInteger, FloatSize},
     ir::{self, IntegerSign},
     lower::{error::LowerErrorKind, structure::monomorphize_structure},
-    resolved,
     target::{Target, TargetOsExt},
 };
 use std::borrow::{Borrow, Cow};
 
 // Represents a resolved type that has had all its polymorphs resolved
-pub struct ConcreteType<'a>(pub Cow<'a, resolved::Type>);
+pub struct ConcreteType<'a>(pub Cow<'a, asg::Type>);
 
 pub fn lower_type(
     ir_module: &ir::Module,
     concrete_type: &ConcreteType,
-    resolved_ast: &resolved::Ast,
+    asg: &Asg,
 ) -> Result<ir::Type, LowerError> {
-    use resolved::{IntegerBits as Bits, IntegerSign as Sign};
+    use asg::{IntegerBits as Bits, IntegerSign as Sign};
 
     let target = &ir_module.target;
     let resolved_type = &concrete_type.borrow().0;
 
     match &resolved_type.kind {
-        resolved::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
-        resolved::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorph"),
-        resolved::TypeKind::Trait(name, _, _) => Err(LowerErrorKind::CannotUseTraitDirectly {
+        asg::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
+        asg::TypeKind::Polymorph(_, _) => todo!("cannot directly lower polymorph"),
+        asg::TypeKind::Trait(name, _, _) => Err(LowerErrorKind::CannotUseTraitDirectly {
             name: name.to_string(),
         }
         .at(resolved_type.source)),
-        resolved::TypeKind::Boolean => Ok(ir::Type::Boolean),
-        resolved::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
+        asg::TypeKind::Boolean => Ok(ir::Type::Boolean),
+        asg::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
             (Bits::Bits8, Sign::Unsigned) => ir::Type::U8,
             (Bits::Bits16, Sign::Signed) => ir::Type::S16,
@@ -39,14 +39,14 @@ pub fn lower_type(
             (Bits::Bits64, Sign::Signed) => ir::Type::S64,
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
-        resolved::TypeKind::CInteger(integer, sign) => Ok(lower_c_integer(target, *integer, *sign)),
-        resolved::TypeKind::IntegerLiteral(value) => {
+        asg::TypeKind::CInteger(integer, sign) => Ok(lower_c_integer(target, *integer, *sign)),
+        asg::TypeKind::IntegerLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
                 value: value.to_string(),
             }
             .at(resolved_type.source))
         }
-        resolved::TypeKind::FloatLiteral(value) => {
+        asg::TypeKind::FloatLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedFloatLiteral {
                 value: if let Some(value) = value {
                     value.to_string()
@@ -56,17 +56,17 @@ pub fn lower_type(
             }
             .at(resolved_type.source))
         }
-        resolved::TypeKind::Floating(size) => Ok(match size {
+        asg::TypeKind::Floating(size) => Ok(match size {
             FloatSize::Bits32 => ir::Type::F32,
             FloatSize::Bits64 => ir::Type::F64,
         }),
-        resolved::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
+        asg::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
             ir_module,
             &ConcreteType(Cow::Borrowed(inner)),
-            resolved_ast,
+            asg,
         )?))),
-        resolved::TypeKind::Void => Ok(ir::Type::Void),
-        resolved::TypeKind::Structure(_, structure_ref, parameters) => {
+        asg::TypeKind::Void => Ok(ir::Type::Void),
+        asg::TypeKind::Structure(_, structure_ref, parameters) => {
             // NOTE: We can assume that all parameters have been resolved to concrete types by this
             // point
 
@@ -80,26 +80,26 @@ pub fn lower_type(
                 ir_module,
                 *structure_ref,
                 values.as_slice(),
-                resolved_ast,
+                asg,
                 concrete_type.0.source,
             )
             .map(ir::Type::Structure)
         }
-        resolved::TypeKind::AnonymousStruct() => {
+        asg::TypeKind::AnonymousStruct() => {
             todo!("lower anonymous struct")
         }
-        resolved::TypeKind::AnonymousUnion() => {
+        asg::TypeKind::AnonymousUnion() => {
             todo!("lower anonymous union")
         }
-        resolved::TypeKind::AnonymousEnum() => {
+        asg::TypeKind::AnonymousEnum() => {
             todo!("lower anonymous enum")
         }
-        resolved::TypeKind::FixedArray(fixed_array) => {
+        asg::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
             let inner = lower_type(
                 ir_module,
                 &ConcreteType(Cow::Borrowed(&fixed_array.inner)),
-                resolved_ast,
+                asg,
             )?;
 
             Ok(ir::Type::FixedArray(Box::new(ir::FixedArray {
@@ -107,30 +107,23 @@ pub fn lower_type(
                 inner,
             })))
         }
-        resolved::TypeKind::FunctionPointer(_function_pointer) => Ok(ir::Type::FunctionPointer),
-        resolved::TypeKind::Enum(_human_name, enum_ref) => {
-            let enum_definition = resolved_ast
-                .enums
-                .get(*enum_ref)
-                .expect("referenced enum to exist");
+        asg::TypeKind::FunctionPointer(_function_pointer) => Ok(ir::Type::FunctionPointer),
+        asg::TypeKind::Enum(_human_name, enum_ref) => {
+            let enum_definition = asg.enums.get(*enum_ref).expect("referenced enum to exist");
 
             lower_type(
                 ir_module,
                 &ConcreteType(Cow::Borrowed(&enum_definition.resolved_type)),
-                resolved_ast,
+                asg,
             )
         }
-        resolved::TypeKind::TypeAlias(_, type_alias_ref) => {
-            let resolved_type = resolved_ast
+        asg::TypeKind::TypeAlias(_, type_alias_ref) => {
+            let resolved_type = asg
                 .type_aliases
                 .get(*type_alias_ref)
                 .expect("referenced type alias to exist");
 
-            lower_type(
-                ir_module,
-                &ConcreteType(Cow::Borrowed(resolved_type)),
-                resolved_ast,
-            )
+            lower_type(ir_module, &ConcreteType(Cow::Borrowed(resolved_type)), asg)
         }
     }
 }

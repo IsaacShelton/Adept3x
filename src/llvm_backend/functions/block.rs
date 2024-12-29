@@ -35,7 +35,7 @@ use crate::{
         value_catalog::ValueCatalog,
         values::build_value,
     },
-    resolved::FloatOrInteger,
+    asg::FloatOrInteger,
     target::Target,
 };
 use cstr::cstr;

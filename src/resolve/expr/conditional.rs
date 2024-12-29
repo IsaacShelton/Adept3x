@@ -8,7 +8,7 @@ use crate::{
         unify_types::unify_types,
         Initialized,
     },
-    resolved::{self, Branch, TypedExpr},
+    asg::{self, Branch, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -35,7 +35,7 @@ pub fn resolve_conditional_expr(
         let condition = conform_expr_or_error(
             ctx,
             &condition,
-            &resolved::TypeKind::Boolean.at(source),
+            &asg::TypeKind::Boolean.at(source),
             ConformMode::Normal,
             ctx.adept_conform_behavior(),
             source,
@@ -43,7 +43,7 @@ pub fn resolve_conditional_expr(
 
         branches_without_else.push(Branch {
             condition,
-            block: resolved::Block::new(stmts),
+            block: asg::Block::new(stmts),
         });
 
         ctx.variable_haystack.end_scope();
@@ -53,7 +53,7 @@ pub fn resolve_conditional_expr(
         .as_ref()
         .map(|otherwise| {
             ctx.variable_haystack.begin_scope();
-            let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(resolved::Block::new);
+            let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(asg::Block::new);
             ctx.variable_haystack.end_scope();
             maybe_block
         })
@@ -68,12 +68,12 @@ pub fn resolve_conditional_expr(
 
     let result_type = if block_results
         .iter()
-        .any(|result| result.kind == resolved::TypeKind::Void)
+        .any(|result| result.kind == asg::TypeKind::Void)
     {
         block_results
             .iter()
             .all_equal()
-            .then_some(resolved::TypeKind::Void.at(source))
+            .then_some(asg::TypeKind::Void.at(source))
             .ok_or_else(|| {
                 ResolveErrorKind::MismatchingYieldedTypes {
                     got: block_results
@@ -95,17 +95,17 @@ pub fn resolve_conditional_expr(
                     .expect("last statement to exist")
                     .kind
                 {
-                    resolved::StmtKind::Expr(expr) => expr,
-                    resolved::StmtKind::Return(..)
-                    | resolved::StmtKind::Declaration(..)
-                    | resolved::StmtKind::Assignment(..) => unreachable!(),
+                    asg::StmtKind::Expr(expr) => expr,
+                    asg::StmtKind::Return(..)
+                    | asg::StmtKind::Declaration(..)
+                    | asg::StmtKind::Assignment(..) => unreachable!(),
                 }
             })
             .collect_vec();
 
         unify_types(
             ctx,
-            preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
+            preferred_type.map(|preferred_type| preferred_type.view(ctx.asg)),
             &mut last_exprs[..],
             ctx.adept_conform_behavior(),
             source,
@@ -121,8 +121,8 @@ pub fn resolve_conditional_expr(
         })
     }?;
 
-    let expr = resolved::Expr::new(
-        resolved::ExprKind::Conditional(Box::new(resolved::Conditional {
+    let expr = asg::Expr::new(
+        asg::ExprKind::Conditional(Box::new(asg::Conditional {
             result_type: result_type.clone(),
             branches: branches_without_else,
             otherwise,

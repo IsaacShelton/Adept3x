@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, TypedExpr},
+    asg::{self, TypedExpr},
     source_files::Source,
 };
 use ast::{IntegerBits, IntegerSign};
@@ -33,7 +33,7 @@ pub fn resolve_array_access_expr(
             ctx,
             &array_access.index,
             Some(PreferredType::of(
-                &resolved::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
+                &asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
             )),
             Initialized::Require,
         )?,
@@ -41,7 +41,7 @@ pub fn resolve_array_access_expr(
     )?;
 
     let item_type = match &subject.resolved_type.kind {
-        resolved::TypeKind::Pointer(inner) => Ok((**inner).clone()),
+        asg::TypeKind::Pointer(inner) => Ok((**inner).clone()),
         bad_type => Err(ResolveErrorKind::CannotAccessMemberOf {
             bad_type: bad_type.to_string(),
         }
@@ -58,8 +58,8 @@ pub fn resolve_array_access_expr(
 
     Ok(TypedExpr::new(
         item_type.clone(),
-        resolved::Expr::new(
-            resolved::ExprKind::ArrayAccess(Box::new(resolved::ArrayAccess {
+        asg::Expr::new(
+            asg::ExprKind::ArrayAccess(Box::new(asg::ArrayAccess {
                 subject: subject.expr,
                 index: index.expr,
                 item_type,

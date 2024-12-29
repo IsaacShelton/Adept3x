@@ -1,8 +1,9 @@
 use super::record_info::RecordInfo;
 use crate::{
+    asg,
     data_units::{BitUnits, ByteUnits},
     diagnostics::{Diagnostics, WarningDiagnostic},
-    ir, resolved,
+    ir,
     target::{
         type_layout::{ASTRecordLayout, TypeLayoutCache},
         TargetOsExt,
@@ -40,7 +41,7 @@ pub struct ItaniumRecordLayoutBuilder<'a> {
     pub preferred_non_virtual_alignment: ByteUnits,
     pub padded_field_size: BitUnits,
 
-    pub primary_base: Option<&'a resolved::Structure>,
+    pub primary_base: Option<&'a asg::Structure>,
     pub has_packed_field: bool,
 
     // NOTE: We don't support using external layouts / inferring alignments yet

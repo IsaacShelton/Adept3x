@@ -1,6 +1,6 @@
 use super::error::{ResolveError, ResolveErrorKind};
 use crate::{
-    resolved::{self, HumanName, StructureRef},
+    asg::{self, Asg, HumanName, StructureRef},
     source_files::Source,
 };
 
@@ -8,21 +8,21 @@ use crate::{
 pub struct CoreStructInfo<'a> {
     pub name: &'a HumanName,
     pub structure_ref: StructureRef,
-    pub arguments: &'a [resolved::Type],
+    pub arguments: &'a [asg::Type],
 }
 
 pub fn get_core_structure_info<'a, 'b>(
-    resolved_ast: &'b resolved::Ast<'a>,
-    resolved_type: &'a resolved::Type,
+    asg: &'b Asg<'a>,
+    resolved_type: &'a asg::Type,
     source: Source,
 ) -> Result<CoreStructInfo<'b>, Option<ResolveError>> {
-    match &resolved_ast
+    match &asg
         .unalias(resolved_type)
         .map_err(|e| ResolveErrorKind::from(e).at(source))
         .map_err(Some)?
         .kind
     {
-        resolved::TypeKind::Structure(name, structure_ref, arguments) => Ok(CoreStructInfo {
+        asg::TypeKind::Structure(name, structure_ref, arguments) => Ok(CoreStructInfo {
             name,
             structure_ref: *structure_ref,
             arguments: arguments.as_slice(),

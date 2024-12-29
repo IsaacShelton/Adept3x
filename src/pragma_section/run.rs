@@ -47,10 +47,10 @@ impl PragmaSection {
         let files = IndexMap::from_iter(std::iter::once((fs_node_id, self.ast_file)));
         let workspace = AstWorkspace::new(fs, files, base_compiler.source_files, None);
 
-        let resolved_ast = resolve(&workspace, &compiler.options).map_err(into_show)?;
-        let ir_module = lower(&compiler.options, &resolved_ast).map_err(into_show)?;
+        let asg = resolve(&workspace, &compiler.options).map_err(into_show)?;
+        let ir_module = lower(&compiler.options, &asg).map_err(into_show)?;
 
-        let mut user_settings = run_build_system_interpreter(&resolved_ast, &ir_module)
+        let mut user_settings = run_build_system_interpreter(&asg, &ir_module)
             .map_err(|interpretter_error| {
                 into_show(
                     ParseErrorKind::Other {

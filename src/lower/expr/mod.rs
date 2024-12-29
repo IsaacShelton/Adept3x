@@ -9,14 +9,13 @@ use super::{
     stmts::lower_stmts,
 };
 use crate::{
+    asg::{
+        self, Asg, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, Member, NumericMode, SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey
+    },
     ast::{FloatSize, IntegerBits, IntegerRigidity},
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     lower::structure::mono,
     resolve::PolyCatalog,
-    resolved::{
-        self, Destination, DestinationKind, Expr, ExprKind, FloatOrInteger, Member, NumericMode,
-        SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
-    },
 };
 use short_circuit::lower_short_circuiting_binary_operation;
 
@@ -24,8 +23,8 @@ pub fn lower_expr(
     builder: &mut Builder,
     ir_module: &ir::Module,
     expr: &Expr,
-    function: &resolved::Function,
-    resolved_ast: &resolved::Ast,
+    function: &asg::Function,
+    asg: &Asg,
 ) -> Result<ir::Value, LowerError> {
     match &expr.kind {
         ExprKind::IntegerLiteral(value) => {
@@ -133,7 +132,7 @@ pub fn lower_expr(
             )
         }
         ExprKind::Call(call) => {
-            let callee = resolved_ast
+            let callee = asg
                 .functions
                 .get(call.callee.function)
                 .expect("referenced function to exist");
@@ -141,19 +140,13 @@ pub fn lower_expr(
             let arguments = call
                 .arguments
                 .iter()
-                .map(|argument| {
-                    lower_expr(builder, ir_module, &argument.expr, function, resolved_ast)
-                })
+                .map(|argument| lower_expr(builder, ir_module, &argument.expr, function, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
 
             let variadic_argument_types = call.arguments[callee.parameters.required.len()..]
                 .iter()
                 .map(|argument| {
-                    lower_type(
-                        ir_module,
-                        &builder.unpoly(&argument.resolved_type)?,
-                        resolved_ast,
-                    )
+                    lower_type(ir_module, &builder.unpoly(&argument.resolved_type)?, asg)
                 })
                 .collect::<Result<Box<[_]>, _>>()?;
 
@@ -165,7 +158,7 @@ pub fn lower_expr(
                             ir_module,
                             call.callee.function,
                             &call.callee.recipe,
-                            resolved_ast,
+                            asg,
                         )
                     })?;
 
@@ -177,11 +170,8 @@ pub fn lower_expr(
         }
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
-            let variable_type = lower_type(
-                ir_module,
-                &builder.unpoly(&variable.resolved_type)?,
-                resolved_ast,
-            )?;
+            let variable_type =
+                lower_type(ir_module, &builder.unpoly(&variable.resolved_type)?, asg)?;
             Ok(builder.push(ir::Instruction::Load((pointer_to_variable, variable_type))))
         }
         ExprKind::GlobalVariable(global_variable) => {
@@ -189,18 +179,13 @@ pub fn lower_expr(
             let ir_type = lower_type(
                 ir_module,
                 &builder.unpoly(&global_variable.resolved_type)?,
-                resolved_ast,
+                asg,
             )?;
             Ok(builder.push(ir::Instruction::Load((pointer, ir_type))))
         }
         ExprKind::DeclareAssign(declare_assign) => {
-            let initial_value = lower_expr(
-                builder,
-                ir_module,
-                &declare_assign.value,
-                function,
-                resolved_ast,
-            )?;
+            let initial_value =
+                lower_expr(builder, ir_module, &declare_assign.value, function, asg)?;
 
             let destination = Value::Reference(ValueReference {
                 basicblock_id: 0,
@@ -215,25 +200,13 @@ pub fn lower_expr(
             let ir_type = lower_type(
                 ir_module,
                 &builder.unpoly(&declare_assign.resolved_type)?,
-                resolved_ast,
+                asg,
             )?;
             Ok(builder.push(ir::Instruction::Load((destination, ir_type))))
         }
         ExprKind::BasicBinaryOperation(operation) => {
-            let left = lower_expr(
-                builder,
-                ir_module,
-                &operation.left.expr,
-                function,
-                resolved_ast,
-            )?;
-            let right = lower_expr(
-                builder,
-                ir_module,
-                &operation.right.expr,
-                function,
-                resolved_ast,
-            )?;
+            let left = lower_expr(builder, ir_module, &operation.left.expr, function, asg)?;
+            let right = lower_expr(builder, ir_module, &operation.right.expr, function, asg)?;
 
             lower_basic_binary_operation(
                 builder,
@@ -243,31 +216,25 @@ pub fn lower_expr(
             )
         }
         ExprKind::ShortCircuitingBinaryOperation(operation) => {
-            lower_short_circuiting_binary_operation(
-                builder,
-                ir_module,
-                operation,
-                function,
-                resolved_ast,
-            )
+            lower_short_circuiting_binary_operation(builder, ir_module, operation, function, asg)
         }
         ExprKind::IntegerCast(cast_from) => {
-            integer_cast(builder, ir_module, function, resolved_ast, cast_from)
+            integer_cast(builder, ir_module, function, asg, cast_from)
         }
         ExprKind::IntegerExtend(cast_from) => {
-            integer_extend(builder, ir_module, function, resolved_ast, cast_from)
+            integer_extend(builder, ir_module, function, asg, cast_from)
         }
         ExprKind::IntegerTruncate(cast) => {
-            integer_truncate(builder, ir_module, function, resolved_ast, cast)
+            integer_truncate(builder, ir_module, function, asg, cast)
         }
         ExprKind::FloatExtend(cast) => {
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
+            let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, asg)?;
             Ok(builder.push(ir::Instruction::FloatExtend(value, ir_type)))
         }
         ExprKind::FloatToInteger(cast) => {
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
+            let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, asg)?;
             let sign = if ir_type
                 .is_signed()
                 .expect("must know signness in order to cast float to integer")
@@ -287,8 +254,8 @@ pub fn lower_expr(
                 .sign(Some(&ir_module.target))
                 .expect("integer to float must know sign");
 
-            let value = lower_expr(builder, ir_module, &cast.value, function, resolved_ast)?;
-            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, resolved_ast)?;
+            let value = lower_expr(builder, ir_module, &cast.value, function, asg)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&cast.target_type)?, asg)?;
             Ok(builder.push(ir::Instruction::IntegerToFloat(value, ir_type, from_sign)))
         }
         ExprKind::Member(member) => {
@@ -299,16 +266,15 @@ pub fn lower_expr(
                 field_type,
             } = &**member;
 
-            let resolved::TypeKind::Structure(_name, _structure_ref, arguments) =
+            let asg::TypeKind::Structure(_name, _structure_ref, arguments) =
                 &subject.resolved_type.kind
             else {
                 todo!("member operator only supports structure types for now");
             };
 
-            let subject_pointer =
-                lower_destination(builder, ir_module, subject, function, resolved_ast)?;
+            let subject_pointer = lower_destination(builder, ir_module, subject, function, asg)?;
 
-            let structure = resolved_ast
+            let structure = asg
                 .structures
                 .get(*resolved_structure_ref)
                 .expect("referenced structure to exist");
@@ -325,14 +291,7 @@ pub fn lower_expr(
             let structure_ref = ir_module.structures.translate(
                 *resolved_structure_ref,
                 poly_recipe,
-                |poly_recipe| {
-                    mono(
-                        ir_module,
-                        resolved_ast,
-                        *resolved_structure_ref,
-                        poly_recipe,
-                    )
-                },
+                |poly_recipe| mono(ir_module, asg, *resolved_structure_ref, poly_recipe),
             )?;
 
             // Access member of structure
@@ -342,29 +301,13 @@ pub fn lower_expr(
                 index: *index,
             });
 
-            let ir_type = lower_type(ir_module, &builder.unpoly(field_type)?, resolved_ast)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(field_type)?, asg)?;
             Ok(builder.push(ir::Instruction::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {
-            let subject = lower_expr(
-                builder,
-                ir_module,
-                &array_access.subject,
-                function,
-                resolved_ast,
-            )?;
-            let index = lower_expr(
-                builder,
-                ir_module,
-                &array_access.index,
-                function,
-                resolved_ast,
-            )?;
-            let item_type = lower_type(
-                ir_module,
-                &builder.unpoly(&array_access.item_type)?,
-                resolved_ast,
-            )?;
+            let subject = lower_expr(builder, ir_module, &array_access.subject, function, asg)?;
+            let index = lower_expr(builder, ir_module, &array_access.index, function, asg)?;
+            let item_type = lower_type(ir_module, &builder.unpoly(&array_access.item_type)?, asg)?;
 
             let item = builder.push(ir::Instruction::ArrayAccess {
                 item_type: item_type.clone(),
@@ -380,13 +323,12 @@ pub fn lower_expr(
                 fields,
             } = &**structure_literal;
 
-            let result_ir_type =
-                lower_type(ir_module, &builder.unpoly(structure_type)?, resolved_ast)?;
+            let result_ir_type = lower_type(ir_module, &builder.unpoly(structure_type)?, asg)?;
             let mut values = Vec::with_capacity(fields.len());
 
             // Evaluate field values in the order specified by the struct literal
             for (_, expr, index) in fields.iter() {
-                let ir_value = lower_expr(builder, ir_module, expr, function, resolved_ast)?;
+                let ir_value = lower_expr(builder, ir_module, expr, function, asg)?;
                 values.push((index, ir_value));
             }
 
@@ -400,7 +342,7 @@ pub fn lower_expr(
         }
         ExprKind::UnaryMathOperation(operation) => {
             let UnaryMathOperation { operator, inner } = &**operation;
-            let value = lower_expr(builder, ir_module, &inner.expr, function, resolved_ast)?;
+            let value = lower_expr(builder, ir_module, &inner.expr, function, asg)?;
 
             let float_or_int = inner
                 .resolved_type
@@ -410,10 +352,10 @@ pub fn lower_expr(
                 .unwrap_or(FloatOrInteger::Integer);
 
             let instruction = match operator {
-                resolved::UnaryMathOperator::Not => ir::Instruction::IsZero(value, float_or_int),
-                resolved::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
-                resolved::UnaryMathOperator::Negate => ir::Instruction::Negate(value, float_or_int),
-                resolved::UnaryMathOperator::IsNonZero => {
+                asg::UnaryMathOperator::Not => ir::Instruction::IsZero(value, float_or_int),
+                asg::UnaryMathOperator::BitComplement => ir::Instruction::BitComplement(value),
+                asg::UnaryMathOperator::Negate => ir::Instruction::Negate(value, float_or_int),
+                asg::UnaryMathOperator::IsNonZero => {
                     ir::Instruction::IsNonZero(value, float_or_int)
                 }
             };
@@ -425,15 +367,11 @@ pub fn lower_expr(
             ir_module,
             destination,
             function,
-            resolved_ast,
+            asg,
         )?),
         ExprKind::Dereference(subject) => {
-            let ir_type = lower_type(
-                ir_module,
-                &builder.unpoly(&subject.resolved_type)?,
-                resolved_ast,
-            )?;
-            let value = lower_expr(builder, ir_module, &subject.expr, function, resolved_ast)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(&subject.resolved_type)?, asg)?;
+            let value = lower_expr(builder, ir_module, &subject.expr, function, asg)?;
             Ok(builder.push(ir::Instruction::Load((value, ir_type))))
         }
         ExprKind::Conditional(conditional) => {
@@ -441,9 +379,8 @@ pub fn lower_expr(
 
             let mut incoming = vec![];
 
-            for resolved::Branch { condition, block } in conditional.branches.iter() {
-                let condition =
-                    lower_expr(builder, ir_module, &condition.expr, function, resolved_ast)?;
+            for asg::Branch { condition, block } in conditional.branches.iter() {
+                let condition = lower_expr(builder, ir_module, &condition.expr, function, asg)?;
 
                 let true_basicblock_id = builder.new_block();
                 let false_basicblock_id = builder.new_block();
@@ -457,7 +394,7 @@ pub fn lower_expr(
                 ));
 
                 builder.use_block(true_basicblock_id);
-                let value = lower_stmts(builder, ir_module, &block.stmts, function, resolved_ast)?;
+                let value = lower_stmts(builder, ir_module, &block.stmts, function, asg)?;
 
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
@@ -469,7 +406,7 @@ pub fn lower_expr(
             }
 
             if let Some(block) = &conditional.otherwise {
-                let value = lower_stmts(builder, ir_module, &block.stmts, function, resolved_ast)?;
+                let value = lower_stmts(builder, ir_module, &block.stmts, function, asg)?;
                 incoming.push(ir::PhiIncoming {
                     basicblock_id: builder.current_block_id(),
                     value,
@@ -480,11 +417,8 @@ pub fn lower_expr(
             builder.use_block(resume_basicblock_id);
 
             if conditional.otherwise.is_some() {
-                let ir_type = lower_type(
-                    ir_module,
-                    &builder.unpoly(&conditional.result_type)?,
-                    resolved_ast,
-                )?;
+                let ir_type =
+                    lower_type(ir_module, &builder.unpoly(&conditional.result_type)?, asg)?;
                 Ok(builder.push(ir::Instruction::Phi(ir::Phi { ir_type, incoming })))
             } else {
                 Ok(Value::Literal(Literal::Void))
@@ -499,13 +433,7 @@ pub fn lower_expr(
             builder.continues_to(evaluate_basicblock_id);
             builder.use_block(evaluate_basicblock_id);
 
-            let condition = lower_expr(
-                builder,
-                ir_module,
-                &while_loop.condition,
-                function,
-                resolved_ast,
-            )?;
+            let condition = lower_expr(builder, ir_module, &while_loop.condition, function, asg)?;
 
             builder.push(ir::Instruction::ConditionalBreak(
                 condition,
@@ -516,20 +444,14 @@ pub fn lower_expr(
             ));
 
             builder.use_block(true_basicblock_id);
-            lower_stmts(
-                builder,
-                ir_module,
-                &while_loop.block.stmts,
-                function,
-                resolved_ast,
-            )?;
+            lower_stmts(builder, ir_module, &while_loop.block.stmts, function, asg)?;
             builder.continues_to(evaluate_basicblock_id);
 
             builder.use_block(false_basicblock_id);
             Ok(Value::Literal(Literal::Void))
         }
         ExprKind::EnumMemberLiteral(enum_member_literal) => {
-            let enum_definition = resolved_ast
+            let enum_definition = asg
                 .enums
                 .get(enum_member_literal.enum_ref)
                 .expect("referenced enum to exist for enum member literal");
@@ -548,7 +470,7 @@ pub fn lower_expr(
             let ir_type = lower_type(
                 ir_module,
                 &builder.unpoly(&enum_definition.resolved_type)?,
-                resolved_ast,
+                asg,
             )?;
 
             let value = &member.value;
@@ -595,17 +517,17 @@ pub fn lower_expr(
             })
         }
         ExprKind::ResolvedNamedExpression(resolved_expr) => {
-            lower_expr(builder, ir_module, resolved_expr, function, resolved_ast)
+            lower_expr(builder, ir_module, resolved_expr, function, asg)
         }
         ExprKind::Zeroed(resolved_type) => {
-            let ir_type = lower_type(ir_module, &builder.unpoly(resolved_type)?, resolved_ast)?;
+            let ir_type = lower_type(ir_module, &builder.unpoly(resolved_type)?, asg)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
         }
         ExprKind::InterpreterSyscall(syscall, args) => {
             let mut values = Vec::with_capacity(args.len());
 
             for arg in args {
-                values.push(lower_expr(builder, ir_module, arg, function, resolved_ast)?);
+                values.push(lower_expr(builder, ir_module, arg, function, asg)?);
             }
 
             Ok(builder.push(ir::Instruction::InterpreterSyscall(*syscall, values)))
@@ -617,8 +539,8 @@ pub fn lower_destination(
     builder: &mut Builder,
     ir_module: &ir::Module,
     destination: &Destination,
-    function: &resolved::Function,
-    resolved_ast: &resolved::Ast,
+    function: &asg::Function,
+    asg: &Asg,
 ) -> Result<ir::Value, LowerError> {
     match &destination.kind {
         DestinationKind::Variable(variable) => Ok(lower_variable_to_value(variable.key)),
@@ -632,16 +554,15 @@ pub fn lower_destination(
             index,
             ..
         } => {
-            let subject_pointer =
-                lower_destination(builder, ir_module, subject, function, resolved_ast)?;
+            let subject_pointer = lower_destination(builder, ir_module, subject, function, asg)?;
 
-            let resolved::TypeKind::Structure(_name, _structure_ref, arguments) =
+            let asg::TypeKind::Structure(_name, _structure_ref, arguments) =
                 &subject.resolved_type.kind
             else {
                 todo!("member operator only supports structure types for now");
             };
 
-            let structure = resolved_ast
+            let structure = asg
                 .structures
                 .get(*resolved_structure_ref)
                 .expect("referenced structure to exist");
@@ -658,14 +579,7 @@ pub fn lower_destination(
             let structure_ref = ir_module.structures.translate(
                 *resolved_structure_ref,
                 poly_recipe,
-                |poly_recipe| {
-                    mono(
-                        ir_module,
-                        resolved_ast,
-                        *resolved_structure_ref,
-                        poly_recipe,
-                    )
-                },
+                |poly_recipe| mono(ir_module, asg, *resolved_structure_ref, poly_recipe),
             )?;
 
             Ok(builder.push(ir::Instruction::Member {
@@ -675,25 +589,10 @@ pub fn lower_destination(
             }))
         }
         DestinationKind::ArrayAccess(array_access) => {
-            let subject_pointer = lower_expr(
-                builder,
-                ir_module,
-                &array_access.subject,
-                function,
-                resolved_ast,
-            )?;
-            let index = lower_expr(
-                builder,
-                ir_module,
-                &array_access.index,
-                function,
-                resolved_ast,
-            )?;
-            let item_type = lower_type(
-                ir_module,
-                &builder.unpoly(&array_access.item_type)?,
-                resolved_ast,
-            )?;
+            let subject_pointer =
+                lower_expr(builder, ir_module, &array_access.subject, function, asg)?;
+            let index = lower_expr(builder, ir_module, &array_access.index, function, asg)?;
+            let item_type = lower_type(ir_module, &builder.unpoly(&array_access.item_type)?, asg)?;
 
             Ok(builder.push(ir::Instruction::ArrayAccess {
                 item_type,
@@ -701,13 +600,9 @@ pub fn lower_destination(
                 index,
             }))
         }
-        DestinationKind::Dereference(lvalue) => Ok(lower_expr(
-            builder,
-            ir_module,
-            lvalue,
-            function,
-            resolved_ast,
-        )?),
+        DestinationKind::Dereference(lvalue) => {
+            Ok(lower_expr(builder, ir_module, lvalue, function, asg)?)
+        }
     }
 }
 
@@ -742,17 +637,17 @@ fn lower_add(
 pub fn lower_basic_binary_operation(
     builder: &mut Builder,
     ir_module: &ir::Module,
-    operator: &resolved::BasicBinaryOperator,
+    operator: &asg::BasicBinaryOperator,
     operands: ir::BinaryOperands,
 ) -> Result<Value, LowerError> {
     match operator {
-        resolved::BasicBinaryOperator::PrimitiveAdd(resolved_type) => {
+        asg::BasicBinaryOperator::PrimitiveAdd(resolved_type) => {
             let ty = builder.unpoly(resolved_type)?;
             let numeric_mode = NumericMode::try_new(&ty.0).expect("PrimitiveAdd to be addable");
             lower_add(builder, &numeric_mode, operands)
         }
-        resolved::BasicBinaryOperator::Add(mode) => lower_add(builder, mode, operands),
-        resolved::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
+        asg::BasicBinaryOperator::Add(mode) => lower_add(builder, mode, operands),
+        asg::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
                 ir::Instruction::Subtract(operands, FloatOrInteger::Integer)
             }
@@ -766,7 +661,7 @@ pub fn lower_basic_binary_operation(
                 operands,
             ),
         })),
-        resolved::BasicBinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
+        asg::BasicBinaryOperator::Multiply(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {
                 ir::Instruction::Multiply(operands, FloatOrInteger::Integer)
             }
@@ -780,46 +675,46 @@ pub fn lower_basic_binary_operation(
                 operands,
             ),
         })),
-        resolved::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instruction::Divide(
+        asg::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instruction::Divide(
             operands,
             mode.or_default_for(&ir_module.target),
         ))),
-        resolved::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instruction::Modulus(
+        asg::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instruction::Modulus(
             operands,
             mode.or_default_for(&ir_module.target),
         ))),
-        resolved::BasicBinaryOperator::Equals(mode) => {
+        asg::BasicBinaryOperator::Equals(mode) => {
             Ok(builder.push(ir::Instruction::Equals(operands, *mode)))
         }
-        resolved::BasicBinaryOperator::NotEquals(mode) => {
+        asg::BasicBinaryOperator::NotEquals(mode) => {
             Ok(builder.push(ir::Instruction::NotEquals(operands, *mode)))
         }
-        resolved::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(
-            ir::Instruction::LessThan(operands, mode.or_default_for(&ir_module.target)),
-        )),
-        resolved::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(
+        asg::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(ir::Instruction::LessThan(
+            operands,
+            mode.or_default_for(&ir_module.target),
+        ))),
+        asg::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(
             ir::Instruction::LessThanEq(operands, mode.or_default_for(&ir_module.target)),
         )),
-        resolved::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(
+        asg::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(
             ir::Instruction::GreaterThan(operands, mode.or_default_for(&ir_module.target)),
         )),
-        resolved::BasicBinaryOperator::GreaterThanEq(mode) => Ok(builder.push(
+        asg::BasicBinaryOperator::GreaterThanEq(mode) => Ok(builder.push(
             ir::Instruction::GreaterThanEq(operands, mode.or_default_for(&ir_module.target)),
         )),
-        resolved::BasicBinaryOperator::BitwiseAnd => {
+        asg::BasicBinaryOperator::BitwiseAnd => {
             Ok(builder.push(ir::Instruction::BitwiseAnd(operands)))
         }
-        resolved::BasicBinaryOperator::BitwiseOr => {
+        asg::BasicBinaryOperator::BitwiseOr => {
             Ok(builder.push(ir::Instruction::BitwiseOr(operands)))
         }
-        resolved::BasicBinaryOperator::BitwiseXor => {
+        asg::BasicBinaryOperator::BitwiseXor => {
             Ok(builder.push(ir::Instruction::BitwiseXor(operands)))
         }
-        resolved::BasicBinaryOperator::LogicalLeftShift
-        | resolved::BasicBinaryOperator::LeftShift => {
+        asg::BasicBinaryOperator::LogicalLeftShift | asg::BasicBinaryOperator::LeftShift => {
             Ok(builder.push(ir::Instruction::LeftShift(operands)))
         }
-        resolved::BasicBinaryOperator::ArithmeticRightShift(sign_or_indeterminate) => {
+        asg::BasicBinaryOperator::ArithmeticRightShift(sign_or_indeterminate) => {
             let sign = match sign_or_indeterminate {
                 SignOrIndeterminate::Sign(sign) => *sign,
                 SignOrIndeterminate::Indeterminate(c_integer) => {
@@ -832,7 +727,7 @@ pub fn lower_basic_binary_operation(
                 IntegerSign::Unsigned => ir::Instruction::LogicalRightShift(operands),
             }))
         }
-        resolved::BasicBinaryOperator::LogicalRightShift => {
+        asg::BasicBinaryOperator::LogicalRightShift => {
             Ok(builder.push(ir::Instruction::LogicalRightShift(operands)))
         }
     }

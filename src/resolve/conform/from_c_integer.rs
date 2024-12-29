@@ -2,7 +2,7 @@ use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
     ast::{CInteger, IntegerBits, OptionIntegerSignExt},
     logic::implies,
-    resolved::{
+    asg::{
         Cast, CastFrom, Expr, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryMathOperation,
         UnaryMathOperator,
     },

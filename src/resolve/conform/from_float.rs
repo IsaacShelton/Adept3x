@@ -1,7 +1,7 @@
 use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
     ast::FloatSize,
-    resolved::{Cast, Expr, ExprKind, Type, TypeKind, TypedExpr},
+    asg::{Cast, Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 

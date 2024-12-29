@@ -2,7 +2,7 @@ use super::{from_integer_literal::from_integer_literal, Objective, ObjectiveResu
 use crate::{
     ast::{CIntegerAssumptions, FloatSize},
     resolve::error::{ResolveError, ResolveErrorKind},
-    resolved::{Expr, ExprKind, TypeKind, TypedExpr},
+    asg::{Expr, ExprKind, TypeKind, TypedExpr},
     source_files::Source,
 };
 use num::BigInt;

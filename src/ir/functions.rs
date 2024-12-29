@@ -9,14 +9,14 @@
 */
 
 use super::Function;
-use crate::{resolve::PolyRecipe, resolved};
+use crate::{asg, resolve::PolyRecipe};
 use append_only_vec::AppendOnlyVec;
 use std::{borrow::Borrow, collections::HashMap, sync::RwLock};
 
 pub struct Functions {
     functions: AppendOnlyVec<Function>,
-    monomorphized: RwLock<HashMap<(resolved::FunctionRef, PolyRecipe), FunctionRef>>,
-    jobs: AppendOnlyVec<(resolved::FunctionRef, PolyRecipe, FunctionRef)>,
+    monomorphized: RwLock<HashMap<(asg::FunctionRef, PolyRecipe), FunctionRef>>,
+    jobs: AppendOnlyVec<(asg::FunctionRef, PolyRecipe, FunctionRef)>,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -35,7 +35,7 @@ impl Functions {
 
     pub fn insert(
         &self,
-        resolved_function_ref: resolved::FunctionRef,
+        resolved_function_ref: asg::FunctionRef,
         function: Function,
     ) -> FunctionRef {
         let index = self.functions.len();
@@ -50,7 +50,7 @@ impl Functions {
 
     pub fn translate<E>(
         &self,
-        resolved_function_ref: resolved::FunctionRef,
+        resolved_function_ref: asg::FunctionRef,
         poly_recipe: impl Borrow<PolyRecipe>,
         monomorphize: impl Fn() -> Result<FunctionRef, E>,
     ) -> Result<FunctionRef, E> {
@@ -97,7 +97,7 @@ impl Functions {
 
     pub fn monomorphized<'a>(
         &'a self,
-    ) -> impl Iterator<Item = &'a (resolved::FunctionRef, PolyRecipe, FunctionRef)> {
+    ) -> impl Iterator<Item = &'a (asg::FunctionRef, PolyRecipe, FunctionRef)> {
         Monomorphized {
             vec: &self.jobs,
             i: 0,
@@ -107,12 +107,12 @@ impl Functions {
 
 #[derive(Clone, Debug)]
 pub struct Monomorphized<'a> {
-    vec: &'a AppendOnlyVec<(resolved::FunctionRef, PolyRecipe, FunctionRef)>,
+    vec: &'a AppendOnlyVec<(asg::FunctionRef, PolyRecipe, FunctionRef)>,
     i: usize,
 }
 
 impl<'a> Iterator for Monomorphized<'a> {
-    type Item = &'a (resolved::FunctionRef, PolyRecipe, FunctionRef);
+    type Item = &'a (asg::FunctionRef, PolyRecipe, FunctionRef);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.i < self.vec.len() {

@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized, PolyCatalog,
     },
-    resolved::{self, Member, TypedExpr},
+    asg::{self, Member, TypedExpr},
     source_files::Source,
 };
 
@@ -24,7 +24,7 @@ pub fn resolve_member_expr(
         structure_ref,
         arguments,
         ..
-    } = get_core_structure_info(ctx.resolved_ast, &resolved_subject.resolved_type, source)
+    } = get_core_structure_info(ctx.asg, &resolved_subject.resolved_type, source)
         .map_err(|e| {
             e.unwrap_or_else(|| {
                 ResolveErrorKind::CannotUseOperator {
@@ -36,7 +36,7 @@ pub fn resolve_member_expr(
         })?;
 
     let structure = ctx
-        .resolved_ast
+        .asg
         .structures
         .get(structure_ref)
         .expect("referenced struct to exist");
@@ -79,8 +79,8 @@ pub fn resolve_member_expr(
 
     Ok(TypedExpr::new(
         resolved_type.clone(),
-        resolved::Expr::new(
-            resolved::ExprKind::Member(Box::new(Member {
+        asg::Expr::new(
+            asg::ExprKind::Member(Box::new(Member {
                 subject: subject_destination,
                 structure_ref,
                 index,

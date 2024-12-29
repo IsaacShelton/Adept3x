@@ -6,13 +6,13 @@ use super::{
     variable_haystack::VariableHaystack,
 };
 use crate::{
+    asg::{Asg, CurrentConstraints, HelperExprDecl},
     ast::AstWorkspace,
-    resolved::{self, CurrentConstraints, HelperExprDecl},
 };
 
 pub fn resolve_helper_expressions(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
@@ -29,7 +29,7 @@ pub fn resolve_helper_expressions(
             let value = {
                 let variable_haystack = VariableHaystack::new();
                 let mut ctx = ResolveExprCtx {
-                    resolved_ast,
+                    asg,
                     function_haystack,
                     variable_haystack,
                     resolved_function_ref: None,

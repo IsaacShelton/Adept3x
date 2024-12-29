@@ -5,13 +5,13 @@ use super::{
     expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
     Initialized,
 };
-use crate::{ast, resolved};
+use crate::{asg, ast};
 use std::borrow::Cow;
 
 pub fn resolve_stmts(
     ctx: &mut ResolveExprCtx,
     stmts: &[ast::Stmt],
-) -> Result<Vec<resolved::Stmt>, ResolveError> {
+) -> Result<Vec<asg::Stmt>, ResolveError> {
     let mut resolved_stmts = Vec::with_capacity(stmts.len());
 
     for stmt in stmts.iter() {
@@ -24,7 +24,7 @@ pub fn resolve_stmts(
 pub fn resolve_stmt(
     ctx: &mut ResolveExprCtx,
     ast_stmt: &ast::Stmt,
-) -> Result<resolved::Stmt, ResolveError> {
+) -> Result<asg::Stmt, ResolveError> {
     let source = ast_stmt.source;
 
     match &ast_stmt.kind {
@@ -42,7 +42,7 @@ pub fn resolve_stmt(
                 )?;
 
                 let mut return_type = Cow::Borrowed(
-                    &ctx.resolved_ast
+                    &ctx.asg
                         .functions
                         .get(resolved_function_ref)
                         .unwrap()
@@ -72,13 +72,9 @@ pub fn resolve_stmt(
                     .at(source));
                 }
             } else {
-                let function = ctx
-                    .resolved_ast
-                    .functions
-                    .get(resolved_function_ref)
-                    .unwrap();
+                let function = ctx.asg.functions.get(resolved_function_ref).unwrap();
 
-                if function.return_type.kind != resolved::TypeKind::Void {
+                if function.return_type.kind != asg::TypeKind::Void {
                     return Err(ResolveErrorKind::CannotReturnVoid {
                         expected: function.return_type.to_string(),
                     }
@@ -88,13 +84,10 @@ pub fn resolve_stmt(
                 None
             };
 
-            Ok(resolved::Stmt::new(
-                resolved::StmtKind::Return(return_value),
-                source,
-            ))
+            Ok(asg::Stmt::new(asg::StmtKind::Return(return_value), source))
         }
-        ast::StmtKind::Expr(value) => Ok(resolved::Stmt::new(
-            resolved::StmtKind::Expr(resolve_expr(ctx, value, None, Initialized::Require)?),
+        ast::StmtKind::Expr(value) => Ok(asg::Stmt::new(
+            asg::StmtKind::Expr(resolve_expr(ctx, value, None, Initialized::Require)?),
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
@@ -150,11 +143,7 @@ pub fn resolve_stmt(
                 );
             };
 
-            let function = ctx
-                .resolved_ast
-                .functions
-                .get_mut(resolved_function_ref)
-                .unwrap();
+            let function = ctx.asg.functions.get_mut(resolved_function_ref).unwrap();
 
             let key = function
                 .variables
@@ -163,8 +152,8 @@ pub fn resolve_stmt(
             ctx.variable_haystack
                 .put(&declaration.name, resolved_type.clone(), key);
 
-            Ok(resolved::Stmt::new(
-                resolved::StmtKind::Declaration(resolved::Declaration { key, value }),
+            Ok(asg::Stmt::new(
+                asg::StmtKind::Declaration(asg::Declaration { key, value }),
                 source,
             ))
         }
@@ -209,12 +198,8 @@ pub fn resolve_stmt(
 
             // Mark destination as initialized
             match &destination.kind {
-                resolved::DestinationKind::Variable(variable) => {
-                    let function = ctx
-                        .resolved_ast
-                        .functions
-                        .get_mut(resolved_function_ref)
-                        .unwrap();
+                asg::DestinationKind::Variable(variable) => {
+                    let function = ctx.asg.functions.get_mut(resolved_function_ref).unwrap();
 
                     function
                         .variables
@@ -222,10 +207,10 @@ pub fn resolve_stmt(
                         .expect("variable being assigned to exists")
                         .set_initialized();
                 }
-                resolved::DestinationKind::GlobalVariable(..) => (),
-                resolved::DestinationKind::Member { .. } => (),
-                resolved::DestinationKind::ArrayAccess { .. } => (),
-                resolved::DestinationKind::Dereference { .. } => (),
+                asg::DestinationKind::GlobalVariable(..) => (),
+                asg::DestinationKind::Member { .. } => (),
+                asg::DestinationKind::ArrayAccess { .. } => (),
+                asg::DestinationKind::Dereference { .. } => (),
             }
 
             let operator = assignment
@@ -241,8 +226,8 @@ pub fn resolve_stmt(
                 })
                 .transpose()?;
 
-            Ok(resolved::Stmt::new(
-                resolved::StmtKind::Assignment(resolved::Assignment {
+            Ok(asg::Stmt::new(
+                asg::StmtKind::Assignment(asg::Assignment {
                     destination,
                     value: value.expr,
                     operator,

@@ -8,7 +8,7 @@ use crate::{
         expr::resolve_expr,
         Initialized,
     },
-    resolved::{self, GlobalVarDecl, Type, TypedExpr},
+    asg::{self, GlobalVarDecl, Type, TypedExpr},
     source_files::Source,
 };
 
@@ -24,7 +24,7 @@ pub fn resolve_variable_expr(
         .and_then(|name| ctx.variable_haystack.find(name))
     {
         if let Some(function) = ctx.resolved_function_ref.map(|function_ref| {
-            ctx.resolved_ast
+            ctx.asg
                 .functions
                 .get_mut(function_ref)
                 .expect("valid function ref")
@@ -37,8 +37,8 @@ pub fn resolve_variable_expr(
 
             return Ok(TypedExpr::new_maybe_initialized(
                 variable.resolved_type.clone(),
-                resolved::Expr::new(
-                    resolved::ExprKind::Variable(Box::new(resolved::Variable {
+                asg::Expr::new(
+                    asg::ExprKind::Variable(Box::new(asg::Variable {
                         key: variable.key,
                         resolved_type: variable.resolved_type.clone(),
                     })),
@@ -158,15 +158,15 @@ fn resolve_global_variable(
     source: Source,
 ) -> TypedExpr {
     let global = ctx
-        .resolved_ast
+        .asg
         .globals
         .get(decl.global_ref)
         .expect("valid global");
 
     TypedExpr::new(
         global.resolved_type.clone(),
-        resolved::Expr::new(
-            resolved::ExprKind::GlobalVariable(Box::new(resolved::GlobalVariable {
+        asg::Expr::new(
+            asg::ExprKind::GlobalVariable(Box::new(asg::GlobalVariable {
                 reference: decl.global_ref,
                 resolved_type: global.resolved_type.clone(),
             })),
@@ -190,8 +190,8 @@ fn resolve_helper_expr(
 
     return Ok(TypedExpr::new_maybe_initialized(
         resolved_type,
-        resolved::Expr::new(
-            resolved::ExprKind::ResolvedNamedExpression(Box::new(expr)),
+        asg::Expr::new(
+            asg::ExprKind::ResolvedNamedExpression(Box::new(expr)),
             source,
         ),
         is_initialized,

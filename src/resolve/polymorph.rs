@@ -1,5 +1,8 @@
 use super::expr::ResolveExprCtx;
-use crate::{resolved, resolved::Type, source_files::Source};
+use crate::{
+    asg::{self, Type},
+    source_files::Source,
+};
 use core::hash::Hash;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
@@ -70,44 +73,43 @@ impl Display for PolymorphErrorKind {
 }
 
 impl PolyRecipe {
-    pub fn resolve_type<'a>(&self, ty: &resolved::Type) -> Result<resolved::Type, PolymorphError> {
+    pub fn resolve_type<'a>(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
         let polymorphs = &self.polymorphs;
 
         Ok(match &ty.kind {
-            resolved::TypeKind::Unresolved => panic!(),
-            resolved::TypeKind::Boolean
-            | resolved::TypeKind::Integer(_, _)
-            | resolved::TypeKind::CInteger(_, _)
-            | resolved::TypeKind::IntegerLiteral(_)
-            | resolved::TypeKind::FloatLiteral(_)
-            | resolved::TypeKind::Void
-            | resolved::TypeKind::Floating(_) => ty.clone(),
-            resolved::TypeKind::Pointer(inner) => {
-                resolved::TypeKind::Pointer(Box::new(self.resolve_type(inner)?)).at(ty.source)
+            asg::TypeKind::Unresolved => panic!(),
+            asg::TypeKind::Boolean
+            | asg::TypeKind::Integer(_, _)
+            | asg::TypeKind::CInteger(_, _)
+            | asg::TypeKind::IntegerLiteral(_)
+            | asg::TypeKind::FloatLiteral(_)
+            | asg::TypeKind::Void
+            | asg::TypeKind::Floating(_) => ty.clone(),
+            asg::TypeKind::Pointer(inner) => {
+                asg::TypeKind::Pointer(Box::new(self.resolve_type(inner)?)).at(ty.source)
             }
-            resolved::TypeKind::AnonymousStruct() => todo!(),
-            resolved::TypeKind::AnonymousUnion() => todo!(),
-            resolved::TypeKind::AnonymousEnum() => todo!(),
-            resolved::TypeKind::FixedArray(fixed_array) => {
-                resolved::TypeKind::FixedArray(Box::new(resolved::FixedArray {
+            asg::TypeKind::AnonymousStruct() => todo!(),
+            asg::TypeKind::AnonymousUnion() => todo!(),
+            asg::TypeKind::AnonymousEnum() => todo!(),
+            asg::TypeKind::FixedArray(fixed_array) => {
+                asg::TypeKind::FixedArray(Box::new(asg::FixedArray {
                     size: fixed_array.size,
                     inner: self.resolve_type(&fixed_array.inner)?,
                 }))
                 .at(ty.source)
             }
-            resolved::TypeKind::FunctionPointer(_) => todo!(),
-            resolved::TypeKind::Enum(_, _) => ty.clone(),
-            resolved::TypeKind::Structure(human_name, structure_ref, poly_args) => {
+            asg::TypeKind::FunctionPointer(_) => todo!(),
+            asg::TypeKind::Enum(_, _) => ty.clone(),
+            asg::TypeKind::Structure(human_name, structure_ref, poly_args) => {
                 let args = poly_args
                     .iter()
                     .map(|arg| self.resolve_type(arg))
                     .collect::<Result<_, _>>()?;
 
-                resolved::TypeKind::Structure(human_name.clone(), *structure_ref, args)
-                    .at(ty.source)
+                asg::TypeKind::Structure(human_name.clone(), *structure_ref, args).at(ty.source)
             }
-            resolved::TypeKind::TypeAlias(_, _) => ty.clone(),
-            resolved::TypeKind::Polymorph(name, _) => {
+            asg::TypeKind::TypeAlias(_, _) => ty.clone(),
+            asg::TypeKind::Polymorph(name, _) => {
                 let Some(value) = polymorphs.get(name) else {
                     return Err(PolymorphErrorKind::UndefinedPolymorph(name.clone()).at(ty.source));
                 };
@@ -118,7 +120,7 @@ impl PolyRecipe {
 
                 poly_type.resolved_type.clone()
             }
-            resolved::TypeKind::Trait(_, _, _) => ty.clone(),
+            asg::TypeKind::Trait(_, _, _) => ty.clone(),
         })
     }
 }
@@ -141,7 +143,7 @@ pub struct PolyType {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct PolyExpr {
-    expr: resolved::Expr,
+    expr: asg::Expr,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, IsVariant)]
@@ -181,24 +183,24 @@ impl PolyCatalog {
         concrete_type: &Type,
     ) -> Result<(), Option<PolyCatalogInsertError>> {
         match &pattern_type.kind {
-            resolved::TypeKind::Unresolved => panic!(),
-            resolved::TypeKind::Boolean
-            | resolved::TypeKind::Integer(_, _)
-            | resolved::TypeKind::CInteger(_, _)
-            | resolved::TypeKind::IntegerLiteral(_)
-            | resolved::TypeKind::FloatLiteral(_)
-            | resolved::TypeKind::Floating(_)
-            | resolved::TypeKind::Void
-            | resolved::TypeKind::Enum(_, _)
-            | resolved::TypeKind::TypeAlias(_, _) => {
+            asg::TypeKind::Unresolved => panic!(),
+            asg::TypeKind::Boolean
+            | asg::TypeKind::Integer(_, _)
+            | asg::TypeKind::CInteger(_, _)
+            | asg::TypeKind::IntegerLiteral(_)
+            | asg::TypeKind::FloatLiteral(_)
+            | asg::TypeKind::Floating(_)
+            | asg::TypeKind::Void
+            | asg::TypeKind::Enum(_, _)
+            | asg::TypeKind::TypeAlias(_, _) => {
                 if *pattern_type == *concrete_type {
                     Ok(())
                 } else {
                     Err(None)
                 }
             }
-            resolved::TypeKind::Trait(_, trait_ref, parameters) => match &concrete_type.kind {
-                resolved::TypeKind::Trait(_, concrete_trait_ref, concrete_parameters) => {
+            asg::TypeKind::Trait(_, trait_ref, parameters) => match &concrete_type.kind {
+                asg::TypeKind::Trait(_, concrete_trait_ref, concrete_parameters) => {
                     if *trait_ref == *concrete_trait_ref
                         || parameters.len() != concrete_parameters.len()
                     {
@@ -215,47 +217,41 @@ impl PolyCatalog {
                 }
                 _ => Err(None),
             },
-            resolved::TypeKind::Structure(_, structure_ref, parameters) => {
-                match &concrete_type.kind {
-                    resolved::TypeKind::Structure(
-                        _,
-                        concrete_structure_ref,
-                        concrete_parameters,
-                    ) => {
-                        if *structure_ref != *concrete_structure_ref
-                            || parameters.len() != concrete_parameters.len()
-                        {
-                            return Err(None);
-                        }
-
-                        for (pattern_parameter, concrete_parameter) in
-                            parameters.iter().zip(concrete_parameters.iter())
-                        {
-                            self.match_type(ctx, pattern_parameter, concrete_parameter)?;
-                        }
-
-                        Ok(())
+            asg::TypeKind::Structure(_, structure_ref, parameters) => match &concrete_type.kind {
+                asg::TypeKind::Structure(_, concrete_structure_ref, concrete_parameters) => {
+                    if *structure_ref != *concrete_structure_ref
+                        || parameters.len() != concrete_parameters.len()
+                    {
+                        return Err(None);
                     }
-                    _ => Err(None),
+
+                    for (pattern_parameter, concrete_parameter) in
+                        parameters.iter().zip(concrete_parameters.iter())
+                    {
+                        self.match_type(ctx, pattern_parameter, concrete_parameter)?;
+                    }
+
+                    Ok(())
                 }
-            }
-            resolved::TypeKind::Pointer(pattern_inner) => match &concrete_type.kind {
-                resolved::TypeKind::Pointer(concrete_inner) => {
+                _ => Err(None),
+            },
+            asg::TypeKind::Pointer(pattern_inner) => match &concrete_type.kind {
+                asg::TypeKind::Pointer(concrete_inner) => {
                     self.match_type(ctx, pattern_inner, concrete_inner)
                 }
                 _ => Err(None),
             },
-            resolved::TypeKind::AnonymousStruct() => todo!(),
-            resolved::TypeKind::AnonymousUnion() => todo!(),
-            resolved::TypeKind::AnonymousEnum() => todo!(),
-            resolved::TypeKind::FixedArray(pattern_inner) => match &concrete_type.kind {
-                resolved::TypeKind::FixedArray(concrete_inner) => {
+            asg::TypeKind::AnonymousStruct() => todo!(),
+            asg::TypeKind::AnonymousUnion() => todo!(),
+            asg::TypeKind::AnonymousEnum() => todo!(),
+            asg::TypeKind::FixedArray(pattern_inner) => match &concrete_type.kind {
+                asg::TypeKind::FixedArray(concrete_inner) => {
                     self.match_type(ctx, &pattern_inner.inner, &concrete_inner.inner)
                 }
                 _ => Err(None),
             },
-            resolved::TypeKind::FunctionPointer(_) => todo!(),
-            resolved::TypeKind::Polymorph(name, constraints) => {
+            asg::TypeKind::FunctionPointer(_) => todo!(),
+            asg::TypeKind::Polymorph(name, constraints) => {
                 self.put_type(name, concrete_type).map_err(Some)?;
 
                 for constraint in constraints {

@@ -1,8 +1,9 @@
 use super::{record_layout::record_info::RecordInfo, Target};
 use crate::{
+    asg::Asg,
     data_units::{BitUnits, ByteUnits},
     diagnostics::Diagnostics,
-    ir, resolved,
+    ir,
     target::record_layout::itanium::ItaniumRecordLayoutBuilder,
 };
 use once_map::unsync::OnceMap;
@@ -50,7 +51,7 @@ pub struct TypeLayoutCache<'a> {
     memo: OnceMap<ir::Type, TypeLayout>,
     pub target: &'a Target,
     pub structures: &'a ir::Structures,
-    pub resolved_ast: &'a resolved::Ast<'a>,
+    pub asg: &'a Asg<'a>,
     pub diagnostics: &'a Diagnostics<'a>,
 }
 
@@ -58,14 +59,14 @@ impl<'a> TypeLayoutCache<'a> {
     pub fn new(
         target: &'a Target,
         structures: &'a ir::Structures,
-        resolved_ast: &'a resolved::Ast,
+        asg: &'a Asg,
         diagnostics: &'a Diagnostics<'a>,
     ) -> Self {
         Self {
             memo: OnceMap::new(),
             target,
             structures,
-            resolved_ast,
+            asg,
             diagnostics,
         }
     }

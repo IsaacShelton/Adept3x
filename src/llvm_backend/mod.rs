@@ -29,8 +29,8 @@ use self::{
     target_triple::{get_triple, make_llvm_target},
 };
 use crate::{
-    backend::BackendError, compiler::Compiler, diagnostics::Diagnostics, ir, linking::link_result,
-    resolved, target::TargetOs,
+    asg::Asg, backend::BackendError, compiler::Compiler, diagnostics::Diagnostics, ir,
+    linking::link_result, target::TargetOs,
 };
 use colored::Colorize;
 use llvm_sys::{
@@ -55,7 +55,7 @@ use std::{
 pub unsafe fn llvm_backend(
     compiler: &mut Compiler,
     ir_module: &ir::Module,
-    resolved_ast: &resolved::Ast,
+    asg: &Asg,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
     diagnostics: &Diagnostics,
@@ -90,13 +90,7 @@ pub unsafe fn llvm_backend(
     let target_data = TargetData::new(&target_machine);
     LLVMSetModuleDataLayout(backend_module.get(), target_data.get());
 
-    let mut ctx = BackendCtx::new(
-        ir_module,
-        &backend_module,
-        &target_data,
-        resolved_ast,
-        diagnostics,
-    )?;
+    let mut ctx = BackendCtx::new(ir_module, &backend_module, &target_data, asg, diagnostics)?;
 
     create_static_variables()?;
     create_globals(&mut ctx)?;

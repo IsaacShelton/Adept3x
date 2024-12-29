@@ -2,7 +2,7 @@ use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
     ast::{CInteger, ConformBehavior, IntegerBits},
     ir::IntegerSign,
-    resolved::{Cast, CastFrom, Expr, ExprKind, Type, TypeKind, TypedExpr},
+    asg::{Cast, CastFrom, Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 

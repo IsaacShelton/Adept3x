@@ -7,7 +7,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, Cast, CastFrom, TypedExpr},
+    asg::{self, Cast, CastFrom, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -37,53 +37,53 @@ pub fn resolve_call_expr(
         let name = &call.function_name.basename;
 
         let target_type_kind = match name.as_ref() {
-            "bool" => Some(resolved::TypeKind::Boolean),
-            "u8" => Some(resolved::TypeKind::u8()),
-            "u16" => Some(resolved::TypeKind::u16()),
-            "u32" => Some(resolved::TypeKind::u32()),
-            "u64" => Some(resolved::TypeKind::u64()),
-            "i8" => Some(resolved::TypeKind::i8()),
-            "i16" => Some(resolved::TypeKind::i16()),
-            "i32" => Some(resolved::TypeKind::i32()),
-            "i64" => Some(resolved::TypeKind::i64()),
-            "char" => Some(resolved::TypeKind::CInteger(CInteger::Char, None)),
-            "schar" => Some(resolved::TypeKind::CInteger(
+            "bool" => Some(asg::TypeKind::Boolean),
+            "u8" => Some(asg::TypeKind::u8()),
+            "u16" => Some(asg::TypeKind::u16()),
+            "u32" => Some(asg::TypeKind::u32()),
+            "u64" => Some(asg::TypeKind::u64()),
+            "i8" => Some(asg::TypeKind::i8()),
+            "i16" => Some(asg::TypeKind::i16()),
+            "i32" => Some(asg::TypeKind::i32()),
+            "i64" => Some(asg::TypeKind::i64()),
+            "char" => Some(asg::TypeKind::CInteger(CInteger::Char, None)),
+            "schar" => Some(asg::TypeKind::CInteger(
                 CInteger::Char,
                 Some(IntegerSign::Signed),
             )),
-            "uchar" => Some(resolved::TypeKind::CInteger(
+            "uchar" => Some(asg::TypeKind::CInteger(
                 CInteger::Char,
                 Some(IntegerSign::Unsigned),
             )),
-            "short" => Some(resolved::TypeKind::CInteger(
+            "short" => Some(asg::TypeKind::CInteger(
                 CInteger::Short,
                 Some(IntegerSign::Signed),
             )),
-            "ushort" => Some(resolved::TypeKind::CInteger(
+            "ushort" => Some(asg::TypeKind::CInteger(
                 CInteger::Short,
                 Some(IntegerSign::Unsigned),
             )),
-            "int" => Some(resolved::TypeKind::CInteger(
+            "int" => Some(asg::TypeKind::CInteger(
                 CInteger::Int,
                 Some(IntegerSign::Signed),
             )),
-            "uint" => Some(resolved::TypeKind::CInteger(
+            "uint" => Some(asg::TypeKind::CInteger(
                 CInteger::Int,
                 Some(IntegerSign::Unsigned),
             )),
-            "long" => Some(resolved::TypeKind::CInteger(
+            "long" => Some(asg::TypeKind::CInteger(
                 CInteger::Long,
                 Some(IntegerSign::Signed),
             )),
-            "ulong" => Some(resolved::TypeKind::CInteger(
+            "ulong" => Some(asg::TypeKind::CInteger(
                 CInteger::Long,
                 Some(IntegerSign::Unsigned),
             )),
-            "longlong" => Some(resolved::TypeKind::CInteger(
+            "longlong" => Some(asg::TypeKind::CInteger(
                 CInteger::LongLong,
                 Some(IntegerSign::Signed),
             )),
-            "ulonglong" => Some(resolved::TypeKind::CInteger(
+            "ulonglong" => Some(asg::TypeKind::CInteger(
                 CInteger::LongLong,
                 Some(IntegerSign::Unsigned),
             )),
@@ -97,13 +97,13 @@ pub fn resolve_call_expr(
                 let argument = arguments.into_iter().next().unwrap();
                 let is_initialized = argument.is_initialized;
 
-                let resolved::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
+                let asg::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
                     unreachable!();
                 };
 
                 return Ok(TypedExpr {
                     resolved_type: target_type_kind.at(source),
-                    expr: resolved::ExprKind::BooleanLiteral(*value != BigInt::ZERO).at(source),
+                    expr: asg::ExprKind::BooleanLiteral(*value != BigInt::ZERO).at(source),
                     is_initialized,
                 });
             }
@@ -115,9 +115,9 @@ pub fn resolve_call_expr(
                 let argument = arguments.into_iter().next().unwrap();
                 let is_initialized = argument.is_initialized;
 
-                let expr = resolved::ExprKind::UnaryMathOperation(Box::new(
-                    resolved::UnaryMathOperation {
-                        operator: resolved::UnaryMathOperator::IsNonZero,
+                let expr = asg::ExprKind::UnaryMathOperation(Box::new(
+                    asg::UnaryMathOperation {
+                        operator: asg::UnaryMathOperator::IsNonZero,
                         inner: argument,
                     },
                 ))
@@ -134,7 +134,7 @@ pub fn resolve_call_expr(
                 let target_type = target_type_kind.at(source);
                 let argument = arguments.into_iter().next().unwrap();
 
-                let expr = resolved::ExprKind::FloatToInteger(Box::new(Cast {
+                let expr = asg::ExprKind::FloatToInteger(Box::new(Cast {
                     target_type: target_type.clone(),
                     value: argument.expr,
                 }))
@@ -151,7 +151,7 @@ pub fn resolve_call_expr(
                 let target_type = target_type_kind.at(source);
                 let argument = arguments.into_iter().next().unwrap();
 
-                let expr = resolved::ExprKind::IntegerCast(Box::new(CastFrom {
+                let expr = asg::ExprKind::IntegerCast(Box::new(CastFrom {
                     cast: Cast {
                         target_type: target_type.clone(),
                         value: argument.expr,
@@ -169,8 +169,8 @@ pub fn resolve_call_expr(
         }
 
         let to_float = match name.as_ref() {
-            "f32" | "float" => Some((resolved::TypeKind::f32(), FloatSize::Bits32)),
-            "f64" | "double" => Some((resolved::TypeKind::f64(), FloatSize::Bits64)),
+            "f32" | "float" => Some((asg::TypeKind::f32(), FloatSize::Bits32)),
+            "f64" | "double" => Some((asg::TypeKind::f64(), FloatSize::Bits64)),
             _ => None,
         };
 
@@ -179,7 +179,7 @@ pub fn resolve_call_expr(
                 let argument = arguments.into_iter().next().unwrap();
                 let is_initialized = argument.is_initialized;
 
-                let resolved::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
+                let asg::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
                     unreachable!();
                 };
 
@@ -194,7 +194,7 @@ pub fn resolve_call_expr(
 
                 return Ok(TypedExpr {
                     resolved_type: target_type_kind.at(source),
-                    expr: resolved::ExprKind::FloatingLiteral(float_size, NotNan::new(value).ok())
+                    expr: asg::ExprKind::FloatingLiteral(float_size, NotNan::new(value).ok())
                         .at(source),
                     is_initialized,
                 });
@@ -204,13 +204,13 @@ pub fn resolve_call_expr(
                 let argument = arguments.into_iter().next().unwrap();
                 let is_initialized = argument.is_initialized;
 
-                let resolved::ExprKind::FloatingLiteral(_size, value) = &argument.expr.kind else {
+                let asg::ExprKind::FloatingLiteral(_size, value) = &argument.expr.kind else {
                     unreachable!();
                 };
 
                 return Ok(TypedExpr {
                     resolved_type: target_type_kind.at(source),
-                    expr: resolved::ExprKind::FloatingLiteral(float_size, *value).at(source),
+                    expr: asg::ExprKind::FloatingLiteral(float_size, *value).at(source),
                     is_initialized,
                 });
             }
@@ -219,7 +219,7 @@ pub fn resolve_call_expr(
                 let target_type = target_type_kind.at(source);
                 let argument = arguments.into_iter().next().unwrap();
 
-                let expr = resolved::ExprKind::IntegerToFloat(Box::new(CastFrom {
+                let expr = asg::ExprKind::IntegerToFloat(Box::new(CastFrom {
                     cast: Cast {
                         target_type: target_type.clone(),
                         value: argument.expr,
@@ -263,17 +263,17 @@ pub fn resolve_call_expr(
         }
     };
 
-    let function = ctx.resolved_ast.functions.get(callee.function).unwrap();
+    let function = ctx.asg.functions.get(callee.function).unwrap();
     let num_required = function.parameters.required.len();
 
     for (i, argument) in arguments.iter_mut().enumerate() {
-        let function = ctx.resolved_ast.functions.get(callee.function).unwrap();
+        let function = ctx.asg.functions.get(callee.function).unwrap();
 
         let preferred_type =
             (i < num_required).then_some(PreferredType::of_parameter(callee.function, i));
 
         if preferred_type.map_or(false, |ty| {
-            ty.view(&ctx.resolved_ast).kind.contains_polymorph()
+            ty.view(&ctx.asg).kind.contains_polymorph()
         }) {
             match conform_expr_to_default::<Perform>(&*argument, ctx.c_integer_assumptions()) {
                 Ok(arg) => {
@@ -287,7 +287,7 @@ pub fn resolve_call_expr(
         }
 
         if let Some(preferred_type) =
-            preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast))
+            preferred_type.map(|preferred_type| preferred_type.view(ctx.asg))
         {
             if let Ok(conformed_argument) = conform_expr::<Perform>(
                 ctx,
@@ -304,7 +304,7 @@ pub fn resolve_call_expr(
                     got: argument.resolved_type.to_string(),
                     name: function
                         .name
-                        .display(&ctx.resolved_ast.workspace.fs)
+                        .display(&ctx.asg.workspace.fs)
                         .to_string(),
                     i,
                 }
@@ -339,7 +339,7 @@ pub fn resolve_call_expr(
                 of: required_ty.to_string(),
                 function_name: function
                     .name
-                    .display(&ctx.resolved_ast.workspace.fs)
+                    .display(&ctx.asg.workspace.fs)
                     .to_string(),
             }
             .at(function.return_type.source));
@@ -348,8 +348,8 @@ pub fn resolve_call_expr(
 
     Ok(TypedExpr::new(
         return_type,
-        resolved::Expr::new(
-            resolved::ExprKind::Call(Box::new(resolved::Call { callee, arguments })),
+        asg::Expr::new(
+            asg::ExprKind::Call(Box::new(asg::Call { callee, arguments })),
             source,
         ),
     ))

@@ -2,7 +2,7 @@ use super::integer_literals::integer_literals_all_fit;
 use crate::{
     ast::{CInteger, CIntegerAssumptions, ConformBehavior, FloatSize, IntegerBits},
     data_units::BitUnits,
-    resolved::{IntegerSign, Type, TypeKind, TypedExpr},
+    asg::{IntegerSign, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;

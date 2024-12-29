@@ -3,7 +3,7 @@ use crate::{
     ast::CompileTimeArgument,
     name::Name,
     resolve::error::ResolveErrorKind,
-    resolved::{self},
+    asg::{self},
 };
 use itertools::Itertools;
 use std::borrow::Cow;
@@ -13,9 +13,9 @@ impl<'a> ResolveTypeCtx<'a> {
         &self,
         name: &Name,
         arguments: &[CompileTimeArgument],
-    ) -> Result<Cow<'a, resolved::TypeKind>, FindTypeError> {
-        let settings = &self.resolved_ast.workspace.settings[self
-            .resolved_ast
+    ) -> Result<Cow<'a, asg::TypeKind>, FindTypeError> {
+        let settings = &self.asg.workspace.settings[self
+            .asg
             .workspace
             .files
             .get(&self.file_fs_node_id)
@@ -32,9 +32,9 @@ impl<'a> ResolveTypeCtx<'a> {
                     .and_then(|types_in_module| types_in_module.get(name))
             })
             // NOTE: This will need to be map instead at some point
-            .filter(|decl| decl.num_parameters(self.resolved_ast) == arguments.len())
+            .filter(|decl| decl.num_parameters(self.asg) == arguments.len())
         {
-            if let resolved::TypeKind::Structure(human_name, structure_ref, _) = &decl.kind {
+            if let asg::TypeKind::Structure(human_name, structure_ref, _) = &decl.kind {
                 let arguments = arguments
                     .iter()
                     .flat_map(|arg| match arg {
@@ -48,14 +48,14 @@ impl<'a> ResolveTypeCtx<'a> {
                     })
                     .collect_vec();
 
-                return Ok(Cow::Owned(resolved::TypeKind::Structure(
+                return Ok(Cow::Owned(asg::TypeKind::Structure(
                     human_name.clone(),
                     *structure_ref,
                     arguments,
                 )));
             }
 
-            if let resolved::TypeKind::Trait(human_name, trait_ref, _) = &decl.kind {
+            if let asg::TypeKind::Trait(human_name, trait_ref, _) = &decl.kind {
                 let arguments = arguments
                     .iter()
                     .flat_map(|arg| match arg {
@@ -68,7 +68,7 @@ impl<'a> ResolveTypeCtx<'a> {
                     })
                     .collect_vec();
 
-                return Ok(Cow::Owned(resolved::TypeKind::Trait(
+                return Ok(Cow::Owned(asg::TypeKind::Trait(
                     human_name.clone(),
                     *trait_ref,
                     arguments,
@@ -95,7 +95,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 .flat_map(|decls| decls.get(basename.as_ref()))
                 .filter(|decl| decl.privacy.is_public())
                 // NOTE: This will need to be flat_map instead at some point
-                .filter(|decl| decl.num_parameters(self.resolved_ast) == arguments.len());
+                .filter(|decl| decl.num_parameters(self.asg) == arguments.len());
 
             if let Some(found) = matches.next() {
                 if matches.next().is_some() {

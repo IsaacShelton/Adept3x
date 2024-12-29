@@ -1,5 +1,5 @@
 use super::error::{ResolveError, ResolveErrorKind};
-use crate::resolved::{Destination, DestinationKind, ExprKind, Member, TypedExpr};
+use crate::asg::{Destination, DestinationKind, ExprKind, Member, TypedExpr};
 
 pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination, ResolveError> {
     let source = typed_expr.expr.source;

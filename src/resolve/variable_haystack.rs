@@ -1,14 +1,14 @@
-use crate::resolved::{self, VariableStorageKey};
+use crate::asg::{self, VariableStorageKey};
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone, Debug)]
 pub struct ScopedVariable {
-    pub resolved_type: resolved::Type,
+    pub resolved_type: asg::Type,
     pub key: VariableStorageKey,
 }
 
 impl ScopedVariable {
-    pub fn new(resolved_type: resolved::Type, key: VariableStorageKey) -> Self {
+    pub fn new(resolved_type: asg::Type, key: VariableStorageKey) -> Self {
         Self { resolved_type, key }
     }
 }
@@ -38,7 +38,7 @@ impl VariableHaystack {
     pub fn put(
         &mut self,
         name: impl ToString,
-        resolved_type: resolved::Type,
+        resolved_type: asg::Type,
         key: VariableStorageKey,
     ) {
         self.variables

@@ -3,14 +3,14 @@ use super::{
     type_ctx::ResolveTypeCtx, variable_haystack::VariableHaystack,
 };
 use crate::{
+    asg::{Asg, FunctionRef},
     ast::{self, AstWorkspace},
-    resolved::{self, FunctionRef},
     workspace::fs::FsNodeId,
 };
 
 pub fn resolve_function_bodies(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
     while let Some(job) = ctx.jobs.pop_front() {
@@ -30,7 +30,7 @@ pub fn resolve_function_bodies(
 
                 resolve_function_body(
                     ctx,
-                    resolved_ast,
+                    asg,
                     ast_workspace,
                     module_file_id,
                     physical_file_id,
@@ -61,7 +61,7 @@ pub fn resolve_function_bodies(
 
                 resolve_function_body(
                     ctx,
-                    resolved_ast,
+                    asg,
                     ast_workspace,
                     module_file_id,
                     physical_file_id,
@@ -77,7 +77,7 @@ pub fn resolve_function_bodies(
 
 fn resolve_function_body(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     ast_workspace: &AstWorkspace,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
@@ -91,7 +91,7 @@ fn resolve_function_body(
 
     let variable_haystack = resolve_parameter_variables(
         ctx,
-        resolved_ast,
+        asg,
         module_file_id,
         physical_file_id,
         ast_function,
@@ -105,7 +105,7 @@ fn resolve_function_body(
 
     let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
-    let f = resolved_ast
+    let f = asg
         .functions
         .get(resolved_function_ref)
         .expect("referenced resolved function to exist");
@@ -114,7 +114,7 @@ fn resolve_function_body(
 
     let resolved_stmts = resolve_stmts(
         &mut ResolveExprCtx {
-            resolved_ast,
+            asg,
             function_haystack,
             variable_haystack,
             resolved_function_ref: Some(resolved_function_ref),
@@ -130,8 +130,7 @@ fn resolve_function_body(
         &ast_function.stmts,
     )?;
 
-    resolved_ast
-        .functions
+    asg.functions
         .get_mut(resolved_function_ref)
         .expect("resolved function head to exist")
         .stmts = resolved_stmts;
@@ -141,7 +140,7 @@ fn resolve_function_body(
 
 fn resolve_parameter_variables(
     ctx: &ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     ast_function: &ast::Function,
@@ -150,10 +149,10 @@ fn resolve_parameter_variables(
     let mut variable_haystack = VariableHaystack::new();
 
     for parameter in ast_function.head.parameters.required.iter() {
-        let function = resolved_ast.functions.get(resolved_function_ref).unwrap();
+        let function = asg.functions.get(resolved_function_ref).unwrap();
 
         let type_ctx = ResolveTypeCtx::new(
-            &resolved_ast,
+            &asg,
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
@@ -163,10 +162,7 @@ fn resolve_parameter_variables(
         let mut resolved_type = type_ctx.resolve(&parameter.ast_type)?;
         resolved_type.strip_constraints();
 
-        let function = resolved_ast
-            .functions
-            .get_mut(resolved_function_ref)
-            .unwrap();
+        let function = asg.functions.get_mut(resolved_function_ref).unwrap();
 
         let key = function.variables.add_parameter(resolved_type.clone());
         variable_haystack.put(parameter.name.clone(), resolved_type, key);

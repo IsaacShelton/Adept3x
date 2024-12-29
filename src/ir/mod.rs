@@ -1,10 +1,10 @@
 mod functions;
 mod structures;
 
-pub use crate::resolved::{FloatOrSign, GlobalVarRef, IntegerSign};
+pub use crate::asg::{FloatOrSign, GlobalVarRef, IntegerSign};
 use crate::{
     data_units::ByteUnits,
-    resolved::{FloatOrInteger, IntegerBits},
+    asg::{FloatOrInteger, IntegerBits},
     source_files::Source,
     target::Target,
 };

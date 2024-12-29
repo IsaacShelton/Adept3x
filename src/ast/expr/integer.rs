@@ -1,7 +1,7 @@
 use crate::{
+    asg::{Type, TypeKind},
     ast::{CInteger, IntegerBits},
     ir::IntegerSign,
-    resolved,
     source_files::Source,
 };
 use num::BigInt;
@@ -19,12 +19,10 @@ pub struct IntegerKnown {
 }
 
 impl IntegerKnown {
-    pub fn make_type(&self, source: Source) -> resolved::Type {
+    pub fn make_type(&self, source: Source) -> Type {
         match self.rigidity {
-            IntegerRigidity::Fixed(bits, sign) => resolved::TypeKind::Integer(bits, sign),
-            IntegerRigidity::Loose(c_integer, sign) => {
-                resolved::TypeKind::CInteger(c_integer, sign)
-            }
+            IntegerRigidity::Fixed(bits, sign) => TypeKind::Integer(bits, sign),
+            IntegerRigidity::Loose(c_integer, sign) => TypeKind::CInteger(c_integer, sign),
         }
         .at(source)
     }

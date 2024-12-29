@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     ast::ConformBehavior,
-    resolved::{Type, TypeKind, TypedExpr},
+    asg::{Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 pub use mode::ConformMode;
@@ -75,12 +75,12 @@ pub fn conform_expr<O: Objective>(
     behavior: ConformBehavior,
     conform_source: Source,
 ) -> ObjectiveResult<O> {
-    let Ok(from_type) = ctx.resolved_ast.unalias(&expr.resolved_type) else {
+    let Ok(from_type) = ctx.asg.unalias(&expr.resolved_type) else {
         warn_type_alias_depth_exceeded(&expr.resolved_type);
         return O::fail();
     };
 
-    let Ok(to_type) = ctx.resolved_ast.unalias(to_type) else {
+    let Ok(to_type) = ctx.asg.unalias(to_type) else {
         warn_type_alias_depth_exceeded(to_type);
         return O::fail();
     };

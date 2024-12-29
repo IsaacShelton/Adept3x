@@ -6,7 +6,7 @@ use crate::{
         unify_types::unify_types,
         Initialized,
     },
-    resolved::{
+    asg::{
         self, Constraint, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate,
         TypedExpr,
     },
@@ -36,8 +36,8 @@ pub fn resolve_basic_binary_operation_expr(
         Initialized::Require,
     )?;
 
-    if let resolved::TypeKind::IntegerLiteral(left) = &left.resolved_type.kind {
-        if let resolved::TypeKind::IntegerLiteral(right) = &right.resolved_type.kind {
+    if let asg::TypeKind::IntegerLiteral(left) = &left.resolved_type.kind {
+        if let asg::TypeKind::IntegerLiteral(right) = &right.resolved_type.kind {
             return resolve_basic_binary_operation_expr_on_literals(
                 &binary_operation.operator,
                 left,
@@ -49,7 +49,7 @@ pub fn resolve_basic_binary_operation_expr(
 
     let unified_type = unify_types(
         ctx,
-        preferred_type.map(|preferred_type| preferred_type.view(ctx.resolved_ast)),
+        preferred_type.map(|preferred_type| preferred_type.view(ctx.asg)),
         &mut [&mut left, &mut right],
         ctx.adept_conform_behavior(),
         source,
@@ -67,15 +67,15 @@ pub fn resolve_basic_binary_operation_expr(
         resolve_basic_binary_operator(ctx, &binary_operation.operator, &unified_type, source)?;
 
     let result_type = if binary_operation.operator.returns_boolean() {
-        resolved::TypeKind::Boolean.at(source)
+        asg::TypeKind::Boolean.at(source)
     } else {
         unified_type
     };
 
     Ok(TypedExpr::new(
         result_type,
-        resolved::Expr::new(
-            resolved::ExprKind::BasicBinaryOperation(Box::new(resolved::BasicBinaryOperation {
+        asg::Expr::new(
+            asg::ExprKind::BasicBinaryOperation(Box::new(asg::BasicBinaryOperation {
                 operator,
                 left,
                 right,
@@ -88,66 +88,66 @@ pub fn resolve_basic_binary_operation_expr(
 pub fn resolve_basic_binary_operator(
     ctx: &ResolveExprCtx,
     ast_operator: &ast::BasicBinaryOperator,
-    resolved_type: &resolved::Type,
+    resolved_type: &asg::Type,
     source: Source,
-) -> Result<resolved::BasicBinaryOperator, ResolveError> {
+) -> Result<asg::BasicBinaryOperator, ResolveError> {
     let resolved_operator = match ast_operator {
         ast::BasicBinaryOperator::Add => NumericMode::try_new(resolved_type)
-            .map(resolved::BasicBinaryOperator::Add)
+            .map(asg::BasicBinaryOperator::Add)
             .or_else(|| {
                 ctx.current_constraints
                     .satisfies(resolved_type, &Constraint::PrimitiveAdd)
-                    .then(|| resolved::BasicBinaryOperator::PrimitiveAdd(resolved_type.clone()))
+                    .then(|| asg::BasicBinaryOperator::PrimitiveAdd(resolved_type.clone()))
             }),
         ast::BasicBinaryOperator::Subtract => {
-            NumericMode::try_new(resolved_type).map(resolved::BasicBinaryOperator::Subtract)
+            NumericMode::try_new(resolved_type).map(asg::BasicBinaryOperator::Subtract)
         }
         ast::BasicBinaryOperator::Multiply => {
-            NumericMode::try_new(resolved_type).map(resolved::BasicBinaryOperator::Multiply)
+            NumericMode::try_new(resolved_type).map(asg::BasicBinaryOperator::Multiply)
         }
         ast::BasicBinaryOperator::Divide => float_or_sign_lax_from_type(resolved_type, false)
-            .map(resolved::BasicBinaryOperator::Divide),
+            .map(asg::BasicBinaryOperator::Divide),
         ast::BasicBinaryOperator::Modulus => float_or_sign_lax_from_type(resolved_type, false)
-            .map(resolved::BasicBinaryOperator::Modulus),
+            .map(asg::BasicBinaryOperator::Modulus),
         ast::BasicBinaryOperator::Equals => float_or_integer_from_type(resolved_type, true)
-            .map(resolved::BasicBinaryOperator::Equals),
+            .map(asg::BasicBinaryOperator::Equals),
         ast::BasicBinaryOperator::NotEquals => float_or_integer_from_type(resolved_type, true)
-            .map(resolved::BasicBinaryOperator::NotEquals),
+            .map(asg::BasicBinaryOperator::NotEquals),
         ast::BasicBinaryOperator::LessThan => float_or_sign_lax_from_type(resolved_type, false)
-            .map(resolved::BasicBinaryOperator::LessThan),
+            .map(asg::BasicBinaryOperator::LessThan),
         ast::BasicBinaryOperator::LessThanEq => float_or_sign_lax_from_type(resolved_type, false)
-            .map(resolved::BasicBinaryOperator::LessThanEq),
+            .map(asg::BasicBinaryOperator::LessThanEq),
         ast::BasicBinaryOperator::GreaterThan => float_or_sign_lax_from_type(resolved_type, false)
-            .map(resolved::BasicBinaryOperator::GreaterThan),
+            .map(asg::BasicBinaryOperator::GreaterThan),
         ast::BasicBinaryOperator::GreaterThanEq => {
             float_or_sign_lax_from_type(resolved_type, false)
-                .map(resolved::BasicBinaryOperator::GreaterThanEq)
+                .map(asg::BasicBinaryOperator::GreaterThanEq)
         }
         ast::BasicBinaryOperator::BitwiseAnd => (resolved_type.kind.is_integer()
             || resolved_type.kind.is_c_integer()
             || resolved_type.kind.is_boolean())
-        .then_some(resolved::BasicBinaryOperator::BitwiseAnd),
+        .then_some(asg::BasicBinaryOperator::BitwiseAnd),
         ast::BasicBinaryOperator::BitwiseOr => (resolved_type.kind.is_integer()
             || resolved_type.kind.is_c_integer()
             || resolved_type.kind.is_boolean())
-        .then_some(resolved::BasicBinaryOperator::BitwiseOr),
+        .then_some(asg::BasicBinaryOperator::BitwiseOr),
         ast::BasicBinaryOperator::BitwiseXor => (resolved_type.kind.is_integer()
             || resolved_type.kind.is_c_integer())
-        .then_some(resolved::BasicBinaryOperator::BitwiseXor),
+        .then_some(asg::BasicBinaryOperator::BitwiseXor),
         ast::BasicBinaryOperator::LeftShift | ast::BasicBinaryOperator::LogicalLeftShift => {
             (resolved_type.kind.is_integer() || resolved_type.kind.is_c_integer())
-                .then_some(resolved::BasicBinaryOperator::LogicalLeftShift)
+                .then_some(asg::BasicBinaryOperator::LogicalLeftShift)
         }
         ast::BasicBinaryOperator::RightShift => match resolved_type.kind {
-            resolved::TypeKind::Integer(_, sign) => {
-                Some(resolved::BasicBinaryOperator::ArithmeticRightShift(
+            asg::TypeKind::Integer(_, sign) => {
+                Some(asg::BasicBinaryOperator::ArithmeticRightShift(
                     SignOrIndeterminate::Sign(sign),
                 ))
             }
-            resolved::TypeKind::CInteger(c_integer, sign) => Some(if let Some(sign) = sign {
-                resolved::BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Sign(sign))
+            asg::TypeKind::CInteger(c_integer, sign) => Some(if let Some(sign) = sign {
+                asg::BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Sign(sign))
             } else {
-                resolved::BasicBinaryOperator::ArithmeticRightShift(
+                asg::BasicBinaryOperator::ArithmeticRightShift(
                     SignOrIndeterminate::Indeterminate(c_integer),
                 )
             }),
@@ -155,7 +155,7 @@ pub fn resolve_basic_binary_operator(
         },
         ast::BasicBinaryOperator::LogicalRightShift => (resolved_type.kind.is_integer()
             || resolved_type.kind.is_c_integer())
-        .then_some(resolved::BasicBinaryOperator::LogicalRightShift),
+        .then_some(asg::BasicBinaryOperator::LogicalRightShift),
     };
 
     resolved_operator.ok_or_else(|| {
@@ -168,36 +168,36 @@ pub fn resolve_basic_binary_operator(
 }
 
 fn float_or_integer_from_type(
-    unified_type: &resolved::Type,
+    unified_type: &asg::Type,
     allow_on_bools: bool,
 ) -> Option<FloatOrInteger> {
     match &unified_type.kind {
-        resolved::TypeKind::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
-        resolved::TypeKind::Integer(..) | resolved::TypeKind::CInteger(..) => {
+        asg::TypeKind::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
+        asg::TypeKind::Integer(..) | asg::TypeKind::CInteger(..) => {
             Some(FloatOrInteger::Integer)
         }
-        resolved::TypeKind::Floating(_) => Some(FloatOrInteger::Float),
+        asg::TypeKind::Floating(_) => Some(FloatOrInteger::Float),
         _ => None,
     }
 }
 
 fn float_or_sign_lax_from_type(
-    unified_type: &resolved::Type,
+    unified_type: &asg::Type,
     allow_on_bools: bool,
 ) -> Option<FloatOrSignLax> {
     match &unified_type.kind {
-        resolved::TypeKind::Boolean if allow_on_bools => {
+        asg::TypeKind::Boolean if allow_on_bools => {
             Some(FloatOrSignLax::Integer(IntegerSign::Unsigned))
         }
-        resolved::TypeKind::Integer(_, sign) => Some(FloatOrSignLax::Integer(*sign)),
-        resolved::TypeKind::CInteger(c_integer, sign) => {
+        asg::TypeKind::Integer(_, sign) => Some(FloatOrSignLax::Integer(*sign)),
+        asg::TypeKind::CInteger(c_integer, sign) => {
             if let Some(sign) = sign {
                 Some(FloatOrSignLax::Integer(*sign))
             } else {
                 Some(FloatOrSignLax::IndeterminateInteger(*c_integer))
             }
         }
-        resolved::TypeKind::Floating(_) => Some(FloatOrSignLax::Float),
+        asg::TypeKind::Floating(_) => Some(FloatOrSignLax::Float),
         _ => None,
     }
 }
@@ -224,38 +224,38 @@ pub fn resolve_basic_binary_operation_expr_on_literals(
         }
         ast::BasicBinaryOperator::Equals => {
             return Ok(TypedExpr::new(
-                resolved::TypeKind::Boolean.at(source),
-                resolved::ExprKind::BooleanLiteral(left == right).at(source),
+                asg::TypeKind::Boolean.at(source),
+                asg::ExprKind::BooleanLiteral(left == right).at(source),
             ))
         }
         ast::BasicBinaryOperator::NotEquals => {
             return Ok(TypedExpr::new(
-                resolved::TypeKind::Boolean.at(source),
-                resolved::ExprKind::BooleanLiteral(left != right).at(source),
+                asg::TypeKind::Boolean.at(source),
+                asg::ExprKind::BooleanLiteral(left != right).at(source),
             ))
         }
         ast::BasicBinaryOperator::LessThan => {
             return Ok(TypedExpr::new(
-                resolved::TypeKind::Boolean.at(source),
-                resolved::ExprKind::BooleanLiteral(left < right).at(source),
+                asg::TypeKind::Boolean.at(source),
+                asg::ExprKind::BooleanLiteral(left < right).at(source),
             ))
         }
         ast::BasicBinaryOperator::LessThanEq => {
             return Ok(TypedExpr::new(
-                resolved::TypeKind::Boolean.at(source),
-                resolved::ExprKind::BooleanLiteral(left <= right).at(source),
+                asg::TypeKind::Boolean.at(source),
+                asg::ExprKind::BooleanLiteral(left <= right).at(source),
             ))
         }
         ast::BasicBinaryOperator::GreaterThan => {
             return Ok(TypedExpr::new(
-                resolved::TypeKind::Boolean.at(source),
-                resolved::ExprKind::BooleanLiteral(left >= right).at(source),
+                asg::TypeKind::Boolean.at(source),
+                asg::ExprKind::BooleanLiteral(left >= right).at(source),
             ))
         }
         ast::BasicBinaryOperator::GreaterThanEq => {
             return Ok(TypedExpr::new(
-                resolved::TypeKind::Boolean.at(source),
-                resolved::ExprKind::BooleanLiteral(left > right).at(source),
+                asg::TypeKind::Boolean.at(source),
+                asg::ExprKind::BooleanLiteral(left > right).at(source),
             ))
         }
         ast::BasicBinaryOperator::BitwiseAnd => {
@@ -303,7 +303,7 @@ pub fn resolve_basic_binary_operation_expr_on_literals(
     };
 
     return Ok(TypedExpr::new(
-        resolved::TypeKind::IntegerLiteral(result.clone()).at(source),
-        resolved::ExprKind::IntegerLiteral(result).at(source),
+        asg::TypeKind::IntegerLiteral(result.clone()).at(source),
+        asg::ExprKind::IntegerLiteral(result).at(source),
     ));
 }

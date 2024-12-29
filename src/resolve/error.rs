@@ -3,7 +3,7 @@ use super::{
     polymorph::{PolymorphError, PolymorphErrorKind},
 };
 use crate::{
-    resolved::UnaliasError,
+    asg::UnaliasError,
     show::Show,
     source_files::{Source, SourceFiles},
 };

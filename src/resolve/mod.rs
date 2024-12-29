@@ -19,7 +19,7 @@ mod unify_types;
 mod variable_haystack;
 
 use self::error::ResolveError;
-use crate::{ast::AstWorkspace, cli::BuildOptions, resolved};
+use crate::{asg::Asg, ast::AstWorkspace, cli::BuildOptions};
 use ctx::ResolveCtx;
 use function_body::resolve_function_bodies;
 use function_head::create_function_heads;
@@ -34,16 +34,16 @@ use type_definition::resolve_type_definitions;
 pub fn resolve<'a>(
     ast_workspace: &'a AstWorkspace,
     options: &BuildOptions,
-) -> Result<resolved::Ast<'a>, ResolveError> {
+) -> Result<Asg<'a>, ResolveError> {
     let mut ctx = ResolveCtx::new();
     let source_files = ast_workspace.source_files;
-    let mut resolved_ast = resolved::Ast::new(source_files, &ast_workspace);
+    let mut asg = Asg::new(source_files, &ast_workspace);
 
-    resolve_type_definitions(&mut ctx, &mut resolved_ast, ast_workspace)?;
-    resolve_global_variables(&mut ctx, &mut resolved_ast, ast_workspace)?;
-    create_function_heads(&mut ctx, &mut resolved_ast, ast_workspace, options)?;
-    resolve_helper_expressions(&mut ctx, &mut resolved_ast, ast_workspace)?;
-    resolve_function_bodies(&mut ctx, &mut resolved_ast, ast_workspace)?;
+    resolve_type_definitions(&mut ctx, &mut asg, ast_workspace)?;
+    resolve_global_variables(&mut ctx, &mut asg, ast_workspace)?;
+    create_function_heads(&mut ctx, &mut asg, ast_workspace, options)?;
+    resolve_helper_expressions(&mut ctx, &mut asg, ast_workspace)?;
+    resolve_function_bodies(&mut ctx, &mut asg, ast_workspace)?;
 
-    Ok(resolved_ast)
+    Ok(asg)
 }

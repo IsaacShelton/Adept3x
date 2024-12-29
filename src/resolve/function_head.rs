@@ -3,12 +3,12 @@ use super::{
     type_ctx::ResolveTypeCtx,
 };
 use crate::{
+    asg::{self, Asg, Constraint, CurrentConstraints, FunctionRef, VariableStorage},
     ast::{self, AstWorkspace, FunctionHead},
     cli::BuildOptions,
     hash_map_ext::HashMapExt,
     index_map_ext::IndexMapExt,
     name::{Name, ResolvedName},
-    resolved::{self, Constraint, CurrentConstraints, FunctionRef, VariableStorage},
     tag::Tag,
     workspace::fs::FsNodeId,
 };
@@ -16,15 +16,15 @@ use std::collections::{HashMap, HashSet};
 
 fn create_impl_head<'a>(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast<'a>,
+    asg: &mut Asg<'a>,
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     imp: &ast::Impl,
-) -> Result<resolved::ImplRef, ResolveError> {
+) -> Result<asg::ImplRef, ResolveError> {
     let pre_parameters_constraints = CurrentConstraints::new_empty();
 
     let type_ctx = ResolveTypeCtx::new(
-        &resolved_ast,
+        &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
@@ -34,7 +34,7 @@ fn create_impl_head<'a>(
     // NOTE: This will need to be resolved to which trait to use instead of an actual type
     let resolved_type = type_ctx.resolve(&imp.target)?;
 
-    Ok(resolved_ast.impls.insert(resolved::Impl {
+    Ok(asg.impls.insert(asg::Impl {
         resolved_type,
         source: imp.source,
         body: HashMap::default(),
@@ -43,7 +43,7 @@ fn create_impl_head<'a>(
 
 pub fn create_function_heads<'a>(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast<'a>,
+    asg: &mut Asg<'a>,
     ast_workspace: &AstWorkspace,
     options: &BuildOptions,
 ) -> Result<(), ResolveError> {
@@ -51,15 +51,14 @@ pub fn create_function_heads<'a>(
         let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
         for (impl_i, imp) in file.impls.iter().enumerate() {
-            let impl_ref =
-                create_impl_head(ctx, resolved_ast, module_file_id, *physical_file_id, imp)?;
+            let impl_ref = create_impl_head(ctx, asg, module_file_id, *physical_file_id, imp)?;
 
             for (function_i, function) in imp.body.iter().enumerate() {
                 let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));
 
                 let function_ref = create_function_head(
                     ctx,
-                    resolved_ast,
+                    asg,
                     options,
                     name.clone(),
                     &function.head,
@@ -74,7 +73,7 @@ pub fn create_function_heads<'a>(
                     function_ref,
                 ));
 
-                let functions_with_name = resolved_ast
+                let functions_with_name = asg
                     .impls
                     .get_mut(impl_ref)
                     .unwrap()
@@ -90,7 +89,7 @@ pub fn create_function_heads<'a>(
 
             let function_ref = create_function_head(
                 ctx,
-                resolved_ast,
+                asg,
                 options,
                 name.clone(),
                 &function.head,
@@ -140,7 +139,7 @@ pub fn create_function_heads<'a>(
 
 pub fn create_function_head<'a>(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast<'a>,
+    asg: &mut Asg<'a>,
     options: &BuildOptions,
     name: ResolvedName,
     head: &FunctionHead,
@@ -150,7 +149,7 @@ pub fn create_function_head<'a>(
     let pre_parameters_constraints = CurrentConstraints::new_empty();
 
     let type_ctx = ResolveTypeCtx::new(
-        &resolved_ast,
+        &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
@@ -165,7 +164,7 @@ pub fn create_function_head<'a>(
         .then(|| collect_constraints(&parameters, &return_type))
         .unwrap_or_default();
 
-    Ok(resolved_ast.functions.insert(resolved::Function {
+    Ok(asg.functions.insert(asg::Function {
         name,
         parameters,
         return_type,
@@ -185,27 +184,27 @@ pub fn create_function_head<'a>(
 pub fn resolve_parameters(
     type_ctx: &ResolveTypeCtx,
     parameters: &ast::Parameters,
-) -> Result<resolved::Parameters, ResolveError> {
+) -> Result<asg::Parameters, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {
         let resolved_type = type_ctx.resolve(&parameter.ast_type)?;
 
-        required.push(resolved::Parameter {
+        required.push(asg::Parameter {
             name: parameter.name.clone(),
             resolved_type,
         });
     }
 
-    Ok(resolved::Parameters {
+    Ok(asg::Parameters {
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
 }
 
 pub fn collect_constraints(
-    parameters: &resolved::Parameters,
-    return_type: &resolved::Type,
+    parameters: &asg::Parameters,
+    return_type: &asg::Type,
 ) -> HashMap<String, HashSet<Constraint>> {
     let mut map = HashMap::default();
 
@@ -217,41 +216,36 @@ pub fn collect_constraints(
     map
 }
 
-pub fn collect_constraints_into(
-    map: &mut HashMap<String, HashSet<Constraint>>,
-    ty: &resolved::Type,
-) {
+pub fn collect_constraints_into(map: &mut HashMap<String, HashSet<Constraint>>, ty: &asg::Type) {
     match &ty.kind {
-        resolved::TypeKind::Unresolved => panic!(),
-        resolved::TypeKind::Boolean
-        | resolved::TypeKind::Integer(_, _)
-        | resolved::TypeKind::CInteger(_, _)
-        | resolved::TypeKind::IntegerLiteral(_)
-        | resolved::TypeKind::FloatLiteral(_)
-        | resolved::TypeKind::Floating(_) => (),
-        resolved::TypeKind::Pointer(inner) => collect_constraints_into(map, inner.as_ref()),
-        resolved::TypeKind::Void => (),
-        resolved::TypeKind::AnonymousStruct() => todo!(),
-        resolved::TypeKind::AnonymousUnion() => todo!(),
-        resolved::TypeKind::AnonymousEnum() => todo!(),
-        resolved::TypeKind::FixedArray(fixed_array) => {
-            collect_constraints_into(map, &fixed_array.inner)
-        }
-        resolved::TypeKind::FunctionPointer(_) => todo!(),
-        resolved::TypeKind::Enum(_, _) => (),
-        resolved::TypeKind::Structure(_, _, parameters) => {
+        asg::TypeKind::Unresolved => panic!(),
+        asg::TypeKind::Boolean
+        | asg::TypeKind::Integer(_, _)
+        | asg::TypeKind::CInteger(_, _)
+        | asg::TypeKind::IntegerLiteral(_)
+        | asg::TypeKind::FloatLiteral(_)
+        | asg::TypeKind::Floating(_) => (),
+        asg::TypeKind::Pointer(inner) => collect_constraints_into(map, inner.as_ref()),
+        asg::TypeKind::Void => (),
+        asg::TypeKind::AnonymousStruct() => todo!(),
+        asg::TypeKind::AnonymousUnion() => todo!(),
+        asg::TypeKind::AnonymousEnum() => todo!(),
+        asg::TypeKind::FixedArray(fixed_array) => collect_constraints_into(map, &fixed_array.inner),
+        asg::TypeKind::FunctionPointer(_) => todo!(),
+        asg::TypeKind::Enum(_, _) => (),
+        asg::TypeKind::Structure(_, _, parameters) => {
             for parameter in parameters {
                 collect_constraints_into(map, parameter);
             }
         }
-        resolved::TypeKind::TypeAlias(_, _) => (),
-        resolved::TypeKind::Polymorph(name, constraints) => {
+        asg::TypeKind::TypeAlias(_, _) => (),
+        asg::TypeKind::Polymorph(name, constraints) => {
             let set = map.entry(name.to_string()).or_default();
             for constraint in constraints {
                 set.insert(constraint.clone());
             }
         }
-        resolved::TypeKind::Trait(_, _, parameters) => {
+        asg::TypeKind::Trait(_, _, parameters) => {
             for parameter in parameters {
                 collect_constraints_into(map, parameter);
             }

@@ -1,5 +1,5 @@
 use super::Structure;
-use crate::{resolve::PolyRecipe, resolved};
+use crate::{asg, resolve::PolyRecipe};
 use append_only_vec::AppendOnlyVec;
 use std::{collections::HashMap, sync::RwLock};
 
@@ -11,8 +11,8 @@ pub struct StructureRef {
 #[derive(Debug)]
 pub struct Structures {
     structures: AppendOnlyVec<Structure>,
-    monomorphized: RwLock<HashMap<(resolved::StructureRef, PolyRecipe), StructureRef>>,
-    jobs: AppendOnlyVec<(resolved::StructureRef, PolyRecipe, StructureRef)>,
+    monomorphized: RwLock<HashMap<(asg::StructureRef, PolyRecipe), StructureRef>>,
+    jobs: AppendOnlyVec<(asg::StructureRef, PolyRecipe, StructureRef)>,
 }
 
 impl Structures {
@@ -26,7 +26,7 @@ impl Structures {
 
     pub fn insert(
         &self,
-        resolved_structure_ref: resolved::StructureRef,
+        resolved_structure_ref: asg::StructureRef,
         structure: Structure,
         poly_recipe: PolyRecipe,
     ) -> StructureRef {
@@ -45,7 +45,7 @@ impl Structures {
 
     pub fn translate<E>(
         &self,
-        resolved_structure_ref: resolved::StructureRef,
+        resolved_structure_ref: asg::StructureRef,
         poly_recipe: PolyRecipe,
         monomorphize: impl Fn(PolyRecipe) -> Result<StructureRef, E>,
     ) -> Result<StructureRef, E> {
@@ -75,7 +75,7 @@ impl Structures {
 
     pub fn monomorphized<'a>(
         &'a self,
-    ) -> impl Iterator<Item = &'a (resolved::StructureRef, PolyRecipe, StructureRef)> {
+    ) -> impl Iterator<Item = &'a (asg::StructureRef, PolyRecipe, StructureRef)> {
         Monomorphized {
             vec: &self.jobs,
             i: 0,
@@ -85,12 +85,12 @@ impl Structures {
 
 #[derive(Clone, Debug)]
 pub struct Monomorphized<'a> {
-    vec: &'a AppendOnlyVec<(resolved::StructureRef, PolyRecipe, StructureRef)>,
+    vec: &'a AppendOnlyVec<(asg::StructureRef, PolyRecipe, StructureRef)>,
     i: usize,
 }
 
 impl<'a> Iterator for Monomorphized<'a> {
-    type Item = &'a (resolved::StructureRef, PolyRecipe, StructureRef);
+    type Item = &'a (asg::StructureRef, PolyRecipe, StructureRef);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.i < self.vec.len() {

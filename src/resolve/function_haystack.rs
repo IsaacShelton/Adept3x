@@ -9,7 +9,7 @@ use super::{
 use crate::{
     name::{Name, ResolvedName},
     resolve::conform::Perform,
-    resolved::{self, Callee, TypeKind, TypedExpr},
+    asg::{self, Callee, TypeKind, TypedExpr},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FunctionHaystack {
-    pub available: HashMap<ResolvedName, Vec<resolved::FunctionRef>>,
+    pub available: HashMap<ResolvedName, Vec<asg::FunctionRef>>,
     pub imported_namespaces: Vec<Box<str>>,
     pub fs_node_id: FsNodeId,
 }
@@ -81,11 +81,11 @@ impl FunctionHaystack {
         local_matches
             .chain(remote_matches)
             .map(|function_ref| {
-                let function = ctx.resolved_ast.functions.get(*function_ref).unwrap();
+                let function = ctx.asg.functions.get(*function_ref).unwrap();
 
                 format!(
                     "{}({})",
-                    function.name.display(&ctx.resolved_ast.workspace.fs),
+                    function.name.display(&ctx.asg.workspace.fs),
                     function.parameters
                 )
             })
@@ -94,11 +94,11 @@ impl FunctionHaystack {
 
     fn fits(
         ctx: &ResolveExprCtx,
-        function_ref: resolved::FunctionRef,
+        function_ref: asg::FunctionRef,
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Callee> {
-        let function = ctx.resolved_ast.functions.get(function_ref).unwrap();
+        let function = ctx.asg.functions.get(function_ref).unwrap();
         let parameters = &function.parameters;
 
         if !parameters.is_cstyle_vararg && arguments.len() != parameters.required.len() {
@@ -116,7 +116,7 @@ impl FunctionHaystack {
                 .then_some(PreferredType::of_parameter(function_ref, i));
 
             let argument_conforms = if let Some(param_type) =
-                preferred_type.map(|p| p.view(ctx.resolved_ast))
+                preferred_type.map(|p| p.view(ctx.asg))
             {
                 if param_type.kind.contains_polymorph() {
                     // NOTE: We probably dont't want arguments to always conform to the default
@@ -162,7 +162,7 @@ impl FunctionHaystack {
         ctx: &ResolveExprCtx,
         catalog: &mut PolyCatalog,
         argument: &TypedExpr,
-        param_type: &resolved::Type,
+        param_type: &asg::Type,
     ) -> bool {
         catalog
             .match_type(ctx, param_type, &argument.resolved_type)
@@ -243,10 +243,10 @@ impl FunctionHaystack {
             .first()
             .map(|arg| &arg.resolved_type)
             .and_then(|first_type| {
-                if let Ok(first_type) = ctx.resolved_ast.unalias(first_type) {
+                if let Ok(first_type) = ctx.asg.unalias(first_type) {
                     match &first_type.kind {
                         TypeKind::Structure(_, structure_ref, _) => Some(
-                            ctx.resolved_ast
+                            ctx.asg
                                 .structures
                                 .get(*structure_ref)
                                 .expect("valid struct")
@@ -254,7 +254,7 @@ impl FunctionHaystack {
                                 .fs_node_id,
                         ),
                         TypeKind::Enum(_, enum_ref) => Some(
-                            ctx.resolved_ast
+                            ctx.asg
                                 .enums
                                 .get(*enum_ref)
                                 .expect("valid enum")

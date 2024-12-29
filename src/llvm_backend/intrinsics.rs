@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     ir::{OverflowOperation, OverflowOperator},
-    resolved::{IntegerBits, IntegerSign},
+    asg::{IntegerBits, IntegerSign},
 };
 use cstr::cstr;
 use llvm_sys::{

@@ -1,12 +1,12 @@
 use crate::{
-    resolved::{self, EnumRef, StructureRef, TraitRef, TypeAliasRef},
+    asg::{self, EnumRef, StructureRef, TraitRef, TypeAliasRef},
     workspace::fs::FsNodeId,
 };
 
 #[derive(Clone, Debug)]
 pub enum FuncJob {
-    Regular(FsNodeId, usize, resolved::FunctionRef),
-    Impling(FsNodeId, usize, usize, resolved::FunctionRef),
+    Regular(FsNodeId, usize, asg::FunctionRef),
+    Impling(FsNodeId, usize, usize, asg::FunctionRef),
 }
 
 #[derive(Clone, Debug)]

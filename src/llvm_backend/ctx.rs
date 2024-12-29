@@ -7,7 +7,7 @@ use super::{
     target_data::TargetData,
 };
 use crate::{
-    backend::BackendError, data_units::ByteUnits, diagnostics::Diagnostics, ir, resolved,
+    asg::Asg, backend::BackendError, data_units::ByteUnits, diagnostics::Diagnostics, ir,
     target::type_layout::TypeLayoutCache,
 };
 use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
@@ -77,15 +77,11 @@ impl<'a> BackendCtx<'a> {
         ir_module: &'a ir::Module,
         backend_module: &'a BackendModule,
         target_data: &'a TargetData,
-        resolved_ast: &'a resolved::Ast,
+        asg: &'a Asg,
         diagnostics: &'a Diagnostics,
     ) -> Result<Self, BackendError> {
-        let type_layout_cache = TypeLayoutCache::new(
-            &ir_module.target,
-            &ir_module.structures,
-            resolved_ast,
-            diagnostics,
-        );
+        let type_layout_cache =
+            TypeLayoutCache::new(&ir_module.target, &ir_module.structures, asg, diagnostics);
 
         let arch = Arch::new(&ir_module.target)
             .ok_or_else(|| BackendError::plain("Target platform is not supported"))?;

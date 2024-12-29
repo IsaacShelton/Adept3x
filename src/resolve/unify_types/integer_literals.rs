@@ -1,6 +1,6 @@
 use crate::{
     data_units::BitUnits,
-    resolved::{IntegerSign, Type, TypeKind},
+    asg::{IntegerSign, Type, TypeKind},
 };
 
 pub fn integer_literals_all_fit<'a>(

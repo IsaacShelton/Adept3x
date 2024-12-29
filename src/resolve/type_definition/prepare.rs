@@ -1,4 +1,7 @@
 use crate::{
+    asg::{
+        self, Asg, CurrentConstraints, EnumRef, HumanName, StructureRef, TraitRef, TypeAliasRef, TypeDecl, TypeParameters
+    },
     ast::{self, AstWorkspace, Privacy},
     name::{Name, ResolvedName},
     resolve::{
@@ -6,10 +9,6 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         job::TypeJob,
         type_ctx::{resolve_constraints, ResolveTypeCtx},
-    },
-    resolved::{
-        self, CurrentConstraints, EnumRef, HumanName, StructureRef, TraitRef, TypeAliasRef,
-        TypeDecl, TypeParameters,
     },
     source_files::Source,
     workspace::fs::FsNodeId,
@@ -19,7 +18,7 @@ use itertools::Itertools;
 
 pub fn prepare_type_jobs(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     ast_workspace: &AstWorkspace,
 ) -> Result<Vec<TypeJob>, ResolveError> {
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
@@ -36,18 +35,14 @@ pub fn prepare_type_jobs(
         };
 
         for user_trait in file.traits.iter() {
-            job.traits.push(prepare_trait(
-                ctx,
-                resolved_ast,
-                module_fs_node_id,
-                user_trait,
-            )?);
+            job.traits
+                .push(prepare_trait(ctx, asg, module_fs_node_id, user_trait)?);
         }
 
         for structure in file.structures.iter() {
             job.structures.push(prepare_structure(
                 ctx,
-                resolved_ast,
+                asg,
                 module_fs_node_id,
                 *physical_file_id,
                 structure,
@@ -55,21 +50,13 @@ pub fn prepare_type_jobs(
         }
 
         for definition in file.enums.iter() {
-            job.enums.push(prepare_enum(
-                ctx,
-                resolved_ast,
-                module_fs_node_id,
-                definition,
-            )?);
+            job.enums
+                .push(prepare_enum(ctx, asg, module_fs_node_id, definition)?);
         }
 
         for definition in file.type_aliases.iter() {
-            job.type_aliases.push(prepare_type_alias(
-                ctx,
-                resolved_ast,
-                module_fs_node_id,
-                definition,
-            )?);
+            job.type_aliases
+                .push(prepare_type_alias(ctx, asg, module_fs_node_id, definition)?);
         }
 
         type_jobs.push(job);
@@ -80,7 +67,7 @@ pub fn prepare_type_jobs(
 
 fn prepare_structure(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_fs_node_id: FsNodeId,
     physical_fs_node_id: FsNodeId,
     structure: &ast::Structure,
@@ -91,7 +78,7 @@ fn prepare_structure(
         let zero_current_constraints = CurrentConstraints::new_empty();
         let constraints = resolve_constraints(
             &ResolveTypeCtx::new(
-                resolved_ast,
+                asg,
                 module_fs_node_id,
                 physical_fs_node_id,
                 &ctx.types_in_modules,
@@ -102,14 +89,14 @@ fn prepare_structure(
 
         if parameters
             .parameters
-            .insert(name.to_string(), resolved::TypeParameter { constraints })
+            .insert(name.to_string(), asg::TypeParameter { constraints })
             .is_some()
         {
             todo!("Error message for duplicate type parameter names")
         }
     }
 
-    let structure_ref = resolved_ast.structures.insert(resolved::Structure {
+    let structure_ref = asg.structures.insert(asg::Structure {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
@@ -121,7 +108,7 @@ fn prepare_structure(
     let polymorphs = structure
         .parameters
         .keys()
-        .map(|name| resolved::TypeKind::Polymorph(name.into(), vec![]).at(structure.source))
+        .map(|name| asg::TypeKind::Polymorph(name.into(), vec![]).at(structure.source))
         .collect_vec();
 
     declare_type(
@@ -130,7 +117,7 @@ fn prepare_structure(
         &structure.name,
         structure.source,
         structure.privacy,
-        resolved::TypeKind::Structure(
+        asg::TypeKind::Structure(
             HumanName(structure.name.to_string()),
             structure_ref,
             polymorphs,
@@ -142,13 +129,13 @@ fn prepare_structure(
 
 fn prepare_enum(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_fs_node_id: FsNodeId,
     definition: &ast::Enum,
 ) -> Result<EnumRef, ResolveError> {
-    let enum_ref = resolved_ast.enums.insert(resolved::Enum {
+    let enum_ref = asg.enums.insert(asg::Enum {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
-        resolved_type: resolved::TypeKind::Unresolved.at(definition.source),
+        resolved_type: asg::TypeKind::Unresolved.at(definition.source),
         source: definition.source,
         members: definition.members.clone(),
     });
@@ -159,7 +146,7 @@ fn prepare_enum(
         &definition.name,
         definition.source,
         definition.privacy,
-        resolved::TypeKind::Enum(HumanName(definition.name.to_string()), enum_ref),
+        asg::TypeKind::Enum(HumanName(definition.name.to_string()), enum_ref),
     )?;
 
     Ok(enum_ref)
@@ -167,11 +154,11 @@ fn prepare_enum(
 
 fn prepare_trait(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_fs_node_id: FsNodeId,
     definition: &ast::Trait,
 ) -> Result<TraitRef, ResolveError> {
-    let trait_ref = resolved_ast.traits.insert(resolved::Trait {
+    let trait_ref = asg.traits.insert(asg::Trait {
         functions: vec![],
         parameters: definition.parameters.clone(),
         source: definition.source,
@@ -180,7 +167,7 @@ fn prepare_trait(
     let parameters = definition
         .parameters
         .iter()
-        .map(|name| resolved::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
+        .map(|name| asg::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
         .collect_vec();
 
     declare_type(
@@ -189,7 +176,7 @@ fn prepare_trait(
         &definition.name,
         definition.source,
         definition.privacy,
-        resolved::TypeKind::Trait(
+        asg::TypeKind::Trait(
             HumanName(definition.name.to_string()),
             trait_ref,
             parameters,
@@ -201,13 +188,13 @@ fn prepare_trait(
 
 fn prepare_type_alias(
     ctx: &mut ResolveCtx,
-    resolved_ast: &mut resolved::Ast,
+    asg: &mut Asg,
     module_fs_node_id: FsNodeId,
     definition: &ast::TypeAlias,
 ) -> Result<TypeAliasRef, ResolveError> {
-    let type_alias_ref = resolved_ast
+    let type_alias_ref = asg
         .type_aliases
-        .insert(resolved::TypeKind::Unresolved.at(definition.value.source));
+        .insert(asg::TypeKind::Unresolved.at(definition.value.source));
 
     if let Some(source) = definition.value.contains_polymorph() {
         return Err(ResolveErrorKind::TypeAliasesCannotContainPolymorphs.at(source));
@@ -219,7 +206,7 @@ fn prepare_type_alias(
         &definition.name,
         definition.source,
         definition.privacy,
-        resolved::TypeKind::TypeAlias(HumanName(definition.name.to_string()), type_alias_ref),
+        asg::TypeKind::TypeAlias(HumanName(definition.name.to_string()), type_alias_ref),
     )?;
 
     Ok(type_alias_ref)
@@ -231,7 +218,7 @@ fn declare_type(
     name: &str,
     source: Source,
     privacy: Privacy,
-    kind: resolved::TypeKind,
+    kind: asg::TypeKind,
 ) -> Result<(), ResolveError> {
     if ctx
         .types_in_modules

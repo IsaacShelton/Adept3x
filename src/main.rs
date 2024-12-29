@@ -7,6 +7,7 @@
 #![feature(maybe_uninit_array_assume_init)]
 #![feature(once_cell_try_insert)]
 
+mod asg;
 mod ast;
 mod backend;
 mod borrow;
@@ -36,7 +37,6 @@ mod path;
 mod pragma_section;
 mod repeating_last;
 mod resolve;
-mod resolved;
 mod show;
 mod single_file_only;
 mod source_files;

@@ -6,7 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    resolved::{self, TypedExpr},
+    asg::{self, TypedExpr},
     source_files::Source,
 };
 
@@ -27,7 +27,7 @@ pub fn resolve_declare_assign_expr(
     };
 
     let function = ctx
-        .resolved_ast
+        .asg
         .functions
         .get_mut(resolved_function_ref)
         .unwrap();
@@ -41,8 +41,8 @@ pub fn resolve_declare_assign_expr(
 
     Ok(TypedExpr::new(
         value.resolved_type.clone(),
-        resolved::Expr::new(
-            resolved::ExprKind::DeclareAssign(Box::new(resolved::DeclareAssign {
+        asg::Expr::new(
+            asg::ExprKind::DeclareAssign(Box::new(asg::DeclareAssign {
                 key,
                 value: value.expr,
                 resolved_type: value.resolved_type,

@@ -3,7 +3,7 @@ use crate::{
     ast::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerKnown, IntegerRigidity},
     data_units::BitUnits,
     ir::IntegerSign,
-    resolved::{Expr, ExprKind, Type, TypeKind, TypedExpr},
+    asg::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 use num::{BigInt, Zero};
