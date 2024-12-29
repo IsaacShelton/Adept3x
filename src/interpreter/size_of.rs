@@ -16,8 +16,8 @@ pub fn size_of(ir_type: &ir::Type, ir_module: &ir::Module) -> u64 {
         ir::Type::F64 => 8,
         ir::Type::Void => 0,
         ir::Type::Union(_) => todo!("interpreter write union"),
-        ir::Type::Structure(structure_ref) => {
-            let structure = ir_module.structs.get(*structure_ref);
+        ir::Type::Structure(struct_ref) => {
+            let structure = ir_module.structs.get(*struct_ref);
 
             // NOTE: We don't do alignment in the interpreter
             structure

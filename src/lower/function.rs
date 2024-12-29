@@ -13,14 +13,11 @@ use crate::{
 
 pub fn lower_function_body(
     ir_module: &ir::Module,
-    function_ref: asg::FuncRef,
+    func_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
     asg: &Asg,
 ) -> Result<BasicBlocks, LowerError> {
-    let function = asg
-        .funcs
-        .get(function_ref)
-        .expect("valid function reference");
+    let function = asg.funcs.get(func_ref).expect("valid function reference");
 
     if function.is_foreign {
         return Ok(BasicBlocks::new());
@@ -90,14 +87,11 @@ pub fn lower_function_body(
 
 pub fn lower_function_head(
     ir_module: &ir::Module,
-    function_ref: asg::FuncRef,
+    func_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
     asg: &Asg,
 ) -> Result<ir::FuncRef, LowerError> {
-    let function = asg
-        .funcs
-        .get(function_ref)
-        .expect("valid function reference");
+    let function = asg.funcs.get(func_ref).expect("valid function reference");
 
     let basicblocks = BasicBlocks::default();
 
@@ -130,7 +124,7 @@ pub fn lower_function_head(
     let is_exposed = is_main;
 
     Ok(ir_module.funcs.insert(
-        function_ref,
+        func_ref,
         ir::Func {
             mangled_name,
             basicblocks,

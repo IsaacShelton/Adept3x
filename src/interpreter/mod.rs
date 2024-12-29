@@ -59,10 +59,10 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
 
     pub fn call(
         &mut self,
-        function_ref: ir::FuncRef,
+        func_ref: ir::FuncRef,
         args: Vec<Value<'a>>,
     ) -> Result<Value<'a>, InterpreterError> {
-        let function = self.ir_module.funcs.get(function_ref);
+        let function = self.ir_module.funcs.get(func_ref);
 
         if function.is_cstyle_variadic {
             todo!("c-style variadic functions are not supported in interpreter yet - (for function {:?})", function.mangled_name);

@@ -138,7 +138,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         privacy: Privacy::Private,
     });
 
-    file.structures.push(Struct {
+    file.structs.push(Struct {
         name: "Project".into(),
         fields: IndexMap::from_iter([(
             "kind".into(),
@@ -154,7 +154,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
         privacy: Privacy::Private,
     });
 
-    file.structures.push(Struct {
+    file.structs.push(Struct {
         name: "Dependency".into(),
         fields: IndexMap::from_iter([(
             "name".into(),

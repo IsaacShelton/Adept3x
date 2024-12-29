@@ -239,7 +239,7 @@ pub fn resolve_call_expr(
         .function_haystack
         .find(ctx, &call.name, &arguments[..], source)
     {
-        Ok(function_ref) => function_ref,
+        Ok(func_ref) => func_ref,
         Err(reason) => {
             let args = arguments.iter().map(|arg| arg.ty.to_string()).collect_vec();
 

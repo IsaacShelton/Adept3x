@@ -251,13 +251,12 @@ pub fn lower_expr(
         ExprKind::Member(member) => {
             let Member {
                 subject,
-                structure_ref: struct_ref,
+                struct_ref,
                 index,
                 field_type,
             } = &**member;
 
-            let asg::TypeKind::Structure(_name, _structure_ref, arguments) = &subject.ty.kind
-            else {
+            let asg::TypeKind::Structure(_name, _struct_ref, arguments) = &subject.ty.kind else {
                 todo!("member operator only supports structure types for now");
             };
 
@@ -277,7 +276,7 @@ pub fn lower_expr(
             }
             let poly_recipe = catalog.bake();
 
-            let structure_ref =
+            let struct_ref =
                 ir_module
                     .structs
                     .translate(*struct_ref, poly_recipe, |poly_recipe| {
@@ -287,7 +286,7 @@ pub fn lower_expr(
             // Access member of structure
             let member = builder.push(ir::Instruction::Member {
                 subject_pointer,
-                struct_type: ir::Type::Structure(structure_ref),
+                struct_type: ir::Type::Structure(struct_ref),
                 index: *index,
             });
 
@@ -536,14 +535,13 @@ pub fn lower_destination(
         }
         DestinationKind::Member {
             subject,
-            structure_ref: struct_ref,
+            struct_ref,
             index,
             ..
         } => {
             let subject_pointer = lower_destination(builder, ir_module, subject, function, asg)?;
 
-            let asg::TypeKind::Structure(_name, _structure_ref, arguments) = &subject.ty.kind
-            else {
+            let asg::TypeKind::Structure(_name, _struct_ref, arguments) = &subject.ty.kind else {
                 todo!("member operator only supports structure types for now");
             };
 
@@ -561,7 +559,7 @@ pub fn lower_destination(
             }
             let poly_recipe = catalog.bake();
 
-            let structure_ref =
+            let struct_ref =
                 ir_module
                     .structs
                     .translate(*struct_ref, poly_recipe, |poly_recipe| {
@@ -570,7 +568,7 @@ pub fn lower_destination(
 
             Ok(builder.push(ir::Instruction::Member {
                 subject_pointer,
-                struct_type: ir::Type::Structure(structure_ref),
+                struct_type: ir::Type::Structure(struct_ref),
                 index: *index,
             }))
         }

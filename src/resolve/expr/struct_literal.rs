@@ -58,18 +58,18 @@ pub fn resolve_struct_literal_expr(
     conform_behavior: ConformBehavior,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_struct_type = ctx.type_ctx().resolve(ast_type)?;
+    let struct_type = ctx.type_ctx().resolve(ast_type)?;
 
     let CoreStructInfo {
         name: struct_name,
-        structure_ref,
+        struct_ref,
         arguments,
-    } = get_core_structure_info(ctx.asg, &resolved_struct_type, source).map_err(|e| {
+    } = get_core_structure_info(ctx.asg, &struct_type, source).map_err(|e| {
         e.unwrap_or_else(|| {
             ResolveErrorKind::CannotCreateStructLiteralForNonStructure {
-                bad_type: resolved_struct_type.to_string(),
+                bad_type: struct_type.to_string(),
             }
-            .at(resolved_struct_type.source)
+            .at(struct_type.source)
         })
     })?;
 
@@ -83,7 +83,7 @@ pub fn resolve_struct_literal_expr(
         let all_fields = &ctx
             .asg
             .structs
-            .get(structure_ref)
+            .get(struct_ref)
             .expect("referenced struct to exist")
             .fields;
 
@@ -102,7 +102,7 @@ pub fn resolve_struct_literal_expr(
             let structure = ctx
                 .asg
                 .structs
-                .get(structure_ref)
+                .get(struct_ref)
                 .expect("referenced structure to exist");
 
             if !structure.fields.contains_key::<str>(&field_name) {
@@ -117,13 +117,13 @@ pub fn resolve_struct_literal_expr(
         let resolved_expr = resolve_expr(
             ctx,
             &field_initializer.value,
-            Some(PreferredType::FieldType(structure_ref, &field_name)),
+            Some(PreferredType::FieldType(struct_ref, &field_name)),
             Initialized::Require,
         )?;
 
         // Lookup additional details required for resolution
-        let field_info = get_field_info(ctx, structure_ref, &arguments, &field_name)
-            .map_err(ResolveError::from)?;
+        let field_info =
+            get_field_info(ctx, struct_ref, &arguments, &field_name).map_err(ResolveError::from)?;
 
         let mode = match conform_behavior {
             ConformBehavior::Adept(_) => ConformMode::Normal,
@@ -167,7 +167,7 @@ pub fn resolve_struct_literal_expr(
     let structure = ctx
         .asg
         .structs
-        .get(structure_ref)
+        .get(struct_ref)
         .expect("referenced structure to exist");
 
     if resolved_fields.len() != structure.fields.len() {
@@ -187,7 +187,7 @@ pub fn resolve_struct_literal_expr(
             }
             FillBehavior::Zeroed => {
                 for field_name in missing.iter() {
-                    let field_info = get_field_info(ctx, structure_ref, &arguments, field_name)
+                    let field_info = get_field_info(ctx, struct_ref, &arguments, field_name)
                         .map_err(ResolveError::from)?;
 
                     let zeroed = asg::ExprKind::Zeroed(Box::new(field_info.ty.clone())).at(source);
@@ -205,10 +205,10 @@ pub fn resolve_struct_literal_expr(
         .map(|(x, (y, z))| (x, y, z))
         .collect_vec();
 
-    let structure_type = asg::TypeKind::Structure(struct_name, structure_ref, arguments).at(source);
+    let structure_type = asg::TypeKind::Structure(struct_name, struct_ref, arguments).at(source);
 
     Ok(TypedExpr::new(
-        resolved_struct_type.clone(),
+        struct_type.clone(),
         asg::Expr::new(
             asg::ExprKind::StructLiteral(Box::new(StructLiteral {
                 structure_type,

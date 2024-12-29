@@ -34,11 +34,11 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
             ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
                 Ok(found) => {
-                    if let asg::TypeKind::Structure(_, structure_ref, arguments) = found.borrow() {
+                    if let asg::TypeKind::Structure(_, struct_ref, arguments) = found.borrow() {
                         let structure = self
                             .asg
                             .structs
-                            .get(*structure_ref)
+                            .get(*struct_ref)
                             .expect("referenced struct to exist");
 
                         assert!(arguments.len() == structure.parameters.len());

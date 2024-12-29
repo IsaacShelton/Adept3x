@@ -21,7 +21,7 @@ pub fn resolve_member_expr(
     let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
 
     let CoreStructInfo {
-        structure_ref,
+        struct_ref,
         arguments,
         ..
     } = get_core_structure_info(ctx.asg, &resolved_subject.ty, source).map_err(|e| {
@@ -37,7 +37,7 @@ pub fn resolve_member_expr(
     let structure = ctx
         .asg
         .structs
-        .get(structure_ref)
+        .get(struct_ref)
         .expect("referenced struct to exist");
 
     let (index, _key, found_field) = match structure.fields.get_full(field_name) {
@@ -81,7 +81,7 @@ pub fn resolve_member_expr(
         asg::Expr::new(
             asg::ExprKind::Member(Box::new(Member {
                 subject: subject_destination,
-                structure_ref,
+                struct_ref,
                 index,
                 field_type: ty,
             })),

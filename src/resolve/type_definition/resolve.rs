@@ -42,14 +42,14 @@ pub fn resolve_type_jobs(
             )?;
         }
 
-        for (structure_ref, structure) in job.structures.iter().zip(file.structures.iter()) {
+        for (struct_ref, structure) in job.structures.iter().zip(file.structs.iter()) {
             resolve_structure(
                 ctx,
                 asg,
                 module_file_id,
                 job.physical_file_id,
                 structure,
-                *structure_ref,
+                *struct_ref,
             )?;
         }
 
@@ -85,7 +85,7 @@ fn resolve_structure(
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
     structure: &ast::Struct,
-    structure_ref: StructRef,
+    struct_ref: StructRef,
 ) -> Result<(), ResolveError> {
     for (field_name, field) in structure.fields.iter() {
         let pre_constraints = CurrentConstraints::new_empty();
@@ -119,7 +119,7 @@ fn resolve_structure(
 
         let ty = type_ctx.resolve_or_undeclared(&field.ast_type)?;
 
-        let resolved_struct = asg.structs.get_mut(structure_ref).expect("valid struct");
+        let resolved_struct = asg.structs.get_mut(struct_ref).expect("valid struct");
 
         resolved_struct.fields.insert(
             field_name.clone(),

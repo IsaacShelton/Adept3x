@@ -55,9 +55,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     .global_variables
                     .push(self.parse_global_variable(annotations)?);
             }
-            TokenKind::StructKeyword => {
-                ast_file.structures.push(self.parse_structure(annotations)?)
-            }
+            TokenKind::StructKeyword => ast_file.structs.push(self.parse_structure(annotations)?),
             TokenKind::TypeAliasKeyword => {
                 let type_alias = self.parse_type_alias(annotations)?;
                 ast_file.type_aliases.push(type_alias);

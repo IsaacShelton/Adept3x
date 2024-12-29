@@ -31,7 +31,7 @@ pub fn prepare_type_jobs(
             physical_file_id: *physical_file_id,
             type_aliases: Vec::with_capacity(file.type_aliases.len()),
             traits: Vec::with_capacity(file.traits.len()),
-            structures: Vec::with_capacity(file.structures.len()),
+            structures: Vec::with_capacity(file.structs.len()),
             enums: Vec::with_capacity(file.enums.len()),
         };
 
@@ -40,7 +40,7 @@ pub fn prepare_type_jobs(
                 .push(prepare_trait(ctx, asg, module_fs_node_id, user_trait)?);
         }
 
-        for structure in file.structures.iter() {
+        for structure in file.structs.iter() {
             job.structures.push(prepare_structure(
                 ctx,
                 asg,
@@ -97,7 +97,7 @@ fn prepare_structure(
         }
     }
 
-    let structure_ref = asg.structs.insert(asg::Struct {
+    let struct_ref = asg.structs.insert(asg::Struct {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
@@ -120,12 +120,12 @@ fn prepare_structure(
         structure.privacy,
         asg::TypeKind::Structure(
             HumanName(structure.name.to_string()),
-            structure_ref,
+            struct_ref,
             polymorphs,
         ),
     )?;
 
-    Ok(structure_ref)
+    Ok(struct_ref)
 }
 
 fn prepare_enum(

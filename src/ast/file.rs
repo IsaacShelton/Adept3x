@@ -6,7 +6,7 @@ use super::{
 #[derive(Clone, Debug)]
 pub struct AstFile {
     pub funcs: Vec<Func>,
-    pub structures: Vec<Struct>,
+    pub structs: Vec<Struct>,
     pub type_aliases: Vec<TypeAlias>,
     pub global_variables: Vec<GlobalVar>,
     pub enums: Vec<Enum>,
@@ -20,7 +20,7 @@ impl AstFile {
     pub fn new() -> AstFile {
         AstFile {
             funcs: vec![],
-            structures: vec![],
+            structs: vec![],
             type_aliases: vec![],
             global_variables: vec![],
             enums: vec![],

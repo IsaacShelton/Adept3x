@@ -100,13 +100,13 @@ impl PolyRecipe {
             }
             asg::TypeKind::FunctionPointer(_) => todo!(),
             asg::TypeKind::Enum(_, _) => ty.clone(),
-            asg::TypeKind::Structure(human_name, structure_ref, poly_args) => {
+            asg::TypeKind::Structure(human_name, struct_ref, poly_args) => {
                 let args = poly_args
                     .iter()
                     .map(|arg| self.resolve_type(arg))
                     .collect::<Result<_, _>>()?;
 
-                asg::TypeKind::Structure(human_name.clone(), *structure_ref, args).at(ty.source)
+                asg::TypeKind::Structure(human_name.clone(), *struct_ref, args).at(ty.source)
             }
             asg::TypeKind::TypeAlias(_, _) => ty.clone(),
             asg::TypeKind::Polymorph(name, _) => {
@@ -217,9 +217,9 @@ impl PolyCatalog {
                 }
                 _ => Err(None),
             },
-            asg::TypeKind::Structure(_, structure_ref, parameters) => match &concrete_type.kind {
-                asg::TypeKind::Structure(_, concrete_structure_ref, concrete_parameters) => {
-                    if *structure_ref != *concrete_structure_ref
+            asg::TypeKind::Structure(_, struct_ref, parameters) => match &concrete_type.kind {
+                asg::TypeKind::Structure(_, concrete_struct_ref, concrete_parameters) => {
+                    if *struct_ref != *concrete_struct_ref
                         || parameters.len() != concrete_parameters.len()
                     {
                         return Err(None);

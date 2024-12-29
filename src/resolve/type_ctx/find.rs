@@ -34,7 +34,7 @@ impl<'a> ResolveTypeCtx<'a> {
             // NOTE: This will need to be map instead at some point
             .filter(|decl| decl.num_parameters(self.asg) == arguments.len())
         {
-            if let asg::TypeKind::Structure(human_name, structure_ref, _) = &decl.kind {
+            if let asg::TypeKind::Structure(human_name, struct_ref, _) = &decl.kind {
                 let arguments = arguments
                     .iter()
                     .flat_map(|arg| match arg {
@@ -50,7 +50,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
                 return Ok(Cow::Owned(asg::TypeKind::Structure(
                     human_name.clone(),
-                    *structure_ref,
+                    *struct_ref,
                     arguments,
                 )));
             }

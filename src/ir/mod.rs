@@ -10,10 +10,9 @@ use crate::{
 };
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
-pub use funcs::FuncRef;
 use funcs::Funcs;
 use std::{collections::HashMap, ffi::CString};
-pub use structs::{StructRef, Structs};
+pub use structs::Structs;
 
 pub struct Module {
     pub target: Target,
@@ -53,12 +52,22 @@ pub struct Func {
     pub abide_abi: bool,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub struct FuncRef {
+    index: usize,
+}
+
 #[derive(Clone, Debug)]
-pub struct Structure {
+pub struct Struct {
     pub name: Option<String>,
     pub fields: Vec<Field>,
     pub is_packed: bool,
     pub source: Source,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct StructRef {
+    index: usize,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -412,9 +421,7 @@ impl Type {
 
     pub fn struct_fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
         match self {
-            Type::Structure(structure_ref) => {
-                Some(&ir_module.structs.get(*structure_ref).fields[..])
-            }
+            Type::Structure(struct_ref) => Some(&ir_module.structs.get(*struct_ref).fields[..]),
             Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
             _ => None,
         }

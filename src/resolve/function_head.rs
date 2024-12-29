@@ -56,7 +56,7 @@ pub fn create_function_heads<'a>(
             for (function_i, function) in imp.body.iter().enumerate() {
                 let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));
 
-                let function_ref = create_function_head(
+                let func_ref = create_function_head(
                     ctx,
                     asg,
                     options,
@@ -70,7 +70,7 @@ pub fn create_function_heads<'a>(
                     *physical_file_id,
                     impl_i,
                     function_i,
-                    function_ref,
+                    func_ref,
                 ));
 
                 let functions_with_name = asg
@@ -80,14 +80,14 @@ pub fn create_function_heads<'a>(
                     .body
                     .get_or_insert_with(&function.head.name, || Default::default());
 
-                functions_with_name.push(function_ref);
+                functions_with_name.push(func_ref);
             }
         }
 
         for (function_i, function) in file.funcs.iter().enumerate() {
             let name = ResolvedName::new(module_file_id, &Name::plain(&function.head.name));
 
-            let function_ref = create_function_head(
+            let func_ref = create_function_head(
                 ctx,
                 asg,
                 options,
@@ -103,7 +103,7 @@ pub fn create_function_heads<'a>(
 
                 public_of_module
                     .get_or_insert_with(function_name, || Default::default())
-                    .push(function_ref);
+                    .push(func_ref);
             }
 
             let settings = file.settings.map(|id| &ast_workspace.settings[id.0]);
@@ -123,13 +123,13 @@ pub fn create_function_heads<'a>(
             function_search_context
                 .available
                 .entry(name)
-                .and_modify(|funcs| funcs.push(function_ref))
-                .or_insert_with(|| vec![function_ref]);
+                .and_modify(|funcs| funcs.push(func_ref))
+                .or_insert_with(|| vec![func_ref]);
 
             ctx.jobs.push_back(FuncJob::Regular(
                 *physical_file_id,
                 function_i,
-                function_ref,
+                func_ref,
             ));
         }
     }

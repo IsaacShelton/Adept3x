@@ -94,16 +94,16 @@ impl<'a> PreferredType<'a> {
         Self::Reference(reference)
     }
 
-    pub fn of_parameter(function_ref: FuncRef, index: usize) -> Self {
-        Self::ParameterType(function_ref, index)
+    pub fn of_parameter(func_ref: FuncRef, index: usize) -> Self {
+        Self::ParameterType(func_ref, index)
     }
 
     pub fn view(&self, asg: &'a Asg) -> &'a asg::Type {
         match self {
             PreferredType::Reference(reference) => reference,
-            PreferredType::ParameterType(function_ref, index) => {
+            PreferredType::ParameterType(func_ref, index) => {
                 &asg.funcs
-                    .get(*function_ref)
+                    .get(*func_ref)
                     .unwrap()
                     .parameters
                     .required
@@ -111,13 +111,13 @@ impl<'a> PreferredType<'a> {
                     .unwrap()
                     .ty
             }
-            PreferredType::ReturnType(function_ref) => {
-                &asg.funcs.get(*function_ref).unwrap().return_type
+            PreferredType::ReturnType(func_ref) => {
+                &asg.funcs.get(*func_ref).unwrap().return_type
             }
-            PreferredType::FieldType(structure_ref, field_name) => {
+            PreferredType::FieldType(struct_ref, field_name) => {
                 let (_, _, field) = asg
                     .structs
-                    .get(*structure_ref)
+                    .get(*struct_ref)
                     .expect("referenced structure to exist")
                     .fields
                     .get_full::<str>(field_name)
@@ -217,7 +217,7 @@ pub fn resolve_expr(
             let type_kind = ctx.type_search_ctx.find_type_or_error("String", source)?;
 
             Ok(TypedExpr::new(
-                asg::TypeKind::Structure("String".into(), *structure_ref).at(source),
+                asg::TypeKind::Structure("String".into(), *struct_ref).at(source),
                 asg::Expr::new(asg::ExprKind::String(value.clone()), source),
             ))
             */

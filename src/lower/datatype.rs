@@ -66,7 +66,7 @@ pub fn lower_type(
             asg,
         )?))),
         asg::TypeKind::Void => Ok(ir::Type::Void),
-        asg::TypeKind::Structure(_, structure_ref, parameters) => {
+        asg::TypeKind::Structure(_, struct_ref, parameters) => {
             // NOTE: We can assume that all parameters have been resolved to concrete types by this
             // point
 
@@ -78,7 +78,7 @@ pub fn lower_type(
 
             monomorphize_structure(
                 ir_module,
-                *structure_ref,
+                *struct_ref,
                 values.as_slice(),
                 asg,
                 concrete_type.0.source,

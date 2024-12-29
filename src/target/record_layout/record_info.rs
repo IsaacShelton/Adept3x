@@ -11,7 +11,7 @@ pub struct RecordInfo<'t> {
 }
 
 impl<'t> RecordInfo<'t> {
-    pub fn from_structure(structure: &'t ir::Structure) -> Self {
+    pub fn from_structure(structure: &'t ir::Struct) -> Self {
         RecordInfo {
             fields: &structure.fields[..],
             is_packed: structure.is_packed,
@@ -38,8 +38,8 @@ impl<'t> RecordInfo<'t> {
             ir::Type::Union(_) => {
                 todo!("RecordInfo::try_from_type for unions is not supported yet")
             }
-            ir::Type::Structure(structure_ref) => Some(RecordInfo::from_structure(
-                ir_module.structs.get(*structure_ref),
+            ir::Type::Structure(struct_ref) => Some(RecordInfo::from_structure(
+                ir_module.structs.get(*struct_ref),
             )),
             ir::Type::AnonymousComposite(composite) => Some(RecordInfo::from_composite(composite)),
             _ => None,

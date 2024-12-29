@@ -11,14 +11,14 @@ pub fn resolve_expr_to_destination(typed_expr: TypedExpr) -> Result<Destination,
             ExprKind::Member(member) => {
                 let Member {
                     subject,
-                    structure_ref,
+                    struct_ref,
                     index,
                     field_type,
                 } = *member;
 
                 DestinationKind::Member {
                     subject: Box::new(subject),
-                    structure_ref,
+                    struct_ref,
                     index,
                     field_type,
                 }

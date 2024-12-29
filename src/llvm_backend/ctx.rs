@@ -52,7 +52,7 @@ pub struct FunctionSkeleton {
     pub function: LLVMValueRef,
     pub abi_function: Option<ABIFunction>,
     pub function_type: FunctionType,
-    pub ir_function_ref: ir::FuncRef,
+    pub ir_func_ref: ir::FuncRef,
     pub max_vector_width: ByteUnits,
 }
 

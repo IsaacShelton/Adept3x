@@ -80,8 +80,8 @@ impl FunctionHaystack {
 
         local_matches
             .chain(remote_matches)
-            .map(|function_ref| {
-                let function = ctx.asg.funcs.get(*function_ref).unwrap();
+            .map(|func_ref| {
+                let function = ctx.asg.funcs.get(*func_ref).unwrap();
 
                 format!(
                     "{}({})",
@@ -94,11 +94,11 @@ impl FunctionHaystack {
 
     fn fits(
         ctx: &ResolveExprCtx,
-        function_ref: asg::FuncRef,
+        func_ref: asg::FuncRef,
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Callee> {
-        let function = ctx.asg.funcs.get(function_ref).unwrap();
+        let function = ctx.asg.funcs.get(func_ref).unwrap();
         let parameters = &function.parameters;
 
         if !parameters.is_cstyle_vararg && arguments.len() != parameters.required.len() {
@@ -112,8 +112,8 @@ impl FunctionHaystack {
         let mut catalog = PolyCatalog::new();
 
         for (i, argument) in arguments.iter().enumerate() {
-            let preferred_type = (i < parameters.required.len())
-                .then_some(PreferredType::of_parameter(function_ref, i));
+            let preferred_type =
+                (i < parameters.required.len()).then_some(PreferredType::of_parameter(func_ref, i));
 
             let argument_conforms = if let Some(param_type) =
                 preferred_type.map(|p| p.view(ctx.asg))
@@ -153,7 +153,7 @@ impl FunctionHaystack {
         }
 
         Some(Callee {
-            function: function_ref,
+            function: func_ref,
             recipe: catalog.bake(),
         })
     }
@@ -243,10 +243,10 @@ impl FunctionHaystack {
             .and_then(|first_type| {
                 if let Ok(first_type) = ctx.asg.unalias(first_type) {
                     match &first_type.kind {
-                        TypeKind::Structure(_, structure_ref, _) => Some(
+                        TypeKind::Structure(_, struct_ref, _) => Some(
                             ctx.asg
                                 .structs
-                                .get(*structure_ref)
+                                .get(*struct_ref)
                                 .expect("valid struct")
                                 .name
                                 .fs_node_id,

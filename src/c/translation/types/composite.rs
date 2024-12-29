@@ -96,7 +96,7 @@ pub fn make_composite(
             if let Some(name) = &composite.name {
                 let name = format!("struct<{}>", name);
 
-                ast_file.structures.push(Struct {
+                ast_file.structs.push(Struct {
                     name: name.clone(),
                     fields,
                     is_packed,

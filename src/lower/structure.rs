@@ -31,9 +31,9 @@ pub fn mono(
         });
     }
 
-    let structure_ref = ir_module.structs.insert(
+    let struct_ref = ir_module.structs.insert(
         struct_ref,
-        ir::Structure {
+        ir::Struct {
             name: Some(structure.name.plain().to_string()),
             fields,
             is_packed: structure.is_packed,
@@ -42,7 +42,7 @@ pub fn mono(
         poly_recipe,
     );
 
-    Ok(structure_ref)
+    Ok(struct_ref)
 }
 
 pub fn monomorphize_structure(
@@ -73,18 +73,18 @@ pub fn monomorphize_structure(
 
     let poly_recipe = catalog.bake();
 
-    let structure_ref = ir_module
+    let struct_ref = ir_module
         .structs
         .translate(struct_ref, poly_recipe, |poly_recipe| {
             mono(ir_module, asg, struct_ref, poly_recipe)
         })?;
 
-    Ok(structure_ref)
+    Ok(struct_ref)
 }
 
 pub fn lower_structure(
     ir_module: &mut ir::Module,
-    structure_ref: asg::StructRef,
+    struct_ref: asg::StructRef,
     structure: &asg::Struct,
     asg: &Asg,
 ) -> Result<(), LowerError> {
@@ -104,8 +104,8 @@ pub fn lower_structure(
     }
 
     ir_module.structs.insert(
-        structure_ref,
-        ir::Structure {
+        struct_ref,
+        ir::Struct {
             name: Some(structure.name.plain().to_string()),
             fields,
             is_packed: structure.is_packed,

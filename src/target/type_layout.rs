@@ -50,7 +50,7 @@ impl TypeLayout {
 pub struct TypeLayoutCache<'a> {
     memo: OnceMap<ir::Type, TypeLayout>,
     pub target: &'a Target,
-    pub structures: &'a ir::Structs,
+    pub structs: &'a ir::Structs,
     pub asg: &'a Asg<'a>,
     pub diagnostics: &'a Diagnostics<'a>,
 }
@@ -65,7 +65,7 @@ impl<'a> TypeLayoutCache<'a> {
         Self {
             memo: OnceMap::new(),
             target,
-            structures,
+            structs: structures,
             asg,
             diagnostics,
         }
@@ -97,8 +97,8 @@ impl<'a> TypeLayoutCache<'a> {
                 alignment_requirement: AlignmentRequirement::None,
             },
             ir::Type::Union(_) => todo!("get_impl for ir::Type::Union"),
-            ir::Type::Structure(structure_ref) => {
-                let structure = self.structures.get(*structure_ref);
+            ir::Type::Structure(struct_ref) => {
+                let structure = self.structs.get(*struct_ref);
 
                 let info = RecordInfo::from_structure(structure);
                 self.get_impl_record_layout(&info, structure.name.as_deref())

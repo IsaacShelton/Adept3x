@@ -38,8 +38,8 @@ pub fn is_homo_aggregate<'a>(
                     * u32::try_from(fixed_array.length).unwrap(),
             })
         }
-        ir::Type::Structure(structure_ref) => {
-            let structure = ir_module.structs.get(*structure_ref);
+        ir::Type::Structure(struct_ref) => {
+            let structure = ir_module.structs.get(*struct_ref);
 
             is_homo_aggregate_record(
                 decider,
