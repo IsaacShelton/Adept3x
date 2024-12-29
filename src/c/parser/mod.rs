@@ -455,7 +455,7 @@ impl<'a> Parser<'a> {
             "va_list".into(),
             CTypedef {
                 ast_type: Type::new(
-                    TypeKind::Pointer(Box::new(Type::new(TypeKind::Void, Source::internal()))),
+                    TypeKind::Ptr(Box::new(Type::new(TypeKind::Void, Source::internal()))),
                     Source::internal(),
                 ),
             },

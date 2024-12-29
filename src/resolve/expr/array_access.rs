@@ -1,12 +1,12 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx};
 use crate::{
+    asg::{self, TypedExpr},
     ast,
     resolve::{
         conform::to_default::conform_expr_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    asg::{self, TypedExpr},
     source_files::Source,
 };
 use ast::{IntegerBits, IntegerSign};
@@ -41,7 +41,7 @@ pub fn resolve_array_access_expr(
     )?;
 
     let item_type = match &subject.ty.kind {
-        asg::TypeKind::Pointer(inner) => Ok((**inner).clone()),
+        asg::TypeKind::Ptr(inner) => Ok((**inner).clone()),
         bad_type => Err(ResolveErrorKind::CannotAccessMemberOf {
             bad_type: bad_type.to_string(),
         }

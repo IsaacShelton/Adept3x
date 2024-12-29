@@ -9,8 +9,8 @@ mod homo_aggregate;
 
 pub fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
     match ty {
-        ir::Type::Pointer(_)
-        | ir::Type::Boolean
+        ir::Type::Ptr(_)
+        | ir::Type::Bool
         | ir::Type::S8
         | ir::Type::S16
         | ir::Type::S32
@@ -42,14 +42,14 @@ pub fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
     // NOTE: Arbitrarily sized integers and `char32` should be, but we don't support those yet
 
     match ty {
-        ir::Type::Boolean | ir::Type::S8 | ir::Type::S16 | ir::Type::U8 | ir::Type::U16 => true,
+        ir::Type::Bool | ir::Type::S8 | ir::Type::S16 | ir::Type::U8 | ir::Type::U16 => true,
         ir::Type::S32
         | ir::Type::S64
         | ir::Type::U32
         | ir::Type::U64
         | ir::Type::F32
         | ir::Type::F64
-        | ir::Type::Pointer(_)
+        | ir::Type::Ptr(_)
         | ir::Type::Void
         | ir::Type::Union(_)
         | ir::Type::Struct(_)

@@ -17,8 +17,8 @@ use super::{
     expr::ResolveExprCtx,
 };
 use crate::{
-    ast::ConformBehavior,
     asg::{Type, TypeKind, TypedExpr},
+    ast::ConformBehavior,
     source_files::Source,
 };
 pub use mode::ConformMode;
@@ -105,9 +105,7 @@ pub fn conform_expr<O: Objective>(
         ),
         TypeKind::FloatLiteral(from) => from_float_literal::<O>(*from, to_type, conform_source),
         TypeKind::Floating(from_size) => from_float::<O>(&expr.expr, mode, *from_size, to_type),
-        TypeKind::Pointer(from_inner) => {
-            from_pointer::<O>(ctx, &expr.expr, mode, from_inner, to_type)
-        }
+        TypeKind::Ptr(from_inner) => from_pointer::<O>(ctx, &expr.expr, mode, from_inner, to_type),
         TypeKind::CInteger(from_size, from_sign) => from_c_integer::<O>(
             &expr.expr,
             from_type,

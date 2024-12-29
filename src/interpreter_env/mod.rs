@@ -54,7 +54,7 @@ fn thin_cstring_func(
 ) -> Func {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
-    let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
+    let ptr_char = TypeKind::Ptr(Box::new(TypeKind::char().at(source))).at(source);
     let param_name = param_name.into();
 
     let head = FuncHead {
@@ -89,7 +89,7 @@ fn thin_cstring_func(
 pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
-    let ptr_char = TypeKind::Pointer(Box::new(TypeKind::char().at(source))).at(source);
+    let ptr_char = TypeKind::Ptr(Box::new(TypeKind::char().at(source))).at(source);
 
     // Call to function we actually care about
     let call = ExprKind::Call(Box::new(Call {

@@ -50,7 +50,7 @@ pub fn lower_short_circuiting_binary_operation(
     builder.use_block(merge_block_id);
 
     Ok(builder.push(ir::Instr::Phi(ir::Phi {
-        ir_type: ir::Type::Boolean,
+        ir_type: ir::Type::Bool,
         incoming: vec![
             ir::PhiIncoming {
                 basicblock_id: short_circuit.left_done_block_id,

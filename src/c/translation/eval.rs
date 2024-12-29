@@ -14,7 +14,7 @@ pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
         ExprKind::Integer(integer) => {
             return Ok(integer.into());
         }
-        ExprKind::Boolean(x) => return Ok(BigInt::from(*x as i64)),
+        ExprKind::Bool(x) => return Ok(BigInt::from(*x as i64)),
         ExprKind::Nullptr => return Ok(BigInt::zero()),
         ExprKind::Character(encoding, s) => match encoding {
             Encoding::Default => return Ok(BigInt::from(s.as_bytes()[0])),

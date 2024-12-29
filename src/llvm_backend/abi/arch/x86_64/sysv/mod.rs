@@ -501,9 +501,9 @@ impl SysV {
         // or C++ member pointers
 
         match ty {
-            ir::Type::Pointer(_)
+            ir::Type::Ptr(_)
             | ir::Type::FuncPtr
-            | ir::Type::Boolean
+            | ir::Type::Bool
             | ir::Type::S8
             | ir::Type::S16
             | ir::Type::S32

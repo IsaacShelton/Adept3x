@@ -82,8 +82,8 @@ impl<'a> TypeLayoutCache<'a> {
 
     fn get_impl(&self, ir_type: &ir::Type) -> TypeLayout {
         match ir_type {
-            ir::Type::Pointer(_) | ir::Type::FuncPtr => self.target.pointer_layout(),
-            ir::Type::Boolean => self.target.bool_layout(),
+            ir::Type::Ptr(_) | ir::Type::FuncPtr => self.target.pointer_layout(),
+            ir::Type::Bool => self.target.bool_layout(),
             ir::Type::S8 | ir::Type::U8 => TypeLayout::basic(ByteUnits::of(1)),
             ir::Type::S16 | ir::Type::U16 => TypeLayout::basic(ByteUnits::of(2)),
             ir::Type::S32 | ir::Type::U32 => TypeLayout::basic(ByteUnits::of(4)),

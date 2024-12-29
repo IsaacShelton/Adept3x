@@ -32,14 +32,14 @@ pub unsafe fn to_backend_type<'a>(
 
     Ok(match ir_type {
         ir::Type::Void => LLVMVoidType(),
-        ir::Type::Boolean => LLVMInt1Type(),
+        ir::Type::Bool => LLVMInt1Type(),
         ir::Type::S8 | ir::Type::U8 => LLVMInt8Type(),
         ir::Type::S16 | ir::Type::U16 => LLVMInt16Type(),
         ir::Type::S32 | ir::Type::U32 => LLVMInt32Type(),
         ir::Type::S64 | ir::Type::U64 => LLVMInt64Type(),
         ir::Type::F32 => LLVMFloatType(),
         ir::Type::F64 => LLVMDoubleType(),
-        ir::Type::Pointer(to) => LLVMPointerType(to_backend_type(ctx, to)?, 0),
+        ir::Type::Ptr(to) => LLVMPointerType(to_backend_type(ctx, to)?, 0),
         ir::Type::Union(_) => todo!("to_backend_type for ir::Type::Union"),
         ir::Type::AnonymousComposite(composite) => {
             let mut subtypes =
@@ -90,7 +90,7 @@ pub unsafe fn get_unabi_function_type<'a>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
     function: &ir::Func,
 ) -> Result<LLVMTypeRef, BackendError> {
-    get_function_pointer_type(
+    get_func_ptr_type(
         ctx.borrow(),
         &function.params[..],
         &function.return_type,
@@ -241,21 +241,21 @@ unsafe fn expand_types(
     Ok(())
 }
 
-pub unsafe fn get_function_pointer_type<'a>(
+pub unsafe fn get_func_ptr_type<'a>(
     ctx: impl Borrow<ToBackendTypeCtx<'a>>,
-    parameters: &[ir::Type],
+    params: &[ir::Type],
     return_type: &ir::Type,
     is_cstyle_variadic: bool,
 ) -> Result<LLVMTypeRef, BackendError> {
     let ctx = ctx.borrow();
     let return_type = to_backend_type(ctx, return_type)?;
-    let mut parameters = to_backend_types(ctx, parameters.iter())?;
+    let mut params = to_backend_types(ctx, params.iter())?;
     let is_vararg = if is_cstyle_variadic { 1 } else { 0 };
 
     Ok(LLVMFunctionType(
         return_type,
-        parameters.as_mut_ptr(),
-        parameters.len().try_into().unwrap(),
+        params.as_mut_ptr(),
+        params.len().try_into().unwrap(),
         is_vararg,
     ))
 }
@@ -276,7 +276,7 @@ pub unsafe fn to_backend_mem_type<'a>(
     // NOTE: We don't support vector types yet
     assert!(ir_type.is_vector());
 
-    if ir_type.is_boolean() {
+    if ir_type.is_bool() {
         return Ok(LLVMTypeRef::new_int(type_layout_cache.get(ir_type).width));
     }
 

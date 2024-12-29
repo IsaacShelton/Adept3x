@@ -124,7 +124,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             Some("ptr") => {
                 if generics.len() == 1 {
                     if let CompileTimeArgument::Type(inner) = generics.into_iter().next().unwrap() {
-                        Ok(TypeKind::Pointer(Box::new(inner)))
+                        Ok(TypeKind::Ptr(Box::new(inner)))
                     } else {
                         Err(ParseError {
                             kind: ParseErrorKind::ExpectedTypeParameterToBeAType {

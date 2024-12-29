@@ -27,7 +27,7 @@ pub enum ExprKind {
     Integer(Integer),
     Float(f64, FloatSuffix),
     StringLiteral(Encoding, String),
-    Boolean(bool),
+    Bool(bool),
     Nullptr,
     Character(Encoding, String),
     Compound(Vec<Expr>),
@@ -214,11 +214,11 @@ impl<'a> Parser<'a> {
         }
 
         if self.eat(CTokenKind::TrueKeyword) {
-            return Ok(ExprKind::Boolean(true).at(source));
+            return Ok(ExprKind::Bool(true).at(source));
         }
 
         if self.eat(CTokenKind::FalseKeyword) {
-            return Ok(ExprKind::Boolean(false).at(source));
+            return Ok(ExprKind::Bool(false).at(source));
         }
 
         if self.eat(CTokenKind::NullptrKeyword) {

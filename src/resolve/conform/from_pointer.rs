@@ -1,7 +1,7 @@
 use super::{warn_type_alias_depth_exceeded, ConformMode, Objective, ObjectiveResult};
 use crate::{
-    resolve::expr::ResolveExprCtx,
     asg::{Expr, Type, TypeKind, TypedExpr},
+    resolve::expr::ResolveExprCtx,
 };
 
 pub fn from_pointer<O: Objective>(
@@ -16,7 +16,7 @@ pub fn from_pointer<O: Objective>(
         return O::fail();
     };
 
-    let TypeKind::Pointer(to_inner_type) = &to_type.kind else {
+    let TypeKind::Ptr(to_inner_type) = &to_type.kind else {
         return O::fail();
     };
 

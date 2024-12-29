@@ -199,7 +199,7 @@ pub fn resolve_expr(
             ),
         )),
         ast::ExprKind::NullTerminatedString(value) => Ok(TypedExpr::new(
-            asg::TypeKind::Pointer(Box::new(
+            asg::TypeKind::Ptr(Box::new(
                 asg::TypeKind::CInteger(CInteger::Char, None).at(source),
             ))
             .at(source),
@@ -288,7 +288,7 @@ pub fn resolve_expr(
                 )?;
 
                 let result_type = match &resolved_expr.ty.kind {
-                    TypeKind::Pointer(inner) if !resolved_expr.ty.kind.is_ambiguous() => {
+                    TypeKind::Ptr(inner) if !resolved_expr.ty.kind.is_ambiguous() => {
                         (**inner).clone()
                     }
                     _ => {

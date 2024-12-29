@@ -28,7 +28,7 @@ pub fn lower_type(
             name: name.to_string(),
         }
         .at(ty.source)),
-        asg::TypeKind::Boolean => Ok(ir::Type::Boolean),
+        asg::TypeKind::Boolean => Ok(ir::Type::Bool),
         asg::TypeKind::Integer(bits, sign) => Ok(match (bits, sign) {
             (Bits::Bits8, Sign::Signed) => ir::Type::S8,
             (Bits::Bits8, Sign::Unsigned) => ir::Type::U8,
@@ -60,7 +60,7 @@ pub fn lower_type(
             FloatSize::Bits32 => ir::Type::F32,
             FloatSize::Bits64 => ir::Type::F64,
         }),
-        asg::TypeKind::Pointer(inner) => Ok(ir::Type::Pointer(Box::new(lower_type(
+        asg::TypeKind::Ptr(inner) => Ok(ir::Type::Ptr(Box::new(lower_type(
             ir_module,
             &ConcreteType(Cow::Borrowed(inner)),
             asg,
@@ -107,7 +107,7 @@ pub fn lower_type(
                 inner,
             })))
         }
-        asg::TypeKind::FuncPointer(_func_pointer) => Ok(ir::Type::FuncPtr),
+        asg::TypeKind::FuncPtr(_func_pointer) => Ok(ir::Type::FuncPtr),
         asg::TypeKind::Enum(_human_name, enum_ref) => {
             let enum_definition = asg.enums.get(*enum_ref).expect("referenced enum to exist");
 

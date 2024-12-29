@@ -2,8 +2,8 @@ use crate::ir;
 
 pub fn size_of(ir_type: &ir::Type, ir_module: &ir::Module) -> u64 {
     match ir_type {
-        ir::Type::Pointer(_) => 8,
-        ir::Type::Boolean => 1,
+        ir::Type::Ptr(_) => 8,
+        ir::Type::Bool => 1,
         ir::Type::S8 => 1,
         ir::Type::S16 => 2,
         ir::Type::S32 => 4,

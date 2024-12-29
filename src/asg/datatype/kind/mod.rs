@@ -28,13 +28,13 @@ pub enum TypeKind {
     IntegerLiteral(BigInt),
     FloatLiteral(Option<NotNan<f64>>),
     Floating(FloatSize),
-    Pointer(Box<Type>),
+    Ptr(Box<Type>),
     Void,
     AnonymousStruct(),
     AnonymousUnion(),
     AnonymousEnum(),
     FixedArray(Box<FixedArray>),
-    FuncPointer(FuncPtr),
+    FuncPtr(FuncPtr),
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef),
@@ -58,13 +58,13 @@ impl TypeKind {
             | TypeKind::IntegerLiteral(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => false,
-            TypeKind::Pointer(inner) => inner.kind.contains_polymorph(),
+            TypeKind::Ptr(inner) => inner.kind.contains_polymorph(),
             TypeKind::Void => false,
             TypeKind::AnonymousStruct() => false,
             TypeKind::AnonymousUnion() => false,
             TypeKind::AnonymousEnum() => false,
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
-            TypeKind::FuncPointer(_) => todo!(),
+            TypeKind::FuncPtr(_) => todo!(),
             TypeKind::Enum(_, _) => false,
             TypeKind::Structure(_, _, parameters) | TypeKind::Trait(_, _, parameters) => parameters
                 .iter()
@@ -90,13 +90,13 @@ impl TypeKind {
             TypeKind::Unresolved => panic!(),
             TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
-            | TypeKind::Pointer(_)
+            | TypeKind::Ptr(_)
             | TypeKind::Structure(_, _, _)
             | TypeKind::Void
             | TypeKind::AnonymousStruct(..)
             | TypeKind::AnonymousUnion(..)
             | TypeKind::FixedArray(..)
-            | TypeKind::FuncPointer(..)
+            | TypeKind::FuncPtr(..)
             | TypeKind::Enum(_, _)
             | TypeKind::AnonymousEnum()
             | TypeKind::Polymorph(_, _)
@@ -152,7 +152,7 @@ impl Display for TypeKind {
                     write!(f, "float NaN")?;
                 }
             }
-            TypeKind::Pointer(inner) => {
+            TypeKind::Ptr(inner) => {
                 write!(f, "ptr<{}>", **inner)?;
             }
             TypeKind::Void => f.write_str("void")?,
@@ -166,7 +166,7 @@ impl Display for TypeKind {
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<{}, {}>", fixed_array.size, fixed_array.inner.kind)?;
             }
-            TypeKind::FuncPointer(..) => f.write_str("function-pointer-type")?,
+            TypeKind::FuncPtr(..) => f.write_str("function-pointer-type")?,
             TypeKind::Enum(name, _) => write!(f, "{}", name)?,
             TypeKind::Polymorph(name, constaints) => {
                 write!(f, "${}", name)?;

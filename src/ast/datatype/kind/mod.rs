@@ -13,14 +13,14 @@ pub enum TypeKind {
     Integer(IntegerBits, IntegerSign),
     CInteger(CInteger, Option<IntegerSign>),
     Floating(FloatSize),
-    Pointer(Box<Type>),
+    Ptr(Box<Type>),
     FixedArray(Box<FixedArray>),
     Void,
     Named(Name, Vec<CompileTimeArgument>),
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(AnoymousUnion),
     AnonymousEnum(AnonymousEnum),
-    FuncPointer(FuncPtr),
+    FuncPtr(FuncPtr),
     Polymorph(String, Vec<Type>),
 }
 

@@ -85,8 +85,8 @@ impl PolyRecipe {
             | asg::TypeKind::FloatLiteral(_)
             | asg::TypeKind::Void
             | asg::TypeKind::Floating(_) => ty.clone(),
-            asg::TypeKind::Pointer(inner) => {
-                asg::TypeKind::Pointer(Box::new(self.resolve_type(inner)?)).at(ty.source)
+            asg::TypeKind::Ptr(inner) => {
+                asg::TypeKind::Ptr(Box::new(self.resolve_type(inner)?)).at(ty.source)
             }
             asg::TypeKind::AnonymousStruct() => todo!(),
             asg::TypeKind::AnonymousUnion() => todo!(),
@@ -98,7 +98,7 @@ impl PolyRecipe {
                 }))
                 .at(ty.source)
             }
-            asg::TypeKind::FuncPointer(_) => todo!(),
+            asg::TypeKind::FuncPtr(_) => todo!(),
             asg::TypeKind::Enum(_, _) => ty.clone(),
             asg::TypeKind::Structure(human_name, struct_ref, poly_args) => {
                 let args = poly_args
@@ -235,8 +235,8 @@ impl PolyCatalog {
                 }
                 _ => Err(None),
             },
-            asg::TypeKind::Pointer(pattern_inner) => match &concrete_type.kind {
-                asg::TypeKind::Pointer(concrete_inner) => {
+            asg::TypeKind::Ptr(pattern_inner) => match &concrete_type.kind {
+                asg::TypeKind::Ptr(concrete_inner) => {
                     self.match_type(ctx, pattern_inner, concrete_inner)
                 }
                 _ => Err(None),
@@ -250,7 +250,7 @@ impl PolyCatalog {
                 }
                 _ => Err(None),
             },
-            asg::TypeKind::FuncPointer(_) => todo!(),
+            asg::TypeKind::FuncPtr(_) => todo!(),
             asg::TypeKind::Polymorph(name, constraints) => {
                 self.put_type(name, concrete_type).map_err(Some)?;
 

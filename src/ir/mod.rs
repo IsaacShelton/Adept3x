@@ -307,8 +307,8 @@ impl CXXRecord {
 
 #[derive(Clone, Debug, PartialEq, Eq, IsVariant, Hash)]
 pub enum Type {
-    Pointer(Box<Type>),
-    Boolean,
+    Ptr(Box<Type>),
+    Bool,
     S8,
     S16,
     S32,
@@ -348,7 +348,7 @@ impl Type {
 
     pub fn is_builtin_data(&self) -> bool {
         match self {
-            Type::Boolean
+            Type::Bool
             | Type::S8
             | Type::S16
             | Type::S32
@@ -359,7 +359,7 @@ impl Type {
             | Type::U64
             | Type::F32
             | Type::F64 => true,
-            Type::Pointer(_)
+            Type::Ptr(_)
             | Type::Void
             | Type::Union(_)
             | Type::Struct(_)
@@ -393,13 +393,13 @@ pub struct Complex {
 
 impl Type {
     pub fn pointer(&self) -> Self {
-        Type::Pointer(Box::new(self.clone()))
+        Type::Ptr(Box::new(self.clone()))
     }
 
     pub fn is_integer_like(&self) -> bool {
         matches!(
             self,
-            Type::Boolean
+            Type::Bool
                 | Type::S8
                 | Type::S16
                 | Type::S32
@@ -414,7 +414,7 @@ impl Type {
     pub fn is_signed(&self) -> Option<bool> {
         match self {
             Type::S8 | Type::S16 | Type::S32 | Type::S64 => Some(true),
-            Type::Boolean | Type::U8 | Type::U16 | Type::U32 | Type::U64 => Some(false),
+            Type::Bool | Type::U8 | Type::U16 | Type::U32 | Type::U64 => Some(false),
             _ => None,
         }
     }

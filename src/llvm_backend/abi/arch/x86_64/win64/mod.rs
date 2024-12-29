@@ -224,7 +224,7 @@ impl Win64 {
         // NOTE: We don't support member pointer types here
 
         // NOTE: We don't support long doubles, or i128/u128 128-bit integers here
-        if ir_type.is_boolean() {
+        if ir_type.is_bool() {
             return Requirement::new(
                 ABIType::new_extend(ir_type, None, ExtendOptions::default()),
                 0,

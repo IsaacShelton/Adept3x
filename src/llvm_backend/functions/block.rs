@@ -756,7 +756,7 @@ fn promote_variadic_argument_type(
 
     match ir_type {
         // Promote integers to 32-bit
-        ir::Type::Boolean | ir::Type::S8 | ir::Type::S16 => ir::Type::S32,
+        ir::Type::Bool | ir::Type::S8 | ir::Type::S16 => ir::Type::S32,
         ir::Type::U8 | ir::Type::U16 | ir::Type::U32 => ir::Type::U32,
 
         // Promote floats to 64-bit

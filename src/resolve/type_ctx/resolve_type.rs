@@ -27,9 +27,9 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Boolean => Ok(asg::TypeKind::Boolean),
             ast::TypeKind::Integer(bits, sign) => Ok(asg::TypeKind::Integer(*bits, *sign)),
             ast::TypeKind::CInteger(integer, sign) => Ok(asg::TypeKind::CInteger(*integer, *sign)),
-            ast::TypeKind::Pointer(inner) => {
+            ast::TypeKind::Ptr(inner) => {
                 let inner = self.resolve_or_undeclared(inner)?;
-                Ok(asg::TypeKind::Pointer(Box::new(inner)))
+                Ok(asg::TypeKind::Ptr(Box::new(inner)))
             }
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
             ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
@@ -83,7 +83,7 @@ impl<'a> ResolveTypeCtx<'a> {
                     todo!("resolve fixed array type with variable size")
                 }
             }
-            ast::TypeKind::FuncPointer(function_pointer) => {
+            ast::TypeKind::FuncPtr(function_pointer) => {
                 let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
 
                 for parameter in function_pointer.parameters.iter() {
@@ -97,7 +97,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
                 let return_type = Box::new(self.resolve(&function_pointer.return_type)?);
 
-                Ok(asg::TypeKind::FuncPointer(asg::FuncPtr {
+                Ok(asg::TypeKind::FuncPtr(asg::FuncPtr {
                     parameters,
                     return_type,
                     is_cstyle_variadic: function_pointer.is_cstyle_variadic,

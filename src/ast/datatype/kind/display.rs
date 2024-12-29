@@ -27,7 +27,7 @@ impl Display for &TypeKind {
             TypeKind::CInteger(integer, sign) => {
                 fmt_c_integer(f, *integer, *sign)?;
             }
-            TypeKind::Pointer(inner) => {
+            TypeKind::Ptr(inner) => {
                 write!(f, "ptr<{inner}>")?;
             }
             TypeKind::Void => {
@@ -63,7 +63,7 @@ impl Display for &TypeKind {
             TypeKind::FixedArray(fixed_array) => {
                 write!(f, "array<(amount), {}>", fixed_array.ast_type)?;
             }
-            TypeKind::FuncPointer(_function) => {
+            TypeKind::FuncPtr(_function) => {
                 write!(f, "(function pointer type)")?;
             }
             TypeKind::Polymorph(polymorph, constraints) => {

@@ -15,8 +15,8 @@ impl Memory {
         }
 
         Ok(match ir_type {
-            ir::Type::Pointer(_) => self.read_u64(from),
-            ir::Type::Boolean => self.read_u1(from),
+            ir::Type::Ptr(_) => self.read_u64(from),
+            ir::Type::Bool => self.read_u1(from),
             ir::Type::S8 => self.read_s8(from),
             ir::Type::S16 => self.read_s16(from),
             ir::Type::S32 => self.read_s32(from),

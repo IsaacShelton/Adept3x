@@ -20,7 +20,7 @@ impl Hash for Type {
 impl Type {
     pub fn pointer(self, source: Source) -> Self {
         Self {
-            kind: TypeKind::Pointer(Box::new(self)),
+            kind: TypeKind::Ptr(Box::new(self)),
             source,
         }
     }
@@ -38,13 +38,13 @@ impl Type {
             TypeKind::IntegerLiteral(_) => (),
             TypeKind::FloatLiteral(_) => (),
             TypeKind::Floating(_) => (),
-            TypeKind::Pointer(inner) => inner.strip_constraints(),
+            TypeKind::Ptr(inner) => inner.strip_constraints(),
             TypeKind::Void => (),
             TypeKind::AnonymousStruct() => todo!(),
             TypeKind::AnonymousUnion() => todo!(),
             TypeKind::AnonymousEnum() => todo!(),
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
-            TypeKind::FuncPointer(_) => todo!(),
+            TypeKind::FuncPtr(_) => todo!(),
             TypeKind::Enum(_, _) => (),
             TypeKind::Structure(_, _, parameters) => {
                 for parameter in parameters {

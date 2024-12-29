@@ -33,7 +33,7 @@ impl Type {
 
     pub fn pointer(self) -> Self {
         let source = self.source;
-        Type::new(TypeKind::Pointer(Box::new(self)), source)
+        Type::new(TypeKind::Ptr(Box::new(self)), source)
     }
 
     pub fn contains_polymorph(&self) -> Option<Source> {
@@ -42,7 +42,7 @@ impl Type {
             | TypeKind::Integer(_, _)
             | TypeKind::CInteger(_, _)
             | TypeKind::Floating(_) => None,
-            TypeKind::Pointer(inner) => inner.contains_polymorph(),
+            TypeKind::Ptr(inner) => inner.contains_polymorph(),
             TypeKind::FixedArray(fixed_array) => fixed_array.ast_type.contains_polymorph(),
             TypeKind::Void => None,
             TypeKind::Named(_, args) => args
@@ -55,7 +55,7 @@ impl Type {
             TypeKind::AnonymousStruct(_) => None,
             TypeKind::AnonymousUnion(_) => None,
             TypeKind::AnonymousEnum(_) => None,
-            TypeKind::FuncPointer(func_pointer) => func_pointer
+            TypeKind::FuncPtr(func_pointer) => func_pointer
                 .parameters
                 .iter()
                 .flat_map(|param| param.ast_type.contains_polymorph())

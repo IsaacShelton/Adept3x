@@ -482,7 +482,7 @@ fn is_thread_local(value: LLVMValueRef) -> bool {
 
 pub fn emit_from_mem(builder: &Builder, value: LLVMValueRef, ir_type: &ir::Type) -> LLVMValueRef {
     match ir_type {
-        ir::Type::Boolean => unsafe {
+        ir::Type::Bool => unsafe {
             LLVMBuildTruncOrBitCast(builder.get(), value, LLVMInt1Type(), cstr!("").as_ptr())
         },
         _ => value,

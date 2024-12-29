@@ -22,7 +22,7 @@ pub fn decorate_pointer(
         ))
     }
 
-    Ok(Type::new(TypeKind::Pointer(Box::new(ast_type)), source))
+    Ok(Type::new(TypeKind::Ptr(Box::new(ast_type)), source))
 }
 
 pub fn decorate_array(
@@ -69,7 +69,7 @@ pub fn decorate_function(
     function: &FunctionQualifier,
     source: Source,
 ) -> Result<Type, ParseError> {
-    Ok(TypeKind::FuncPointer(FuncPtr {
+    Ok(TypeKind::FuncPtr(FuncPtr {
         parameters: function.parameters.clone(),
         return_type: Box::new(ast_type),
         is_cstyle_variadic: function.is_cstyle_variadic,

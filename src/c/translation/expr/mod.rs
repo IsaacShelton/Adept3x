@@ -30,7 +30,7 @@ pub fn translate_expr(
         ExprKind::StringLiteral(encoding, content) => {
             translate_expr_string(encoding, content, expr.source)?
         }
-        ExprKind::Boolean(x) => ast::ExprKind::Boolean(*x).at(expr.source),
+        ExprKind::Bool(x) => ast::ExprKind::Boolean(*x).at(expr.source),
         ExprKind::Nullptr => todo!(),
         ExprKind::Character(_, _) => todo!(),
         ExprKind::Compound(_) => todo!(),

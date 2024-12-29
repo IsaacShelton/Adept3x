@@ -220,13 +220,13 @@ pub fn collect_constraints_into(map: &mut HashMap<String, HashSet<Constraint>>, 
         | asg::TypeKind::IntegerLiteral(_)
         | asg::TypeKind::FloatLiteral(_)
         | asg::TypeKind::Floating(_) => (),
-        asg::TypeKind::Pointer(inner) => collect_constraints_into(map, inner.as_ref()),
+        asg::TypeKind::Ptr(inner) => collect_constraints_into(map, inner.as_ref()),
         asg::TypeKind::Void => (),
         asg::TypeKind::AnonymousStruct() => todo!(),
         asg::TypeKind::AnonymousUnion() => todo!(),
         asg::TypeKind::AnonymousEnum() => todo!(),
         asg::TypeKind::FixedArray(fixed_array) => collect_constraints_into(map, &fixed_array.inner),
-        asg::TypeKind::FuncPointer(_) => todo!(),
+        asg::TypeKind::FuncPtr(_) => todo!(),
         asg::TypeKind::Enum(_, _) => (),
         asg::TypeKind::Structure(_, _, parameters) => {
             for parameter in parameters {
