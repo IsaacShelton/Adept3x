@@ -1,9 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{
-        CompileTimeArgument, Expr, ExprKind, StaticMember, StaticMemberAction,
-        StaticMemberActionKind,
-    },
+    ast::{Expr, ExprKind, StaticMember, StaticMemberAction, StaticMemberActionKind, TypeArg},
     inflow::Inflow,
     name::Name,
     parser::error::{ParseError, ParseErrorKind},
@@ -15,7 +12,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_static_member(
         &mut self,
         type_name: Name,
-        generics: Vec<CompileTimeArgument>,
+        generics: Vec<TypeArg>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // EnumName::EnumVariant
@@ -35,7 +32,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             || self.input.peek_is(TokenKind::OpenAngle)
         {
             let name = Name::plain(action_name);
-            let generics = self.parse_generics()?;
+            let generics = self.parse_type_args()?;
             StaticMemberActionKind::Call(self.parse_call_raw(name, generics)?)
         } else {
             StaticMemberActionKind::Value(action_name)

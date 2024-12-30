@@ -104,7 +104,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 // namespaces and generic parsing that applies to all cases
 
                 let name = self.parse_name(None::<&str>).unwrap();
-                let generics = self.parse_generics()?;
+                let generics = self.parse_type_args()?;
 
                 match self.input.peek().kind {
                     TokenKind::StaticMember => self.parse_static_member(name, generics, source),

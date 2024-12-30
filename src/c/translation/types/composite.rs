@@ -1,6 +1,6 @@
 use super::get_name_and_type;
 use crate::{
-    ast::{AnonymousStruct, AstFile, Field, Privacy, Struct, TypeKind},
+    ast::{AnonymousStruct, AstFile, Field, Privacy, Struct, TypeKind, TypeParams},
     c::parser::{
         error::ParseErrorKind, CTypedef, Composite, CompositeKind, DeclarationSpecifiers,
         MemberDeclaration, MemberDeclarator, ParseError,
@@ -98,9 +98,9 @@ pub fn make_composite(
 
                 ast_file.structs.push(Struct {
                     name: name.clone(),
+                    params: TypeParams::default(),
                     fields,
                     is_packed,
-                    params: IndexMap::default(),
                     source: composite.source,
                     privacy: Privacy::Private,
                 });

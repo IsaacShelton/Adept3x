@@ -29,7 +29,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.ignore_newlines();
 
-        let parameters = self.parse_type_parameters()?;
+        let parameters = self.parse_type_params()?;
         self.parse_token(TokenKind::OpenCurly, Some("to begin trait body"))?;
         self.ignore_newlines();
 

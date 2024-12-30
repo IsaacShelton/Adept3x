@@ -17,7 +17,7 @@ mod parse_top_level;
 mod parse_trait;
 mod parse_type;
 mod parse_type_alias;
-mod parse_type_parameters;
+mod parse_type_params;
 mod parse_util;
 
 use self::error::ParseError;

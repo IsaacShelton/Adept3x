@@ -14,7 +14,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.parse_token(TokenKind::Member, Some("for member expression"))?;
         let member_name = self.parse_name(Some("for member name"))?;
 
-        let generics = self.parse_generics()?;
+        let generics = self.parse_type_args()?;
 
         if !generics.is_empty()
             || self.input.peek_is(TokenKind::OpenParen)

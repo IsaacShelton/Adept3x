@@ -1,6 +1,6 @@
 use super::TypeKind;
 use crate::{
-    ast::{fmt_c_integer, CompileTimeArgument, FloatSize, IntegerBits},
+    ast::{fmt_c_integer, FloatSize, IntegerBits, TypeArg},
     ir::IntegerSign,
 };
 use itertools::Itertools;
@@ -41,8 +41,8 @@ impl Display for &TypeKind {
 
                     for (i, argument) in arguments.iter().enumerate() {
                         match argument {
-                            CompileTimeArgument::Type(ty) => write!(f, "{}", ty)?,
-                            CompileTimeArgument::Expr(expr) => write!(f, "({:?})", expr)?, // TODO: Implement display for ast::Expr
+                            TypeArg::Type(ty) => write!(f, "{}", ty)?,
+                            TypeArg::Expr(expr) => write!(f, "({:?})", expr)?, // TODO: Implement display for ast::Expr
                         }
 
                         if i + 1 < arguments.len() {

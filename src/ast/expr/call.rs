@@ -1,6 +1,6 @@
 use super::Expr;
 use crate::{
-    ast::{CompileTimeArgument, Type},
+    ast::{Type, TypeArg},
     name::Name,
 };
 
@@ -9,5 +9,5 @@ pub struct Call {
     pub name: Name,
     pub args: Vec<Expr>,
     pub expected_to_return: Option<Type>,
-    pub generics: Vec<CompileTimeArgument>,
+    pub generics: Vec<TypeArg>,
 }

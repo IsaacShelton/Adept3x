@@ -48,8 +48,8 @@ impl Type {
             TypeKind::Named(_, args) => args
                 .iter()
                 .flat_map(|arg| match arg {
-                    CompileTimeArgument::Type(ty) => ty.contains_polymorph(),
-                    CompileTimeArgument::Expr(_) => todo!("ast::Type::contains_polymorph"),
+                    TypeArg::Type(ty) => ty.contains_polymorph(),
+                    TypeArg::Expr(_) => todo!("ast::Type::contains_polymorph"),
                 })
                 .next(),
             TypeKind::AnonymousStruct(_) => None,

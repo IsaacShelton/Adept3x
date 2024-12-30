@@ -31,7 +31,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.ignore_newlines();
 
-        let parameters = self.parse_type_parameters()?;
+        let params = self.parse_type_params()?;
         self.parse_token(TokenKind::OpenParen, Some("to begin struct fields"))?;
         self.ignore_newlines();
 
@@ -66,7 +66,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             name,
             fields,
             is_packed,
-            params: parameters,
+            params: params.into(),
             source,
             privacy,
         })

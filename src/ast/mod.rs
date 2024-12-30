@@ -9,10 +9,12 @@ mod given;
 mod global_variable;
 mod helper_expr;
 mod implementation;
+mod privacy;
 mod stmt;
 mod structs;
 mod traits;
 mod type_alias;
+mod type_params;
 mod workspace;
 
 pub use block::*;
@@ -26,9 +28,11 @@ pub use given::*;
 pub use global_variable::*;
 pub use helper_expr::*;
 pub use implementation::*;
+pub use privacy::*;
 #[allow(unused_imports)]
 pub use stmt::*;
 pub use structs::*;
 pub use traits::*;
 pub use type_alias::*;
+pub use type_params::*;
 pub use workspace::*;

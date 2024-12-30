@@ -3,7 +3,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{TypeKind, TypeParameter},
+    ast::{TypeKind, TypeParam},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_type_parameter(
         &mut self,
-        generics: &mut IndexMap<String, TypeParameter>,
+        generics: &mut IndexMap<String, TypeParam>,
     ) -> Result<(), ParseError> {
         if !self.input.peek().is_polymorph() {
             return Err(ParseErrorKind::Expected {
@@ -44,7 +44,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         // TODO: CLEANUP: Clean up this part to not clone unless necessary
         if generics
-            .insert(polymorph.clone(), TypeParameter::new(constraints))
+            .insert(polymorph.clone(), TypeParam::new(constraints))
             .is_some()
         {
             return Err(
@@ -56,7 +56,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Ok(())
     }
 
-    pub fn parse_type_parameters(&mut self) -> Result<IndexMap<String, TypeParameter>, ParseError> {
+    pub fn parse_type_params(&mut self) -> Result<IndexMap<String, TypeParam>, ParseError> {
         let mut parameters = IndexMap::new();
 
         if self.input.eat(TokenKind::OpenAngle) {

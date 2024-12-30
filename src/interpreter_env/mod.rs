@@ -3,7 +3,7 @@ use crate::{
     ast::{
         AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Func,
         FuncHead, InterpreterSyscall, Language, Param, Params, Privacy, StmtKind, Struct,
-        StructLiteral, TypeKind,
+        StructLiteral, TypeKind, TypeParams,
     },
     interpreter::{
         syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
@@ -140,6 +140,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.structs.push(Struct {
         name: "Project".into(),
+        params: TypeParams::default(),
         fields: IndexMap::from_iter([(
             "kind".into(),
             Field {
@@ -148,7 +149,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                 source,
             },
         )]),
-        params: IndexMap::default(),
         is_packed: false,
         source,
         privacy: Privacy::Private,
@@ -156,6 +156,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.structs.push(Struct {
         name: "Dependency".into(),
+        params: TypeParams::default(),
         fields: IndexMap::from_iter([(
             "name".into(),
             Field {
@@ -164,7 +165,6 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
                 source,
             },
         )]),
-        params: IndexMap::default(),
         is_packed: false,
         source,
         privacy: Privacy::Private,

@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{Call, CompileTimeArgument, Expr, ExprKind},
+    ast::{Call, Expr, ExprKind, TypeArg},
     inflow::Inflow,
     name::Name,
     parser::error::ParseError,
@@ -12,7 +12,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call(
         &mut self,
         name: Name,
-        generics: Vec<CompileTimeArgument>,
+        generics: Vec<TypeArg>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         self.parse_call_raw_with(name, generics, vec![])
@@ -22,7 +22,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call_with(
         &mut self,
         name: Name,
-        generics: Vec<CompileTimeArgument>,
+        generics: Vec<TypeArg>,
         prefix_args: Vec<Expr>,
         source: Source,
     ) -> Result<Expr, ParseError> {
@@ -33,7 +33,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call_raw(
         &mut self,
         name: Name,
-        generics: Vec<CompileTimeArgument>,
+        generics: Vec<TypeArg>,
     ) -> Result<Call, ParseError> {
         self.parse_call_raw_with(name, generics, vec![])
     }
@@ -41,7 +41,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_call_raw_with(
         &mut self,
         name: Name,
-        generics: Vec<CompileTimeArgument>,
+        generics: Vec<TypeArg>,
         prefix_args: Vec<Expr>,
     ) -> Result<Call, ParseError> {
         // function_name(arg1, arg2, arg3)

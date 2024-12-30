@@ -1,9 +1,9 @@
 use super::{find_error::FindTypeError, ResolveTypeCtx};
 use crate::{
-    ast::CompileTimeArgument,
+    asg::{self},
+    ast::TypeArg,
     name::Name,
     resolve::error::ResolveErrorKind,
-    asg::{self},
 };
 use itertools::Itertools;
 use std::borrow::Cow;
@@ -12,7 +12,7 @@ impl<'a> ResolveTypeCtx<'a> {
     pub fn find(
         &self,
         name: &Name,
-        arguments: &[CompileTimeArgument],
+        arguments: &[TypeArg],
     ) -> Result<Cow<'a, asg::TypeKind>, FindTypeError> {
         let settings = &self.asg.workspace.settings[self
             .asg
@@ -38,8 +38,8 @@ impl<'a> ResolveTypeCtx<'a> {
                 let arguments = arguments
                     .iter()
                     .flat_map(|arg| match arg {
-                        CompileTimeArgument::Type(ty) => self.resolve(ty),
-                        CompileTimeArgument::Expr(expr) => Err(ResolveErrorKind::Other {
+                        TypeArg::Type(ty) => self.resolve(ty),
+                        TypeArg::Expr(expr) => Err(ResolveErrorKind::Other {
                             message:
                                 "Expressions cannot be used as type parameters to structures yet"
                                     .into(),
@@ -59,8 +59,8 @@ impl<'a> ResolveTypeCtx<'a> {
                 let arguments = arguments
                     .iter()
                     .flat_map(|arg| match arg {
-                        CompileTimeArgument::Type(ty) => self.resolve(ty),
-                        CompileTimeArgument::Expr(expr) => Err(ResolveErrorKind::Other {
+                        TypeArg::Type(ty) => self.resolve(ty),
+                        TypeArg::Expr(expr) => Err(ResolveErrorKind::Other {
                             message: "Expressions cannot be used as type parameters to traits yet"
                                 .into(),
                         }

@@ -3,7 +3,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{CompileTimeArgument, Type, TypeKind},
+    ast::{Type, TypeArg, TypeKind},
     inflow::Inflow,
     name::Name,
     source_files::Source,
@@ -55,11 +55,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             return Ok(TypeKind::Polymorph(polymorph, constraints).at(source));
         };
 
-        let generics = self.parse_generics()?;
+        let generics = self.parse_type_args()?;
         self.parse_type_from_parts(name, generics, source)
     }
 
-    pub fn parse_generics(&mut self) -> Result<Vec<CompileTimeArgument>, ParseError> {
+    pub fn parse_type_args(&mut self) -> Result<Vec<TypeArg>, ParseError> {
         let mut generics = vec![];
 
         if !self.input.eat(TokenKind::OpenAngle) {
@@ -80,11 +80,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
 
             generics.push(if self.input.peek().could_start_type() {
-                CompileTimeArgument::Type(
-                    self.parse_type(None::<&str>, Some("for compile time argument"))?,
-                )
+                TypeArg::Type(self.parse_type(None::<&str>, Some("for compile time argument"))?)
             } else {
-                CompileTimeArgument::Expr(self.parse_expr_primary()?)
+                TypeArg::Expr(self.parse_expr_primary()?)
             });
         }
 
@@ -94,7 +92,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_type_from_parts(
         &mut self,
         name: Name,
-        generics: Vec<CompileTimeArgument>,
+        generics: Vec<TypeArg>,
         source: Source,
     ) -> Result<Type, ParseError> {
         let type_kind = match name.as_plain_str() {
@@ -123,7 +121,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             Some("void") => Ok(TypeKind::Void),
             Some("ptr") => {
                 if generics.len() == 1 {
-                    if let CompileTimeArgument::Type(inner) = generics.into_iter().next().unwrap() {
+                    if let TypeArg::Type(inner) = generics.into_iter().next().unwrap() {
                         Ok(TypeKind::Ptr(Box::new(inner)))
                     } else {
                         Err(ParseError {

@@ -2,8 +2,8 @@ mod common;
 mod display;
 
 use super::{
-    AnonymousEnum, AnonymousStruct, AnoymousUnion, CInteger, CompileTimeArgument, FixedArray,
-    FloatSize, FuncPtr, IntegerBits, IntegerSign, Type,
+    AnonymousEnum, AnonymousStruct, AnoymousUnion, CInteger, FixedArray, FloatSize, FuncPtr,
+    IntegerBits, IntegerSign, Type, TypeArg,
 };
 use crate::{name::Name, source_files::Source};
 
@@ -16,7 +16,7 @@ pub enum TypeKind {
     Ptr(Box<Type>),
     FixedArray(Box<FixedArray>),
     Void,
-    Named(Name, Vec<CompileTimeArgument>),
+    Named(Name, Vec<TypeArg>),
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(AnoymousUnion),
     AnonymousEnum(AnonymousEnum),
