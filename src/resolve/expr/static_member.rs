@@ -88,6 +88,13 @@ pub fn resolve_static_member_call(
         ));
     };
 
+    if imp.name_params.len() != impl_args.len() {
+        return Err(ResolveError::other(
+            "Wrong number of arguments for implementation",
+            source,
+        ));
+    }
+
     let TypeKind::Trait(_trait_human_name, _trait_ref, trait_args) = &imp.ty.kind else {
         return Err(ResolveError::other(
             "Implementation is not for trait?",

@@ -15,6 +15,7 @@ use crate::{
     tag::Tag,
     workspace::fs::FsNodeId,
 };
+use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
 fn create_impl_head<'a>(
@@ -37,7 +38,19 @@ fn create_impl_head<'a>(
     // NOTE: This will need to be resolved to which trait to use instead of an actual type
     let ty = type_ctx.resolve(&imp.target)?;
 
+    if imp
+        .params
+        .values()
+        .any(|param| !param.constraints.is_empty())
+    {
+        return Err(ResolveError::other(
+            "Constraints on implementation name parameters are not supported yet",
+            imp.source,
+        ));
+    }
+
     let impl_ref = asg.impls.insert(asg::Impl {
+        name_params: IndexMap::from_iter(imp.params.keys().cloned().map(|key| (key, ()))),
         ty,
         source: imp.source,
         body: HashMap::default(),
