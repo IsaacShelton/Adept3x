@@ -20,6 +20,15 @@ impl ResolveError {
     pub fn new(kind: ResolveErrorKind, source: Source) -> Self {
         Self { kind, source }
     }
+
+    pub fn other(message: impl ToString, source: Source) -> Self {
+        Self {
+            kind: ResolveErrorKind::Other {
+                message: message.to_string(),
+            },
+            source,
+        }
+    }
 }
 
 impl From<UnaliasError> for ResolveErrorKind {

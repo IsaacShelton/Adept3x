@@ -94,7 +94,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     // Call to function we actually care about
     let call = ExprKind::Call(Box::new(Call {
         name: Name::plain("main"),
-        arguments: vec![],
+        args: vec![],
         expected_to_return: Some(void.clone()),
         generics: vec![],
     }))

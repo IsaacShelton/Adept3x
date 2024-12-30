@@ -7,7 +7,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Call {
     pub name: Name,
-    pub arguments: Vec<Expr>,
+    pub args: Vec<Expr>,
     pub expected_to_return: Option<Type>,
     pub generics: Vec<CompileTimeArgument>,
 }

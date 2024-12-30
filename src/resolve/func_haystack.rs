@@ -92,7 +92,7 @@ impl FuncHaystack {
             .collect_vec()
     }
 
-    fn fits(
+    pub fn fits(
         ctx: &ResolveExprCtx,
         func_ref: asg::FuncRef,
         arguments: &[TypedExpr],

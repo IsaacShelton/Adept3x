@@ -149,7 +149,7 @@ fn restrict_allowed_expr(expr: &Expr) -> Result<(), Box<dyn Show>> {
                 return Err(found_forbidden_expr(expr.source));
             }
 
-            for argument in call.arguments.iter() {
+            for argument in call.args.iter() {
                 restrict_allowed_expr(argument)?;
             }
         }

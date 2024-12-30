@@ -67,7 +67,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         Ok(Call {
             name,
-            arguments: args,
+            args,
             expected_to_return: None,
             generics,
         })

@@ -1,5 +1,8 @@
 use super::{
-    ctx::ResolveCtx, error::ResolveError, func_haystack::FuncHaystack, job::FuncJob,
+    ctx::ResolveCtx,
+    error::{ResolveError, ResolveErrorKind},
+    func_haystack::FuncHaystack,
+    job::FuncJob,
     type_ctx::ResolveTypeCtx,
 };
 use crate::{
@@ -34,11 +37,31 @@ fn create_impl_head<'a>(
     // NOTE: This will need to be resolved to which trait to use instead of an actual type
     let ty = type_ctx.resolve(&imp.target)?;
 
-    Ok(asg.impls.insert(asg::Impl {
+    let impl_ref = asg.impls.insert(asg::Impl {
         ty,
         source: imp.source,
         body: HashMap::default(),
-    }))
+    });
+
+    let name = imp
+        .name
+        .as_ref()
+        .map_or("<unnamed impl>", |name| name.as_str());
+
+    if ctx
+        .impls_in_modules
+        .entry(module_file_id)
+        .or_default()
+        .insert(name.to_string(), impl_ref)
+        .is_some()
+    {
+        return Err(ResolveErrorKind::Other {
+            message: format!("Duplicate implementation name '{}'", name),
+        }
+        .at(imp.source));
+    };
+
+    Ok(impl_ref)
 }
 
 pub fn create_func_heads<'a>(

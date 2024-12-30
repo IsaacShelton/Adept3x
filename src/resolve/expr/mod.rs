@@ -5,6 +5,7 @@ mod conditional;
 mod declare_assign;
 mod member_expr;
 mod short_circuiting_binary_operation;
+mod static_member;
 mod struct_literal;
 mod unary_operation;
 mod variable;
@@ -26,7 +27,7 @@ use crate::{
     asg::{self, Asg, CurrentConstraints, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
-        StaticMemberActionKind, UnaryOperator,
+        UnaryOperator,
     },
     resolve::{
         error::ResolveErrorKind,
@@ -43,6 +44,7 @@ use crate::{
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
 use ordered_float::NotNan;
+use static_member::resolve_static_member;
 use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
@@ -55,6 +57,7 @@ pub struct ResolveExprCtx<'a, 'b> {
     pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
     pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
     pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
+    pub impls_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::ImplRef>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
     pub current_constraints: CurrentConstraints,
@@ -345,37 +348,7 @@ pub fn resolve_expr(
             asg::Expr::new(asg::ExprKind::BooleanLiteral(*value), source),
         )),
         ast::ExprKind::StaticMember(static_access) => {
-            let ty = ctx.type_ctx().resolve(&static_access.subject)?;
-            match &static_access.action.kind {
-                StaticMemberActionKind::Value(member) => {
-                    let TypeKind::Enum(human_name, enum_ref) = &ty.kind else {
-                        return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
-                            ty: static_access.subject.to_string(),
-                            member: member.clone(),
-                        }
-                        .at(source));
-                    };
-
-                    Ok(TypedExpr::new(
-                        ty.clone(),
-                        asg::Expr::new(
-                            asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
-                                human_name: human_name.clone(),
-                                enum_ref: *enum_ref,
-                                variant_name: member.clone(),
-                                source,
-                            })),
-                            source,
-                        ),
-                    ))
-                }
-                StaticMemberActionKind::Call(_call) => {
-                    return Err(ResolveErrorKind::Other {
-                        message: "calling static members is not supported yet".into(),
-                    }
-                    .at(source))
-                }
-            }
+            resolve_static_member(ctx, static_access, source)
         }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {
