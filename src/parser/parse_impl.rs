@@ -6,7 +6,6 @@ use super::{
 use crate::{
     ast::{Impl, Privacy, TypeParams},
     inflow::Inflow,
-    name::Name,
     token::{Token, TokenKind},
 };
 
@@ -26,29 +25,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
         }
 
-        let name1 = self
-            .input
-            .eat_identifier()
-            .ok_or_else(|| ParseError::expected("trait name", None::<&str>, self.input.peek()))?;
-        let generics1 = self.parse_type_args()?;
+        let target = self.parse_type(Some("trait"), None::<&str>)?;
 
-        let name2 = self.input.eat_identifier();
-        let generics2 = name2
-            .is_some()
-            .then(|| self.parse_type_args())
-            .transpose()?
-            .unwrap_or_default();
-
-        let (name, params, target) = if let Some(name2) = name2 {
-            let params = TypeParams::try_from(generics1)
-                .map_err(|(message, source)| ParseErrorKind::Other { message }.at(source))?;
-
-            let target = self.parse_type_from_parts(Name::plain(name2), generics2, source)?;
-            (Some(name1), params, target)
-        } else {
-            let target = self.parse_type_from_parts(Name::plain(name1), generics1, source)?;
-            (None, TypeParams::default(), target)
-        };
+        let name = self.input.eat_identifier();
+        let params = TypeParams::try_from(self.parse_type_args()?)
+            .map_err(|(message, source)| ParseErrorKind::Other { message }.at(source))?;
 
         let mut body = vec![];
 

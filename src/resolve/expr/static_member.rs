@@ -117,7 +117,7 @@ pub fn resolve_static_member_call(
             ast::TypeArg::Type(ty) => {
                 catalog
                     .put_type(name, &ctx.type_ctx().resolve(ty)?)
-                    .expect("unique impl parameters names");
+                    .expect("unique impl parameter names");
             }
             ast::TypeArg::Expr(expr) => {
                 return Err(ResolveError::other(
