@@ -140,7 +140,7 @@ pub fn call_callee(
 }
 
 fn cast(
-    _ctx: &mut ResolveExprCtx,
+    ctx: &mut ResolveExprCtx,
     call: &ast::Call,
     arguments: Vec<TypedExpr>,
     source: Source,
@@ -215,6 +215,19 @@ fn cast(
     let argument_type_kind = &arguments[0].ty.kind;
 
     if let Some(target_type_kind) = target_type_kind {
+        if argument_type_kind.is_integer_literal() || argument_type_kind.is_float_literal() {
+            return conform_expr::<Perform>(
+                ctx,
+                &arguments[0],
+                &target_type_kind.at(source),
+                ConformMode::Explicit,
+                ctx.adept_conform_behavior(),
+                source,
+            )
+            .map(Ok)
+            .map_err(|_| ResolveError::other("Cannot cast literal to unsuitable type", source));
+        }
+
         if target_type_kind.is_boolean() && argument_type_kind.is_integer_literal() {
             let argument = arguments.into_iter().next().unwrap();
             let is_initialized = argument.is_initialized;

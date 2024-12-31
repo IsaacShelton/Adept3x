@@ -96,10 +96,13 @@ impl FuncHaystack {
         ctx: &ResolveExprCtx,
         func_ref: asg::FuncRef,
         arguments: &[TypedExpr],
+        existing_catalog: Option<PolyCatalog>,
         source: Source,
     ) -> Option<Callee> {
         let function = ctx.asg.funcs.get(func_ref).unwrap();
         let parameters = &function.params;
+
+        let mut catalog = existing_catalog.unwrap_or_default();
 
         if !parameters.is_cstyle_vararg && arguments.len() != parameters.required.len() {
             return None;
@@ -108,8 +111,6 @@ impl FuncHaystack {
         if arguments.len() < parameters.required.len() {
             return None;
         }
-
-        let mut catalog = PolyCatalog::new();
 
         for (i, argument) in arguments.iter().enumerate() {
             let preferred_type =
@@ -179,7 +180,7 @@ impl FuncHaystack {
             .get(&resolved_name)
             .into_iter()
             .flatten()
-            .flat_map(|f| Self::fits(ctx, *f, arguments, source));
+            .flat_map(|f| Self::fits(ctx, *f, arguments, None, source));
 
         local_matches.next().map(|found| {
             if local_matches.next().is_some() {
@@ -215,7 +216,7 @@ impl FuncHaystack {
                     .into_iter()
             })
             .flatten()
-            .flat_map(|f| Self::fits(ctx, *f, arguments, source));
+            .flat_map(|f| Self::fits(ctx, *f, arguments, None, source));
 
         remote_matches.next().map(|found| {
             if remote_matches.next().is_some() {
@@ -285,7 +286,7 @@ impl FuncHaystack {
                     .into_iter()
                     .flatten()
             })
-            .flat_map(|f| Self::fits(ctx, *f, arguments, source));
+            .flat_map(|f| Self::fits(ctx, *f, arguments, None, source));
 
         matches.next().map(|found| {
             if matches.next().is_some() {

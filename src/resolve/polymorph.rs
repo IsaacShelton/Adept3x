@@ -152,7 +152,7 @@ pub enum PolyValue {
     PolyExpr(PolyExpr),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PolyCatalog {
     polymorphs: IndexMap<String, PolyValue>,
 }

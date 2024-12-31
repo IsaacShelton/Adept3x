@@ -6,6 +6,7 @@ use crate::{
         error::{ResolveError, ResolveErrorKind},
         func_haystack::{FindFunctionError, FuncHaystack},
         initialized::Initialized,
+        PolyCatalog,
     },
     source_files::Source,
 };
@@ -109,12 +110,32 @@ pub fn resolve_static_member_call(
         ));
     };
 
+    let mut catalog = PolyCatalog::default();
+
+    for (name, arg) in imp.name_params.keys().zip(impl_args) {
+        match arg {
+            ast::TypeArg::Type(ty) => {
+                catalog
+                    .put_type(name, &ctx.type_ctx().resolve(ty)?)
+                    .expect("unique impl parameters names");
+            }
+            ast::TypeArg::Expr(expr) => {
+                return Err(ResolveError::other(
+                    "Cannot use expressions as implementation parameters yet",
+                    expr.source,
+                ));
+            }
+        }
+    }
+
     let mut matches = imp
         .body
         .get(callee_name)
         .into_iter()
         .flatten()
-        .flat_map(|func_ref| FuncHaystack::fits(ctx, *func_ref, &args, source));
+        .flat_map(|func_ref| {
+            FuncHaystack::fits(ctx, *func_ref, &args, Some(catalog.clone()), source)
+        });
 
     let callee = matches
         .next()
