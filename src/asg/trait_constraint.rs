@@ -5,11 +5,11 @@ use crate::source_files::Source;
 pub struct Trait {
     pub source: Source,
     pub parameters: Vec<String>,
-    pub functions: Vec<TraitFunction>,
+    pub funcs: Vec<TraitFunc>,
 }
 
 #[derive(Clone, Debug)]
-pub struct TraitFunction {
+pub struct TraitFunc {
     pub name: String,
     pub parameters: Parameters,
     pub return_type: Type,

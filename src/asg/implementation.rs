@@ -1,4 +1,4 @@
-use super::{FuncRef, Type};
+use super::{FuncRef, GenericTraitRef};
 use crate::source_files::Source;
 use indexmap::IndexMap;
 use std::collections::HashMap;
@@ -6,7 +6,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct Impl {
     pub name_params: IndexMap<String, ()>,
-    pub ty: Type,
+    pub target: GenericTraitRef,
     pub source: Source,
     pub body: HashMap<String, Vec<FuncRef>>,
 }

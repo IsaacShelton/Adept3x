@@ -160,7 +160,7 @@ fn prepare_trait(
     definition: &ast::Trait,
 ) -> Result<TraitRef, ResolveError> {
     let trait_ref = asg.traits.insert(asg::Trait {
-        functions: vec![],
+        funcs: vec![],
         parameters: definition.parameters.clone(),
         source: definition.source,
     });

@@ -1,7 +1,5 @@
 use crate::{
-    asg::{
-        self, Asg, CurrentConstraints, EnumRef, StructRef, TraitFunction, TraitRef, TypeAliasRef,
-    },
+    asg::{self, Asg, CurrentConstraints, EnumRef, StructRef, TraitFunc, TraitRef, TypeAliasRef},
     ast::{self, AstWorkspace},
     resolve::{
         ctx::ResolveCtx,
@@ -207,7 +205,7 @@ fn resolve_trait(
         let parameters = resolve_parameters(&type_ctx, &function.params)?;
         let return_type = type_ctx.resolve(&function.return_type)?;
 
-        functions.push(TraitFunction {
+        functions.push(TraitFunc {
             name: function.name.clone(),
             parameters,
             return_type,
@@ -215,6 +213,6 @@ fn resolve_trait(
         });
     }
 
-    asg.traits.get_mut(trait_ref).unwrap().functions = functions;
+    asg.traits.get_mut(trait_ref).unwrap().funcs = functions;
     Ok(())
 }

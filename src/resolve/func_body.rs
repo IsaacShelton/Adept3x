@@ -123,7 +123,7 @@ fn resolve_func_body(
             types_in_modules: &ctx.types_in_modules,
             globals_in_modules: &ctx.globals_in_modules,
             helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
-            impls_in_modules: &ctx.impls_in_modules,
+            impls_in_modules: &mut ctx.impls_in_modules,
             module_fs_node_id: module_file_id,
             physical_fs_node_id: physical_file_id,
             current_constraints: constraints,
