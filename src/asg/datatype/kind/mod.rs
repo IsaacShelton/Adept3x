@@ -109,9 +109,7 @@ impl TypeKind {
             TypeKind::Structure(_, struct_ref, _) => {
                 asg.structs.get(*struct_ref).unwrap().params.len()
             }
-            TypeKind::Trait(_, trait_ref, _) => {
-                asg.traits.get(*trait_ref).unwrap().parameters.len()
-            }
+            TypeKind::Trait(_, trait_ref, _) => asg.traits.get(*trait_ref).unwrap().params.len(),
             _ => 0,
         }
     }

@@ -10,6 +10,7 @@ use crate::{
     },
     workspace::fs::FsNodeId,
 };
+use indexmap::IndexMap;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -199,18 +200,20 @@ fn resolve_trait(
         &constraints,
     );
 
-    let mut functions = Vec::with_capacity(definition.funcs.len());
+    let mut functions = IndexMap::new();
 
     for function in &definition.funcs {
         let parameters = resolve_parameters(&type_ctx, &function.params)?;
         let return_type = type_ctx.resolve(&function.return_type)?;
 
-        functions.push(TraitFunc {
-            name: function.name.clone(),
-            parameters,
-            return_type,
-            source: function.source,
-        });
+        functions.insert(
+            function.name.clone(),
+            TraitFunc {
+                params: parameters,
+                return_type,
+                source: function.source,
+            },
+        );
     }
 
     asg.traits.get_mut(trait_ref).unwrap().funcs = functions;

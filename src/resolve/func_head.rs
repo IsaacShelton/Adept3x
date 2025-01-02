@@ -120,19 +120,19 @@ pub fn create_func_head<'a>(
 pub fn resolve_parameters(
     type_ctx: &ResolveTypeCtx,
     parameters: &ast::Params,
-) -> Result<asg::Parameters, ResolveError> {
+) -> Result<asg::Params, ResolveError> {
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {
         let ty = type_ctx.resolve(&parameter.ast_type)?;
 
-        required.push(asg::Parameter {
+        required.push(asg::Param {
             name: parameter.name.clone(),
             ty,
         });
     }
 
-    Ok(asg::Parameters {
+    Ok(asg::Params {
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })

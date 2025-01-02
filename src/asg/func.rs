@@ -49,7 +49,7 @@ impl<'a> CurrentConstraints {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub name: ResolvedName,
-    pub params: Parameters,
+    pub params: Params,
     pub return_type: Type,
     pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
@@ -61,13 +61,13 @@ pub struct Func {
     pub constraints: CurrentConstraints,
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct Parameters {
-    pub required: Vec<Parameter>,
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Params {
+    pub required: Vec<Param>,
     pub is_cstyle_vararg: bool,
 }
 
-impl Display for Parameters {
+impl Display for Params {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, param) in self.required.iter().enumerate() {
             if i != 0 {
@@ -89,18 +89,18 @@ impl Display for Parameters {
 }
 
 #[derive(Clone, Debug, Hash, Eq)]
-pub struct Parameter {
+pub struct Param {
     pub name: String,
     pub ty: Type,
 }
 
-impl Display for Parameter {
+impl Display for Param {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.name, self.ty)
     }
 }
 
-impl PartialEq for Parameter {
+impl PartialEq for Param {
     fn eq(&self, other: &Self) -> bool {
         self.ty.eq(&other.ty)
     }

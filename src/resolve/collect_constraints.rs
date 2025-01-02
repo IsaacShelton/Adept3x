@@ -2,7 +2,7 @@ use crate::asg::{self, Constraint};
 use std::collections::{HashMap, HashSet};
 
 pub fn collect_constraints(
-    parameters: &asg::Parameters,
+    parameters: &asg::Params,
     return_type: &asg::Type,
 ) -> HashMap<String, HashSet<Constraint>> {
     let mut map = HashMap::default();

@@ -1,8 +1,7 @@
-use crate::asg::{Parameter, Type};
+use crate::asg::{Params, Type};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct FuncPtr {
-    pub parameters: Vec<Parameter>,
+    pub params: Params,
     pub return_type: Box<Type>,
-    pub is_cstyle_variadic: bool,
 }

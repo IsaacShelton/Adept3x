@@ -1,6 +1,6 @@
 use super::{resolve_constraints, ResolveTypeCtx};
 use crate::{
-    asg::{self},
+    asg::{self, Params},
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
@@ -84,12 +84,12 @@ impl<'a> ResolveTypeCtx<'a> {
                 }
             }
             ast::TypeKind::FuncPtr(function_pointer) => {
-                let mut parameters = Vec::with_capacity(function_pointer.parameters.len());
+                let mut params = Vec::with_capacity(function_pointer.parameters.len());
 
                 for parameter in function_pointer.parameters.iter() {
                     let ty = self.resolve(&parameter.ast_type)?;
 
-                    parameters.push(asg::Parameter {
+                    params.push(asg::Param {
                         name: parameter.name.clone(),
                         ty,
                     });
@@ -98,9 +98,11 @@ impl<'a> ResolveTypeCtx<'a> {
                 let return_type = Box::new(self.resolve(&function_pointer.return_type)?);
 
                 Ok(asg::TypeKind::FuncPtr(asg::FuncPtr {
-                    parameters,
                     return_type,
-                    is_cstyle_variadic: function_pointer.is_cstyle_variadic,
+                    params: Params {
+                        required: params,
+                        is_cstyle_vararg: function_pointer.is_cstyle_variadic,
+                    },
                 }))
             }
             ast::TypeKind::Polymorph(polymorph, constraints) => Ok(asg::TypeKind::Polymorph(

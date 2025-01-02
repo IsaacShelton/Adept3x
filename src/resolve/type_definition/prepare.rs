@@ -160,13 +160,14 @@ fn prepare_trait(
     definition: &ast::Trait,
 ) -> Result<TraitRef, ResolveError> {
     let trait_ref = asg.traits.insert(asg::Trait {
-        funcs: vec![],
-        parameters: definition.parameters.clone(),
+        human_name: HumanName(definition.name.clone()),
+        funcs: IndexMap::default(),
+        params: definition.params.clone(),
         source: definition.source,
     });
 
-    let parameters = definition
-        .parameters
+    let params = definition
+        .params
         .iter()
         .map(|name| asg::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
         .collect_vec();
@@ -177,11 +178,7 @@ fn prepare_trait(
         &definition.name,
         definition.source,
         definition.privacy,
-        asg::TypeKind::Trait(
-            HumanName(definition.name.to_string()),
-            trait_ref,
-            parameters,
-        ),
+        asg::TypeKind::Trait(HumanName(definition.name.to_string()), trait_ref, params),
     )?;
 
     Ok(trait_ref)
