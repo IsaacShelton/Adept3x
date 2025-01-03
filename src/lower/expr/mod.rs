@@ -16,9 +16,11 @@ use crate::{
     ast::{FloatSize, IntegerBits, IntegerRigidity},
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     lower::structure::mono,
-    resolve::PolyCatalog,
+    resolve::{PolyCatalog, PolyRecipe, PolyType, PolyValue},
 };
+use indexmap::IndexMap;
 use short_circuit::lower_short_circuiting_binary_operation;
+use std::borrow::Borrow;
 
 pub fn lower_expr(
     builder: &mut Builder,
@@ -149,12 +151,32 @@ pub fn lower_expr(
                 .map(|argument| lower_type(ir_module, &builder.unpoly(&argument.ty)?, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
 
-            let function =
-                ir_module
-                    .funcs
-                    .translate(call.callee.function, &call.callee.recipe, || {
-                        lower_func_head(ir_module, call.callee.function, &call.callee.recipe, asg)
-                    })?;
+            // NOTE: We have to resolve our own polymorphs in the mapping
+            let mut polymorphs = IndexMap::<String, PolyValue>::new();
+
+            for (name, value) in call.callee.recipe.polymorphs.iter() {
+                match value {
+                    PolyValue::PolyType(ty) => {
+                        polymorphs.insert(
+                            name.clone(),
+                            PolyValue::PolyType(PolyType {
+                                ty: Borrow::<asg::Type>::borrow(&builder.unpoly(&ty.ty)?.0).clone(),
+                            }),
+                        );
+                    }
+                    PolyValue::PolyExpr(_) => {
+                        todo!("compile-time expression parameters are not supported when calling generic functions yet")
+                    }
+                }
+            }
+
+            let recipe = PolyRecipe { polymorphs };
+
+            let function = ir_module
+                .funcs
+                .translate(call.callee.function, &recipe, || {
+                    lower_func_head(ir_module, call.callee.function, &recipe, asg)
+                })?;
 
             Ok(builder.push(ir::Instr::Call(ir::Call {
                 func: function,

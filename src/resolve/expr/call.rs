@@ -112,12 +112,6 @@ pub fn call_callee(
     if let Some(required_ty) = &call.expected_to_return {
         let resolved_required_ty = ctx.type_ctx().resolve(required_ty)?;
 
-        // TODO: Map return type according to polymorph catalog
-        // if applicable.
-        eprintln!(
-            "warning: call resolution does't map return types according to poly catalogs yet"
-        );
-
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {
                 of: required_ty.to_string(),

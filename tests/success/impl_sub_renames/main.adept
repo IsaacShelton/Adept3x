@@ -14,7 +14,7 @@ trait Act<$T> {
 
 #[public]
 impl Act<$Self> actAnything {
-    func act(self $Self) {
+    func act(s $Self) {
         printf(c"act anything...\n")
     }
 }

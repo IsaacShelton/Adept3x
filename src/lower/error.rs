@@ -14,6 +14,15 @@ impl LowerError {
     pub fn new(kind: LowerErrorKind, source: Source) -> Self {
         Self { kind, source }
     }
+
+    pub fn other(message: impl Into<String>, source: Source) -> Self {
+        Self {
+            kind: LowerErrorKind::Other {
+                message: message.into(),
+            },
+            source,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -43,6 +52,9 @@ pub enum LowerErrorKind {
     IncorrectNumberOfTypeArguments,
     CannotUseTraitDirectly {
         name: String,
+    },
+    Other {
+        message: String,
     },
 }
 
@@ -111,6 +123,9 @@ impl Display for LowerErrorKind {
             LowerErrorKind::PolymorphError(e) => e.fmt(f),
             LowerErrorKind::CannotUseTraitDirectly { name } => {
                 write!(f, "Cannot use trait '{}' directly", name)
+            }
+            LowerErrorKind::Other { message } => {
+                write!(f, "{}", message)
             }
         }
     }

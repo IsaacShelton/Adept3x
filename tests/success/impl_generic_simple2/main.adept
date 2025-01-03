@@ -1,0 +1,37 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+#[foreign]
+func strlen(string ptr<char>) ulonglong
+
+func main {
+    generator := c"Hello, world!"
+    listOut(generator, strlen(generator))
+}
+
+trait Generator<$Self, $Item> {
+    func generate(self ptr<$Self>) $Item
+}
+
+impl Generator<ptr<$T>, $T> generateFromPointer {
+    func generate(self ptr<ptr<$T>>) $T {
+        c := **self
+        rest := &(*self)[1]
+        *self = rest
+        return c
+    }
+}
+
+func listOut(generator ptr<$GeneratedItem>, count ulonglong) {
+    while count > 0 {
+        value := generateFromPointer::generate(&generator)
+
+        // We're going to pretend for now that we can print each item with %d.
+        // This should probably become a compile-time error in the future.
+        printf(c"%d\n", value)
+        count -= 1
+    }
+}
