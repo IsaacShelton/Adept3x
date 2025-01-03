@@ -1,5 +1,0 @@
-
-func main {
-    printf(c"Hello World!\n")
-}
-

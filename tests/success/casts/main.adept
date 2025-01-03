@@ -1,0 +1,276 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    x int = 0
+    y int = 0
+    xf float = 3.14159
+    x double = 3.14159
+
+    did_finish := 0
+
+    while did_finish < 100 {
+        printf(c"%d\n", did_finish.bool())
+        did_finish += 1
+    }
+
+    printf(c"float -> bool\n")
+    y bool = xf.bool()
+    printf(c"%s\n", if y { c"true" } else { c"false" })
+
+    printf(c"double -> bool\n")
+    y bool = x.bool()
+    printf(c"%s\n", if y { c"true" } else { c"false" })
+
+    printf(c"double -> signed fixed\n")
+
+    y i8 = x.i8()
+    printf(c"%d\n", y)
+
+    y i16 = x.i16()
+    printf(c"%d\n", y)
+
+    y i32 = x.i32()
+    printf(c"%d\n", y)
+
+    y i64 = x.i64()
+    printf(c"%lld\n", y)
+
+    // ---------------------------------
+
+    printf(c"double -> unsigned fixed\n")
+
+    y u8 = x.u8()
+    printf(c"%u\n", y)
+
+    y u16 = x.u16()
+    printf(c"%u\n", y)
+
+    y u32 = x.u32()
+    printf(c"%u\n", y)
+
+    y u64 = x.u64()
+
+    printf(c"%llu\n", y)
+
+    // ---------------------------------
+
+    x i8 = -123
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x i16 = -1234
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x i32 = -1234
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x i64 = -1234
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x u8 = 123
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x u16 = 1234
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x u32 = 1234
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x u64 = 1234
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x char = c'A'
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x uchar = 65
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x schar = 65
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x short = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x ushort = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x int = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x uint = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x long = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x ulong = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x longlong = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    x ulonglong = 100
+    printf(c"%f %f\n", x.f32(), x.f64())
+
+    // ---------------------------------
+
+    printf(c"floats -> non-fixed integers\n")
+
+    x f32 = 65.0
+    printf(c"%c\n", x.char())
+
+    x f64 = 65.0
+    printf(c"%c\n", x.char())
+
+    x f32 = 66.0
+    printf(c"%c\n", x.schar())
+
+    x f64 = 66.0
+    printf(c"%c\n", x.schar())
+
+    x f32 = 67.0
+    printf(c"%c\n", x.uchar())
+
+    x f64 = 67.0
+    printf(c"%c\n", x.uchar())
+
+    x f32 = 68.0
+    printf(c"%d\n", x.short())
+
+    x f64 = 68.0
+    printf(c"%d\n", x.short())
+
+    x f32 = 69.0
+    printf(c"%d\n", x.ushort())
+
+    x f64 = 69.0
+    printf(c"%d\n", x.ushort())
+
+    x f32 = 70.0
+    printf(c"%d\n", x.int())
+
+    x f64 = 70.0
+    printf(c"%d\n", x.int())
+
+    x f32 = 71.0
+    printf(c"%d\n", x.uint())
+
+    x f64 = 71.0
+    printf(c"%d\n", x.uint())
+
+    x f32 = 72.0
+    printf(c"%ld\n", x.long())
+
+    x f64 = 72.0
+    printf(c"%ld\n", x.long())
+
+    x f32 = 73.0
+    printf(c"%ld\n", x.ulong())
+
+    x f64 = 73.0
+    printf(c"%ld\n", x.ulong())
+
+    x f32 = 74.0
+    printf(c"%lld\n", x.longlong())
+
+    x f64 = 74.0
+    printf(c"%lld\n", x.longlong())
+
+    x f32 = 75.0
+    printf(c"%lld\n", x.ulonglong())
+
+    x f64 = 75.0
+    printf(c"%lld\n", x.ulonglong())
+
+    x f32 = 76.0
+    y bool = x.bool()
+    printf(c"%s\n", if y { c"true" } else { c"false" })
+
+    x f64 = 76.0
+    y bool = x.bool()
+    printf(c"%s\n", if y { c"true" } else { c"false" })
+
+
+    // ---------------------------------
+
+    x ulonglong = 65
+
+    y bool = x.bool()
+    printf(c"%s\n", if y { c"true" } else { c"false" })
+
+    y u8 = x.u8()
+    printf(c"%c\n", y)
+
+    y u16 = x.u16()
+    printf(c"%d\n", y)
+
+    y u32 = x.u32()
+    printf(c"%d\n", y)
+
+    y u64 = x.u64()
+    printf(c"%d\n", y)
+
+    y i8 = x.i8()
+    printf(c"%c\n", y)
+
+    y i16 = x.i16()
+    printf(c"%d\n", y)
+
+    y i32 = x.i32()
+    printf(c"%d\n", y)
+
+    y i64 = x.i64()
+    printf(c"%d\n", y)
+
+    y char = x.char()
+    printf(c"%c\n", y)
+
+    y schar = x.schar()
+    printf(c"%c\n", y)
+
+    y uchar = x.uchar()
+    printf(c"%c\n", y)
+
+    y short = x.short()
+    printf(c"%d\n", y)
+
+    y ushort = x.ushort()
+    printf(c"%u\n", y)
+
+    y int = x.int()
+    printf(c"%d\n", y)
+
+    y uint = x.uint()
+    printf(c"%u\n", y)
+
+    y long = x.long()
+    printf(c"%ld\n", y)
+
+    y ulong = x.ulong()
+    printf(c"%lu\n", y)
+
+    y longlong = x.longlong()
+    printf(c"%lld\n", y)
+
+    y ulonglong = x.ulonglong()
+    printf(c"%llu\n", y)
+
+    printf(c"%f\n", false.f32())
+    printf(c"%f\n", true.f32())
+    printf(c"%f\n", false.f64())
+    printf(c"%f\n", true.f64())
+
+    printf(c"%d\n", false.int())
+    printf(c"%d\n", true.int())
+    printf(c"%d\n", false.int())
+    printf(c"%d\n", true.int())
+
+    printf(c"%llu\n", false.ulonglong())
+    printf(c"%llu\n", true.ulonglong())
+    printf(c"%llu\n", false.ulonglong())
+    printf(c"%llu\n", true.ulonglong())
+}
+

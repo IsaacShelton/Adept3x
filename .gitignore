@@ -2,7 +2,6 @@
 .DS_Store
 a.o
 a.out
-lexer_tests
-raw_tests
 bin/
 obj/
+__pycache__

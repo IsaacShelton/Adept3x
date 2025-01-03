@@ -1,0 +1,23 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    a := u8(255)
+    b := i8(-1)
+    c := i16(65500) // NOTE: This does not fit and will cause an error
+    d := u32(100000)
+    e := i64(-123456)
+    f := i64(123456)
+
+    a_check u8 = a
+    b_check i8 = b
+    c_check i16 = c
+    d_check u32 = d
+    e_check i64 = e
+    f_check u64 = f
+
+    println(x + y)
+}
