@@ -1,0 +1,44 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    speakInt::speak(10)
+    speakFloat::speak(11)
+    speakCString::speak(c"Hello, World!")
+    speakAnything<int>::speak(int(10))
+}
+
+trait Speak<$T> {
+    func speak(self $T) void
+}
+
+#[public]
+impl Speak<int> speakInt {
+    func speak(self int) {
+        printf(c"int = %d\n", self)
+    }
+}
+
+#[public]
+impl Speak<float> speakFloat {
+    func speak(self float) {
+        printf(c"float = %f\n", self)
+    }
+}
+
+#[public]
+impl Speak<ptr<char>> speakCString {
+    func speak(self ptr<char>) {
+        printf(c"ptr<char> = %s\n", self)
+    }
+}
+
+#[public]
+impl Speak<$T> speakAnything<$T> {
+    func speak(self $T) {
+        printf(c"anything = ???\n")
+    }
+}

@@ -1,0 +1,26 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    readWriteInt::write(readWriteInt::read())
+}
+
+trait ReadWriter<$T> {
+    func read() $T
+    func write(self $T) void
+}
+
+#[public]
+impl ReadWriter<int> readWriteInt {
+    func read() int {
+        return 10
+    }
+
+    func write(self int) {
+        printf(c"%d\n", self)
+    }
+}
+
