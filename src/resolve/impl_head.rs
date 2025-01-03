@@ -1,4 +1,7 @@
-use super::{ctx::ResolveCtx, error::ResolveError, func_head::create_func_head, job::FuncJob};
+use super::{
+    collect_constraints::collect_constraints_into, ctx::ResolveCtx, error::ResolveError,
+    func_head::create_func_head, job::FuncJob,
+};
 use crate::{
     asg::{self, Asg, CurrentConstraints, Func, GenericTraitRef, TraitFunc, Type},
     ast::{self, AstFile},
@@ -10,7 +13,7 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn create_impl_heads(
     ctx: &mut ResolveCtx,
@@ -76,6 +79,7 @@ pub fn create_impl_heads(
 
 #[derive(Debug, Default)]
 struct ForAlls {
+    substitution_polys: HashSet<String>,
     trait_to_impl: HashMap<String, String>,
     impl_to_trait: HashMap<String, String>,
 }
@@ -87,16 +91,18 @@ impl ForAlls {
         in_impl: String,
         source: Source,
     ) -> Result<(), ResolveError> {
+        if self.substitution_polys.contains(&in_impl) {
+            return Err(ResolveError::other("Inconsistent mapping", source));
+        }
+
         if let Some(expected) = self.trait_to_impl.get(&in_trait) {
             if *expected != in_impl {
-                // Inconsistent mapping
                 return Err(ResolveError::other("Inconsistent mapping", source));
             }
         }
 
         if let Some(expected) = self.impl_to_trait.get(&in_impl) {
             if *expected != in_trait {
-                // Inconsistent mapping
                 return Err(ResolveError::other("Inconsistent mapping", source));
             }
         }
@@ -112,7 +118,6 @@ impl ForAlls {
             .is_none()
             || !self.impl_to_trait.insert(in_impl, in_trait).is_none()
         {
-            // Inconsistent mapping
             return Err(ResolveError::other("Inconsistent mapping", source));
         }
 
@@ -128,6 +133,12 @@ fn ensure_satisfies_trait_func(
     impl_func: &Func,
 ) -> Result<(), ResolveError> {
     let mut for_alls = ForAlls::default();
+
+    let mut mappings = HashMap::new();
+    for sub in expected.values() {
+        collect_constraints_into(&mut mappings, sub);
+    }
+    for_alls.substitution_polys = mappings.into_keys().collect();
 
     if trait_func.params.is_cstyle_vararg != impl_func.params.is_cstyle_vararg {
         return Err(ResolveError::other(
