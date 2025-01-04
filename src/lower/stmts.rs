@@ -31,7 +31,7 @@ pub fn lower_stmts(
                 });
 
                 builder.push(instruction);
-                Value::Literal(Literal::Void)
+                return Ok(Value::Literal(Literal::Void));
             }
             StmtKind::Expr(expr) => lower_expr(builder, ir_module, &expr.expr, func, asg)?,
             StmtKind::Declaration(declaration) => {
