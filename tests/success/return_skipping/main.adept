@@ -1,0 +1,14 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    printf(c"1\n")
+    return
+    
+    printf(c"2\n")
+    return
+}
+
