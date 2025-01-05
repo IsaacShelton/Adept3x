@@ -119,6 +119,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             Some("f32" | "float") => Ok(TypeKind::f32()),
             Some("f64" | "double") => Ok(TypeKind::f64()),
             Some("void") => Ok(TypeKind::Void),
+            Some("never") => Ok(TypeKind::Never),
             Some("ptr") => {
                 if generics.len() == 1 {
                     if let TypeArg::Type(inner) = generics.into_iter().next().unwrap() {

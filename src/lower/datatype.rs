@@ -68,7 +68,7 @@ pub fn lower_type(
             &ConcreteType(Cow::Borrowed(inner)),
             asg,
         )?))),
-        asg::TypeKind::Void => Ok(ir::Type::Void),
+        asg::TypeKind::Void | asg::TypeKind::Never => Ok(ir::Type::Void),
         asg::TypeKind::Structure(_, struct_ref, parameters) => {
             // NOTE: We can assume that all parameters have been resolved to concrete types by this
             // point

@@ -209,6 +209,7 @@ fn matches(
     match &ty_in_trait.kind {
         asg::TypeKind::Unresolved => panic!("unresolved"),
         asg::TypeKind::Void
+        | asg::TypeKind::Never
         | asg::TypeKind::Boolean
         | asg::TypeKind::Integer(_, _)
         | asg::TypeKind::CInteger(_, _)

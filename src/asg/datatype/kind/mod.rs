@@ -30,6 +30,7 @@ pub enum TypeKind {
     Floating(FloatSize),
     Ptr(Box<Type>),
     Void,
+    Never,
     AnonymousStruct(),
     AnonymousUnion(),
     AnonymousEnum(),
@@ -59,7 +60,7 @@ impl TypeKind {
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => false,
             TypeKind::Ptr(inner) => inner.kind.contains_polymorph(),
-            TypeKind::Void => false,
+            TypeKind::Void | TypeKind::Never => false,
             TypeKind::AnonymousStruct() => false,
             TypeKind::AnonymousUnion() => false,
             TypeKind::AnonymousEnum() => false,
@@ -93,6 +94,7 @@ impl TypeKind {
             | TypeKind::Ptr(_)
             | TypeKind::Structure(_, _, _)
             | TypeKind::Void
+            | TypeKind::Never
             | TypeKind::AnonymousStruct(..)
             | TypeKind::AnonymousUnion(..)
             | TypeKind::FixedArray(..)
@@ -154,6 +156,7 @@ impl Display for TypeKind {
                 write!(f, "ptr<{}>", **inner)?;
             }
             TypeKind::Void => f.write_str("void")?,
+            TypeKind::Never => f.write_str("never")?,
             TypeKind::Structure(name, _, parameters) => {
                 write!(f, "{}", name)?;
                 write_parameters(f, parameters)?;

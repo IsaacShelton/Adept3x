@@ -84,6 +84,7 @@ impl PolyRecipe {
             | asg::TypeKind::IntegerLiteral(_)
             | asg::TypeKind::FloatLiteral(_)
             | asg::TypeKind::Void
+            | asg::TypeKind::Never
             | asg::TypeKind::Floating(_) => ty.clone(),
             asg::TypeKind::Ptr(inner) => {
                 asg::TypeKind::Ptr(Box::new(self.resolve_type(inner)?)).at(ty.source)
@@ -191,6 +192,7 @@ impl PolyCatalog {
             | asg::TypeKind::FloatLiteral(_)
             | asg::TypeKind::Floating(_)
             | asg::TypeKind::Void
+            | asg::TypeKind::Never
             | asg::TypeKind::Enum(_, _)
             | asg::TypeKind::TypeAlias(_, _) => {
                 if *pattern_type == *concrete_type {

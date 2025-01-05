@@ -16,6 +16,7 @@ pub enum TypeKind {
     Ptr(Box<Type>),
     FixedArray(Box<FixedArray>),
     Void,
+    Never,
     Named(Name, Vec<TypeArg>),
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(AnoymousUnion),

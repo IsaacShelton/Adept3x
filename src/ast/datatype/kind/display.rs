@@ -33,6 +33,9 @@ impl Display for &TypeKind {
             TypeKind::Void => {
                 write!(f, "void")?;
             }
+            TypeKind::Never => {
+                write!(f, "never")?;
+            }
             TypeKind::Named(name, arguments) => {
                 write!(f, "{name}")?;
 

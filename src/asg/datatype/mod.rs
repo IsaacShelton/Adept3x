@@ -40,6 +40,7 @@ impl Type {
             TypeKind::Floating(_) => (),
             TypeKind::Ptr(inner) => inner.strip_constraints(),
             TypeKind::Void => (),
+            TypeKind::Never => (),
             TypeKind::AnonymousStruct() => todo!(),
             TypeKind::AnonymousUnion() => todo!(),
             TypeKind::AnonymousEnum() => todo!(),

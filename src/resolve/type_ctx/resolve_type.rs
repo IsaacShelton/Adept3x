@@ -32,6 +32,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 Ok(asg::TypeKind::Ptr(Box::new(inner)))
             }
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
+            ast::TypeKind::Never => Ok(asg::TypeKind::Never),
             ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
                 Ok(found) => {
                     if let asg::TypeKind::Structure(_, struct_ref, arguments) = found.borrow() {

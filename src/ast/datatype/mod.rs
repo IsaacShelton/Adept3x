@@ -44,7 +44,7 @@ impl Type {
             | TypeKind::Floating(_) => None,
             TypeKind::Ptr(inner) => inner.contains_polymorph(),
             TypeKind::FixedArray(fixed_array) => fixed_array.ast_type.contains_polymorph(),
-            TypeKind::Void => None,
+            TypeKind::Void | TypeKind::Never => None,
             TypeKind::Named(_, args) => args
                 .iter()
                 .flat_map(|arg| match arg {
