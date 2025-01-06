@@ -1,4 +1,4 @@
-use super::{call::call_callee, resolve_expr, ResolveExprCtx};
+use super::{call::call_callee, resolve_expr, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, TypeKind, TypedExpr},
     ast::{self, StaticMember, StaticMemberActionKind},
@@ -79,7 +79,13 @@ pub fn resolve_static_member_call(
 
     let mut args = Vec::with_capacity(call.args.len());
     for arg in call.args.iter() {
-        args.push(resolve_expr(ctx, arg, None, Initialized::Require)?);
+        args.push(resolve_expr(
+            ctx,
+            arg,
+            None,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
+        )?);
     }
 
     let Some(imp) = impl_ref.and_then(|found| ctx.asg.impls.get(*found)) else {

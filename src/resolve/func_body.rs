@@ -1,6 +1,11 @@
 use super::{
-    ctx::ResolveCtx, error::ResolveError, expr::ResolveExprCtx, job::FuncJob, stmt::resolve_stmts,
-    type_ctx::ResolveTypeCtx, variable_haystack::VariableHaystack,
+    ctx::ResolveCtx,
+    error::ResolveError,
+    expr::{ResolveExprCtx, ResolveExprMode},
+    job::FuncJob,
+    stmt::resolve_stmts,
+    type_ctx::ResolveTypeCtx,
+    variable_haystack::VariableHaystack,
 };
 use crate::{
     asg::{Asg, FuncRef},
@@ -129,6 +134,7 @@ fn resolve_func_body(
             current_constraints: constraints,
         },
         &ast_function.stmts,
+        ResolveExprMode::NeglectValue,
     )?;
 
     asg.funcs

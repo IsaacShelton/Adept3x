@@ -1,12 +1,12 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
+    asg::{Expr, ExprKind, TypeKind, TypedExpr, UnaryMathOperation},
     ast::{self, UnaryMathOperator},
     resolve::{
         conform::to_default::conform_expr_to_default_or_error,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    asg::{Expr, ExprKind, TypeKind, TypedExpr, UnaryMathOperation},
     source_files::Source,
 };
 
@@ -17,8 +17,14 @@ pub fn resolve_unary_math_operation_expr(
     preferred_type: Option<PreferredType>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_expr = resolve_expr(ctx, inner, preferred_type, Initialized::Require)
-        .and_then(|expr| conform_expr_to_default_or_error(expr, ctx.c_integer_assumptions()))?;
+    let resolved_expr = resolve_expr(
+        ctx,
+        inner,
+        preferred_type,
+        Initialized::Require,
+        ResolveExprMode::RequireValue,
+    )
+    .and_then(|expr| conform_expr_to_default_or_error(expr, ctx.c_integer_assumptions()))?;
 
     let from_type = &resolved_expr.ty;
 

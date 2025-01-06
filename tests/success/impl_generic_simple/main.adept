@@ -13,7 +13,6 @@ func main {
 
         if c == c'\0' {
             running = false
-            0
         } else {
             printf(c"%c\n", c)
         }

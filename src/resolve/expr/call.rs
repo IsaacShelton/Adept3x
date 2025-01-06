@@ -1,4 +1,4 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, Callee, Cast, CastFrom, TypedExpr},
     ast::{self, CInteger, FloatSize},
@@ -28,7 +28,13 @@ pub fn resolve_call_expr(
 
     let mut args = Vec::with_capacity(call.args.len());
     for arg in call.args.iter() {
-        args.push(resolve_expr(ctx, arg, None, Initialized::Require)?);
+        args.push(resolve_expr(
+            ctx,
+            arg,
+            None,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
+        )?);
     }
 
     let args = match cast(ctx, call, args, source)? {

@@ -84,6 +84,12 @@ impl<'a, 'b> ResolveExprCtx<'a, 'b> {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ResolveExprMode {
+    RequireValue,
+    NeglectValue,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum PreferredType<'a> {
     Reference(&'a asg::Type),
@@ -135,6 +141,7 @@ pub fn resolve_expr(
     ast_expr: &ast::Expr,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
+    mode: ResolveExprMode,
 ) -> Result<asg::TypedExpr, ResolveError> {
     let source = ast_expr.source;
 
@@ -276,6 +283,7 @@ pub fn resolve_expr(
                     &unary_operation.inner,
                     preferred_type,
                     Initialized::Require,
+                    ResolveExprMode::RequireValue,
                 )?;
                 let result_type = resolved_expr.ty.clone().pointer(source);
                 let destination = resolve_expr_to_destination(resolved_expr)?;
@@ -288,6 +296,7 @@ pub fn resolve_expr(
                     &unary_operation.inner,
                     preferred_type,
                     Initialized::Require,
+                    ResolveExprMode::RequireValue,
                 )?;
 
                 let result_type = match &resolved_expr.ty.kind {
@@ -310,7 +319,7 @@ pub fn resolve_expr(
             }
         },
         ast::ExprKind::Conditional(conditional) => {
-            resolve_conditional_expr(ctx, conditional, preferred_type, source)
+            resolve_conditional_expr(ctx, conditional, preferred_type, mode, source)
         }
         ast::ExprKind::While(while_loop) => {
             ctx.variable_haystack.begin_scope();
@@ -320,6 +329,7 @@ pub fn resolve_expr(
                 &while_loop.condition,
                 Some(PreferredType::of(&asg::TypeKind::Boolean.at(source))),
                 Initialized::Require,
+                ResolveExprMode::RequireValue,
             )?;
 
             let condition = conform_expr_or_error(
@@ -332,7 +342,11 @@ pub fn resolve_expr(
             )?
             .expr;
 
-            let block = asg::Block::new(resolve_stmts(ctx, &while_loop.block.stmts)?);
+            let block = asg::Block::new(resolve_stmts(
+                ctx,
+                &while_loop.block.stmts,
+                ResolveExprMode::NeglectValue,
+            )?);
             ctx.variable_haystack.end_scope();
 
             Ok(TypedExpr::new(
@@ -369,6 +383,7 @@ pub fn resolve_expr(
                         arg,
                         Some(PreferredType::Reference(&preferred_type)),
                         Initialized::Require,
+                        ResolveExprMode::RequireValue,
                     )?
                     .expr,
                 );

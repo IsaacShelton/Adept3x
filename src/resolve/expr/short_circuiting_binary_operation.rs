@@ -1,12 +1,12 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
+    asg::{self, TypedExpr},
     ast,
     resolve::{
         conform::{conform_expr, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
-    asg::{self, TypedExpr},
     source_files::Source,
 };
 
@@ -23,6 +23,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         &binary_operation.left,
         preferred_type,
         Initialized::Require,
+        ResolveExprMode::RequireValue,
     )?;
 
     let left = conform_expr::<Perform>(
@@ -50,6 +51,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         &binary_operation.right,
         preferred_type,
         Initialized::Require,
+        ResolveExprMode::RequireValue,
     )?;
 
     let right = conform_expr::<Perform>(

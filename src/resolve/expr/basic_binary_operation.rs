@@ -1,14 +1,14 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
+    asg::{
+        self, Constraint, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate,
+        TypedExpr,
+    },
     ast,
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         unify_types::unify_types,
         Initialized,
-    },
-    asg::{
-        self, Constraint, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate,
-        TypedExpr,
     },
     source_files::Source,
 };
@@ -27,6 +27,7 @@ pub fn resolve_basic_binary_operation_expr(
         &binary_operation.left,
         preferred_type,
         Initialized::Require,
+        ResolveExprMode::RequireValue,
     )?;
 
     let mut right = resolve_expr(
@@ -34,6 +35,7 @@ pub fn resolve_basic_binary_operation_expr(
         &binary_operation.right,
         preferred_type,
         Initialized::Require,
+        ResolveExprMode::RequireValue,
     )?;
 
     if let asg::TypeKind::IntegerLiteral(left) = &left.ty.kind {
@@ -105,51 +107,54 @@ pub fn resolve_basic_binary_operator(
         ast::BasicBinaryOperator::Multiply => {
             NumericMode::try_new(ty).map(asg::BasicBinaryOperator::Multiply)
         }
-        ast::BasicBinaryOperator::Divide => float_or_sign_lax_from_type(ty, false)
-            .map(asg::BasicBinaryOperator::Divide),
-        ast::BasicBinaryOperator::Modulus => float_or_sign_lax_from_type(ty, false)
-            .map(asg::BasicBinaryOperator::Modulus),
-        ast::BasicBinaryOperator::Equals => float_or_integer_from_type(ty, true)
-            .map(asg::BasicBinaryOperator::Equals),
-        ast::BasicBinaryOperator::NotEquals => float_or_integer_from_type(ty, true)
-            .map(asg::BasicBinaryOperator::NotEquals),
-        ast::BasicBinaryOperator::LessThan => float_or_sign_lax_from_type(ty, false)
-            .map(asg::BasicBinaryOperator::LessThan),
-        ast::BasicBinaryOperator::LessThanEq => float_or_sign_lax_from_type(ty, false)
-            .map(asg::BasicBinaryOperator::LessThanEq),
-        ast::BasicBinaryOperator::GreaterThan => float_or_sign_lax_from_type(ty, false)
-            .map(asg::BasicBinaryOperator::GreaterThan),
-        ast::BasicBinaryOperator::GreaterThanEq => {
-            float_or_sign_lax_from_type(ty, false)
-                .map(asg::BasicBinaryOperator::GreaterThanEq)
+        ast::BasicBinaryOperator::Divide => {
+            float_or_sign_lax_from_type(ty, false).map(asg::BasicBinaryOperator::Divide)
         }
-        ast::BasicBinaryOperator::BitwiseAnd => (ty.kind.is_integer()
-            || ty.kind.is_c_integer()
-            || ty.kind.is_boolean())
-        .then_some(asg::BasicBinaryOperator::BitwiseAnd),
-        ast::BasicBinaryOperator::BitwiseOr => (ty.kind.is_integer()
-            || ty.kind.is_c_integer()
-            || ty.kind.is_boolean())
-        .then_some(asg::BasicBinaryOperator::BitwiseOr),
-        ast::BasicBinaryOperator::BitwiseXor => (ty.kind.is_integer()
-            || ty.kind.is_c_integer())
-        .then_some(asg::BasicBinaryOperator::BitwiseXor),
+        ast::BasicBinaryOperator::Modulus => {
+            float_or_sign_lax_from_type(ty, false).map(asg::BasicBinaryOperator::Modulus)
+        }
+        ast::BasicBinaryOperator::Equals => {
+            float_or_integer_from_type(ty, true).map(asg::BasicBinaryOperator::Equals)
+        }
+        ast::BasicBinaryOperator::NotEquals => {
+            float_or_integer_from_type(ty, true).map(asg::BasicBinaryOperator::NotEquals)
+        }
+        ast::BasicBinaryOperator::LessThan => {
+            float_or_sign_lax_from_type(ty, false).map(asg::BasicBinaryOperator::LessThan)
+        }
+        ast::BasicBinaryOperator::LessThanEq => {
+            float_or_sign_lax_from_type(ty, false).map(asg::BasicBinaryOperator::LessThanEq)
+        }
+        ast::BasicBinaryOperator::GreaterThan => {
+            float_or_sign_lax_from_type(ty, false).map(asg::BasicBinaryOperator::GreaterThan)
+        }
+        ast::BasicBinaryOperator::GreaterThanEq => {
+            float_or_sign_lax_from_type(ty, false).map(asg::BasicBinaryOperator::GreaterThanEq)
+        }
+        ast::BasicBinaryOperator::BitwiseAnd => {
+            (ty.kind.is_integer() || ty.kind.is_c_integer() || ty.kind.is_boolean())
+                .then_some(asg::BasicBinaryOperator::BitwiseAnd)
+        }
+        ast::BasicBinaryOperator::BitwiseOr => {
+            (ty.kind.is_integer() || ty.kind.is_c_integer() || ty.kind.is_boolean())
+                .then_some(asg::BasicBinaryOperator::BitwiseOr)
+        }
+        ast::BasicBinaryOperator::BitwiseXor => (ty.kind.is_integer() || ty.kind.is_c_integer())
+            .then_some(asg::BasicBinaryOperator::BitwiseXor),
         ast::BasicBinaryOperator::LeftShift | ast::BasicBinaryOperator::LogicalLeftShift => {
             (ty.kind.is_integer() || ty.kind.is_c_integer())
                 .then_some(asg::BasicBinaryOperator::LogicalLeftShift)
         }
         ast::BasicBinaryOperator::RightShift => match ty.kind {
-            asg::TypeKind::Integer(_, sign) => {
-                Some(asg::BasicBinaryOperator::ArithmeticRightShift(
-                    SignOrIndeterminate::Sign(sign),
-                ))
-            }
+            asg::TypeKind::Integer(_, sign) => Some(
+                asg::BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Sign(sign)),
+            ),
             asg::TypeKind::CInteger(c_integer, sign) => Some(if let Some(sign) = sign {
                 asg::BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Sign(sign))
             } else {
-                asg::BasicBinaryOperator::ArithmeticRightShift(
-                    SignOrIndeterminate::Indeterminate(c_integer),
-                )
+                asg::BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Indeterminate(
+                    c_integer,
+                ))
             }),
             _ => None,
         },
@@ -173,9 +178,7 @@ fn float_or_integer_from_type(
 ) -> Option<FloatOrInteger> {
     match &unified_type.kind {
         asg::TypeKind::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
-        asg::TypeKind::Integer(..) | asg::TypeKind::CInteger(..) => {
-            Some(FloatOrInteger::Integer)
-        }
+        asg::TypeKind::Integer(..) | asg::TypeKind::CInteger(..) => Some(FloatOrInteger::Integer),
         asg::TypeKind::Floating(_) => Some(FloatOrInteger::Float),
         _ => None,
     }

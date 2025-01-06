@@ -1,4 +1,4 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, StructLiteral, StructRef, TypedExpr},
     ast::{self, ConformBehavior, FieldInitializer, FillBehavior},
@@ -119,6 +119,7 @@ pub fn resolve_struct_literal_expr(
             &field_initializer.value,
             Some(PreferredType::FieldType(struct_ref, &field_name)),
             Initialized::Require,
+            ResolveExprMode::RequireValue,
         )?;
 
         // Lookup additional details required for resolution

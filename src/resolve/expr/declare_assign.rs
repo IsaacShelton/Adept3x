@@ -1,4 +1,4 @@
-use super::{resolve_expr, ResolveExprCtx};
+use super::{resolve_expr, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, TypedExpr},
     ast::{self},
@@ -18,7 +18,13 @@ pub fn resolve_declare_assign_expr(
     let c_integer_assumptions = ctx.c_integer_assumptions();
 
     let value = conform_expr_to_default_or_error(
-        resolve_expr(ctx, &declare_assign.value, None, Initialized::Require)?,
+        resolve_expr(
+            ctx,
+            &declare_assign.value,
+            None,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
+        )?,
         c_integer_assumptions,
     )?;
 

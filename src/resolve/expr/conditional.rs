@@ -1,5 +1,6 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
+    asg::{self, Branch, TypedExpr},
     ast,
     resolve::{
         conform::{conform_expr_or_error, ConformMode},
@@ -8,7 +9,6 @@ use crate::{
         unify_types::unify_types,
         Initialized,
     },
-    asg::{self, Branch, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -17,6 +17,7 @@ pub fn resolve_conditional_expr(
     ctx: &mut ResolveExprCtx<'_, '_>,
     conditional: &ast::Conditional,
     preferred_type: Option<PreferredType>,
+    mode: ResolveExprMode,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let ast::Conditional {
@@ -28,9 +29,15 @@ pub fn resolve_conditional_expr(
 
     for (expr, block) in conditions.iter() {
         ctx.variable_haystack.begin_scope();
-        let condition = resolve_expr(ctx, expr, preferred_type, Initialized::Require)?;
+        let condition = resolve_expr(
+            ctx,
+            expr,
+            preferred_type,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
+        )?;
 
-        let stmts = resolve_stmts(ctx, &block.stmts)?;
+        let stmts = resolve_stmts(ctx, &block.stmts, mode)?;
 
         let condition = conform_expr_or_error(
             ctx,
@@ -53,7 +60,7 @@ pub fn resolve_conditional_expr(
         .as_ref()
         .map(|otherwise| {
             ctx.variable_haystack.begin_scope();
-            let maybe_block = resolve_stmts(ctx, &otherwise.stmts).map(asg::Block::new);
+            let maybe_block = resolve_stmts(ctx, &otherwise.stmts, mode).map(asg::Block::new);
             ctx.variable_haystack.end_scope();
             maybe_block
         })
@@ -66,23 +73,27 @@ pub fn resolve_conditional_expr(
         .map(|block| block.get_result_type(source))
         .collect_vec();
 
-    let result_type = if block_results
+    let result_type: Option<asg::Type> = if mode == ResolveExprMode::NeglectValue {
+        None
+    } else if block_results
         .iter()
         .any(|result| result.kind == asg::TypeKind::Void)
     {
-        block_results
-            .iter()
-            .all_equal()
-            .then_some(asg::TypeKind::Void.at(source))
-            .ok_or_else(|| {
-                ResolveErrorKind::MismatchingYieldedTypes {
-                    got: block_results
-                        .iter()
-                        .map(|ty| ty.kind.to_string())
-                        .collect_vec(),
-                }
-                .at(source)
-            })
+        Some(
+            block_results
+                .iter()
+                .all_equal()
+                .then_some(asg::TypeKind::Void.at(source))
+                .ok_or_else(|| {
+                    ResolveErrorKind::MismatchingYieldedTypes {
+                        got: block_results
+                            .iter()
+                            .map(|ty| ty.kind.to_string())
+                            .collect_vec(),
+                    }
+                    .at(source)
+                })?,
+        )
     } else {
         let mut last_exprs = branches_without_else
             .chunks_exact_mut(1)
@@ -110,6 +121,7 @@ pub fn resolve_conditional_expr(
             ctx.adept_conform_behavior(),
             source,
         )
+        .map(Some)
         .ok_or_else(|| {
             ResolveErrorKind::MismatchingYieldedTypes {
                 got: block_results
@@ -118,8 +130,8 @@ pub fn resolve_conditional_expr(
                     .collect_vec(),
             }
             .at(source)
-        })
-    }?;
+        })?
+    };
 
     let expr = asg::Expr::new(
         asg::ExprKind::Conditional(Box::new(asg::Conditional {
@@ -130,5 +142,8 @@ pub fn resolve_conditional_expr(
         source,
     );
 
-    Ok(TypedExpr::new(result_type, expr))
+    Ok(TypedExpr::new(
+        result_type.unwrap_or_else(|| asg::TypeKind::Void.at(source)),
+        expr,
+    ))
 }

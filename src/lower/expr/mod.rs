@@ -421,9 +421,12 @@ pub fn lower_expr(
             builder.use_block(resume_basicblock_id);
 
             if conditional.otherwise.is_some() {
-                let ir_type =
-                    lower_type(ir_module, &builder.unpoly(&conditional.result_type)?, asg)?;
-                Ok(builder.push(ir::Instr::Phi(ir::Phi { ir_type, incoming })))
+                if let Some(result_type) = &conditional.result_type {
+                    let ir_type = lower_type(ir_module, &builder.unpoly(result_type)?, asg)?;
+                    Ok(builder.push(ir::Instr::Phi(ir::Phi { ir_type, incoming })))
+                } else {
+                    Ok(Value::Literal(Literal::Void))
+                }
             } else {
                 Ok(Value::Literal(Literal::Void))
             }

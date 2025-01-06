@@ -2,7 +2,9 @@ use super::{
     conform::{conform_expr, ConformMode, Perform},
     destination::resolve_expr_to_destination,
     error::{ResolveError, ResolveErrorKind},
-    expr::{resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx},
+    expr::{
+        resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode,
+    },
     Initialized,
 };
 use crate::{asg, ast};
@@ -11,11 +13,12 @@ use std::borrow::Cow;
 pub fn resolve_stmts(
     ctx: &mut ResolveExprCtx,
     stmts: &[ast::Stmt],
+    mode: ResolveExprMode,
 ) -> Result<Vec<asg::Stmt>, ResolveError> {
     let mut resolved_stmts = Vec::with_capacity(stmts.len());
 
     for stmt in stmts.iter() {
-        resolved_stmts.push(resolve_stmt(ctx, stmt)?);
+        resolved_stmts.push(resolve_stmt(ctx, stmt, mode)?);
     }
 
     Ok(resolved_stmts)
@@ -24,6 +27,7 @@ pub fn resolve_stmts(
 pub fn resolve_stmt(
     ctx: &mut ResolveExprCtx,
     ast_stmt: &ast::Stmt,
+    mode: ResolveExprMode,
 ) -> Result<asg::Stmt, ResolveError> {
     let source = ast_stmt.source;
 
@@ -39,6 +43,7 @@ pub fn resolve_stmt(
                     value,
                     Some(PreferredType::ReturnType(func_ref)),
                     Initialized::Require,
+                    ResolveExprMode::RequireValue,
                 )?;
 
                 let mut return_type =
@@ -82,7 +87,7 @@ pub fn resolve_stmt(
             Ok(asg::Stmt::new(asg::StmtKind::Return(return_value), source))
         }
         ast::StmtKind::Expr(value) => Ok(asg::Stmt::new(
-            asg::StmtKind::Expr(resolve_expr(ctx, value, None, Initialized::Require)?),
+            asg::StmtKind::Expr(resolve_expr(ctx, value, None, Initialized::Require, mode)?),
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
@@ -97,6 +102,7 @@ pub fn resolve_stmt(
                         value,
                         Some(PreferredType::of(&ty)),
                         Initialized::Require,
+                        ResolveExprMode::RequireValue,
                     )
                 })
                 .transpose()?
@@ -156,6 +162,7 @@ pub fn resolve_stmt(
                 &assignment.destination,
                 None,
                 Initialized::AllowUninitialized,
+                ResolveExprMode::RequireValue,
             )?;
 
             let value = resolve_expr(
@@ -163,6 +170,7 @@ pub fn resolve_stmt(
                 &assignment.value,
                 Some(PreferredType::of(&destination_expr.ty)),
                 Initialized::Require,
+                ResolveExprMode::RequireValue,
             )?;
 
             let value = conform_expr::<Perform>(

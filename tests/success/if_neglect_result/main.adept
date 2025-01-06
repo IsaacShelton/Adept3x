@@ -1,0 +1,13 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    if true {
+        printf(c"Hello\n")
+    } else {
+        // Do nothing
+    }
+}

@@ -6,6 +6,7 @@ use crate::{
         core_struct_info::{get_core_struct_info, CoreStructInfo},
         destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
+        expr::ResolveExprMode,
         Initialized, PolyCatalog,
     },
     source_files::Source,
@@ -18,7 +19,13 @@ pub fn resolve_member_expr(
     min_privacy: Privacy,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_subject = resolve_expr(ctx, subject, None, Initialized::Require)?;
+    let resolved_subject = resolve_expr(
+        ctx,
+        subject,
+        None,
+        Initialized::Require,
+        ResolveExprMode::RequireValue,
+    )?;
 
     let CoreStructInfo {
         struct_ref,

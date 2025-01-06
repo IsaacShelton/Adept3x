@@ -1,7 +1,7 @@
 use super::{
     ctx::ResolveCtx,
     error::ResolveError,
-    expr::{resolve_expr, ResolveExprCtx},
+    expr::{resolve_expr, ResolveExprCtx, ResolveExprMode},
     initialized::Initialized,
     variable_haystack::VariableHaystack,
 };
@@ -44,7 +44,13 @@ pub fn resolve_helper_expressions(
                     current_constraints: CurrentConstraints::new_empty(),
                 };
 
-                resolve_expr(&mut ctx, &helper_expr.value, None, Initialized::Require)?
+                resolve_expr(
+                    &mut ctx,
+                    &helper_expr.value,
+                    None,
+                    Initialized::Require,
+                    ResolveExprMode::RequireValue,
+                )?
             };
 
             let helper_exprs = ctx

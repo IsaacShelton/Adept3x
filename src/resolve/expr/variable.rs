@@ -1,4 +1,4 @@
-use super::{PreferredType, ResolveExprCtx};
+use super::{PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, GlobalVarDecl, Type, TypedExpr},
     ast::HelperExpr,
@@ -174,13 +174,14 @@ fn resolve_helper_expr(
     helper_expr: &HelperExpr,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
+    mode: ResolveExprMode,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let TypedExpr {
         ty,
         expr,
         is_initialized,
-    } = resolve_expr(ctx, &helper_expr.value, preferred_type, initialized)?;
+    } = resolve_expr(ctx, &helper_expr.value, preferred_type, initialized, mode)?;
 
     return Ok(TypedExpr::new_maybe_initialized(
         ty,

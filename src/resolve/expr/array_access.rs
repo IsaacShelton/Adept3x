@@ -1,4 +1,4 @@
-use super::{resolve_expr, PreferredType, ResolveExprCtx};
+use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, TypedExpr},
     ast,
@@ -23,7 +23,8 @@ pub fn resolve_array_access_expr(
             ctx,
             &array_access.subject,
             None,
-            crate::resolve::Initialized::Require,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
         )?,
         c_integer_assumptions,
     )?;
@@ -36,6 +37,7 @@ pub fn resolve_array_access_expr(
                 &asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
             )),
             Initialized::Require,
+            ResolveExprMode::RequireValue,
         )?,
         c_integer_assumptions,
     )?;
