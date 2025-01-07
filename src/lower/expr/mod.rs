@@ -375,8 +375,13 @@ pub fn lower_expr(
         )?),
         ExprKind::Dereference(subject) => {
             let ir_type = lower_type(ir_module, &builder.unpoly(&subject.ty)?, asg)?;
+
+            let ir::Type::Ptr(ir_type) = ir_type else {
+                panic!("Cannot lower dereference of non-pointer");
+            };
+
             let value = lower_expr(builder, ir_module, &subject.expr, function, asg)?;
-            Ok(builder.push(ir::Instr::Load((value, ir_type))))
+            Ok(builder.push(ir::Instr::Load((value, *ir_type))))
         }
         ExprKind::Conditional(conditional) => {
             let resume_basicblock_id = builder.new_block();
