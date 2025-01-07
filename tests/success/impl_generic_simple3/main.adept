@@ -1,0 +1,37 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    iterator := c"Hello, world!"
+    
+    running := true
+    while running {
+        c := iteratorCString::next(&iterator)
+
+        if c == c'\0' {
+            running = false
+        } else {
+            printf(c"%c\n", c)
+        }
+    }
+}
+
+trait Iterator<$Self, $Item> {
+    func next(self ptr<$Self>) $Item
+}
+
+impl Iterator<ptr<char>, char> iteratorCString {
+    func next(self ptr<ptr<char>>) char {
+        c := **self
+
+        if c == c'\0' {
+            return c'\0'
+        }
+
+        *self = &(*self)[1]
+        return c
+    }
+}
