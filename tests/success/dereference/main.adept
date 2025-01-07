@@ -1,0 +1,30 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+#[foreign]
+func strlen(string ptr<char>) ulonglong
+
+func main {
+    string := c"abcdefg"
+    pointer := &string
+    count := strlen(string)
+
+    i := 0.ulonglong()
+    while i < count {
+        j := 0.ulonglong()
+        while j < count {
+            printf(c"%c", **pointer)
+            j += 1
+        }
+
+        printf(c"\n")
+        *pointer = &(*pointer)[1]
+        i += 1
+    }
+
+
+    printf(c"Done\n")
+}
