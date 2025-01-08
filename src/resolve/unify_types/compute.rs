@@ -1,8 +1,8 @@
 use super::integer_literals::integer_literals_all_fit;
 use crate::{
+    asg::{IntegerSign, Type, TypeKind, TypedExpr},
     ast::{CInteger, CIntegerAssumptions, ConformBehavior, FloatSize, IntegerBits},
     data_units::BitUnits,
-    asg::{IntegerSign, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 use itertools::Itertools;
@@ -271,6 +271,10 @@ fn unify_integer_properties_flexible(
             IntegerSign::strongest(a.required_sign, b.required_sign),
         )
     };
+
+    if bits > BitUnits::of(64) {
+        return None;
+    }
 
     let bits = IntegerBits::new(bits).unwrap_or(IntegerBits::Bits64);
 

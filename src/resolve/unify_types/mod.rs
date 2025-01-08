@@ -6,8 +6,8 @@ use super::{
     expr::ResolveExprCtx,
 };
 use crate::{
-    ast::ConformBehavior,
     asg::{self, TypedExpr},
+    ast::ConformBehavior,
     source_files::Source,
 };
 use compute::compute_unifying_type;

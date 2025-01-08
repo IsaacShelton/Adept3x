@@ -1,11 +1,11 @@
 use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
-    ast::{CInteger, IntegerBits, OptionIntegerSignExt},
-    logic::implies,
     asg::{
         Cast, CastFrom, Expr, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryMathOperation,
         UnaryMathOperator,
     },
+    ast::{CInteger, IntegerBits, OptionIntegerSignExt},
+    logic::implies,
     source_files::Source,
 };
 
