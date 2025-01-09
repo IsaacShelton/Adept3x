@@ -1,6 +1,8 @@
 use super::Parser;
 use crate::{
-    ast::{Expr, ExprKind, StaticMember, StaticMemberAction, StaticMemberActionKind, TypeArg},
+    ast::{
+        Expr, ExprKind, StaticMember, StaticMemberAction, StaticMemberActionKind, Type, TypeArg,
+    },
     inflow::Inflow,
     name::Name,
     parser::error::{ParseError, ParseErrorKind},
@@ -19,6 +21,16 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         //         ^
 
         let subject = self.parse_type_from_parts(type_name, generics, source)?;
+        self.parse_static_member_with_type(subject, source)
+    }
+
+    pub fn parse_static_member_with_type(
+        &mut self,
+        subject: Type,
+        source: Source,
+    ) -> Result<Expr, ParseError> {
+        // EnumName::EnumVariant
+        //         ^
 
         self.parse_token(TokenKind::StaticMember, Some("for static member access"))?;
 

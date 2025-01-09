@@ -64,6 +64,13 @@ pub fn resolve_static_member_call(
     call: &ast::Call,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
+    let ast::TypeKind::Polymorph(_polymorph, _) = &subject.kind else {
+        return Err(ResolveError::other(
+            "Using callee supplied trait implementations is not supported yet",
+            source,
+        ));
+    };
+
     let ast::TypeKind::Named(impl_name, impl_args) = &subject.kind else {
         return Err(ResolveError::other("Invalid implementation name", source));
     };

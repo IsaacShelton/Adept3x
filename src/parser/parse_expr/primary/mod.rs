@@ -7,7 +7,7 @@ mod struct_literal;
 use super::{super::error::ParseError, is_right_associative, is_terminating_token, Parser};
 use crate::{
     ast::{
-        Block, Conditional, Expr, ExprKind, Integer, UnaryMathOperator, UnaryOperation,
+        Block, Conditional, Expr, ExprKind, Integer, TypeKind, UnaryMathOperator, UnaryOperation,
         UnaryOperator, While,
     },
     inflow::Inflow,
@@ -98,6 +98,11 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
             TokenKind::StructKeyword | TokenKind::UnionKeyword | TokenKind::EnumKeyword => {
                 self.parse_struct_literal()
+            }
+            TokenKind::Polymorph(_) => {
+                let polymorph = self.input.eat_polymorph().unwrap();
+                let subject = TypeKind::Polymorph(polymorph, vec![]).at(source);
+                self.parse_static_member_with_type(subject, source)
             }
             TokenKind::Identifier(_) | TokenKind::NamespacedIdentifier(_) => {
                 // TODO: CLEANUP: This should be cleaned up once we have proper

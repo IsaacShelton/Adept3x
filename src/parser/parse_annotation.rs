@@ -29,7 +29,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 "abide_abi" => AnnotationKind::AbideAbi,
                 "public" => AnnotationKind::Public,
                 "template" => AnnotationKind::Template,
-                "given" => AnnotationKind::Given(Given {
+                "using" => AnnotationKind::Using(Given {
                     name: self.input.eat_polymorph(),
                     ty: self.parse_type(None::<&str>, Some("for context"))?,
                 }),

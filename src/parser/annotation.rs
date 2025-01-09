@@ -21,7 +21,7 @@ pub enum AnnotationKind {
     AbideAbi,
     Public,
     Template,
-    Given(Given),
+    Using(Given),
 }
 
 impl AnnotationKind {
@@ -39,7 +39,7 @@ impl Display for AnnotationKind {
             Self::AbideAbi => "abide_abi",
             Self::Public => "public",
             Self::Template => "template",
-            Self::Given(_) => "given",
+            Self::Using(_) => "using",
         })
     }
 }

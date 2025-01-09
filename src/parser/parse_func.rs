@@ -34,7 +34,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
-                AnnotationKind::Given(given) => {
+                AnnotationKind::Using(given) => {
                     givens.push(given);
                 }
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
