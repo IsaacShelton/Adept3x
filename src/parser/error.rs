@@ -142,7 +142,7 @@ impl Display for ParseErrorKind {
                 write!(f, "Expected ")?;
 
                 if let Some(prefix) = prefix {
-                    write!(f, "{}", prefix)?;
+                    write!(f, "{} ", prefix)?;
                 }
 
                 write!(f, "type")?;

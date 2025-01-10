@@ -82,7 +82,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.ignore_newlines();
 
-        let return_type = self.parse_type(Some("return "), Some("for trait method"))?;
+        let return_type = self.parse_type(Some("return"), Some("for trait method"))?;
 
         Ok(TraitFunc {
             name,

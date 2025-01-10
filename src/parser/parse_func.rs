@@ -61,7 +61,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let return_type = if self.input.peek_is(TokenKind::OpenCurly) {
             TypeKind::Void.at(self.source_here())
         } else {
-            self.parse_type(Some("return "), Some("for function"))?
+            self.parse_type(Some("return"), Some("for function"))?
         };
 
         let stmts = (!is_foreign)

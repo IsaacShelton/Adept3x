@@ -65,11 +65,36 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
 
+        let mut using = vec![];
+
+        if self.input.peek_is(TokenKind::StaticMember)
+            && self.input.peek_nth(1).kind.is_open_paren()
+        {
+            assert!(self.input.advance().is_static_member());
+            assert!(self.input.advance().is_open_paren());
+
+            while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
+                if using.len() > starting_args_len {
+                    self.parse_token(
+                        TokenKind::Comma,
+                        Some("to separate implementation arguments"),
+                    )?;
+                    self.ignore_newlines();
+                }
+
+                using.push(self.parse_type(Some("implementation"), Some("for implementation"))?);
+                self.ignore_newlines();
+            }
+
+            self.parse_token(TokenKind::CloseParen, Some("to end implementation list"))?;
+        }
+
         Ok(Call {
             name,
             args,
             expected_to_return: None,
             generics,
+            using,
         })
     }
 }

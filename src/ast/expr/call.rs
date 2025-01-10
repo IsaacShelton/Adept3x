@@ -10,4 +10,5 @@ pub struct Call {
     pub args: Vec<Expr>,
     pub expected_to_return: Option<Type>,
     pub generics: Vec<TypeArg>,
+    pub using: Vec<Type>,
 }
