@@ -29,9 +29,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 "abide_abi" => AnnotationKind::AbideAbi,
                 "public" => AnnotationKind::Public,
                 "template" => AnnotationKind::Template,
-                "using" => AnnotationKind::Using(Given {
-                    name: self.input.eat_polymorph(),
-                    ty: self.parse_type(None::<&str>, Some("for context"))?,
+                "using" => AnnotationKind::Using({
+                    let source = self.input.peek().source;
+
+                    Given {
+                        name: self.input.eat_polymorph().map(|name| (name, source)),
+                        ty: self.parse_type(None::<&str>, Some("for context"))?,
+                    }
                 }),
                 _ => {
                     return Err(ParseErrorKind::UnrecognizedAnnotation {

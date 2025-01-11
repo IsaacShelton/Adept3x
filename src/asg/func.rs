@@ -47,6 +47,11 @@ impl<'a> CurrentConstraints {
 }
 
 #[derive(Clone, Debug)]
+pub struct ImplParams {
+    pub params: HashMap<String, GenericTraitRef>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Func {
     pub name: ResolvedName,
     pub params: Params,
@@ -59,6 +64,7 @@ pub struct Func {
     pub abide_abi: bool,
     pub tag: Option<Tag>,
     pub constraints: CurrentConstraints,
+    pub impl_params: ImplParams,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]

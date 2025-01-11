@@ -4,7 +4,7 @@ use super::{
     type_ctx::ResolveTypeCtx,
 };
 use crate::{
-    asg::{self, Asg, CurrentConstraints, FuncRef, VariableStorage},
+    asg::{self, Asg, CurrentConstraints, FuncRef, GenericTraitRef, ImplParams, VariableStorage},
     ast::{self, AstWorkspace, FuncHead},
     cli::BuildOptions,
     hash_map_ext::HashMapExt,
@@ -13,6 +13,7 @@ use crate::{
     tag::Tag,
     workspace::fs::FsNodeId,
 };
+use std::collections::HashMap;
 
 pub fn create_func_heads<'a>(
     ctx: &mut ResolveCtx,
@@ -93,16 +94,49 @@ pub fn create_func_head<'a>(
     );
 
     let is_generic = head.is_generic();
-    let parameters = resolve_parameters(&type_ctx, &head.params)?;
+    let params = resolve_parameters(&type_ctx, &head.params)?;
     let return_type = type_ctx.resolve(&head.return_type)?;
 
     let constraints = is_generic
-        .then(|| collect_constraints(&parameters, &return_type))
+        .then(|| collect_constraints(&params, &return_type))
         .unwrap_or_default();
+
+    let impl_params = {
+        let mut params = HashMap::default();
+
+        for given in &head.givens {
+            let trait_ty = type_ctx.resolve(&given.ty)?;
+
+            let asg::TypeKind::Trait(_, trait_ref, trait_args) = &trait_ty.kind else {
+                return Err(ResolveError::other("Expected trait", trait_ty.source));
+            };
+
+            let generic_trait_ref = GenericTraitRef {
+                trait_ref: *trait_ref,
+                args: trait_args.to_vec(),
+            };
+
+            let Some((name, name_source)) = &given.name else {
+                return Err(ResolveError::other(
+                    "Anonymous trait implementation polymorph not supported yet",
+                    trait_ty.source,
+                ));
+            };
+
+            if params.insert(name.clone(), generic_trait_ref).is_some() {
+                return Err(ResolveError::other(
+                    format!("Trait implementation polymorph '${}' already exists", name),
+                    *name_source,
+                ));
+            }
+        }
+
+        ImplParams { params }
+    };
 
     Ok(asg.funcs.insert(asg::Func {
         name,
-        params: parameters,
+        params,
         return_type,
         stmts: vec![],
         is_foreign: head.is_foreign,
@@ -114,6 +148,7 @@ pub fn create_func_head<'a>(
         }),
         is_generic,
         constraints: CurrentConstraints::new(constraints),
+        impl_params,
     }))
 }
 
