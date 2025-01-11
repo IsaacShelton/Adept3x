@@ -540,6 +540,7 @@ pub fn lower_expr(
 
             Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
         }
+        ExprKind::PolyCall(_) => todo!("lowering poly calls is not implemented yet!"),
     }
 }
 

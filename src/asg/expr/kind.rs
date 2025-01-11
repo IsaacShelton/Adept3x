@@ -4,6 +4,7 @@ use crate::{
     ir::InterpreterSyscallKind,
     source_files::Source,
 };
+use expr::poly_call::PolyCall;
 use num::BigInt;
 use ordered_float::NotNan;
 use std::ffi::CString;
@@ -19,6 +20,7 @@ pub enum ExprKind {
     String(String),
     NullTerminatedString(CString),
     Call(Box<Call>),
+    PolyCall(Box<PolyCall>),
     DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),

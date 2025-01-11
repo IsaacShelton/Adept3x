@@ -118,7 +118,7 @@ pub fn create_func_head<'a>(
 
             let Some((name, name_source)) = &given.name else {
                 return Err(ResolveError::other(
-                    "Anonymous trait implementation polymorph not supported yet",
+                    "Anonymous trait implementation polymorphs are not supported yet",
                     trait_ty.source,
                 ));
             };

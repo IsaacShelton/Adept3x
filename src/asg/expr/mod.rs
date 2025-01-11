@@ -9,6 +9,7 @@ mod enum_member;
 mod global_variable;
 mod kind;
 mod member;
+mod poly_call;
 mod struct_literal;
 mod typed;
 mod unary;

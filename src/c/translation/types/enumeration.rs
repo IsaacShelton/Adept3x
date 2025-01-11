@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, AnonymousEnum, AstFile, EnumMember, Privacy, StaticMemberActionKind, TypeKind},
+    ast::{self, AnonymousEnum, AstFile, EnumMember, Privacy, TypeKind},
     c::{
         parser::{error::ParseErrorKind, Enumeration, ParseError},
         translation::eval::evaluate_to_const_integer,
@@ -52,17 +52,18 @@ pub fn make_anonymous_enum(
                 // TODO: Add way to use enums that don't have a definition name
                 // Should they just be normal defines? Or anonymous enum values? (which don't exist yet)
                 if let Some(definition_name) = &definition.name {
-                    let aka_value = ast::ExprKind::StaticMember(Box::new(ast::StaticMember {
-                        subject: TypeKind::Named(
-                            Name::plain(format!("enum<{}>", definition_name)),
-                            vec![],
-                        )
-                        .at(enumerator.source),
-                        action: StaticMemberActionKind::Value(enumerator.name.clone())
+                    let aka_value =
+                        ast::ExprKind::StaticMemberValue(Box::new(ast::StaticMemberValue {
+                            subject: TypeKind::Named(
+                                Name::plain(format!("enum<{}>", definition_name)),
+                                vec![],
+                            )
                             .at(enumerator.source),
-                        source: enumerator.source,
-                    }))
-                    .at(enumerator.source);
+                            value: enumerator.name.clone(),
+                            value_source: enumerator.source,
+                            source: enumerator.source,
+                        }))
+                        .at(enumerator.source);
 
                     ast_file.helper_exprs.push(ast::HelperExpr {
                         name: enumerator.name.clone(),

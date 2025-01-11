@@ -1,8 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{
-        Expr, ExprKind, StaticMember, StaticMemberAction, StaticMemberActionKind, Type, TypeArg,
-    },
+    ast::{Expr, ExprKind, StaticMemberCall, StaticMemberValue, Type, TypeArg},
     inflow::Inflow,
     name::Name,
     parser::error::{ParseError, ParseErrorKind},
@@ -40,24 +38,27 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .eat_identifier()
             .ok_or_else(|| ParseErrorKind::ExpectedEnumMemberName.at(action_source))?;
 
-        let action_kind = if self.input.peek_is(TokenKind::OpenParen)
-            || self.input.peek_is(TokenKind::OpenAngle)
-        {
-            let name = Name::plain(action_name);
-            let generics = self.parse_type_args()?;
-            StaticMemberActionKind::Call(self.parse_call_raw(name, generics)?)
-        } else {
-            StaticMemberActionKind::Value(action_name)
-        };
+        Ok(
+            if self.input.peek_is(TokenKind::OpenParen) || self.input.peek_is(TokenKind::OpenAngle)
+            {
+                let name = Name::plain(action_name);
+                let generics = self.parse_type_args()?;
 
-        Ok(ExprKind::StaticMember(Box::new(StaticMember {
-            subject,
-            action: StaticMemberAction {
-                kind: action_kind,
-                source: action_source,
-            },
-            source,
-        }))
-        .at(source))
+                ExprKind::StaticMemberCall(Box::new(StaticMemberCall {
+                    subject,
+                    call: self.parse_call_raw(name, generics)?,
+                    call_source: action_source,
+                    source,
+                }))
+            } else {
+                ExprKind::StaticMemberValue(Box::new(StaticMemberValue {
+                    subject,
+                    value: action_name,
+                    value_source: action_source,
+                    source,
+                }))
+            }
+            .at(source),
+        )
     }
 }

@@ -44,7 +44,7 @@ use crate::{
 use ast::FloatSize;
 pub use basic_binary_operation::resolve_basic_binary_operator;
 use ordered_float::NotNan;
-use static_member::resolve_static_member;
+use static_member::{resolve_static_member_call, resolve_static_member_value};
 use std::collections::HashMap;
 
 pub struct ResolveExprCtx<'a, 'b> {
@@ -361,8 +361,11 @@ pub fn resolve_expr(
             asg::TypeKind::Boolean.at(source),
             asg::Expr::new(asg::ExprKind::BooleanLiteral(*value), source),
         )),
-        ast::ExprKind::StaticMember(static_access) => {
-            resolve_static_member(ctx, static_access, source)
+        ast::ExprKind::StaticMemberValue(static_access_value) => {
+            resolve_static_member_value(ctx, static_access_value)
+        }
+        ast::ExprKind::StaticMemberCall(static_access_call) => {
+            resolve_static_member_call(ctx, static_access_call)
         }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {

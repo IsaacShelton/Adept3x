@@ -1,47 +1,35 @@
 use super::{call::call_callee, resolve_expr, ResolveExprCtx, ResolveExprMode};
 use crate::{
     asg::{self, TypeKind, TypedExpr},
-    ast::{self, StaticMember, StaticMemberActionKind},
+    ast::{self, StaticMemberCall, StaticMemberValue},
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         func_haystack::{FindFunctionError, FuncHaystack},
         initialized::Initialized,
         PolyCatalog,
     },
-    source_files::Source,
 };
 use itertools::Itertools;
 
-pub fn resolve_static_member(
-    ctx: &mut ResolveExprCtx,
-    static_access: &StaticMember,
-    source: Source,
-) -> Result<TypedExpr, ResolveError> {
-    let subject = &static_access.subject;
-    match &static_access.action.kind {
-        StaticMemberActionKind::Value(member) => {
-            resolve_static_member_value(ctx, subject, member, source)
-        }
-        StaticMemberActionKind::Call(call) => {
-            resolve_static_member_call(ctx, subject, call, source)
-        }
-    }
-}
-
 pub fn resolve_static_member_value(
     ctx: &mut ResolveExprCtx,
-    subject: &ast::Type,
-    member: &str,
-    source: Source,
+    static_member_value: &StaticMemberValue,
 ) -> Result<TypedExpr, ResolveError> {
+    let StaticMemberValue {
+        subject,
+        value,
+        value_source,
+        source,
+    } = static_member_value;
+
     let ty = ctx.type_ctx().resolve(&subject)?;
 
     let TypeKind::Enum(human_name, enum_ref) = &ty.kind else {
         return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
             ty: subject.to_string(),
-            member: member.to_string(),
+            member: value.to_string(),
         }
-        .at(source));
+        .at(*value_source));
     };
 
     Ok(TypedExpr::new(
@@ -50,33 +38,38 @@ pub fn resolve_static_member_value(
             asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
                 human_name: human_name.clone(),
                 enum_ref: *enum_ref,
-                variant_name: member.to_string(),
-                source,
+                variant_name: value.to_string(),
+                source: *value_source,
             })),
-            source,
+            *source,
         ),
     ))
 }
 
 pub fn resolve_static_member_call(
     ctx: &mut ResolveExprCtx,
-    subject: &ast::Type,
-    call: &ast::Call,
-    source: Source,
+    static_member_call: &StaticMemberCall,
 ) -> Result<TypedExpr, ResolveError> {
+    let StaticMemberCall {
+        subject,
+        call,
+        call_source,
+        source,
+    } = &static_member_call;
+
     let ast::TypeKind::Polymorph(_polymorph, _) = &subject.kind else {
         return Err(ResolveError::other(
             "Using callee supplied trait implementations is not supported yet",
-            source,
+            *source,
         ));
     };
 
     let ast::TypeKind::Named(impl_name, impl_args) = &subject.kind else {
-        return Err(ResolveError::other("Invalid implementation name", source));
+        return Err(ResolveError::other("Invalid implementation name", *source));
     };
 
     let Some(impl_name) = impl_name.as_plain_str() else {
-        return Err(ResolveError::other("Invalid implementation name", source));
+        return Err(ResolveError::other("Invalid implementation name", *source));
     };
 
     let impl_ref = ctx
@@ -98,14 +91,14 @@ pub fn resolve_static_member_call(
     let Some(imp) = impl_ref.and_then(|found| ctx.asg.impls.get(*found)) else {
         return Err(ResolveError::other(
             "Undefined trait implementation",
-            source,
+            *source,
         ));
     };
 
     if imp.name_params.len() != impl_args.len() {
         return Err(ResolveError::other(
             "Wrong number of arguments for implementation",
-            source,
+            *source,
         ));
     }
 
@@ -114,7 +107,7 @@ pub fn resolve_static_member_call(
     let Some(callee_name) = call.name.as_plain_str() else {
         return Err(ResolveError::other(
             "Implementation does not have namespaced functions",
-            source,
+            *call_source,
         ));
     };
 
@@ -142,7 +135,7 @@ pub fn resolve_static_member_call(
         .into_iter()
         .flatten()
         .flat_map(|func_ref| {
-            FuncHaystack::fits(ctx, *func_ref, &args, Some(catalog.clone()), source)
+            FuncHaystack::fits(ctx, *func_ref, &args, Some(catalog.clone()), *call_source)
         });
 
     let callee = matches
@@ -166,8 +159,8 @@ pub fn resolve_static_member_call(
                 reason,
                 almost_matches: ctx.func_haystack.find_near_matches(ctx, &call.name),
             }
-            .at(source)
+            .at(*call_source)
         })?;
 
-    call_callee(ctx, call, callee, args, source)
+    call_callee(ctx, call, callee, args, *call_source)
 }
