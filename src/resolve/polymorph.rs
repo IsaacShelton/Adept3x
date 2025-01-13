@@ -15,6 +15,18 @@ pub struct PolyRecipe {
     pub polymorphs: IndexMap<String, PolyValue>,
 }
 
+impl From<IndexMap<String, Type>> for PolyRecipe {
+    fn from(mut value: IndexMap<String, Type>) -> Self {
+        Self {
+            polymorphs: IndexMap::from_iter(
+                value
+                    .drain(..)
+                    .map(|(name, ty)| (name, PolyValue::PolyType(PolyType { ty }))),
+            ),
+        }
+    }
+}
+
 impl Display for PolyRecipe {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;

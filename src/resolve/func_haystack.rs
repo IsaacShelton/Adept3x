@@ -95,58 +95,51 @@ impl FuncHaystack {
     pub fn fits(
         ctx: &ResolveExprCtx,
         func_ref: asg::FuncRef,
-        arguments: &[TypedExpr],
+        args: &[TypedExpr],
         existing_catalog: Option<PolyCatalog>,
         source: Source,
     ) -> Option<Callee> {
         let function = ctx.asg.funcs.get(func_ref).unwrap();
-        let parameters = &function.params;
+        let params = &function.params;
 
         let mut catalog = existing_catalog.unwrap_or_default();
 
-        if !parameters.is_cstyle_vararg && arguments.len() != parameters.required.len() {
+        if !params.is_cstyle_vararg && args.len() != params.required.len() {
             return None;
         }
 
-        if arguments.len() < parameters.required.len() {
+        if args.len() < params.required.len() {
             return None;
         }
 
-        for (i, argument) in arguments.iter().enumerate() {
+        for (i, arg) in args.iter().enumerate() {
             let preferred_type =
-                (i < parameters.required.len()).then_some(PreferredType::of_parameter(func_ref, i));
+                (i < params.required.len()).then_some(PreferredType::of_parameter(func_ref, i));
 
-            let argument_conforms = if let Some(param_type) =
-                preferred_type.map(|p| p.view(ctx.asg))
-            {
-                if param_type.kind.contains_polymorph() {
-                    // NOTE: We probably dont't want arguments to always conform to the default
-                    // representation without taking the full function match into account, but
-                    // this will work for now.
-                    // This would require tracking each type match for each polymorph
-                    // and then unifying afterward
+            let argument_conforms =
+                if let Some(param_type) = preferred_type.map(|p| p.view(ctx.asg)) {
+                    if param_type.kind.contains_polymorph() {
+                        let Ok(argument) =
+                            conform_expr_to_default::<Perform>(arg, ctx.c_integer_assumptions())
+                        else {
+                            return None;
+                        };
 
-                    let Ok(argument) =
-                        conform_expr_to_default::<Perform>(argument, ctx.c_integer_assumptions())
-                    else {
-                        return None;
-                    };
-
-                    Self::conform_polymorph(ctx, &mut catalog, &argument, param_type)
+                        Self::conform_polymorph(ctx, &mut catalog, &argument, param_type)
+                    } else {
+                        conform_expr::<Validate>(
+                            ctx,
+                            &arg,
+                            param_type,
+                            ConformMode::ParameterPassing,
+                            ctx.adept_conform_behavior(),
+                            source,
+                        )
+                        .is_ok()
+                    }
                 } else {
-                    conform_expr::<Validate>(
-                        ctx,
-                        &argument,
-                        param_type,
-                        ConformMode::ParameterPassing,
-                        ctx.adept_conform_behavior(),
-                        source,
-                    )
-                    .is_ok()
-                }
-            } else {
-                conform_expr_to_default::<Validate>(argument, ctx.c_integer_assumptions()).is_ok()
-            };
+                    conform_expr_to_default::<Validate>(arg, ctx.c_integer_assumptions()).is_ok()
+                };
 
             if !argument_conforms {
                 return None;
@@ -159,7 +152,7 @@ impl FuncHaystack {
         })
     }
 
-    fn conform_polymorph(
+    pub fn conform_polymorph(
         ctx: &ResolveExprCtx,
         catalog: &mut PolyCatalog,
         argument: &TypedExpr,

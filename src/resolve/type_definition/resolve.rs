@@ -200,17 +200,17 @@ fn resolve_trait(
         &constraints,
     );
 
-    let mut functions = IndexMap::new();
+    let mut funcs = IndexMap::new();
 
     for func in &definition.funcs {
-        let parameters = resolve_parameters(&type_ctx, &func.params)?;
+        let params = resolve_parameters(&type_ctx, &func.params)?;
         let return_type = type_ctx.resolve(&func.return_type)?;
 
-        if functions
+        if funcs
             .insert(
                 func.name.clone(),
                 TraitFunc {
-                    params: parameters,
+                    params,
                     return_type,
                     source: func.source,
                 },
@@ -227,6 +227,6 @@ fn resolve_trait(
         }
     }
 
-    asg.traits.get_mut(trait_ref).unwrap().funcs = functions;
+    asg.traits.get_mut(trait_ref).unwrap().funcs = funcs;
     Ok(())
 }

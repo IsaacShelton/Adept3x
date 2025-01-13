@@ -4,12 +4,17 @@ use crate::{
     ast::{self, StaticMemberCall, StaticMemberValue, TypeArg},
     name::Name,
     resolve::{
+        conform::{
+            conform_expr, to_default::conform_expr_to_default, ConformMode, Perform, Validate,
+        },
         error::{ResolveError, ResolveErrorKind},
+        expr::PreferredType,
         func_haystack::{FindFunctionError, FuncHaystack},
         initialized::Initialized,
-        PolyCatalog,
+        PolyCatalog, PolyRecipe,
     },
 };
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 pub fn resolve_static_member_value(
@@ -179,6 +184,17 @@ pub fn resolve_static_member_call_polymorph(
         ));
     };
 
+    let mut args = Vec::with_capacity(call.args.len());
+    for arg in call.args.iter() {
+        args.push(resolve_expr(
+            ctx,
+            arg,
+            None,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
+        )?);
+    }
+
     let func = ctx
         .asg
         .funcs
@@ -219,19 +235,79 @@ pub fn resolve_static_member_call_polymorph(
         ));
     };
 
-    dbg!(&trait_func);
-    todo!("Calling functions of implementation polymorphs is not supported yet");
+    if trait_decl.params.len() != generic_trait_ref.args.len() {
+        return Err(ResolveError::other(
+            format!(
+                "Incorrect number of type arguments for trait '{}'",
+                &trait_decl.human_name.0
+            ),
+            func.source,
+        ));
+    }
 
-    let callee = PolyCallee {
-        polymorph: polymorph.into(),
-        member,
-    };
+    let mut values = IndexMap::new();
+    for (type_param_name, ty) in trait_decl.params.iter().zip(generic_trait_ref.args.iter()) {
+        assert!(values.insert(type_param_name.clone(), ty.clone()).is_none());
+    }
+    let recipe = PolyRecipe::from(values);
 
-    let arguments = todo!();
-    let result_ty = todo!();
+    let return_type = recipe.resolve_type(&trait_func.return_type)?;
+
+    let mut catalog = PolyCatalog::default();
+    let params = &trait_func.params;
+
+    for (i, arg) in args.iter().enumerate() {
+        let preferred_type =
+            (i < params.required.len()).then_some(PreferredType::Reference(&params.required[i].ty));
+
+        let argument_conforms = if let Some(param_type) = preferred_type.map(|p| p.view(ctx.asg)) {
+            if param_type.kind.contains_polymorph() {
+                let Ok(argument) =
+                    conform_expr_to_default::<Perform>(arg, ctx.c_integer_assumptions())
+                else {
+                    return Err(ResolveError::other(
+                        "Cannot conform argument to default value",
+                        arg.expr.source,
+                    ));
+                };
+
+                FuncHaystack::conform_polymorph(ctx, &mut catalog, &argument, param_type)
+            } else {
+                conform_expr::<Validate>(
+                    ctx,
+                    &arg,
+                    param_type,
+                    ConformMode::ParameterPassing,
+                    ctx.adept_conform_behavior(),
+                    *call_source,
+                )
+                .is_ok()
+            }
+        } else {
+            conform_expr_to_default::<Validate>(arg, ctx.c_integer_assumptions()).is_ok()
+        };
+
+        if !argument_conforms {
+            return Err(ResolveError::other(
+                if let Some(p) = preferred_type.map(|p| p.view(&ctx.asg)) {
+                    format!("Cannot conform argument to expected type '{}'", p)
+                } else {
+                    format!("Cannot conform argument to default type",)
+                },
+                arg.expr.source,
+            ));
+        }
+    }
 
     Ok(TypedExpr::new(
-        result_ty,
-        asg::ExprKind::PolyCall(Box::new(PolyCall { callee, arguments })).at(*call_source),
+        return_type,
+        asg::ExprKind::PolyCall(Box::new(PolyCall {
+            callee: PolyCallee {
+                polymorph: polymorph.into(),
+                member,
+            },
+            args,
+        }))
+        .at(*call_source),
     ))
 }
