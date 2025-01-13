@@ -152,7 +152,7 @@ pub fn resolve_static_member_call_named(
                 args.iter().map(|arg| arg.ty.to_string()).join(", ")
             ),
             reason: FindFunctionError::NotDefined,
-            almost_matches: ctx.func_haystack.find_near_matches(ctx, &call.name),
+            almost_matches: vec![],
         }
         .at(*call_source)
     })?;
