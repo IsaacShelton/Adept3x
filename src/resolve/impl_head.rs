@@ -6,7 +6,6 @@ use crate::{
     asg::{self, Asg, CurrentConstraints, Func, GenericTraitRef, TraitFunc, Type},
     ast::{self, AstFile},
     cli::BuildOptions,
-    hash_map_ext::HashMapExt,
     name::{Name, ResolvedName},
     resolve::{error::ResolveErrorKind, type_ctx::ResolveTypeCtx},
     source_files::Source,
@@ -65,12 +64,19 @@ pub fn create_impl_heads(
             ctx.jobs
                 .push_back(FuncJob::Impling(physical_file_id, impl_i, func_i, func_ref));
 
-            asg.impls
+            if asg
+                .impls
                 .get_mut(impl_ref)
                 .unwrap()
                 .body
-                .get_or_insert_with(&func.head.name, || Default::default())
-                .push(func_ref);
+                .insert(func.head.name.clone(), func_ref)
+                .is_some()
+            {
+                return Err(ResolveError::other(
+                    format!("Function '{}' is already implemented", &func.head.name),
+                    ast_impl.source,
+                ));
+            }
         }
     }
 

@@ -1,7 +1,8 @@
 use super::{call::call_callee, resolve_expr, ResolveExprCtx, ResolveExprMode};
 use crate::{
-    asg::{self, TypeKind, TypedExpr},
-    ast::{self, StaticMemberCall, StaticMemberValue},
+    asg::{self, PolyCall, PolyCallee, TypeKind, TypedExpr},
+    ast::{self, StaticMemberCall, StaticMemberValue, TypeArg},
+    name::Name,
     resolve::{
         error::{ResolveError, ResolveErrorKind},
         func_haystack::{FindFunctionError, FuncHaystack},
@@ -50,23 +51,32 @@ pub fn resolve_static_member_call(
     ctx: &mut ResolveExprCtx,
     static_member_call: &StaticMemberCall,
 ) -> Result<TypedExpr, ResolveError> {
+    match &static_member_call.subject.kind {
+        ast::TypeKind::Named(impl_name, impl_args) => {
+            resolve_static_member_call_named(ctx, static_member_call, impl_name, impl_args)
+        }
+        ast::TypeKind::Polymorph(polymorph, _constraints) => {
+            resolve_static_member_call_polymorph(ctx, static_member_call, polymorph)
+        }
+        _ => Err(ResolveError::other(
+            "Using callee supplied trait implementations is not supported yet",
+            static_member_call.source,
+        )),
+    }
+}
+
+pub fn resolve_static_member_call_named(
+    ctx: &mut ResolveExprCtx,
+    static_member_call: &StaticMemberCall,
+    impl_name: &Name,
+    impl_args: &[TypeArg],
+) -> Result<TypedExpr, ResolveError> {
     let StaticMemberCall {
-        subject,
+        subject: _,
         call,
         call_source,
         source,
     } = &static_member_call;
-
-    let ast::TypeKind::Polymorph(_polymorph, _) = &subject.kind else {
-        return Err(ResolveError::other(
-            "Using callee supplied trait implementations is not supported yet",
-            *source,
-        ));
-    };
-
-    let ast::TypeKind::Named(impl_name, impl_args) = &subject.kind else {
-        return Err(ResolveError::other("Invalid implementation name", *source));
-    };
 
     let Some(impl_name) = impl_name.as_plain_str() else {
         return Err(ResolveError::other("Invalid implementation name", *source));
@@ -129,38 +139,99 @@ pub fn resolve_static_member_call(
         }
     }
 
-    let mut matches = imp
-        .body
-        .get(callee_name)
-        .into_iter()
-        .flatten()
-        .flat_map(|func_ref| {
-            FuncHaystack::fits(ctx, *func_ref, &args, Some(catalog.clone()), *call_source)
-        });
+    let mut only_match = imp.body.get(callee_name).into_iter().flat_map(|func_ref| {
+        FuncHaystack::fits(ctx, *func_ref, &args, Some(catalog.clone()), *call_source)
+    });
 
-    let callee = matches
-        .next()
-        .map(|found| {
-            if matches.next().is_some() {
-                Err(FindFunctionError::Ambiguous)
-            } else {
-                Ok(found)
-            }
-        })
-        .unwrap_or_else(|| Err(FindFunctionError::NotDefined))
-        .map_err(|reason| {
-            ResolveErrorKind::FailedToFindFunction {
-                signature: format!(
-                    "{}::{}({})",
-                    impl_name,
-                    call.name,
-                    args.iter().map(|arg| arg.ty.to_string()).join(", ")
-                ),
-                reason,
-                almost_matches: ctx.func_haystack.find_near_matches(ctx, &call.name),
-            }
-            .at(*call_source)
-        })?;
+    let callee = only_match.next().ok_or_else(|| {
+        ResolveErrorKind::FailedToFindFunction {
+            signature: format!(
+                "{}::{}({})",
+                impl_name,
+                call.name,
+                args.iter().map(|arg| arg.ty.to_string()).join(", ")
+            ),
+            reason: FindFunctionError::NotDefined,
+            almost_matches: ctx.func_haystack.find_near_matches(ctx, &call.name),
+        }
+        .at(*call_source)
+    })?;
 
     call_callee(ctx, call, callee, args, *call_source)
+}
+
+pub fn resolve_static_member_call_polymorph(
+    ctx: &mut ResolveExprCtx,
+    static_member_call: &StaticMemberCall,
+    polymorph: &str,
+) -> Result<TypedExpr, ResolveError> {
+    let StaticMemberCall {
+        subject: _,
+        call,
+        call_source,
+        source,
+    } = static_member_call;
+
+    let Some(func_ref) = ctx.func_ref else {
+        return Err(ResolveError::other(
+            "Cannot use implementation polymorph outside of function",
+            *source,
+        ));
+    };
+
+    let func = ctx
+        .asg
+        .funcs
+        .get(func_ref)
+        .expect("referenced function to exist");
+
+    let Some(generic_trait_ref) = func.impl_params.params.get(polymorph) else {
+        return Err(ResolveError::other(
+            format!("Undeclared implementation '${}'", polymorph),
+            *source,
+        ));
+    };
+
+    let trait_decl = ctx
+        .asg
+        .traits
+        .get(generic_trait_ref.trait_ref)
+        .expect("referenced trait to exist");
+
+    let member = call
+        .name
+        .as_plain_str()
+        .ok_or_else(|| {
+            ResolveError::other(
+                "Namespaced functions do not exist on trait implementations",
+                *call_source,
+            )
+        })?
+        .to_string();
+
+    let Some(trait_func) = trait_decl.funcs.get(&member) else {
+        return Err(ResolveError::other(
+            format!(
+                "Function '{}' does not exist on trait '{}'",
+                &member, &trait_decl.human_name.0
+            ),
+            *call_source,
+        ));
+    };
+
+    dbg!(&trait_func);
+    todo!("Calling functions of implementation polymorphs is not supported yet");
+
+    let callee = PolyCallee {
+        polymorph: polymorph.into(),
+        member,
+    };
+
+    let arguments = todo!();
+    let result_ty = todo!();
+
+    Ok(TypedExpr::new(
+        result_ty,
+        asg::ExprKind::PolyCall(Box::new(PolyCall { callee, arguments })).at(*call_source),
+    ))
 }

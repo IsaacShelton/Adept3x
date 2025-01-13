@@ -8,5 +8,5 @@ pub struct Impl {
     pub name_params: IndexMap<String, ()>,
     pub target: GenericTraitRef,
     pub source: Source,
-    pub body: HashMap<String, Vec<FuncRef>>,
+    pub body: HashMap<String, FuncRef>,
 }

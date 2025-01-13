@@ -42,10 +42,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             .at(source));
         }
 
-        let mut methods = vec![];
+        let mut funcs = vec![];
 
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-            methods.push(self.parse_trait_method()?);
+            funcs.push(self.parse_trait_method()?);
             self.ignore_newlines();
         }
 
@@ -56,7 +56,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             params: params.into_keys().collect(),
             source,
             privacy,
-            funcs: methods,
+            funcs,
         })
     }
 

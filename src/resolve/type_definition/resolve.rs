@@ -202,18 +202,29 @@ fn resolve_trait(
 
     let mut functions = IndexMap::new();
 
-    for function in &definition.funcs {
-        let parameters = resolve_parameters(&type_ctx, &function.params)?;
-        let return_type = type_ctx.resolve(&function.return_type)?;
+    for func in &definition.funcs {
+        let parameters = resolve_parameters(&type_ctx, &func.params)?;
+        let return_type = type_ctx.resolve(&func.return_type)?;
 
-        functions.insert(
-            function.name.clone(),
-            TraitFunc {
-                params: parameters,
-                return_type,
-                source: function.source,
-            },
-        );
+        if functions
+            .insert(
+                func.name.clone(),
+                TraitFunc {
+                    params: parameters,
+                    return_type,
+                    source: func.source,
+                },
+            )
+            .is_some()
+        {
+            return Err(ResolveError::other(
+                format!(
+                    "Cannot have multiple functions named '{}' within trait",
+                    &func.name
+                ),
+                func.source,
+            ));
+        }
     }
 
     asg.traits.get_mut(trait_ref).unwrap().funcs = functions;

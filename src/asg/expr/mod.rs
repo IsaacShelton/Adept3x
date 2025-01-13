@@ -29,6 +29,7 @@ pub use enum_member::*;
 pub use global_variable::*;
 pub use kind::*;
 pub use member::*;
+pub use poly_call::*;
 pub use struct_literal::*;
 pub use typed::*;
 pub use unary::*;
