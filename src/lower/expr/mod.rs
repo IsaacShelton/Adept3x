@@ -16,7 +16,7 @@ use crate::{
     ast::{FloatSize, IntegerBits, IntegerRigidity},
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     lower::structure::mono,
-    resolve::{PolyCatalog, PolyRecipe, PolyType, PolyValue},
+    resolve::{PolyCatalog, PolyRecipe, PolyValue},
 };
 use indexmap::IndexMap;
 use short_circuit::lower_short_circuiting_binary_operation;
@@ -156,16 +156,19 @@ pub fn lower_expr(
 
             for (name, value) in call.callee.recipe.polymorphs.iter() {
                 match value {
-                    PolyValue::PolyType(ty) => {
+                    PolyValue::Type(ty) => {
                         polymorphs.insert(
                             name.clone(),
-                            PolyValue::PolyType(PolyType {
-                                ty: Borrow::<asg::Type>::borrow(&builder.unpoly(&ty.ty)?.0).clone(),
-                            }),
+                            PolyValue::Type(
+                                Borrow::<asg::Type>::borrow(&builder.unpoly(ty)?.0).clone(),
+                            ),
                         );
                     }
-                    PolyValue::PolyExpr(_) => {
+                    PolyValue::Expr(_) => {
                         todo!("compile-time expression parameters are not supported when calling generic functions yet")
+                    }
+                    PolyValue::Impl(_) => {
+                        eprintln!("warning: implementation polymorphs are not propogated yet when calling from functions that have them");
                     }
                 }
             }
@@ -540,7 +543,18 @@ pub fn lower_expr(
 
             Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
         }
-        ExprKind::PolyCall(_) => todo!("lowering poly calls is not implemented yet!"),
+        ExprKind::PolyCall(poly_call) => {
+            let impl_ref = builder
+                .poly_recipe()
+                .resolve_impl(&poly_call.callee.polymorph, expr.source)
+                .map_err(LowerError::from)?;
+
+            let imp = asg.impls.get(impl_ref).expect("referenced impl to exist");
+
+            dbg!(poly_call);
+            dbg!(imp);
+            todo!("lowering poly calls is not implemented yet!");
+        }
     }
 }
 

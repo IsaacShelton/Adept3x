@@ -21,7 +21,7 @@ impl From<IndexMap<String, Type>> for PolyRecipe {
             polymorphs: IndexMap::from_iter(
                 value
                     .drain(..)
-                    .map(|(name, ty)| (name, PolyValue::PolyType(PolyType { ty }))),
+                    .map(|(name, ty)| (name, PolyValue::Type(ty))),
             ),
         }
     }
@@ -35,11 +35,14 @@ impl Display for PolyRecipe {
             write!(f, "${} :: ", name)?;
 
             match value {
-                PolyValue::PolyType(ty) => {
-                    write!(f, "{}", ty.ty.to_string())?;
+                PolyValue::Type(ty) => {
+                    write!(f, "{}", ty.to_string())?;
                 }
-                PolyValue::PolyExpr(_) => {
+                PolyValue::Expr(_) => {
                     todo!("mangle name for polymorphic function with expr polymorph")
+                }
+                PolyValue::Impl(_) => {
+                    todo!("mangle name for polymorphic implementation with impl polymorph")
                 }
             }
 
@@ -63,6 +66,7 @@ pub struct PolymorphError {
 pub enum PolymorphErrorKind {
     UndefinedPolymorph(String),
     PolymorphIsNotAType(String),
+    PolymorphIsNotAnImpl(String),
 }
 
 impl PolymorphErrorKind {
@@ -79,6 +83,9 @@ impl Display for PolymorphErrorKind {
             }
             PolymorphErrorKind::PolymorphIsNotAType(name) => {
                 write!(f, "Polymorph '${}' is not a type", name)
+            }
+            PolymorphErrorKind::PolymorphIsNotAnImpl(name) => {
+                write!(f, "Polymorph '${}' is not a trait implementation", name)
             }
         }
     }
@@ -127,14 +134,23 @@ impl PolyRecipe {
                     return Err(PolymorphErrorKind::UndefinedPolymorph(name.clone()).at(ty.source));
                 };
 
-                let PolyValue::PolyType(poly_type) = value else {
+                let PolyValue::Type(poly_type) = value else {
                     return Err(PolymorphErrorKind::PolymorphIsNotAType(name.clone()).at(ty.source));
                 };
 
-                poly_type.ty.clone()
+                poly_type.clone()
             }
             asg::TypeKind::Trait(_, _, _) => ty.clone(),
         })
+    }
+
+    pub fn resolve_impl(&self, name: &str, source: Source) -> Result<asg::ImplRef, PolymorphError> {
+        match self.polymorphs.get(name) {
+            Some(PolyValue::Impl(impl_ref)) => Ok(*impl_ref),
+            Some(_) => Err(PolymorphErrorKind::PolymorphIsNotAnImpl(name.into())),
+            None => Err(PolymorphErrorKind::UndefinedPolymorph(name.into())),
+        }
+        .map_err(|err| err.at(source))
     }
 }
 
@@ -149,20 +165,11 @@ impl Hash for PolyRecipe {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct PolyType {
-    pub ty: Type,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct PolyExpr {
-    expr: asg::Expr,
-}
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq, IsVariant)]
 pub enum PolyValue {
-    PolyType(PolyType),
-    PolyExpr(PolyExpr),
+    Type(asg::Type),
+    Expr(asg::Expr),
+    Impl(asg::ImplRef),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -282,20 +289,17 @@ impl PolyCatalog {
     pub fn put_type(&mut self, name: &str, new_type: &Type) -> Result<(), PolyCatalogInsertError> {
         if let Some(existing) = self.polymorphs.get_mut(name) {
             match existing {
-                PolyValue::PolyType(poly_type) => {
-                    if poly_type.ty != *new_type {
+                PolyValue::Type(poly_type) => {
+                    if *poly_type != *new_type {
                         return Err(PolyCatalogInsertError::Incongruent);
                     }
                 }
-                PolyValue::PolyExpr(_) => return Err(PolyCatalogInsertError::Incongruent),
+                PolyValue::Expr(_) => return Err(PolyCatalogInsertError::Incongruent),
+                PolyValue::Impl(_) => return Err(PolyCatalogInsertError::Incongruent),
             }
         } else {
-            self.polymorphs.insert(
-                name.to_string(),
-                PolyValue::PolyType(PolyType {
-                    ty: new_type.clone(),
-                }),
-            );
+            self.polymorphs
+                .insert(name.to_string(), PolyValue::Type(new_type.clone()));
         }
 
         Ok(())
