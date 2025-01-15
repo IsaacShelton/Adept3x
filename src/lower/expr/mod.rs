@@ -167,8 +167,8 @@ pub fn lower_expr(
                     PolyValue::Expr(_) => {
                         todo!("compile-time expression parameters are not supported when calling generic functions yet")
                     }
-                    PolyValue::Impl(_) => {
-                        eprintln!("warning: implementation polymorphs are not propogated yet when calling from functions that have them");
+                    PolyValue::Impl(impl_ref) => {
+                        polymorphs.insert(name.clone(), PolyValue::Impl(*impl_ref));
                     }
                 }
             }

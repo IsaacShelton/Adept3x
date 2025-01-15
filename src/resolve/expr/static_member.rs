@@ -1,6 +1,6 @@
 use super::{call::call_callee, resolve_expr, ResolveExprCtx, ResolveExprMode};
 use crate::{
-    asg::{self, PolyCall, PolyCallee, TypeKind, TypedExpr},
+    asg::{self, ImplRef, PolyCall, PolyCallee, TypeKind, TypedExpr},
     ast::{self, StaticMemberCall, StaticMemberValue, TypeArg},
     name::Name,
     resolve::{
@@ -13,6 +13,7 @@ use crate::{
         initialized::Initialized,
         PolyCatalog, PolyRecipe,
     },
+    source_files::Source,
 };
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -70,21 +71,28 @@ pub fn resolve_static_member_call(
     }
 }
 
-pub fn resolve_static_member_call_named(
+pub fn resolve_impl_mention_from_type<'a>(
     ctx: &mut ResolveExprCtx,
-    static_member_call: &StaticMemberCall,
+    ty: &ast::Type,
+) -> Result<(ImplRef, PolyCatalog), ResolveError> {
+    let ast::TypeKind::Named(name, type_args) = &ty.kind else {
+        return Err(ResolveError::other(
+            "Expected implementation name",
+            ty.source,
+        ));
+    };
+
+    resolve_impl_mention(ctx, name, type_args, ty.source)
+}
+
+pub fn resolve_impl_mention(
+    ctx: &mut ResolveExprCtx,
     impl_name: &Name,
     impl_args: &[TypeArg],
-) -> Result<TypedExpr, ResolveError> {
-    let StaticMemberCall {
-        subject: _,
-        call,
-        call_source,
-        source,
-    } = &static_member_call;
-
+    source: Source,
+) -> Result<(ImplRef, PolyCatalog), ResolveError> {
     let Some(impl_name) = impl_name.as_plain_str() else {
-        return Err(ResolveError::other("Invalid implementation name", *source));
+        return Err(ResolveError::other("Invalid implementation name", source));
     };
 
     let impl_ref = ctx
@@ -92,39 +100,22 @@ pub fn resolve_static_member_call_named(
         .get(&ctx.module_fs_node_id)
         .and_then(|impls| impls.get(impl_name));
 
-    let mut args = Vec::with_capacity(call.args.len());
-    for arg in call.args.iter() {
-        args.push(resolve_expr(
-            ctx,
-            arg,
-            None,
-            Initialized::Require,
-            ResolveExprMode::RequireValue,
-        )?);
-    }
-
     let Some(imp) = impl_ref.and_then(|found| ctx.asg.impls.get(*found)) else {
         return Err(ResolveError::other(
             "Undefined trait implementation",
-            *source,
+            source,
         ));
     };
+
+    // Guaranteed to be valid now
+    let impl_ref = impl_ref.unwrap();
 
     if imp.name_params.len() != impl_args.len() {
         return Err(ResolveError::other(
             "Wrong number of arguments for implementation",
-            *source,
+            source,
         ));
     }
-
-    let target = &imp.target;
-
-    let Some(callee_name) = call.name.as_plain_str() else {
-        return Err(ResolveError::other(
-            "Implementation does not have namespaced functions",
-            *call_source,
-        ));
-    };
 
     let mut catalog = PolyCatalog::default();
 
@@ -144,9 +135,56 @@ pub fn resolve_static_member_call_named(
         }
     }
 
-    let mut only_match = imp.body.get(callee_name).into_iter().flat_map(|func_ref| {
-        FuncHaystack::fits(ctx, *func_ref, &args, Some(catalog.clone()), *call_source)
-    });
+    Ok((*impl_ref, catalog))
+}
+
+pub fn resolve_static_member_call_named(
+    ctx: &mut ResolveExprCtx,
+    static_member_call: &StaticMemberCall,
+    impl_name: &Name,
+    impl_args: &[TypeArg],
+) -> Result<TypedExpr, ResolveError> {
+    let StaticMemberCall {
+        subject: _,
+        call,
+        call_source,
+        source: _,
+    } = &static_member_call;
+
+    let mut args = Vec::with_capacity(call.args.len());
+    for arg in call.args.iter() {
+        args.push(resolve_expr(
+            ctx,
+            arg,
+            None,
+            Initialized::Require,
+            ResolveExprMode::RequireValue,
+        )?);
+    }
+
+    let (impl_ref, catalog) =
+        resolve_impl_mention(ctx, impl_name, impl_args, static_member_call.source)?;
+
+    let Some(callee_name) = call.name.as_plain_str() else {
+        return Err(ResolveError::other(
+            "Implementation does not have namespaced functions",
+            *call_source,
+        ));
+    };
+    let imp = ctx
+        .asg
+        .impls
+        .get(impl_ref)
+        .expect("referenced impl to exist");
+
+    let mut only_match = imp
+        .body
+        .get(callee_name)
+        .into_iter()
+        .copied()
+        .flat_map(|func_ref| {
+            FuncHaystack::fits(ctx, func_ref, &args, Some(catalog.clone()), *call_source)
+        });
 
     let callee = only_match.next().ok_or_else(|| {
         ResolveErrorKind::FailedToFindFunction {

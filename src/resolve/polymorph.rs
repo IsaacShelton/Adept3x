@@ -1,11 +1,12 @@
 use super::expr::ResolveExprCtx;
 use crate::{
-    asg::{self, Type},
+    asg::{self, GenericTraitRef, Type},
     source_files::Source,
 };
 use core::hash::Hash;
 use derive_more::IsVariant;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use std::fmt::Display;
 
 // TODO: We probably want this to store some kind of internal hash
@@ -41,8 +42,11 @@ impl Display for PolyRecipe {
                 PolyValue::Expr(_) => {
                     todo!("mangle name for polymorphic function with expr polymorph")
                 }
-                PolyValue::Impl(_) => {
-                    todo!("mangle name for polymorphic implementation with impl polymorph")
+                PolyValue::Impl(impl_ref) => {
+                    eprintln!(
+                        "warning: name mangling for functions called with impl params is ad-hoc"
+                    );
+                    write!(f, "{:?}", impl_ref)?;
                 }
             }
 
@@ -151,6 +155,20 @@ impl PolyRecipe {
             None => Err(PolymorphErrorKind::UndefinedPolymorph(name.into())),
         }
         .map_err(|err| err.at(source))
+    }
+
+    pub fn resolve_trait(
+        &self,
+        generic_trait: &GenericTraitRef,
+    ) -> Result<GenericTraitRef, PolymorphError> {
+        Ok(GenericTraitRef {
+            trait_ref: generic_trait.trait_ref,
+            args: generic_trait
+                .args
+                .iter()
+                .map(|ty| self.resolve_type(ty))
+                .try_collect()?,
+        })
     }
 }
 

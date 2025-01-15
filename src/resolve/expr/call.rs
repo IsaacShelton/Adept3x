@@ -6,7 +6,8 @@ use crate::{
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
-        Initialized,
+        expr::static_member::resolve_impl_mention_from_type,
+        Initialized, PolyValue,
     },
     source_files::Source,
 };
@@ -64,12 +65,69 @@ pub fn resolve_call_expr(
 pub fn call_callee(
     ctx: &mut ResolveExprCtx,
     call: &ast::Call,
-    callee: Callee,
+    mut callee: Callee,
     mut args: Vec<TypedExpr>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
+    for impl_arg in call.using.iter() {
+        let (impl_ref, impl_poly_catalog) = resolve_impl_mention_from_type(ctx, impl_arg)?;
+
+        let imp = ctx
+            .asg
+            .impls
+            .get(impl_ref)
+            .expect("referenced impl to exist");
+
+        dbg!(&callee.recipe);
+        dbg!(&imp.target);
+
+        let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
+
+        let function = ctx.asg.funcs.get(callee.function).unwrap();
+        for (poly_impl_name, param_generic_trait) in function.impl_params.params.iter() {
+            let param_concrete_trait = callee.recipe.resolve_trait(param_generic_trait)?;
+
+            if arg_concrete_trait != param_concrete_trait {
+                return Err(ResolveError::other(
+                    format!(
+                        "Implementation of {} cannot be used for {}",
+                        arg_concrete_trait.display(ctx.asg),
+                        param_concrete_trait.display(ctx.asg)
+                    ),
+                    impl_arg.source,
+                ));
+            }
+
+            dbg!(&arg_concrete_trait);
+            dbg!(&param_concrete_trait);
+
+            if callee
+                .recipe
+                .polymorphs
+                .insert(poly_impl_name.into(), PolyValue::Impl(impl_ref))
+                .is_some()
+            {
+                return Err(ResolveError::other(
+                    format!(
+                        "Multiple implementations were specified for implementation parameter '${}'",
+                        poly_impl_name
+                    ),
+                    impl_arg.source,
+                ));
+            }
+        }
+
+        // NOTE: We will need to populate the callee's poly recipe with `callee.recipe.polymorphs.insert()`
+        // ...
+    }
+
     let function = ctx.asg.funcs.get(callee.function).unwrap();
     let num_required = function.params.required.len();
+
+    if !function.impl_params.params.is_empty() {
+        dbg!(&function.impl_params);
+        eprintln!("warning: calling functions with implementation parameters is not fully implemented yet!");
+    }
 
     for (i, arg) in args.iter_mut().enumerate() {
         let function = ctx.asg.funcs.get(callee.function).unwrap();
