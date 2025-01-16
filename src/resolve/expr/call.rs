@@ -78,9 +78,6 @@ pub fn call_callee(
             .get(impl_ref)
             .expect("referenced impl to exist");
 
-        dbg!(&callee.recipe);
-        dbg!(&imp.target);
-
         let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
 
         let function = ctx.asg.funcs.get(callee.function).unwrap();
@@ -97,9 +94,6 @@ pub fn call_callee(
                     impl_arg.source,
                 ));
             }
-
-            dbg!(&arg_concrete_trait);
-            dbg!(&param_concrete_trait);
 
             if callee
                 .recipe
@@ -125,8 +119,7 @@ pub fn call_callee(
     let num_required = function.params.required.len();
 
     if !function.impl_params.params.is_empty() {
-        dbg!(&function.impl_params);
-        eprintln!("warning: calling functions with implementation parameters is not fully implemented yet!");
+        eprintln!("warning: calling functions with implementation parameters is not fully implemented yet! (more that one implementation parameter is not supported yet)");
     }
 
     for (i, arg) in args.iter_mut().enumerate() {
@@ -188,10 +181,7 @@ pub fn call_callee(
     Ok(TypedExpr::new(
         return_type,
         asg::Expr::new(
-            asg::ExprKind::Call(Box::new(asg::Call {
-                callee,
-                arguments: args,
-            })),
+            asg::ExprKind::Call(Box::new(asg::Call { callee, args })),
             source,
         ),
     ))

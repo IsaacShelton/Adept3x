@@ -814,7 +814,7 @@ unsafe fn emit_call(
         let abi_function = skeleton.abi_function.as_ref().expect("abi function");
 
         let variadic_argument_types = call
-            .unpromoted_variadic_argument_types
+            .unpromoted_variadic_arg_types
             .iter()
             .map(|argument_type| {
                 promote_variadic_argument_type(builder, &ctx.ir_module.target, argument_type)

@@ -1,4 +1,5 @@
 use super::TypedExpr;
+use crate::resolve::PolyRecipe;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct PolyCall {
@@ -10,4 +11,5 @@ pub struct PolyCall {
 pub struct PolyCallee {
     pub polymorph: String,
     pub member: String,
+    pub recipe: PolyRecipe,
 }

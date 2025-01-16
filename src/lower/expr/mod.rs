@@ -140,15 +140,15 @@ pub fn lower_expr(
                 .get(call.callee.function)
                 .expect("referenced function to exist");
 
-            let arguments = call
-                .arguments
+            let args = call
+                .args
                 .iter()
-                .map(|argument| lower_expr(builder, ir_module, &argument.expr, function, asg))
+                .map(|arg| lower_expr(builder, ir_module, &arg.expr, function, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
 
-            let variadic_argument_types = call.arguments[callee.params.required.len()..]
+            let variadic_arg_types = call.args[callee.params.required.len()..]
                 .iter()
-                .map(|argument| lower_type(ir_module, &builder.unpoly(&argument.ty)?, asg))
+                .map(|arg| lower_type(ir_module, &builder.unpoly(&arg.ty)?, asg))
                 .collect::<Result<Box<[_]>, _>>()?;
 
             // NOTE: We have to resolve our own polymorphs in the mapping
@@ -183,8 +183,8 @@ pub fn lower_expr(
 
             Ok(builder.push(ir::Instr::Call(ir::Call {
                 func: function,
-                arguments,
-                unpromoted_variadic_argument_types: variadic_argument_types,
+                arguments: args,
+                unpromoted_variadic_arg_types: variadic_arg_types,
             })))
         }
         ExprKind::Variable(variable) => {
@@ -551,9 +551,60 @@ pub fn lower_expr(
 
             let imp = asg.impls.get(impl_ref).expect("referenced impl to exist");
 
-            dbg!(poly_call);
-            dbg!(imp);
-            todo!("lowering poly calls is not implemented yet!");
+            let func_ref = imp
+                .body
+                .get(&poly_call.callee.member)
+                .expect("expected impl body function refereneced by poly call to exist");
+
+            let callee = asg
+                .funcs
+                .get(*func_ref)
+                .expect("referenced function to exist");
+
+            let args = poly_call
+                .args
+                .iter()
+                .map(|arg| lower_expr(builder, ir_module, &arg.expr, function, asg))
+                .collect::<Result<Box<[_]>, _>>()?;
+
+            let variadic_arg_types = poly_call.args[callee.params.required.len()..]
+                .iter()
+                .map(|arg| lower_type(ir_module, &builder.unpoly(&arg.ty)?, asg))
+                .collect::<Result<Box<[_]>, _>>()?;
+
+            // NOTE: We have to resolve our own polymorphs in the mapping
+            let mut polymorphs = IndexMap::<String, PolyValue>::new();
+
+            for (name, value) in poly_call.callee.recipe.polymorphs.iter() {
+                match value {
+                    PolyValue::Type(ty) => {
+                        polymorphs.insert(
+                            name.clone(),
+                            PolyValue::Type(
+                                Borrow::<asg::Type>::borrow(&builder.unpoly(&ty)?.0).clone(),
+                            ),
+                        );
+                    }
+                    PolyValue::Expr(_) => {
+                        todo!("compile-time expression parameters are not supported when calling generic functions yet")
+                    }
+                    PolyValue::Impl(impl_ref) => {
+                        polymorphs.insert(name.clone(), PolyValue::Impl(*impl_ref));
+                    }
+                }
+            }
+
+            let recipe = PolyRecipe { polymorphs };
+
+            let function = ir_module.funcs.translate(*func_ref, &recipe, || {
+                lower_func_head(ir_module, *func_ref, &recipe, asg)
+            })?;
+
+            Ok(builder.push(ir::Instr::Call(ir::Call {
+                func: function,
+                arguments: args,
+                unpromoted_variadic_arg_types: variadic_arg_types,
+            })))
         }
     }
 }

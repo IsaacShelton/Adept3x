@@ -343,6 +343,7 @@ pub fn resolve_static_member_call_polymorph(
             callee: PolyCallee {
                 polymorph: polymorph.into(),
                 member,
+                recipe: catalog.bake(),
             },
             args,
         }))
