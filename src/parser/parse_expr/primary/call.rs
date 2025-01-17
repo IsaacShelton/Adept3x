@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::{
-    ast::{Call, Expr, ExprKind, TypeArg},
+    ast::{Call, Expr, ExprKind, TypeArg, Using},
     inflow::Inflow,
     name::Name,
     parser::error::ParseError,
@@ -82,7 +82,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     self.ignore_newlines();
                 }
 
-                using.push(self.parse_type(Some("implementation"), Some("for implementation"))?);
+                let name = self.parse_identifier(Some("for implementation parameter name"))?;
+
+                using.push(Using {
+                    name,
+                    ty: self.parse_type(Some("implementation"), Some("for implementation"))?,
+                });
                 self.ignore_newlines();
             }
 

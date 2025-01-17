@@ -795,8 +795,8 @@ unsafe fn emit_call(
 
     let function_value = skeleton.function;
 
-    let mut arguments = call
-        .arguments
+    let mut args = call
+        .args
         .iter()
         .enumerate()
         .map(|(i, argument)| {
@@ -830,7 +830,7 @@ unsafe fn emit_call(
 
         // If we're using variadic arguments, then we have to re-generate the ABI
         // function signature for the way we're calling it
-        let abi_function_approximation = (abi_function.parameter_types.len() < arguments.len())
+        let abi_function_approximation = (abi_function.parameter_types.len() < args.len())
             .then(|| {
                 ABIFunction::new(
                     ctx,
@@ -845,10 +845,7 @@ unsafe fn emit_call(
             .unwrap_or(Cow::Borrowed(abi_function));
 
         // After generating the function signature, we should have ABI parameter information for each argument
-        assert_eq!(
-            abi_function_approximation.parameter_types.len(),
-            arguments.len()
-        );
+        assert_eq!(abi_function_approximation.parameter_types.len(), args.len());
 
         // NOTE: We shouldn't need inalloca, since we intend to target
         // only x86_64 Windows GNU on Windows, as opposed to older MSVC ABIs.
@@ -914,7 +911,7 @@ unsafe fn emit_call(
         let saved_stack_pointer = builder.save_stack_pointer(ctx);
 
         for (argument, argument_type, abi_param, param_mapping) in zip4(
-            arguments.iter().copied(),
+            args.iter().copied(),
             argument_types_iter,
             abi_function_approximation.parameter_types.iter(),
             params_mapping.params().iter(),
@@ -1140,8 +1137,8 @@ unsafe fn emit_call(
             builder.get(),
             function_type,
             function_value,
-            arguments.as_mut_ptr(),
-            arguments.len().try_into().unwrap(),
+            args.as_mut_ptr(),
+            args.len().try_into().unwrap(),
             cstr!("").as_ptr(),
         ))
     }

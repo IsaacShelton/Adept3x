@@ -204,7 +204,7 @@ impl BinaryOperands {
 #[derive(Clone, Debug)]
 pub struct Call {
     pub func: FuncRef,
-    pub arguments: Box<[Value]>,
+    pub args: Box<[Value]>,
     pub unpromoted_variadic_arg_types: Box<[Type]>,
 }
 

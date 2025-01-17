@@ -183,7 +183,7 @@ pub fn lower_expr(
 
             Ok(builder.push(ir::Instr::Call(ir::Call {
                 func: function,
-                arguments: args,
+                args,
                 unpromoted_variadic_arg_types: variadic_arg_types,
             })))
         }
@@ -554,7 +554,7 @@ pub fn lower_expr(
             let func_ref = imp
                 .body
                 .get(&poly_call.callee.member)
-                .expect("expected impl body function refereneced by poly call to exist");
+                .expect("expected impl body function referenced by poly call to exist");
 
             let callee = asg
                 .funcs
@@ -602,7 +602,7 @@ pub fn lower_expr(
 
             Ok(builder.push(ir::Instr::Call(ir::Call {
                 func: function,
-                arguments: args,
+                args,
                 unpromoted_variadic_arg_types: variadic_arg_types,
             })))
         }

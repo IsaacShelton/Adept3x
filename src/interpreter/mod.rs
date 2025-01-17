@@ -94,9 +94,9 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     break value;
                 }
                 ir::Instr::Call(call) => {
-                    let mut arguments = Vec::with_capacity(call.arguments.len());
+                    let mut arguments = Vec::with_capacity(call.args.len());
 
-                    for argument in call.arguments.iter() {
+                    for argument in call.args.iter() {
                         arguments.push(self.eval(&registers, argument));
                     }
 

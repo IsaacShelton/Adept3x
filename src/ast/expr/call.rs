@@ -10,5 +10,11 @@ pub struct Call {
     pub args: Vec<Expr>,
     pub expected_to_return: Option<Type>,
     pub generics: Vec<TypeArg>,
-    pub using: Vec<Type>,
+    pub using: Vec<Using>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Using {
+    pub name: String,
+    pub ty: Type,
 }
