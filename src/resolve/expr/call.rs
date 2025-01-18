@@ -85,32 +85,30 @@ pub fn call_callee(
         let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
         let function = ctx.asg.funcs.get(callee.function).unwrap();
 
-        let poly_impl_name = impl_using
-            .name
-            .as_ref()
-            .ok_or(())
-            .or_else(|_| {
-                function
-                    .impl_params
-                    .params
-                    .iter()
-                    .filter(|(param_name, param)| {
-                        param.trait_ref == arg_concrete_trait.trait_ref
-                            && !used_names.contains(*param_name)
-                    })
-                    .map(|(param_name, _)| param_name)
-                    .next()
-                    .ok_or_else(|| {
-                        ResolveError::other(
-                            format!(
-                                "Excess implementation of trait '{}' is not used by callee",
-                                arg_concrete_trait.display(&ctx.asg)
-                            ),
-                            impl_arg.source,
-                        )
-                    })
-            })?
-            .clone();
+        let poly_impl_name = if let Some(name) = &impl_using.name {
+            name.clone()
+        } else {
+            function
+                .impl_params
+                .params
+                .iter()
+                .filter(|(param_name, param)| {
+                    param.trait_ref == arg_concrete_trait.trait_ref
+                        && !used_names.contains(*param_name)
+                })
+                .map(|(param_name, _)| param_name)
+                .next()
+                .ok_or_else(|| {
+                    ResolveError::other(
+                        format!(
+                            "Excess implementation of trait '{}' is not used by callee",
+                            arg_concrete_trait.display(&ctx.asg)
+                        ),
+                        impl_arg.source,
+                    )
+                })?
+                .clone()
+        };
 
         if !used_names.insert(poly_impl_name.clone()) {
             return Err(ResolveError::other(
