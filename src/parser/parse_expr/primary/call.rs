@@ -82,7 +82,13 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     self.ignore_newlines();
                 }
 
-                let name = self.parse_identifier(Some("for implementation parameter name"))?;
+                let name = if self.input.peek().is_identifier()
+                    && self.input.peek_nth(1).could_start_type()
+                {
+                    Some(self.parse_identifier(Some("for implementation parameter name"))?)
+                } else {
+                    None
+                };
 
                 using.push(Using {
                     name,

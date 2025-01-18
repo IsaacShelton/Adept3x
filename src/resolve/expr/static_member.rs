@@ -102,7 +102,7 @@ pub fn resolve_impl_mention(
 
     let Some(imp) = impl_ref.and_then(|found| ctx.asg.impls.get(*found)) else {
         return Err(ResolveError::other(
-            "Undefined trait implementation",
+            format!("Undefined trait implementation '{}'", impl_name),
             source,
         ));
     };

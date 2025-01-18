@@ -15,6 +15,6 @@ pub struct Call {
 
 #[derive(Clone, Debug)]
 pub struct Using {
-    pub name: String,
+    pub name: Option<String>,
     pub ty: Type,
 }

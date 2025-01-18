@@ -14,6 +14,7 @@ use crate::{
 use itertools::Itertools;
 use num::BigInt;
 use ordered_float::NotNan;
+use std::collections::HashSet;
 
 pub fn resolve_call_expr(
     ctx: &mut ResolveExprCtx,
@@ -69,6 +70,8 @@ pub fn call_callee(
     mut args: Vec<TypedExpr>,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
+    let mut used_names = HashSet::new();
+
     for impl_using in call.using.iter() {
         let impl_arg = &impl_using.ty;
         let (impl_ref, impl_poly_catalog) = resolve_impl_mention_from_type(ctx, impl_arg)?;
@@ -80,14 +83,46 @@ pub fn call_callee(
             .expect("referenced impl to exist");
 
         let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
-
         let function = ctx.asg.funcs.get(callee.function).unwrap();
 
-        let poly_impl_name = &impl_using.name;
+        let poly_impl_name = if let Some(name) = &impl_using.name {
+            name.clone()
+        } else {
+            function
+                .impl_params
+                .params
+                .iter()
+                .filter(|(param_name, param)| {
+                    param.trait_ref == arg_concrete_trait.trait_ref
+                        && used_names.contains(*param_name)
+                })
+                .map(|(param_name, _)| param_name)
+                .next()
+                .ok_or_else(|| {
+                    ResolveError::other(
+                        "No implementation parameter left for implementation argument",
+                        impl_arg.source,
+                    )
+                })?
+                .clone()
+        };
 
-        let Some(param_generic_trait) = function.impl_params.params.get(&impl_using.name) else {
+        if !used_names.insert(poly_impl_name.clone()) {
             return Err(ResolveError::other(
-                format!("Unknown implementation argument '${}'", poly_impl_name),
+                format!(
+                    "Implementation for '${}' was already specified",
+                    &poly_impl_name
+                ),
+                impl_arg.source,
+            ));
+        }
+
+        let Some(param_generic_trait) = function.impl_params.params.get(&poly_impl_name) else {
+            return Err(ResolveError::other(
+                format!(
+                    "Callee does not have implementation parameter '${}'",
+                    &poly_impl_name
+                ),
                 source,
             ));
         };
@@ -107,7 +142,7 @@ pub fn call_callee(
         if callee
             .recipe
             .polymorphs
-            .insert(poly_impl_name.into(), PolyValue::Impl(impl_ref))
+            .insert(poly_impl_name.clone(), PolyValue::Impl(impl_ref))
             .is_some()
         {
             return Err(ResolveError::other(
