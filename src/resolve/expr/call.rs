@@ -85,10 +85,9 @@ pub fn call_callee(
         let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
         let function = ctx.asg.funcs.get(callee.function).unwrap();
 
-        let poly_impl_name = if let Some(name) = &impl_using.name {
-            name.clone()
-        } else {
-            function
+        let poly_impl_name = match &impl_using.name {
+            Some(name) => name,
+            None => function
                 .impl_params
                 .params
                 .iter()
@@ -106,15 +105,15 @@ pub fn call_callee(
                         ),
                         impl_arg.source,
                     )
-                })?
-                .clone()
-        };
+                })?,
+        }
+        .clone();
 
         if !used_names.insert(poly_impl_name.clone()) {
             return Err(ResolveError::other(
                 format!(
                     "Implementation for '${}' was already specified",
-                    &poly_impl_name
+                    poly_impl_name
                 ),
                 impl_arg.source,
             ));
@@ -124,7 +123,7 @@ pub fn call_callee(
             return Err(ResolveError::other(
                 format!(
                     "Callee does not have implementation parameter '${}'",
-                    &poly_impl_name
+                    poly_impl_name
                 ),
                 source,
             ));
@@ -163,10 +162,6 @@ pub fn call_callee(
 
     let function = ctx.asg.funcs.get(callee.function).unwrap();
     let num_required = function.params.required.len();
-
-    if !function.impl_params.params.is_empty() {
-        eprintln!("warning: calling functions with implementation parameters is not fully implemented yet! (more that one implementation parameter is not supported yet)");
-    }
 
     for (i, arg) in args.iter_mut().enumerate() {
         let function = ctx.asg.funcs.get(callee.function).unwrap();
