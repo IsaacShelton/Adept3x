@@ -1,3 +1,4 @@
+mod call;
 mod short_circuit;
 
 use super::{
@@ -5,7 +6,6 @@ use super::{
     cast::{integer_cast, integer_extend, integer_truncate},
     datatype::lower_type,
     error::{LowerError, LowerErrorKind},
-    function::lower_func_head,
     stmts::lower_stmts,
 };
 use crate::{
@@ -16,11 +16,10 @@ use crate::{
     ast::{FloatSize, IntegerBits, IntegerRigidity},
     ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     lower::structure::mono,
-    resolve::{PolyCatalog, PolyRecipe, PolyValue},
+    resolve::PolyCatalog,
 };
-use indexmap::IndexMap;
+use call::{lower_expr_call, lower_expr_poly_call};
 use short_circuit::lower_short_circuiting_binary_operation;
-use std::borrow::Borrow;
 
 pub fn lower_expr(
     builder: &mut Builder,
@@ -134,59 +133,7 @@ pub fn lower_expr(
                 "String literals are not fully implemented yet, still need ability to lower"
             )
         }
-        ExprKind::Call(call) => {
-            let callee = asg
-                .funcs
-                .get(call.callee.function)
-                .expect("referenced function to exist");
-
-            let args = call
-                .args
-                .iter()
-                .map(|arg| lower_expr(builder, ir_module, &arg.expr, function, asg))
-                .collect::<Result<Box<[_]>, _>>()?;
-
-            let variadic_arg_types = call.args[callee.params.required.len()..]
-                .iter()
-                .map(|arg| lower_type(ir_module, &builder.unpoly(&arg.ty)?, asg))
-                .collect::<Result<Box<[_]>, _>>()?;
-
-            // NOTE: We have to resolve our own polymorphs in the mapping
-            let mut polymorphs = IndexMap::<String, PolyValue>::new();
-
-            for (name, value) in call.callee.recipe.polymorphs.iter() {
-                match value {
-                    PolyValue::Type(ty) => {
-                        polymorphs.insert(
-                            name.clone(),
-                            PolyValue::Type(
-                                Borrow::<asg::Type>::borrow(&builder.unpoly(ty)?.0).clone(),
-                            ),
-                        );
-                    }
-                    PolyValue::Expr(_) => {
-                        todo!("compile-time expression parameters are not supported when calling generic functions yet")
-                    }
-                    PolyValue::Impl(impl_ref) => {
-                        polymorphs.insert(name.clone(), PolyValue::Impl(*impl_ref));
-                    }
-                }
-            }
-
-            let recipe = PolyRecipe { polymorphs };
-
-            let function = ir_module
-                .funcs
-                .translate(call.callee.function, &recipe, || {
-                    lower_func_head(ir_module, call.callee.function, &recipe, asg)
-                })?;
-
-            Ok(builder.push(ir::Instr::Call(ir::Call {
-                func: function,
-                args,
-                unpromoted_variadic_arg_types: variadic_arg_types,
-            })))
-        }
+        ExprKind::Call(call) => lower_expr_call(builder, ir_module, expr, function, asg, call),
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
             let variable_type = lower_type(ir_module, &builder.unpoly(&variable.ty)?, asg)?;
@@ -544,67 +491,7 @@ pub fn lower_expr(
             Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
         }
         ExprKind::PolyCall(poly_call) => {
-            let impl_ref = builder
-                .poly_recipe()
-                .resolve_impl(&poly_call.callee.polymorph, expr.source)
-                .map_err(LowerError::from)?;
-
-            let imp = asg.impls.get(impl_ref).expect("referenced impl to exist");
-
-            let func_ref = imp
-                .body
-                .get(&poly_call.callee.member)
-                .expect("expected impl body function referenced by poly call to exist");
-
-            let callee = asg
-                .funcs
-                .get(*func_ref)
-                .expect("referenced function to exist");
-
-            let args = poly_call
-                .args
-                .iter()
-                .map(|arg| lower_expr(builder, ir_module, &arg.expr, function, asg))
-                .collect::<Result<Box<[_]>, _>>()?;
-
-            let variadic_arg_types = poly_call.args[callee.params.required.len()..]
-                .iter()
-                .map(|arg| lower_type(ir_module, &builder.unpoly(&arg.ty)?, asg))
-                .collect::<Result<Box<[_]>, _>>()?;
-
-            // NOTE: We have to resolve our own polymorphs in the mapping
-            let mut polymorphs = IndexMap::<String, PolyValue>::new();
-
-            for (name, value) in poly_call.callee.recipe.polymorphs.iter() {
-                match value {
-                    PolyValue::Type(ty) => {
-                        polymorphs.insert(
-                            name.clone(),
-                            PolyValue::Type(
-                                Borrow::<asg::Type>::borrow(&builder.unpoly(&ty)?.0).clone(),
-                            ),
-                        );
-                    }
-                    PolyValue::Expr(_) => {
-                        todo!("compile-time expression parameters are not supported when calling generic functions yet")
-                    }
-                    PolyValue::Impl(impl_ref) => {
-                        polymorphs.insert(name.clone(), PolyValue::Impl(*impl_ref));
-                    }
-                }
-            }
-
-            let recipe = PolyRecipe { polymorphs };
-
-            let function = ir_module.funcs.translate(*func_ref, &recipe, || {
-                lower_func_head(ir_module, *func_ref, &recipe, asg)
-            })?;
-
-            Ok(builder.push(ir::Instr::Call(ir::Call {
-                func: function,
-                args,
-                unpromoted_variadic_arg_types: variadic_arg_types,
-            })))
+            lower_expr_poly_call(builder, ir_module, expr, function, asg, poly_call)
         }
     }
 }

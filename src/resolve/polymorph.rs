@@ -35,6 +35,7 @@ impl Display for PolyRecipe {
         for (i, (name, value)) in self.polymorphs.iter().enumerate() {
             write!(f, "${} :: ", name)?;
 
+            // NOTE: We shouldn't
             match value {
                 PolyValue::Type(ty) => {
                     write!(f, "{}", ty.to_string())?;
@@ -46,7 +47,13 @@ impl Display for PolyRecipe {
                     eprintln!(
                         "warning: name mangling for functions called with impl params is ad-hoc"
                     );
-                    write!(f, "{:?}", impl_ref)?;
+                    write!(f, "impl {:?}", impl_ref)?;
+                }
+                PolyValue::PolyImpl(name) => {
+                    eprintln!(
+                        "warning: name mangling for functions called with impl params is ad-hoc"
+                    );
+                    write!(f, "impl ${}", name)?;
                 }
             }
 
@@ -188,6 +195,7 @@ pub enum PolyValue {
     Type(asg::Type),
     Expr(asg::Expr),
     Impl(asg::ImplRef),
+    PolyImpl(String),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -314,6 +322,7 @@ impl PolyCatalog {
                 }
                 PolyValue::Expr(_) => return Err(PolyCatalogInsertError::Incongruent),
                 PolyValue::Impl(_) => return Err(PolyCatalogInsertError::Incongruent),
+                PolyValue::PolyImpl(_) => return Err(PolyCatalogInsertError::Incongruent),
             }
         } else {
             self.polymorphs

@@ -74,86 +74,193 @@ pub fn call_callee(
 
     for impl_using in call.using.iter() {
         let impl_arg = &impl_using.ty;
-        let (impl_ref, impl_poly_catalog) = resolve_impl_mention_from_type(ctx, impl_arg)?;
 
-        let imp = ctx
-            .asg
-            .impls
-            .get(impl_ref)
-            .expect("referenced impl to exist");
+        if let ast::TypeKind::Polymorph(impl_poly_name, impl_args) = &impl_arg.kind {
+            let callee_func = ctx.asg.funcs.get(callee.function).unwrap();
 
-        let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
-        let function = ctx.asg.funcs.get(callee.function).unwrap();
+            if !impl_args.is_empty() {
+                return Err(ResolveError::other(
+                    "Implementation polymorphs cannot take type arguments",
+                    impl_arg.source,
+                ));
+            }
 
-        let poly_impl_name = match &impl_using.name {
-            Some(name) => name,
-            None => function
-                .impl_params
-                .params
-                .iter()
-                .filter(|(param_name, param)| {
-                    param.trait_ref == arg_concrete_trait.trait_ref
-                        && !used_names.contains(*param_name)
-                })
-                .map(|(param_name, _)| param_name)
-                .next()
-                .ok_or_else(|| {
-                    ResolveError::other(
-                        format!(
-                            "Excess implementation of trait '{}' is not used by callee",
-                            arg_concrete_trait.display(&ctx.asg)
-                        ),
-                        impl_arg.source,
-                    )
-                })?,
-        }
-        .clone();
+            let caller = ctx
+                .func_ref
+                .and_then(|func_ref| ctx.asg.funcs.get(func_ref))
+                .unwrap();
 
-        if !used_names.insert(poly_impl_name.clone()) {
-            return Err(ResolveError::other(
-                format!(
-                    "Implementation for '${}' was already specified",
-                    poly_impl_name
-                ),
-                impl_arg.source,
-            ));
-        }
+            let Some(arg_concrete_trait) = caller.impl_params.params.get(impl_poly_name) else {
+                return Err(ResolveError::other(
+                    format!(
+                        "Undefined implementation parameter polymorph '${}'",
+                        impl_poly_name
+                    ),
+                    impl_arg.source,
+                ));
+            };
 
-        let Some(param_generic_trait) = function.impl_params.params.get(&poly_impl_name) else {
-            return Err(ResolveError::other(
-                format!(
-                    "Callee does not have implementation parameter '${}'",
-                    poly_impl_name
-                ),
-                source,
-            ));
-        };
+            let target_poly_impl_name = match &impl_using.name {
+                Some(name) => name,
+                None => callee_func
+                    .impl_params
+                    .params
+                    .iter()
+                    .filter(|(param_name, param)| {
+                        param.trait_ref == arg_concrete_trait.trait_ref
+                            && !used_names.contains(*param_name)
+                    })
+                    .map(|(param_name, _)| param_name)
+                    .next()
+                    .ok_or_else(|| {
+                        ResolveError::other(
+                            format!(
+                                "Excess implementation of trait '{}' is not used by callee",
+                                arg_concrete_trait.display(&ctx.asg)
+                            ),
+                            impl_arg.source,
+                        )
+                    })?,
+            }
+            .clone();
 
-        let param_concrete_trait = callee.recipe.resolve_trait(param_generic_trait)?;
+            let Some(param_generic_trait) =
+                callee_func.impl_params.params.get(&target_poly_impl_name)
+            else {
+                return Err(ResolveError::other(
+                    format!(
+                        "Callee does not have implementation parameter '${}'",
+                        target_poly_impl_name
+                    ),
+                    source,
+                ));
+            };
 
-        if arg_concrete_trait != param_concrete_trait {
-            return Err(ResolveError::other(
-                format!(
-                    "Implementation of {} cannot be used for {}",
-                    arg_concrete_trait.display(ctx.asg),
-                    param_concrete_trait.display(ctx.asg)
-                ),
-                impl_arg.source,
-            ));
-        }
-        if callee
-            .recipe
-            .polymorphs
-            .insert(poly_impl_name.clone(), PolyValue::Impl(impl_ref))
-            .is_some()
-        {
-            return Err(ResolveError::other(
-                format!(
+            if !used_names.insert(target_poly_impl_name.clone()) {
+                return Err(ResolveError::other(
+                    format!(
+                        "Implementation for '${}' was already specified",
+                        target_poly_impl_name
+                    ),
+                    impl_arg.source,
+                ));
+            }
+
+            let param_concrete_trait = callee.recipe.resolve_trait(param_generic_trait)?;
+
+            if *arg_concrete_trait != param_concrete_trait {
+                return Err(ResolveError::other(
+                    format!(
+                        "Implementation of {} cannot be used for {}",
+                        arg_concrete_trait.display(ctx.asg),
+                        param_concrete_trait.display(ctx.asg)
+                    ),
+                    impl_arg.source,
+                ));
+            }
+
+            if callee
+                .recipe
+                .polymorphs
+                .insert(
+                    target_poly_impl_name.clone(),
+                    PolyValue::PolyImpl(impl_poly_name.into()),
+                )
+                .is_some()
+            {
+                return Err(ResolveError::other(
+                    format!(
                     "Multiple implementations were specified for implementation parameter '${}'",
-                    poly_impl_name
+                    target_poly_impl_name
                 ),
-                impl_arg.source,
-            ));
+                    impl_arg.source,
+                ));
+            }
+        } else {
+            let (impl_ref, impl_poly_catalog) = resolve_impl_mention_from_type(ctx, impl_arg)?;
+
+            let imp = ctx
+                .asg
+                .impls
+                .get(impl_ref)
+                .expect("referenced impl to exist");
+
+            let arg_concrete_trait = impl_poly_catalog.bake().resolve_trait(&imp.target)?;
+
+            let function = ctx.asg.funcs.get(callee.function).unwrap();
+
+            let target_poly_impl_name = match &impl_using.name {
+                Some(name) => name,
+                None => function
+                    .impl_params
+                    .params
+                    .iter()
+                    .filter(|(param_name, param)| {
+                        param.trait_ref == arg_concrete_trait.trait_ref
+                            && !used_names.contains(*param_name)
+                    })
+                    .map(|(param_name, _)| param_name)
+                    .next()
+                    .ok_or_else(|| {
+                        ResolveError::other(
+                            format!(
+                                "Excess implementation of trait '{}' is not used by callee",
+                                arg_concrete_trait.display(&ctx.asg)
+                            ),
+                            impl_arg.source,
+                        )
+                    })?,
+            }
+            .clone();
+
+            if !used_names.insert(target_poly_impl_name.clone()) {
+                return Err(ResolveError::other(
+                    format!(
+                        "Implementation for '${}' was already specified",
+                        target_poly_impl_name
+                    ),
+                    impl_arg.source,
+                ));
+            }
+
+            let Some(param_generic_trait) = function.impl_params.params.get(&target_poly_impl_name)
+            else {
+                return Err(ResolveError::other(
+                    format!(
+                        "Callee does not have implementation parameter '${}'",
+                        target_poly_impl_name
+                    ),
+                    source,
+                ));
+            };
+
+            let param_concrete_trait = callee.recipe.resolve_trait(param_generic_trait)?;
+
+            if arg_concrete_trait != param_concrete_trait {
+                return Err(ResolveError::other(
+                    format!(
+                        "Implementation of {} cannot be used for {}",
+                        arg_concrete_trait.display(ctx.asg),
+                        param_concrete_trait.display(ctx.asg)
+                    ),
+                    impl_arg.source,
+                ));
+            }
+
+            if callee
+                .recipe
+                .polymorphs
+                .insert(target_poly_impl_name.clone(), PolyValue::Impl(impl_ref))
+                .is_some()
+            {
+                return Err(ResolveError::other(
+                    format!(
+                    "Multiple implementations were specified for implementation parameter '${}'",
+                    target_poly_impl_name
+                ),
+                    impl_arg.source,
+                ));
+            }
         }
 
         // NOTE: We will need to populate the callee's poly recipe with `callee.recipe.polymorphs.insert()`
