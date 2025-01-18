@@ -35,7 +35,9 @@ impl Display for PolyRecipe {
         for (i, (name, value)) in self.polymorphs.iter().enumerate() {
             write!(f, "${} :: ", name)?;
 
-            // NOTE: We shouldn't
+            // NOTE: We shouldn't need to do something like this for mangling, only concrete types,
+            // impls, exprs, etc. should be included. We can probably be smarter than that too
+            // though.
             match value {
                 PolyValue::Type(ty) => {
                     write!(f, "{}", ty.to_string())?;
@@ -320,9 +322,9 @@ impl PolyCatalog {
                         return Err(PolyCatalogInsertError::Incongruent);
                     }
                 }
-                PolyValue::Expr(_) => return Err(PolyCatalogInsertError::Incongruent),
-                PolyValue::Impl(_) => return Err(PolyCatalogInsertError::Incongruent),
-                PolyValue::PolyImpl(_) => return Err(PolyCatalogInsertError::Incongruent),
+                PolyValue::Expr(_) | PolyValue::Impl(_) | PolyValue::PolyImpl(_) => {
+                    return Err(PolyCatalogInsertError::Incongruent)
+                }
             }
         } else {
             self.polymorphs
