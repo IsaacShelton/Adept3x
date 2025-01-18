@@ -94,7 +94,7 @@ pub fn call_callee(
                 .iter()
                 .filter(|(param_name, param)| {
                     param.trait_ref == arg_concrete_trait.trait_ref
-                        && used_names.contains(*param_name)
+                        && !used_names.contains(*param_name)
                 })
                 .map(|(param_name, _)| param_name)
                 .next()

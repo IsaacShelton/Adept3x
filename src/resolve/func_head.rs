@@ -13,7 +13,7 @@ use crate::{
     tag::Tag,
     workspace::fs::FsNodeId,
 };
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 pub fn create_func_heads<'a>(
     ctx: &mut ResolveCtx,
@@ -102,7 +102,7 @@ pub fn create_func_head<'a>(
         .unwrap_or_default();
 
     let impl_params = {
-        let mut params = HashMap::default();
+        let mut params = IndexMap::default();
 
         for given in &head.givens {
             let trait_ty = type_ctx.resolve(&given.ty)?;
