@@ -22,11 +22,11 @@ pub fn resolve_impl_arg(
     if let ast::TypeKind::Polymorph(polymorph, args_to_polymorph) = &impl_arg.kind {
         resolve_polymorph_impl_arg(ctx, callee, using, polymorph, args_to_polymorph, used_names)
     } else {
-        resolve_name_impl_arg(ctx, callee, using, impl_arg, source, used_names)
+        resolve_concrete_impl_arg(ctx, callee, using, impl_arg, source, used_names)
     }
 }
 
-fn resolve_name_impl_arg(
+fn resolve_concrete_impl_arg(
     ctx: &mut ResolveExprCtx,
     callee: &mut Callee,
     using: &Using,
@@ -110,10 +110,18 @@ fn resolve_polymorph_impl_arg(
         ));
     }
 
+    let Some(current_func_ref) = ctx.func_ref else {
+        return Err(ResolveError::other(
+            format!("Undefined implementation polymorph '${}'", polymorph),
+            impl_arg_source,
+        ));
+    };
+
     let caller = ctx
-        .func_ref
-        .and_then(|func_ref| ctx.asg.funcs.get(func_ref))
-        .unwrap();
+        .asg
+        .funcs
+        .get(current_func_ref)
+        .expect("referenced function to exist");
 
     let Some(arg_concrete_trait) = caller.impl_params.params.get(polymorph) else {
         return Err(ResolveError::other(
