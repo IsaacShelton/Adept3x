@@ -119,7 +119,7 @@ fn try_register_specified_impl(
     arg_concrete_trait: &GenericTraitRef,
     impl_params: &ImplParams,
 ) -> Result<(), ResolveError> {
-    let target_poly_impl = match &using.name {
+    let target_param = match &using.name {
         Some(name_and_source) => name_and_source.as_ref(),
         None => Sourced::new(
             callee_func
@@ -146,24 +146,23 @@ fn try_register_specified_impl(
     }
     .clone();
 
-    let Some(param_generic_trait) = impl_params.params.get(target_poly_impl.inner().as_str())
-    else {
+    let Some(param_generic_trait) = impl_params.params.get(target_param.inner().as_str()) else {
         return Err(ResolveError::other(
             format!(
                 "No implementation parameter named '${}' exists on callee",
-                target_poly_impl.inner()
+                target_param.inner()
             ),
-            target_poly_impl.source,
+            target_param.source,
         ));
     };
 
-    if !used_names.insert(target_poly_impl.inner().to_string()) {
+    if !used_names.insert(target_param.inner().to_string()) {
         return Err(ResolveError::other(
             format!(
                 "Implementation for '${}' was already specified",
-                target_poly_impl.inner()
+                target_param.inner()
             ),
-            target_poly_impl.source,
+            target_param.source,
         ));
     }
 
@@ -183,15 +182,15 @@ fn try_register_specified_impl(
     callee
         .recipe
         .polymorphs
-        .insert(target_poly_impl.inner().to_string(), poly_value)
+        .insert(target_param.inner().to_string(), poly_value)
         .is_some()
         .then(|| {
             ResolveError::other(
                 format!(
                     "Multiple implementations were specified for implementation parameter '${}'",
-                    target_poly_impl.inner()
+                    target_param.inner()
                 ),
-                target_poly_impl.source,
+                target_param.source,
             )
         })
         .map_or(Ok(()), Err)
