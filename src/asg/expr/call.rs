@@ -9,6 +9,6 @@ pub struct Call {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Callee {
-    pub function: FuncRef,
+    pub func_ref: FuncRef,
     pub recipe: PolyRecipe,
 }

@@ -7,7 +7,9 @@ use crate::{
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
-        let (name, source) = self.parse_identifier_keep_location(Some("for variable name"))?;
+        let (name, source) = self
+            .parse_identifier_keep_location(Some("for variable name"))?
+            .tuple();
 
         let variable_type = self.parse_type(None::<&str>, Some("for variable"))?;
 

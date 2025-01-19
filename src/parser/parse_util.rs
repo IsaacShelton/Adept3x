@@ -5,7 +5,7 @@ use super::{
 use crate::{
     inflow::Inflow,
     name::Name,
-    source_files::Source,
+    source_files::{source::Sourced, Source},
     token::{Token, TokenKind},
 };
 use std::borrow::Borrow;
@@ -30,17 +30,20 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         &mut self,
         for_reason: Option<impl ToString>,
     ) -> Result<String, ParseError> {
-        Ok(self.parse_identifier_keep_location(for_reason)?.0)
+        Ok(self
+            .parse_identifier_keep_location(for_reason)?
+            .inner()
+            .into())
     }
 
     pub fn parse_identifier_keep_location(
         &mut self,
         for_reason: Option<impl ToString>,
-    ) -> Result<(String, Source), ParseError> {
+    ) -> Result<Sourced<String>, ParseError> {
         let token = self.input.advance();
 
         if let TokenKind::Identifier(identifier) = &token.kind {
-            Ok((identifier.into(), token.source))
+            Ok(Sourced::new(identifier.into(), token.source))
         } else {
             Err(ParseError::expected("identifier", for_reason, token))
         }

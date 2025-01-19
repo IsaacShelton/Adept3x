@@ -19,8 +19,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let mut annotations = Vec::with_capacity(2);
 
         loop {
-            let (annotation_name, source) =
-                self.parse_identifier_keep_location(Some("for annotation name"))?;
+            let (annotation_name, source) = self
+                .parse_identifier_keep_location(Some("for annotation name"))?
+                .tuple();
 
             let annotation = match annotation_name.as_str() {
                 "foreign" => AnnotationKind::Foreign,

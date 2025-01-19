@@ -2,6 +2,7 @@ use super::Expr;
 use crate::{
     ast::{Type, TypeArg},
     name::Name,
+    source_files::source::Sourced,
 };
 
 #[derive(Clone, Debug)]
@@ -15,6 +16,6 @@ pub struct Call {
 
 #[derive(Clone, Debug)]
 pub struct Using {
-    pub name: Option<String>,
+    pub name: Option<Sourced<String>>,
     pub ty: Type,
 }

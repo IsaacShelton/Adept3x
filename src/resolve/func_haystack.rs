@@ -147,7 +147,7 @@ impl FuncHaystack {
         }
 
         Some(Callee {
-            function: func_ref,
+            func_ref,
             recipe: catalog.bake(),
         })
     }

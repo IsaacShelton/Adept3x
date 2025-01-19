@@ -32,8 +32,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
         }
 
-        let (name, source) =
-            self.parse_identifier_keep_location(Some("for name of global variable"))?;
+        let (name, source) = self
+            .parse_identifier_keep_location(Some("for name of global variable"))?
+            .tuple();
 
         // Better error message for trying to call functions at global scope
         if self.input.peek_is(TokenKind::OpenParen) {

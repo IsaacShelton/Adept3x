@@ -84,7 +84,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
                 let name = (self.input.peek().is_identifier()
                     && self.input.peek_nth(1).could_start_type())
-                .then(|| self.parse_identifier(Some("for implementation parameter name")))
+                .then(|| {
+                    self.parse_identifier_keep_location(Some("for implementation parameter name"))
+                })
                 .transpose()?;
 
                 using.push(Using {

@@ -23,7 +23,7 @@ pub fn lower_expr_call(
         expr,
         function,
         asg,
-        call.callee.function,
+        call.callee.func_ref,
         &call.callee.recipe,
         call.args.as_slice(),
     )

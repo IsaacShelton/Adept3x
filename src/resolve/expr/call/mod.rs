@@ -74,17 +74,30 @@ pub fn call_callee(
     let mut used_names = HashSet::new();
 
     for using in call.using.iter() {
-        resolve_impl_arg(ctx, &mut callee, source, using, &mut used_names)?;
+        resolve_impl_arg(ctx, &mut callee, using, &mut used_names)?;
     }
 
-    let function = ctx.asg.funcs.get(callee.function).unwrap();
+    let function = ctx.asg.funcs.get(callee.func_ref).unwrap();
     let num_required = function.params.required.len();
 
+    for (expected_name, expected_trait) in function.impl_params.params.iter() {
+        if !used_names.contains(expected_name) {
+            return Err(ResolveError::other(
+                format!(
+                    "Missing '${} {}' trait implementation required by function call",
+                    expected_name,
+                    expected_trait.display(&ctx.asg),
+                ),
+                source,
+            ));
+        }
+    }
+
     for (i, arg) in args.iter_mut().enumerate() {
-        let function = ctx.asg.funcs.get(callee.function).unwrap();
+        let function = ctx.asg.funcs.get(callee.func_ref).unwrap();
 
         let preferred_type =
-            (i < num_required).then_some(PreferredType::of_parameter(callee.function, i));
+            (i < num_required).then_some(PreferredType::of_parameter(callee.func_ref, i));
 
         if preferred_type.map_or(false, |ty| ty.view(&ctx.asg).kind.contains_polymorph()) {
             *arg = conform_expr_to_default::<Perform>(&*arg, ctx.c_integer_assumptions())
