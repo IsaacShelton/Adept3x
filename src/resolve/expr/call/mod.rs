@@ -85,27 +85,30 @@ pub fn call_callee(
             continue;
         }
 
-        // NOTE: PERFORMANCE: TODO: This could probably be optimized
-        if let Some(caller) = ctx
+        let Some(caller) = ctx
             .func_ref
             .map(|caller_func_ref| ctx.asg.funcs.get(caller_func_ref).unwrap())
-        {
-            let from_env = caller.impl_params.params.iter().filter(|(_, param_trait)| {
-                callee
-                    .recipe
-                    .resolve_trait(expected_trait)
-                    .map_or(false, |expected_trait| **param_trait == expected_trait)
-            });
+        else {
+            continue;
+        };
 
-            match from_env.exactly_one() {
-                Ok((param_name, _)) => {
-                    if callee
-                        .recipe
-                        .polymorphs
-                        .insert(expected_name.into(), PolyValue::PolyImpl(param_name.into()))
-                        .is_some()
-                    {
-                        return Err(ResolveError::other(
+        // NOTE: PERFORMANCE: TODO: This could probably be optimized
+        let from_env = caller.impl_params.params.iter().filter(|(_, param_trait)| {
+            callee
+                .recipe
+                .resolve_trait(expected_trait)
+                .map_or(false, |expected_trait| **param_trait == expected_trait)
+        });
+
+        match from_env.exactly_one() {
+            Ok((param_name, _)) => {
+                if callee
+                    .recipe
+                    .polymorphs
+                    .insert(expected_name.into(), PolyValue::PolyImpl(param_name.into()))
+                    .is_some()
+                {
+                    return Err(ResolveError::other(
                         format!(
                             "Could not automatically supply trait implementation for '${} {}' required by function call, since the polymorph is already in use",
                             expected_name,
@@ -113,26 +116,25 @@ pub fn call_callee(
                         ),
                         source,
                     ));
-                    }
                 }
-                Err(mut non_unique) => {
-                    return Err(ResolveError::other(
-                        if non_unique.next().is_some() {
-                            format!(
+            }
+            Err(mut non_unique) => {
+                return Err(ResolveError::other(
+                    if non_unique.next().is_some() {
+                        format!(
                             "Ambiguous trait implementation for '${} {}' required by function call, please specify manually",
                             expected_name,
                             expected_trait.display(&ctx.asg),
                         )
-                        } else {
-                            format!(
-                                "Missing '${} {}' trait implementation required by function call",
-                                expected_name,
-                                expected_trait.display(&ctx.asg),
-                            )
-                        },
-                        source,
-                    ));
-                }
+                    } else {
+                        format!(
+                            "Missing '${} {}' trait implementation required by function call",
+                            expected_name,
+                            expected_trait.display(&ctx.asg),
+                        )
+                    },
+                    source,
+                ));
             }
         }
     }
