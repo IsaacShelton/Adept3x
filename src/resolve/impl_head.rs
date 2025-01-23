@@ -421,6 +421,13 @@ pub fn create_impl_head<'a>(
         body: HashMap::default(),
     });
 
+    if imp.name.is_none() {
+        return Err(ResolveError::other(
+            "Unnamed trait implementations are not supported yet",
+            imp.source,
+        ));
+    }
+
     let name = imp
         .name
         .as_ref()

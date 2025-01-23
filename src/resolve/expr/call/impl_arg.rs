@@ -4,7 +4,7 @@ use crate::{
     resolve::{
         error::ResolveError,
         expr::{static_member::resolve_impl_mention_from_type, ResolveExprCtx},
-        PolyValue,
+        PolyCatalog, PolyValue,
     },
     source_files::{source::Sourced, Source},
 };
@@ -15,13 +15,22 @@ pub fn resolve_impl_arg(
     callee: &mut Callee,
     using: &Using,
     used_names: &mut HashSet<String>,
+    catalog: &mut PolyCatalog,
 ) -> Result<(), ResolveError> {
     let impl_arg = &using.ty;
 
     if let ast::TypeKind::Polymorph(polymorph, args_to_polymorph) = &impl_arg.kind {
-        resolve_polymorph_impl_arg(ctx, callee, using, polymorph, args_to_polymorph, used_names)
+        resolve_polymorph_impl_arg(
+            ctx,
+            callee,
+            using,
+            polymorph,
+            args_to_polymorph,
+            used_names,
+            catalog,
+        )
     } else {
-        resolve_concrete_impl_arg(ctx, callee, using, impl_arg, used_names)
+        resolve_concrete_impl_arg(ctx, callee, using, impl_arg, used_names, catalog)
     }
 }
 
@@ -31,6 +40,7 @@ fn resolve_concrete_impl_arg(
     using: &Using,
     impl_arg: &ast::Type,
     used_names: &mut HashSet<String>,
+    catalog: &mut PolyCatalog,
 ) -> Result<(), ResolveError> {
     let impl_arg_source = using.ty.source;
     let (impl_ref, impl_poly_catalog) = resolve_impl_mention_from_type(ctx, impl_arg)?;
@@ -46,7 +56,6 @@ fn resolve_concrete_impl_arg(
 
     try_register_specified_impl(
         ctx,
-        callee,
         callee_func,
         using,
         impl_arg_source,
@@ -54,6 +63,7 @@ fn resolve_concrete_impl_arg(
         PolyValue::Impl(impl_ref),
         &arg_concrete_trait,
         &callee_func.impl_params,
+        catalog,
     )
 }
 
@@ -64,6 +74,7 @@ fn resolve_polymorph_impl_arg(
     polymorph: &str,
     args_to_polymorph: &[ast::Type],
     used_names: &mut HashSet<String>,
+    catalog: &mut PolyCatalog,
 ) -> Result<(), ResolveError> {
     let impl_arg_source = using.ty.source;
     let callee_func = ctx.asg.funcs.get(callee.func_ref).unwrap();
@@ -97,7 +108,6 @@ fn resolve_polymorph_impl_arg(
 
     try_register_specified_impl(
         ctx,
-        callee,
         callee_func,
         using,
         impl_arg_source,
@@ -105,12 +115,12 @@ fn resolve_polymorph_impl_arg(
         PolyValue::PolyImpl(polymorph.into()),
         arg_concrete_trait,
         &callee_func.impl_params,
+        catalog,
     )
 }
 
 fn try_register_specified_impl(
     ctx: &ResolveExprCtx,
-    callee: &mut Callee,
     callee_func: &asg::Func,
     using: &Using,
     impl_arg_source: Source,
@@ -118,6 +128,7 @@ fn try_register_specified_impl(
     poly_value: PolyValue,
     arg_concrete_trait: &GenericTraitRef,
     impl_params: &ImplParams,
+    catalog: &mut PolyCatalog,
 ) -> Result<(), ResolveError> {
     let target_param = match &using.name {
         Some(name_and_source) => name_and_source.as_ref(),
@@ -166,7 +177,36 @@ fn try_register_specified_impl(
         ));
     }
 
-    let param_concrete_trait = callee.recipe.resolve_trait(param_generic_trait)?;
+    if param_generic_trait.args.len() != arg_concrete_trait.args.len() {
+        return Err(ResolveError::other(
+            "Mismatching number of arguments expected for trait implementation",
+            target_param.source,
+        ));
+    }
+
+    for (pattern, concrete) in param_generic_trait
+        .args
+        .iter()
+        .zip(arg_concrete_trait.args.iter())
+    {
+        match catalog.match_type(ctx, pattern, concrete) {
+            Ok(()) => {}
+            Err(_) => {
+                return Err(ResolveError::other(
+                    format!(
+                        "Implementation of '{}' cannot be used for '{}'",
+                        arg_concrete_trait.display(ctx.asg),
+                        param_generic_trait.display(ctx.asg)
+                    ),
+                    impl_arg_source,
+                ));
+            }
+        }
+    }
+
+    // TODO: PERFORMANCE: We shouldn't need to clone this
+    let recipe = catalog.clone().bake();
+    let param_concrete_trait = recipe.resolve_trait(param_generic_trait)?;
 
     if *arg_concrete_trait != param_concrete_trait {
         return Err(ResolveError::other(
@@ -179,8 +219,7 @@ fn try_register_specified_impl(
         ));
     }
 
-    callee
-        .recipe
+    catalog
         .polymorphs
         .insert(target_param.inner().to_string(), poly_value)
         .is_some()

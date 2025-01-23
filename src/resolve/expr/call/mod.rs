@@ -8,7 +8,7 @@ use crate::{
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
-        Initialized, PolyValue,
+        Initialized, PolyCatalog, PolyValue,
     },
     source_files::Source,
 };
@@ -72,10 +72,14 @@ pub fn call_callee(
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     let mut used_names = HashSet::new();
+    let mut catalog = PolyCatalog {
+        polymorphs: callee.recipe.polymorphs.clone(),
+    };
 
     for using in call.using.iter() {
-        resolve_impl_arg(ctx, &mut callee, using, &mut used_names)?;
+        resolve_impl_arg(ctx, &mut callee, using, &mut used_names, &mut catalog)?;
     }
+    callee.recipe = catalog.bake();
 
     let function = ctx.asg.funcs.get(callee.func_ref).unwrap();
     let num_required = function.params.required.len();
