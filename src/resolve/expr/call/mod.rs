@@ -108,7 +108,7 @@ pub fn call_callee(
                 return false;
             }
 
-            catalog
+            catalog_plus_match
                 .resolver()
                 .resolve_trait(expected_trait)
                 .map_or(false, |expected_trait| {
