@@ -79,7 +79,6 @@ pub fn call_callee(
     for using in call.using.iter() {
         resolve_impl_arg(ctx, &mut callee, using, &mut used_names, &mut catalog)?;
     }
-    callee.recipe = catalog.bake();
 
     let function = ctx.asg.funcs.get(callee.func_ref).unwrap();
     let num_required = function.params.required.len();
@@ -98,16 +97,24 @@ pub fn call_callee(
 
         // NOTE: PERFORMANCE: TODO: This could probably be optimized
         let from_env = caller.impl_params.params.iter().filter(|(_, param_trait)| {
-            callee
-                .recipe
+            if catalog
+                .match_types(ctx, &expected_trait.args, &param_trait.args)
+                .is_err()
+            {
+                return false;
+            }
+
+            catalog
+                .resolver()
                 .resolve_trait(expected_trait)
-                .map_or(false, |expected_trait| **param_trait == expected_trait)
+                .map_or(false, |expected_trait| {
+                    param_trait.trait_ref == expected_trait.trait_ref
+                })
         });
 
         match from_env.exactly_one() {
             Ok((param_name, _)) => {
-                if callee
-                    .recipe
+                if catalog
                     .polymorphs
                     .insert(expected_name.into(), PolyValue::PolyImpl(param_name.into()))
                     .is_some()
@@ -145,6 +152,8 @@ pub fn call_callee(
 
     // We shouldn't use used_names after this, since we know all names were satisfied
     drop(used_names);
+
+    callee.recipe = catalog.bake();
 
     for (i, arg) in args.iter_mut().enumerate() {
         let function = ctx.asg.funcs.get(callee.func_ref).unwrap();

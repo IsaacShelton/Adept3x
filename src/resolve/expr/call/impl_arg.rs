@@ -4,7 +4,7 @@ use crate::{
     resolve::{
         error::ResolveError,
         expr::{static_member::resolve_impl_mention_from_type, ResolveExprCtx},
-        PolyCatalog, PolyValue,
+        MatchTypesError, PolyCatalog, PolyValue,
     },
     source_files::{source::Sourced, Source},
 };
@@ -177,36 +177,31 @@ fn try_register_specified_impl(
         ));
     }
 
-    if param_generic_trait.args.len() != arg_concrete_trait.args.len() {
-        return Err(ResolveError::other(
-            "Mismatching number of arguments expected for trait implementation",
-            target_param.source,
-        ));
-    }
-
-    for (pattern, concrete) in param_generic_trait
-        .args
-        .iter()
-        .zip(arg_concrete_trait.args.iter())
-    {
-        match catalog.match_type(ctx, pattern, concrete) {
-            Ok(()) => {}
-            Err(_) => {
-                return Err(ResolveError::other(
-                    format!(
-                        "Implementation of '{}' cannot be used for '{}'",
-                        arg_concrete_trait.display(ctx.asg),
-                        param_generic_trait.display(ctx.asg)
-                    ),
-                    impl_arg_source,
-                ));
-            }
+    match catalog.match_types(
+        ctx,
+        param_generic_trait.args.as_slice(),
+        arg_concrete_trait.args.as_slice(),
+    ) {
+        Ok(()) => {}
+        Err(MatchTypesError::LengthMismatch) => {
+            return Err(ResolveError::other(
+                "Mismatching number of arguments expected for trait implementation",
+                target_param.source,
+            ));
+        }
+        Err(MatchTypesError::Incongruent(_) | MatchTypesError::NoMatch(_)) => {
+            return Err(ResolveError::other(
+                format!(
+                    "Implementation of '{}' cannot be used for '{}'",
+                    arg_concrete_trait.display(&ctx.asg),
+                    param_generic_trait.display(&ctx.asg),
+                ),
+                impl_arg_source,
+            ));
         }
     }
 
-    // TODO: PERFORMANCE: We shouldn't need to clone this
-    let recipe = catalog.clone().bake();
-    let param_concrete_trait = recipe.resolve_trait(param_generic_trait)?;
+    let param_concrete_trait = catalog.resolver().resolve_trait(param_generic_trait)?;
 
     if *arg_concrete_trait != param_concrete_trait {
         return Err(ResolveError::other(

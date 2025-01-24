@@ -73,6 +73,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             assert!(self.input.advance().is_static_member());
             assert!(self.input.advance().is_open_paren());
 
+            self.ignore_newlines();
+
             while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
                 if using.len() > starting_args_len {
                     self.parse_token(

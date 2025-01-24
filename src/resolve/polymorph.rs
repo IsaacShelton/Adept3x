@@ -105,7 +105,34 @@ impl Display for PolymorphErrorKind {
 }
 
 impl PolyRecipe {
-    pub fn resolve_type<'a>(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
+    pub fn resolver<'a>(&'a self) -> PolyRecipeResolver<'a> {
+        PolyRecipeResolver {
+            polymorphs: &self.polymorphs,
+        }
+    }
+
+    pub fn resolve_type(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
+        self.resolver().resolve_type(ty)
+    }
+
+    pub fn resolve_impl(&self, name: &str, source: Source) -> Result<asg::ImplRef, PolymorphError> {
+        self.resolver().resolve_impl(name, source)
+    }
+
+    pub fn resolve_trait(
+        &self,
+        generic_trait: &GenericTraitRef,
+    ) -> Result<GenericTraitRef, PolymorphError> {
+        self.resolver().resolve_trait(generic_trait)
+    }
+}
+
+pub struct PolyRecipeResolver<'a> {
+    polymorphs: &'a IndexMap<String, PolyValue>,
+}
+
+impl<'a> PolyRecipeResolver<'a> {
+    pub fn resolve_type(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
         let polymorphs = &self.polymorphs;
 
         Ok(match &ty.kind {
@@ -218,6 +245,12 @@ impl PolyCatalog {
         }
     }
 
+    pub fn resolver<'a>(&'a self) -> PolyRecipeResolver<'a> {
+        PolyRecipeResolver {
+            polymorphs: &self.polymorphs,
+        }
+    }
+
     pub fn bake(self) -> PolyRecipe {
         PolyRecipe {
             polymorphs: self.polymorphs,
@@ -314,6 +347,37 @@ impl PolyCatalog {
         }
     }
 
+    pub fn match_types<'a>(
+        &'a mut self,
+        ctx: &ResolveExprCtx,
+        pattern_types: &'a [Type],
+        concrete_types: &'a [Type],
+    ) -> Result<(), MatchTypesError<'a>> {
+        if concrete_types.len() != pattern_types.len() {
+            return Err(MatchTypesError::LengthMismatch);
+        }
+
+        for (pattern, concrete) in pattern_types.iter().zip(concrete_types.iter()) {
+            match self.match_type(ctx, pattern, concrete) {
+                Ok(()) => {}
+                Err(None) => {
+                    return Err(MatchTypesError::NoMatch(TypePatternAttempt {
+                        pattern,
+                        concrete,
+                    }))
+                }
+                Err(Some(PolyCatalogInsertError::Incongruent)) => {
+                    return Err(MatchTypesError::Incongruent(TypePatternAttempt {
+                        pattern,
+                        concrete,
+                    }));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn put_type(&mut self, name: &str, new_type: &Type) -> Result<(), PolyCatalogInsertError> {
         if let Some(existing) = self.polymorphs.get_mut(name) {
             match existing {
@@ -337,4 +401,17 @@ impl PolyCatalog {
     pub fn get(&mut self, name: &str) -> Option<&PolyValue> {
         self.polymorphs.get(name)
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypePatternAttempt<'a> {
+    pub pattern: &'a Type,
+    pub concrete: &'a Type,
+}
+
+#[derive(Clone, Debug)]
+pub enum MatchTypesError<'a> {
+    LengthMismatch,
+    NoMatch(TypePatternAttempt<'a>),
+    Incongruent(TypePatternAttempt<'a>),
 }
