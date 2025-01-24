@@ -95,9 +95,13 @@ pub fn call_callee(
             continue;
         };
 
-        // NOTE: PERFORMANCE: TODO: This could probably be optimized
+        // TODO: PERFORMANCE: Optimize this and remove unnecessary cloning.
+        // We should really change `match_type` and friends to produce a type match solution
+        // instead of modifying the poly catalog.
         let from_env = caller.impl_params.params.iter().filter(|(_, param_trait)| {
-            if catalog
+            let mut catalog_plus_match = catalog.clone();
+
+            if catalog_plus_match
                 .match_types(ctx, &expected_trait.args, &param_trait.args)
                 .is_err()
             {
@@ -108,7 +112,12 @@ pub fn call_callee(
                 .resolver()
                 .resolve_trait(expected_trait)
                 .map_or(false, |expected_trait| {
-                    param_trait.trait_ref == expected_trait.trait_ref
+                    if param_trait.trait_ref == expected_trait.trait_ref {
+                        catalog = catalog_plus_match;
+                        true
+                    } else {
+                        false
+                    }
                 })
         });
 
