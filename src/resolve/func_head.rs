@@ -14,6 +14,7 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
+use std::borrow::Cow;
 
 pub fn create_func_heads<'a>(
     ctx: &mut ResolveCtx,
@@ -101,38 +102,7 @@ pub fn create_func_head<'a>(
         .then(|| collect_constraints(&params, &return_type))
         .unwrap_or_default();
 
-    let impl_params = {
-        let mut params = IndexMap::default();
-
-        for given in &head.givens {
-            let trait_ty = type_ctx.resolve(&given.ty)?;
-
-            let asg::TypeKind::Trait(_, trait_ref, trait_args) = &trait_ty.kind else {
-                return Err(ResolveError::other("Expected trait", trait_ty.source));
-            };
-
-            let generic_trait_ref = GenericTraitRef {
-                trait_ref: *trait_ref,
-                args: trait_args.to_vec(),
-            };
-
-            let Some((name, name_source)) = &given.name else {
-                return Err(ResolveError::other(
-                    "Anonymous trait implementation polymorphs are not supported yet",
-                    trait_ty.source,
-                ));
-            };
-
-            if params.insert(name.clone(), generic_trait_ref).is_some() {
-                return Err(ResolveError::other(
-                    format!("Trait implementation polymorph '${}' already exists", name),
-                    *name_source,
-                ));
-            }
-        }
-
-        ImplParams { params }
-    };
+    let impl_params = create_func_impl_params(&type_ctx, head)?;
 
     Ok(asg.funcs.insert(asg::Func {
         name,
@@ -171,4 +141,42 @@ pub fn resolve_parameters(
         required,
         is_cstyle_vararg: parameters.is_cstyle_vararg,
     })
+}
+
+pub fn create_func_impl_params<'a>(
+    type_ctx: &ResolveTypeCtx<'a>,
+    head: &FuncHead,
+) -> Result<ImplParams, ResolveError> {
+    let mut params = IndexMap::default();
+
+    for (i, given) in head.givens.iter().enumerate() {
+        let trait_ty = type_ctx.resolve(&given.ty)?;
+
+        let asg::TypeKind::Trait(_, trait_ref, trait_args) = &trait_ty.kind else {
+            return Err(ResolveError::other("Expected trait", trait_ty.source));
+        };
+
+        let generic_trait_ref = GenericTraitRef {
+            trait_ref: *trait_ref,
+            args: trait_args.to_vec(),
+        };
+
+        let (name, name_source) = given
+            .name
+            .as_ref()
+            .map(|(name, name_source)| (Cow::Borrowed(name), *name_source))
+            .unwrap_or_else(|| (Cow::Owned(format!(".{}", i)), given.ty.source));
+
+        if params
+            .insert(name.as_ref().clone(), generic_trait_ref)
+            .is_some()
+        {
+            return Err(ResolveError::other(
+                format!("Trait implementation polymorph '${}' already exists", name),
+                name_source,
+            ));
+        }
+    }
+
+    Ok(ImplParams { params })
 }
