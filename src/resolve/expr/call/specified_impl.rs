@@ -177,7 +177,7 @@ fn try_register_specified_impl(
         ));
     }
 
-    match catalog.match_types(
+    match catalog.extend_if_match_all_types(
         ctx,
         param_generic_trait.args.as_slice(),
         arg_concrete_trait.args.as_slice(),

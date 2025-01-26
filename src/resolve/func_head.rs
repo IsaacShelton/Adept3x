@@ -143,8 +143,8 @@ pub fn resolve_parameters(
     })
 }
 
-pub fn create_func_impl_params<'a>(
-    type_ctx: &ResolveTypeCtx<'a>,
+pub fn create_func_impl_params(
+    type_ctx: &ResolveTypeCtx,
     head: &FuncHead,
 ) -> Result<ImplParams, ResolveError> {
     let mut params = IndexMap::default();

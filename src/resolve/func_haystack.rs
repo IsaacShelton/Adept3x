@@ -158,7 +158,9 @@ impl FuncHaystack {
         argument: &TypedExpr,
         param_type: &asg::Type,
     ) -> bool {
-        catalog.match_type(ctx, param_type, &argument.ty).is_ok()
+        catalog
+            .extend_if_match_type(ctx, param_type, &argument.ty)
+            .is_ok()
     }
 
     fn find_local(
