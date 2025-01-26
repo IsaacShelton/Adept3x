@@ -1,16 +1,14 @@
 
 pragma => adept(c"3.0")
 
-trait Example<$T> {
-    #[using Speak<$T>]
-    func invalidFunction(self $T) void
-}
-
 trait Speak<$T> {
     func speak(self $T) void
 }
 
-func main {
-    
+trait InvalidTrait<$T> {
+    #[using Speak<$T>]
+    func invalidFunction(self $T) void
 }
+
+func main {}
 

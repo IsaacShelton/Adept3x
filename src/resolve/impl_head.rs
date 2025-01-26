@@ -138,8 +138,14 @@ fn ensure_satisfies_trait_func(
     trait_func: &TraitFunc,
     impl_func: &Func,
 ) -> Result<(), ResolveError> {
-    let mut for_alls = ForAlls::default();
+    if !impl_func.impl_params.params.is_empty() {
+        return Err(ResolveError::other(
+            "Implementation parameter is not allowed by trait definition",
+            impl_func.source,
+        ));
+    }
 
+    let mut for_alls = ForAlls::default();
     let mut mappings = HashMap::new();
     for sub in expected.values() {
         collect_constraints_into(&mut mappings, sub);

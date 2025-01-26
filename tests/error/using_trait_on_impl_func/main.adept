@@ -1,0 +1,18 @@
+
+pragma => adept(c"3.0")
+
+trait Speak<$T> {
+    func speak(self $T) void
+}
+
+trait Act {
+    func act() void
+}
+
+impl Act myExampleImpl {
+    #[using Speak<int>]
+    func act() {}
+}
+
+func main {}
+
