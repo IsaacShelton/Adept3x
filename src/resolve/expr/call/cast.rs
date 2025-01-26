@@ -4,18 +4,20 @@ use crate::{
     ir::IntegerSign,
     resolve::{
         conform::{conform_expr, ConformMode, Perform},
+        destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
         expr::ResolveExprCtx,
     },
     source_files::Source,
 };
+use itertools::Itertools;
 use num::BigInt;
 use ordered_float::NotNan;
 
 pub fn cast(
     ctx: &mut ResolveExprCtx,
     call: &ast::Call,
-    arguments: Vec<TypedExpr>,
+    args: Vec<TypedExpr>,
     source: Source,
 ) -> Result<Result<TypedExpr, Vec<TypedExpr>>, ResolveError> {
     if !call.generics.is_empty() {
@@ -25,13 +27,44 @@ pub fn cast(
         ));
     }
 
-    if !call.name.namespace.is_empty() || arguments.len() != 1 {
-        return Ok(Err(arguments));
+    if !call.name.namespace.is_empty() || args.len() != 1 {
+        return Ok(Err(args));
     }
 
     let name = &call.name.basename;
 
     let target_type_kind = match name.as_ref() {
+        "deref" => match args.into_iter().exactly_one() {
+            Ok(arg) => {
+                if let asg::TypeKind::Ptr(inner) = &arg.ty.kind {
+                    return Ok(Ok(TypedExpr {
+                        ty: inner.as_ref().clone(),
+                        is_initialized: arg.is_initialized,
+                        expr: asg::ExprKind::Dereference(Box::new(arg)).at(source),
+                    }));
+                }
+
+                return Ok(Err(vec![arg]));
+            }
+            Err(args) => {
+                return Ok(Err(args.collect()));
+            }
+        },
+        "ptr" => match args.into_iter().exactly_one() {
+            Ok(arg) => {
+                let is_initialized = arg.is_initialized;
+                let destination = resolve_expr_to_destination(arg)?;
+
+                return Ok(Ok(TypedExpr {
+                    ty: destination.ty.clone().pointer(source),
+                    is_initialized,
+                    expr: asg::ExprKind::AddressOf(Box::new(destination)).at(source),
+                }));
+            }
+            Err(args) => {
+                return Ok(Err(args.collect()));
+            }
+        },
         "bool" => Some(asg::TypeKind::Boolean),
         "u8" => Some(asg::TypeKind::u8()),
         "u16" => Some(asg::TypeKind::u16()),
@@ -85,13 +118,13 @@ pub fn cast(
         _ => None,
     };
 
-    let argument_type_kind = &arguments[0].ty.kind;
+    let argument_type_kind = &args[0].ty.kind;
 
     if let Some(target_type_kind) = target_type_kind {
         if argument_type_kind.is_integer_literal() || argument_type_kind.is_float_literal() {
             return conform_expr::<Perform>(
                 ctx,
-                &arguments[0],
+                &args[0],
                 &target_type_kind.at(source),
                 ConformMode::Explicit,
                 ctx.adept_conform_behavior(),
@@ -102,7 +135,7 @@ pub fn cast(
         }
 
         if target_type_kind.is_boolean() && argument_type_kind.is_integer_literal() {
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
             let is_initialized = argument.is_initialized;
 
             let asg::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
@@ -120,7 +153,7 @@ pub fn cast(
             && (argument_type_kind.is_integer_like() || argument_type_kind.is_float_like())
         {
             let target_type = target_type_kind.at(source);
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
             let is_initialized = argument.is_initialized;
 
             let expr = asg::ExprKind::UnaryMathOperation(Box::new(asg::UnaryMathOperation {
@@ -138,7 +171,7 @@ pub fn cast(
 
         if argument_type_kind.is_floating() {
             let target_type = target_type_kind.at(source);
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
 
             let expr = asg::ExprKind::FloatToInteger(Box::new(Cast {
                 target_type: target_type.clone(),
@@ -155,7 +188,7 @@ pub fn cast(
 
         if argument_type_kind.is_integer_like() || argument_type_kind.is_boolean() {
             let target_type = target_type_kind.at(source);
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
 
             let expr = asg::ExprKind::IntegerCast(Box::new(CastFrom {
                 cast: Cast {
@@ -182,7 +215,7 @@ pub fn cast(
 
     if let Some((target_type_kind, float_size)) = to_float {
         if argument_type_kind.is_integer_literal() {
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
             let is_initialized = argument.is_initialized;
 
             let asg::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
@@ -207,7 +240,7 @@ pub fn cast(
         }
 
         if argument_type_kind.is_float_literal() {
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
             let is_initialized = argument.is_initialized;
 
             let asg::ExprKind::FloatingLiteral(_size, value) = &argument.expr.kind else {
@@ -223,7 +256,7 @@ pub fn cast(
 
         if argument_type_kind.is_integer_like() || argument_type_kind.is_boolean() {
             let target_type = target_type_kind.at(source);
-            let argument = arguments.into_iter().next().unwrap();
+            let argument = args.into_iter().next().unwrap();
 
             let expr = asg::ExprKind::IntegerToFloat(Box::new(CastFrom {
                 cast: Cast {
@@ -242,5 +275,5 @@ pub fn cast(
         }
     }
 
-    Ok(Err(arguments))
+    Ok(Err(args))
 }
