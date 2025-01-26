@@ -33,35 +33,39 @@ impl<'a> ResolveTypeCtx<'a> {
             }
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
             ast::TypeKind::Never => Ok(asg::TypeKind::Never),
-            ast::TypeKind::Named(name, arguments) => match self.find(name, arguments) {
-                Ok(found) => {
-                    if let asg::TypeKind::Structure(_, struct_ref, arguments) = found.borrow() {
-                        let structure = self
-                            .asg
-                            .structs
-                            .get(*struct_ref)
-                            .expect("referenced struct to exist");
+            ast::TypeKind::Named(name, arguments) => {
+                match self.find(name, arguments, ast_type.source) {
+                    Ok(found) => {
+                        if let asg::TypeKind::Structure(_, struct_ref, arguments) = found.borrow() {
+                            let structure = self
+                                .asg
+                                .structs
+                                .get(*struct_ref)
+                                .expect("referenced struct to exist");
 
-                        assert!(arguments.len() == structure.params.len());
+                            assert!(arguments.len() == structure.params.len());
 
-                        for (parameter, argument) in
-                            structure.params.parameters.values().zip(arguments)
-                        {
-                            for constraint in &parameter.constraints {
-                                if !self.current_constraints.satisfies(argument, constraint) {
-                                    return Err(ResolveErrorKind::ConstraintsNotSatisfiedForType {
-                                        name: name.to_string(),
+                            for (parameter, argument) in
+                                structure.params.parameters.values().zip(arguments)
+                            {
+                                for constraint in &parameter.constraints {
+                                    if !self.current_constraints.satisfies(argument, constraint) {
+                                        return Err(
+                                            ResolveErrorKind::ConstraintsNotSatisfiedForType {
+                                                name: name.to_string(),
+                                            }
+                                            .at(ast_type.source),
+                                        );
                                     }
-                                    .at(ast_type.source));
                                 }
                             }
                         }
-                    }
 
-                    Ok(found.into_owned())
+                        Ok(found.into_owned())
+                    }
+                    Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
                 }
-                Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
-            },
+            }
             ast::TypeKind::Floating(size) => Ok(asg::TypeKind::Floating(*size)),
             ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
             ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),

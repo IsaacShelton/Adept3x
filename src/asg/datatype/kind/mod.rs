@@ -17,7 +17,7 @@ pub use fixed_array::FixedArray;
 pub use func_ptr::FuncPtr;
 use num::{BigInt, Zero};
 use ordered_float::NotNan;
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 #[derive(Clone, Debug, Hash, PartialEq, IsVariant, Unwrap)]
 pub enum TypeKind {
@@ -115,6 +115,125 @@ impl TypeKind {
             _ => 0,
         }
     }
+
+    pub fn map_type_params<E>(
+        &self,
+        mut mapper: impl FnMut(TypeParam) -> Result<TypeParam, E>,
+    ) -> Result<Cow<Self>, TypeParamError<E>> {
+        match self {
+            TypeKind::Unresolved
+            | TypeKind::Boolean
+            | TypeKind::Integer(_, _)
+            | TypeKind::CInteger(_, _)
+            | TypeKind::IntegerLiteral(_)
+            | TypeKind::FloatLiteral(_)
+            | TypeKind::Floating(_) => Ok(Cow::Borrowed(self)),
+            TypeKind::Ptr(inner) => {
+                let TypeParam::Type(inner) = mapper(TypeParam::Type(Cow::Borrowed(inner)))
+                    .map_err(TypeParamError::MappingError)?
+                else {
+                    return Err(TypeParamError::ExpectedType { index: 0 });
+                };
+
+                Ok(Cow::Owned(Self::Ptr(Box::new(inner.into_owned()))))
+            }
+            TypeKind::Void
+            | TypeKind::Never
+            | TypeKind::AnonymousStruct()
+            | TypeKind::AnonymousUnion()
+            | TypeKind::AnonymousEnum() => Ok(Cow::Borrowed(self)),
+            TypeKind::FixedArray(fixed_array) => {
+                let TypeParam::Size(size) = mapper(TypeParam::Size(fixed_array.size))
+                    .map_err(TypeParamError::MappingError)?
+                else {
+                    return Err(TypeParamError::ExpectedSize { index: 0 });
+                };
+
+                if size != fixed_array.size {
+                    return Err(TypeParamError::ExpectedSizeValue {
+                        index: 0,
+                        value: fixed_array.size,
+                    });
+                }
+
+                let TypeParam::Type(inner) =
+                    mapper(TypeParam::Type(Cow::Borrowed(&fixed_array.inner)))
+                        .map_err(TypeParamError::MappingError)?
+                else {
+                    return Err(TypeParamError::ExpectedType { index: 1 });
+                };
+
+                Ok(Cow::Owned(Self::FixedArray(Box::new(FixedArray {
+                    size,
+                    inner: inner.into_owned(),
+                }))))
+            }
+            TypeKind::FuncPtr(_) => todo!(),
+            TypeKind::Enum(_, _) => Ok(Cow::Borrowed(self)),
+            TypeKind::Structure(human_name, struct_ref, type_args) => {
+                if type_args.is_empty() {
+                    return Ok(Cow::Borrowed(self));
+                }
+
+                let mut mapped = vec![];
+
+                for (i, type_arg) in type_args.iter().enumerate() {
+                    let TypeParam::Type(inner) = mapper(TypeParam::Type(Cow::Borrowed(type_arg)))
+                        .map_err(TypeParamError::MappingError)?
+                    else {
+                        return Err(TypeParamError::ExpectedType { index: i });
+                    };
+
+                    mapped.push(inner.into_owned());
+                }
+
+                Ok(Cow::Owned(Self::Structure(
+                    human_name.clone(),
+                    *struct_ref,
+                    mapped,
+                )))
+            }
+            TypeKind::TypeAlias(_, _) => Ok(Cow::Borrowed(self)),
+            TypeKind::Polymorph(_, _) => Ok(Cow::Borrowed(self)),
+            TypeKind::Trait(human_name, trait_ref, type_args) => {
+                if type_args.is_empty() {
+                    return Ok(Cow::Borrowed(self));
+                }
+
+                let mut mapped = vec![];
+
+                for (i, type_arg) in type_args.iter().enumerate() {
+                    let TypeParam::Type(inner) = mapper(TypeParam::Type(Cow::Borrowed(type_arg)))
+                        .map_err(TypeParamError::MappingError)?
+                    else {
+                        return Err(TypeParamError::ExpectedType { index: i });
+                    };
+
+                    mapped.push(inner.into_owned());
+                }
+
+                Ok(Cow::Owned(Self::Trait(
+                    human_name.clone(),
+                    *trait_ref,
+                    mapped,
+                )))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeParam<'a> {
+    Size(u64),
+    Type(Cow<'a, Type>),
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeParamError<E> {
+    MappingError(E),
+    ExpectedType { index: usize },
+    ExpectedSize { index: usize },
+    ExpectedSizeValue { index: usize, value: u64 },
 }
 
 impl Display for TypeKind {

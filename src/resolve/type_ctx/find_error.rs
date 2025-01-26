@@ -11,6 +11,7 @@ pub enum FindTypeError {
     RecursiveAlias(ResolvedName),
     ResolveError(ResolveError),
     ConstraintsNotSatisfied,
+    TypeArgsLengthMismatch,
 }
 
 impl FindTypeError {
@@ -36,6 +37,10 @@ impl FindTypeError {
                 }
                 .at(source)
             }
+            FindTypeError::TypeArgsLengthMismatch => ResolveErrorKind::Other {
+                message: "Incorrect number of type arguments for type".into(),
+            }
+            .at(source),
             FindTypeError::ResolveError(err) => err,
         }
     }

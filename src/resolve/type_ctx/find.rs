@@ -1,18 +1,19 @@
 use super::{find_error::FindTypeError, ResolveTypeCtx};
 use crate::{
-    asg::{self},
-    ast::TypeArg,
+    asg::{self, TypeParam, TypeParamError},
+    ast::{self, TypeArg},
     name::Name,
-    resolve::error::ResolveErrorKind,
+    resolve::error::ResolveError,
+    source_files::Source,
 };
-use itertools::Itertools;
 use std::borrow::Cow;
 
 impl<'a> ResolveTypeCtx<'a> {
     pub fn find(
         &self,
         name: &Name,
-        arguments: &[TypeArg],
+        type_args: &[TypeArg],
+        source: Source,
     ) -> Result<Cow<'a, asg::TypeKind>, FindTypeError> {
         let settings = &self.asg.workspace.settings[self
             .asg
@@ -24,88 +25,107 @@ impl<'a> ResolveTypeCtx<'a> {
             .expect("valid settings id")
             .0];
 
-        if let Some(decl) = name
+        let decl = name
             .as_plain_str()
             .and_then(|name| {
                 self.types_in_modules
                     .get(&self.module_fs_node_id)
                     .and_then(|types_in_module| types_in_module.get(name))
             })
-            // NOTE: This will need to be map instead at some point
-            .filter(|decl| decl.num_parameters(self.asg) == arguments.len())
-        {
-            if let asg::TypeKind::Structure(human_name, struct_ref, _) = &decl.kind {
-                let arguments = arguments
-                    .iter()
-                    .flat_map(|arg| match arg {
-                        TypeArg::Type(ty) => self.resolve(ty),
-                        TypeArg::Expr(expr) => Err(ResolveErrorKind::Other {
-                            message:
-                                "Expressions cannot be used as type parameters to structures yet"
-                                    .into(),
-                        }
-                        .at(expr.source)),
-                    })
-                    .collect_vec();
-
-                return Ok(Cow::Owned(asg::TypeKind::Structure(
-                    human_name.clone(),
-                    *struct_ref,
-                    arguments,
-                )));
-            }
-
-            if let asg::TypeKind::Trait(human_name, trait_ref, _) = &decl.kind {
-                let arguments = arguments
-                    .iter()
-                    .flat_map(|arg| match arg {
-                        TypeArg::Type(ty) => self.resolve(ty),
-                        TypeArg::Expr(expr) => Err(ResolveErrorKind::Other {
-                            message: "Expressions cannot be used as type parameters to traits yet"
-                                .into(),
-                        }
-                        .at(expr.source)),
-                    })
-                    .collect_vec();
-
-                return Ok(Cow::Owned(asg::TypeKind::Trait(
-                    human_name.clone(),
-                    *trait_ref,
-                    arguments,
-                )));
-            }
-
-            return Ok(Cow::Borrowed(&decl.kind));
-        }
-
-        if !name.namespace.is_empty() {
-            let Name {
-                namespace,
-                basename,
-                ..
-            } = name;
-
-            let mut matches = settings
-                .namespace_to_dependency
-                .get(namespace.as_ref())
-                .into_iter()
-                .flatten()
-                .flat_map(|dep| settings.dependency_to_module.get(dep))
-                .flat_map(|fs_node_id| self.types_in_modules.get(fs_node_id))
-                .flat_map(|decls| decls.get(basename.as_ref()))
-                .filter(|decl| decl.privacy.is_public())
-                // NOTE: This will need to be flat_map instead at some point
-                .filter(|decl| decl.num_parameters(self.asg) == arguments.len());
-
-            if let Some(found) = matches.next() {
-                if matches.next().is_some() {
-                    return Err(FindTypeError::Ambiguous);
-                } else {
-                    return Ok(Cow::Borrowed(&found.kind));
+            .filter(|local| local.num_parameters(self.asg) == type_args.len())
+            .map(Ok)
+            .unwrap_or_else(|| {
+                if name.namespace.is_empty() {
+                    return Err(FindTypeError::NotDefined);
                 }
-            }
-        }
 
-        Err(FindTypeError::NotDefined)
+                let Name {
+                    namespace,
+                    basename,
+                    ..
+                } = name;
+
+                let mut matches = settings
+                    .namespace_to_dependency
+                    .get(namespace.as_ref())
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|dep| settings.dependency_to_module.get(dep))
+                    .flat_map(|fs_node_id| self.types_in_modules.get(fs_node_id))
+                    .flat_map(|decls| decls.get(basename.as_ref()))
+                    .filter(|decl| decl.privacy.is_public())
+                    .filter(|decl| decl.num_parameters(self.asg) == type_args.len());
+
+                if let Some(found) = matches.next() {
+                    if matches.next().is_some() {
+                        Err(FindTypeError::Ambiguous)
+                    } else {
+                        Ok(found)
+                    }
+                } else {
+                    Err(FindTypeError::NotDefined)
+                }
+            })?;
+
+        let mut type_args = type_args.into_iter().enumerate();
+
+        let filled = decl
+            .kind
+            .map_type_params(|_hint| {
+                let Some((_i, value)) = type_args.next() else {
+                    return Err(FindTypeError::TypeArgsLengthMismatch);
+                };
+
+                match value {
+                    TypeArg::Type(ty) => self
+                        .resolve(ty)
+                        .map(Cow::Owned)
+                        .map(TypeParam::Type)
+                        .map_err(FindTypeError::ResolveError),
+                    TypeArg::Expr(expr) => {
+                        let ast::ExprKind::Integer(ast::Integer::Generic(value)) = &expr.kind
+                        else {
+                            return Err(FindTypeError::ResolveError(ResolveError::other(
+                                "Expressions are not supported as type arguments yet",
+                                source,
+                            )));
+                        };
+
+                        u64::try_from(value).map(TypeParam::Size).map_err(|_| {
+                            FindTypeError::ResolveError(ResolveError::other(
+                                "Size is too large",
+                                source,
+                            ))
+                        })
+                    }
+                }
+            })
+            .map_err(|err| match err {
+                TypeParamError::MappingError(e) => e,
+                TypeParamError::ExpectedType { index } => {
+                    FindTypeError::ResolveError(ResolveError::other(
+                        format!("Expected type for type argument {}", index + 1),
+                        source,
+                    ))
+                }
+                TypeParamError::ExpectedSize { index } => {
+                    FindTypeError::ResolveError(ResolveError::other(
+                        format!("Expected size for type argument {}", index + 1),
+                        source,
+                    ))
+                }
+                TypeParamError::ExpectedSizeValue { index, value } => {
+                    FindTypeError::ResolveError(ResolveError::other(
+                        format!("Expected size of {} of type argument {}", value, index + 1),
+                        source,
+                    ))
+                }
+            });
+
+        if type_args.next().is_some() {
+            return Err(FindTypeError::TypeArgsLengthMismatch);
+        };
+
+        filled
     }
 }

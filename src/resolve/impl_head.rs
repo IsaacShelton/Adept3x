@@ -206,10 +206,6 @@ fn ensure_satisfies_trait_func(
     Ok(())
 }
 
-fn mismatch(source: Source) -> ResolveError {
-    ResolveError::other("Type violates expected type required by trait", source)
-}
-
 fn matches(
     ctx: &ResolveCtx,
     asg: &Asg,
@@ -218,6 +214,17 @@ fn matches(
     ty_in_trait: &Type,
     ty_in_impl: &Type,
 ) -> Result<(), ResolveError> {
+    let mismatch = |source| {
+        ResolveError::other(
+            format!(
+                "Type '{}' violates expected type required by trait '{}'",
+                ty_in_impl.to_string(),
+                ty_in_trait.to_string(),
+            ),
+            source,
+        )
+    };
+
     match &ty_in_trait.kind {
         asg::TypeKind::Unresolved => panic!("unresolved"),
         asg::TypeKind::Void
