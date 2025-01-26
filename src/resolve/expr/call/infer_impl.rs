@@ -25,24 +25,29 @@ pub fn infer_callee_missing_impl_args(
             continue;
         };
 
-        let from_env = caller.impl_params.params.iter().filter(|(_, param_trait)| {
-            if catalog
-                .extend_if_match_all_types(ctx, &expected_trait.args, &param_trait.args)
-                .is_err()
-            {
-                return false;
-            }
+        let from_env = caller
+            .impl_params
+            .params
+            .iter()
+            .filter_map(|(param_name, param_trait)| {
+                if catalog
+                    .extend_if_match_all_types(ctx, &expected_trait.args, &param_trait.args)
+                    .is_err()
+                {
+                    return None;
+                }
 
-            catalog
-                .resolver()
-                .resolve_trait(expected_trait)
-                .map_or(false, |expected_trait| {
-                    param_trait.trait_ref == expected_trait.trait_ref
-                })
-        });
+                catalog
+                    .resolver()
+                    .resolve_trait(expected_trait)
+                    .ok()
+                    .and_then(|expected_trait| {
+                        (param_trait.trait_ref == expected_trait.trait_ref).then_some(param_name)
+                    })
+            });
 
         match from_env.exactly_one() {
-            Ok((param_name, _)) => {
+            Ok(param_name) => {
                 if catalog
                     .polymorphs
                     .insert(expected_name.into(), PolyValue::PolyImpl(param_name.into()))

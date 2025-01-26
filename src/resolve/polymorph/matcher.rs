@@ -162,8 +162,10 @@ impl<'a, 'b, 'c> TypeMatcher<'a, 'b, 'c> {
             }
         }
 
-        self.partial
-            .insert(name.to_string(), PolyValue::Type(new_type.clone()));
+        assert!(self
+            .partial
+            .insert(name.to_string(), PolyValue::Type(new_type.clone()))
+            .is_none());
 
         Ok(())
     }
