@@ -1,0 +1,10 @@
+
+pragma => adept("3.0")
+
+trait Say {
+    func say() void
+}
+
+#[using $say Say]
+func main {}
+

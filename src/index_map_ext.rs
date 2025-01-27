@@ -23,7 +23,7 @@ impl<K: Equivalent<K> + Hash + Eq, V> IndexMapExt<K, V> for IndexMap<K, V> {
         value: V,
         or_else: FnOrElse,
     ) -> Result<(), E> {
-        // Unfortantely there isn't an API provided to do this without having
+        // Unfortunately there isn't an API provided to do this without having
         // to do the lookup twice or cloning the key, so we will prefer the double lookup.
         if self.contains_key(&key) {
             Err(or_else(key))
