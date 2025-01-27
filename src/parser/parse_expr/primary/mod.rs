@@ -35,6 +35,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 self.input.advance().kind.unwrap_false_keyword();
                 Ok(Expr::new(ExprKind::Boolean(false), source))
             }
+            TokenKind::NullKeyword => {
+                self.input.advance().kind.unwrap_null_keyword();
+                Ok(Expr::new(ExprKind::Null, source))
+            }
             TokenKind::Integer(..) => Ok(Expr::new(
                 ExprKind::Integer(Integer::Generic(self.input.advance().kind.unwrap_integer())),
                 source,

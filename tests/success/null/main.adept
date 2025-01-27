@@ -1,0 +1,12 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr-char, ...) int
+
+func main {
+    message ptr<char> = null
+    printf(c"message\t= %010p\n", message)
+    printf(c"null\t= %010p\n", null)
+}
+

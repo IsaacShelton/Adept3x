@@ -230,6 +230,10 @@ pub fn resolve_expr(
             ))
             */
         }
+        ast::ExprKind::Null => Ok(TypedExpr::new(
+            asg::TypeKind::Ptr(Box::new(asg::TypeKind::Void.at(source))).at(source),
+            asg::Expr::new(asg::ExprKind::Null, source),
+        )),
         ast::ExprKind::Call(call) => resolve_call_expr(ctx, call, source),
         ast::ExprKind::DeclareAssign(declare_assign) => {
             resolve_declare_assign_expr(ctx, declare_assign, source)

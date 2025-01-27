@@ -19,6 +19,7 @@ pub enum ExprKind {
     FloatingLiteral(FloatSize, Option<NotNan<f64>>),
     String(String),
     NullTerminatedString(CString),
+    Null,
     Call(Box<Call>),
     PolyCall(Box<PolyCall>),
     DeclareAssign(Box<DeclareAssign>),

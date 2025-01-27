@@ -133,6 +133,9 @@ pub fn lower_expr(
                 "String literals are not fully implemented yet, still need ability to lower"
             )
         }
+        ExprKind::Null => Ok(ir::Value::Literal(Literal::Zeroed(ir::Type::Ptr(
+            Box::new(ir::Type::Void),
+        )))),
         ExprKind::Call(call) => lower_expr_call(builder, ir_module, expr, function, asg, call),
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
