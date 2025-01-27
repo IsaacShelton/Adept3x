@@ -62,6 +62,10 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_type_args(&mut self) -> Result<Vec<TypeArg>, ParseError> {
         let mut generics = vec![];
 
+        if self.input.eat(TokenKind::ShortGeneric) {
+            return Ok(vec![self.parse_type_arg()?]);
+        }
+
         if !self.input.eat(TokenKind::OpenAngle) {
             return Ok(generics);
         }
@@ -79,14 +83,18 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 return Err(self.unexpected_token_is_next());
             }
 
-            generics.push(if self.input.peek().could_start_type() {
-                TypeArg::Type(self.parse_type(None::<&str>, Some("for compile time argument"))?)
-            } else {
-                TypeArg::Expr(self.parse_expr_primary()?)
-            });
+            generics.push(self.parse_type_arg()?);
         }
 
         Ok(generics)
+    }
+
+    pub fn parse_type_arg(&mut self) -> Result<TypeArg, ParseError> {
+        Ok(if self.input.peek().could_start_type() {
+            TypeArg::Type(self.parse_type(None::<&str>, Some("for compile time argument"))?)
+        } else {
+            TypeArg::Expr(self.parse_expr_primary()?)
+        })
     }
 
     pub fn parse_type_from_parts(

@@ -14,6 +14,7 @@ pub enum State {
     String(StringState),
     Number(NumberState),
     HexNumber(HexNumberState),
+    ShortGeneric,
 }
 
 impl State {

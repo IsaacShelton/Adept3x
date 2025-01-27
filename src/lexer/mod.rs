@@ -42,6 +42,7 @@ impl<T: Text + Send> Lexer<T> {
             State::String(_) => self.feed_string(),
             State::Number(_) => self.feed_number(),
             State::HexNumber(_) => self.feed_hex_number(),
+            State::ShortGeneric => self.feed_short_generic(),
         }
     }
 
@@ -378,7 +379,7 @@ impl<T: Text + Send> Lexer<T> {
             }
             _ => {
                 let token = state.finalize();
-                self.state = State::Idle;
+                self.state = State::ShortGeneric;
                 Has(token)
             }
         }
@@ -515,6 +516,16 @@ impl<T: Text + Send> Lexer<T> {
             let token = state.to_token();
             self.state = State::Idle;
             Has(token)
+        }
+    }
+
+    fn feed_short_generic(&mut self) -> FeedResult<Token> {
+        self.state = State::Idle;
+
+        if let Ok(source) = self.characters.eat_remember('-') {
+            FeedResult::Has(TokenKind::ShortGeneric.at(source))
+        } else {
+            self.feed_idle()
         }
     }
 }

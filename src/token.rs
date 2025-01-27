@@ -136,6 +136,7 @@ pub enum TokenKind {
     StaticMember,
     Extend,
     FatArrow,
+    ShortGeneric,
 }
 
 impl Display for TokenKind {
@@ -231,6 +232,7 @@ impl Display for TokenKind {
             TokenKind::StaticMember => f.write_str("'::'"),
             TokenKind::Extend => f.write_str("'..'"),
             TokenKind::FatArrow => f.write_str("'=>'"),
+            TokenKind::ShortGeneric => f.write_str("short generic '-'"),
         }
     }
 }
@@ -324,7 +326,8 @@ impl TokenKind {
             | TokenKind::Dereference
             | TokenKind::StaticMember
             | TokenKind::Extend
-            | TokenKind::FatArrow => 0,
+            | TokenKind::FatArrow
+            | TokenKind::ShortGeneric => 0,
         }
     }
 
