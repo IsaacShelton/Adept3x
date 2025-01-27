@@ -99,7 +99,7 @@ fn resolve_polymorph_impl_arg(
         .get(current_func_ref)
         .expect("referenced function to exist");
 
-    let Some(arg_concrete_trait) = caller.impl_params.params.get(polymorph) else {
+    let Some(arg_concrete_trait) = caller.impl_params.get(polymorph) else {
         return Err(ResolveError::other(
             format!("Undefined implementation polymorph '${}'", polymorph),
             impl_arg_source,
@@ -135,7 +135,6 @@ fn try_register_specified_impl(
         None => Sourced::new(
             callee_func
                 .impl_params
-                .params
                 .iter()
                 .filter(|(param_name, param)| {
                     param.trait_ref == arg_concrete_trait.trait_ref
@@ -157,7 +156,7 @@ fn try_register_specified_impl(
     }
     .clone();
 
-    let Some(param_generic_trait) = impl_params.params.get(target_param.inner().as_str()) else {
+    let Some(param_generic_trait) = impl_params.get(target_param.inner().as_str()) else {
         return Err(ResolveError::other(
             format!(
                 "No implementation parameter named '${}' exists on callee",

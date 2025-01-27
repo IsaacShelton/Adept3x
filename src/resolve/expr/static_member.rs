@@ -239,7 +239,7 @@ pub fn resolve_static_member_call_polymorph(
         .get(func_ref)
         .expect("referenced function to exist");
 
-    let Some(generic_trait_ref) = func.impl_params.params.get(polymorph) else {
+    let Some(generic_trait_ref) = func.impl_params.get(polymorph) else {
         return Err(ResolveError::other(
             format!("Undeclared implementation '${}'", polymorph),
             *source,

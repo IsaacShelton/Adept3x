@@ -104,6 +104,15 @@ pub fn create_func_head<'a>(
 
     let impl_params = create_func_impl_params(&type_ctx, head)?;
 
+    let is_main = options.coerce_main_signature && head.name == "main";
+
+    if is_main && impl_params.has_items() {
+        return Err(ResolveError::other(
+            "Main function cannot have implementation parameters",
+            head.source,
+        ));
+    }
+
     Ok(asg.funcs.insert(asg::Func {
         name,
         params,
@@ -113,9 +122,7 @@ pub fn create_func_head<'a>(
         vars: VariableStorage::new(),
         source: head.source,
         abide_abi: head.abide_abi,
-        tag: head.tag.or_else(|| {
-            (options.coerce_main_signature && head.name == "main").then_some(Tag::Main)
-        }),
+        tag: head.tag.or_else(|| is_main.then_some(Tag::Main)),
         is_generic,
         constraints: CurrentConstraints::new(constraints),
         impl_params,
@@ -178,5 +185,5 @@ pub fn create_func_impl_params(
         }
     }
 
-    Ok(ImplParams { params })
+    Ok(ImplParams::new(params))
 }

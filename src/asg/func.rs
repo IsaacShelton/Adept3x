@@ -1,5 +1,4 @@
 use crate::{asg::*, name::ResolvedName, source_files::Source, tag::Tag};
-use indexmap::IndexMap;
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Clone, Debug)]
@@ -45,11 +44,6 @@ impl<'a> CurrentConstraints {
             },
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct ImplParams {
-    pub params: IndexMap<String, GenericTraitRef>,
 }
 
 #[derive(Clone, Debug)]

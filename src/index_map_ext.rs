@@ -12,6 +12,8 @@ pub trait IndexMapExt<K: Equivalent<K> + Hash + Eq, V> {
     fn get_or_insert_with(&mut self, key: K, make_val: impl Fn() -> V) -> &mut V;
 
     fn insert_or_panic(&mut self, key: K, value: V);
+
+    fn has_items(&self) -> bool;
 }
 
 impl<K: Equivalent<K> + Hash + Eq, V> IndexMapExt<K, V> for IndexMap<K, V> {
@@ -37,5 +39,9 @@ impl<K: Equivalent<K> + Hash + Eq, V> IndexMapExt<K, V> for IndexMap<K, V> {
 
     fn insert_or_panic(&mut self, key: K, value: V) {
         assert!(self.insert(key, value).is_none());
+    }
+
+    fn has_items(&self) -> bool {
+        !self.is_empty()
     }
 }

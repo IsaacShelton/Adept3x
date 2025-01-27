@@ -1,3 +1,4 @@
+mod for_alls;
 use super::{
     collect_constraints::collect_constraints_into, ctx::ResolveCtx, error::ResolveError,
     func_head::create_func_head, job::FuncJob,
@@ -8,11 +9,11 @@ use crate::{
     cli::BuildOptions,
     name::{Name, ResolvedName},
     resolve::{error::ResolveErrorKind, type_ctx::ResolveTypeCtx},
-    source_files::Source,
     workspace::fs::FsNodeId,
 };
+use for_alls::ForAlls;
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn create_impl_heads(
     ctx: &mut ResolveCtx,
@@ -83,54 +84,6 @@ pub fn create_impl_heads(
     Ok(())
 }
 
-#[derive(Debug, Default)]
-struct ForAlls {
-    substitution_polys: HashSet<String>,
-    trait_to_impl: HashMap<String, String>,
-    impl_to_trait: HashMap<String, String>,
-}
-
-impl ForAlls {
-    pub fn insert(
-        &mut self,
-        in_trait: String,
-        in_impl: String,
-        source: Source,
-    ) -> Result<(), ResolveError> {
-        if self.substitution_polys.contains(&in_impl) {
-            return Err(ResolveError::other("Inconsistent mapping", source));
-        }
-
-        if let Some(expected) = self.trait_to_impl.get(&in_trait) {
-            if *expected != in_impl {
-                return Err(ResolveError::other("Inconsistent mapping", source));
-            }
-        }
-
-        if let Some(expected) = self.impl_to_trait.get(&in_impl) {
-            if *expected != in_trait {
-                return Err(ResolveError::other("Inconsistent mapping", source));
-            }
-        }
-
-        if self.trait_to_impl.contains_key(&in_trait) && self.impl_to_trait.contains_key(&in_impl) {
-            // Already exists, and is correct
-            return Ok(());
-        }
-
-        if !self
-            .trait_to_impl
-            .insert(in_trait.clone(), in_impl.clone())
-            .is_none()
-            || !self.impl_to_trait.insert(in_impl, in_trait).is_none()
-        {
-            return Err(ResolveError::other("Inconsistent mapping", source));
-        }
-
-        Ok(())
-    }
-}
-
 fn ensure_satisfies_trait_func(
     ctx: &ResolveCtx,
     asg: &Asg,
@@ -138,19 +91,19 @@ fn ensure_satisfies_trait_func(
     trait_func: &TraitFunc,
     impl_func: &Func,
 ) -> Result<(), ResolveError> {
-    if !impl_func.impl_params.params.is_empty() {
+    if impl_func.impl_params.has_items() {
         return Err(ResolveError::other(
             "Implementation parameter is not allowed by trait definition",
             impl_func.source,
         ));
     }
 
-    let mut for_alls = ForAlls::default();
     let mut mappings = HashMap::new();
     for sub in expected.values() {
         collect_constraints_into(&mut mappings, sub);
     }
-    for_alls.substitution_polys = mappings.into_keys().collect();
+
+    let mut for_alls = ForAlls::new(mappings.into_keys().collect());
 
     if trait_func.params.is_cstyle_vararg != impl_func.params.is_cstyle_vararg {
         return Err(ResolveError::other(

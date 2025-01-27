@@ -13,7 +13,7 @@ pub fn infer_callee_missing_impl_args(
     catalog: &mut PolyCatalog,
     source: Source,
 ) -> Result<(), ResolveError> {
-    for (expected_name, expected_trait) in function.impl_params.params.iter() {
+    for (expected_name, expected_trait) in function.impl_params.iter() {
         if used_names.contains(expected_name) {
             continue;
         }
@@ -27,7 +27,6 @@ pub fn infer_callee_missing_impl_args(
 
         let from_env = caller
             .impl_params
-            .params
             .iter()
             .filter_map(|(param_name, param_trait)| {
                 if catalog
