@@ -148,7 +148,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     }
                     _ => {
                         if !generics.is_empty() {
-                            return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
+                            if let Some("sizeof") = name.as_plain_str() {
+                                todo!("sizeof operator");
+                                // Ok(Expr::new(ExprKind::SizeOf(inner), source))
+                            }
+
+                            return Err(ParseErrorKind::Other {
+                                message: format!("Macro '{}' does not exist", name.to_string()),
+                            }
+                            .at(source));
                         }
 
                         Ok(Expr::new(ExprKind::Variable(name), source))

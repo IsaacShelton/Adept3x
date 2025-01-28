@@ -1,18 +1,19 @@
 mod funcs;
+mod global;
+mod instr;
 mod structs;
+mod value;
 
 pub use crate::asg::{FloatOrSign, GlobalVarRef, IntegerSign};
-use crate::{
-    asg::{FloatOrInteger, IntegerBits},
-    data_units::ByteUnits,
-    source_files::Source,
-    target::Target,
-};
+use crate::{data_units::ByteUnits, source_files::Source, target::Target};
 use derivative::Derivative;
-use derive_more::{Deref, DerefMut, IsVariant, Unwrap};
+use derive_more::{Deref, DerefMut, IsVariant};
 use funcs::Funcs;
-use std::{collections::HashMap, ffi::CString};
+pub use global::Global;
+pub use instr::*;
+use std::collections::HashMap;
 pub use structs::Structs;
+pub use value::*;
 
 pub struct Module {
     pub target: Target,
@@ -30,14 +31,6 @@ impl std::fmt::Debug for Module {
         write!(f, "SlotMap }}")?;
         Ok(())
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct Global {
-    pub mangled_name: String,
-    pub ir_type: Type,
-    pub is_foreign: bool,
-    pub is_thread_local: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -73,145 +66,6 @@ pub struct StructRef {
 #[derive(Clone, Debug, Default)]
 pub struct BasicBlock {
     pub instructions: Vec<Instr>,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum OverflowOperator {
-    Add,
-    Subtract,
-    Multiply,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct OverflowOperation {
-    pub operator: OverflowOperator,
-    pub sign: IntegerSign,
-    pub bits: IntegerBits,
-}
-
-#[derive(Clone, Debug)]
-pub enum Instr {
-    Return(Option<Value>),
-    Call(Call),
-    Alloca(Type),
-    Store(Store),
-    Load((Value, Type)),
-    Malloc(Type),
-    MallocArray(Type, Value),
-    Free(Value),
-    SizeOf(Type),
-    Parameter(u32),
-    GlobalVariable(GlobalVarRef),
-    Add(BinaryOperands, FloatOrInteger),
-    Checked(OverflowOperation, BinaryOperands),
-    Subtract(BinaryOperands, FloatOrInteger),
-    Multiply(BinaryOperands, FloatOrInteger),
-    Divide(BinaryOperands, FloatOrSign),
-    Modulus(BinaryOperands, FloatOrSign),
-    Equals(BinaryOperands, FloatOrInteger),
-    NotEquals(BinaryOperands, FloatOrInteger),
-    LessThan(BinaryOperands, FloatOrSign),
-    LessThanEq(BinaryOperands, FloatOrSign),
-    GreaterThan(BinaryOperands, FloatOrSign),
-    GreaterThanEq(BinaryOperands, FloatOrSign),
-    And(BinaryOperands),
-    Or(BinaryOperands),
-    BitwiseAnd(BinaryOperands),
-    BitwiseOr(BinaryOperands),
-    BitwiseXor(BinaryOperands),
-    LeftShift(BinaryOperands),
-    ArithmeticRightShift(BinaryOperands),
-    LogicalRightShift(BinaryOperands),
-    Bitcast(Value, Type),
-    ZeroExtend(Value, Type),
-    SignExtend(Value, Type),
-    FloatExtend(Value, Type),
-    Truncate(Value, Type),
-    TruncateFloat(Value, Type),
-    IntegerToPointer(Value, Type),
-    PointerToInteger(Value, Type),
-    FloatToInteger(Value, Type, IntegerSign),
-    IntegerToFloat(Value, Type, IntegerSign),
-    Member {
-        struct_type: Type,
-        subject_pointer: Value,
-        index: usize,
-    },
-    ArrayAccess {
-        item_type: Type,
-        subject_pointer: Value,
-        index: Value,
-    },
-    StructLiteral(Type, Vec<Value>),
-    IsZero(Value, FloatOrInteger),
-    IsNonZero(Value, FloatOrInteger),
-    Negate(Value, FloatOrInteger),
-    BitComplement(Value),
-    Break(Break),
-    ConditionalBreak(Value, ConditionalBreak),
-    Phi(Phi),
-    InterpreterSyscall(InterpreterSyscallKind, Vec<Value>),
-}
-
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub enum InterpreterSyscallKind {
-    Println,
-    BuildAddProject,
-    BuildSetAdeptVersion,
-    BuildLinkFilename,
-    BuildLinkFrameworkName,
-    Experimental,
-    ImportNamespace,
-    DontAssumeIntAtLeast32Bits,
-    UseDependency,
-}
-
-#[derive(Clone, Debug)]
-pub struct Phi {
-    pub ir_type: Type,
-    pub incoming: Vec<PhiIncoming>,
-}
-
-#[derive(Clone, Debug)]
-pub struct PhiIncoming {
-    pub basicblock_id: usize,
-    pub value: Value,
-}
-
-#[derive(Clone, Debug)]
-pub struct Break {
-    pub basicblock_id: usize,
-}
-
-#[derive(Clone, Debug)]
-pub struct ConditionalBreak {
-    pub true_basicblock_id: usize,
-    pub false_basicblock_id: usize,
-}
-
-#[derive(Clone, Debug)]
-pub struct BinaryOperands {
-    pub left: Value,
-    pub right: Value,
-}
-
-impl BinaryOperands {
-    pub fn new(left: Value, right: Value) -> Self {
-        Self { left, right }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Call {
-    pub func: FuncRef,
-    pub args: Box<[Value]>,
-    pub unpromoted_variadic_arg_types: Box<[Type]>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Store {
-    pub new_value: Value,
-    pub destination: Value,
 }
 
 #[derive(Derivative, Clone, Debug)]
@@ -444,36 +298,6 @@ pub struct TypeFunc {
     pub params: Vec<Type>,
     pub return_type: Box<Type>,
     pub is_cstyle_variadic: bool,
-}
-
-#[derive(Clone, Debug)]
-pub enum Value {
-    Literal(Literal),
-    Reference(ValueReference),
-}
-
-#[derive(Clone, Debug, Unwrap, IsVariant)]
-pub enum Literal {
-    Void,
-    Boolean(bool),
-    Signed8(i8),
-    Signed16(i16),
-    Signed32(i32),
-    Signed64(i64),
-    Unsigned8(u8),
-    Unsigned16(u16),
-    Unsigned32(u32),
-    Unsigned64(u64),
-    Float32(f32),
-    Float64(f64),
-    NullTerminatedString(CString),
-    Zeroed(Type),
-}
-
-#[derive(Clone, Debug)]
-pub struct ValueReference {
-    pub basicblock_id: usize,
-    pub instruction_id: usize,
 }
 
 impl Module {
