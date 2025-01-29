@@ -159,9 +159,15 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                                     .at(source));
                                 };
 
-                                let TypeArg::Type(ty) = arg else {
+                                let expr = if let TypeArg::Type(ty) = arg {
+                                    ExprKind::SizeOf(Box::new(ty)).at(source)
+                                } else if let TypeArg::Expr(value) = arg {
+                                    ExprKind::SizeOfValue(Box::new(value)).at(source)
+                                } else {
                                     return Err(ParseErrorKind::Other {
-                                        message: "Cannot get size of non-type value".into(),
+                                        message:
+                                            "Cannot get size of compile-time value that isn't type or expression"
+                                                .into(),
                                     }
                                     .at(source));
                                 };
@@ -173,7 +179,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                                     .at(source));
                                 };
 
-                                return Ok(ExprKind::SizeOf(Box::new(ty)).at(source));
+                                return Ok(expr);
                             }
 
                             return Err(ParseErrorKind::Other {

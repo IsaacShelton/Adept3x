@@ -232,7 +232,7 @@ impl Display for TokenKind {
             TokenKind::StaticMember => f.write_str("'::'"),
             TokenKind::Extend => f.write_str("'..'"),
             TokenKind::FatArrow => f.write_str("'=>'"),
-            TokenKind::ShortGeneric => f.write_str("short generic '-'"),
+            TokenKind::ShortGeneric => f.write_str("short generic '#'"),
         }
     }
 }

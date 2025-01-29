@@ -34,6 +34,7 @@ pub enum ExprKind {
     StaticMemberValue(Box<StaticMemberValue>),
     StaticMemberCall(Box<StaticMemberCall>),
     SizeOf(Box<Type>),
+    SizeOfValue(Box<Expr>),
     InterpreterSyscall(Box<InterpreterSyscall>),
 }
 

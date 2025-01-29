@@ -93,7 +93,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Ok(if self.input.peek().could_start_type() {
             TypeArg::Type(self.parse_type(None::<&str>, Some("for compile time argument"))?)
         } else {
-            TypeArg::Expr(self.parse_expr_primary()?)
+            TypeArg::Expr(self.parse_expr_primary_base()?)
         })
     }
 

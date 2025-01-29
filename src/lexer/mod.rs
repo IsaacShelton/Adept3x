@@ -522,7 +522,7 @@ impl<T: Text + Send> Lexer<T> {
     fn feed_short_generic(&mut self) -> FeedResult<Token> {
         self.state = State::Idle;
 
-        if let Ok(source) = self.characters.eat_remember('-') {
+        if let Ok(source) = self.characters.eat_remember('#') {
             FeedResult::Has(TokenKind::ShortGeneric.at(source))
         } else {
             self.feed_idle()

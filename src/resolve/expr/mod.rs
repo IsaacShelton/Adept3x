@@ -383,6 +383,21 @@ pub fn resolve_expr(
                 asg::ExprKind::SizeOf(Box::new(ty)).at(source),
             ))
         }
+        ast::ExprKind::SizeOfValue(value) => {
+            let ty = resolve_expr(
+                ctx,
+                value,
+                preferred_type,
+                initialized,
+                ResolveExprMode::RequireValue,
+            )?
+            .ty;
+
+            Ok(TypedExpr::new(
+                asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
+                asg::ExprKind::SizeOf(Box::new(ty)).at(source),
+            ))
+        }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {
                 kind,
