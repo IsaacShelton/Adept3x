@@ -24,11 +24,15 @@ use super::{
     Initialized, ResolveTypeCtx,
 };
 use crate::{
-    asg::{self, Asg, CurrentConstraints, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
+    asg::{
+        self, Asg, CurrentConstraints, Expr, ExprKind, FuncRef, IntegerBits, StructRef, TypeKind,
+        TypedExpr,
+    },
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
         UnaryOperator,
     },
+    ir::IntegerSign,
     resolve::{
         error::ResolveErrorKind,
         expr::{
@@ -370,6 +374,14 @@ pub fn resolve_expr(
         }
         ast::ExprKind::StaticMemberCall(static_access_call) => {
             resolve_static_member_call(ctx, static_access_call)
+        }
+        ast::ExprKind::SizeOf(ast_type) => {
+            let ty = ctx.type_ctx().resolve(ast_type)?;
+
+            Ok(TypedExpr::new(
+                asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
+                asg::ExprKind::SizeOf(Box::new(ty)).at(source),
+            ))
         }
         ast::ExprKind::InterpreterSyscall(info) => {
             let ast::InterpreterSyscall {

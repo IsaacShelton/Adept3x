@@ -42,6 +42,7 @@ pub enum ExprKind {
     EnumMemberLiteral(Box<EnumMemberLiteral>),
     ResolvedNamedExpression(Box<Expr>),
     Zeroed(Box<Type>),
+    SizeOf(Box<Type>),
     InterpreterSyscall(InterpreterSyscallKind, Vec<Expr>),
 }
 

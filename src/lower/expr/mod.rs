@@ -137,6 +137,9 @@ pub fn lower_expr(
             Box::new(ir::Type::Void),
         )))),
         ExprKind::Call(call) => lower_expr_call(builder, ir_module, expr, function, asg, call),
+        ExprKind::PolyCall(poly_call) => {
+            lower_expr_poly_call(builder, ir_module, expr, function, asg, poly_call)
+        }
         ExprKind::Variable(variable) => {
             let pointer_to_variable = lower_variable_to_value(variable.key);
             let variable_type = lower_type(ir_module, &builder.unpoly(&variable.ty)?, asg)?;
@@ -484,6 +487,10 @@ pub fn lower_expr(
             let ir_type = lower_type(ir_module, &builder.unpoly(ty)?, asg)?;
             Ok(ir::Value::Literal(Literal::Zeroed(ir_type)))
         }
+        ExprKind::SizeOf(ty) => {
+            let ir_type = lower_type(ir_module, &builder.unpoly(ty)?, asg)?;
+            Ok(builder.push(ir::Instr::SizeOf(ir_type)))
+        }
         ExprKind::InterpreterSyscall(syscall, args) => {
             let mut values = Vec::with_capacity(args.len());
 
@@ -492,9 +499,6 @@ pub fn lower_expr(
             }
 
             Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
-        }
-        ExprKind::PolyCall(poly_call) => {
-            lower_expr_poly_call(builder, ir_module, expr, function, asg, poly_call)
         }
     }
 }

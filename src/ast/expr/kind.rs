@@ -3,7 +3,11 @@ use super::{
     InterpreterSyscall, ShortCircuitingBinaryOperation, StaticMemberCall, StaticMemberValue,
     StructLiteral, UnaryOperation, While,
 };
-use crate::{ast::Privacy, name::Name, source_files::Source};
+use crate::{
+    ast::{Privacy, Type},
+    name::Name,
+    source_files::Source,
+};
 use std::ffi::CString;
 
 #[derive(Clone, Debug)]
@@ -29,6 +33,7 @@ pub enum ExprKind {
     While(Box<While>),
     StaticMemberValue(Box<StaticMemberValue>),
     StaticMemberCall(Box<StaticMemberCall>),
+    SizeOf(Box<Type>),
     InterpreterSyscall(Box<InterpreterSyscall>),
 }
 

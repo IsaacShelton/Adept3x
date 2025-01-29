@@ -7,8 +7,8 @@ mod struct_literal;
 use super::{super::error::ParseError, is_right_associative, is_terminating_token, Parser};
 use crate::{
     ast::{
-        Block, Conditional, Expr, ExprKind, Integer, TypeKind, UnaryMathOperator, UnaryOperation,
-        UnaryOperator, While,
+        Block, Conditional, Expr, ExprKind, Integer, TypeArg, TypeKind, UnaryMathOperator,
+        UnaryOperation, UnaryOperator, While,
     },
     inflow::Inflow,
     parser::{array_last, error::ParseErrorKind, parse_util::into_plain_name},
@@ -148,9 +148,17 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     }
                     _ => {
                         if !generics.is_empty() {
+                            // TODO: CLEANUP: Clean up this code
                             if let Some("sizeof") = name.as_plain_str() {
-                                todo!("sizeof operator");
-                                // Ok(Expr::new(ExprKind::SizeOf(inner), source))
+                                if let Some(type_arg) = generics.first() {
+                                    if let TypeArg::Type(ty) = type_arg {
+                                        if generics.len() == 1 {
+                                            return Ok(
+                                                ExprKind::SizeOf(Box::new(ty.clone())).at(source)
+                                            );
+                                        }
+                                    }
+                                }
                             }
 
                             return Err(ParseErrorKind::Other {
