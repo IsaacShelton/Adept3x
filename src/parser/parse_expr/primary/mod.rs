@@ -148,17 +148,32 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     }
                     _ => {
                         if !generics.is_empty() {
-                            // TODO: CLEANUP: Clean up this code
+                            let mut generics = generics;
+                            let mut generics = generics.drain(..);
+
                             if let Some("sizeof") = name.as_plain_str() {
-                                if let Some(type_arg) = generics.first() {
-                                    if let TypeArg::Type(ty) = type_arg {
-                                        if generics.len() == 1 {
-                                            return Ok(
-                                                ExprKind::SizeOf(Box::new(ty.clone())).at(source)
-                                            );
-                                        }
+                                let Some(arg) = generics.next() else {
+                                    return Err(ParseErrorKind::Other {
+                                        message: "Expected type argument to sizeof macro".into(),
                                     }
-                                }
+                                    .at(source));
+                                };
+
+                                let TypeArg::Type(ty) = arg else {
+                                    return Err(ParseErrorKind::Other {
+                                        message: "Cannot get size of non-type value".into(),
+                                    }
+                                    .at(source));
+                                };
+
+                                if generics.next().is_some() {
+                                    return Err(ParseErrorKind::Other {
+                                        message: "Too many arguments to sizeof macro".into(),
+                                    }
+                                    .at(source));
+                                };
+
+                                return Ok(ExprKind::SizeOf(Box::new(ty.clone())).at(source));
                             }
 
                             return Err(ParseErrorKind::Other {

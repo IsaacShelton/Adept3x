@@ -1,0 +1,15 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr-char, ...) int
+
+func main {
+    printf(c"sizeof-char = %d\n", sizeof-char.int())
+    printf(c"sizeof-short = %d\n", sizeof-char.int())
+    printf(c"sizeof-int = %d\n", sizeof-int.int())
+    printf(c"sizeof-long = %d\n", sizeof-long.int())
+    printf(c"sizeof-longlong = %d\n", sizeof-longlong.int())
+    printf(c"sizeof-ptr-char = %d\n", sizeof-ptr-char.int())
+}
+
