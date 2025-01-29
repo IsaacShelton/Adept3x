@@ -173,7 +173,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                                     .at(source));
                                 };
 
-                                return Ok(ExprKind::SizeOf(Box::new(ty.clone())).at(source));
+                                return Ok(ExprKind::SizeOf(Box::new(ty)).at(source));
                             }
 
                             return Err(ParseErrorKind::Other {
