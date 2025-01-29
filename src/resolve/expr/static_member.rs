@@ -183,7 +183,14 @@ pub fn resolve_static_member_call_named(
         .into_iter()
         .copied()
         .flat_map(|func_ref| {
-            FuncHaystack::fits(ctx, func_ref, &args, Some(catalog.clone()), *call_source)
+            FuncHaystack::fits(
+                ctx,
+                func_ref,
+                static_member_call.call.generics.as_slice(),
+                &args,
+                Some(catalog.clone()),
+                *call_source,
+            )
         });
 
     let callee = only_match.next().ok_or_else(|| {

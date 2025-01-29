@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     asg::{self, Callee, TypeKind, TypedExpr},
+    ast::TypeArg,
     name::{Name, ResolvedName},
     resolve::conform::Perform,
     source_files::Source,
@@ -42,14 +43,15 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         name: &Name,
+        generics: &[TypeArg],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Result<Callee, FindFunctionError> {
         let resolved_name = ResolvedName::new(self.fs_node_id, name);
 
-        self.find_local(ctx, &resolved_name, arguments, source)
-            .or_else(|| self.find_remote(ctx, &name, arguments, source))
-            .or_else(|| self.find_imported(ctx, &name, arguments, source))
+        self.find_local(ctx, &resolved_name, generics, arguments, source)
+            .or_else(|| self.find_remote(ctx, &name, generics, arguments, source))
+            .or_else(|| self.find_imported(ctx, &name, generics, arguments, source))
             .unwrap_or(Err(FindFunctionError::NotDefined))
     }
 
@@ -95,6 +97,7 @@ impl FuncHaystack {
     pub fn fits(
         ctx: &ResolveExprCtx,
         func_ref: asg::FuncRef,
+        generics: &[TypeArg],
         args: &[TypedExpr],
         existing_catalog: Option<PolyCatalog>,
         source: Source,
@@ -103,6 +106,10 @@ impl FuncHaystack {
         let params = &function.params;
 
         let mut catalog = existing_catalog.unwrap_or_default();
+
+        if generics.len() != 0 {
+            todo!("FuncHaystack::fits does not support specified generics yet");
+        }
 
         if !params.is_cstyle_vararg && args.len() != params.required.len() {
             return None;
@@ -167,6 +174,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         resolved_name: &ResolvedName,
+        generics: &[TypeArg],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
@@ -175,7 +183,7 @@ impl FuncHaystack {
             .get(&resolved_name)
             .into_iter()
             .flatten()
-            .flat_map(|f| Self::fits(ctx, *f, arguments, None, source));
+            .flat_map(|f| Self::fits(ctx, *f, generics, arguments, None, source));
 
         local_matches.next().map(|found| {
             if local_matches.next().is_some() {
@@ -190,6 +198,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         name: &Name,
+        generics: &[TypeArg],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
@@ -211,7 +220,7 @@ impl FuncHaystack {
                     .into_iter()
             })
             .flatten()
-            .flat_map(|f| Self::fits(ctx, *f, arguments, None, source));
+            .flat_map(|f| Self::fits(ctx, *f, generics, arguments, None, source));
 
         remote_matches.next().map(|found| {
             if remote_matches.next().is_some() {
@@ -226,6 +235,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         name: &Name,
+        generics: &[TypeArg],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
@@ -281,7 +291,7 @@ impl FuncHaystack {
                     .into_iter()
                     .flatten()
             })
-            .flat_map(|f| Self::fits(ctx, *f, arguments, None, source));
+            .flat_map(|f| Self::fits(ctx, *f, generics, arguments, None, source));
 
         matches.next().map(|found| {
             if matches.next().is_some() {

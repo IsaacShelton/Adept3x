@@ -20,14 +20,8 @@ pub fn cast(
     args: Vec<TypedExpr>,
     source: Source,
 ) -> Result<Result<TypedExpr, Vec<TypedExpr>>, ResolveError> {
-    if !call.generics.is_empty() {
-        return Err(ResolveError::other(
-            "Resolution of casting call with generics is not implemented yet",
-            source,
-        ));
-    }
-
-    if !call.name.namespace.is_empty() || args.len() != 1 {
+    if !call.name.namespace.is_empty() || args.len() != 1 || !call.generics.is_empty() {
+        // No match
         return Ok(Err(args));
     }
 

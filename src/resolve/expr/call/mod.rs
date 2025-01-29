@@ -24,13 +24,6 @@ pub fn resolve_call_expr(
     call: &ast::Call,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    if !call.generics.is_empty() {
-        return Err(ResolveError::other(
-            "Resolution of calls with generics is not implemented yet",
-            source,
-        ));
-    }
-
     let mut args = Vec::with_capacity(call.args.len());
     for arg in call.args.iter() {
         args.push(resolve_expr(
@@ -49,7 +42,7 @@ pub fn resolve_call_expr(
 
     let callee = ctx
         .func_haystack
-        .find(ctx, &call.name, &args[..], source)
+        .find(ctx, &call.name, call.generics.as_slice(), &args[..], source)
         .map_err(|reason| {
             ResolveErrorKind::FailedToFindFunction {
                 signature: format!(
