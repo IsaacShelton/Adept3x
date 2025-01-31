@@ -103,6 +103,7 @@ impl PragmaSection {
             ast_file.funcs.push(Func {
                 head: FuncHead {
                     name: "main".into(),
+                    named_type_params: vec![],
                     givens: vec![],
                     params: Params::default(),
                     return_type: TypeKind::Void.at(source),

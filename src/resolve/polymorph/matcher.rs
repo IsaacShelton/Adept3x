@@ -42,13 +42,13 @@ pub fn match_type<'t, 'a>(
     })
 }
 
-pub struct TypeMatcher<'a, 'b, 'c> {
-    pub ctx: &'a ResolveExprCtx<'b, 'c>,
-    pub parent: &'a IndexMap<String, PolyValue>,
+pub struct TypeMatcher<'local, 'ast, 'root_ctx> {
+    pub ctx: &'local ResolveExprCtx<'ast, 'root_ctx>,
+    pub parent: &'local IndexMap<String, PolyValue>,
     pub partial: IndexMap<String, PolyValue>,
 }
 
-impl<'a, 'b, 'c> TypeMatcher<'a, 'b, 'c> {
+impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
     pub fn match_type<'t>(
         &mut self,
         pattern: &'t Type,
@@ -149,7 +149,8 @@ impl<'a, 'b, 'c> TypeMatcher<'a, 'b, 'c> {
     }
 
     pub fn put_type(&mut self, name: &str, new_type: &Type) -> Result<(), PolyCatalogInsertError> {
-        if let Some(existing) = self.parent.get(name).or_else(|| self.partial.get(name)) {
+        let in_parent = self.parent.get(name);
+        if let Some(existing) = in_parent.or_else(|| self.partial.get(name)) {
             match existing {
                 PolyValue::Type(poly_type) => {
                     if *poly_type != *new_type {
@@ -162,10 +163,12 @@ impl<'a, 'b, 'c> TypeMatcher<'a, 'b, 'c> {
             }
         }
 
-        assert!(self
-            .partial
-            .insert(name.to_string(), PolyValue::Type(new_type.clone()))
-            .is_none());
+        if in_parent.is_none() {
+            assert!(self
+                .partial
+                .insert(name.to_string(), PolyValue::Type(new_type.clone()))
+                .is_none());
+        }
 
         Ok(())
     }

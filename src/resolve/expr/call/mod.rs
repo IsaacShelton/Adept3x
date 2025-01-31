@@ -9,7 +9,7 @@ use crate::{
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
-        Initialized, PolyCatalog,
+        resolve_type_args_to_poly_args, Initialized, PolyCatalog,
     },
     source_files::Source,
 };
@@ -35,6 +35,8 @@ pub fn resolve_call_expr(
         )?);
     }
 
+    let generics = resolve_type_args_to_poly_args(ctx, &call.generics)?;
+
     let args = match cast(ctx, call, args, source)? {
         Ok(cast) => return Ok(cast),
         Err(args) => args,
@@ -42,7 +44,7 @@ pub fn resolve_call_expr(
 
     let callee = ctx
         .func_haystack
-        .find(ctx, &call.name, call.generics.as_slice(), &args[..], source)
+        .find(ctx, &call.name, &generics, &args[..], source)
         .map_err(|reason| {
             ResolveErrorKind::FailedToFindFunction {
                 signature: format!(

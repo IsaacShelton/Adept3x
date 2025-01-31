@@ -51,17 +51,17 @@ use ordered_float::NotNan;
 use static_member::{resolve_static_member_call, resolve_static_member_value};
 use std::collections::HashMap;
 
-pub struct ResolveExprCtx<'a, 'b> {
-    pub asg: &'b mut Asg<'a>,
-    pub func_haystack: &'b FuncHaystack,
+pub struct ResolveExprCtx<'ast, 'root_ctx> {
+    pub asg: &'root_ctx mut Asg<'ast>,
+    pub func_haystack: &'root_ctx FuncHaystack,
     pub variable_haystack: VariableHaystack,
     pub func_ref: Option<asg::FuncRef>,
-    pub settings: &'b Settings,
-    pub public_funcs: &'b HashMap<FsNodeId, HashMap<String, Vec<asg::FuncRef>>>,
-    pub types_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
-    pub globals_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
-    pub helper_exprs_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
-    pub impls_in_modules: &'b HashMap<FsNodeId, HashMap<String, asg::ImplRef>>,
+    pub settings: &'root_ctx Settings,
+    pub public_funcs: &'root_ctx HashMap<FsNodeId, HashMap<String, Vec<asg::FuncRef>>>,
+    pub types_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
+    pub globals_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
+    pub helper_exprs_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
+    pub impls_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::ImplRef>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
     pub current_constraints: CurrentConstraints,

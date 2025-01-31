@@ -19,6 +19,10 @@ impl ImplParams {
         self.params.get(key)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.params.is_empty()
+    }
+
     pub fn has_items(&self) -> bool {
         self.params.has_items()
     }

@@ -11,7 +11,7 @@ use crate::{
         expr::PreferredType,
         func_haystack::{FindFunctionError, FuncHaystack},
         initialized::Initialized,
-        PolyCatalog, PolyRecipe,
+        resolve_type_args_to_poly_args, PolyCatalog, PolyRecipe,
     },
     source_files::Source,
 };
@@ -171,6 +171,9 @@ pub fn resolve_static_member_call_named(
             *call_source,
         ));
     };
+
+    let generics = resolve_type_args_to_poly_args(ctx, &static_member_call.call.generics)?;
+
     let imp = ctx
         .asg
         .impls
@@ -186,7 +189,7 @@ pub fn resolve_static_member_call_named(
             FuncHaystack::fits(
                 ctx,
                 func_ref,
-                static_member_call.call.generics.as_slice(),
+                &generics,
                 &args,
                 Some(catalog.clone()),
                 *call_source,

@@ -73,6 +73,7 @@ pub fn declare_function(
 
     let head = FuncHead {
         name,
+        named_type_params: vec![],
         givens: vec![],
         params: parameters,
         return_type,

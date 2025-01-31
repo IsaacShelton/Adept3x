@@ -49,6 +49,7 @@ impl<'a> CurrentConstraints {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub name: ResolvedName,
+    pub named_type_args: Vec<String>,
     pub params: Params,
     pub return_type: Type,
     pub stmts: Vec<Stmt>,

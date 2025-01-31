@@ -8,6 +8,7 @@ use crate::{
     inflow::Inflow,
     token::{Token, TokenKind},
 };
+use itertools::Itertools;
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
     pub fn parse_func(&mut self, annotations: Vec<Annotation>) -> Result<Func, ParseError> {
@@ -49,6 +50,9 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let name = self.parse_identifier(Some("after 'func' keyword"))?;
         self.ignore_newlines();
 
+        let named_type_params = self.parse_type_params()?.into_keys().collect_vec();
+        self.ignore_newlines();
+
         let params = self
             .input
             .peek_is(TokenKind::OpenParen)
@@ -72,6 +76,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Ok(Func {
             head: FuncHead {
                 name,
+                named_type_params,
                 givens,
                 params,
                 return_type,

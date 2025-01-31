@@ -2,6 +2,7 @@ mod error;
 mod matcher;
 mod recipe;
 mod resolver;
+mod type_args_to_poly_value;
 
 use super::expr::ResolveExprCtx;
 use crate::asg::{self, Type};
@@ -13,11 +14,12 @@ pub use matcher::MatchTypesError;
 use matcher::{match_type, TypeMatcher};
 pub use recipe::PolyRecipe;
 pub use resolver::PolyRecipeResolver;
+pub use type_args_to_poly_value::*;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, IsVariant)]
 pub enum PolyValue {
     Type(asg::Type),
-    Expr(asg::Expr),
+    Expr(asg::TypedExpr),
     Impl(asg::ImplRef),
     PolyImpl(String),
 }
@@ -64,12 +66,25 @@ impl PolyCatalog {
         Ok(())
     }
 
-    pub fn extend_if_match_all_types<'t>(
-        &mut self,
-        ctx: &ResolveExprCtx,
+    pub fn extend_if_match_all_types<'slf: 'root_ctx, 't, 'expr_ctx, 'ast, 'root_ctx>(
+        &'slf mut self,
+        ctx: &'expr_ctx ResolveExprCtx<'ast, 'root_ctx>,
         pattern_types: &'t [Type],
         concrete_types: &'t [Type],
     ) -> Result<(), MatchTypesError<'t>> {
+        self.polymorphs.extend(
+            self.try_match_all_types(ctx, pattern_types, concrete_types)?
+                .partial,
+        );
+        Ok(())
+    }
+
+    pub fn try_match_all_types<'slf: 'root_ctx, 't, 'expr_ctx, 'ast, 'root_ctx>(
+        &'slf self,
+        ctx: &'expr_ctx ResolveExprCtx<'ast, 'root_ctx>,
+        pattern_types: &'t [Type],
+        concrete_types: &'t [Type],
+    ) -> Result<TypeMatcher<'expr_ctx, 'ast, 'root_ctx>, MatchTypesError<'t>> {
         if concrete_types.len() != pattern_types.len() {
             return Err(MatchTypesError::LengthMismatch);
         }
@@ -84,8 +99,7 @@ impl PolyCatalog {
             matcher.match_type(pattern, concrete)?;
         }
 
-        self.polymorphs.extend(matcher.partial.into_iter());
-        Ok(())
+        Ok(matcher)
     }
 
     pub fn can_put_type(

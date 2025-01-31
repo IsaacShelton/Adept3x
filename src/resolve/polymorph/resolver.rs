@@ -7,16 +7,42 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 pub struct PolyRecipeResolver<'a> {
-    polymorphs: &'a IndexMap<String, PolyValue>,
+    direct: &'a IndexMap<String, PolyValue>,
+    parent: Option<&'a PolyRecipeResolver<'a>>,
 }
 
+// NOTE: All operations assume disjointed-ness
 impl<'a> PolyRecipeResolver<'a> {
-    pub fn new(polymorphs: &'a IndexMap<String, PolyValue>) -> Self {
-        Self { polymorphs }
+    pub fn new(direct: &'a IndexMap<String, PolyValue>) -> Self {
+        Self {
+            direct,
+            parent: None,
+        }
     }
-    pub fn resolve_type(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
-        let polymorphs = &self.polymorphs;
 
+    pub fn new_disjoint(
+        direct: &'a IndexMap<String, PolyValue>,
+        parent: &'a PolyRecipeResolver<'a>,
+    ) -> Self {
+        for name in direct.keys() {
+            if parent.get(name).is_some() {
+                panic!("PolyRecipeResolver::new_disjoint called for non-disjoint values, '{}' exists in both", name);
+            }
+        }
+
+        Self {
+            direct,
+            parent: Some(parent),
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&PolyValue> {
+        self.direct
+            .get(name)
+            .or_else(|| self.parent.and_then(|parent| parent.get(name)))
+    }
+
+    pub fn resolve_type(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
         Ok(match &ty.kind {
             asg::TypeKind::Unresolved => panic!(),
             asg::TypeKind::Boolean
@@ -52,7 +78,7 @@ impl<'a> PolyRecipeResolver<'a> {
             }
             asg::TypeKind::TypeAlias(_, _) => ty.clone(),
             asg::TypeKind::Polymorph(name, _) => {
-                let Some(value) = polymorphs.get(name) else {
+                let Some(value) = self.get(name) else {
                     return Err(PolymorphErrorKind::UndefinedPolymorph(name.clone()).at(ty.source));
                 };
 
@@ -67,7 +93,7 @@ impl<'a> PolyRecipeResolver<'a> {
     }
 
     pub fn resolve_impl(&self, name: &str, source: Source) -> Result<asg::ImplRef, PolymorphError> {
-        match self.polymorphs.get(name) {
+        match self.get(name) {
             Some(PolyValue::Impl(impl_ref)) => Ok(*impl_ref),
             Some(_) => Err(PolymorphErrorKind::PolymorphIsNotAnImpl(name.into())),
             None => Err(PolymorphErrorKind::UndefinedPolymorph(name.into())),

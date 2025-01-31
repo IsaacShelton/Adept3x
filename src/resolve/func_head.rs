@@ -115,6 +115,7 @@ pub fn create_func_head<'a>(
 
     Ok(asg.funcs.insert(asg::Func {
         name,
+        named_type_args: head.named_type_params.clone(),
         params,
         return_type,
         stmts: vec![],

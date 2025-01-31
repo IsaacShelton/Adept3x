@@ -1,6 +1,8 @@
 use crate::{
     asg,
-    resolve::{error::ResolveError, expr::ResolveExprCtx, PolyCatalog, PolyValue},
+    resolve::{
+        error::ResolveError, expr::ResolveExprCtx, PolyCatalog, PolyRecipeResolver, PolyValue,
+    },
     source_files::Source,
 };
 use itertools::Itertools;
@@ -29,24 +31,23 @@ pub fn infer_callee_missing_impl_args(
             .impl_params
             .iter()
             .filter_map(|(param_name, param_trait)| {
-                if catalog
-                    .extend_if_match_all_types(ctx, &expected_trait.args, &param_trait.args)
-                    .is_err()
-                {
-                    return None;
-                }
+                let matched = catalog
+                    .try_match_all_types(ctx, &expected_trait.args, &param_trait.args)
+                    .ok()?;
 
-                catalog
-                    .resolver()
+                PolyRecipeResolver::new_disjoint(&matched.partial, &catalog.resolver())
                     .resolve_trait(expected_trait)
                     .ok()
                     .and_then(|expected_trait| {
-                        (param_trait.trait_ref == expected_trait.trait_ref).then_some(param_name)
+                        (param_trait.trait_ref == expected_trait.trait_ref)
+                            .then_some((param_name, matched))
                     })
             });
 
         match from_env.exactly_one() {
-            Ok(param_name) => {
+            Ok((param_name, matched)) => {
+                catalog.polymorphs.extend(matched.partial);
+
                 if catalog
                     .polymorphs
                     .insert(expected_name.into(), PolyValue::PolyImpl(param_name.into()))

@@ -23,6 +23,7 @@ fn thin_void_func(name: impl Into<String>, syscall_kind: InterpreterSyscallKind)
 
     let head = FuncHead {
         name: name.into(),
+        named_type_params: vec![],
         givens: vec![],
         params: Params::default(),
         return_type: void.clone(),
@@ -59,6 +60,7 @@ fn thin_cstring_func(
 
     let head = FuncHead {
         name: name.into(),
+        named_type_params: vec![],
         givens: vec![],
         params: Params::normal([Param::new(param_name.clone(), ptr_char.clone())]),
         return_type: void.clone(),
@@ -104,6 +106,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     file.funcs.push(Func {
         head: FuncHead {
             name: "<interpreter entry point>".into(),
+            named_type_params: vec![],
             givens: vec![],
             params: Params::default(),
             return_type: void.clone(),
@@ -215,6 +218,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     file.funcs.push(Func {
         head: FuncHead {
             name: "project".into(),
+            named_type_params: vec![],
             givens: vec![],
             params: Params::normal([
                 Param::new("name".into(), ptr_char.clone()),
@@ -258,6 +262,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     file.funcs.push(Func {
         head: FuncHead {
             name: "use".into(),
+            named_type_params: vec![],
             givens: vec![],
             params: Params::normal([
                 Param::new("as_namespace".into(), ptr_char.clone()),
@@ -301,6 +306,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
     file.funcs.push(Func {
         head: FuncHead {
             name: "import".into(),
+            named_type_params: vec![],
             givens: vec![],
             params: Params::normal([Param::new("namespace".into(), ptr_char.clone())]),
             return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),

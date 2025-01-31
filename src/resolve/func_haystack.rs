@@ -8,9 +8,8 @@ use super::{
 };
 use crate::{
     asg::{self, Callee, TypeKind, TypedExpr},
-    ast::TypeArg,
     name::{Name, ResolvedName},
-    resolve::conform::Perform,
+    resolve::{conform::Perform, PolyValue},
     source_files::Source,
     workspace::fs::FsNodeId,
 };
@@ -43,7 +42,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         name: &Name,
-        generics: &[TypeArg],
+        generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Result<Callee, FindFunctionError> {
@@ -97,7 +96,7 @@ impl FuncHaystack {
     pub fn fits(
         ctx: &ResolveExprCtx,
         func_ref: asg::FuncRef,
-        generics: &[TypeArg],
+        generics: &[PolyValue],
         args: &[TypedExpr],
         existing_catalog: Option<PolyCatalog>,
         source: Source,
@@ -107,8 +106,23 @@ impl FuncHaystack {
 
         let mut catalog = existing_catalog.unwrap_or_default();
 
-        if generics.len() != 0 {
-            todo!("FuncHaystack::fits does not support specified generics yet");
+        if generics.len() > function.named_type_args.len() {
+            return None;
+        }
+
+        for (name, poly_value) in function
+            .named_type_args
+            .iter()
+            .take(generics.len())
+            .zip(generics.iter())
+        {
+            if catalog
+                .polymorphs
+                .insert(name.clone(), poly_value.clone())
+                .is_some()
+            {
+                return None;
+            }
         }
 
         if !params.is_cstyle_vararg && args.len() != params.required.len() {
@@ -174,7 +188,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         resolved_name: &ResolvedName,
-        generics: &[TypeArg],
+        generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
@@ -198,7 +212,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         name: &Name,
-        generics: &[TypeArg],
+        generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
@@ -235,7 +249,7 @@ impl FuncHaystack {
         &self,
         ctx: &ResolveExprCtx,
         name: &Name,
-        generics: &[TypeArg],
+        generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {

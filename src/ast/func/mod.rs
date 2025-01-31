@@ -13,6 +13,7 @@ pub struct Func {
 #[derive(Clone, Debug)]
 pub struct FuncHead {
     pub name: String,
+    pub named_type_params: Vec<String>,
     pub givens: Vec<Given>,
     pub params: Params,
     pub return_type: Type,
@@ -31,5 +32,7 @@ impl FuncHead {
                 .required
                 .iter()
                 .any(|param| param.ast_type.contains_polymorph().is_some())
+            || !self.named_type_params.is_empty()
+            || !self.givens.is_empty()
     }
 }
