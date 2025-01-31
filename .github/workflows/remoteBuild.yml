@@ -140,7 +140,7 @@ jobs:
     name: ${{ format('Test / {0}', matrix.os) }}
     steps:
       - name: Download Build Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-${{ matrix.os }}-archive
       - name: Unpack Build Artifact
@@ -175,15 +175,15 @@ jobs:
           echo 'releaseName=Nightly' >> $GITHUB_ENV
           echo 'releaseTagName=Nightly' >> $GITHUB_ENV
       - name: Download Build Artifact (windows-latest)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-windows-latest-archive
       - name: Download Build Artifact (macos-latest)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-macos-latest-archive
       - name: Download Build Artifact (ubuntu-latest)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-ubuntu-latest-archive
       - name: Get current date
