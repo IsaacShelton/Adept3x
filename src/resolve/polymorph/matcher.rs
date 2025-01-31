@@ -150,6 +150,7 @@ impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
 
     pub fn put_type(&mut self, name: &str, new_type: &Type) -> Result<(), PolyCatalogInsertError> {
         let in_parent = self.parent.get(name);
+
         if let Some(existing) = in_parent.or_else(|| self.partial.get(name)) {
             match existing {
                 PolyValue::Type(poly_type) => {

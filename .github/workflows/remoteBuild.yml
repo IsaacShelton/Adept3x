@@ -126,7 +126,7 @@ jobs:
           files: adept
           outPath: ${{github.workspace}}/build-${{ matrix.os }}.tar.gz
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.os }}-archive
           path: build-${{ matrix.os }}.tar.gz
