@@ -30,7 +30,7 @@ def prepare(executable, dir, entry):
     folder = join(dir, entry.name)
     is_mod = exists(join(folder, "_.adept"))
 
-    cmd = [executable]
+    cmd = [executable, "--infrastructure", "infrastructure"]
 
     if is_mod:
         cmd.append(folder)

@@ -1,0 +1,31 @@
+
+pragma => {
+    adept("3.0")
+    use("std", import("std"))
+    importNamespace("std")
+}
+
+#[foreign]
+func printf(format ptr<char>, ...) int
+
+func main {
+    castTest(1234)::(myCastIntToDouble, myCastIntToLongLong)
+}
+
+#[using std/Cast<int, double>]
+#[using std/Cast<int, longlong>]
+func castTest(x int) {
+    printf(c"%d %f %lld\n", x, x.cast<double>(), x.cast<longlong>())
+}
+
+impl std/Cast<int, double> myCastIntToDouble {
+    func cast(from int) double {
+        return from.double()
+    }
+}
+
+impl std/Cast<int, longlong> myCastIntToLongLong {
+    func cast(from int) longlong {
+        return from.longlong()
+    }
+}
