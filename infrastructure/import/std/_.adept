@@ -1,0 +1,14 @@
+
+pragma => adept("3.0")
+
+#[public]
+trait Cast<$From, $To> {
+    func cast(from $From) $To
+}
+
+#[public]
+#[using $cast Cast<$From, $To>]
+func cast<$To>(from $From) $To {
+    return $cast::cast(from)
+}
+
