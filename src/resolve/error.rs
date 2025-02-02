@@ -221,6 +221,9 @@ pub enum ResolveErrorKind {
     DuplicateTypeName {
         name: String,
     },
+    DuplicateImplementationName {
+        name: String,
+    },
     CannotCreateOutOfRangeFloat,
     TypeAliasesCannotContainPolymorphs,
     FailedToConformArgumentToDefaultValue,
@@ -562,6 +565,9 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::DuplicateTypeName { name } => {
                 write!(f, "Duplicate type name '{}'", name)?;
+            }
+            ResolveErrorKind::DuplicateImplementationName { name } => {
+                write!(f, "Duplicate implementation name '{}'", name)?;
             }
             ResolveErrorKind::CannotCreateOutOfRangeFloat => {
                 write!(f, "Cannot create out-of-range floating-point number")?;

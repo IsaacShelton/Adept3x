@@ -4,11 +4,14 @@ use super::{
     func_head::create_func_head, job::FuncJob,
 };
 use crate::{
-    asg::{self, Asg, CurrentConstraints, Func, GenericTraitRef, TraitFunc, Type},
-    ast::{self, AstFile},
+    asg::{
+        self, Asg, CurrentConstraints, Func, GenericTraitRef, ImplDecl, ImplRef, TraitFunc, Type,
+    },
+    ast::{self, AstFile, Privacy},
     cli::BuildOptions,
     name::{Name, ResolvedName},
     resolve::{error::ResolveErrorKind, type_ctx::ResolveTypeCtx},
+    source_files::Source,
     workspace::fs::FsNodeId,
 };
 use for_alls::ForAlls;
@@ -305,16 +308,16 @@ fn matches(
 pub fn create_impl_head<'a>(
     ctx: &mut ResolveCtx,
     asg: &mut Asg<'a>,
-    module_file_id: FsNodeId,
-    physical_file_id: FsNodeId,
+    module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     imp: &ast::Impl,
 ) -> Result<asg::ImplRef, ResolveError> {
     let pre_parameters_constraints = CurrentConstraints::new_empty();
 
     let type_ctx = ResolveTypeCtx::new(
         &asg,
-        module_file_id,
-        physical_file_id,
+        module_fs_node_id,
+        physical_fs_node_id,
         &ctx.types_in_modules,
         &pre_parameters_constraints,
     );
@@ -399,18 +402,14 @@ pub fn create_impl_head<'a>(
         .as_ref()
         .map_or("<unnamed impl>", |name| name.as_str());
 
-    if ctx
-        .impls_in_modules
-        .entry(module_file_id)
-        .or_default()
-        .insert(name.to_string(), impl_ref)
-        .is_some()
-    {
-        return Err(ResolveErrorKind::Other {
-            message: format!("Duplicate implementation name '{}'", name),
-        }
-        .at(imp.source));
-    };
+    declare_impl(
+        ctx,
+        module_fs_node_id,
+        name,
+        imp.source,
+        imp.privacy,
+        impl_ref,
+    )?;
 
     Ok(impl_ref)
 }
@@ -427,4 +426,35 @@ fn into_trait(ty: &Type) -> Result<GenericTraitRef, ResolveError> {
         trait_ref: *trait_ref,
         args: args.clone(),
     })
+}
+
+fn declare_impl(
+    ctx: &mut ResolveCtx,
+    module_fs_node_id: FsNodeId,
+    name: &str,
+    source: Source,
+    privacy: Privacy,
+    impl_ref: ImplRef,
+) -> Result<(), ResolveError> {
+    if ctx
+        .impls_in_modules
+        .entry(module_fs_node_id)
+        .or_default()
+        .insert(
+            name.to_string(),
+            ImplDecl {
+                impl_ref,
+                privacy,
+                source,
+            },
+        )
+        .is_some()
+    {
+        return Err(ResolveErrorKind::DuplicateImplementationName {
+            name: name.to_string(),
+        }
+        .at(source));
+    };
+
+    Ok(())
 }

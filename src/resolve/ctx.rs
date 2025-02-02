@@ -11,7 +11,7 @@ pub struct ResolveCtx {
     pub globals_in_modules: HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
     pub helper_exprs_in_modules: HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
     pub trait_haystacks: HashMap<FsNodeId, HashMap<String, asg::TraitRef>>,
-    pub impls_in_modules: HashMap<FsNodeId, HashMap<String, asg::ImplRef>>,
+    pub impls_in_modules: HashMap<FsNodeId, HashMap<String, asg::ImplDecl>>,
 }
 
 impl ResolveCtx {

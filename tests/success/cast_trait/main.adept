@@ -6,26 +6,18 @@ pragma => {
 }
 
 #[foreign]
-func printf(format ptr<char>, ...) int
+func printf(format ptr#char, ...) int
 
 func main {
-    castTest(1234)::(myCastIntToDouble, myCastIntToLongLong)
+    castTest(1234)::(std/castI32ToDouble, std/castI32ToLongLong)
 }
 
-#[using std/Cast<int, double>]
-#[using std/Cast<int, longlong>]
-func castTest(x int) {
+#[using std/Cast<i32, double>]
+#[using std/Cast<i32, longlong>]
+func castTest(x i32) {
+    printf(c"With long form generics syntax:\n")
     printf(c"%d %f %lld\n", x, x.cast<double>(), x.cast<longlong>())
+    printf(c"With shorthand generics syntax:\n")
+    printf(c"%d %f %lld\n", x, x.cast#double(), x.cast#longlong())
 }
 
-impl std/Cast<int, double> myCastIntToDouble {
-    func cast(from int) double {
-        return from.double()
-    }
-}
-
-impl std/Cast<int, longlong> myCastIntToLongLong {
-    func cast(from int) longlong {
-        return from.longlong()
-    }
-}

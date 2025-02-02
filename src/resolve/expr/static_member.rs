@@ -91,24 +91,54 @@ pub fn resolve_impl_mention(
     impl_args: &[TypeArg],
     source: Source,
 ) -> Result<(ImplRef, PolyCatalog), ResolveError> {
-    let Some(impl_name) = impl_name.as_plain_str() else {
-        return Err(ResolveError::other("Invalid implementation name", source));
-    };
+    let impl_decl = impl_name.as_plain_str().and_then(|impl_name| {
+        ctx.impls_in_modules
+            .get(&ctx.module_fs_node_id)
+            .and_then(|impls| impls.get(impl_name))
+    });
 
-    let impl_ref = ctx
-        .impls_in_modules
-        .get(&ctx.module_fs_node_id)
-        .and_then(|impls| impls.get(impl_name));
+    let impl_decl = impl_decl.ok_or(()).or_else(|_| {
+        let mut matches = (!impl_name.namespace.is_empty())
+            .then(|| {
+                ctx.settings
+                    .namespace_to_dependency
+                    .get(impl_name.namespace.as_ref())
+            })
+            .flatten()
+            .into_iter()
+            .flatten()
+            .flat_map(|dependency| {
+                ctx.settings
+                    .dependency_to_module
+                    .get(dependency)
+                    .and_then(|module_fs_node_id| ctx.impls_in_modules.get(module_fs_node_id))
+                    .and_then(|imp| imp.get(impl_name.basename.as_ref()))
+                    .filter(|imp| imp.privacy.is_public())
+                    .into_iter()
+            });
 
-    let Some(imp) = impl_ref.and_then(|found| ctx.asg.impls.get(*found)) else {
-        return Err(ResolveError::other(
-            format!("Undefined trait implementation '{}'", impl_name),
-            source,
-        ));
-    };
+        let Some(imp) = matches.next() else {
+            return Err(ResolveError::other(
+                format!("Undefined trait implementation '{}'", impl_name),
+                source,
+            ));
+        };
 
-    // Guaranteed to be valid now
-    let impl_ref = impl_ref.unwrap();
+        if matches.next().is_some() {
+            return Err(ResolveError::other(
+                format!("Ambiguous trait implementation '{}'", impl_name),
+                source,
+            ));
+        }
+
+        Ok(imp)
+    })?;
+
+    let imp = ctx
+        .asg
+        .impls
+        .get(impl_decl.impl_ref)
+        .expect("public impl of impl decl to exist");
 
     if imp.name_params.len() != impl_args.len() {
         return Err(ResolveError::other(
@@ -135,7 +165,7 @@ pub fn resolve_impl_mention(
         }
     }
 
-    Ok((*impl_ref, catalog))
+    Ok((impl_decl.impl_ref, catalog))
 }
 
 pub fn resolve_static_member_call_named(

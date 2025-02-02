@@ -61,7 +61,7 @@ pub struct ResolveExprCtx<'ast, 'root_ctx> {
     pub types_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::TypeDecl>>,
     pub globals_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::GlobalVarDecl>>,
     pub helper_exprs_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::HelperExprDecl>>,
-    pub impls_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::ImplRef>>,
+    pub impls_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::ImplDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
     pub current_constraints: CurrentConstraints,
