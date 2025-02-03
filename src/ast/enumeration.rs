@@ -12,7 +12,7 @@ pub struct Enum {
     pub privacy: Privacy,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EnumMember {
     pub value: BigInt,
     pub explicit_value: bool,

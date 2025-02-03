@@ -94,7 +94,7 @@ pub fn lower_type(
         asg::TypeKind::AnonymousUnion() => {
             todo!("lower anonymous union")
         }
-        asg::TypeKind::AnonymousEnum() => {
+        asg::TypeKind::AnonymousEnum(_) => {
             todo!("lower anonymous enum")
         }
         asg::TypeKind::FixedArray(fixed_array) => {

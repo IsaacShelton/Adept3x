@@ -10,6 +10,7 @@ use crate::{
     source_files::Source,
     target::Target,
 };
+pub use anonymous_enum::AnonymousEnum;
 pub use constraint::Constraint;
 use core::hash::Hash;
 use derive_more::{IsVariant, Unwrap};
@@ -33,7 +34,7 @@ pub enum TypeKind {
     Never,
     AnonymousStruct(),
     AnonymousUnion(),
-    AnonymousEnum(),
+    AnonymousEnum(Box<AnonymousEnum>),
     FixedArray(Box<FixedArray>),
     FuncPtr(FuncPtr),
     Enum(HumanName, EnumRef),
@@ -63,7 +64,7 @@ impl TypeKind {
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::AnonymousStruct() => false,
             TypeKind::AnonymousUnion() => false,
-            TypeKind::AnonymousEnum() => false,
+            TypeKind::AnonymousEnum(_) => false,
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
             TypeKind::FuncPtr(_) => todo!(),
             TypeKind::Enum(_, _) => false,
@@ -89,6 +90,7 @@ impl TypeKind {
             }
             TypeKind::TypeAlias(_, _type_ref) => todo!(),
             TypeKind::Unresolved => panic!(),
+            TypeKind::AnonymousEnum(enumeration) => enumeration.backing_type.kind.sign(target),
             TypeKind::Floating(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Ptr(_)
@@ -100,7 +102,6 @@ impl TypeKind {
             | TypeKind::FixedArray(..)
             | TypeKind::FuncPtr(..)
             | TypeKind::Enum(_, _)
-            | TypeKind::AnonymousEnum()
             | TypeKind::Polymorph(_, _)
             | TypeKind::Trait(_, _, _) => None,
         }
@@ -141,7 +142,7 @@ impl TypeKind {
             | TypeKind::Never
             | TypeKind::AnonymousStruct()
             | TypeKind::AnonymousUnion()
-            | TypeKind::AnonymousEnum() => Ok(Cow::Borrowed(self)),
+            | TypeKind::AnonymousEnum(_) => Ok(Cow::Borrowed(self)),
             TypeKind::FixedArray(fixed_array) => {
                 let TypeParam::Size(size) = mapper(TypeParam::Size(fixed_array.size))
                     .map_err(TypeParamError::MappingError)?

@@ -1,6 +1,6 @@
 use super::{resolve_constraints, ResolveTypeCtx};
 use crate::{
-    asg::{self, Params},
+    asg::{self, AnonymousEnum, Params},
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
@@ -69,8 +69,22 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Floating(size) => Ok(asg::TypeKind::Floating(*size)),
             ast::TypeKind::AnonymousStruct(..) => todo!("resolve anonymous struct type"),
             ast::TypeKind::AnonymousUnion(..) => todo!("resolve anonymous union type"),
-            ast::TypeKind::AnonymousEnum(_) => {
-                todo!("resolve anonymous enum type")
+            ast::TypeKind::AnonymousEnum(enumeration) => {
+                let backing_type = enumeration
+                    .backing_type
+                    .as_ref()
+                    .map(|ty| self.resolve(ty.as_ref()))
+                    .transpose()?
+                    .unwrap_or_else(|| {
+                        asg::TypeKind::Integer(IntegerBits::Bits32, IntegerSign::Signed)
+                            .at(ast_type.source)
+                    });
+
+                Ok(asg::TypeKind::AnonymousEnum(Box::new(AnonymousEnum {
+                    members: enumeration.members.clone(),
+                    backing_type,
+                    source: ast_type.source,
+                })))
             }
             ast::TypeKind::FixedArray(fixed_array) => {
                 if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {

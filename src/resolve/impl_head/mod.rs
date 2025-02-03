@@ -201,7 +201,7 @@ fn matches(
         },
         asg::TypeKind::AnonymousStruct()
         | asg::TypeKind::AnonymousUnion()
-        | asg::TypeKind::AnonymousEnum() => (ty_in_impl == ty_in_trait)
+        | asg::TypeKind::AnonymousEnum(_) => (ty_in_impl == ty_in_trait)
             .then_some(Ok(()))
             .unwrap_or_else(|| Err(mismatch(ty_in_impl.source))),
         asg::TypeKind::FixedArray(trait_fixed_array) => match &ty_in_impl.kind {

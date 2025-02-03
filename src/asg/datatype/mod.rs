@@ -41,11 +41,11 @@ impl Type {
             TypeKind::Ptr(inner) => inner.strip_constraints(),
             TypeKind::Void => (),
             TypeKind::Never => (),
-            TypeKind::AnonymousStruct() => todo!(),
-            TypeKind::AnonymousUnion() => todo!(),
-            TypeKind::AnonymousEnum() => todo!(),
+            TypeKind::AnonymousStruct() => todo!("strip_constraints for anonymous struct"),
+            TypeKind::AnonymousUnion() => todo!("strip_constraints for anonymous union"),
+            TypeKind::AnonymousEnum(_) => (),
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
-            TypeKind::FuncPtr(_) => todo!(),
+            TypeKind::FuncPtr(_) => todo!("strip_constraints for function pointer"),
             TypeKind::Enum(_, _) => (),
             TypeKind::Structure(_, _, parameters) => {
                 for parameter in parameters {

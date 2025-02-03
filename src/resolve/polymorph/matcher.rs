@@ -124,7 +124,34 @@ impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
             },
             TypeKind::AnonymousStruct() => todo!(),
             TypeKind::AnonymousUnion() => todo!(),
-            TypeKind::AnonymousEnum() => todo!(),
+            TypeKind::AnonymousEnum(pattern_inner) => match &concrete.kind {
+                TypeKind::AnonymousEnum(concrete_inner) => {
+                    // NOTE: Can never be polymorphic, so ok
+                    if pattern_inner.backing_type != concrete_inner.backing_type
+                        || pattern_inner.members.len() != concrete_inner.members.len()
+                    {
+                        return no_match();
+                    }
+
+                    for ((pattern_name, pattern_value), (concrete_name, concrete_value)) in
+                        pattern_inner
+                            .members
+                            .iter()
+                            .zip(concrete_inner.members.iter())
+                    {
+                        // NOTE: We are only checking the actual values match,
+                        // should we care if the explicitness between them is different too?
+                        if pattern_name != concrete_name
+                            || pattern_value.value == concrete_value.value
+                        {
+                            return no_match();
+                        }
+                    }
+
+                    Ok(())
+                }
+                _ => no_match(),
+            },
             TypeKind::FixedArray(pattern_inner) => match &concrete.kind {
                 TypeKind::FixedArray(concrete_inner) => {
                     self.match_type(&pattern_inner.inner, &concrete_inner.inner)

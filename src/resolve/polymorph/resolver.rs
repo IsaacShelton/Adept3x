@@ -58,7 +58,10 @@ impl<'a> PolyRecipeResolver<'a> {
             }
             asg::TypeKind::AnonymousStruct() => todo!(),
             asg::TypeKind::AnonymousUnion() => todo!(),
-            asg::TypeKind::AnonymousEnum() => todo!(),
+            asg::TypeKind::AnonymousEnum(_) => {
+                // NOTE: There are no inner polymorphs
+                ty.clone()
+            }
             asg::TypeKind::FixedArray(fixed_array) => {
                 asg::TypeKind::FixedArray(Box::new(asg::FixedArray {
                     size: fixed_array.size,
