@@ -75,11 +75,9 @@ impl<'a> PolyRecipeResolver<'a> {
                     .required
                     .iter()
                     .map(|param| {
-                        self.resolve_type(&param.ty).and_then(|ty| {
-                            Ok(asg::Param {
-                                name: param.name.clone(),
-                                ty,
-                            })
+                        self.resolve_type(&param.ty).map(|ty| asg::Param {
+                            name: param.name.clone(),
+                            ty,
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
