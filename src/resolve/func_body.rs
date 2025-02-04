@@ -4,7 +4,7 @@ use super::{
     expr::{ResolveExprCtx, ResolveExprMode},
     job::FuncJob,
     stmt::resolve_stmts,
-    type_ctx::ResolveTypeCtx,
+    type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
     variable_haystack::VariableHaystack,
 };
 use crate::{
@@ -164,7 +164,7 @@ fn resolve_param_vars(
             &asg.funcs.get(func_ref).unwrap().constraints,
         );
 
-        let mut ty = type_ctx.resolve(&param.ast_type)?;
+        let mut ty = type_ctx.resolve(&param.ast_type, ResolveTypeOptions::Unalias)?;
         ty.strip_constraints();
 
         let function = asg.funcs.get_mut(func_ref).unwrap();

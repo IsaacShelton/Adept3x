@@ -1,7 +1,11 @@
 use super::{
-    collect_constraints::collect_constraints, ctx::ResolveCtx, error::ResolveError,
-    func_haystack::FuncHaystack, impl_head::create_impl_heads, job::FuncJob,
-    type_ctx::ResolveTypeCtx,
+    collect_constraints::collect_constraints,
+    ctx::ResolveCtx,
+    error::ResolveError,
+    func_haystack::FuncHaystack,
+    impl_head::create_impl_heads,
+    job::FuncJob,
+    type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
 };
 use crate::{
     asg::{self, Asg, CurrentConstraints, FuncRef, GenericTraitRef, ImplParams, VariableStorage},
@@ -96,7 +100,7 @@ pub fn create_func_head<'a>(
 
     let is_generic = head.is_generic();
     let params = resolve_parameters(&type_ctx, &head.params)?;
-    let return_type = type_ctx.resolve(&head.return_type)?;
+    let return_type = type_ctx.resolve(&head.return_type, ResolveTypeOptions::Unalias)?;
 
     let constraints = is_generic
         .then(|| collect_constraints(&params, &return_type))
@@ -137,7 +141,7 @@ pub fn resolve_parameters(
     let mut required = Vec::with_capacity(parameters.required.len());
 
     for parameter in parameters.required.iter() {
-        let ty = type_ctx.resolve(&parameter.ast_type)?;
+        let ty = type_ctx.resolve(&parameter.ast_type, ResolveTypeOptions::Unalias)?;
 
         required.push(asg::Param {
             name: parameter.name.clone(),
@@ -158,7 +162,7 @@ pub fn create_func_impl_params(
     let mut params = IndexMap::default();
 
     for (i, given) in head.givens.iter().enumerate() {
-        let trait_ty = type_ctx.resolve(&given.ty)?;
+        let trait_ty = type_ctx.resolve(&given.ty, ResolveTypeOptions::Unalias)?;
 
         let asg::TypeKind::Trait(_, trait_ref, trait_args) = &trait_ty.kind else {
             return Err(ResolveError::other("Expected trait", trait_ty.source));

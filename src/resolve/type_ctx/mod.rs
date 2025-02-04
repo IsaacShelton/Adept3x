@@ -12,6 +12,7 @@ use crate::{
     name::ResolvedName,
     workspace::fs::FsNodeId,
 };
+pub use resolve_type::ResolveTypeOptions;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
@@ -76,13 +77,15 @@ pub fn resolve_constraint(
         match name.as_plain_str() {
             Some("PrimitiveAdd") if arguments.is_empty() => return Ok(Constraint::PrimitiveAdd),
             _ => {
-                let ty = type_ctx.resolve(constraint).map_err(|err| {
-                    if let ResolveErrorKind::UndeclaredType { name } = err.kind {
-                        ResolveErrorKind::UndeclaredTrait(name).at(err.source)
-                    } else {
-                        err
-                    }
-                })?;
+                let ty = type_ctx
+                    .resolve(constraint, ResolveTypeOptions::Unalias)
+                    .map_err(|err| {
+                        if let ResolveErrorKind::UndeclaredType { name } = err.kind {
+                            ResolveErrorKind::UndeclaredTrait(name).at(err.source)
+                        } else {
+                            err
+                        }
+                    })?;
 
                 let asg::TypeKind::Trait(_, trait_ref, parameters) = &ty.kind else {
                     return Err(ResolveErrorKind::TypeIsNotATrait {

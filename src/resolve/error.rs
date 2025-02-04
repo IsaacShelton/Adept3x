@@ -523,28 +523,19 @@ impl Display for ResolveErrorKind {
                 )?;
             }
             ResolveErrorKind::UnaliasError(details) => match details {
-                UnaliasError::MaxDepthExceeded => write!(
-                    f,
-                    "Maximum type alias depth exceeded, please ensure your type alias is not recursive"
-                )?,
+                UnaliasError::MaxDepthExceeded => write!(f, "Maximum type alias depth exceeded")?,
+                UnaliasError::SelfReferentialTypeAlias(type_alias_name) => {
+                    write!(f, "Type alias '{}' is self-referential", type_alias_name)?
+                }
             },
             ResolveErrorKind::CannotDeclareVariableOutsideFunction => {
-                write!(
-                    f,
-                    "Cannot declare variable outside of function"
-                )?;
-            },
+                write!(f, "Cannot declare variable outside of function")?;
+            }
             ResolveErrorKind::CannotReturnOutsideFunction => {
-                write!(
-                    f,
-                    "Cannot return outside of function"
-                )?;
+                write!(f, "Cannot return outside of function")?;
             }
             ResolveErrorKind::CannotAssignVariableOutsideFunction => {
-                write!(
-                    f,
-                    "Cannot assign variable outside of function"
-                )?;
+                write!(f, "Cannot assign variable outside of function")?;
             }
             ResolveErrorKind::PolymorphError(e) => {
                 e.fmt(f)?;
@@ -553,14 +544,16 @@ impl Display for ResolveErrorKind {
                 write!(f, "Undeclared trait '{}'", trait_name)?;
             }
             ResolveErrorKind::CannotUseOperator { operator, on_type } => {
-                write!(f, "Cannot use operator '{}' on type '{}'", operator, on_type)?;
+                write!(
+                    f,
+                    "Cannot use operator '{}' on type '{}'",
+                    operator, on_type
+                )?;
             }
             ResolveErrorKind::ConstraintsNotSatisfiedForType { name } => {
                 write!(f, "Constraints not satisfied for type '{}'", name)?;
             }
-            ResolveErrorKind::TypeIsNotATrait {
-                name
-            } => {
+            ResolveErrorKind::TypeIsNotATrait { name } => {
                 write!(f, "Type '{}' is not a trait", name)?;
             }
             ResolveErrorKind::DuplicateTypeName { name } => {

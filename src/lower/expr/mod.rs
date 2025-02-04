@@ -419,32 +419,41 @@ pub fn lower_expr(
             Ok(Value::Literal(Literal::Void))
         }
         ExprKind::EnumMemberLiteral(enum_member_literal) => {
-            let enum_definition = asg
-                .enums
-                .get(enum_member_literal.enum_ref)
-                .expect("referenced enum to exist for enum member literal");
+            let (value, ir_type, source) = match &enum_member_literal.enum_target {
+                asg::EnumTarget::Named(enum_ref) => {
+                    let enum_definition = asg
+                        .enums
+                        .get(*enum_ref)
+                        .expect("referenced enum to exist for enum member literal");
 
-            let member = enum_definition
-                .members
-                .get(&enum_member_literal.variant_name)
-                .ok_or_else(|| {
-                    LowerErrorKind::NoSuchEnumMember {
-                        enum_name: enum_member_literal.human_name.to_string(),
-                        variant_name: enum_member_literal.variant_name.clone(),
-                    }
-                    .at(enum_member_literal.source)
-                })?;
+                    let member = enum_definition
+                        .members
+                        .get(&enum_member_literal.variant_name)
+                        .ok_or_else(|| {
+                            LowerErrorKind::NoSuchEnumMember {
+                                enum_name: enum_member_literal.human_name.to_string(),
+                                variant_name: enum_member_literal.variant_name.clone(),
+                            }
+                            .at(enum_member_literal.source)
+                        })?;
 
-            let ir_type = lower_type(ir_module, &builder.unpoly(&enum_definition.ty)?, asg)?;
+                    let ir_type =
+                        lower_type(ir_module, &builder.unpoly(&enum_definition.ty)?, asg)?;
 
-            let value = &member.value;
+                    (&member.value, ir_type, enum_definition.source)
+                }
+                asg::EnumTarget::Anonymous(value, ty) => {
+                    let ir_type = lower_type(ir_module, &builder.unpoly(&ty)?, asg)?;
+                    (value, ir_type, enum_member_literal.source)
+                }
+            };
 
             let make_error = |_| {
                 LowerErrorKind::CannotFit {
                     value: value.to_string(),
                     expected_type: enum_member_literal.human_name.to_string(),
                 }
-                .at(enum_definition.source)
+                .at(source)
             };
 
             Ok(match ir_type {
@@ -476,7 +485,7 @@ pub fn lower_expr(
                     return Err(LowerErrorKind::EnumBackingTypeMustBeInteger {
                         enum_name: enum_member_literal.human_name.to_string(),
                     }
-                    .at(enum_definition.source))
+                    .at(source))
                 }
             })
         }

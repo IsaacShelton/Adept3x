@@ -4,16 +4,22 @@ use crate::{
     ast::{self, IntegerBits},
     ir::IntegerSign,
     resolve::error::{ResolveError, ResolveErrorKind},
-    source_files::Source,
 };
 use std::borrow::Borrow;
+
+#[derive(Copy, Clone, Debug)]
+pub enum ResolveTypeOptions {
+    Unalias,
+    KeepAliases,
+}
 
 impl<'a> ResolveTypeCtx<'a> {
     pub fn resolve_or_undeclared(
         &self,
         ast_type: &'a ast::Type,
+        options: ResolveTypeOptions,
     ) -> Result<asg::Type, ResolveError> {
-        match self.resolve(ast_type) {
+        match self.resolve(ast_type, options) {
             Ok(inner) => Ok(inner),
             Err(_) if ast_type.kind.allow_indirect_undefined() => {
                 Ok(asg::TypeKind::Void.at(ast_type.source))
@@ -22,13 +28,35 @@ impl<'a> ResolveTypeCtx<'a> {
         }
     }
 
-    pub fn resolve(&self, ast_type: &'a ast::Type) -> Result<asg::Type, ResolveError> {
+    pub fn resolve(
+        &self,
+        ast_type: &'a ast::Type,
+        options: ResolveTypeOptions,
+    ) -> Result<asg::Type, ResolveError> {
+        let ty = self.resolve_keep_outer_aliases(ast_type, options)?;
+
+        match options {
+            ResolveTypeOptions::Unalias => Ok(self
+                .asg
+                .unalias(&ty)
+                .map_err(ResolveErrorKind::from)
+                .map_err(|e| e.at(ast_type.source))?
+                .clone()),
+            ResolveTypeOptions::KeepAliases => Ok(ty),
+        }
+    }
+
+    pub fn resolve_keep_outer_aliases(
+        &self,
+        ast_type: &'a ast::Type,
+        options: ResolveTypeOptions,
+    ) -> Result<asg::Type, ResolveError> {
         match &ast_type.kind {
             ast::TypeKind::Boolean => Ok(asg::TypeKind::Boolean),
             ast::TypeKind::Integer(bits, sign) => Ok(asg::TypeKind::Integer(*bits, *sign)),
             ast::TypeKind::CInteger(integer, sign) => Ok(asg::TypeKind::CInteger(*integer, *sign)),
             ast::TypeKind::Ptr(inner) => {
-                let inner = self.resolve_or_undeclared(inner)?;
+                let inner = self.resolve_or_undeclared(inner, options)?;
                 Ok(asg::TypeKind::Ptr(Box::new(inner)))
             }
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
@@ -73,7 +101,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 let backing_type = enumeration
                     .backing_type
                     .as_ref()
-                    .map(|ty| self.resolve(ty.as_ref()))
+                    .map(|ty| self.resolve(ty.as_ref(), options))
                     .transpose()?
                     .unwrap_or_else(|| {
                         asg::TypeKind::Integer(IntegerBits::Bits32, IntegerSign::Signed)
@@ -89,7 +117,7 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::FixedArray(fixed_array) => {
                 if let ast::ExprKind::Integer(integer) = &fixed_array.count.kind {
                     if let Ok(size) = integer.value().try_into() {
-                        let inner = self.resolve(&fixed_array.ast_type)?;
+                        let inner = self.resolve(&fixed_array.ast_type, options)?;
 
                         Ok(asg::TypeKind::FixedArray(Box::new(asg::FixedArray {
                             size,
@@ -106,7 +134,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 let mut params = Vec::with_capacity(function_pointer.parameters.len());
 
                 for parameter in function_pointer.parameters.iter() {
-                    let ty = self.resolve(&parameter.ast_type)?;
+                    let ty = self.resolve(&parameter.ast_type, options)?;
 
                     params.push(asg::Param {
                         name: parameter.name.clone(),
@@ -114,7 +142,7 @@ impl<'a> ResolveTypeCtx<'a> {
                     });
                 }
 
-                let return_type = Box::new(self.resolve(&function_pointer.return_type)?);
+                let return_type = Box::new(self.resolve(&function_pointer.return_type, options)?);
 
                 Ok(asg::TypeKind::FuncPtr(asg::FuncPtr {
                     return_type,
@@ -130,17 +158,5 @@ impl<'a> ResolveTypeCtx<'a> {
             )),
         }
         .map(|kind| kind.at(ast_type.source))
-    }
-}
-
-fn resolve_enum_backing_type(
-    ctx: &ResolveTypeCtx,
-    backing_type: Option<impl Borrow<ast::Type>>,
-    source: Source,
-) -> Result<asg::Type, ResolveError> {
-    if let Some(backing_type) = backing_type.as_ref().map(Borrow::borrow) {
-        ctx.resolve(backing_type)
-    } else {
-        Ok(asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source))
     }
 }

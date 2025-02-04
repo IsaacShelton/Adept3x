@@ -20,6 +20,7 @@ use super::{
     destination::resolve_expr_to_destination,
     error::ResolveError,
     func_haystack::FuncHaystack,
+    type_ctx::ResolveTypeOptions,
     variable_haystack::VariableHaystack,
     Initialized, ResolveTypeCtx,
 };
@@ -376,7 +377,9 @@ pub fn resolve_expr(
             resolve_static_member_call(ctx, static_access_call)
         }
         ast::ExprKind::SizeOf(ast_type) => {
-            let ty = ctx.type_ctx().resolve(ast_type)?;
+            let ty = ctx
+                .type_ctx()
+                .resolve(ast_type, ResolveTypeOptions::Unalias)?;
 
             Ok(TypedExpr::new(
                 asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
@@ -405,11 +408,15 @@ pub fn resolve_expr(
                 result_type,
             } = &**info;
 
-            let ty = ctx.type_ctx().resolve(result_type)?;
+            let ty = ctx
+                .type_ctx()
+                .resolve(result_type, ResolveTypeOptions::Unalias)?;
             let mut resolved_args = Vec::with_capacity(args.len());
 
             for (expected_arg_type, arg) in args {
-                let preferred_type = ctx.type_ctx().resolve(expected_arg_type)?;
+                let preferred_type = ctx
+                    .type_ctx()
+                    .resolve(expected_arg_type, ResolveTypeOptions::Unalias)?;
 
                 resolved_args.push(
                     resolve_expr(

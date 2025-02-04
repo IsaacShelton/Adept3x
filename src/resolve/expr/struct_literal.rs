@@ -6,6 +6,7 @@ use crate::{
         conform::{conform_expr, ConformMode, Perform},
         core_struct_info::{get_core_struct_info, CoreStructInfo},
         error::{ResolveError, ResolveErrorKind},
+        type_ctx::ResolveTypeOptions,
         Initialized, PolyCatalog, PolymorphError,
     },
     source_files::Source,
@@ -58,7 +59,9 @@ pub fn resolve_struct_literal_expr(
     conform_behavior: ConformBehavior,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let struct_type = ctx.type_ctx().resolve(ast_type)?;
+    let struct_type = ctx
+        .type_ctx()
+        .resolve(ast_type, ResolveTypeOptions::Unalias)?;
 
     let CoreStructInfo {
         name: struct_name,

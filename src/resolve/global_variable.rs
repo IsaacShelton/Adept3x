@@ -1,4 +1,8 @@
-use super::{ctx::ResolveCtx, error::ResolveError, type_ctx::ResolveTypeCtx};
+use super::{
+    ctx::ResolveCtx,
+    error::ResolveError,
+    type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
+};
 use crate::{
     asg::{self, Asg, CurrentConstraints, GlobalVarDecl},
     ast::AstWorkspace,
@@ -24,7 +28,7 @@ pub fn resolve_global_variables(
                 &constraints,
             );
 
-            let ty = type_ctx.resolve(&global.ast_type)?;
+            let ty = type_ctx.resolve(&global.ast_type, ResolveTypeOptions::Unalias)?;
             let resolved_name = ResolvedName::new(module_file_id, &Name::plain(&global.name));
 
             let global_ref = asg.globals.insert(asg::GlobalVar {

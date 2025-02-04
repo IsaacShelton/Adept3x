@@ -9,7 +9,9 @@ use crate::{
     resolve::{
         conform::{conform_expr, to_default::conform_expr_to_default, ConformMode, Perform},
         error::{ResolveError, ResolveErrorKind},
-        resolve_type_args_to_poly_args, Initialized, PolyCatalog,
+        resolve_type_args_to_poly_args,
+        type_ctx::ResolveTypeOptions,
+        Initialized, PolyCatalog,
     },
     source_files::Source,
 };
@@ -132,7 +134,9 @@ pub fn call_callee(
         .map_err(ResolveError::from)?;
 
     if let Some(required_ty) = &call.expected_to_return {
-        let resolved_required_ty = ctx.type_ctx().resolve(required_ty)?;
+        let resolved_required_ty = ctx
+            .type_ctx()
+            .resolve(required_ty, ResolveTypeOptions::Unalias)?;
 
         if resolved_required_ty != return_type {
             return Err(ResolveErrorKind::FunctionMustReturnType {

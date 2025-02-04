@@ -34,7 +34,7 @@ pub use impl_params::*;
 pub use implementation::*;
 pub use overload::*;
 use slotmap::{new_key_type, SlotMap};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 pub use stmt::*;
 pub use structure::*;
 pub use trait_constraint::*;
@@ -83,11 +83,12 @@ impl<'a> Asg<'a> {
         }
     }
 
-    pub fn unalias(&'a self, mut ty: &'a Type) -> Result<&'a Type, UnaliasError> {
+    pub fn unalias(&'a self, whole_type: &'a Type) -> Result<&'a Type, UnaliasError> {
+        let mut running = whole_type;
         let mut depth = 0;
 
-        while let TypeKind::TypeAlias(_, type_alias_ref) = ty.kind {
-            ty = self
+        while let TypeKind::TypeAlias(_, type_alias_ref) = running.kind {
+            running = self
                 .type_aliases
                 .get(type_alias_ref)
                 .expect("valid type alias ref");
@@ -95,15 +96,41 @@ impl<'a> Asg<'a> {
             depth += 1;
 
             if depth > Self::MAX_UNALIAS_DEPTH {
-                return Err(UnaliasError::MaxDepthExceeded);
+                return Err(self.find_type_alias_self_reference(whole_type));
             }
         }
 
-        Ok(ty)
+        Ok(running)
+    }
+
+    fn find_type_alias_self_reference(&self, whole_type: &Type) -> UnaliasError {
+        let mut seen = HashSet::new();
+        let mut running = whole_type;
+        let mut depth = 0;
+
+        while let TypeKind::TypeAlias(human_name, type_alias_ref) = &running.kind {
+            running = self
+                .type_aliases
+                .get(*type_alias_ref)
+                .expect("valid type alias ref");
+
+            if !seen.insert(type_alias_ref) {
+                return UnaliasError::SelfReferentialTypeAlias(human_name.0.clone());
+            }
+
+            depth += 1;
+
+            if depth > Self::MAX_UNALIAS_DEPTH {
+                break;
+            }
+        }
+
+        return UnaliasError::MaxDepthExceeded;
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum UnaliasError {
     MaxDepthExceeded,
+    SelfReferentialTypeAlias(String),
 }

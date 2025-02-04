@@ -1,6 +1,6 @@
 use super::{call::call_callee, resolve_expr, ResolveExprCtx, ResolveExprMode};
 use crate::{
-    asg::{self, ImplRef, PolyCall, PolyCallee, TypeKind, TypedExpr},
+    asg::{self, HumanName, ImplRef, PolyCall, PolyCallee, TypeKind, TypedExpr},
     ast::{self, StaticMemberCall, StaticMemberValue, TypeArg},
     name::Name,
     resolve::{
@@ -11,7 +11,9 @@ use crate::{
         expr::PreferredType,
         func_haystack::{FindFunctionError, FuncHaystack},
         initialized::Initialized,
-        resolve_type_args_to_poly_args, PolyCatalog, PolyRecipe,
+        resolve_type_args_to_poly_args,
+        type_ctx::ResolveTypeOptions,
+        PolyCatalog, PolyRecipe,
     },
     source_files::Source,
 };
@@ -29,9 +31,24 @@ pub fn resolve_static_member_value(
         source,
     } = static_member_value;
 
-    let ty = ctx.type_ctx().resolve(&subject)?;
+    let ty = ctx
+        .type_ctx()
+        .resolve(&subject, ResolveTypeOptions::Unalias)?;
 
-    let TypeKind::Enum(human_name, enum_ref) = &ty.kind else {
+    let extracted = match &ty.kind {
+        TypeKind::AnonymousEnum(enumeration) => enumeration.members.get(value).map(|member| {
+            (
+                HumanName("(anonymous enum)".into()),
+                asg::EnumTarget::Anonymous(member.value.clone(), ty.clone()),
+            )
+        }),
+        TypeKind::Enum(human_name, enum_ref) => {
+            Some((human_name.clone(), asg::EnumTarget::Named(*enum_ref)))
+        }
+        _ => None,
+    };
+
+    let Some((human_name, enum_target)) = extracted else {
         return Err(ResolveErrorKind::StaticMemberOfTypeDoesNotExist {
             ty: subject.to_string(),
             member: value.to_string(),
@@ -40,11 +57,11 @@ pub fn resolve_static_member_value(
     };
 
     Ok(TypedExpr::new(
-        ty.clone(),
+        ty,
         asg::Expr::new(
             asg::ExprKind::EnumMemberLiteral(Box::new(asg::EnumMemberLiteral {
-                human_name: human_name.clone(),
-                enum_ref: *enum_ref,
+                human_name,
+                enum_target,
                 variant_name: value.to_string(),
                 source: *value_source,
             })),
@@ -153,7 +170,10 @@ pub fn resolve_impl_mention(
         match arg {
             ast::TypeArg::Type(ty) => {
                 catalog
-                    .put_type(name, &ctx.type_ctx().resolve(ty)?)
+                    .put_type(
+                        name,
+                        &ctx.type_ctx().resolve(ty, ResolveTypeOptions::Unalias)?,
+                    )
                     .expect("unique impl parameter names");
             }
             ast::TypeArg::Expr(expr) => {

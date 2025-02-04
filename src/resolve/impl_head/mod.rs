@@ -1,7 +1,7 @@
 mod for_alls;
 use super::{
     collect_constraints::collect_constraints_into, ctx::ResolveCtx, error::ResolveError,
-    func_head::create_func_head, job::FuncJob,
+    func_head::create_func_head, job::FuncJob, type_ctx::ResolveTypeOptions,
 };
 use crate::{
     asg::{
@@ -333,7 +333,7 @@ pub fn create_impl_head<'a>(
         ));
     }
 
-    let ty = type_ctx.resolve(&imp.target)?;
+    let ty = type_ctx.resolve(&imp.target, ResolveTypeOptions::Unalias)?;
     let concrete_trait = into_trait(&ty)?;
     let mut func_names = HashMap::new();
 

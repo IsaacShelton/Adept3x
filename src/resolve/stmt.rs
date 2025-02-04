@@ -5,6 +5,7 @@ use super::{
     expr::{
         resolve_basic_binary_operator, resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode,
     },
+    type_ctx::ResolveTypeOptions,
     Initialized,
 };
 use crate::{asg, ast};
@@ -91,7 +92,9 @@ pub fn resolve_stmt(
             source,
         )),
         ast::StmtKind::Declaration(declaration) => {
-            let ty = ctx.type_ctx().resolve(&declaration.ast_type)?;
+            let ty = ctx
+                .type_ctx()
+                .resolve(&declaration.ast_type, ResolveTypeOptions::Unalias)?;
 
             let value = declaration
                 .initial_value

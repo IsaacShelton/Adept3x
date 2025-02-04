@@ -6,7 +6,7 @@ use crate::{
         error::ResolveError,
         func_head::resolve_parameters,
         job::TypeJob,
-        type_ctx::{resolve_constraints, ResolveTypeCtx},
+        type_ctx::{resolve_constraints, ResolveTypeCtx, ResolveTypeOptions},
     },
     workspace::fs::FsNodeId,
 };
@@ -116,7 +116,7 @@ fn resolve_structure(
             &constraints,
         );
 
-        let ty = type_ctx.resolve_or_undeclared(&field.ast_type)?;
+        let ty = type_ctx.resolve_or_undeclared(&field.ast_type, ResolveTypeOptions::Unalias)?;
 
         let resolved_struct = asg.structs.get_mut(struct_ref).expect("valid struct");
 
@@ -156,7 +156,7 @@ fn resolve_enum(
         .map(Cow::Borrowed)
         .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
 
-    let ty = type_ctx.resolve_or_undeclared(&ast_type)?;
+    let ty = type_ctx.resolve_or_undeclared(&ast_type, ResolveTypeOptions::Unalias)?;
     asg.enums.get_mut(enum_ref).unwrap().ty = ty;
     Ok(())
 }
@@ -178,7 +178,7 @@ fn resolve_type_alias(
         &constraints,
     );
 
-    let ty = type_ctx.resolve_or_undeclared(&definition.value)?;
+    let ty = type_ctx.resolve_or_undeclared(&definition.value, ResolveTypeOptions::KeepAliases)?;
     *asg.type_aliases.get_mut(type_alias_ref).unwrap() = ty;
     Ok(())
 }
@@ -204,7 +204,7 @@ fn resolve_trait(
 
     for func in &definition.funcs {
         let params = resolve_parameters(&type_ctx, &func.params)?;
-        let return_type = type_ctx.resolve(&func.return_type)?;
+        let return_type = type_ctx.resolve(&func.return_type, ResolveTypeOptions::Unalias)?;
 
         if funcs
             .insert(

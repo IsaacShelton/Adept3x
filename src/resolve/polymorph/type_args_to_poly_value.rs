@@ -5,6 +5,7 @@ use crate::{
         error::ResolveError,
         expr::{resolve_expr, ResolveExprCtx, ResolveExprMode},
         initialized::Initialized,
+        type_ctx::ResolveTypeOptions,
     },
 };
 
@@ -15,7 +16,10 @@ pub fn resolve_type_args_to_poly_args(
     generics
         .iter()
         .map(|type_arg| match type_arg {
-            TypeArg::Type(ty) => ctx.type_ctx().resolve(ty).map(PolyValue::Type),
+            TypeArg::Type(ty) => ctx
+                .type_ctx()
+                .resolve(ty, ResolveTypeOptions::Unalias)
+                .map(PolyValue::Type),
             TypeArg::Expr(expr) => resolve_expr(
                 ctx,
                 expr,

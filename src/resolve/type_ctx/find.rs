@@ -1,4 +1,4 @@
-use super::{find_error::FindTypeError, ResolveTypeCtx};
+use super::{find_error::FindTypeError, ResolveTypeCtx, ResolveTypeOptions};
 use crate::{
     asg::{self, TypeParam, TypeParamError},
     ast::{self, TypeArg},
@@ -78,7 +78,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
                 match value {
                     TypeArg::Type(ty) => self
-                        .resolve(ty)
+                        .resolve(ty, ResolveTypeOptions::Unalias)
                         .map(Cow::Owned)
                         .map(TypeParam::Type)
                         .map_err(FindTypeError::ResolveError),
