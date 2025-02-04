@@ -69,7 +69,32 @@ impl<'a> PolyRecipeResolver<'a> {
                 }))
                 .at(ty.source)
             }
-            asg::TypeKind::FuncPtr(_) => todo!(),
+            asg::TypeKind::FuncPtr(func) => {
+                let required = func
+                    .params
+                    .required
+                    .iter()
+                    .map(|param| {
+                        self.resolve_type(&param.ty).and_then(|ty| {
+                            Ok(asg::Param {
+                                name: param.name.clone(),
+                                ty,
+                            })
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let return_type = self.resolve_type(&func.return_type)?;
+
+                asg::TypeKind::FuncPtr(asg::FuncPtr {
+                    params: asg::Params {
+                        required,
+                        is_cstyle_vararg: func.params.is_cstyle_vararg,
+                    },
+                    return_type: Box::new(return_type),
+                })
+                .at(ty.source)
+            }
             asg::TypeKind::Enum(_, _) => ty.clone(),
             asg::TypeKind::Structure(human_name, struct_ref, poly_args) => {
                 let args = poly_args

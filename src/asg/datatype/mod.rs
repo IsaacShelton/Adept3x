@@ -45,7 +45,12 @@ impl Type {
             TypeKind::AnonymousUnion() => todo!("strip_constraints for anonymous union"),
             TypeKind::AnonymousEnum(_) => (),
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
-            TypeKind::FuncPtr(_) => todo!("strip_constraints for function pointer"),
+            TypeKind::FuncPtr(func) => {
+                for param in func.params.required.iter_mut() {
+                    param.ty.strip_constraints();
+                }
+                func.return_type.strip_constraints();
+            }
             TypeKind::Enum(_, _) => (),
             TypeKind::Structure(_, _, parameters) => {
                 for parameter in parameters {
