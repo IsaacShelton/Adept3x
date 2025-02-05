@@ -84,6 +84,7 @@ pub fn make_anonymous_enum(
             Ok(TypeKind::AnonymousEnum(AnonymousEnum {
                 members,
                 backing_type,
+                allow_implicit_integer_conversions: true,
             }))
         }
         Enumeration::Named(named) => {

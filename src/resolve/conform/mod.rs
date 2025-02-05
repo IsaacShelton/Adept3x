@@ -1,3 +1,4 @@
+mod from_anonymous_enum;
 mod from_c_integer;
 mod from_float;
 mod from_float_literal;
@@ -8,9 +9,9 @@ mod mode;
 pub mod to_default;
 
 use self::{
-    from_c_integer::from_c_integer, from_float::from_float, from_float_literal::from_float_literal,
-    from_integer::from_integer, from_integer_literal::from_integer_literal,
-    from_pointer::from_pointer,
+    from_anonymous_enum::from_anonymous_enum, from_c_integer::from_c_integer,
+    from_float::from_float, from_float_literal::from_float_literal, from_integer::from_integer,
+    from_integer_literal::from_integer_literal, from_pointer::from_pointer,
 };
 use super::{
     error::{ResolveError, ResolveErrorKind},
@@ -113,6 +114,14 @@ pub fn conform_expr<O: Objective>(
             *from_size,
             *from_sign,
             to_type,
+            conform_source,
+        ),
+        TypeKind::AnonymousEnum(enumeration) => from_anonymous_enum::<O>(
+            &expr.expr,
+            from_type,
+            mode,
+            to_type,
+            enumeration.as_ref(),
             conform_source,
         ),
         _ => O::fail(),

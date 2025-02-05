@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 pub struct AnonymousEnum {
     pub backing_type: Type,
     pub members: IndexMap<String, EnumMember>,
+    pub allow_implicit_integer_conversions: bool,
     pub source: Source,
 }
 

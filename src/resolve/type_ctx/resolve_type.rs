@@ -111,6 +111,8 @@ impl<'a> ResolveTypeCtx<'a> {
                 Ok(asg::TypeKind::AnonymousEnum(Box::new(AnonymousEnum {
                     members: enumeration.members.clone(),
                     backing_type,
+                    allow_implicit_integer_conversions: enumeration
+                        .allow_implicit_integer_conversions,
                     source: ast_type.source,
                 })))
             }
