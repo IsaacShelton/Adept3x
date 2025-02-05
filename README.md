@@ -50,9 +50,9 @@ Adept 3.x will have:
 | 2024-11-1  | Milestone 0                          | ☑
 | 2024-12-1  | Built-in Traits                      | ☑
 | 2024-1-27  | User-Defined Traits                  | ☑
-| 2025-1-27  | User-Defined Trait Implementations | 30 days - in progress
-| 2025-1-30  | Standard Type Casting Trait        | 3 days
-| 2025-3-30  | C Expressions Support              | 60 days
+| 2025-1-27  | User-Defined Trait Implementations | ☑
+| 2025-1-30  | Standard Type Casting Trait        | ☑
+| 2025-3-30  | C Expressions Support              | 60 days - in progress
 | 2025-4-30  | C Better Type Declarations Support | 30 days
 | 2025-5-7   | Conditional Compilation            | 7 days 
 | 2025-5-14  | Mini Standard Library              | 7 days 
