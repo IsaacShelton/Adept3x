@@ -45,7 +45,12 @@ pub fn resolve_static_member_value(
         TypeKind::Enum(human_name, enum_ref) => {
             Some((human_name.clone(), asg::EnumTarget::Named(*enum_ref)))
         }
-        _ => None,
+        _ => {
+            return Err(ResolveError::other(
+                format!("Type '{}' is not an enum", subject),
+                *value_source,
+            ));
+        }
     };
 
     let Some((human_name, enum_target)) = extracted else {
