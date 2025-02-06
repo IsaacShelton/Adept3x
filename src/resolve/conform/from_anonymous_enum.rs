@@ -1,31 +1,36 @@
 use super::{ConformMode, Objective, ObjectiveResult};
 use crate::{
-    asg::{AnonymousEnum, Expr, Type, TypeKind},
+    asg::{self, AnonymousEnum, Cast, CastFrom, Expr, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 
 pub fn from_anonymous_enum<O: Objective>(
-    _expr: &Expr,
+    expr: &Expr,
     _from_type: &Type,
     _mode: ConformMode,
     to_type: &Type,
     enumeration: &AnonymousEnum,
-    _source: Source,
+    source: Source,
 ) -> ObjectiveResult<O> {
     match &to_type.kind {
-        TypeKind::Integer(_to_bits, _to_sign) => {
+        TypeKind::Integer(..) | TypeKind::CInteger(..) => {
             if !enumeration.allow_implicit_integer_conversions {
                 return O::fail();
             }
 
-            todo!("convert from anonymous enum to fixed integer")
-        }
-        TypeKind::CInteger(_to_c_integer, _to_sign) => {
-            if !enumeration.allow_implicit_integer_conversions {
-                return O::fail();
-            }
-
-            todo!("convert from anonymous enum to flexible integer")
+            O::success(|| {
+                TypedExpr::new(
+                    to_type.clone(),
+                    asg::ExprKind::IntegerCast(Box::new(CastFrom {
+                        cast: Cast {
+                            target_type: to_type.clone(),
+                            value: expr.clone(),
+                        },
+                        from_type: enumeration.backing_type.clone(),
+                    }))
+                    .at(source),
+                )
+            })
         }
         _ => O::fail(),
     }

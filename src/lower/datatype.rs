@@ -94,9 +94,11 @@ pub fn lower_type(
         asg::TypeKind::AnonymousUnion() => {
             todo!("lower anonymous union")
         }
-        asg::TypeKind::AnonymousEnum(_) => {
-            todo!("lower anonymous enum")
-        }
+        asg::TypeKind::AnonymousEnum(anonymous_enum) => lower_type(
+            ir_module,
+            &ConcreteType(Cow::Borrowed(&anonymous_enum.backing_type)),
+            asg,
+        ),
         asg::TypeKind::FixedArray(fixed_array) => {
             let size = fixed_array.size;
             let inner = lower_type(
