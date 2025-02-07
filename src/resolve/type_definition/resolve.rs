@@ -116,7 +116,8 @@ fn resolve_structure(
             &constraints,
         );
 
-        let ty = type_ctx.resolve_or_undeclared(&field.ast_type, ResolveTypeOptions::Unalias)?;
+        let ty =
+            type_ctx.resolve_or_undeclared(&field.ast_type, ResolveTypeOptions::KeepAliases)?;
 
         let resolved_struct = asg.structs.get_mut(struct_ref).expect("valid struct");
 
@@ -156,7 +157,7 @@ fn resolve_enum(
         .map(Cow::Borrowed)
         .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
 
-    let ty = type_ctx.resolve_or_undeclared(&ast_type, ResolveTypeOptions::Unalias)?;
+    let ty = type_ctx.resolve_or_undeclared(&ast_type, ResolveTypeOptions::KeepAliases)?;
     asg.enums.get_mut(enum_ref).unwrap().ty = ty;
     Ok(())
 }
@@ -204,7 +205,7 @@ fn resolve_trait(
 
     for func in &definition.funcs {
         let params = resolve_parameters(&type_ctx, &func.params)?;
-        let return_type = type_ctx.resolve(&func.return_type, ResolveTypeOptions::Unalias)?;
+        let return_type = type_ctx.resolve(&func.return_type, ResolveTypeOptions::KeepAliases)?;
 
         if funcs
             .insert(
