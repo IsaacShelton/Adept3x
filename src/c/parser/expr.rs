@@ -41,6 +41,7 @@ pub enum ExprKind {
     Identifier(String),
     EnumConstant(String, Integer),
     CompoundLiteral(Box<CompoundLiteral>),
+    AddressOf(Box<Expr>),
 }
 
 impl ExprKind {
@@ -353,8 +354,13 @@ impl<'a> Parser<'a> {
     pub fn parse_expr_primary_base(&mut self) -> Result<Expr, ParseError> {
         // Parse sequence of unary operators and casts
 
+        let source = self.input.peek().source;
+
         match &self.input.peek().kind {
-            CTokenKind::Punctuator(Punctuator::Ampersand) => todo!(),
+            CTokenKind::Punctuator(Punctuator::Ampersand) => {
+                let inner = self.parse_expr_primary()?;
+                return Ok(ExprKind::AddressOf(Box::new(inner)).at(source));
+            }
             CTokenKind::Punctuator(Punctuator::Multiply) => todo!(),
             CTokenKind::Punctuator(Punctuator::Add) => todo!(),
             CTokenKind::Punctuator(Punctuator::Subtract) => todo!(),

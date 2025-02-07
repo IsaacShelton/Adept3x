@@ -44,7 +44,7 @@ impl<'a> PolyRecipeResolver<'a> {
 
     pub fn resolve_type(&self, ty: &asg::Type) -> Result<asg::Type, PolymorphError> {
         Ok(match &ty.kind {
-            asg::TypeKind::Unresolved => panic!(),
+            asg::TypeKind::Unresolved => panic!("unresolved type"),
             asg::TypeKind::Boolean
             | asg::TypeKind::Integer(_, _)
             | asg::TypeKind::CInteger(_, _)

@@ -8,7 +8,7 @@ use self::{
     string::translate_expr_string,
 };
 use crate::{
-    ast::{self, AstFile},
+    ast::{self, AstFile, UnaryOperation, UnaryOperator},
     c::parser::{
         error::ParseErrorKind,
         expr::{Expr, ExprKind},
@@ -52,5 +52,10 @@ pub fn translate_expr(
             expr.source,
             diagnostics,
         )?,
+        ExprKind::AddressOf(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
+            operator: UnaryOperator::AddressOf,
+            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+        }))
+        .at(expr.source),
     })
 }
