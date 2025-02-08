@@ -8,7 +8,7 @@ use self::{
     string::translate_expr_string,
 };
 use crate::{
-    ast::{self, AstFile, UnaryOperation, UnaryOperator},
+    ast::{self, AstFile, UnaryMathOperator, UnaryOperation, UnaryOperator},
     c::parser::{
         error::ParseErrorKind,
         expr::{Expr, ExprKind},
@@ -54,6 +54,26 @@ pub fn translate_expr(
         )?,
         ExprKind::AddressOf(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
             operator: UnaryOperator::AddressOf,
+            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+        }))
+        .at(expr.source),
+        ExprKind::Dereference(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
+            operator: UnaryOperator::Dereference,
+            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+        }))
+        .at(expr.source),
+        ExprKind::Negate(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
+            operator: UnaryOperator::Math(UnaryMathOperator::Negate),
+            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+        }))
+        .at(expr.source),
+        ExprKind::BitComplement(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
+            operator: UnaryOperator::Math(UnaryMathOperator::BitComplement),
+            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+        }))
+        .at(expr.source),
+        ExprKind::Not(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
+            operator: UnaryOperator::Math(UnaryMathOperator::Not),
             inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
         }))
         .at(expr.source),

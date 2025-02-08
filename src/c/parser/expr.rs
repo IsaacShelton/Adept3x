@@ -42,6 +42,10 @@ pub enum ExprKind {
     EnumConstant(String, Integer),
     CompoundLiteral(Box<CompoundLiteral>),
     AddressOf(Box<Expr>),
+    Dereference(Box<Expr>),
+    Negate(Box<Expr>),
+    BitComplement(Box<Expr>),
+    Not(Box<Expr>),
 }
 
 impl ExprKind {
@@ -361,11 +365,23 @@ impl<'a> Parser<'a> {
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::AddressOf(Box::new(inner)).at(source));
             }
-            CTokenKind::Punctuator(Punctuator::Multiply) => todo!(),
+            CTokenKind::Punctuator(Punctuator::Multiply) => {
+                let inner = self.parse_expr_primary()?;
+                return Ok(ExprKind::Dereference(Box::new(inner)).at(source));
+            }
             CTokenKind::Punctuator(Punctuator::Add) => todo!(),
-            CTokenKind::Punctuator(Punctuator::Subtract) => todo!(),
-            CTokenKind::Punctuator(Punctuator::BitComplement) => todo!(),
-            CTokenKind::Punctuator(Punctuator::Not) => todo!(),
+            CTokenKind::Punctuator(Punctuator::Subtract) => {
+                let inner = self.parse_expr_primary()?;
+                return Ok(ExprKind::Negate(Box::new(inner)).at(source));
+            }
+            CTokenKind::Punctuator(Punctuator::BitComplement) => {
+                let inner = self.parse_expr_primary()?;
+                return Ok(ExprKind::BitComplement(Box::new(inner)).at(source));
+            }
+            CTokenKind::Punctuator(Punctuator::Not) => {
+                let inner = self.parse_expr_primary()?;
+                return Ok(ExprKind::Not(Box::new(inner)).at(source));
+            }
             CTokenKind::Punctuator(Punctuator::Increment) => todo!(),
             CTokenKind::Punctuator(Punctuator::Decrement) => todo!(),
             CTokenKind::SizeofKeyword => todo!(),
