@@ -8,10 +8,10 @@ use self::{
     string::translate_expr_string,
 };
 use crate::{
-    ast::{self, AstFile, UnaryMathOperator, UnaryOperation, UnaryOperator},
+    ast::{self, AstFile},
     c::parser::{
         error::ParseErrorKind,
-        expr::{Expr, ExprKind},
+        expr::{BinaryOperator, Expr, ExprKind},
         CTypedef, ParseError,
     },
     diagnostics::Diagnostics,
@@ -34,7 +34,62 @@ pub fn translate_expr(
         ExprKind::Nullptr => todo!(),
         ExprKind::Character(_, _) => todo!(),
         ExprKind::Compound(_) => todo!(),
-        ExprKind::BinaryOperation(_) => todo!(),
+        ExprKind::BinaryOperation(operation) => {
+            let left = translate_expr(ast_file, typedefs, &operation.left, diagnostics)?;
+            let right = translate_expr(ast_file, typedefs, &operation.right, diagnostics)?;
+
+            let op: ast::BinaryOperator = match operation.operator {
+                BinaryOperator::LogicalOr => todo!(),
+                BinaryOperator::LogicalAnd => todo!(),
+                BinaryOperator::InclusiveOr => todo!(),
+                BinaryOperator::ExclusiveOr => todo!(),
+                BinaryOperator::BitwiseAnd => todo!(),
+                BinaryOperator::Equals => todo!(),
+                BinaryOperator::NotEquals => todo!(),
+                BinaryOperator::LessThan => todo!(),
+                BinaryOperator::GreaterThan => todo!(),
+                BinaryOperator::LessThanEq => todo!(),
+                BinaryOperator::GreaterThanEq => todo!(),
+                BinaryOperator::LeftShift => todo!(),
+                BinaryOperator::RightShift => todo!(),
+                BinaryOperator::Add => ast::BasicBinaryOperator::Add.into(),
+                BinaryOperator::Subtract => ast::BasicBinaryOperator::Subtract.into(),
+                BinaryOperator::Multiply => ast::BasicBinaryOperator::Multiply.into(),
+                BinaryOperator::Divide => ast::BasicBinaryOperator::Divide.into(),
+                BinaryOperator::Modulus => ast::BasicBinaryOperator::Modulus.into(),
+                BinaryOperator::Assign => todo!(),
+                BinaryOperator::AddAssign => todo!(),
+                BinaryOperator::SubtractAssign => todo!(),
+                BinaryOperator::MultiplyAssign => todo!(),
+                BinaryOperator::DivideAssign => todo!(),
+                BinaryOperator::ModulusAssign => todo!(),
+                BinaryOperator::LeftShiftAssign => todo!(),
+                BinaryOperator::RightShiftAssign => todo!(),
+                BinaryOperator::BitAndAssign => todo!(),
+                BinaryOperator::BitXorAssign => todo!(),
+                BinaryOperator::BitOrAssign => todo!(),
+            };
+
+            match op {
+                ast::BinaryOperator::Basic(operator) => {
+                    ast::ExprKind::BasicBinaryOperation(Box::new(ast::BasicBinaryOperation {
+                        operator,
+                        left,
+                        right,
+                    }))
+                }
+                ast::BinaryOperator::ShortCircuiting(operator) => {
+                    ast::ExprKind::ShortCircuitingBinaryOperation(Box::new(
+                        ast::ShortCircuitingBinaryOperation {
+                            operator,
+                            left,
+                            right,
+                        },
+                    ))
+                }
+            }
+            .at(expr.source)
+        }
         ExprKind::Ternary(_) => todo!(),
         ExprKind::Cast(_) => todo!(),
         ExprKind::Subscript(_) => todo!(),
@@ -52,28 +107,34 @@ pub fn translate_expr(
             expr.source,
             diagnostics,
         )?,
-        ExprKind::AddressOf(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
-            operator: UnaryOperator::AddressOf,
+        ExprKind::AddressOf(inner) => {
+            ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
+                operator: ast::UnaryOperator::AddressOf,
+                inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+            }))
+            .at(expr.source)
+        }
+        ExprKind::Dereference(inner) => {
+            ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
+                operator: ast::UnaryOperator::Dereference,
+                inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+            }))
+            .at(expr.source)
+        }
+        ExprKind::Negate(inner) => ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
+            operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::Negate),
             inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
         }))
         .at(expr.source),
-        ExprKind::Dereference(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
-            operator: UnaryOperator::Dereference,
-            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
-        }))
-        .at(expr.source),
-        ExprKind::Negate(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
-            operator: UnaryOperator::Math(UnaryMathOperator::Negate),
-            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
-        }))
-        .at(expr.source),
-        ExprKind::BitComplement(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
-            operator: UnaryOperator::Math(UnaryMathOperator::BitComplement),
-            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
-        }))
-        .at(expr.source),
-        ExprKind::Not(inner) => ast::ExprKind::UnaryOperation(Box::new(UnaryOperation {
-            operator: UnaryOperator::Math(UnaryMathOperator::Not),
+        ExprKind::BitComplement(inner) => {
+            ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
+                operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::BitComplement),
+                inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+            }))
+            .at(expr.source)
+        }
+        ExprKind::Not(inner) => ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
+            operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::Not),
             inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
         }))
         .at(expr.source),
