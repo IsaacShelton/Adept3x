@@ -4,7 +4,7 @@ use crate::{
         Cast, CastFrom, Expr, ExprKind, IntegerSign, Type, TypeKind, TypedExpr, UnaryMathOperation,
         UnaryMathOperator,
     },
-    ast::{CInteger, IntegerBits, OptionIntegerSignExt},
+    ast::{CInteger, ConformBehavior, IntegerBits, OptionIntegerSignExt},
     logic::implies,
     source_files::Source,
 };
@@ -13,13 +13,14 @@ pub fn from_c_integer<O: Objective>(
     expr: &Expr,
     from_type: &Type,
     mode: ConformMode,
+    behavior: ConformBehavior,
     from_c_integer: CInteger,
     from_sign: Option<IntegerSign>,
     to_type: &Type,
     source: Source,
 ) -> ObjectiveResult<O> {
     match &to_type.kind {
-        TypeKind::Boolean => from_c_integer_to_bool::<O>(expr, from_type, mode, source),
+        TypeKind::Boolean => from_c_integer_to_bool::<O>(expr, from_type, mode, behavior, source),
         TypeKind::Integer(to_bits, to_sign) => from_c_integer_to_integer::<O>(
             expr,
             mode,
@@ -46,9 +47,10 @@ fn from_c_integer_to_bool<O: Objective>(
     expr: &Expr,
     from_type: &Type,
     mode: ConformMode,
+    behavior: ConformBehavior,
     source: Source,
 ) -> ObjectiveResult<O> {
-    if !mode.allow_lossy_integer() {
+    if !behavior.auto_c_integer_to_bool_conversion() && !mode.allow_lossy_integer() {
         return O::fail();
     }
 

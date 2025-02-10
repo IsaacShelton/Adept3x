@@ -1,7 +1,7 @@
 use super::{is_right_associative, is_terminating_token, Parser};
 use crate::{
     ast::{
-        BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind,
+        BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind, Language,
         ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator,
     },
     inflow::Inflow,
@@ -79,6 +79,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     operator: short_circuiting_operator,
                     left: lhs,
                     right: rhs,
+                    language: Language::Adept,
                 }))
             }
         }

@@ -38,20 +38,20 @@ pub fn translate_expr(
             let left = translate_expr(ast_file, typedefs, &operation.left, diagnostics)?;
             let right = translate_expr(ast_file, typedefs, &operation.right, diagnostics)?;
 
-            let op: ast::BinaryOperator = match operation.operator {
-                BinaryOperator::LogicalOr => todo!(),
-                BinaryOperator::LogicalAnd => todo!(),
-                BinaryOperator::InclusiveOr => todo!(),
-                BinaryOperator::ExclusiveOr => todo!(),
-                BinaryOperator::BitwiseAnd => todo!(),
-                BinaryOperator::Equals => todo!(),
-                BinaryOperator::NotEquals => todo!(),
-                BinaryOperator::LessThan => todo!(),
-                BinaryOperator::GreaterThan => todo!(),
-                BinaryOperator::LessThanEq => todo!(),
-                BinaryOperator::GreaterThanEq => todo!(),
-                BinaryOperator::LeftShift => todo!(),
-                BinaryOperator::RightShift => todo!(),
+            let operator: ast::BinaryOperator = match operation.operator {
+                BinaryOperator::LogicalOr => ast::ShortCircuitingBinaryOperator::Or.into(),
+                BinaryOperator::LogicalAnd => ast::ShortCircuitingBinaryOperator::And.into(),
+                BinaryOperator::InclusiveOr => ast::BasicBinaryOperator::BitwiseOr.into(),
+                BinaryOperator::ExclusiveOr => ast::BasicBinaryOperator::BitwiseXor.into(),
+                BinaryOperator::BitwiseAnd => ast::BasicBinaryOperator::BitwiseAnd.into(),
+                BinaryOperator::Equals => ast::BasicBinaryOperator::Equals.into(),
+                BinaryOperator::NotEquals => ast::BasicBinaryOperator::NotEquals.into(),
+                BinaryOperator::LessThan => ast::BasicBinaryOperator::LessThan.into(),
+                BinaryOperator::GreaterThan => ast::BasicBinaryOperator::GreaterThan.into(),
+                BinaryOperator::LessThanEq => ast::BasicBinaryOperator::LessThanEq.into(),
+                BinaryOperator::GreaterThanEq => ast::BasicBinaryOperator::GreaterThanEq.into(),
+                BinaryOperator::LeftShift => ast::BasicBinaryOperator::LeftShift.into(),
+                BinaryOperator::RightShift => ast::BasicBinaryOperator::RightShift.into(),
                 BinaryOperator::Add => ast::BasicBinaryOperator::Add.into(),
                 BinaryOperator::Subtract => ast::BasicBinaryOperator::Subtract.into(),
                 BinaryOperator::Multiply => ast::BasicBinaryOperator::Multiply.into(),
@@ -70,7 +70,7 @@ pub fn translate_expr(
                 BinaryOperator::BitOrAssign => todo!(),
             };
 
-            match op {
+            match operator {
                 ast::BinaryOperator::Basic(operator) => {
                     ast::ExprKind::BasicBinaryOperation(Box::new(ast::BasicBinaryOperation {
                         operator,
@@ -84,6 +84,7 @@ pub fn translate_expr(
                             operator,
                             left,
                             right,
+                            language: ast::Language::C,
                         },
                     ))
                 }

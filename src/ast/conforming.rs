@@ -1,6 +1,6 @@
 use super::CIntegerAssumptions;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Language {
     Adept,
     C,
@@ -17,6 +17,13 @@ impl ConformBehavior {
         match self {
             ConformBehavior::Adept(assumptions) => *assumptions,
             ConformBehavior::C => Default::default(),
+        }
+    }
+
+    pub fn auto_c_integer_to_bool_conversion(&self) -> bool {
+        match self {
+            ConformBehavior::Adept(_) => false,
+            ConformBehavior::C => true,
         }
     }
 }

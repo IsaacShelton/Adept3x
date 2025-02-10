@@ -111,6 +111,7 @@ pub fn conform_expr<O: Objective>(
             &expr.expr,
             from_type,
             mode,
+            behavior,
             *from_size,
             *from_sign,
             to_type,

@@ -31,7 +31,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         &left,
         &local_bool_type,
         ConformMode::Normal,
-        ctx.adept_conform_behavior(),
+        ctx.conform_behavior(binary_operation.language),
         source,
     )
     .map_err(|_| {
@@ -59,7 +59,7 @@ pub fn resolve_short_circuiting_binary_operation_expr(
         &right,
         &local_bool_type,
         ConformMode::Normal,
-        ctx.adept_conform_behavior(),
+        ctx.conform_behavior(binary_operation.language),
         source,
     )
     .map_err(|_| {
