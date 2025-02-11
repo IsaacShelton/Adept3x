@@ -19,13 +19,20 @@ pub fn resolve_member_expr(
     min_privacy: Privacy,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    let resolved_subject = resolve_expr(
+    let mut resolved_subject = resolve_expr(
         ctx,
         subject,
         None,
         Initialized::Require,
         ResolveExprMode::RequireValue,
     )?;
+
+    while let asg::TypeKind::Ptr(inner) = &resolved_subject.ty.kind {
+        resolved_subject = TypedExpr::new(
+            inner.as_ref().clone(),
+            asg::ExprKind::Dereference(Box::new(resolved_subject)).at(source),
+        );
+    }
 
     let CoreStructInfo {
         struct_ref,
