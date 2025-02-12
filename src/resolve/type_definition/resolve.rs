@@ -119,6 +119,16 @@ fn resolve_structure(
         let ty =
             type_ctx.resolve_or_undeclared(&field.ast_type, ResolveTypeOptions::KeepAliases)?;
 
+        // TODO: CLEANUP: Cleanup this code
+        let mut ok = Ok(());
+        ty.kind.for_each_polymorph(&mut |name| {
+            if structure.params.params.keys().filter(|n| *n == name).next().is_none() {
+                ok = Err(ResolveError::other(format!("Cannot use polymorph '${}' inside type that is not declared by enclosing structure", name), ty.source));
+            }
+        });
+
+        ok?;
+
         let resolved_struct = asg.structs.get_mut(struct_ref).expect("valid struct");
 
         resolved_struct.fields.insert(

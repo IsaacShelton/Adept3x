@@ -117,6 +117,44 @@ impl TypeKind {
         }
     }
 
+    pub fn for_each_polymorph(&self, f: &mut impl FnMut(&str) -> ()) {
+        match self {
+            TypeKind::Unresolved => panic!("unresolved type"),
+            TypeKind::Boolean
+            | TypeKind::Integer(_, _)
+            | TypeKind::CInteger(_, _)
+            | TypeKind::IntegerLiteral(_)
+            | TypeKind::FloatLiteral(_)
+            | TypeKind::Floating(_) => (),
+            TypeKind::Ptr(inner) => inner.kind.for_each_polymorph(f),
+            TypeKind::Void
+            | TypeKind::Never
+            | TypeKind::AnonymousStruct()
+            | TypeKind::AnonymousUnion()
+            | TypeKind::AnonymousEnum(_) => (),
+            TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.for_each_polymorph(f),
+            TypeKind::FuncPtr(func) => {
+                for param in func.params.required.iter() {
+                    param.ty.kind.for_each_polymorph(f);
+                }
+                func.return_type.kind.for_each_polymorph(f);
+            }
+            TypeKind::Enum(_, _) => (),
+            TypeKind::Structure(_, _, params) => {
+                for param in params.iter() {
+                    param.kind.for_each_polymorph(f);
+                }
+            }
+            TypeKind::TypeAlias(_, _) => (),
+            TypeKind::Polymorph(name, _) => f(name),
+            TypeKind::Trait(_, _, params) => {
+                for param in params.iter() {
+                    param.kind.for_each_polymorph(f);
+                }
+            }
+        }
+    }
+
     pub fn map_type_params<E>(
         &self,
         mut mapper: impl FnMut(TypeParam) -> Result<TypeParam, E>,
