@@ -1,0 +1,6 @@
+
+pragma => adept("3.0")
+
+struct Vector (items ptr<$T>, length ulonglong, capacity ulonglong)
+
+func main {}
