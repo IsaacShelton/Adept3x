@@ -44,6 +44,8 @@ pub enum ExprKind {
     Zeroed(Box<Type>),
     SizeOf(Box<Type>),
     InterpreterSyscall(InterpreterSyscallKind, Vec<Expr>),
+    Break,
+    Continue,
 }
 
 // Make sure ExprKind doesn't accidentally become huge

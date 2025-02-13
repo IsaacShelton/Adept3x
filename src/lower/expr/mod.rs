@@ -14,7 +14,7 @@ use crate::{
         NumericMode, SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
     },
     ast::{FloatSize, IntegerBits, IntegerRigidity},
-    ir::{self, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
+    ir::{self, Break, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     lower::structure::mono,
     resolve::PolyCatalog,
 };
@@ -508,6 +508,20 @@ pub fn lower_expr(
             }
 
             Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
+        }
+        ExprKind::Break => {
+            builder.push(ir::Instr::Break(Break {
+                basicblock_id: todo!("break"),
+            }));
+
+            Ok(ir::Value::Literal(Literal::Void))
+        }
+        ExprKind::Continue => {
+            builder.push(ir::Instr::Break(Break {
+                basicblock_id: todo!("continue"),
+            }));
+
+            Ok(ir::Value::Literal(Literal::Void))
         }
     }
 }

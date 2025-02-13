@@ -438,6 +438,14 @@ pub fn resolve_expr(
                 ),
             ))
         }
+        ast::ExprKind::Break => Ok(TypedExpr::new(
+            asg::TypeKind::Never.at(source),
+            asg::ExprKind::Break.at(source),
+        )),
+        ast::ExprKind::Continue => Ok(TypedExpr::new(
+            asg::TypeKind::Never.at(source),
+            asg::ExprKind::Continue.at(source),
+        )),
     }?;
 
     match initialized {

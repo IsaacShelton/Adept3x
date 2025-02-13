@@ -36,6 +36,8 @@ pub enum ExprKind {
     SizeOf(Box<Type>),
     SizeOfValue(Box<Expr>),
     InterpreterSyscall(Box<InterpreterSyscall>),
+    Break,
+    Continue,
 }
 
 impl ExprKind {

@@ -87,6 +87,8 @@ pub enum TokenKind {
     ForKeyword,
     IsKeyword,
     NullKeyword,
+    BreakKeyword,
+    ContinueKeyword,
     Member,
     Add,
     Subtract,
@@ -183,6 +185,8 @@ impl Display for TokenKind {
             TokenKind::ForKeyword => f.write_str("'for' keyword"),
             TokenKind::IsKeyword => f.write_str("'is' keyword"),
             TokenKind::NullKeyword => f.write_str("'null' keyword"),
+            TokenKind::BreakKeyword => f.write_str("'break' keyword"),
+            TokenKind::ContinueKeyword => f.write_str("'continue' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -317,6 +321,8 @@ impl TokenKind {
             | TokenKind::ForKeyword
             | TokenKind::IsKeyword
             | TokenKind::NullKeyword
+            | TokenKind::BreakKeyword
+            | TokenKind::ContinueKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon
