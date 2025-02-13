@@ -296,6 +296,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     source,
                 ))
             }
+            TokenKind::BreakKeyword => {
+                self.input.advance().kind.unwrap_break_keyword();
+                Ok(ExprKind::Break.at(source))
+            }
+            TokenKind::ContinueKeyword => {
+                self.input.advance().kind.unwrap_continue_keyword();
+                Ok(ExprKind::Continue.at(source))
+            }
             unexpected => Err(ParseError {
                 kind: match unexpected {
                     TokenKind::Error(message) => ParseErrorKind::Lexical {

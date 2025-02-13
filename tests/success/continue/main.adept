@@ -1,0 +1,21 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr#char, ...) int
+
+func main {
+    i := int(1)
+
+    while i <= 10 {
+        printf(c"%d", i)
+        i += 1
+        
+        if i > 6 {
+            printf(c"\n")
+            continue
+        }
+        
+        printf(c"!\n")
+    }
+}

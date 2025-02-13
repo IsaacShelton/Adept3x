@@ -86,3 +86,25 @@ pub fn lower_stmts(
 
     Ok(result)
 }
+
+pub fn lower_stmts_with_break_and_continue(
+    builder: &mut Builder,
+    ir_module: &ir::Module,
+    stmts: &[asg::Stmt],
+    func: &asg::Func,
+    asg: &Asg,
+    break_basicblock_id: Option<usize>,
+    continue_basicblock_id: Option<usize>,
+) -> Result<Value, LowerError> {
+    let prev_break_basicblock_id = builder.break_basicblock_id;
+    let prev_continue_basicblock_id = builder.continue_basicblock_id;
+
+    builder.break_basicblock_id = break_basicblock_id.or(builder.break_basicblock_id);
+    builder.continue_basicblock_id = continue_basicblock_id.or(builder.continue_basicblock_id);
+
+    let result = lower_stmts(builder, ir_module, stmts, func, asg);
+
+    builder.break_basicblock_id = prev_break_basicblock_id;
+    builder.continue_basicblock_id = prev_continue_basicblock_id;
+    result
+}

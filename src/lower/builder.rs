@@ -10,6 +10,8 @@ pub struct Builder<'a> {
     basicblocks: BasicBlocks,
     current_basicblock_id: usize,
     poly_recipe: &'a PolyRecipe,
+    pub break_basicblock_id: Option<usize>,
+    pub continue_basicblock_id: Option<usize>,
 }
 
 impl<'a> Builder<'a> {
@@ -21,6 +23,8 @@ impl<'a> Builder<'a> {
             basicblocks,
             current_basicblock_id: 0,
             poly_recipe,
+            break_basicblock_id: None,
+            continue_basicblock_id: None,
         }
     }
 

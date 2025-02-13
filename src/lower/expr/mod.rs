@@ -6,7 +6,7 @@ use super::{
     cast::{integer_cast, integer_extend, integer_truncate},
     datatype::lower_type,
     error::{LowerError, LowerErrorKind},
-    stmts::lower_stmts,
+    stmts::{lower_stmts, lower_stmts_with_break_and_continue},
 };
 use crate::{
     asg::{
@@ -412,7 +412,16 @@ pub fn lower_expr(
             ));
 
             builder.use_block(true_basicblock_id);
-            lower_stmts(builder, ir_module, &while_loop.block.stmts, function, asg)?;
+            lower_stmts_with_break_and_continue(
+                builder,
+                ir_module,
+                &while_loop.block.stmts,
+                function,
+                asg,
+                Some(false_basicblock_id),
+                Some(evaluate_basicblock_id),
+            )?;
+
             builder.continues_to(evaluate_basicblock_id);
 
             builder.use_block(false_basicblock_id);
@@ -510,15 +519,29 @@ pub fn lower_expr(
             Ok(builder.push(ir::Instr::InterpreterSyscall(*syscall, values)))
         }
         ExprKind::Break => {
+            let Some(target_basicblock_id) = builder.break_basicblock_id else {
+                return Err(LowerErrorKind::Other {
+                    message: "Nowhere to break to".into(),
+                }
+                .at(expr.source));
+            };
+
             builder.push(ir::Instr::Break(Break {
-                basicblock_id: todo!("break"),
+                basicblock_id: target_basicblock_id,
             }));
 
             Ok(ir::Value::Literal(Literal::Void))
         }
         ExprKind::Continue => {
+            let Some(target_basicblock_id) = builder.continue_basicblock_id else {
+                return Err(LowerErrorKind::Other {
+                    message: "Nowhere to continue to".into(),
+                }
+                .at(expr.source));
+            };
+
             builder.push(ir::Instr::Break(Break {
-                basicblock_id: todo!("continue"),
+                basicblock_id: target_basicblock_id,
             }));
 
             Ok(ir::Value::Literal(Literal::Void))

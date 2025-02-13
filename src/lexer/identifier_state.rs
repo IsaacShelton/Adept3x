@@ -48,6 +48,8 @@ impl IdentifierState {
             "for" => TokenKind::ForKeyword,
             "is" => TokenKind::IsKeyword,
             "null" => TokenKind::NullKeyword,
+            "break" => TokenKind::BreakKeyword,
+            "continue" => TokenKind::ContinueKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)
