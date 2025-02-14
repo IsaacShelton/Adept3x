@@ -190,13 +190,18 @@ fn prepare_type_alias(
     module_fs_node_id: FsNodeId,
     definition: &ast::TypeAlias,
 ) -> Result<TypeAliasRef, ResolveError> {
-    let type_alias_ref = asg
-        .type_aliases
-        .insert(asg::TypeKind::Unresolved.at(definition.value.source));
+    let type_alias_ref = asg.type_aliases.insert(asg::TypeAlias {
+        human_name: HumanName(definition.name.clone()),
+        params: definition.params.clone(),
+        becomes: asg::TypeKind::Unresolved.at(definition.value.source),
+        source: definition.source,
+    });
 
-    if let Some(source) = definition.value.contains_polymorph() {
-        return Err(ResolveErrorKind::TypeAliasesCannotContainPolymorphs.at(source));
-    }
+    let params = definition
+        .params
+        .iter()
+        .map(|name| asg::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
+        .collect_vec();
 
     declare_type(
         ctx,
@@ -204,7 +209,11 @@ fn prepare_type_alias(
         &definition.name,
         definition.source,
         definition.privacy,
-        asg::TypeKind::TypeAlias(HumanName(definition.name.to_string()), type_alias_ref),
+        asg::TypeKind::TypeAlias(
+            HumanName(definition.name.to_string()),
+            type_alias_ref,
+            params,
+        ),
     )?;
 
     Ok(type_alias_ref)

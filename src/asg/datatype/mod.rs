@@ -52,12 +52,11 @@ impl Type {
                 func.return_type.strip_constraints();
             }
             TypeKind::Enum(_, _) => (),
-            TypeKind::Structure(_, _, parameters) => {
-                for parameter in parameters {
+            TypeKind::Structure(_, _, params) | TypeKind::TypeAlias(_, _, params) => {
+                for parameter in params {
                     parameter.strip_constraints();
                 }
             }
-            TypeKind::TypeAlias(_, _) => (),
             TypeKind::Polymorph(_, constraints) => {
                 constraints.drain(..);
             }

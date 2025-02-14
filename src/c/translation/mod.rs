@@ -11,6 +11,7 @@ use crate::{
     c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError},
     diagnostics::Diagnostics,
 };
+use indexmap::IndexSet;
 use std::collections::HashMap;
 
 pub fn declare_named_declaration(
@@ -33,6 +34,7 @@ pub fn declare_named_declaration(
     if is_typedef {
         ast_file.type_aliases.push(ast::TypeAlias {
             name: name.clone(),
+            params: IndexSet::new(),
             value: ast_type.clone(),
             source: declarator.source,
             privacy: Privacy::Public,

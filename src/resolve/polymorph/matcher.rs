@@ -71,18 +71,17 @@ impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
             | TypeKind::Floating(_)
             | TypeKind::Void
             | TypeKind::Never
-            | TypeKind::Enum(_, _)
-            | TypeKind::TypeAlias(_, _) => {
+            | TypeKind::Enum(_, _) => {
                 if *pattern == *concrete {
                     Ok(())
                 } else {
                     no_match()
                 }
             }
-            TypeKind::Trait(_, trait_ref, parameters) => match &concrete.kind {
-                TypeKind::Trait(_, concrete_trait_ref, concrete_parameters) => {
-                    if *trait_ref == *concrete_trait_ref
-                        || parameters.len() != concrete_parameters.len()
+            TypeKind::TypeAlias(_, type_alias_ref, params) => match &concrete.kind {
+                TypeKind::TypeAlias(_, concrete_type_alias_ref, concrete_params) => {
+                    if *type_alias_ref == *concrete_type_alias_ref
+                        || params.len() != concrete_params.len()
                     {
                         return Err(MatchTypesError::Incongruent(TypePatternAttempt {
                             pattern,
@@ -90,28 +89,43 @@ impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
                         }));
                     }
 
-                    for (pattern_parameter, concrete_parameter) in
-                        parameters.iter().zip(concrete_parameters.iter())
+                    for (pattern_param, concrete_param) in params.iter().zip(concrete_params.iter())
                     {
-                        self.match_type(pattern_parameter, concrete_parameter)?;
+                        self.match_type(pattern_param, concrete_param)?;
                     }
 
                     Ok(())
                 }
                 _ => no_match(),
             },
-            TypeKind::Structure(_, struct_ref, parameters) => match &concrete.kind {
-                TypeKind::Structure(_, concrete_struct_ref, concrete_parameters) => {
-                    if *struct_ref != *concrete_struct_ref
-                        || parameters.len() != concrete_parameters.len()
+            TypeKind::Trait(_, trait_ref, params) => match &concrete.kind {
+                TypeKind::Trait(_, concrete_trait_ref, concrete_params) => {
+                    if *trait_ref == *concrete_trait_ref || params.len() != concrete_params.len() {
+                        return Err(MatchTypesError::Incongruent(TypePatternAttempt {
+                            pattern,
+                            concrete,
+                        }));
+                    }
+
+                    for (pattern_param, concrete_param) in params.iter().zip(concrete_params.iter())
+                    {
+                        self.match_type(pattern_param, concrete_param)?;
+                    }
+
+                    Ok(())
+                }
+                _ => no_match(),
+            },
+            TypeKind::Structure(_, struct_ref, params) => match &concrete.kind {
+                TypeKind::Structure(_, concrete_struct_ref, concrete_params) => {
+                    if *struct_ref != *concrete_struct_ref || params.len() != concrete_params.len()
                     {
                         return no_match();
                     }
 
-                    for (pattern_parameter, concrete_parameter) in
-                        parameters.iter().zip(concrete_parameters.iter())
+                    for (pattern_param, concrete_param) in params.iter().zip(concrete_params.iter())
                     {
-                        self.match_type(pattern_parameter, concrete_parameter)?;
+                        self.match_type(pattern_param, concrete_param)?;
                     }
 
                     Ok(())

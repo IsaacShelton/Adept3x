@@ -225,7 +225,6 @@ pub enum ResolveErrorKind {
         name: String,
     },
     CannotCreateOutOfRangeFloat,
-    TypeAliasesCannotContainPolymorphs,
     FailedToConformArgumentToDefaultValue,
     Other {
         message: String,
@@ -564,9 +563,6 @@ impl Display for ResolveErrorKind {
             }
             ResolveErrorKind::CannotCreateOutOfRangeFloat => {
                 write!(f, "Cannot create out-of-range floating-point number")?;
-            }
-            ResolveErrorKind::TypeAliasesCannotContainPolymorphs => {
-                write!(f, "Type aliases cannot contain polymorphs")?;
             }
             ResolveErrorKind::FailedToConformArgumentToDefaultValue => {
                 write!(f, "Failed to conform argument to default value")?;

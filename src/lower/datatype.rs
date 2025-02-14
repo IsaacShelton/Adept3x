@@ -122,13 +122,21 @@ pub fn lower_type(
                 asg,
             )
         }
-        asg::TypeKind::TypeAlias(_, type_alias_ref) => {
-            let ty = asg
+        asg::TypeKind::TypeAlias(_, type_alias_ref, type_args) => {
+            if !type_args.is_empty() {
+                todo!("lower_type for type alias with type args");
+            }
+
+            let type_alias = asg
                 .type_aliases
                 .get(*type_alias_ref)
                 .expect("referenced type alias to exist");
 
-            lower_type(ir_module, &ConcreteType(Cow::Borrowed(ty)), asg)
+            lower_type(
+                ir_module,
+                &ConcreteType(Cow::Borrowed(&type_alias.becomes)),
+                asg,
+            )
         }
     }
 }

@@ -33,12 +33,11 @@ pub fn collect_constraints_into(map: &mut HashMap<String, HashSet<Constraint>>, 
         asg::TypeKind::FixedArray(fixed_array) => collect_constraints_into(map, &fixed_array.inner),
         asg::TypeKind::FuncPtr(_) => todo!(),
         asg::TypeKind::Enum(_, _) => (),
-        asg::TypeKind::Structure(_, _, parameters) => {
-            for parameter in parameters {
+        asg::TypeKind::Structure(_, _, params) | asg::TypeKind::TypeAlias(_, _, params) => {
+            for parameter in params {
                 collect_constraints_into(map, parameter);
             }
         }
-        asg::TypeKind::TypeAlias(_, _) => (),
         asg::TypeKind::Polymorph(name, constraints) => {
             let set = map.entry(name.to_string()).or_default();
             for constraint in constraints {

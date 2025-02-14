@@ -268,13 +268,19 @@ fn matches(
             }
             _ => Err(mismatch(ty_in_impl.source)),
         },
-        asg::TypeKind::TypeAlias(_, trait_alias_ref) => match &ty_in_impl.kind {
-            asg::TypeKind::TypeAlias(_, impl_alias_ref) => {
-                if trait_alias_ref == impl_alias_ref {
-                    Ok(())
-                } else {
-                    Err(mismatch(ty_in_impl.source))
+        asg::TypeKind::TypeAlias(_, trait_type_alias_ref, trait_args) => match &ty_in_impl.kind {
+            asg::TypeKind::TypeAlias(_, impl_type_alias_ref, impl_args) => {
+                if trait_type_alias_ref != impl_type_alias_ref
+                    || trait_args.len() != impl_args.len()
+                {
+                    return Err(mismatch(ty_in_impl.source));
                 }
+
+                for (trait_arg, impl_arg) in trait_args.iter().zip(impl_args.iter()) {
+                    matches(ctx, asg, expected, for_alls, trait_arg, impl_arg)?;
+                }
+
+                Ok(())
             }
             _ => Err(mismatch(ty_in_impl.source)),
         },

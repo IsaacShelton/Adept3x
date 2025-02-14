@@ -18,6 +18,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let name = self.parse_identifier(Some("for alias name after 'typealias' keyword"))?;
         self.ignore_newlines();
 
+        let params = self.parse_type_params()?.into_keys().collect();
+
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Public => privacy = Privacy::Public,
@@ -31,6 +33,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         Ok(TypeAlias {
             name,
+            params,
             value: becomes_type,
             source,
             privacy,

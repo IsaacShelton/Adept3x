@@ -39,7 +39,7 @@ pub enum TypeKind {
     FuncPtr(FuncPtr),
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructRef, Vec<Type>),
-    TypeAlias(HumanName, TypeAliasRef),
+    TypeAlias(HumanName, TypeAliasRef, Vec<Type>),
     Polymorph(String, Vec<Constraint>),
     Trait(HumanName, TraitRef, Vec<Type>),
 }
@@ -68,10 +68,11 @@ impl TypeKind {
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
             TypeKind::FuncPtr(_) => todo!(),
             TypeKind::Enum(_, _) => false,
-            TypeKind::Structure(_, _, parameters) | TypeKind::Trait(_, _, parameters) => parameters
+            TypeKind::Structure(_, _, parameters)
+            | TypeKind::Trait(_, _, parameters)
+            | TypeKind::TypeAlias(_, _, parameters) => parameters
                 .iter()
                 .any(|parameter| parameter.kind.contains_polymorph()),
-            TypeKind::TypeAlias(_, _) => false,
             TypeKind::Polymorph(_, _) => true,
         }
     }
@@ -88,7 +89,7 @@ impl TypeKind {
             TypeKind::CInteger(integer, sign) => {
                 sign.or_else(|| target.map(|target| target.default_c_integer_sign(*integer)))
             }
-            TypeKind::TypeAlias(_, _type_ref) => todo!(),
+            TypeKind::TypeAlias(_, _, _) => panic!("sign of type alias"),
             TypeKind::Unresolved => panic!(),
             TypeKind::AnonymousEnum(enumeration) => enumeration.backing_type.kind.sign(target),
             TypeKind::Floating(_)
@@ -113,6 +114,9 @@ impl TypeKind {
                 asg.structs.get(*struct_ref).unwrap().params.len()
             }
             TypeKind::Trait(_, trait_ref, _) => asg.traits.get(*trait_ref).unwrap().params.len(),
+            TypeKind::TypeAlias(_, type_alias_ref, _) => {
+                asg.type_aliases.get(*type_alias_ref).unwrap().params.len()
+            }
             _ => 0,
         }
     }
@@ -140,12 +144,11 @@ impl TypeKind {
                 func.return_type.kind.for_each_polymorph(f);
             }
             TypeKind::Enum(_, _) => (),
-            TypeKind::Structure(_, _, params) => {
+            TypeKind::Structure(_, _, params) | TypeKind::TypeAlias(_, _, params) => {
                 for param in params.iter() {
                     param.kind.for_each_polymorph(f);
                 }
             }
-            TypeKind::TypeAlias(_, _) => (),
             TypeKind::Polymorph(name, _) => f(name),
             TypeKind::Trait(_, _, params) => {
                 for param in params.iter() {
@@ -232,7 +235,29 @@ impl TypeKind {
                     mapped,
                 )))
             }
-            TypeKind::TypeAlias(_, _) => Ok(Cow::Borrowed(self)),
+            TypeKind::TypeAlias(human_name, type_alias_ref, type_args) => {
+                if type_args.is_empty() {
+                    return Ok(Cow::Borrowed(self));
+                }
+
+                let mut mapped = vec![];
+
+                for (i, type_arg) in type_args.iter().enumerate() {
+                    let TypeParam::Type(inner) = mapper(TypeParam::Type(Cow::Borrowed(type_arg)))
+                        .map_err(TypeParamError::MappingError)?
+                    else {
+                        return Err(TypeParamError::ExpectedType { index: i });
+                    };
+
+                    mapped.push(inner.into_owned());
+                }
+
+                Ok(Cow::Owned(Self::TypeAlias(
+                    human_name.clone(),
+                    *type_alias_ref,
+                    mapped,
+                )))
+            }
             TypeKind::Polymorph(_, _) => Ok(Cow::Borrowed(self)),
             TypeKind::Trait(human_name, trait_ref, type_args) => {
                 if type_args.is_empty() {
@@ -279,7 +304,10 @@ impl Display for TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TypeKind::Unresolved => panic!("cannot display unresolved type"),
-            TypeKind::TypeAlias(name, _) => write!(f, "{}", name)?,
+            TypeKind::TypeAlias(name, _, type_args) => {
+                write!(f, "{}", name)?;
+                write_parameters(f, type_args)?;
+            }
             TypeKind::Boolean => write!(f, "bool")?,
             TypeKind::Integer(bits, sign) => {
                 f.write_str(match (bits, sign) {
@@ -315,9 +343,9 @@ impl Display for TypeKind {
             }
             TypeKind::Void => f.write_str("void")?,
             TypeKind::Never => f.write_str("never")?,
-            TypeKind::Structure(name, _, parameters) => {
+            TypeKind::Structure(name, _, type_args) => {
                 write!(f, "{}", name)?;
-                write_parameters(f, parameters)?;
+                write_parameters(f, type_args)?;
             }
             TypeKind::AnonymousStruct() => f.write_str("anonymous-struct")?,
             TypeKind::AnonymousUnion() => f.write_str("anonymous-union")?,

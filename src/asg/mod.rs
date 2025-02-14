@@ -14,6 +14,7 @@ mod overload;
 mod stmt;
 mod structure;
 mod trait_constraint;
+mod type_alias;
 mod type_decl;
 mod variable_storage;
 
@@ -38,6 +39,7 @@ use std::collections::{HashMap, HashSet};
 pub use stmt::*;
 pub use structure::*;
 pub use trait_constraint::*;
+pub use type_alias::TypeAlias;
 pub use type_decl::*;
 pub use variable_storage::*;
 
@@ -59,7 +61,7 @@ pub struct Asg<'a> {
     pub structs: SlotMap<StructRef, Struct>,
     pub globals: SlotMap<GlobalVarRef, GlobalVar>,
     pub enums: SlotMap<EnumRef, Enum>,
-    pub type_aliases: SlotMap<TypeAliasRef, Type>,
+    pub type_aliases: SlotMap<TypeAliasRef, TypeAlias>,
     pub traits: SlotMap<TraitRef, Trait>,
     pub impls: SlotMap<ImplRef, Impl>,
     pub workspace: &'a AstWorkspace<'a>,
@@ -87,12 +89,17 @@ impl<'a> Asg<'a> {
         let mut running = whole_type;
         let mut depth = 0;
 
-        while let TypeKind::TypeAlias(_, type_alias_ref) = running.kind {
-            running = self
+        while let TypeKind::TypeAlias(_, type_alias_ref, type_args) = &running.kind {
+            let alias = self
                 .type_aliases
-                .get(type_alias_ref)
+                .get(*type_alias_ref)
                 .expect("valid type alias ref");
 
+            if !type_args.is_empty() || !alias.params.is_empty() {
+                todo!("unalias type alias with type args");
+            }
+
+            running = &alias.becomes;
             depth += 1;
 
             if depth > Self::MAX_UNALIAS_DEPTH {
@@ -108,11 +115,17 @@ impl<'a> Asg<'a> {
         let mut running = whole_type;
         let mut depth = 0;
 
-        while let TypeKind::TypeAlias(human_name, type_alias_ref) = &running.kind {
-            running = self
+        while let TypeKind::TypeAlias(human_name, type_alias_ref, type_args) = &running.kind {
+            let alias = self
                 .type_aliases
                 .get(*type_alias_ref)
                 .expect("valid type alias ref");
+
+            if !type_args.is_empty() || !alias.params.is_empty() {
+                todo!("unalias type alias with type args");
+            }
+
+            running = &alias.becomes;
 
             if !seen.insert(type_alias_ref) {
                 return UnaliasError::SelfReferentialTypeAlias(human_name.0.clone());

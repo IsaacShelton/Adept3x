@@ -191,7 +191,7 @@ fn resolve_type_alias(
     );
 
     let ty = type_ctx.resolve_or_undeclared(&definition.value, ResolveTypeOptions::KeepAliases)?;
-    *asg.type_aliases.get_mut(type_alias_ref).unwrap() = ty;
+    asg.type_aliases.get_mut(type_alias_ref).unwrap().becomes = ty;
     Ok(())
 }
 

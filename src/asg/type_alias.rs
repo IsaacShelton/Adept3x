@@ -1,12 +1,11 @@
-use super::{Privacy, Type};
+use super::{HumanName, Type};
 use crate::source_files::Source;
 use indexmap::IndexSet;
 
 #[derive(Clone, Debug)]
 pub struct TypeAlias {
-    pub name: String,
-    pub params: IndexSet<String>,
-    pub value: Type,
+    pub human_name: HumanName,
     pub source: Source,
-    pub privacy: Privacy,
+    pub params: IndexSet<String>,
+    pub becomes: Type,
 }

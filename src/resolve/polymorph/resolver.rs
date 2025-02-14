@@ -102,7 +102,14 @@ impl<'a> PolyRecipeResolver<'a> {
 
                 asg::TypeKind::Structure(human_name.clone(), *struct_ref, args).at(ty.source)
             }
-            asg::TypeKind::TypeAlias(_, _) => ty.clone(),
+            asg::TypeKind::TypeAlias(human_name, type_alias_ref, poly_args) => {
+                let args = poly_args
+                    .iter()
+                    .map(|arg| self.resolve_type(arg))
+                    .collect::<Result<_, _>>()?;
+
+                asg::TypeKind::TypeAlias(human_name.clone(), *type_alias_ref, args).at(ty.source)
+            }
             asg::TypeKind::Polymorph(name, _) => {
                 let Some(value) = self.get(name) else {
                     return Err(PolymorphErrorKind::UndefinedPolymorph(name.clone()).at(ty.source));
