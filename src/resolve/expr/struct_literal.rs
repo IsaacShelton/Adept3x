@@ -76,7 +76,7 @@ pub fn resolve_struct_literal_expr(
         })
     })?;
 
-    let struct_name = struct_name.clone();
+    let struct_name = struct_name.into_owned();
     let arguments = arguments.to_vec();
 
     let mut next_index = 0;

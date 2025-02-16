@@ -88,7 +88,7 @@ pub fn conform_expr<O: Objective>(
 
     if *from_type == *to_type {
         return O::success(|| TypedExpr {
-            ty: to_type.clone(),
+            ty: to_type.into_owned(),
             expr: expr.expr.clone(),
             is_initialized: expr.is_initialized,
         });
@@ -99,29 +99,29 @@ pub fn conform_expr<O: Objective>(
             from,
             behavior.c_integer_assumptions(),
             expr.expr.source,
-            to_type,
+            &to_type,
         ),
         TypeKind::Integer(from_bits, from_sign) => from_integer::<O>(
-            &expr.expr, from_type, mode, behavior, *from_bits, *from_sign, to_type,
+            &expr.expr, &from_type, mode, behavior, *from_bits, *from_sign, &to_type,
         ),
-        TypeKind::FloatLiteral(from) => from_float_literal::<O>(*from, to_type, conform_source),
-        TypeKind::Floating(from_size) => from_float::<O>(&expr.expr, mode, *from_size, to_type),
-        TypeKind::Ptr(from_inner) => from_pointer::<O>(ctx, &expr.expr, mode, from_inner, to_type),
+        TypeKind::FloatLiteral(from) => from_float_literal::<O>(*from, &to_type, conform_source),
+        TypeKind::Floating(from_size) => from_float::<O>(&expr.expr, mode, *from_size, &to_type),
+        TypeKind::Ptr(from_inner) => from_pointer::<O>(ctx, &expr.expr, mode, from_inner, &to_type),
         TypeKind::CInteger(from_size, from_sign) => from_c_integer::<O>(
             &expr.expr,
-            from_type,
+            &from_type,
             mode,
             behavior,
             *from_size,
             *from_sign,
-            to_type,
+            &to_type,
             conform_source,
         ),
         TypeKind::AnonymousEnum(enumeration) => from_anonymous_enum::<O>(
             &expr.expr,
-            from_type,
+            &from_type,
             mode,
-            to_type,
+            &to_type,
             enumeration.as_ref(),
             conform_source,
         ),

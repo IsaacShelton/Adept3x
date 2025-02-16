@@ -41,7 +41,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 .unalias(&ty)
                 .map_err(ResolveErrorKind::from)
                 .map_err(|e| e.at(ast_type.source))?
-                .clone()),
+                .into_owned()),
             ResolveTypeOptions::KeepAliases => Ok(ty),
         }
     }

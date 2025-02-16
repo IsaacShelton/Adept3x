@@ -1,0 +1,13 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr#char, ...) int
+
+typealias t<$T> = $T
+
+func main {
+    x t<int> = 13
+
+    printf(c"x = %d\n", x)
+}

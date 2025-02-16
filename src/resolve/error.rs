@@ -526,6 +526,14 @@ impl Display for ResolveErrorKind {
                 UnaliasError::SelfReferentialTypeAlias(type_alias_name) => {
                     write!(f, "Type alias '{}' is self-referential", type_alias_name)?
                 }
+                UnaliasError::IncorrectNumberOfTypeArgsForAlias(type_alias_name) => write!(
+                    f,
+                    "Incorrect number of type arguments for type alias '{}'",
+                    type_alias_name
+                )?,
+                UnaliasError::PolymorphError(e) => {
+                    e.fmt(f)?;
+                }
             },
             ResolveErrorKind::CannotDeclareVariableOutsideFunction => {
                 write!(f, "Cannot declare variable outside of function")?;

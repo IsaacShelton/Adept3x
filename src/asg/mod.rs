@@ -20,7 +20,11 @@ mod variable_storage;
 
 pub use self::variable_storage::VariableStorageKey;
 pub use crate::ast::{IntegerBits, IntegerSign};
-use crate::{ast::AstWorkspace, source_files::SourceFiles};
+use crate::{
+    ast::AstWorkspace,
+    resolve::{PolyRecipe, PolyValue, PolymorphErrorKind},
+    source_files::SourceFiles,
+};
 pub use block::*;
 pub use datatype::*;
 pub use destination::*;
@@ -33,9 +37,13 @@ pub use helper_expr::*;
 pub use human_name::*;
 pub use impl_params::*;
 pub use implementation::*;
+use indexmap::IndexMap;
 pub use overload::*;
 use slotmap::{new_key_type, SlotMap};
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 pub use stmt::*;
 pub use structure::*;
 pub use trait_constraint::*;
@@ -85,21 +93,42 @@ impl<'a> Asg<'a> {
         }
     }
 
-    pub fn unalias(&'a self, whole_type: &'a Type) -> Result<&'a Type, UnaliasError> {
-        let mut running = whole_type;
+    pub fn unalias(&'a self, whole_type: &'a Type) -> Result<Cow<'a, Type>, UnaliasError> {
+        let mut running = Cow::Borrowed(whole_type);
         let mut depth = 0;
 
-        while let TypeKind::TypeAlias(_, type_alias_ref, type_args) = &running.kind {
+        while let TypeKind::TypeAlias(human_name, type_alias_ref, type_args) = &running.kind {
             let alias = self
                 .type_aliases
                 .get(*type_alias_ref)
                 .expect("valid type alias ref");
 
-            if !type_args.is_empty() || !alias.params.is_empty() {
-                todo!("unalias type alias with type args");
+            if type_args.len() != alias.params.len() {
+                return Err(UnaliasError::IncorrectNumberOfTypeArgsForAlias(
+                    human_name.0.clone(),
+                ));
             }
 
-            running = &alias.becomes;
+            if alias.params.is_empty() {
+                running = Cow::Borrowed(&alias.becomes);
+            } else {
+                let polymorphs = IndexMap::<String, PolyValue>::from_iter(
+                    alias
+                        .params
+                        .iter()
+                        .cloned()
+                        .zip(type_args.iter().cloned().map(PolyValue::Type)),
+                );
+
+                let recipe = PolyRecipe { polymorphs };
+
+                running = Cow::Owned(
+                    recipe
+                        .resolve_type(&alias.becomes)
+                        .map_err(|e| UnaliasError::PolymorphError(e.kind))?,
+                )
+            }
+
             depth += 1;
 
             if depth > Self::MAX_UNALIAS_DEPTH {
@@ -146,4 +175,6 @@ impl<'a> Asg<'a> {
 pub enum UnaliasError {
     MaxDepthExceeded,
     SelfReferentialTypeAlias(String),
+    IncorrectNumberOfTypeArgsForAlias(String),
+    PolymorphError(PolymorphErrorKind),
 }
