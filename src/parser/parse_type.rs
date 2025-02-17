@@ -19,40 +19,17 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.input.peek().source;
         let token = self.input.peek().clone();
 
-        // TODO: CLEANUP: Clean up this obscure parsing recovery behavior
         let Ok(name) = self.parse_name(None::<&str>) else {
-            if !token.kind.is_polymorph() {
-                return Err(ParseError {
-                    kind: ParseErrorKind::ExpectedType {
-                        prefix: prefix.map(|prefix| prefix.to_string()),
-                        for_reason: for_reason.map(|for_reason| for_reason.to_string()),
-                        got: token.to_string(),
-                    },
-                    source,
-                });
+            if token.kind.is_polymorph() {
+                return Ok(TypeKind::Polymorph(token.kind.unwrap_polymorph()).at(source));
             }
 
-            let polymorph = token.kind.unwrap_polymorph();
-            let mut constraints = vec![];
-
-            // TODO: Merge this parsing code with structure generic type parameter parsing
-            if self.input.eat(TokenKind::Colon) {
-                loop {
-                    constraints
-                        .push(self.parse_type(None::<&str>, Some("for polymorph constraint"))?);
-
-                    if let TypeKind::Polymorph(..) = constraints.last().unwrap().kind {
-                        return Err(ParseErrorKind::PolymorphsCannotBeUsedAsConstraints
-                            .at(constraints.last().unwrap().source));
-                    }
-
-                    if !self.input.eat(TokenKind::Add) {
-                        break;
-                    }
-                }
+            return Err(ParseErrorKind::ExpectedType {
+                prefix: prefix.map(|prefix| prefix.to_string()),
+                for_reason: for_reason.map(|for_reason| for_reason.to_string()),
+                got: token.to_string(),
             }
-
-            return Ok(TypeKind::Polymorph(polymorph, constraints).at(source));
+            .at(source));
         };
 
         let generics = self.parse_type_args()?;
@@ -71,7 +48,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
 
         loop {
-            if self.parse_type_parameters_close().is_some() {
+            if self.parse_type_param_close().is_some() {
                 break;
             } else if self.input.peek_is(TokenKind::EndOfFile) {
                 // TODO: Improve error message
@@ -171,7 +148,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
     /// This function may partially consume tokens, so be
     /// aware that any previously peeked tokens may no longer be in
     /// the same lookahead position after calling this function.
-    fn parse_type_parameters_close(&mut self) -> Option<()> {
+    fn parse_type_param_close(&mut self) -> Option<()> {
         let closer = self.input.peek();
         let source = closer.source;
 

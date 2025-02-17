@@ -47,14 +47,7 @@ pub fn resolve_stmt(
                     ResolveExprMode::RequireValue,
                 )?;
 
-                let mut return_type =
-                    Cow::Borrowed(&ctx.asg.funcs.get(func_ref).unwrap().return_type);
-
-                if return_type.kind.contains_polymorph() {
-                    let mut stripped = return_type.as_ref().clone();
-                    stripped.strip_constraints();
-                    return_type = Cow::Owned(stripped);
-                }
+                let return_type = Cow::Borrowed(&ctx.asg.funcs.get(func_ref).unwrap().return_type);
 
                 if let Ok(result) = conform_expr::<Perform>(
                     ctx,

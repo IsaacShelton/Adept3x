@@ -1,12 +1,12 @@
-use super::{HumanName, Params, Type};
+use super::{HumanName, Params, Type, TypeParams};
 use crate::source_files::Source;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct Trait {
     pub human_name: HumanName,
     pub source: Source,
-    pub params: IndexSet<String>,
+    pub params: TypeParams,
     pub funcs: IndexMap<String, TraitFunc>,
 }
 

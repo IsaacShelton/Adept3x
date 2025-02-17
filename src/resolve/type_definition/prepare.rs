@@ -1,15 +1,11 @@
 use crate::{
-    asg::{
-        self, Asg, CurrentConstraints, EnumRef, HumanName, StructRef, TraitRef, TypeAliasRef,
-        TypeDecl, TypeParameters,
-    },
+    asg::{self, Asg, EnumRef, HumanName, StructRef, TraitRef, TypeAliasRef, TypeDecl},
     ast::{self, AstWorkspace, Privacy},
     name::{Name, ResolvedName},
     resolve::{
         ctx::ResolveCtx,
         error::{ResolveError, ResolveErrorKind},
         job::TypeJob,
-        type_ctx::{resolve_constraints, ResolveTypeCtx},
     },
     source_files::Source,
     workspace::fs::FsNodeId,
@@ -41,13 +37,8 @@ pub fn prepare_type_jobs(
         }
 
         for structure in file.structs.iter() {
-            job.structs.push(prepare_structure(
-                ctx,
-                asg,
-                module_fs_node_id,
-                *physical_file_id,
-                structure,
-            )?);
+            job.structs
+                .push(prepare_structure(ctx, asg, module_fs_node_id, structure)?);
         }
 
         for definition in file.enums.iter() {
@@ -70,46 +61,20 @@ fn prepare_structure(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     module_fs_node_id: FsNodeId,
-    physical_fs_node_id: FsNodeId,
     structure: &ast::Struct,
 ) -> Result<StructRef, ResolveError> {
-    let mut parameters = TypeParameters::default();
-
-    for (name, parameter) in structure.params.iter() {
-        let zero_current_constraints = CurrentConstraints::new_empty();
-        let constraints = resolve_constraints(
-            &ResolveTypeCtx::new(
-                asg,
-                module_fs_node_id,
-                physical_fs_node_id,
-                &ctx.types_in_modules,
-                &zero_current_constraints,
-            ),
-            &parameter.constraints,
-        )?;
-
-        if parameters
-            .parameters
-            .insert(name.to_string(), asg::TypeParameter { constraints })
-            .is_some()
-        {
-            todo!("Error message for duplicate type parameter names")
-        }
-    }
-
     let struct_ref = asg.structs.insert(asg::Struct {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
-        params: parameters,
+        params: structure.params.clone(),
         source: structure.source,
     });
 
-    // TODO: Improve the source tracking for these
     let polymorphs = structure
         .params
-        .keys()
-        .map(|name| asg::TypeKind::Polymorph(name.into(), vec![]).at(structure.source))
+        .names()
+        .map(|name| asg::TypeKind::Polymorph(name.into()).at(structure.source))
         .collect_vec();
 
     declare_type(
@@ -168,8 +133,8 @@ fn prepare_trait(
 
     let params = definition
         .params
-        .iter()
-        .map(|name| asg::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
+        .names()
+        .map(|name| asg::TypeKind::Polymorph(name.clone()).at(definition.source))
         .collect_vec();
 
     declare_type(
@@ -199,8 +164,8 @@ fn prepare_type_alias(
 
     let params = definition
         .params
-        .iter()
-        .map(|name| asg::TypeKind::Polymorph(name.clone(), vec![]).at(definition.source))
+        .names()
+        .map(|name| asg::TypeKind::Polymorph(name.clone()).at(definition.source))
         .collect_vec();
 
     declare_type(

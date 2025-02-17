@@ -28,45 +28,6 @@ impl Type {
     pub fn is_ambiguous(&self) -> bool {
         self.kind.is_ambiguous()
     }
-
-    pub fn strip_constraints(&mut self) {
-        match &mut self.kind {
-            TypeKind::Unresolved => panic!(),
-            TypeKind::Boolean => (),
-            TypeKind::Integer(_, _) => (),
-            TypeKind::CInteger(_, _) => (),
-            TypeKind::IntegerLiteral(_) => (),
-            TypeKind::FloatLiteral(_) => (),
-            TypeKind::Floating(_) => (),
-            TypeKind::Ptr(inner) => inner.strip_constraints(),
-            TypeKind::Void => (),
-            TypeKind::Never => (),
-            TypeKind::AnonymousStruct() => todo!("strip_constraints for anonymous struct"),
-            TypeKind::AnonymousUnion() => todo!("strip_constraints for anonymous union"),
-            TypeKind::AnonymousEnum(_) => (),
-            TypeKind::FixedArray(fixed_array) => fixed_array.inner.strip_constraints(),
-            TypeKind::FuncPtr(func) => {
-                for param in func.params.required.iter_mut() {
-                    param.ty.strip_constraints();
-                }
-                func.return_type.strip_constraints();
-            }
-            TypeKind::Enum(_, _) => (),
-            TypeKind::Structure(_, _, params) | TypeKind::TypeAlias(_, _, params) => {
-                for parameter in params {
-                    parameter.strip_constraints();
-                }
-            }
-            TypeKind::Polymorph(_, constraints) => {
-                constraints.drain(..);
-            }
-            TypeKind::Trait(_, _, parameters) => {
-                for parameter in parameters {
-                    parameter.strip_constraints();
-                }
-            }
-        }
-    }
 }
 
 impl PartialEq for Type {

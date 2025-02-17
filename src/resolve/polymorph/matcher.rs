@@ -173,19 +173,9 @@ impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
                 _ => no_match(),
             },
             TypeKind::FuncPtr(_) => todo!(),
-            TypeKind::Polymorph(name, constraints) => {
-                self.put_type(name, concrete).map_err(|_| {
-                    MatchTypesError::Incongruent(TypePatternAttempt { pattern, concrete })
-                })?;
-
-                for constraint in constraints {
-                    if !self.ctx.current_constraints.satisfies(concrete, constraint) {
-                        return no_match();
-                    }
-                }
-
-                Ok(())
-            }
+            TypeKind::Polymorph(name) => self.put_type(name, concrete).map_err(|_| {
+                MatchTypesError::Incongruent(TypePatternAttempt { pattern, concrete })
+            }),
         }
     }
 

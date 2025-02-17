@@ -110,13 +110,6 @@ fn resolve_func_body(
 
     let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
-    let f = asg
-        .funcs
-        .get(func_ref)
-        .expect("referenced resolved function to exist");
-
-    let constraints = f.constraints.clone();
-
     let resolved_stmts = resolve_stmts(
         &mut ResolveExprCtx {
             asg,
@@ -131,7 +124,6 @@ fn resolve_func_body(
             impls_in_modules: &mut ctx.impls_in_modules,
             module_fs_node_id: module_file_id,
             physical_fs_node_id: physical_file_id,
-            current_constraints: constraints,
         },
         &ast_function.stmts,
         ResolveExprMode::NeglectValue,
@@ -161,12 +153,9 @@ fn resolve_param_vars(
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
-            &asg.funcs.get(func_ref).unwrap().constraints,
         );
 
-        let mut ty = type_ctx.resolve(&param.ast_type, ResolveTypeOptions::Unalias)?;
-        ty.strip_constraints();
-
+        let ty = type_ctx.resolve(&param.ast_type, ResolveTypeOptions::Unalias)?;
         let function = asg.funcs.get_mut(func_ref).unwrap();
 
         let key = function.vars.add_param(ty.clone());

@@ -1,5 +1,4 @@
 mod anonymous_enum;
-mod constraint;
 mod fixed_array;
 mod func_ptr;
 
@@ -11,7 +10,6 @@ use crate::{
     target::Target,
 };
 pub use anonymous_enum::AnonymousEnum;
-pub use constraint::Constraint;
 use core::hash::Hash;
 use derive_more::{IsVariant, Unwrap};
 pub use fixed_array::FixedArray;
@@ -40,7 +38,7 @@ pub enum TypeKind {
     Enum(HumanName, EnumRef),
     Structure(HumanName, StructRef, Vec<Type>),
     TypeAlias(HumanName, TypeAliasRef, Vec<Type>),
-    Polymorph(String, Vec<Constraint>),
+    Polymorph(String),
     Trait(HumanName, TraitRef, Vec<Type>),
 }
 
@@ -73,7 +71,7 @@ impl TypeKind {
             | TypeKind::TypeAlias(_, _, parameters) => parameters
                 .iter()
                 .any(|parameter| parameter.kind.contains_polymorph()),
-            TypeKind::Polymorph(_, _) => true,
+            TypeKind::Polymorph(_) => true,
         }
     }
 
@@ -103,7 +101,7 @@ impl TypeKind {
             | TypeKind::FixedArray(..)
             | TypeKind::FuncPtr(..)
             | TypeKind::Enum(_, _)
-            | TypeKind::Polymorph(_, _)
+            | TypeKind::Polymorph(_)
             | TypeKind::Trait(_, _, _) => None,
         }
     }
@@ -149,7 +147,7 @@ impl TypeKind {
                     param.kind.for_each_polymorph(f);
                 }
             }
-            TypeKind::Polymorph(name, _) => f(name),
+            TypeKind::Polymorph(name) => f(name),
             TypeKind::Trait(_, _, params) => {
                 for param in params.iter() {
                     param.kind.for_each_polymorph(f);
@@ -258,7 +256,7 @@ impl TypeKind {
                     mapped,
                 )))
             }
-            TypeKind::Polymorph(_, _) => Ok(Cow::Borrowed(self)),
+            TypeKind::Polymorph(_) => Ok(Cow::Borrowed(self)),
             TypeKind::Trait(human_name, trait_ref, type_args) => {
                 if type_args.is_empty() {
                     return Ok(Cow::Borrowed(self));
@@ -355,16 +353,8 @@ impl Display for TypeKind {
             }
             TypeKind::FuncPtr(..) => f.write_str("function-pointer-type")?,
             TypeKind::Enum(name, _) => write!(f, "{}", name)?,
-            TypeKind::Polymorph(name, constaints) => {
+            TypeKind::Polymorph(name) => {
                 write!(f, "${}", name)?;
-
-                if !constaints.is_empty() {
-                    write!(f, ": ")?;
-                }
-
-                for constaint in constaints {
-                    write!(f, "{}", constaint)?;
-                }
             }
             TypeKind::Trait(name, _, parameters) => {
                 write!(f, "{}", name)?;

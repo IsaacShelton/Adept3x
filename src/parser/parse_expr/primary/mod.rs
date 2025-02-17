@@ -105,7 +105,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
             TokenKind::Polymorph(_) => {
                 let polymorph = self.input.eat_polymorph().unwrap();
-                let subject = TypeKind::Polymorph(polymorph, vec![]).at(source);
+                let subject = TypeKind::Polymorph(polymorph).at(source);
                 self.parse_static_member_with_type(subject, source)
             }
             TokenKind::Identifier(_) | TokenKind::NamespacedIdentifier(_) => {

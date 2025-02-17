@@ -7,11 +7,11 @@ mod types;
 use self::types::get_name_and_type;
 pub use self::{expr::translate_expr, function::declare_function};
 use crate::{
+    asg::TypeParams,
     ast::{self, AstFile, Privacy},
     c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError},
     diagnostics::Diagnostics,
 };
-use indexmap::IndexSet;
 use std::collections::HashMap;
 
 pub fn declare_named_declaration(
@@ -34,7 +34,7 @@ pub fn declare_named_declaration(
     if is_typedef {
         ast_file.type_aliases.push(ast::TypeAlias {
             name: name.clone(),
-            params: IndexSet::new(),
+            params: TypeParams::default(),
             value: ast_type.clone(),
             source: declarator.source,
             privacy: Privacy::Public,

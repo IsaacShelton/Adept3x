@@ -1,39 +1,28 @@
-use super::{Type, TypeArg};
+use super::TypeArg;
 use crate::source_files::Source;
-use indexmap::IndexMap;
-
-#[derive(Clone, Debug)]
-pub struct TypeParam {
-    pub constraints: Vec<Type>,
-}
-
-impl TypeParam {
-    pub fn new(constraints: Vec<Type>) -> Self {
-        Self { constraints }
-    }
-}
+use indexmap::IndexSet;
 
 #[derive(Clone, Debug, Default)]
 pub struct TypeParams {
-    pub params: IndexMap<String, TypeParam>,
+    pub params: IndexSet<String>,
 }
 
 impl TypeParams {
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &TypeParam)> {
+    pub fn names(&self) -> impl Iterator<Item = &String> {
         self.params.iter()
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &String> {
-        self.params.keys()
+    pub fn len(&self) -> usize {
+        self.params.len()
     }
 
-    pub fn values(&self) -> impl Iterator<Item = &TypeParam> {
-        self.params.values()
+    pub fn is_empty(&self) -> bool {
+        self.params.is_empty()
     }
 }
 
-impl From<IndexMap<String, TypeParam>> for TypeParams {
-    fn from(params: IndexMap<String, TypeParam>) -> Self {
+impl From<IndexSet<String>> for TypeParams {
+    fn from(params: IndexSet<String>) -> Self {
         Self { params }
     }
 }
@@ -42,17 +31,13 @@ impl TryFrom<Vec<TypeArg>> for TypeParams {
     type Error = (String, Source);
 
     fn try_from(mut args: Vec<TypeArg>) -> Result<Self, Self::Error> {
-        let mut params = IndexMap::<String, TypeParam>::new();
+        let mut params = IndexSet::<String>::new();
 
         for arg in args.drain(..) {
             match arg {
                 TypeArg::Type(ty) => match ty.kind {
-                    super::TypeKind::Polymorph(name, constraints) => {
-                        if let Some(existing) = params.get_mut(&name) {
-                            existing.constraints.extend(constraints);
-                        } else {
-                            params.insert(name, TypeParam { constraints });
-                        }
+                    super::TypeKind::Polymorph(name) => {
+                        params.insert(name);
                     }
                     _ => {
                         return Err((

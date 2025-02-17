@@ -1,4 +1,4 @@
-use super::{resolve_constraints, ResolveTypeCtx};
+use super::ResolveTypeCtx;
 use crate::{
     asg::{self, AnonymousEnum, Params},
     ast::{self, IntegerBits},
@@ -72,21 +72,6 @@ impl<'a> ResolveTypeCtx<'a> {
                                 .expect("referenced struct to exist");
 
                             assert!(arguments.len() == structure.params.len());
-
-                            for (parameter, argument) in
-                                structure.params.parameters.values().zip(arguments)
-                            {
-                                for constraint in &parameter.constraints {
-                                    if !self.current_constraints.satisfies(argument, constraint) {
-                                        return Err(
-                                            ResolveErrorKind::ConstraintsNotSatisfiedForType {
-                                                name: name.to_string(),
-                                            }
-                                            .at(ast_type.source),
-                                        );
-                                    }
-                                }
-                            }
                         }
 
                         Ok(found.into_owned())
@@ -154,10 +139,7 @@ impl<'a> ResolveTypeCtx<'a> {
                     },
                 }))
             }
-            ast::TypeKind::Polymorph(polymorph, constraints) => Ok(asg::TypeKind::Polymorph(
-                polymorph.clone(),
-                resolve_constraints(self, constraints)?,
-            )),
+            ast::TypeKind::Polymorph(polymorph) => Ok(asg::TypeKind::Polymorph(polymorph.clone())),
         }
         .map(|kind| kind.at(ast_type.source))
     }

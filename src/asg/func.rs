@@ -1,55 +1,10 @@
 use crate::{asg::*, name::ResolvedName, source_files::Source, tag::Tag};
-use std::{collections::HashSet, fmt::Display};
-
-#[derive(Clone, Debug)]
-pub struct CurrentConstraints {
-    constraints: HashMap<String, HashSet<Constraint>>,
-}
-
-impl<'a> CurrentConstraints {
-    pub fn new(constraints: HashMap<String, HashSet<Constraint>>) -> Self {
-        Self { constraints }
-    }
-
-    pub fn new_empty() -> Self {
-        Self {
-            constraints: Default::default(),
-        }
-    }
-
-    pub fn satisfies(&self, ty: &Type, constraint: &Constraint) -> bool {
-        match constraint {
-            Constraint::PrimitiveAdd => match &ty.kind {
-                TypeKind::Integer(..) | TypeKind::CInteger(..) | TypeKind::Floating(..) => true,
-                TypeKind::Polymorph(name, constraints) => {
-                    constraints.contains(constraint)
-                        || self
-                            .constraints
-                            .get(name)
-                            .map_or(false, |in_scope| in_scope.contains(constraint))
-                }
-                _ => false,
-            },
-            Constraint::Trait(name, _trait_ref, _trait_arguments) => match &ty.kind {
-                TypeKind::Polymorph(name, constraints) => {
-                    constraints.contains(constraint)
-                        || self
-                            .constraints
-                            .get(name)
-                            .map_or(false, |in_scope| in_scope.contains(constraint))
-                }
-                _ => {
-                    todo!("test if user-defined trait '{}' is satisfied", name)
-                }
-            },
-        }
-    }
-}
+use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 pub struct Func {
     pub name: ResolvedName,
-    pub named_type_args: Vec<String>,
+    pub type_params: TypeParams,
     pub params: Params,
     pub return_type: Type,
     pub stmts: Vec<Stmt>,
@@ -59,7 +14,6 @@ pub struct Func {
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,
-    pub constraints: CurrentConstraints,
     pub impl_params: ImplParams,
 }
 

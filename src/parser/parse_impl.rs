@@ -28,9 +28,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let target = self.parse_type(Some("trait"), None::<&str>)?;
 
         let name = self.input.eat_identifier();
-        let params = TypeParams::try_from(self.parse_type_args()?)
-            .map_err(|(message, source)| ParseErrorKind::Other { message }.at(source))?;
-
+        let params = TypeParams::from(self.parse_type_params()?);
         let mut body = vec![];
 
         if !self.input.eat(TokenKind::OpenCurly) {

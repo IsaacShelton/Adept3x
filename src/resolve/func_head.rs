@@ -1,5 +1,4 @@
 use super::{
-    collect_constraints::collect_constraints,
     ctx::ResolveCtx,
     error::ResolveError,
     func_haystack::FuncHaystack,
@@ -8,7 +7,7 @@ use super::{
     type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
 };
 use crate::{
-    asg::{self, Asg, CurrentConstraints, FuncRef, GenericTraitRef, ImplParams, VariableStorage},
+    asg::{self, Asg, FuncRef, GenericTraitRef, ImplParams, VariableStorage},
     ast::{self, AstWorkspace, FuncHead},
     cli::BuildOptions,
     hash_map_ext::HashMapExt,
@@ -88,26 +87,17 @@ pub fn create_func_head<'a>(
     module_file_id: FsNodeId,
     physical_file_id: FsNodeId,
 ) -> Result<FuncRef, ResolveError> {
-    let pre_parameters_constraints = CurrentConstraints::new_empty();
-
     let type_ctx = ResolveTypeCtx::new(
         &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
-        &pre_parameters_constraints,
     );
 
     let is_generic = head.is_generic();
     let params = resolve_parameters(&type_ctx, &head.params)?;
     let return_type = type_ctx.resolve(&head.return_type, ResolveTypeOptions::Unalias)?;
-
-    let constraints = is_generic
-        .then(|| collect_constraints(&params, &return_type))
-        .unwrap_or_default();
-
     let impl_params = create_func_impl_params(&type_ctx, head)?;
-
     let is_main = options.coerce_main_signature && head.name == "main";
 
     if is_main && impl_params.has_items() {
@@ -119,7 +109,7 @@ pub fn create_func_head<'a>(
 
     Ok(asg.funcs.insert(asg::Func {
         name,
-        named_type_args: head.named_type_params.clone(),
+        type_params: head.type_params.clone(),
         params,
         return_type,
         stmts: vec![],
@@ -129,7 +119,6 @@ pub fn create_func_head<'a>(
         abide_abi: head.abide_abi,
         tag: head.tag.or_else(|| is_main.then_some(Tag::Main)),
         is_generic,
-        constraints: CurrentConstraints::new(constraints),
         impl_params,
     }))
 }

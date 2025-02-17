@@ -17,12 +17,11 @@ pub fn get_core_struct_info<'a, 'b>(
     ty: &'a asg::Type,
     source: Source,
 ) -> Result<CoreStructInfo<'b>, Option<ResolveError>> {
-    let t = asg
+    match asg
         .unalias(ty)
         .map_err(|e| ResolveErrorKind::from(e).at(source))
-        .map_err(Some)?;
-
-    match t {
+        .map_err(Some)?
+    {
         Cow::Borrowed(t) => match &t.kind {
             asg::TypeKind::Structure(name, struct_ref, arguments) => Ok(CoreStructInfo {
                 name: Cow::Borrowed(&name),

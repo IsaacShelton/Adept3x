@@ -1,20 +1,18 @@
 use crate::{
-    asg::{self, Asg, CurrentConstraints, EnumRef, StructRef, TraitFunc, TraitRef, TypeAliasRef},
-    ast::{self, AstWorkspace},
+    asg::{self, Asg, EnumRef, StructRef, TraitFunc, TraitRef, Type, TypeAliasRef},
+    ast::{self, AstWorkspace, TypeParams},
     resolve::{
         ctx::ResolveCtx,
-        error::ResolveError,
+        error::{ResolveError, ResolveErrorKind},
         func_head::resolve_parameters,
         job::TypeJob,
-        type_ctx::{resolve_constraints, ResolveTypeCtx, ResolveTypeOptions},
+        type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
+        PolymorphErrorKind,
     },
     workspace::fs::FsNodeId,
 };
 use indexmap::IndexMap;
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use std::borrow::Cow;
 
 pub fn resolve_type_jobs(
     ctx: &mut ResolveCtx,
@@ -78,6 +76,21 @@ pub fn resolve_type_jobs(
     Ok(())
 }
 
+pub fn ensure_declared_polymorphs(ty: &Type, params: &TypeParams) -> Result<(), ResolveError> {
+    let mut ok = Ok(());
+
+    ty.kind.for_each_polymorph(&mut |name| {
+        if params.names().filter(|n| *n == name).next().is_none() && ok.is_ok() {
+            ok = Err(
+                ResolveErrorKind::from(PolymorphErrorKind::UndefinedPolymorph(name.to_string()))
+                    .at(ty.source),
+            );
+        }
+    });
+
+    ok
+}
+
 fn resolve_structure(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
@@ -87,48 +100,17 @@ fn resolve_structure(
     struct_ref: StructRef,
 ) -> Result<(), ResolveError> {
     for (field_name, field) in structure.fields.iter() {
-        let pre_constraints = CurrentConstraints::new_empty();
-        let pre_type_ctx = ResolveTypeCtx::new(
-            &asg,
-            module_file_id,
-            physical_file_id,
-            &ctx.types_in_modules,
-            &pre_constraints,
-        );
-
-        let mut constraints = HashMap::new();
-        for (name, parameter) in structure.params.iter() {
-            constraints.insert(
-                name.into(),
-                HashSet::from_iter(
-                    resolve_constraints(&pre_type_ctx, &parameter.constraints)?.drain(..),
-                ),
-            );
-        }
-
-        let constraints = CurrentConstraints::new(constraints);
-
         let type_ctx = ResolveTypeCtx::new(
             &asg,
             module_file_id,
             physical_file_id,
             &ctx.types_in_modules,
-            &constraints,
         );
 
         let ty =
             type_ctx.resolve_or_undeclared(&field.ast_type, ResolveTypeOptions::KeepAliases)?;
 
-        // TODO: CLEANUP: Cleanup this code
-        let mut ok = Ok(());
-        ty.kind.for_each_polymorph(&mut |name| {
-            if structure.params.params.keys().filter(|n| *n == name).next().is_none() {
-                if ok.is_ok() {
-                    ok = Err(ResolveError::other(format!("Cannot use polymorph '${}' inside type that is not declared by enclosing structure", name), ty.source));
-                }
-            }
-        });
-        ok?;
+        ensure_declared_polymorphs(&ty, &structure.params)?;
 
         let resolved_struct = asg.structs.get_mut(struct_ref).expect("valid struct");
 
@@ -153,13 +135,11 @@ fn resolve_enum(
     definition: &ast::Enum,
     enum_ref: EnumRef,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::new_empty();
     let type_ctx = ResolveTypeCtx::new(
         &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
-        &constraints,
     );
 
     let ast_type = definition
@@ -181,16 +161,18 @@ fn resolve_type_alias(
     definition: &ast::TypeAlias,
     type_alias_ref: TypeAliasRef,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::new_empty();
     let type_ctx = ResolveTypeCtx::new(
         &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
-        &constraints,
     );
 
+    let params = &asg.type_aliases.get(type_alias_ref).unwrap().params;
     let ty = type_ctx.resolve_or_undeclared(&definition.value, ResolveTypeOptions::KeepAliases)?;
+
+    ensure_declared_polymorphs(&ty, params)?;
+
     asg.type_aliases.get_mut(type_alias_ref).unwrap().becomes = ty;
     Ok(())
 }
@@ -203,13 +185,11 @@ fn resolve_trait(
     definition: &ast::Trait,
     trait_ref: TraitRef,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::new_empty();
     let type_ctx = ResolveTypeCtx::new(
         &asg,
         module_file_id,
         physical_file_id,
         &ctx.types_in_modules,
-        &constraints,
     );
 
     let mut funcs = IndexMap::new();

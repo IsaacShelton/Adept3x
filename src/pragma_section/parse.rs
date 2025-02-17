@@ -1,6 +1,9 @@
 use super::PragmaSection;
 use crate::{
-    ast::{AstFile, Expr, ExprKind, Func, FuncHead, Params, Privacy, Stmt, StmtKind, TypeKind},
+    ast::{
+        AstFile, Expr, ExprKind, Func, FuncHead, Params, Privacy, Stmt, StmtKind, TypeKind,
+        TypeParams,
+    },
     diagnostics::ErrorDiagnostic,
     inflow::Inflow,
     parser::{self, error::ParseError, Input},
@@ -103,7 +106,7 @@ impl PragmaSection {
             ast_file.funcs.push(Func {
                 head: FuncHead {
                     name: "main".into(),
-                    named_type_params: vec![],
+                    type_params: TypeParams::default(),
                     givens: vec![],
                     params: Params::default(),
                     return_type: TypeKind::Void.at(source),

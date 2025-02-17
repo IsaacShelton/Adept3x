@@ -61,7 +61,7 @@ impl Type {
                 .flat_map(|param| param.ast_type.contains_polymorph())
                 .next()
                 .or_else(|| func_pointer.return_type.contains_polymorph()),
-            TypeKind::Polymorph(_, _) => Some(self.source),
+            TypeKind::Polymorph(_) => Some(self.source),
         }
     }
 }

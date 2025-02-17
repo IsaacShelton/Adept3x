@@ -19,16 +19,8 @@ pub fn resolve_impl_arg(
 ) -> Result<(), ResolveError> {
     let impl_arg = &using.ty;
 
-    if let ast::TypeKind::Polymorph(polymorph, args_to_polymorph) = &impl_arg.kind {
-        resolve_polymorph_impl_arg(
-            ctx,
-            callee,
-            using,
-            polymorph,
-            args_to_polymorph,
-            used_names,
-            catalog,
-        )
+    if let ast::TypeKind::Polymorph(polymorph) = &impl_arg.kind {
+        resolve_polymorph_impl_arg(ctx, callee, using, polymorph, used_names, catalog)
     } else {
         resolve_concrete_impl_arg(ctx, callee, using, impl_arg, used_names, catalog)
     }
@@ -72,19 +64,11 @@ fn resolve_polymorph_impl_arg(
     callee: &mut Callee,
     using: &Using,
     polymorph: &str,
-    args_to_polymorph: &[ast::Type],
     used_names: &mut HashSet<String>,
     catalog: &mut PolyCatalog,
 ) -> Result<(), ResolveError> {
     let impl_arg_source = using.ty.source;
     let callee_func = ctx.asg.funcs.get(callee.func_ref).unwrap();
-
-    if !args_to_polymorph.is_empty() {
-        return Err(ResolveError::other(
-            "Implementation polymorphs cannot take type arguments",
-            impl_arg_source,
-        ));
-    }
 
     let Some(current_func_ref) = ctx.func_ref else {
         return Err(ResolveError::other(

@@ -1,4 +1,4 @@
-use super::{Type, TypeParameters};
+use super::{Type, TypeParams};
 use crate::{ast::Privacy, name::ResolvedName, source_files::Source};
 use indexmap::IndexMap;
 
@@ -7,7 +7,7 @@ pub struct Struct {
     pub name: ResolvedName,
     pub fields: IndexMap<String, Field>,
     pub is_packed: bool,
-    pub params: TypeParameters,
+    pub params: TypeParams,
     pub source: Source,
 }
 

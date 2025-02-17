@@ -110,7 +110,7 @@ impl<'a> PolyRecipeResolver<'a> {
 
                 asg::TypeKind::TypeAlias(human_name.clone(), *type_alias_ref, args).at(ty.source)
             }
-            asg::TypeKind::Polymorph(name, _) => {
+            asg::TypeKind::Polymorph(name) => {
                 let Some(value) = self.get(name) else {
                     return Err(PolymorphErrorKind::UndefinedPolymorph(name.clone()).at(ty.source));
                 };

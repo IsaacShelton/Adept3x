@@ -6,7 +6,7 @@ use super::{
     variable_haystack::VariableHaystack,
 };
 use crate::{
-    asg::{Asg, CurrentConstraints, HelperExprDecl},
+    asg::{Asg, HelperExprDecl},
     ast::AstWorkspace,
 };
 
@@ -41,7 +41,6 @@ pub fn resolve_helper_expressions(
                     impls_in_modules: &ctx.impls_in_modules,
                     module_fs_node_id: module_file_id,
                     physical_fs_node_id: *physical_file_id,
-                    current_constraints: CurrentConstraints::new_empty(),
                 };
 
                 resolve_expr(

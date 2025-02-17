@@ -1,6 +1,8 @@
-use super::{Asg, Constraint, TypeKind};
-use crate::{ast::Privacy, source_files::Source};
-use indexmap::IndexMap;
+use super::{Asg, TypeKind};
+use crate::{
+    ast::{self, Privacy},
+    source_files::Source,
+};
 
 #[derive(Clone, Debug)]
 pub struct TypeDecl {
@@ -15,26 +17,4 @@ impl TypeDecl {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct TypeParameters {
-    pub parameters: IndexMap<String, TypeParameter>,
-}
-
-impl TypeParameters {
-    pub fn len(&self) -> usize {
-        self.parameters.len()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &TypeParameter)> {
-        self.parameters.iter()
-    }
-
-    pub fn names(&self) -> impl Iterator<Item = &String> {
-        self.parameters.keys()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct TypeParameter {
-    pub constraints: Vec<Constraint>,
-}
+pub type TypeParams = ast::TypeParams;

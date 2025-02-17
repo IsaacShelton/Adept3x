@@ -40,10 +40,7 @@ pub use implementation::*;
 use indexmap::IndexMap;
 pub use overload::*;
 use slotmap::{new_key_type, SlotMap};
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use std::{borrow::Cow, collections::HashSet};
 pub use stmt::*;
 pub use structure::*;
 pub use trait_constraint::*;
@@ -115,7 +112,7 @@ impl<'a> Asg<'a> {
                 let polymorphs = IndexMap::<String, PolyValue>::from_iter(
                     alias
                         .params
-                        .iter()
+                        .names()
                         .cloned()
                         .zip(type_args.iter().cloned().map(PolyValue::Type)),
                 );

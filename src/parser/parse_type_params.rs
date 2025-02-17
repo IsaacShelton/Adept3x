@@ -3,17 +3,14 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{TypeKind, TypeParam},
+    ast::{TypeKind, TypeParams},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
-use indexmap::IndexMap;
+use indexmap::IndexSet;
 
 impl<'a, I: Inflow<Token>> Parser<'a, I> {
-    pub fn parse_type_parameter(
-        &mut self,
-        generics: &mut IndexMap<String, TypeParam>,
-    ) -> Result<(), ParseError> {
+    pub fn parse_type_param(&mut self, generics: &mut IndexSet<String>) -> Result<(), ParseError> {
         if !self.input.peek().is_polymorph() {
             return Err(ParseErrorKind::Expected {
                 expected: "polymorph".into(),
@@ -43,10 +40,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         }
 
         // TODO: CLEANUP: Clean up this part to not clone unless necessary
-        if generics
-            .insert(polymorph.clone(), TypeParam::new(constraints))
-            .is_some()
-        {
+        if !generics.insert(polymorph.clone()) {
             return Err(
                 ParseErrorKind::GenericTypeParameterAlreadyExists { name: polymorph }
                     .at(token.source),
@@ -56,8 +50,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         Ok(())
     }
 
-    pub fn parse_type_params(&mut self) -> Result<IndexMap<String, TypeParam>, ParseError> {
-        let mut parameters = IndexMap::new();
+    pub fn parse_type_params(&mut self) -> Result<TypeParams, ParseError> {
+        let mut params = IndexSet::new();
 
         if self.input.eat(TokenKind::OpenAngle) {
             self.ignore_newlines();
@@ -67,7 +61,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                     break;
                 }
 
-                self.parse_type_parameter(&mut parameters)?;
+                self.parse_type_param(&mut params)?;
 
                 if !self.input.eat(TokenKind::Comma) {
                     continue;
@@ -87,6 +81,6 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             }
         }
 
-        Ok(parameters)
+        Ok(params.into())
     }
 }

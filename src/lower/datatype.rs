@@ -23,7 +23,7 @@ pub fn lower_type(
 
     match &ty.kind {
         asg::TypeKind::Unresolved => panic!("got unresolved type during lower_type!"),
-        asg::TypeKind::Polymorph(name, _) => Err(LowerError::other(
+        asg::TypeKind::Polymorph(name) => Err(LowerError::other(
             format!("Cannot lower polymorph '${}' directly", name),
             ty.source,
         )),

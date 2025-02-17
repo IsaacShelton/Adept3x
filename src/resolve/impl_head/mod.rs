@@ -1,12 +1,10 @@
 mod for_alls;
 use super::{
-    collect_constraints::collect_constraints_into, ctx::ResolveCtx, error::ResolveError,
+    collect_polymorphs::collect_polymorphs, ctx::ResolveCtx, error::ResolveError,
     func_head::create_func_head, job::FuncJob, type_ctx::ResolveTypeOptions,
 };
 use crate::{
-    asg::{
-        self, Asg, CurrentConstraints, Func, GenericTraitRef, ImplDecl, ImplRef, TraitFunc, Type,
-    },
+    asg::{self, Asg, Func, GenericTraitRef, ImplDecl, ImplRef, TraitFunc, Type},
     ast::{self, AstFile, Privacy},
     cli::BuildOptions,
     name::{Name, ResolvedName},
@@ -15,8 +13,7 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 use for_alls::ForAlls;
-use indexmap::IndexMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn create_impl_heads(
     ctx: &mut ResolveCtx,
@@ -47,7 +44,7 @@ pub fn create_impl_heads(
             let concrete_trait = &asg_impl.target;
 
             let mut expected = HashMap::new();
-            for (name, arg) in trait_def.params.iter().zip(concrete_trait.args.iter()) {
+            for (name, arg) in trait_def.params.names().zip(concrete_trait.args.iter()) {
                 assert!(expected.insert(name.as_str(), arg).is_none());
             }
 
@@ -101,12 +98,12 @@ fn ensure_satisfies_trait_func(
         ));
     }
 
-    let mut mappings = HashMap::new();
+    let mut mappings = HashSet::new();
     for sub in expected.values() {
-        collect_constraints_into(&mut mappings, sub);
+        collect_polymorphs(&mut mappings, sub);
     }
 
-    let mut for_alls = ForAlls::new(mappings.into_keys().collect());
+    let mut for_alls = ForAlls::new(mappings);
 
     if trait_func.params.is_cstyle_vararg != impl_func.params.is_cstyle_vararg {
         return Err(ResolveError::other(
@@ -284,11 +281,7 @@ fn matches(
             }
             _ => Err(mismatch(ty_in_impl.source)),
         },
-        asg::TypeKind::Polymorph(in_trait, trait_constraints) => {
-            if !trait_constraints.is_empty() {
-                return Err(mismatch(ty_in_impl.source));
-            }
-
+        asg::TypeKind::Polymorph(in_trait) => {
             if let Some(substituation) = expected.get(in_trait.as_str()) {
                 if *substituation != ty_in_impl {
                     return Err(mismatch(ty_in_impl.source));
@@ -297,11 +290,7 @@ fn matches(
             }
 
             match &ty_in_impl.kind {
-                asg::TypeKind::Polymorph(in_impl, impl_constraints) => {
-                    if !impl_constraints.is_empty() {
-                        return Err(mismatch(ty_in_impl.source));
-                    }
-
+                asg::TypeKind::Polymorph(in_impl) => {
                     for_alls.insert(in_trait.clone(), in_impl.clone(), ty_in_impl.source)
                 }
                 _ => Err(mismatch(ty_in_impl.source)),
@@ -318,26 +307,12 @@ pub fn create_impl_head<'a>(
     physical_fs_node_id: FsNodeId,
     imp: &ast::Impl,
 ) -> Result<asg::ImplRef, ResolveError> {
-    let pre_parameters_constraints = CurrentConstraints::new_empty();
-
     let type_ctx = ResolveTypeCtx::new(
         &asg,
         module_fs_node_id,
         physical_fs_node_id,
         &ctx.types_in_modules,
-        &pre_parameters_constraints,
     );
-
-    if imp
-        .params
-        .values()
-        .any(|param| !param.constraints.is_empty())
-    {
-        return Err(ResolveError::other(
-            "Constraints on implementation name parameters are not supported yet",
-            imp.source,
-        ));
-    }
 
     let ty = type_ctx.resolve(&imp.target, ResolveTypeOptions::Unalias)?;
     let concrete_trait = into_trait(&ty)?;
@@ -390,7 +365,7 @@ pub fn create_impl_head<'a>(
     }
 
     let impl_ref = asg.impls.insert(asg::Impl {
-        name_params: IndexMap::from_iter(imp.params.keys().cloned().map(|key| (key, ()))),
+        params: imp.params.clone(),
         target: concrete_trait,
         source: imp.source,
         body: HashMap::default(),

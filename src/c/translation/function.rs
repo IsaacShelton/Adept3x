@@ -1,5 +1,6 @@
 use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
+    asg::TypeParams,
     ast::{self, AstFile, Func, FuncHead, Param, Params, Privacy},
     c::parser::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
@@ -66,16 +67,14 @@ pub fn declare_function(
         return Ok(());
     }
 
-    let parameters = Params {
-        required,
-        is_cstyle_vararg: parameter_type_list.is_variadic,
-    };
-
     let head = FuncHead {
         name,
-        named_type_params: vec![],
+        type_params: TypeParams::default(),
         givens: vec![],
-        params: parameters,
+        params: Params {
+            required,
+            is_cstyle_vararg: parameter_type_list.is_variadic,
+        },
         return_type,
         is_foreign: true,
         source,

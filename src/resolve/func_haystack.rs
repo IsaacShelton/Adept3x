@@ -106,13 +106,13 @@ impl FuncHaystack {
 
         let mut catalog = existing_catalog.unwrap_or_default();
 
-        if generics.len() > function.named_type_args.len() {
+        if generics.len() > function.type_params.len() {
             return None;
         }
 
         for (name, poly_value) in function
-            .named_type_args
-            .iter()
+            .type_params
+            .names()
             .take(generics.len())
             .zip(generics.iter())
         {

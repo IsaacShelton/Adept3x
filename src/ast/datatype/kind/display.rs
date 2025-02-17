@@ -3,7 +3,6 @@ use crate::{
     ast::{fmt_c_integer, FloatSize, IntegerBits, TypeArg},
     ir::IntegerSign,
 };
-use itertools::Itertools;
 use std::fmt::Display;
 
 impl Display for &TypeKind {
@@ -69,13 +68,8 @@ impl Display for &TypeKind {
             TypeKind::FuncPtr(_function) => {
                 write!(f, "(function pointer type)")?;
             }
-            TypeKind::Polymorph(polymorph, constraints) => {
+            TypeKind::Polymorph(polymorph) => {
                 write!(f, "${}", polymorph)?;
-
-                if !constraints.is_empty() {
-                    write!(f, ": ")?;
-                    write!(f, "{}", constraints.iter().map(|x| x.to_string()).join("+"))?;
-                }
             }
         }
 

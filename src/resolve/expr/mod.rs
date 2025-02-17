@@ -25,10 +25,7 @@ use super::{
     Initialized, ResolveTypeCtx,
 };
 use crate::{
-    asg::{
-        self, Asg, CurrentConstraints, Expr, ExprKind, FuncRef, IntegerBits, StructRef, TypeKind,
-        TypedExpr,
-    },
+    asg::{self, Asg, Expr, ExprKind, FuncRef, IntegerBits, StructRef, TypeKind, TypedExpr},
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
         UnaryOperator,
@@ -65,7 +62,6 @@ pub struct ResolveExprCtx<'ast, 'root_ctx> {
     pub impls_in_modules: &'root_ctx HashMap<FsNodeId, HashMap<String, asg::ImplDecl>>,
     pub module_fs_node_id: FsNodeId,
     pub physical_fs_node_id: FsNodeId,
-    pub current_constraints: CurrentConstraints,
 }
 
 impl<'a, 'b> ResolveExprCtx<'a, 'b> {

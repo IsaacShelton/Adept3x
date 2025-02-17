@@ -4,7 +4,7 @@ use super::{
     type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
 };
 use crate::{
-    asg::{self, Asg, CurrentConstraints, GlobalVarDecl},
+    asg::{self, Asg, GlobalVarDecl},
     ast::AstWorkspace,
     name::{Name, ResolvedName},
 };
@@ -14,8 +14,6 @@ pub fn resolve_global_variables(
     asg: &mut Asg,
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
-    let constraints = CurrentConstraints::new_empty();
-
     for (physical_file_id, file) in ast_workspace.files.iter() {
         let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
@@ -25,7 +23,6 @@ pub fn resolve_global_variables(
                 module_file_id,
                 *physical_file_id,
                 &ctx.types_in_modules,
-                &constraints,
             );
 
             let ty = type_ctx.resolve(&global.ast_type, ResolveTypeOptions::Unalias)?;

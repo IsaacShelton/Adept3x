@@ -1,9 +1,6 @@
 use super::{resolve_expr, PreferredType, ResolveExprCtx, ResolveExprMode};
 use crate::{
-    asg::{
-        self, Constraint, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate,
-        TypedExpr,
-    },
+    asg::{self, FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate, TypedExpr},
     ast,
     resolve::{
         error::{ResolveError, ResolveErrorKind},
@@ -88,19 +85,16 @@ pub fn resolve_basic_binary_operation_expr(
 }
 
 pub fn resolve_basic_binary_operator(
-    ctx: &ResolveExprCtx,
+    _ctx: &ResolveExprCtx,
     ast_operator: &ast::BasicBinaryOperator,
     ty: &asg::Type,
     source: Source,
 ) -> Result<asg::BasicBinaryOperator, ResolveError> {
     let resolved_operator = match ast_operator {
-        ast::BasicBinaryOperator::Add => NumericMode::try_new(ty)
-            .map(asg::BasicBinaryOperator::Add)
-            .or_else(|| {
-                ctx.current_constraints
-                    .satisfies(ty, &Constraint::PrimitiveAdd)
-                    .then(|| asg::BasicBinaryOperator::PrimitiveAdd(ty.clone()))
-            }),
+        ast::BasicBinaryOperator::Add => {
+            NumericMode::try_new(ty).map(asg::BasicBinaryOperator::Add)
+        }
+
         ast::BasicBinaryOperator::Subtract => {
             NumericMode::try_new(ty).map(asg::BasicBinaryOperator::Subtract)
         }

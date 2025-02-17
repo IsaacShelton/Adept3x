@@ -1,6 +1,6 @@
 mod params;
 
-use super::{Given, Privacy, Stmt, Type};
+use super::{Given, Privacy, Stmt, Type, TypeParams};
 use crate::{source_files::Source, tag::Tag};
 pub use params::{Param, Params};
 
@@ -13,7 +13,7 @@ pub struct Func {
 #[derive(Clone, Debug)]
 pub struct FuncHead {
     pub name: String,
-    pub named_type_params: Vec<String>,
+    pub type_params: TypeParams,
     pub givens: Vec<Given>,
     pub params: Params,
     pub return_type: Type,
@@ -32,7 +32,7 @@ impl FuncHead {
                 .required
                 .iter()
                 .any(|param| param.ast_type.contains_polymorph().is_some())
-            || !self.named_type_params.is_empty()
+            || !self.type_params.is_empty()
             || !self.givens.is_empty()
     }
 }

@@ -83,7 +83,7 @@ pub fn resolve_static_member_call(
         ast::TypeKind::Named(impl_name, impl_args) => {
             resolve_static_member_call_named(ctx, static_member_call, impl_name, impl_args)
         }
-        ast::TypeKind::Polymorph(polymorph, _constraints) => {
+        ast::TypeKind::Polymorph(polymorph) => {
             resolve_static_member_call_polymorph(ctx, static_member_call, polymorph)
         }
         _ => Err(ResolveError::other(
@@ -162,7 +162,7 @@ pub fn resolve_impl_mention(
         .get(impl_decl.impl_ref)
         .expect("public impl of impl decl to exist");
 
-    if imp.name_params.len() != impl_args.len() {
+    if imp.params.len() != impl_args.len() {
         return Err(ResolveError::other(
             "Wrong number of arguments for implementation",
             source,
@@ -171,7 +171,7 @@ pub fn resolve_impl_mention(
 
     let mut catalog = PolyCatalog::default();
 
-    for (name, arg) in imp.name_params.keys().zip(impl_args) {
+    for (name, arg) in imp.params.names().zip(impl_args) {
         match arg {
             ast::TypeArg::Type(ty) => {
                 catalog
@@ -349,7 +349,7 @@ pub fn resolve_static_member_call_polymorph(
     }
 
     let mut values = IndexMap::new();
-    for (type_param_name, ty) in trait_decl.params.iter().zip(generic_trait_ref.args.iter()) {
+    for (type_param_name, ty) in trait_decl.params.names().zip(generic_trait_ref.args.iter()) {
         assert!(values.insert(type_param_name.clone(), ty.clone()).is_none());
     }
     let recipe = PolyRecipe::from(values);

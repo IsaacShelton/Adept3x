@@ -91,7 +91,7 @@ pub fn lower_struct(
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     // NOTE: We only lower polymorphic structures on-demand, so skip them for now
-    if !structure.params.parameters.is_empty() {
+    if !structure.params.is_empty() {
         return Ok(());
     }
 
