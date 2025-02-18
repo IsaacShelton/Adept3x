@@ -1,15 +1,16 @@
 use crate::{resolve::error::ResolveError, source_files::Source};
-use std::collections::{HashMap, HashSet};
+use indexmap::IndexSet;
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct ForAlls {
-    substitution_polys: HashSet<String>,
+    substitution_polys: IndexSet<String>,
     trait_to_impl: HashMap<String, String>,
     impl_to_trait: HashMap<String, String>,
 }
 
 impl ForAlls {
-    pub fn new(substitution_polys: HashSet<String>) -> Self {
+    pub fn new(substitution_polys: IndexSet<String>) -> Self {
         Self {
             substitution_polys,
             trait_to_impl: Default::default(),

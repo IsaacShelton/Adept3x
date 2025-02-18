@@ -13,7 +13,8 @@ use crate::{
     workspace::fs::FsNodeId,
 };
 use for_alls::ForAlls;
-use std::collections::{HashMap, HashSet};
+use indexmap::IndexSet;
+use std::collections::HashMap;
 
 pub fn create_impl_heads(
     ctx: &mut ResolveCtx,
@@ -98,7 +99,7 @@ fn ensure_satisfies_trait_func(
         ));
     }
 
-    let mut mappings = HashSet::new();
+    let mut mappings = IndexSet::new();
     for sub in expected.values() {
         collect_polymorphs(&mut mappings, sub);
     }
