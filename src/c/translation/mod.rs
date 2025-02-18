@@ -9,8 +9,8 @@ pub use self::{expr::translate_expr, function::declare_function};
 use crate::{
     asg::TypeParams,
     ast::{self, AstFile, Privacy},
-    c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError},
-    diagnostics::Diagnostics,
+    c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError, StorageClassSpecifier},
+    diagnostics::{Diagnostics, WarningDiagnostic},
 };
 use std::collections::HashMap;
 
@@ -22,7 +22,7 @@ pub fn declare_named_declaration(
     typedefs: &mut HashMap<String, CTypedef>,
     diagnostics: &Diagnostics,
 ) -> Result<(), ParseError> {
-    let (name, ast_type, is_typedef) = get_name_and_type(
+    let (name, ast_type, storage_class, function_specifier) = get_name_and_type(
         ast_file,
         typedefs,
         declarator,
@@ -31,7 +31,17 @@ pub fn declare_named_declaration(
         diagnostics,
     )?;
 
-    if is_typedef {
+    if let Some(StorageClassSpecifier::Typedef) = storage_class {
+        if let Some(function_specifier) = function_specifier {
+            diagnostics.push(WarningDiagnostic::new(
+                format!(
+                    "Function specifier '{}' does nothing on typedef",
+                    function_specifier.as_str()
+                ),
+                declarator.source,
+            ));
+        }
+
         ast_file.type_aliases.push(ast::TypeAlias {
             name: name.clone(),
             params: TypeParams::default(),

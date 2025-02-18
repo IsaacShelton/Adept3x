@@ -34,8 +34,18 @@ pub fn get_caster_type(
 
     let base = builder.build()?;
 
-    if base.is_typedef {
-        todo!("error message for typedef base in caster");
+    if base.storage_class.is_some() {
+        return Err(ParseError::message(
+            "Storage class specifier cannot be used on cast",
+            caster.source,
+        ));
+    }
+
+    if base.function_specifier.is_some() {
+        return Err(ParseError::message(
+            "Storage class specifier cannot be used on cast",
+            caster.source,
+        ));
     }
 
     Ok(base.ast_type)

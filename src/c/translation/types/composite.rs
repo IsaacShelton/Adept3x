@@ -54,18 +54,28 @@ pub fn make_composite(
                         for member_declarator in member.member_declarators.iter() {
                             match member_declarator {
                                 MemberDeclarator::Declarator(declarator) => {
-                                    let (name, ast_type, is_typedef) = get_name_and_type(
-                                        ast_file,
-                                        typedefs,
-                                        declarator,
-                                        &DeclarationSpecifiers::from(&member.specifier_qualifiers),
-                                        false,
-                                        diagnostics,
-                                    )?;
+                                    let (name, ast_type, storage_class, function_specifier) =
+                                        get_name_and_type(
+                                            ast_file,
+                                            typedefs,
+                                            declarator,
+                                            &DeclarationSpecifiers::from(
+                                                &member.specifier_qualifiers,
+                                            ),
+                                            false,
+                                            diagnostics,
+                                        )?;
 
-                                    if is_typedef {
+                                    if storage_class.is_some() {
                                         return Err(ParseErrorKind::Misc(
-                                            "Cannot typedef a composite's member",
+                                            "Storage classes not supported here",
+                                        )
+                                        .at(declarator.source));
+                                    }
+
+                                    if function_specifier.is_some() {
+                                        return Err(ParseErrorKind::Misc(
+                                            "Function specifiers cannot be used here",
                                         )
                                         .at(declarator.source));
                                     }

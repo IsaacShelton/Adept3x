@@ -25,55 +25,13 @@ pub fn get_type_base(
 
     for specifier in declaration_specifiers.specifiers.iter() {
         match &specifier.kind {
-            DeclarationSpecifierKind::Auto => {
-                return Err(ParseError::message(
-                    "'auto' not supported yet",
-                    specifier.source,
-                ))
+            DeclarationSpecifierKind::StorageClassSpecifier(storage_class) => {
+                builder.storage_class = Some(*storage_class);
             }
-            DeclarationSpecifierKind::Constexpr => {
-                return Err(ParseError::message(
-                    "'constexpr' not supported yet",
-                    specifier.source,
-                ))
+            DeclarationSpecifierKind::FunctionSpecifier(function_specifier) => {
+                builder.function_specifier = Some(*function_specifier);
             }
-            DeclarationSpecifierKind::Extern => {
-                return Err(ParseError::message(
-                    "'extern' not supported yet",
-                    specifier.source,
-                ))
-            }
-            DeclarationSpecifierKind::Register => {
-                return Err(ParseError::message(
-                    "'register' declaration specifier not supported yet",
-                    specifier.source,
-                ))
-            }
-            DeclarationSpecifierKind::Static => {
-                return Err(ParseError::message(
-                    "'static' declaration specifier not supported yet",
-                    specifier.source,
-                ))
-            }
-            DeclarationSpecifierKind::ThreadLocal => {
-                return Err(ParseError::message(
-                    "'thread_local' declaration specifier not supported yet",
-                    specifier.source,
-                ))
-            }
-            DeclarationSpecifierKind::Typedef => builder.is_typedef = true,
-            DeclarationSpecifierKind::Inline => {
-                return Err(ParseError::message(
-                    "'inline' declaration specifier not supported yet",
-                    specifier.source,
-                ))
-            }
-            DeclarationSpecifierKind::Noreturn => {
-                return Err(ParseError::message(
-                    "'_Noreturn' declaration specifier not supported yet",
-                    specifier.source,
-                ))
-            }
+
             DeclarationSpecifierKind::TypeSpecifierQualifier(tsq) => {
                 build_type_specifier_qualifier(ast_file, &mut builder, typedefs, tsq, diagnostics)?
             }

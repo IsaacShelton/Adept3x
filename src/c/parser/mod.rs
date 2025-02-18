@@ -21,7 +21,7 @@ use crate::{
     diagnostics::{Diagnostics, WarningDiagnostic},
     source_files::source::Source,
 };
-use derive_more::IsVariant;
+use derive_more::{From, IsVariant};
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -202,8 +202,8 @@ impl From<TypeSpecifierQualifier> for DeclarationSpecifier {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum DeclarationSpecifierKind {
+#[derive(Copy, Clone, Debug, IsVariant)]
+pub enum StorageClassSpecifier {
     Auto,
     Constexpr,
     Extern,
@@ -211,8 +211,41 @@ pub enum DeclarationSpecifierKind {
     Static,
     ThreadLocal,
     Typedef,
+}
+
+impl StorageClassSpecifier {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StorageClassSpecifier::Auto => "auto",
+            StorageClassSpecifier::Constexpr => "constexpr",
+            StorageClassSpecifier::Extern => "extern",
+            StorageClassSpecifier::Register => "register",
+            StorageClassSpecifier::Static => "static",
+            StorageClassSpecifier::ThreadLocal => "thread_local",
+            StorageClassSpecifier::Typedef => "typedef",
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, IsVariant)]
+pub enum FunctionSpecifier {
     Inline,
     Noreturn,
+}
+
+impl FunctionSpecifier {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FunctionSpecifier::Inline => "inline",
+            FunctionSpecifier::Noreturn => "_Noreturn",
+        }
+    }
+}
+
+#[derive(Clone, Debug, From)]
+pub enum DeclarationSpecifierKind {
+    StorageClassSpecifier(StorageClassSpecifier),
+    FunctionSpecifier(FunctionSpecifier),
     TypeSpecifierQualifier(TypeSpecifierQualifier),
 }
 
@@ -565,16 +598,16 @@ impl<'a> Parser<'a> {
         let CToken { kind, source } = self.input.peek();
         let source = *source;
 
-        let result = match kind {
-            CTokenKind::AutoKeyword => DeclarationSpecifierKind::Auto,
-            CTokenKind::ConstexprKeyword => DeclarationSpecifierKind::Constexpr,
-            CTokenKind::ExternKeyword => DeclarationSpecifierKind::Extern,
-            CTokenKind::RegisterKeyword => DeclarationSpecifierKind::Register,
-            CTokenKind::StaticKeyword => DeclarationSpecifierKind::Static,
-            CTokenKind::ThreadLocalKeyword => DeclarationSpecifierKind::ThreadLocal,
-            CTokenKind::TypedefKeyword => DeclarationSpecifierKind::Typedef,
-            CTokenKind::InlineKeyword => DeclarationSpecifierKind::Inline,
-            CTokenKind::NoreturnKeyword => DeclarationSpecifierKind::Noreturn,
+        let result: DeclarationSpecifierKind = match kind {
+            CTokenKind::AutoKeyword => StorageClassSpecifier::Auto.into(),
+            CTokenKind::ConstexprKeyword => StorageClassSpecifier::Constexpr.into(),
+            CTokenKind::ExternKeyword => StorageClassSpecifier::Extern.into(),
+            CTokenKind::RegisterKeyword => StorageClassSpecifier::Register.into(),
+            CTokenKind::StaticKeyword => StorageClassSpecifier::Static.into(),
+            CTokenKind::ThreadLocalKeyword => StorageClassSpecifier::ThreadLocal.into(),
+            CTokenKind::TypedefKeyword => StorageClassSpecifier::Typedef.into(),
+            CTokenKind::InlineKeyword => FunctionSpecifier::Inline.into(),
+            CTokenKind::NoreturnKeyword => FunctionSpecifier::Noreturn.into(),
             _ => {
                 return Ok(DeclarationSpecifierKind::TypeSpecifierQualifier(
                     self.parse_type_specifier_qualifier()?,

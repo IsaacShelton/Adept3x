@@ -14,8 +14,9 @@ use crate::{
     ast::{AstFile, CInteger, FloatSize, IntegerSign, Param, Type, TypeKind},
     c::parser::{
         error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator,
-        DeclaratorKind, Decorator, Decorators, FunctionQualifier, ParameterDeclarationCore,
-        ParseError, TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
+        DeclaratorKind, Decorator, Decorators, FunctionQualifier, FunctionSpecifier,
+        ParameterDeclarationCore, ParseError, StorageClassSpecifier, TypeQualifierKind,
+        TypeSpecifierKind, TypeSpecifierQualifier,
     },
     diagnostics::Diagnostics,
     source_files::Source,
@@ -25,7 +26,8 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct TypeBase {
     pub ast_type: Type,
-    pub is_typedef: bool,
+    pub storage_class: Option<StorageClassSpecifier>,
+    pub function_specifier: Option<FunctionSpecifier>,
 }
 
 #[derive(Debug)]
@@ -34,7 +36,8 @@ pub struct TypeBaseBuilder {
     pub size: Option<CInteger>,
     pub sign: Option<IntegerSign>,
     pub concrete: Option<Type>,
-    pub is_typedef: bool,
+    pub storage_class: Option<StorageClassSpecifier>,
+    pub function_specifier: Option<FunctionSpecifier>,
 }
 
 impl TypeBaseBuilder {
@@ -44,7 +47,8 @@ impl TypeBaseBuilder {
             size: None,
             sign: None,
             concrete: None,
-            is_typedef: false,
+            storage_class: None,
+            function_specifier: None,
         }
     }
 
@@ -63,11 +67,10 @@ impl TypeBaseBuilder {
             return Err(ParseErrorKind::InvalidType.at(self.source));
         };
 
-        let is_typedef = self.is_typedef;
-
         Ok(TypeBase {
             ast_type,
-            is_typedef,
+            storage_class: self.storage_class,
+            function_specifier: self.function_specifier,
         })
     }
 
@@ -189,7 +192,15 @@ pub fn get_name_and_type(
     declaration_specifiers: &DeclarationSpecifiers,
     for_parameter: bool,
     diagnostics: &Diagnostics,
-) -> Result<(String, Type, bool), ParseError> {
+) -> Result<
+    (
+        String,
+        Type,
+        Option<StorageClassSpecifier>,
+        Option<FunctionSpecifier>,
+    ),
+    ParseError,
+> {
     let (name, decorators) = get_name_and_decorators(ast_file, typedefs, declarator, diagnostics)?;
     let type_base = get_type_base(
         ast_file,
@@ -223,7 +234,12 @@ pub fn get_name_and_type(
         }
     }
 
-    Ok((name, ast_type, type_base.is_typedef))
+    Ok((
+        name,
+        ast_type,
+        type_base.storage_class,
+        type_base.function_specifier,
+    ))
 }
 
 fn get_name_and_decorators(
@@ -250,7 +266,7 @@ fn get_name_and_decorators(
                 for parameter in parameter_type_list.parameter_declarations.iter() {
                     let (parameter_name, parameter_type) = match &parameter.core {
                         ParameterDeclarationCore::Declarator(declarator) => {
-                            let (parameter_name, ast_type, _) = get_name_and_type(
+                            let (parameter_name, ast_type, _, _) = get_name_and_type(
                                 ast_file,
                                 typedefs,
                                 declarator,
