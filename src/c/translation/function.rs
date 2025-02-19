@@ -20,14 +20,15 @@ pub fn declare_function(
     diagnostics: &Diagnostics,
 ) -> Result<(), ParseError> {
     let source = declarator.source;
-    let (name, return_type, storage_class, function_specifier) = get_name_and_type(
-        ast_file,
-        typedefs,
-        declarator,
-        declaration_specifiers,
-        false,
-        diagnostics,
-    )?;
+    let (name, return_type, storage_class, function_specifier, _is_thread_local) =
+        get_name_and_type(
+            ast_file,
+            typedefs,
+            declarator,
+            declaration_specifiers,
+            false,
+            diagnostics,
+        )?;
     let mut required = vec![];
 
     if function_specifier.is_some() {
@@ -36,7 +37,7 @@ pub fn declare_function(
 
     if has_parameters(parameter_type_list) {
         for param in parameter_type_list.parameter_declarations.iter() {
-            let (name, ast_type, storage_class, function_specifier) = match &param.core {
+            let (name, ast_type, storage_class, function_specifier, _) = match &param.core {
                 ParameterDeclarationCore::Declarator(declarator) => get_name_and_type(
                     ast_file,
                     typedefs,

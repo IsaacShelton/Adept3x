@@ -54,7 +54,7 @@ pub fn make_composite(
                         for member_declarator in member.member_declarators.iter() {
                             match member_declarator {
                                 MemberDeclarator::Declarator(declarator) => {
-                                    let (name, ast_type, storage_class, function_specifier) =
+                                    let (name, ast_type, storage_class, function_specifier, _) =
                                         get_name_and_type(
                                             ast_file,
                                             typedefs,

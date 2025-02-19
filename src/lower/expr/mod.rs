@@ -267,7 +267,15 @@ pub fn lower_expr(
             Ok(builder.push(ir::Instr::Load((member, ir_type))))
         }
         ExprKind::ArrayAccess(array_access) => {
-            let subject = lower_expr(builder, ir_module, &array_access.subject, function, asg)?;
+            let subject = match &array_access.subject {
+                asg::ArrayDestination::Expr(subject) => {
+                    lower_expr(builder, ir_module, subject, function, asg)?
+                }
+                asg::ArrayDestination::Destination(subject) => {
+                    lower_destination(builder, ir_module, subject, function, asg)?
+                }
+            };
+
             let index = lower_expr(builder, ir_module, &array_access.index, function, asg)?;
             let item_type = lower_type(ir_module, &builder.unpoly(&array_access.item_type)?, asg)?;
 
@@ -602,8 +610,15 @@ pub fn lower_destination(
             }))
         }
         DestinationKind::ArrayAccess(array_access) => {
-            let subject_pointer =
-                lower_expr(builder, ir_module, &array_access.subject, function, asg)?;
+            let subject_pointer = match &array_access.subject {
+                asg::ArrayDestination::Expr(subject) => {
+                    lower_expr(builder, ir_module, subject, function, asg)?
+                }
+                asg::ArrayDestination::Destination(subject) => {
+                    lower_destination(builder, ir_module, subject, function, asg)?
+                }
+            };
+
             let index = lower_expr(builder, ir_module, &array_access.index, function, asg)?;
             let item_type = lower_type(ir_module, &builder.unpoly(&array_access.item_type)?, asg)?;
 

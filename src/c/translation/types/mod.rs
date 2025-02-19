@@ -28,6 +28,7 @@ pub struct TypeBase {
     pub ast_type: Type,
     pub storage_class: Option<StorageClassSpecifier>,
     pub function_specifier: Option<FunctionSpecifier>,
+    pub is_thread_local: bool,
 }
 
 #[derive(Debug)]
@@ -38,6 +39,7 @@ pub struct TypeBaseBuilder {
     pub concrete: Option<Type>,
     pub storage_class: Option<StorageClassSpecifier>,
     pub function_specifier: Option<FunctionSpecifier>,
+    pub is_thread_local: bool,
 }
 
 impl TypeBaseBuilder {
@@ -49,6 +51,7 @@ impl TypeBaseBuilder {
             concrete: None,
             storage_class: None,
             function_specifier: None,
+            is_thread_local: false,
         }
     }
 
@@ -71,6 +74,7 @@ impl TypeBaseBuilder {
             ast_type,
             storage_class: self.storage_class,
             function_specifier: self.function_specifier,
+            is_thread_local: false,
         })
     }
 
@@ -198,6 +202,7 @@ pub fn get_name_and_type(
         Type,
         Option<StorageClassSpecifier>,
         Option<FunctionSpecifier>,
+        bool,
     ),
     ParseError,
 > {
@@ -239,6 +244,7 @@ pub fn get_name_and_type(
         ast_type,
         type_base.storage_class,
         type_base.function_specifier,
+        type_base.is_thread_local,
     ))
 }
 
@@ -266,7 +272,7 @@ fn get_name_and_decorators(
                 for parameter in parameter_type_list.parameter_declarations.iter() {
                     let (parameter_name, parameter_type) = match &parameter.core {
                         ParameterDeclarationCore::Declarator(declarator) => {
-                            let (parameter_name, ast_type, _, _) = get_name_and_type(
+                            let (parameter_name, ast_type, _, _, _) = get_name_and_type(
                                 ast_file,
                                 typedefs,
                                 declarator,

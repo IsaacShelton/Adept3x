@@ -4,6 +4,7 @@ use crate::{
     ast,
     resolve::{
         conform::to_default::conform_expr_to_default_or_error,
+        destination::resolve_expr_to_destination,
         error::{ResolveError, ResolveErrorKind},
         Initialized,
     },
@@ -42,8 +43,17 @@ pub fn resolve_array_access_expr(
         c_integer_assumptions,
     )?;
 
-    let item_type = match &subject.ty.kind {
-        asg::TypeKind::Ptr(inner) => Ok((**inner).clone()),
+    let (item_type, subject) = match &subject.ty.kind {
+        asg::TypeKind::Ptr(inner) => {
+            let item_type = (**inner).clone();
+            let array_destination = subject.expr.into();
+            Ok((item_type, array_destination))
+        }
+        asg::TypeKind::FixedArray(fixed_array) => {
+            let item_type = fixed_array.inner.clone();
+            let array_destination = resolve_expr_to_destination(subject)?.into();
+            Ok((item_type, array_destination))
+        }
         bad_type => Err(ResolveErrorKind::CannotAccessMemberOf {
             bad_type: bad_type.to_string(),
         }
@@ -62,7 +72,7 @@ pub fn resolve_array_access_expr(
         item_type.clone(),
         asg::Expr::new(
             asg::ExprKind::ArrayAccess(Box::new(asg::ArrayAccess {
-                subject: subject.expr,
+                subject,
                 index: index.expr,
                 item_type,
             })),

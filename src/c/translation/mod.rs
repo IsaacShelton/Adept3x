@@ -22,7 +22,7 @@ pub fn declare_named_declaration(
     typedefs: &mut HashMap<String, CTypedef>,
     diagnostics: &Diagnostics,
 ) -> Result<(), ParseError> {
-    let (name, ast_type, storage_class, function_specifier) = get_name_and_type(
+    let (name, ast_type, storage_class, function_specifier, is_thread_local) = get_name_and_type(
         ast_file,
         typedefs,
         declarator,
@@ -51,6 +51,28 @@ pub fn declare_named_declaration(
         });
 
         typedefs.insert(name, CTypedef { ast_type });
+        return Ok(());
+    }
+
+    if let Some(StorageClassSpecifier::Extern) = storage_class {
+        if let Some(function_specifier) = function_specifier {
+            diagnostics.push(WarningDiagnostic::new(
+                format!(
+                    "Function specifier '{}' on functions is not respected yet",
+                    function_specifier.as_str()
+                ),
+                declarator.source,
+            ));
+        }
+
+        ast_file.global_variables.push(ast::GlobalVar {
+            name,
+            ast_type,
+            source: declarator.source,
+            is_foreign: true,
+            is_thread_local,
+            privacy: Privacy::Public,
+        });
         return Ok(());
     }
 
