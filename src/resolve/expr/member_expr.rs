@@ -66,6 +66,14 @@ pub fn resolve_member_expr(
 
     match found_field.privacy {
         Privacy::Public => (),
+        Privacy::Protected => {
+            if min_privacy != Privacy::Protected && min_privacy != Privacy::Private {
+                return Err(ResolveErrorKind::FieldIsPrivate {
+                    field_name: field_name.to_string(),
+                }
+                .at(subject.source));
+            }
+        }
         Privacy::Private => {
             if min_privacy != Privacy::Private {
                 return Err(ResolveErrorKind::FieldIsPrivate {

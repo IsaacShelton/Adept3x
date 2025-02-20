@@ -26,7 +26,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let mut is_foreign = false;
         let mut abide_abi = false;
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
         let mut givens = vec![];
 
         for annotation in annotations {
@@ -34,6 +34,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Private => privacy = Privacy::Private,
                 AnnotationKind::Using(given) => {
                     givens.push(given);
                 }

@@ -5,4 +5,5 @@ pub enum Privacy {
     #[default]
     Public,
     Private,
+    Protected,
 }

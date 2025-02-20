@@ -29,6 +29,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 "packed" => AnnotationKind::Packed,
                 "abide_abi" => AnnotationKind::AbideAbi,
                 "public" => AnnotationKind::Public,
+                "private" => AnnotationKind::Private,
                 "template" => AnnotationKind::Template,
                 "using" => AnnotationKind::Using({
                     let source = self.input.peek().source;
