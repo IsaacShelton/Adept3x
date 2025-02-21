@@ -20,7 +20,8 @@ use std::collections::HashMap;
 pub struct FuncHaystack {
     pub available: HashMap<ResolvedName, Vec<asg::FuncRef>>,
     pub imported_namespaces: Vec<Box<str>>,
-    pub fs_node_id: FsNodeId,
+    pub physical_fs_node_id: FsNodeId,
+    pub module_fs_node_id: FsNodeId,
 }
 
 #[derive(Clone, Debug)]
@@ -30,11 +31,16 @@ pub enum FindFunctionError {
 }
 
 impl FuncHaystack {
-    pub fn new(imported_namespaces: Vec<Box<str>>, fs_node_id: FsNodeId) -> Self {
+    pub fn new(
+        imported_namespaces: Vec<Box<str>>,
+        physical_fs_node_id: FsNodeId,
+        module_fs_node_id: FsNodeId,
+    ) -> Self {
         Self {
             available: Default::default(),
             imported_namespaces,
-            fs_node_id,
+            physical_fs_node_id,
+            module_fs_node_id,
         }
     }
 
@@ -46,19 +52,29 @@ impl FuncHaystack {
         arguments: &[TypedExpr],
         source: Source,
     ) -> Result<Callee, FindFunctionError> {
-        let resolved_name = ResolvedName::new(self.fs_node_id, name);
-
-        self.find_local(ctx, &resolved_name, generics, arguments, source)
-            .or_else(|| self.find_remote(ctx, &name, generics, arguments, source))
-            .or_else(|| self.find_imported(ctx, &name, generics, arguments, source))
+        self.find_local(ctx, name, generics, arguments, source)
+            .or_else(|| self.find_remote(ctx, name, generics, arguments, source))
+            .or_else(|| self.find_imported(ctx, name, generics, arguments, source))
             .unwrap_or(Err(FindFunctionError::NotDefined))
     }
 
     pub fn find_near_matches(&self, ctx: &ResolveExprCtx, name: &Name) -> Vec<String> {
         // TODO: Clean up this function
 
-        let resolved_name = ResolvedName::new(self.fs_node_id, name);
-        let local_matches = self.available.get(&resolved_name).into_iter().flatten();
+        let local_matches = self
+            .available
+            .get(&ResolvedName::new(self.module_fs_node_id, name))
+            .into_iter()
+            .chain(
+                (self.module_fs_node_id != self.physical_fs_node_id)
+                    .then(|| {
+                        self.available
+                            .get(&ResolvedName::new(self.physical_fs_node_id, name))
+                    })
+                    .into_iter()
+                    .flatten(),
+            )
+            .flatten();
 
         let remote_matches = (!name.namespace.is_empty())
             .then(|| {
@@ -187,15 +203,24 @@ impl FuncHaystack {
     fn find_local(
         &self,
         ctx: &ResolveExprCtx,
-        resolved_name: &ResolvedName,
+        name: &Name,
         generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
         let mut local_matches = self
             .available
-            .get(&resolved_name)
+            .get(&ResolvedName::new(self.module_fs_node_id, name))
             .into_iter()
+            .chain(
+                (self.module_fs_node_id != self.physical_fs_node_id)
+                    .then(|| {
+                        self.available
+                            .get(&ResolvedName::new(self.physical_fs_node_id, name))
+                    })
+                    .into_iter()
+                    .flatten(),
+            )
             .flatten()
             .flat_map(|f| Self::fits(ctx, *f, generics, arguments, None, source));
 

@@ -31,7 +31,11 @@ pub fn create_func_heads<'a>(
         create_impl_heads(ctx, asg, options, module_file_id, *physical_file_id, file)?;
 
         for (func_i, func) in file.funcs.iter().enumerate() {
-            let name = ResolvedName::new(module_file_id, &Name::plain(&func.head.name));
+            let name = if func.head.privacy.is_private() {
+                ResolvedName::new(*physical_file_id, &Name::plain(&func.head.name))
+            } else {
+                ResolvedName::new(module_file_id, &Name::plain(&func.head.name))
+            };
 
             let func_ref = create_func_head(
                 ctx,
@@ -60,6 +64,7 @@ pub fn create_func_heads<'a>(
                     imported_namespaces
                         .map(|namespaces| namespaces.clone())
                         .unwrap_or_else(|| vec![]),
+                    *physical_file_id,
                     module_file_id,
                 )
             });

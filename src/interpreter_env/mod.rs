@@ -182,7 +182,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
 
     file.funcs.push(thin_cstring_func(
         "adept",
-        "version_string",
+        "version",
         InterpreterSyscallKind::BuildSetAdeptVersion,
     ));
 
