@@ -1,0 +1,27 @@
+
+pragma => adept("3.0")
+
+#[foreign]
+func printf(format ptr#char, ...) int
+
+func main {
+    printf(c"3 + 4 = %d\n", ADD_RESULT)
+    printf(c"3 - 4 = %d\n", SUBTRACT_RESULT)
+    printf(c"3 * 4 = %d\n", MULTIPLY_RESULT)
+    printf(c"21 / 4 = %d\n", DIVIDE_RESULT)
+    printf(c"21 %% 4 = %d\n", MODULUS_RESULT)
+    printf(c"21 || 0 = %d\n", OR_RESULT)
+    printf(c"21 && 0 = %d\n", AND_RESULT)
+    printf(c"21 | 2 = %d\n", BITWISE_OR_RESULT)
+    printf(c"21 & 2 = %d\n", BITWISE_AND_RESULT)
+    printf(c"21 ^ 2 = %d\n", BITWISE_XOR_RESULT)
+    printf(c"21 == 2 = %d\n", EQ_RESULT)
+    printf(c"21 != 2 = %d\n", NEQ_RESULT)
+    printf(c"21 < 2 = %d\n", LT_RESULT)
+    printf(c"21 > 2 = %d\n", GT_RESULT)
+    printf(c"21 <= 2 = %d\n", LTE_RESULT)
+    printf(c"21 >= 2 = %d\n", GTE_RESULT)
+    printf(c"21 << 2 = %d\n", LSHIFT_RESULT)
+    printf(c"21 >> 2 = %d\n", RSHIFT_RESULT)
+}
+
