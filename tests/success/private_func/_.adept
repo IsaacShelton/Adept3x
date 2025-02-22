@@ -1,0 +1,7 @@
+
+pragma => adept("3.0")
+
+func main {
+    sayMessage()
+}
+

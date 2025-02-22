@@ -26,13 +26,13 @@ pub fn resolve_type_jobs(
             .get(&job.physical_file_id)
             .expect("valid ast file");
 
-        let module_file_id = ast_workspace.get_owning_module_or_self(job.physical_file_id);
+        let module_folder_id = ast_workspace.get_owning_module_or_self(job.physical_file_id);
 
         for (trait_ref, user_trait) in job.traits.iter().zip(file.traits.iter()) {
             resolve_trait(
                 ctx,
                 asg,
-                module_file_id,
+                module_folder_id,
                 job.physical_file_id,
                 user_trait,
                 *trait_ref,
@@ -43,7 +43,7 @@ pub fn resolve_type_jobs(
             resolve_structure(
                 ctx,
                 asg,
-                module_file_id,
+                module_folder_id,
                 job.physical_file_id,
                 structure,
                 *struct_ref,
@@ -54,7 +54,7 @@ pub fn resolve_type_jobs(
             resolve_enum(
                 ctx,
                 asg,
-                module_file_id,
+                module_folder_id,
                 job.physical_file_id,
                 definition,
                 *enum_ref,
@@ -65,7 +65,7 @@ pub fn resolve_type_jobs(
             resolve_type_alias(
                 ctx,
                 asg,
-                module_file_id,
+                module_folder_id,
                 job.physical_file_id,
                 definition,
                 *type_alias_ref,
@@ -94,7 +94,7 @@ pub fn ensure_declared_polymorphs(ty: &Type, params: &TypeParams) -> Result<(), 
 fn resolve_structure(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     structure: &ast::Struct,
     struct_ref: StructRef,
@@ -102,7 +102,7 @@ fn resolve_structure(
     for (field_name, field) in structure.fields.iter() {
         let type_ctx = ResolveTypeCtx::new(
             &asg,
-            module_file_id,
+            module_folder_id,
             physical_file_id,
             &ctx.types_in_modules,
         );
@@ -130,14 +130,14 @@ fn resolve_structure(
 fn resolve_enum(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     definition: &ast::Enum,
     enum_ref: EnumRef,
 ) -> Result<(), ResolveError> {
     let type_ctx = ResolveTypeCtx::new(
         &asg,
-        module_file_id,
+        module_folder_id,
         physical_file_id,
         &ctx.types_in_modules,
     );
@@ -156,14 +156,14 @@ fn resolve_enum(
 fn resolve_type_alias(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     definition: &ast::TypeAlias,
     type_alias_ref: TypeAliasRef,
 ) -> Result<(), ResolveError> {
     let type_ctx = ResolveTypeCtx::new(
         &asg,
-        module_file_id,
+        module_folder_id,
         physical_file_id,
         &ctx.types_in_modules,
     );
@@ -180,14 +180,14 @@ fn resolve_type_alias(
 fn resolve_trait(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     definition: &ast::Trait,
     trait_ref: TraitRef,
 ) -> Result<(), ResolveError> {
     let type_ctx = ResolveTypeCtx::new(
         &asg,
-        module_file_id,
+        module_folder_id,
         physical_file_id,
         &ctx.types_in_modules,
     );

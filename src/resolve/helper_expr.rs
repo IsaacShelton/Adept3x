@@ -16,13 +16,13 @@ pub fn resolve_helper_expressions(
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+        let module_folder_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
         let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
         // NOTE: This module should already have a function haystack
         let func_haystack = ctx
             .func_haystacks
-            .get(&module_file_id)
+            .get(&module_folder_id)
             .expect("function haystack to exist for file");
 
         for helper_expr in file.helper_exprs.iter() {
@@ -39,7 +39,7 @@ pub fn resolve_helper_expressions(
                     globals_in_modules: &ctx.globals_in_modules,
                     helper_exprs_in_modules: &ctx.helper_exprs_in_modules,
                     impls_in_modules: &ctx.impls_in_modules,
-                    module_fs_node_id: module_file_id,
+                    module_fs_node_id: module_folder_id,
                     physical_fs_node_id: *physical_file_id,
                 };
 
@@ -54,7 +54,7 @@ pub fn resolve_helper_expressions(
 
             let helper_exprs = ctx
                 .helper_exprs_in_modules
-                .entry(module_file_id)
+                .entry(module_folder_id)
                 .or_default();
 
             helper_exprs.insert(

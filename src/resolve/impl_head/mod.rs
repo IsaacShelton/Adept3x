@@ -20,15 +20,15 @@ pub fn create_impl_heads(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     options: &BuildOptions,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     file: &AstFile,
 ) -> Result<(), ResolveError> {
     for (impl_i, ast_impl) in file.impls.iter().enumerate() {
-        let impl_ref = create_impl_head(ctx, asg, module_file_id, physical_file_id, ast_impl)?;
+        let impl_ref = create_impl_head(ctx, asg, module_folder_id, physical_file_id, ast_impl)?;
 
         for (func_i, func) in ast_impl.body.iter().enumerate() {
-            let name = ResolvedName::new(module_file_id, &Name::plain(&func.head.name));
+            let name = ResolvedName::new(module_folder_id, &Name::plain(&func.head.name));
 
             let func_ref = create_func_head(
                 ctx,
@@ -36,7 +36,7 @@ pub fn create_impl_heads(
                 options,
                 name.clone(),
                 &func.head,
-                module_file_id,
+                module_folder_id,
                 physical_file_id,
             )?;
 

@@ -1,0 +1,13 @@
+
+#[foreign]
+func printf(format ptr#char, ...) int
+
+func sayMessage() {
+    helloWorld()
+}
+
+#[private]
+func helloWorld {
+    printf(c"Hello, world!\n")
+}
+

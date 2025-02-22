@@ -56,7 +56,7 @@ impl Fs {
             &normalized_path_segments(path),
             last_modified_ms.unwrap_or(0),
             Some(Self::ROOT),
-            OsStr::new(""),
+            OsStr::new(if cfg!(target_os = "windows") { "" } else { "/" }),
         )
     }
 

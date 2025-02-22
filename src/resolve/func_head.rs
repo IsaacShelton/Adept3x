@@ -26,15 +26,15 @@ pub fn create_func_heads<'a>(
     options: &BuildOptions,
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+        let module_folder_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
-        create_impl_heads(ctx, asg, options, module_file_id, *physical_file_id, file)?;
+        create_impl_heads(ctx, asg, options, module_folder_id, *physical_file_id, file)?;
 
         for (func_i, func) in file.funcs.iter().enumerate() {
             let name = if func.head.privacy.is_private() {
                 ResolvedName::new(*physical_file_id, &Name::plain(&func.head.name))
             } else {
-                ResolvedName::new(module_file_id, &Name::plain(&func.head.name))
+                ResolvedName::new(module_folder_id, &Name::plain(&func.head.name))
             };
 
             let func_ref = create_func_head(
@@ -43,13 +43,13 @@ pub fn create_func_heads<'a>(
                 options,
                 name.clone(),
                 &func.head,
-                module_file_id,
+                module_folder_id,
                 *physical_file_id,
             )?;
 
             if func.head.privacy.is_public() {
                 let name = &func.head.name;
-                let public_of_module = ctx.public_funcs.entry(module_file_id).or_default();
+                let public_of_module = ctx.public_funcs.entry(module_folder_id).or_default();
 
                 public_of_module
                     .get_or_insert_with(name, || Default::default())
@@ -59,13 +59,12 @@ pub fn create_func_heads<'a>(
             let settings = file.settings.map(|id| &ast_workspace.settings[id.0]);
             let imported_namespaces = settings.map(|settings| &settings.imported_namespaces);
 
-            let func_haystack = ctx.func_haystacks.get_or_insert_with(module_file_id, || {
+            let func_haystack = ctx.func_haystacks.get_or_insert_with(module_folder_id, || {
                 FuncHaystack::new(
                     imported_namespaces
                         .map(|namespaces| namespaces.clone())
                         .unwrap_or_else(|| vec![]),
-                    *physical_file_id,
-                    module_file_id,
+                    module_folder_id,
                 )
             });
 
@@ -89,12 +88,12 @@ pub fn create_func_head<'a>(
     options: &BuildOptions,
     name: ResolvedName,
     head: &FuncHead,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
 ) -> Result<FuncRef, ResolveError> {
     let type_ctx = ResolveTypeCtx::new(
         &asg,
-        module_file_id,
+        module_folder_id,
         physical_file_id,
         &ctx.types_in_modules,
     );

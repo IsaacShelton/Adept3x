@@ -15,18 +15,18 @@ pub fn resolve_global_variables(
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_file_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+        let module_folder_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
 
         for global in file.global_variables.iter() {
             let type_ctx = ResolveTypeCtx::new(
                 &asg,
-                module_file_id,
+                module_folder_id,
                 *physical_file_id,
                 &ctx.types_in_modules,
             );
 
             let ty = type_ctx.resolve(&global.ast_type, ResolveTypeOptions::Unalias)?;
-            let resolved_name = ResolvedName::new(module_file_id, &Name::plain(&global.name));
+            let resolved_name = ResolvedName::new(module_folder_id, &Name::plain(&global.name));
 
             let global_ref = asg.globals.insert(asg::GlobalVar {
                 name: resolved_name,
@@ -37,7 +37,7 @@ pub fn resolve_global_variables(
             });
 
             ctx.globals_in_modules
-                .entry(module_file_id)
+                .entry(module_folder_id)
                 .or_default()
                 .insert(
                     global.name.clone(),

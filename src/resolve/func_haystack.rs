@@ -20,7 +20,6 @@ use std::collections::HashMap;
 pub struct FuncHaystack {
     pub available: HashMap<ResolvedName, Vec<asg::FuncRef>>,
     pub imported_namespaces: Vec<Box<str>>,
-    pub physical_fs_node_id: FsNodeId,
     pub module_fs_node_id: FsNodeId,
 }
 
@@ -31,15 +30,10 @@ pub enum FindFunctionError {
 }
 
 impl FuncHaystack {
-    pub fn new(
-        imported_namespaces: Vec<Box<str>>,
-        physical_fs_node_id: FsNodeId,
-        module_fs_node_id: FsNodeId,
-    ) -> Self {
+    pub fn new(imported_namespaces: Vec<Box<str>>, module_fs_node_id: FsNodeId) -> Self {
         Self {
             available: Default::default(),
             imported_namespaces,
-            physical_fs_node_id,
             module_fs_node_id,
         }
     }
@@ -66,10 +60,10 @@ impl FuncHaystack {
             .get(&ResolvedName::new(self.module_fs_node_id, name))
             .into_iter()
             .chain(
-                (self.module_fs_node_id != self.physical_fs_node_id)
+                (self.module_fs_node_id != ctx.physical_fs_node_id)
                     .then(|| {
                         self.available
-                            .get(&ResolvedName::new(self.physical_fs_node_id, name))
+                            .get(&ResolvedName::new(ctx.physical_fs_node_id, name))
                     })
                     .into_iter()
                     .flatten(),
@@ -213,10 +207,10 @@ impl FuncHaystack {
             .get(&ResolvedName::new(self.module_fs_node_id, name))
             .into_iter()
             .chain(
-                (self.module_fs_node_id != self.physical_fs_node_id)
+                (self.module_fs_node_id != ctx.physical_fs_node_id)
                     .then(|| {
                         self.available
-                            .get(&ResolvedName::new(self.physical_fs_node_id, name))
+                            .get(&ResolvedName::new(ctx.physical_fs_node_id, name))
                     })
                     .into_iter()
                     .flatten(),

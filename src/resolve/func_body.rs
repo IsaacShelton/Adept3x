@@ -21,7 +21,7 @@ pub fn resolve_func_bodies(
     while let Some(job) = ctx.jobs.pop_front() {
         match job {
             FuncJob::Regular(physical_file_id, ast_func_index, func_ref) => {
-                let module_file_id = ast_workspace.get_owning_module_or_self(physical_file_id);
+                let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
                 let ast_file = ast_workspace
                     .files
@@ -37,7 +37,7 @@ pub fn resolve_func_bodies(
                     ctx,
                     asg,
                     ast_workspace,
-                    module_file_id,
+                    module_folder_id,
                     physical_file_id,
                     ast_function,
                     func_ref,
@@ -49,7 +49,7 @@ pub fn resolve_func_bodies(
                 ast_impl_function_index,
                 func_ref,
             ) => {
-                let module_file_id = ast_workspace.get_owning_module_or_self(physical_file_id);
+                let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
                 let ast_file = ast_workspace
                     .files
@@ -68,7 +68,7 @@ pub fn resolve_func_bodies(
                     ctx,
                     asg,
                     ast_workspace,
-                    module_file_id,
+                    module_folder_id,
                     physical_file_id,
                     ast_function,
                     func_ref,
@@ -84,20 +84,20 @@ fn resolve_func_body(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     ast_workspace: &AstWorkspace,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     ast_function: &ast::Func,
     func_ref: FuncRef,
 ) -> Result<(), ResolveError> {
     let func_haystack = ctx
         .func_haystacks
-        .get(&module_file_id)
+        .get(&module_folder_id)
         .expect("function haystack to exist for file");
 
     let variable_haystack = resolve_param_vars(
         ctx,
         asg,
-        module_file_id,
+        module_folder_id,
         physical_file_id,
         ast_function,
         func_ref,
@@ -122,7 +122,7 @@ fn resolve_func_body(
             globals_in_modules: &ctx.globals_in_modules,
             helper_exprs_in_modules: &mut ctx.helper_exprs_in_modules,
             impls_in_modules: &mut ctx.impls_in_modules,
-            module_fs_node_id: module_file_id,
+            module_fs_node_id: module_folder_id,
             physical_fs_node_id: physical_file_id,
         },
         &ast_function.stmts,
@@ -140,7 +140,7 @@ fn resolve_func_body(
 fn resolve_param_vars(
     ctx: &ResolveCtx,
     asg: &mut Asg,
-    module_file_id: FsNodeId,
+    module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
     ast_func: &ast::Func,
     func_ref: FuncRef,
@@ -150,7 +150,7 @@ fn resolve_param_vars(
     for param in ast_func.head.params.required.iter() {
         let type_ctx = ResolveTypeCtx::new(
             &asg,
-            module_file_id,
+            module_folder_id,
             physical_file_id,
             &ctx.types_in_modules,
         );
