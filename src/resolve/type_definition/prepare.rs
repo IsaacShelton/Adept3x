@@ -21,10 +21,11 @@ pub fn prepare_type_jobs(
     let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_fs_node_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+        let physical_file_id = *physical_file_id;
+        let module_fs_node_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
         let mut job = TypeJob {
-            physical_file_id: *physical_file_id,
+            physical_file_id,
             type_aliases: Vec::with_capacity(file.type_aliases.len()),
             traits: Vec::with_capacity(file.traits.len()),
             structs: Vec::with_capacity(file.structs.len()),
@@ -32,23 +33,43 @@ pub fn prepare_type_jobs(
         };
 
         for user_trait in file.traits.iter() {
-            job.traits
-                .push(prepare_trait(ctx, asg, module_fs_node_id, user_trait)?);
+            job.traits.push(prepare_trait(
+                ctx,
+                asg,
+                module_fs_node_id,
+                physical_file_id,
+                user_trait,
+            )?);
         }
 
         for structure in file.structs.iter() {
-            job.structs
-                .push(prepare_structure(ctx, asg, module_fs_node_id, structure)?);
+            job.structs.push(prepare_structure(
+                ctx,
+                asg,
+                module_fs_node_id,
+                physical_file_id,
+                structure,
+            )?);
         }
 
         for definition in file.enums.iter() {
-            job.enums
-                .push(prepare_enum(ctx, asg, module_fs_node_id, definition)?);
+            job.enums.push(prepare_enum(
+                ctx,
+                asg,
+                module_fs_node_id,
+                physical_file_id,
+                definition,
+            )?);
         }
 
         for definition in file.type_aliases.iter() {
-            job.type_aliases
-                .push(prepare_type_alias(ctx, asg, module_fs_node_id, definition)?);
+            job.type_aliases.push(prepare_type_alias(
+                ctx,
+                asg,
+                module_fs_node_id,
+                physical_file_id,
+                definition,
+            )?);
         }
 
         type_jobs.push(job);
@@ -61,6 +82,7 @@ fn prepare_structure(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     structure: &ast::Struct,
 ) -> Result<StructRef, ResolveError> {
     let struct_ref = asg.structs.insert(asg::Struct {
@@ -80,6 +102,7 @@ fn prepare_structure(
     declare_type(
         ctx,
         module_fs_node_id,
+        physical_fs_node_id,
         &structure.name,
         structure.source,
         structure.privacy,
@@ -97,6 +120,7 @@ fn prepare_enum(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     definition: &ast::Enum,
 ) -> Result<EnumRef, ResolveError> {
     let enum_ref = asg.enums.insert(asg::Enum {
@@ -109,6 +133,7 @@ fn prepare_enum(
     declare_type(
         ctx,
         module_fs_node_id,
+        physical_fs_node_id,
         &definition.name,
         definition.source,
         definition.privacy,
@@ -122,6 +147,7 @@ fn prepare_trait(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     definition: &ast::Trait,
 ) -> Result<TraitRef, ResolveError> {
     let trait_ref = asg.traits.insert(asg::Trait {
@@ -140,6 +166,7 @@ fn prepare_trait(
     declare_type(
         ctx,
         module_fs_node_id,
+        physical_fs_node_id,
         &definition.name,
         definition.source,
         definition.privacy,
@@ -153,6 +180,7 @@ fn prepare_type_alias(
     ctx: &mut ResolveCtx,
     asg: &mut Asg,
     module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     definition: &ast::TypeAlias,
 ) -> Result<TypeAliasRef, ResolveError> {
     let type_alias_ref = asg.type_aliases.insert(asg::TypeAlias {
@@ -171,6 +199,7 @@ fn prepare_type_alias(
     declare_type(
         ctx,
         module_fs_node_id,
+        physical_fs_node_id,
         &definition.name,
         definition.source,
         definition.privacy,
@@ -187,6 +216,7 @@ fn prepare_type_alias(
 fn declare_type(
     ctx: &mut ResolveCtx,
     module_fs_node_id: FsNodeId,
+    physical_fs_node_id: FsNodeId,
     name: &str,
     source: Source,
     privacy: Privacy,
@@ -202,6 +232,7 @@ fn declare_type(
                 kind,
                 source,
                 privacy,
+                file_fs_node_id: physical_fs_node_id,
             },
         )
         .is_some()

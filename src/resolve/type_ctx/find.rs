@@ -31,6 +31,10 @@ impl<'a> ResolveTypeCtx<'a> {
                 self.types_in_modules
                     .get(&self.module_fs_node_id)
                     .and_then(|types_in_module| types_in_module.get(name))
+                    .filter(|ty_decl| {
+                        !ty_decl.privacy.is_private()
+                            || self.file_fs_node_id == ty_decl.file_fs_node_id
+                    })
             })
             .filter(|local| local.num_parameters(self.asg) == type_args.len())
             .map(Ok)

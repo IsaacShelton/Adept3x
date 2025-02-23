@@ -1,0 +1,15 @@
+
+#[foreign]
+func printf(format ptr#char, ...) int
+
+#[private]
+struct Name (firstname ptr#char)
+
+func test {
+    name := Name { firstname: c"John" }
+    name.ptr().greet()
+}
+
+func greet(name ptr#Name) {
+    printf(c"Hello %s\n", name.firstname)
+}

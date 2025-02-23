@@ -2,6 +2,7 @@ use super::{Asg, TypeKind};
 use crate::{
     ast::{self, Privacy},
     source_files::Source,
+    workspace::fs::FsNodeId,
 };
 
 #[derive(Clone, Debug)]
@@ -9,6 +10,7 @@ pub struct TypeDecl {
     pub kind: TypeKind,
     pub source: Source,
     pub privacy: Privacy,
+    pub file_fs_node_id: FsNodeId,
 }
 
 impl TypeDecl {
