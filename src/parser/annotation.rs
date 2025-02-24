@@ -16,6 +16,7 @@ impl Annotation {
 #[derive(Clone, Debug)]
 pub enum AnnotationKind {
     Foreign,
+    Exposed,
     ThreadLocal,
     Packed,
     AbideAbi,
@@ -35,6 +36,7 @@ impl Display for AnnotationKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Foreign => "foreign",
+            Self::Exposed => "exposed",
             Self::ThreadLocal => "thread_local",
             Self::Packed => "packed",
             Self::AbideAbi => "abide_abi",

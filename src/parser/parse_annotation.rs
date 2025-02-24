@@ -25,6 +25,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
             let annotation = match annotation_name.as_str() {
                 "foreign" => AnnotationKind::Foreign,
+                "exposed" => AnnotationKind::Exposed,
                 "thread_local" => AnnotationKind::ThreadLocal,
                 "packed" => AnnotationKind::Packed,
                 "abide_abi" => AnnotationKind::AbideAbi,
