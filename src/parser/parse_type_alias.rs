@@ -14,7 +14,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.source_here();
         assert!(self.input.advance().is_type_alias_keyword());
 
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
         let name = self.parse_identifier(Some("for alias name after 'typealias' keyword"))?;
         self.ignore_newlines();
 
@@ -23,6 +23,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Private => privacy = Privacy::Private,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for type alias"))),
             }
         }

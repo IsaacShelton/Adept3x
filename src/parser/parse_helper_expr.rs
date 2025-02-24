@@ -17,7 +17,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.source_here();
         self.input.advance();
 
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
         let name = self.parse_identifier(Some("for define name after 'define' keyword"))?;
         self.ignore_newlines();
 
@@ -27,6 +27,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Private => privacy = Privacy::Private,
                 _ => return Err(self.unexpected_annotation(&annotation, Some("for define"))),
             }
         }

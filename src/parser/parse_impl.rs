@@ -14,11 +14,12 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.input.peek().source;
         self.input.advance().kind.unwrap_impl_keyword();
 
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Private => privacy = Privacy::Private,
                 _ => {
                     return Err(self.unexpected_annotation(&annotation, Some("for implementation")))
                 }

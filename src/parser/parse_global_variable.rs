@@ -19,13 +19,14 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         let mut is_foreign = false;
         let mut is_thread_local = false;
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
 
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
                 AnnotationKind::ThreadLocal => is_thread_local = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
+                AnnotationKind::Private => privacy = Privacy::Private,
                 _ => {
                     return Err(self.unexpected_annotation(&annotation, Some("for global variable")))
                 }

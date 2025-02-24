@@ -13,7 +13,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.source_here();
         assert!(self.input.advance().is_enum_keyword());
 
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
         let name = self.parse_identifier(Some("for enum name after 'enum' keyword"))?;
         self.ignore_newlines();
 

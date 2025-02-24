@@ -17,7 +17,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let name = self.parse_identifier(Some("for trait name after 'trait' keyword"))?;
         self.ignore_newlines();
 
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
 
         for annotation in annotations {
             match annotation.kind {

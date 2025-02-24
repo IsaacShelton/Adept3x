@@ -19,7 +19,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         self.ignore_newlines();
 
         let mut is_packed = false;
-        let mut privacy = Privacy::Private;
+        let mut privacy = Privacy::Protected;
 
         for annotation in annotations {
             match annotation.kind {
