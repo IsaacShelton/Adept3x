@@ -1,4 +1,4 @@
-use super::{Privacy, Type};
+use super::{Exposure, Privacy, Type};
 use crate::source_files::Source;
 
 #[derive(Clone, Debug)]
@@ -9,4 +9,5 @@ pub struct GlobalVar {
     pub is_foreign: bool,
     pub is_thread_local: bool,
     pub privacy: Privacy,
+    pub exposure: Exposure,
 }

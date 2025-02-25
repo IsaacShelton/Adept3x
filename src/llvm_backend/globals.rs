@@ -15,7 +15,7 @@ pub unsafe fn create_globals(ctx: &mut BackendCtx) -> Result<(), BackendError> {
         let name = CString::new(global.mangled_name.as_bytes()).unwrap();
         let backend_global = LLVMAddGlobal(ctx.backend_module.get(), backend_type, name.as_ptr());
 
-        let linkage = if global.is_foreign {
+        let linkage = if global.exposure.is_exposed() {
             LLVMLinkage::LLVMExternalLinkage
         } else {
             LLVMLinkage::LLVMInternalLinkage

@@ -72,6 +72,7 @@ pub fn declare_named_declaration(
             is_foreign: true,
             is_thread_local,
             privacy: Privacy::Public,
+            exposure: ast::Exposure::Exposed,
         });
         return Ok(());
     }

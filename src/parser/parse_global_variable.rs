@@ -4,7 +4,7 @@ use super::{
     Parser,
 };
 use crate::{
-    ast::{GlobalVar, Privacy},
+    ast::{Exposure, GlobalVar, Privacy},
     inflow::Inflow,
     token::{Token, TokenKind},
 };
@@ -20,6 +20,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let mut is_foreign = false;
         let mut is_thread_local = false;
         let mut privacy = Privacy::Protected;
+        let mut exposure = Exposure::Hidden;
 
         for annotation in annotations {
             match annotation.kind {
@@ -27,6 +28,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 AnnotationKind::ThreadLocal => is_thread_local = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Private => privacy = Privacy::Private,
+                AnnotationKind::Exposed => exposure = Exposure::Exposed,
                 _ => {
                     return Err(self.unexpected_annotation(&annotation, Some("for global variable")))
                 }
@@ -51,6 +53,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             is_foreign,
             is_thread_local,
             privacy,
+            exposure,
         })
     }
 }

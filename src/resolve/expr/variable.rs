@@ -50,7 +50,8 @@ pub fn resolve_variable_expr(
     if let Some(basename) = name.as_plain_str() {
         let maybe_global = ctx
             .globals_in_modules
-            .get(&ctx.module_fs_node_id)
+            .get(&ctx.physical_fs_node_id)
+            .or_else(|| ctx.globals_in_modules.get(&ctx.module_fs_node_id))
             .and_then(|globals| globals.get(basename));
 
         let maybe_helper_expr = ctx

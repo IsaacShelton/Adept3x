@@ -34,10 +34,17 @@ pub fn resolve_global_variables(
                 source: global.source,
                 is_foreign: global.is_foreign,
                 is_thread_local: global.is_thread_local,
+                exposure: global.exposure,
             });
 
+            let fs_node_id = if global.privacy.is_private() {
+                *physical_file_id
+            } else {
+                module_folder_id
+            };
+
             ctx.globals_in_modules
-                .entry(module_folder_id)
+                .entry(fs_node_id)
                 .or_default()
                 .insert(
                     global.name.clone(),

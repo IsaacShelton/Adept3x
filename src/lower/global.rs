@@ -11,7 +11,7 @@ pub fn lower_global(
     global: &asg::GlobalVar,
     asg: &Asg,
 ) -> Result<(), LowerError> {
-    let mangled_name = if global.is_foreign {
+    let mangled_name = if global.is_foreign || global.exposure.is_exposed() {
         global.name.plain().to_string()
     } else {
         global.name.display(&asg.workspace.fs).to_string()
@@ -21,13 +21,10 @@ pub fn lower_global(
         global_ref,
         Global {
             mangled_name,
-            ir_type: lower_type(
-                ir_module,
-                &unpoly(&PolyRecipe::default(), &global.ty)?,
-                asg,
-            )?,
+            ir_type: lower_type(ir_module, &unpoly(&PolyRecipe::default(), &global.ty)?, asg)?,
             is_foreign: global.is_foreign,
             is_thread_local: global.is_thread_local,
+            exposure: global.exposure,
         },
     );
 
