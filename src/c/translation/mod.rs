@@ -11,7 +11,7 @@ use crate::{
     ast::{self, AstFile},
     c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError, StorageClassSpecifier},
     diagnostics::{Diagnostics, WarningDiagnostic},
-    workspace::compile::header::CFileType,
+    workspace::compile::c_code::CFileType,
 };
 use std::collections::HashMap;
 

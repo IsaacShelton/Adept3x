@@ -1,4 +1,4 @@
-use super::header::{c_code, CFileType};
+use super::c_code::{c_code, CFileType};
 use crate::{
     ast::AstFile,
     compiler::Compiler,

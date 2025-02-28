@@ -7,7 +7,7 @@ use crate::{
         ParameterDeclarationCore, ParameterTypeList, ParseError, StorageClassSpecifier,
     },
     diagnostics::Diagnostics,
-    workspace::compile::header::CFileType,
+    workspace::compile::c_code::CFileType,
 };
 use std::collections::HashMap;
 

@@ -20,7 +20,7 @@ use crate::{
     ast::{AstFile, Param, Type, TypeKind},
     diagnostics::{Diagnostics, WarningDiagnostic},
     source_files::source::Source,
-    workspace::compile::header::CFileType,
+    workspace::compile::c_code::CFileType,
 };
 use derive_more::{From, IsVariant};
 use itertools::Itertools;
