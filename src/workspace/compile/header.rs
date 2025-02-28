@@ -12,10 +12,26 @@ use crate::{
     text::Text,
 };
 
-pub fn header(
+#[derive(Copy, Clone, Debug)]
+pub enum CFileType {
+    Header,
+    Source,
+}
+
+impl CFileType {
+    pub fn privacy(&self) -> Privacy {
+        match self {
+            CFileType::Header => Privacy::Protected,
+            CFileType::Source => Privacy::Private,
+        }
+    }
+}
+
+pub fn c_code(
     compiler: &Compiler,
     text: impl Text,
     key: SourceFileKey,
+    c_file_type: CFileType,
 ) -> Result<AstFile, Box<(dyn Show + 'static)>> {
     let Preprocessed {
         document,
@@ -28,6 +44,7 @@ pub fn header(
     let mut parser = c::parser::Parser::new(
         c::parser::Input::new(lexed, compiler.source_files, key),
         compiler.diagnostics,
+        c_file_type,
     );
 
     let mut ast_file = parser.parse().map_err(into_show)?;

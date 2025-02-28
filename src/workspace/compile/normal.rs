@@ -1,4 +1,4 @@
-use super::header::header;
+use super::header::{c_code, CFileType};
 use crate::{
     ast::AstFile,
     compiler::Compiler,
@@ -47,10 +47,16 @@ pub fn compile_normal_file(
                 Source::new(key, Location { line: 1, column: 1 }),
             ));
 
-            out_ast_files.push((normal_file.fs_node_id, header(compiler, text, key)?));
+            out_ast_files.push((
+                normal_file.fs_node_id,
+                c_code(compiler, text, key, CFileType::Source)?,
+            ));
         }
         NormalFileKind::CHeader => {
-            out_ast_files.push((normal_file.fs_node_id, header(compiler, text, key)?));
+            out_ast_files.push((
+                normal_file.fs_node_id,
+                c_code(compiler, text, key, CFileType::Header)?,
+            ));
         }
     }
 

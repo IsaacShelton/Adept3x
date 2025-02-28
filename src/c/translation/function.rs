@@ -1,12 +1,13 @@
 use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
     asg::TypeParams,
-    ast::{self, AstFile, Func, FuncHead, Param, Params, Privacy},
+    ast::{self, AstFile, Func, FuncHead, Param, Params},
     c::parser::{
         error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError, StorageClassSpecifier,
     },
     diagnostics::Diagnostics,
+    workspace::compile::header::CFileType,
 };
 use std::collections::HashMap;
 
@@ -18,6 +19,7 @@ pub fn declare_function(
     declarator: &Declarator,
     parameter_type_list: &ParameterTypeList,
     diagnostics: &Diagnostics,
+    c_file_type: CFileType,
 ) -> Result<(), ParseError> {
     let source = declarator.source;
     let (name, return_type, storage_class, function_specifier, _is_thread_local) =
@@ -100,7 +102,7 @@ pub fn declare_function(
         source,
         abide_abi: true,
         tag: None,
-        privacy: Privacy::Public,
+        privacy: c_file_type.privacy(),
     };
 
     ast_file.funcs.push(Func {

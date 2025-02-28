@@ -20,6 +20,7 @@ use crate::{
     ast::{AstFile, Param, Type, TypeKind},
     diagnostics::{Diagnostics, WarningDiagnostic},
     source_files::source::Source,
+    workspace::compile::header::CFileType,
 };
 use derive_more::{From, IsVariant};
 use itertools::Itertools;
@@ -30,6 +31,7 @@ pub struct Parser<'a> {
     typedefs: HashMap<String, CTypedef>,
     enum_constants: HashMap<String, Integer>,
     diagnostics: &'a Diagnostics<'a>,
+    c_file_type: CFileType,
 }
 
 impl Parser<'_> {
@@ -476,7 +478,7 @@ pub struct EnumerationNamed {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(input: Input<'a>, diagnostics: &'a Diagnostics<'a>) -> Self {
+    pub fn new(input: Input<'a>, diagnostics: &'a Diagnostics<'a>, c_file_type: CFileType) -> Self {
         let mut typedefs = HashMap::default();
 
         diagnostics.push(WarningDiagnostic::new(
@@ -499,6 +501,7 @@ impl<'a> Parser<'a> {
             typedefs,
             enum_constants: HashMap::default(),
             diagnostics,
+            c_file_type,
         }
     }
 
@@ -526,6 +529,7 @@ impl<'a> Parser<'a> {
                                     &declaration.declaration_specifiers,
                                     &mut self.typedefs,
                                     self.diagnostics,
+                                    self.c_file_type,
                                 )?,
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
@@ -536,6 +540,7 @@ impl<'a> Parser<'a> {
                                         declarator,
                                         parameter_type_list,
                                         self.diagnostics,
+                                        self.c_file_type,
                                     )?;
                                 }
                             }
