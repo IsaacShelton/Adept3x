@@ -23,9 +23,14 @@ use crate::{
 };
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TypeBase {
     pub ast_type: Type,
+    pub specifiers: TypeBaseSpecifiers,
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeBaseSpecifiers {
     pub storage_class: Option<StorageClassSpecifier>,
     pub function_specifier: Option<FunctionSpecifier>,
     pub is_thread_local: bool,
@@ -72,9 +77,11 @@ impl TypeBaseBuilder {
 
         Ok(TypeBase {
             ast_type,
-            storage_class: self.storage_class,
-            function_specifier: self.function_specifier,
-            is_thread_local: false,
+            specifiers: TypeBaseSpecifiers {
+                storage_class: self.storage_class,
+                function_specifier: self.function_specifier,
+                is_thread_local: false,
+            },
         })
     }
 
@@ -189,6 +196,13 @@ pub fn build_type_specifier_qualifier(
     Ok(())
 }
 
+#[derive(Clone, Debug)]
+pub struct DeclaratorInfo {
+    pub name: String,
+    pub ast_type: Type,
+    pub specifiers: TypeBaseSpecifiers,
+}
+
 pub fn get_name_and_type(
     ast_file: &mut AstFile,
     typedefs: &HashMap<String, CTypedef>,
@@ -196,16 +210,7 @@ pub fn get_name_and_type(
     declaration_specifiers: &DeclarationSpecifiers,
     for_parameter: bool,
     diagnostics: &Diagnostics,
-) -> Result<
-    (
-        String,
-        Type,
-        Option<StorageClassSpecifier>,
-        Option<FunctionSpecifier>,
-        bool,
-    ),
-    ParseError,
-> {
+) -> Result<DeclaratorInfo, ParseError> {
     let (name, decorators) = get_name_and_decorators(ast_file, typedefs, declarator, diagnostics)?;
     let type_base = get_type_base(
         ast_file,
@@ -239,13 +244,11 @@ pub fn get_name_and_type(
         }
     }
 
-    Ok((
+    Ok(DeclaratorInfo {
         name,
         ast_type,
-        type_base.storage_class,
-        type_base.function_specifier,
-        type_base.is_thread_local,
-    ))
+        specifiers: type_base.specifiers,
+    })
 }
 
 fn get_name_and_decorators(
@@ -265,14 +268,13 @@ fn get_name_and_decorators(
         DeclaratorKind::Function(inner, parameter_type_list) => {
             let (name, mut decorators) =
                 get_name_and_decorators(ast_file, typedefs, inner, diagnostics)?;
-            let mut parameters =
-                Vec::with_capacity(parameter_type_list.parameter_declarations.len());
+            let mut params = Vec::with_capacity(parameter_type_list.parameter_declarations.len());
 
             if has_parameters(parameter_type_list) {
                 for parameter in parameter_type_list.parameter_declarations.iter() {
-                    let (parameter_name, parameter_type) = match &parameter.core {
+                    let (param_name, param_type) = match &parameter.core {
                         ParameterDeclarationCore::Declarator(declarator) => {
-                            let (parameter_name, ast_type, _, _, _) = get_name_and_type(
+                            let declarator_info = get_name_and_type(
                                 ast_file,
                                 typedefs,
                                 declarator,
@@ -280,7 +282,7 @@ fn get_name_and_decorators(
                                 true,
                                 diagnostics,
                             )?;
-                            (parameter_name, ast_type)
+                            (declarator_info.name, declarator_info.ast_type)
                         }
                         ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
                         ParameterDeclarationCore::Nothing => {
@@ -288,15 +290,12 @@ fn get_name_and_decorators(
                         }
                     };
 
-                    parameters.push(Param {
-                        name: parameter_name,
-                        ast_type: parameter_type,
-                    });
+                    params.push(Param::named(param_name, param_type));
                 }
             }
 
             decorators.then_function(FunctionQualifier {
-                parameters,
+                params,
                 source: declarator.source,
                 is_cstyle_variadic: parameter_type_list.is_variadic,
             });

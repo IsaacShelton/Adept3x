@@ -169,7 +169,7 @@ pub struct ArrayQualifier {
 
 #[derive(Clone, Debug)]
 pub struct FunctionQualifier {
-    pub parameters: Vec<Param>,
+    pub params: Vec<Param>,
     pub is_cstyle_variadic: bool,
     pub source: Source,
 }
@@ -1552,7 +1552,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        todo!();
+        todo!("parse compound statement");
 
         if !self.eat_punctuator(Punctuator::CloseCurly) {
             return Err(ParseError::new(

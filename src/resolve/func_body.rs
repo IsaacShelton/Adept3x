@@ -159,7 +159,10 @@ fn resolve_param_vars(
         let function = asg.funcs.get_mut(func_ref).unwrap();
 
         let key = function.vars.add_param(ty.clone());
-        variable_haystack.put(param.name.clone(), ty, key);
+
+        if let Some(name) = &param.name {
+            variable_haystack.put(name.clone(), ty, key);
+        }
     }
 
     Ok(variable_haystack)

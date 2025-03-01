@@ -46,13 +46,17 @@ impl Display for Params {
 
 #[derive(Clone, Debug, Hash, Eq)]
 pub struct Param {
-    pub name: String,
+    pub name: Option<String>,
     pub ty: Type,
 }
 
 impl Display for Param {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.name, self.ty)
+        if let Some(name) = &self.name {
+            write!(f, "{} {}", name, self.ty)
+        } else {
+            write!(f, "{}", self.ty)
+        }
     }
 }
 

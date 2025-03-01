@@ -17,12 +17,19 @@ impl Params {
 
 #[derive(Clone, Debug)]
 pub struct Param {
-    pub name: String,
+    pub name: Option<String>,
     pub ast_type: Type,
 }
 
 impl Param {
-    pub fn new(name: String, ast_type: Type) -> Self {
+    pub fn new(name: Option<String>, ast_type: Type) -> Self {
         Self { name, ast_type }
+    }
+
+    pub fn named(name: String, ast_type: Type) -> Self {
+        Self {
+            name: Some(name),
+            ast_type,
+        }
     }
 }

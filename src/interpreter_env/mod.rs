@@ -62,7 +62,7 @@ fn thin_cstring_func(
         name: name.into(),
         type_params: TypeParams::default(),
         givens: vec![],
-        params: Params::normal([Param::new(param_name.clone(), ptr_char.clone())]),
+        params: Params::normal([Param::named(param_name.clone(), ptr_char.clone())]),
         return_type: void.clone(),
         abide_abi: false,
         is_foreign: false,
@@ -221,8 +221,8 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             type_params: TypeParams::default(),
             givens: vec![],
             params: Params::normal([
-                Param::new("name".into(), ptr_char.clone()),
-                Param::new(
+                Param::named("name".into(), ptr_char.clone()),
+                Param::named(
                     "project".into(),
                     TypeKind::Named(Name::plain("Project"), vec![]).at(source),
                 ),
@@ -265,8 +265,8 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             type_params: TypeParams::default(),
             givens: vec![],
             params: Params::normal([
-                Param::new("as_namespace".into(), ptr_char.clone()),
-                Param::new(
+                Param::named("as_namespace".into(), ptr_char.clone()),
+                Param::named(
                     "dependency".into(),
                     TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
                 ),
@@ -308,7 +308,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
             name: "import".into(),
             type_params: TypeParams::default(),
             givens: vec![],
-            params: Params::normal([Param::new("namespace".into(), ptr_char.clone())]),
+            params: Params::normal([Param::named("namespace".into(), ptr_char.clone())]),
             return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
             abide_abi: false,
             is_foreign: false,

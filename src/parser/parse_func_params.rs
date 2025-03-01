@@ -35,7 +35,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             self.ignore_newlines();
             let ast_type = self.parse_type(None::<&str>, Some("for parameter"))?;
             self.ignore_newlines();
-            required.push(Param { name, ast_type });
+            required.push(Param::named(name, ast_type));
         }
 
         self.parse_token(TokenKind::CloseParen, Some("to end function parameters"))?;

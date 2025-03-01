@@ -22,24 +22,23 @@ pub fn declare_function(
     c_file_type: CFileType,
 ) -> Result<(), ParseError> {
     let source = declarator.source;
-    let (name, return_type, storage_class, function_specifier, _is_thread_local) =
-        get_name_and_type(
-            ast_file,
-            typedefs,
-            declarator,
-            declaration_specifiers,
-            false,
-            diagnostics,
-        )?;
+    let func_info = get_name_and_type(
+        ast_file,
+        typedefs,
+        declarator,
+        declaration_specifiers,
+        false,
+        diagnostics,
+    )?;
     let mut required = vec![];
 
-    if function_specifier.is_some() {
+    if func_info.specifiers.function_specifier.is_some() {
         return Err(ParseErrorKind::Misc("Function specifiers are not supported yet").at(source));
     }
 
     if has_parameters(parameter_type_list) {
         for param in parameter_type_list.parameter_declarations.iter() {
-            let (name, ast_type, storage_class, function_specifier, _) = match &param.core {
+            let param_info = match &param.core {
                 ParameterDeclarationCore::Declarator(declarator) => get_name_and_type(
                     ast_file,
                     typedefs,
@@ -52,33 +51,33 @@ pub fn declare_function(
                 ParameterDeclarationCore::Nothing => todo!(),
             };
 
-            if storage_class.is_some() {
+            if param_info.specifiers.storage_class.is_some() {
                 return Err(
                     ParseErrorKind::Misc("Storage classes not support on typedef").at(param.source),
                 );
             }
 
-            if function_specifier.is_some() {
+            if param_info.specifiers.function_specifier.is_some() {
                 return Err(
                     ParseErrorKind::Misc("Function specifiers cannot be used on typedef")
                         .at(source),
                 );
             }
 
-            required.push(Param { name, ast_type });
+            required.push(Param::new(Some(param_info.name), param_info.ast_type));
         }
     }
 
-    match storage_class {
+    match func_info.specifiers.storage_class {
         Some(StorageClassSpecifier::Typedef) => {
             let ast_type = ast::TypeKind::FuncPtr(ast::FuncPtr {
                 parameters: required,
-                return_type: Box::new(return_type),
+                return_type: Box::new(func_info.ast_type),
                 is_cstyle_variadic: parameter_type_list.is_variadic,
             })
             .at(declarator.source);
 
-            typedefs.insert(name, CTypedef { ast_type });
+            typedefs.insert(func_info.name, CTypedef { ast_type });
             return Ok(());
         }
         Some(_) => {
@@ -90,14 +89,14 @@ pub fn declare_function(
     }
 
     let head = FuncHead {
-        name,
+        name: func_info.name,
         type_params: TypeParams::default(),
         givens: vec![],
         params: Params {
             required,
             is_cstyle_vararg: parameter_type_list.is_variadic,
         },
-        return_type,
+        return_type: func_info.ast_type,
         is_foreign: true,
         source,
         abide_abi: true,

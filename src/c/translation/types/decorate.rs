@@ -70,7 +70,7 @@ pub fn decorate_function(
     source: Source,
 ) -> Result<Type, ParseError> {
     Ok(TypeKind::FuncPtr(FuncPtr {
-        parameters: function.parameters.clone(),
+        parameters: function.params.clone(),
         return_type: Box::new(ast_type),
         is_cstyle_variadic: function.is_cstyle_variadic,
     })

@@ -120,11 +120,11 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::FuncPtr(function_pointer) => {
                 let mut params = Vec::with_capacity(function_pointer.parameters.len());
 
-                for parameter in function_pointer.parameters.iter() {
-                    let ty = self.resolve(&parameter.ast_type, options)?;
+                for param in function_pointer.parameters.iter() {
+                    let ty = self.resolve(&param.ast_type, options)?;
 
                     params.push(asg::Param {
-                        name: parameter.name.clone(),
+                        name: param.name.clone(),
                         ty,
                     });
                 }

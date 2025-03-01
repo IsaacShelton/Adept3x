@@ -24,7 +24,7 @@ pub fn declare_named_declaration(
     diagnostics: &Diagnostics,
     c_file_type: CFileType,
 ) -> Result<(), ParseError> {
-    let (name, ast_type, storage_class, function_specifier, is_thread_local) = get_name_and_type(
+    let decl_info = get_name_and_type(
         ast_file,
         typedefs,
         declarator,
@@ -33,8 +33,8 @@ pub fn declare_named_declaration(
         diagnostics,
     )?;
 
-    if let Some(StorageClassSpecifier::Typedef) = storage_class {
-        if let Some(function_specifier) = function_specifier {
+    if let Some(StorageClassSpecifier::Typedef) = decl_info.specifiers.storage_class {
+        if let Some(function_specifier) = decl_info.specifiers.function_specifier {
             diagnostics.push(WarningDiagnostic::new(
                 format!(
                     "Function specifier '{}' does nothing on typedef",
@@ -45,21 +45,26 @@ pub fn declare_named_declaration(
         }
 
         ast_file.type_aliases.push(ast::TypeAlias {
-            name: name.clone(),
+            name: decl_info.name.clone(),
             params: TypeParams::default(),
-            value: ast_type.clone(),
+            value: decl_info.ast_type.clone(),
             source: declarator.source,
             privacy: c_file_type.privacy(),
         });
 
-        typedefs.insert(name, CTypedef { ast_type });
+        typedefs.insert(
+            decl_info.name,
+            CTypedef {
+                ast_type: decl_info.ast_type,
+            },
+        );
         return Ok(());
     }
 
-    if let None | Some(StorageClassSpecifier::Extern) = storage_class {
-        let is_foreign = storage_class.is_some();
+    if let None | Some(StorageClassSpecifier::Extern) = decl_info.specifiers.storage_class {
+        let is_foreign = decl_info.specifiers.storage_class.is_some();
 
-        if let Some(function_specifier) = function_specifier {
+        if let Some(function_specifier) = decl_info.specifiers.function_specifier {
             diagnostics.push(WarningDiagnostic::new(
                 format!(
                     "Function specifier '{}' on functions is not respected yet",
@@ -70,11 +75,11 @@ pub fn declare_named_declaration(
         }
 
         ast_file.global_variables.push(ast::GlobalVar {
-            name,
-            ast_type,
+            name: decl_info.name,
+            ast_type: decl_info.ast_type,
             source: declarator.source,
             is_foreign,
-            is_thread_local,
+            is_thread_local: decl_info.specifiers.is_thread_local,
             privacy: c_file_type.privacy(),
             exposure: ast::Exposure::Exposed,
         });

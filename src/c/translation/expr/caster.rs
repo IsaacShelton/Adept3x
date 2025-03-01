@@ -34,14 +34,14 @@ pub fn get_caster_type(
 
     let base = builder.build()?;
 
-    if base.storage_class.is_some() {
+    if base.specifiers.storage_class.is_some() {
         return Err(ParseError::message(
             "Storage class specifier cannot be used on cast",
             caster.source,
         ));
     }
 
-    if base.function_specifier.is_some() {
+    if base.specifiers.function_specifier.is_some() {
         return Err(ParseError::message(
             "Storage class specifier cannot be used on cast",
             caster.source,

@@ -54,26 +54,23 @@ pub fn make_composite(
                         for member_declarator in member.member_declarators.iter() {
                             match member_declarator {
                                 MemberDeclarator::Declarator(declarator) => {
-                                    let (name, ast_type, storage_class, function_specifier, _) =
-                                        get_name_and_type(
-                                            ast_file,
-                                            typedefs,
-                                            declarator,
-                                            &DeclarationSpecifiers::from(
-                                                &member.specifier_qualifiers,
-                                            ),
-                                            false,
-                                            diagnostics,
-                                        )?;
+                                    let member_info = get_name_and_type(
+                                        ast_file,
+                                        typedefs,
+                                        declarator,
+                                        &DeclarationSpecifiers::from(&member.specifier_qualifiers),
+                                        false,
+                                        diagnostics,
+                                    )?;
 
-                                    if storage_class.is_some() {
+                                    if member_info.specifiers.storage_class.is_some() {
                                         return Err(ParseErrorKind::Misc(
                                             "Storage classes not supported here",
                                         )
                                         .at(declarator.source));
                                     }
 
-                                    if function_specifier.is_some() {
+                                    if member_info.specifiers.function_specifier.is_some() {
                                         return Err(ParseErrorKind::Misc(
                                             "Function specifiers cannot be used here",
                                         )
@@ -81,9 +78,9 @@ pub fn make_composite(
                                     }
 
                                     fields.insert(
-                                        name.clone(),
+                                        member_info.name.clone(),
                                         Field {
-                                            ast_type,
+                                            ast_type: member_info.ast_type.clone(),
                                             privacy: Privacy::Public,
                                             source: declarator.source,
                                         },
