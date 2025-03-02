@@ -6,6 +6,7 @@ mod types;
 
 use self::types::get_name_and_type;
 pub use self::{expr::translate_expr, function::declare_function};
+use super::parser::Attribute;
 use crate::{
     asg::TypeParams,
     ast::{self, AstFile},
@@ -18,7 +19,7 @@ use std::collections::HashMap;
 pub fn declare_named_declaration(
     ast_file: &mut AstFile,
     declarator: &Declarator,
-    _attribute_specifiers: &[()],
+    _attribute_specifiers: &[Attribute],
     declaration_specifiers: &DeclarationSpecifiers,
     typedefs: &mut HashMap<String, CTypedef>,
     diagnostics: &Diagnostics,

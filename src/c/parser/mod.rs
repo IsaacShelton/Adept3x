@@ -112,7 +112,7 @@ pub enum ParameterDeclarationCore {
 
 #[derive(Clone, Debug)]
 pub struct ParameterDeclaration {
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub declaration_specifiers: DeclarationSpecifiers,
     pub core: ParameterDeclarationCore,
     pub source: Source,
@@ -176,7 +176,7 @@ pub struct FunctionQualifier {
 
 #[derive(Clone, Debug)]
 pub struct Pointer {
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub type_qualifiers: Vec<TypeQualifier>,
     pub source: Source,
 }
@@ -291,7 +291,7 @@ impl TypeSpecifierQualifier {
 
 #[derive(Clone, Debug)]
 pub struct SpecifierQualifierList {
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub type_specifier_qualifiers: Vec<TypeSpecifierQualifier>,
 }
 
@@ -347,7 +347,7 @@ pub enum AlignmentSpecifierKind {
 #[derive(Clone, Debug)]
 pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
 }
 
 impl From<&SpecifierQualifierList> for DeclarationSpecifiers {
@@ -379,7 +379,7 @@ pub struct StaticAssertDeclaration {
 
 #[derive(Clone, Debug)]
 pub struct Member {
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub specifier_qualifiers: SpecifierQualifierList,
     pub member_declarators: Vec<MemberDeclarator>,
 }
@@ -396,16 +396,109 @@ pub enum ExternalDeclaration {
     FunctionDefinition(FunctionDefinition),
 }
 
+#[derive(Clone, Debug, From)]
+pub enum BlockItem {
+    ExternalDeclaration(ExternalDeclaration),
+    UnlabeledStatement(UnlabeledStatement),
+    Label(Label),
+}
+
+#[derive(Clone, Debug, From)]
+pub enum UnlabeledStatement {
+    ExprStatement(ExprStatement),
+    PrimaryBlock(Vec<Attribute>, PrimaryBlock),
+    JumpStatement(Vec<Attribute>, JumpStatement),
+}
+
+#[derive(Clone, Debug)]
+pub enum ExprStatement {
+    Empty,
+    Normal(Vec<Attribute>, Expr),
+}
+
+#[derive(Clone, Debug)]
+pub struct Attribute {
+    pub kind: AttributeKind,
+    pub clause: Vec<CToken>,
+}
+
+#[derive(Clone, Debug)]
+pub enum AttributeKind {
+    Standard(String),
+    Namespaced(String, String),
+}
+
+#[derive(Clone, Debug)]
+pub enum JumpStatement {
+    Goto(String),
+    Continue,
+    Break,
+    Return(Option<Expr>),
+}
+
+#[derive(Clone, Debug)]
+pub enum PrimaryBlock {
+    CompoundStatement(CompoundStatement),
+    SelectionStatement(SelectionStatement),
+    IterationStatement(IterationStatement),
+}
+
+#[derive(Clone, Debug)]
+pub enum IterationStatement {
+    While(Expr, SecondaryBlock),
+    DoWhile(SecondaryBlock, Expr),
+    For(Option<Expr>, Option<Expr>, Option<Expr>),
+}
+
+#[derive(Clone, Debug)]
+pub struct CompoundStatement {
+    pub statements: Vec<BlockItem>,
+}
+
+type SecondaryBlock = Statement;
+
+#[derive(Clone, Debug)]
+pub enum Statement {
+    LabeledStatement(Box<LabeledStatement>),
+    UnlabeledStatement(Box<UnlabeledStatement>),
+}
+
+#[derive(Clone, Debug)]
+pub struct LabeledStatement {
+    pub label: Label,
+    pub statement: Statement,
+}
+
+#[derive(Clone, Debug)]
+pub enum SelectionStatement {
+    If(Expr, SecondaryBlock),
+    IfElse(Expr, SecondaryBlock, SecondaryBlock),
+    Switch(Expr, SecondaryBlock),
+}
+
+#[derive(Clone, Debug)]
+pub enum LabelKind {
+    UserDefined(String),
+    Case(ConstExpr),
+    Default,
+}
+
+#[derive(Clone, Debug)]
+pub struct Label {
+    pub attributes: Vec<Attribute>,
+    pub kind: LabelKind,
+}
+
 #[derive(Clone, Debug)]
 pub enum Declaration {
     Common(CommonDeclaration),
     StaticAssert(StaticAssertDeclaration),
-    Attribute(Vec<()>),
+    Attribute(Vec<Attribute>),
 }
 
 #[derive(Clone, Debug)]
 pub struct CommonDeclaration {
-    pub attribute_specifiers: Vec<()>,
+    pub attribute_specifiers: Vec<Attribute>,
     pub declaration_specifiers: DeclarationSpecifiers,
     pub init_declarator_list: Vec<InitDeclarator>,
 }
@@ -429,7 +522,7 @@ pub struct Composite {
     pub kind: CompositeKind,
     pub source: Source,
     pub name: Option<String>,
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub members: Option<Vec<MemberDeclaration>>,
 }
 
@@ -441,7 +534,7 @@ pub struct EnumTypeSpecifier {
 #[derive(Clone, Debug)]
 pub struct Enumerator {
     pub name: String,
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub value: Option<ConstExpr>,
     pub source: Source,
 }
@@ -464,7 +557,7 @@ impl Enumeration {
 #[derive(Clone, Debug)]
 pub struct EnumerationDefinition {
     pub name: Option<String>,
-    pub attributes: Vec<()>,
+    pub attributes: Vec<Attribute>,
     pub enum_type_specifier: Option<EnumTypeSpecifier>,
     pub body: Vec<Enumerator>,
     pub source: Source,
@@ -572,7 +665,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_attribute_specifier_sequence(&mut self) -> Result<Vec<()>, ParseError> {
+    fn parse_attribute_specifier_sequence(&mut self) -> Result<Vec<Attribute>, ParseError> {
         #[allow(clippy::never_loop)]
         while self.eat_sequence(&[
             CTokenKind::Punctuator(Punctuator::OpenBracket),
@@ -1541,10 +1634,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_body(&mut self) -> Result<(), ParseError> {
-        self.parse_compound_statement()
+        let _statements = self.parse_compound_statement()?;
+        todo!("parse_function_body");
     }
 
-    fn parse_compound_statement(&mut self) -> Result<(), ParseError> {
+    fn parse_compound_statement(&mut self) -> Result<CompoundStatement, ParseError> {
         if !self.eat_punctuator(Punctuator::OpenCurly) {
             return Err(ParseError::new(
                 ParseErrorKind::Misc("Expected '{' to begin compound statement"),
@@ -1552,16 +1646,60 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        todo!("parse compound statement");
+        let mut statements = vec![];
 
-        if !self.eat_punctuator(Punctuator::CloseCurly) {
+        loop {
+            if self.eat_punctuator(Punctuator::CloseCurly) {
+                break;
+            }
+
+            if let Ok(declaration) = self.parse_declaration() {
+                statements.push(declaration.into());
+            }
+
+            if let Ok(unlabeled_statement) = self.parse_unlabeled_statement() {
+                statements.push(unlabeled_statement.into());
+            }
+
+            if let Ok(label) = self.parse_label() {
+                statements.push(label.into());
+            }
+
             return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected '}' to close compound statement"),
+                ParseErrorKind::Misc("Expected '}' to end compound statement"),
                 self.input.peek().source,
             ));
         }
 
-        Ok(())
+        Ok(CompoundStatement { statements })
+    }
+
+    fn parse_unlabeled_statement(&mut self) -> Result<UnlabeledStatement, ParseError> {
+        if let Ok(expr_statement) = self.parse_expr_statement() {
+            return Ok(expr_statement.into());
+        }
+
+        todo!("parse_unlabeled_statement")
+    }
+
+    fn parse_expr_statement(&mut self) -> Result<ExprStatement, ParseError> {
+        if self
+            .input
+            .peek_is(CTokenKind::Punctuator(Punctuator::Semicolon))
+        {
+            return Ok(ExprStatement::Empty);
+        }
+
+        let attributes = self.parse_attribute_specifier_sequence()?;
+
+        return Ok(ExprStatement::Normal(
+            attributes,
+            self.parse_expr_multiple()?,
+        ));
+    }
+
+    fn parse_label(&mut self) -> Result<Label, ParseError> {
+        todo!("parse_label")
     }
 
     fn eat(&mut self, expected: CTokenKind) -> bool {

@@ -3,7 +3,7 @@ use crate::{
     asg::TypeParams,
     ast::{self, AstFile, Func, FuncHead, Param, Params},
     c::parser::{
-        error::ParseErrorKind, CTypedef, DeclarationSpecifiers, Declarator,
+        error::ParseErrorKind, Attribute, CTypedef, DeclarationSpecifiers, Declarator,
         ParameterDeclarationCore, ParameterTypeList, ParseError, StorageClassSpecifier,
     },
     diagnostics::Diagnostics,
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 pub fn declare_function(
     typedefs: &mut HashMap<String, CTypedef>,
     ast_file: &mut AstFile,
-    _attribute_specifiers: &[()],
+    _attribute_specifiers: &[Attribute],
     declaration_specifiers: &DeclarationSpecifiers,
     declarator: &Declarator,
     parameter_type_list: &ParameterTypeList,
