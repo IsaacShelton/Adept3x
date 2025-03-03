@@ -390,7 +390,7 @@ pub enum MemberDeclarator {
     BitField(Option<Declarator>, ConstExpr),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, From)]
 pub enum ExternalDeclaration {
     Declaration(Declaration),
     FunctionDefinition(FunctionDefinition),
@@ -398,7 +398,7 @@ pub enum ExternalDeclaration {
 
 #[derive(Clone, Debug, From)]
 pub enum BlockItem {
-    ExternalDeclaration(ExternalDeclaration),
+    Declaration(Declaration),
     UnlabeledStatement(UnlabeledStatement),
     Label(Label),
 }
@@ -650,19 +650,19 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
-        if let Ok(_func_definition) = speculate!(self.input, self.parse_function_definition()) {
-            return Ok(todo!());
+        if let Ok(declaration) = speculate!(self.input, self.parse_declaration()) {
+            return Ok(declaration.into());
         }
 
-        speculate!(self.input, self.parse_declaration())
+        Ok(speculate!(self.input, self.parse_function_definition())?.into())
     }
 
-    fn parse_function_definition(&mut self) -> Result<(), ParseError> {
+    fn parse_function_definition(&mut self) -> Result<FunctionDefinition, ParseError> {
         self.parse_attribute_specifier_sequence()?;
         self.parse_declaration_specifiers()?;
         self.parse_declarator()?;
         self.parse_function_body()?;
-        Ok(())
+        Ok(todo!("parse_function_definition"))
     }
 
     fn parse_attribute_specifier_sequence(&mut self) -> Result<Vec<Attribute>, ParseError> {
@@ -1462,18 +1462,16 @@ impl<'a> Parser<'a> {
         todo!()
     }
 
-    fn parse_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
+    fn parse_declaration(&mut self) -> Result<Declaration, ParseError> {
         if self.input.peek_is(CTokenKind::StaticAssertKeyword) {
-            return Ok(ExternalDeclaration::Declaration(Declaration::StaticAssert(
-                self.parse_static_assert()?,
-            )));
+            return Ok(Declaration::StaticAssert(self.parse_static_assert()?));
         }
 
         let attribute_specifiers = self.parse_attribute_specifier_sequence()?;
 
         if self.eat_punctuator(Punctuator::Semicolon) {
             // attribute-declaration
-            todo!();
+            todo!("parse attribute declaration");
             return Ok(todo!());
         }
 
@@ -1496,13 +1494,11 @@ impl<'a> Parser<'a> {
             );
         }
 
-        Ok(ExternalDeclaration::Declaration(Declaration::Common(
-            CommonDeclaration {
-                attribute_specifiers,
-                declaration_specifiers,
-                init_declarator_list,
-            },
-        )))
+        Ok(Declaration::Common(CommonDeclaration {
+            attribute_specifiers,
+            declaration_specifiers,
+            init_declarator_list,
+        }))
     }
 
     fn parse_init_declarator_list(&mut self) -> Result<Vec<InitDeclarator>, ParseError> {
@@ -1655,14 +1651,17 @@ impl<'a> Parser<'a> {
 
             if let Ok(declaration) = self.parse_declaration() {
                 statements.push(declaration.into());
+                continue;
             }
 
             if let Ok(unlabeled_statement) = self.parse_unlabeled_statement() {
                 statements.push(unlabeled_statement.into());
+                continue;
             }
 
             if let Ok(label) = self.parse_label() {
                 statements.push(label.into());
+                continue;
             }
 
             return Err(ParseError::new(
@@ -1699,7 +1698,30 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_label(&mut self) -> Result<Label, ParseError> {
-        todo!("parse_label")
+        let attributes = self.parse_attribute_specifier_sequence()?;
+
+        if self.eat(CTokenKind::CaseKeyword) {
+            return Ok(Label {
+                attributes,
+                kind: LabelKind::Case(self.parse_constant_expression()?),
+            });
+        }
+
+        if self.eat(CTokenKind::DefaultKeyword) {
+            return Ok(Label {
+                attributes,
+                kind: LabelKind::Default,
+            });
+        }
+
+        if let Some(label) = self.eat_identifier() {
+            return Ok(Label {
+                attributes,
+                kind: LabelKind::UserDefined(label),
+            });
+        }
+
+        return Err(ParseErrorKind::Misc("Expected label").at(self.input.peek().source));
     }
 
     fn eat(&mut self, expected: CTokenKind) -> bool {

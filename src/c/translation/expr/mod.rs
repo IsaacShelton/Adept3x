@@ -139,5 +139,6 @@ pub fn translate_expr(
             inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
         }))
         .at(expr.source),
+        ExprKind::Call(_target, _args) => todo!("translate C call expression"),
     })
 }

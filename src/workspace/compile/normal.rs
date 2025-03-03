@@ -3,13 +3,11 @@ use crate::{
     ast::AstFile,
     compiler::Compiler,
     data_units::ByteUnits,
-    diagnostics::{ErrorDiagnostic, WarningDiagnostic},
+    diagnostics::ErrorDiagnostic,
     inflow::IntoInflow,
     lexer::Lexer,
-    line_column::Location,
     parser::parse,
     show::{into_show, Show},
-    source_files::Source,
     text::{IntoText, IntoTextStream},
     workspace::{
         fs::FsNodeId,
@@ -42,11 +40,6 @@ pub fn compile_normal_file(
             ));
         }
         NormalFileKind::CSource => {
-            compiler.diagnostics.push(WarningDiagnostic::new(
-                "c source files are currently treated the same as headers",
-                Source::new(key, Location { line: 1, column: 1 }),
-            ));
-
             out_ast_files.push((
                 normal_file.fs_node_id,
                 c_code(compiler, text, key, CFileType::Source)?,

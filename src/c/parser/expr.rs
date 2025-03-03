@@ -46,6 +46,7 @@ pub enum ExprKind {
     Negate(Box<Expr>),
     BitComplement(Box<Expr>),
     Not(Box<Expr>),
+    Call(Box<Expr>, Vec<Expr>),
 }
 
 impl ExprKind {
@@ -274,7 +275,7 @@ impl<'a> Parser<'a> {
             todo!()
         }
 
-        Err(ParseErrorKind::Misc("Expected expression atom").at(source))
+        Err(ParseErrorKind::Misc("Expected expression").at(source))
     }
 
     pub fn parse_expr_primary(&mut self) -> Result<Expr, ParseError> {
@@ -284,9 +285,10 @@ impl<'a> Parser<'a> {
 
     fn parse_expr_post(&mut self, base: Expr) -> Result<Expr, ParseError> {
         let mut base = base;
+        let source = self.input.peek().source;
 
         loop {
-            if let Some(source) = self.eat_punctuator_source(Punctuator::OpenBracket) {
+            if self.eat_punctuator(Punctuator::OpenBracket) {
                 let subscript = self.parse_expr_multiple()?;
 
                 if !self.eat_punctuator(Punctuator::CloseBracket) {
@@ -303,7 +305,7 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            if let Some(source) = self.eat_punctuator_source(Punctuator::Dot) {
+            if self.eat_punctuator(Punctuator::Dot) {
                 let field = self.eat_identifier().ok_or_else(|| {
                     ParseErrorKind::Misc("Expected field name after '.'").at(source)
                 })?;
@@ -318,7 +320,7 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            if let Some(source) = self.eat_punctuator_source(Punctuator::Arrow) {
+            if self.eat_punctuator(Punctuator::Arrow) {
                 let field = self.eat_identifier().ok_or_else(|| {
                     ParseErrorKind::Misc("Expected field name after '.'").at(source)
                 })?;
@@ -333,19 +335,19 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            if let Some(source) = self.eat_punctuator_source(Punctuator::Increment) {
+            if self.eat_punctuator(Punctuator::Increment) {
                 base = ExprKind::PostIncrement(Box::new(base)).at(source);
                 continue;
             }
 
-            if let Some(source) = self.eat_punctuator_source(Punctuator::Decrement) {
+            if self.eat_punctuator(Punctuator::Decrement) {
                 base = ExprKind::PostDecrement(Box::new(base)).at(source);
                 continue;
             }
 
             if self.eat_open_paren() {
-                // Call
-                base = todo!();
+                let args = self.parse_argument_expr_list_rest()?;
+                base = ExprKind::Call(Box::new(base), args).at(source);
                 continue;
             }
 
@@ -353,6 +355,32 @@ impl<'a> Parser<'a> {
         }
 
         Ok(base)
+    }
+
+    pub fn parse_argument_expr_list_rest(&mut self) -> Result<Vec<Expr>, ParseError> {
+        // function_name_or_value(arg1, arg2, arg3, arg4, argN)
+        //                        ^
+
+        let mut args = vec![];
+
+        if self.eat_punctuator(Punctuator::CloseParen) {
+            return Ok(args);
+        }
+
+        loop {
+            args.push(self.parse_expr_singular()?);
+
+            if self.eat_punctuator(Punctuator::Comma) {
+                continue;
+            }
+
+            if self.eat_punctuator(Punctuator::CloseParen) {
+                return Ok(args);
+            }
+
+            return Err(ParseErrorKind::Misc("Expected ')' to close argument list")
+                .at(self.input.peek().source));
+        }
     }
 
     pub fn parse_expr_primary_base(&mut self) -> Result<Expr, ParseError> {
