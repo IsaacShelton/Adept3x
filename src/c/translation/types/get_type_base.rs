@@ -1,7 +1,10 @@
 use super::{build_type_specifier_qualifier, TypeBase, TypeBaseBuilder};
 use crate::{
     ast::AstFile,
-    c::parser::{CTypedef, DeclarationSpecifierKind, DeclarationSpecifiers, ParseError},
+    c::{
+        ast::{CTypedef, DeclarationSpecifierKind, DeclarationSpecifiers},
+        parser::ParseError,
+    },
     diagnostics::Diagnostics,
     source_files::Source,
 };

@@ -9,10 +9,12 @@ use self::{
 };
 use crate::{
     ast::{self, AstFile},
-    c::parser::{
-        error::ParseErrorKind,
-        expr::{BinaryOperator, Expr, ExprKind},
-        CTypedef, ParseError,
+    c::{
+        ast::{
+            expr::{BinaryOperator, Expr, ExprKind},
+            CTypedef,
+        },
+        parser::{error::ParseErrorKind, ParseError},
     },
     diagnostics::Diagnostics,
 };

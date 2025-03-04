@@ -12,11 +12,13 @@ use self::{
 use super::parameters::has_parameters;
 use crate::{
     ast::{AstFile, CInteger, FloatSize, IntegerSign, Param, Type, TypeKind},
-    c::parser::{
-        error::ParseErrorKind, AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator,
-        DeclaratorKind, Decorator, Decorators, FunctionQualifier, FunctionSpecifier,
-        ParameterDeclarationCore, ParseError, StorageClassSpecifier, TypeQualifierKind,
-        TypeSpecifierKind, TypeSpecifierQualifier,
+    c::{
+        ast::{
+            AlignmentSpecifierKind, CTypedef, DeclarationSpecifiers, Declarator, DeclaratorKind,
+            Decorator, Decorators, FunctionQualifier, FunctionSpecifier, ParameterDeclarationCore,
+            StorageClassSpecifier, TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
+        },
+        parser::{error::ParseErrorKind, ParseError},
     },
     diagnostics::Diagnostics,
     source_files::Source,

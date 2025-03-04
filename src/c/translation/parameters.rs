@@ -1,4 +1,4 @@
-use crate::c::parser::ParameterTypeList;
+use crate::c::ast::ParameterTypeList;
 
 pub fn has_parameters(parameter_type_list: &ParameterTypeList) -> bool {
     let declarations = &parameter_type_list.parameter_declarations;

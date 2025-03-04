@@ -1,10 +1,11 @@
 use crate::{
     ast::{self, AstFile, FillBehavior, Language},
     c::{
-        parser::{
+        ast::{
             expr::{CompoundLiteral, Initializer},
-            CTypedef, ParseError,
+            CTypedef,
         },
+        parser::ParseError,
         translate_expr,
         translation::expr::caster::get_caster_type,
     },

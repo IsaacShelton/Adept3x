@@ -2,9 +2,12 @@ use super::{parameters::has_parameters, types::get_name_and_type};
 use crate::{
     asg::TypeParams,
     ast::{self, AstFile, Func, FuncHead, Param, Params},
-    c::parser::{
-        error::ParseErrorKind, Attribute, CTypedef, DeclarationSpecifiers, Declarator,
-        ParameterDeclarationCore, ParameterTypeList, ParseError, StorageClassSpecifier,
+    c::{
+        ast::{
+            Attribute, CTypedef, DeclarationSpecifiers, Declarator, ParameterDeclarationCore,
+            ParameterTypeList, StorageClassSpecifier,
+        },
+        parser::{error::ParseErrorKind, ParseError},
     },
     diagnostics::Diagnostics,
     workspace::compile::c_code::CFileType,

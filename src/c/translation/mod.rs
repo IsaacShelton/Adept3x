@@ -6,11 +6,11 @@ mod types;
 
 use self::types::get_name_and_type;
 pub use self::{expr::translate_expr, function::declare_function};
-use super::parser::Attribute;
+use super::{ast::Attribute, parser::ParseError};
 use crate::{
     asg::TypeParams,
     ast::{self, AstFile},
-    c::parser::{CTypedef, DeclarationSpecifiers, Declarator, ParseError, StorageClassSpecifier},
+    c::ast::{CTypedef, DeclarationSpecifiers, Declarator, StorageClassSpecifier},
     diagnostics::{Diagnostics, WarningDiagnostic},
     workspace::compile::c_code::CFileType,
 };

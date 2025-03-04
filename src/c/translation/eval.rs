@@ -1,10 +1,7 @@
 use crate::c::{
+    ast::{Expr, ExprKind},
     encoding::Encoding,
-    parser::{
-        error::ParseErrorKind,
-        expr::{Expr, ExprKind},
-        ParseError,
-    },
+    parser::{error::ParseErrorKind, ParseError},
 };
 use num_bigint::BigInt;
 use num_traits::Zero;

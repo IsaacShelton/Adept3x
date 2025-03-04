@@ -1,3 +1,4 @@
+pub mod ast;
 pub mod encoding;
 pub mod lexer;
 pub mod parser;

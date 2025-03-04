@@ -1,7 +1,8 @@
 use crate::{
     ast::{AstFile, FixedArray, FuncPtr, Type, TypeKind},
     c::{
-        parser::{ArrayQualifier, CTypedef, FunctionQualifier, ParseError, Pointer},
+        ast::{ArrayQualifier, CTypedef, FunctionQualifier, Pointer},
+        parser::ParseError,
         translate_expr,
     },
     diagnostics::{Diagnostics, WarningDiagnostic},

@@ -1,7 +1,8 @@
 use crate::{
     ast::{self, AnonymousEnum, AstFile, EnumMember, Privacy, TypeKind},
     c::{
-        parser::{error::ParseErrorKind, Enumeration, ParseError},
+        ast::Enumeration,
+        parser::{error::ParseErrorKind, ParseError},
         translation::eval::evaluate_to_const_integer,
     },
     name::Name,

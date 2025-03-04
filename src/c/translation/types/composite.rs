@@ -1,9 +1,12 @@
 use super::get_name_and_type;
 use crate::{
     ast::{AnonymousStruct, AstFile, Field, Privacy, Struct, TypeKind, TypeParams},
-    c::parser::{
-        error::ParseErrorKind, CTypedef, Composite, CompositeKind, DeclarationSpecifiers,
-        MemberDeclaration, MemberDeclarator, ParseError,
+    c::{
+        ast::{
+            CTypedef, Composite, CompositeKind, DeclarationSpecifiers, MemberDeclaration,
+            MemberDeclarator,
+        },
+        parser::{error::ParseErrorKind, ParseError},
     },
     diagnostics::Diagnostics,
     name::Name,

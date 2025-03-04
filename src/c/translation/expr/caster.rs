@@ -1,7 +1,8 @@
 use crate::{
     ast::{self, AstFile},
     c::{
-        parser::{expr::Caster, CTypedef, ParseError},
+        ast::{expr::Caster, CTypedef},
+        parser::ParseError,
         translation::types::{build_type_specifier_qualifier, TypeBaseBuilder},
     },
     diagnostics::Diagnostics,
