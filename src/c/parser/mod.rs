@@ -504,7 +504,12 @@ pub struct CommonDeclaration {
 }
 
 #[derive(Clone, Debug)]
-pub struct FunctionDefinition {}
+pub struct FunctionDefinition {
+    pub attributes: Vec<Attribute>,
+    pub declaration_specifiers: DeclarationSpecifiers,
+    pub declarator: Declarator,
+    pub body: CompoundStatement,
+}
 
 #[derive(Clone, Debug)]
 pub struct ConstExpr {
@@ -639,10 +644,10 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    Declaration::StaticAssert(_) => todo!(),
-                    Declaration::Attribute(_) => todo!(),
+                    Declaration::StaticAssert(_) => todo!("c static assert"),
+                    Declaration::Attribute(_) => todo!("c attribute declaration"),
                 },
-                ExternalDeclaration::FunctionDefinition(_) => todo!(),
+                ExternalDeclaration::FunctionDefinition(_) => todo!("define c function"),
             }
         }
 
@@ -658,11 +663,17 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_definition(&mut self) -> Result<FunctionDefinition, ParseError> {
-        self.parse_attribute_specifier_sequence()?;
-        self.parse_declaration_specifiers()?;
-        self.parse_declarator()?;
-        self.parse_function_body()?;
-        Ok(todo!("parse_function_definition"))
+        let attributes = self.parse_attribute_specifier_sequence()?;
+        let declaration_specifiers = self.parse_declaration_specifiers()?;
+        let declarator = self.parse_declarator()?;
+        let body = self.parse_function_body()?;
+
+        Ok(FunctionDefinition {
+            attributes,
+            declaration_specifiers,
+            declarator,
+            body,
+        })
     }
 
     fn parse_attribute_specifier_sequence(&mut self) -> Result<Vec<Attribute>, ParseError> {
@@ -1469,7 +1480,7 @@ impl<'a> Parser<'a> {
 
         let attribute_specifiers = self.parse_attribute_specifier_sequence()?;
 
-        if self.eat_punctuator(Punctuator::Semicolon) {
+        if !attribute_specifiers.is_empty() && self.eat_punctuator(Punctuator::Semicolon) {
             // attribute-declaration
             todo!("parse attribute declaration");
             return Ok(todo!());
@@ -1629,9 +1640,8 @@ impl<'a> Parser<'a> {
         Ok(Designation { path })
     }
 
-    fn parse_function_body(&mut self) -> Result<(), ParseError> {
-        let _statements = self.parse_compound_statement()?;
-        todo!("parse_function_body");
+    fn parse_function_body(&mut self) -> Result<CompoundStatement, ParseError> {
+        self.parse_compound_statement()
     }
 
     fn parse_compound_statement(&mut self) -> Result<CompoundStatement, ParseError> {
@@ -1649,17 +1659,19 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            if let Ok(declaration) = self.parse_declaration() {
+            if let Ok(declaration) = speculate!(self.input, self.parse_declaration()) {
                 statements.push(declaration.into());
                 continue;
             }
 
-            if let Ok(unlabeled_statement) = self.parse_unlabeled_statement() {
+            if let Ok(unlabeled_statement) =
+                speculate!(self.input, self.parse_unlabeled_statement())
+            {
                 statements.push(unlabeled_statement.into());
                 continue;
             }
 
-            if let Ok(label) = self.parse_label() {
+            if let Ok(label) = speculate!(self.input, self.parse_label()) {
                 statements.push(label.into());
                 continue;
             }
@@ -1674,11 +1686,34 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_unlabeled_statement(&mut self) -> Result<UnlabeledStatement, ParseError> {
-        if let Ok(expr_statement) = self.parse_expr_statement() {
+        if let Ok(expr_statement) = speculate!(self.input, self.parse_expr_statement()) {
             return Ok(expr_statement.into());
         }
 
-        todo!("parse_unlabeled_statement")
+        let _attribute_specifier_sequence = self.parse_attribute_specifier_sequence()?;
+
+        if let Ok(_primary_block) = speculate!(self.input, self.parse_primary_block()) {
+            return todo!("handle parsed primary block");
+        }
+
+        if let Ok(_primary_block) = speculate!(self.input, self.parse_jump_block()) {
+            return todo!("handle parsed jump block");
+        }
+
+        todo!("parse_unlabeled_statement");
+
+        return Err(ParseError::message(
+            "Expected unlabeled statement",
+            self.input.peek().source,
+        ));
+    }
+
+    fn parse_primary_block(&mut self) -> Result<(), ParseError> {
+        todo!("parse_primary_block")
+    }
+
+    fn parse_jump_block(&mut self) -> Result<(), ParseError> {
+        todo!("parse_jump_block")
     }
 
     fn parse_expr_statement(&mut self) -> Result<ExprStatement, ParseError> {

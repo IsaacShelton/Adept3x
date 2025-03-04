@@ -322,7 +322,7 @@ impl<'a> Parser<'a> {
 
             if self.eat_punctuator(Punctuator::Arrow) {
                 let field = self.eat_identifier().ok_or_else(|| {
-                    ParseErrorKind::Misc("Expected field name after '.'").at(source)
+                    ParseErrorKind::Misc("Expected field name after '->'").at(source)
                 })?;
 
                 base = ExprKind::Field(Box::new(Field {
