@@ -4,8 +4,8 @@ use crate::{
     ast::{self, AstFile, Func, FuncHead, Param, Params},
     c::{
         ast::{
-            Attribute, CTypedef, DeclarationSpecifiers, Declarator, ParameterDeclarationCore,
-            ParameterTypeList, StorageClassSpecifier,
+            Attribute, CTypedef, CompoundStatement, DeclarationSpecifiers, Declarator,
+            ParameterDeclarationCore, ParameterTypeList, StorageClassSpecifier,
         },
         parser::{error::ParseErrorKind, ParseError},
     },
@@ -21,6 +21,7 @@ pub fn declare_function(
     declaration_specifiers: &DeclarationSpecifiers,
     declarator: &Declarator,
     parameter_type_list: &ParameterTypeList,
+    body: Option<CompoundStatement>,
     diagnostics: &Diagnostics,
     c_file_type: CFileType,
 ) -> Result<(), ParseError> {

@@ -477,6 +477,7 @@ pub struct FunctionDefinition {
     pub attributes: Vec<Attribute>,
     pub declaration_specifiers: DeclarationSpecifiers,
     pub declarator: Declarator,
+    pub parameter_type_list: ParameterTypeList,
     pub body: CompoundStatement,
 }
 

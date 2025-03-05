@@ -110,6 +110,7 @@ impl<'a> Parser<'a> {
                                         &declaration.declaration_specifiers,
                                         declarator,
                                         parameter_type_list,
+                                        None,
                                         self.diagnostics,
                                         self.c_file_type,
                                     )?;
@@ -120,7 +121,19 @@ impl<'a> Parser<'a> {
                     Declaration::StaticAssert(_) => todo!("c static assert"),
                     Declaration::Attribute(_) => todo!("c attribute declaration"),
                 },
-                ExternalDeclaration::FunctionDefinition(_) => todo!("define c function"),
+                ExternalDeclaration::FunctionDefinition(function_definition) => {
+                    declare_function(
+                        &mut self.typedefs,
+                        &mut ast_file,
+                        &function_definition.attributes,
+                        &function_definition.declaration_specifiers,
+                        &function_definition.declarator,
+                        &function_definition.parameter_type_list,
+                        Some(function_definition.body),
+                        self.diagnostics,
+                        self.c_file_type,
+                    )?;
+                }
             }
         }
 
@@ -141,10 +154,23 @@ impl<'a> Parser<'a> {
         let declarator = self.parse_declarator()?;
         let body = self.parse_function_body()?;
 
+        let (declarator, parameter_type_list) = match declarator.kind {
+            DeclaratorKind::Function(declarator, parameter_type_list) => {
+                (*declarator, parameter_type_list)
+            }
+            _ => {
+                return Err(ParseError::message(
+                    "Invalid function definition",
+                    declarator.source,
+                ))
+            }
+        };
+
         Ok(FunctionDefinition {
             attributes,
             declaration_specifiers,
             declarator,
+            parameter_type_list,
             body,
         })
     }
