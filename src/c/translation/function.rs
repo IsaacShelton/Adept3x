@@ -74,6 +74,12 @@ pub fn declare_function(
 
     match func_info.specifiers.storage_class {
         Some(StorageClassSpecifier::Typedef) => {
+            if body.is_some() {
+                return Err(
+                    ParseErrorKind::Misc("Cannot typedef function with body").at(declarator.source)
+                );
+            }
+
             let ast_type = ast::TypeKind::FuncPtr(ast::FuncPtr {
                 parameters: required,
                 return_type: Box::new(func_info.ast_type),
@@ -102,6 +108,7 @@ pub fn declare_function(
         },
         return_type: func_info.ast_type,
         is_foreign: true,
+        is_exposed: body.is_some(),
         source,
         abide_abi: true,
         tag: None,

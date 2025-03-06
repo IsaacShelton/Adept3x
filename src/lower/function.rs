@@ -115,7 +115,7 @@ pub fn lower_func_head(
     };
 
     let is_main = mangled_name == "main";
-    let is_exposed = is_main;
+    let is_exposed = func.is_exposed || is_main;
 
     Ok(ir_module.funcs.insert(
         func_ref,

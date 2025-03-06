@@ -25,6 +25,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         let source = self.input.advance().source;
 
         let mut is_foreign = false;
+        let mut is_exposed = false;
         let mut abide_abi = false;
         let mut privacy = Privacy::Protected;
         let mut givens = vec![];
@@ -32,6 +33,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
         for annotation in annotations {
             match annotation.kind {
                 AnnotationKind::Foreign => is_foreign = true,
+                AnnotationKind::Exposed => is_exposed = true,
                 AnnotationKind::AbideAbi => abide_abi = true,
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Private => privacy = Privacy::Private,
@@ -81,6 +83,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
                 params,
                 return_type,
                 is_foreign,
+                is_exposed,
                 source,
                 abide_abi,
                 tag: None,

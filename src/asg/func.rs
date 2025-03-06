@@ -9,6 +9,7 @@ pub struct Func {
     pub return_type: Type,
     pub stmts: Vec<Stmt>,
     pub is_foreign: bool,
+    pub is_exposed: bool,
     pub is_generic: bool,
     pub vars: VariableStorage,
     pub source: Source,

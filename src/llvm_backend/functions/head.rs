@@ -13,10 +13,13 @@ use crate::{
 };
 use cstr::cstr;
 use llvm_sys::{
-    core::{LLVMAddFunction, LLVMFunctionType, LLVMSetFunctionCallConv, LLVMSetLinkage},
+    core::{
+        LLVMAddFunction, LLVMFunctionType, LLVMGetNamedFunction, LLVMSetFunctionCallConv,
+        LLVMSetLinkage,
+    },
     LLVMCallConv, LLVMLinkage,
 };
-use std::ffi::CString;
+use std::{ffi::CString, ptr::null_mut};
 
 pub unsafe fn create_func_heads(ctx: &mut BackendCtx) -> Result<(), BackendError> {
     for (func_ref, func) in ctx.ir_module.funcs.iter() {
@@ -62,19 +65,37 @@ pub unsafe fn create_func_heads(ctx: &mut BackendCtx) -> Result<(), BackendError
         };
 
         let name = CString::new(func.mangled_name.as_bytes()).unwrap();
-        let skeleton = LLVMAddFunction(
-            ctx.backend_module.get(),
-            name.as_ptr(),
-            function_type.pointer,
-        );
-        LLVMSetFunctionCallConv(skeleton, LLVMCallConv::LLVMCCallConv as u32);
 
-        let nounwind = create_enum_attribute(cstr!("nounwind"), 0);
-        add_func_attribute(skeleton, nounwind);
+        let existing = if func.is_foreign || func.is_exposed {
+            LLVMGetNamedFunction(ctx.backend_module.get(), name.as_ptr())
+        } else {
+            null_mut()
+        };
 
-        if !func.is_foreign && !func.is_exposed {
-            LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);
-        }
+        let skeleton = if existing.is_null() {
+            let skeleton = LLVMAddFunction(
+                ctx.backend_module.get(),
+                name.as_ptr(),
+                function_type.pointer,
+            );
+
+            LLVMSetFunctionCallConv(skeleton, LLVMCallConv::LLVMCCallConv as u32);
+
+            let nounwind = create_enum_attribute(cstr!("nounwind"), 0);
+            add_func_attribute(skeleton, nounwind);
+
+            if !func.is_foreign && !func.is_exposed {
+                LLVMSetLinkage(skeleton, LLVMLinkage::LLVMPrivateLinkage);
+            }
+
+            skeleton
+        } else {
+            if func.is_foreign || func.is_exposed {
+                LLVMSetLinkage(existing, LLVMLinkage::LLVMExternalLinkage);
+            }
+
+            existing
+        };
 
         ctx.func_skeletons.insert(
             func_ref,

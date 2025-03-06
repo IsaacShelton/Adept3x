@@ -18,6 +18,7 @@ pub struct FuncHead {
     pub params: Params,
     pub return_type: Type,
     pub is_foreign: bool,
+    pub is_exposed: bool,
     pub source: Source,
     pub abide_abi: bool,
     pub tag: Option<Tag>,

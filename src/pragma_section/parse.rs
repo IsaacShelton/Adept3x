@@ -111,6 +111,7 @@ impl PragmaSection {
                     params: Params::default(),
                     return_type: TypeKind::Void.at(source),
                     is_foreign: false,
+                    is_exposed: false,
                     source,
                     abide_abi: false,
                     tag: None,
