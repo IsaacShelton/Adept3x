@@ -108,7 +108,7 @@ pub fn lower_func_head(
 
     let mangled_name = if func.name.plain() == "main" {
         "main".into()
-    } else if func.is_foreign {
+    } else if func.is_foreign || func.is_exposed {
         func.name.plain().to_string()
     } else {
         func.name.display(&asg.workspace.fs).to_string() + &poly_recipe.to_string()
