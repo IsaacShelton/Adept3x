@@ -16,7 +16,7 @@ use super::{
         DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind,
         EnumTypeSpecifier, Enumeration, EnumerationDefinition, EnumerationNamed, Enumerator,
         ExprStatement, ExternalDeclaration, FunctionDefinition, FunctionSpecifier, InitDeclarator,
-        Initializer, Label, LabelKind, Member, MemberDeclaration, MemberDeclarator,
+        Initializer, JumpStatement, Label, LabelKind, Member, MemberDeclaration, MemberDeclarator,
         ParameterDeclaration, ParameterDeclarationCore, ParameterTypeList, Pointer,
         SpecifierQualifierList, StaticAssertDeclaration, StorageClassSpecifier, TypeQualifier,
         TypeQualifierKind, TypeSpecifier, TypeSpecifierKind, TypeSpecifierQualifier, TypedefName,
@@ -1195,7 +1195,7 @@ impl<'a> Parser<'a> {
             return todo!("handle parsed primary block");
         }
 
-        if let Ok(_primary_block) = speculate!(self.input, self.parse_jump_block()) {
+        if let Ok(_jump_block) = speculate!(self.input, self.parse_jump_statement()) {
             return todo!("handle parsed jump block");
         }
 
@@ -1211,8 +1211,66 @@ impl<'a> Parser<'a> {
         todo!("parse_primary_block")
     }
 
-    fn parse_jump_block(&mut self) -> Result<(), ParseError> {
-        todo!("parse_jump_block")
+    fn parse_jump_statement(&mut self) -> Result<JumpStatement, ParseError> {
+        if self.eat(CTokenKind::GotoKeyword) {
+            let Some(label) = self.eat_identifier() else {
+                return Err(ParseError::message(
+                    "Expected label to goto",
+                    self.input.peek().source,
+                ));
+            };
+
+            if !self.eat_punctuator(Punctuator::Semicolon) {
+                return Err(ParseError::message(
+                    "Expected ';' after goto statement",
+                    self.input.peek().source,
+                ));
+            }
+
+            return Ok(JumpStatement::Goto(label));
+        }
+
+        if self.eat(CTokenKind::ContinueKeyword) {
+            if !self.eat_punctuator(Punctuator::Semicolon) {
+                return Err(ParseError::message(
+                    "Expected ';' after continue statement",
+                    self.input.peek().source,
+                ));
+            }
+
+            return Ok(JumpStatement::Continue);
+        }
+
+        if self.eat(CTokenKind::BreakKeyword) {
+            if !self.eat_punctuator(Punctuator::Semicolon) {
+                return Err(ParseError::message(
+                    "Expected ';' after break statement",
+                    self.input.peek().source,
+                ));
+            }
+
+            return Ok(JumpStatement::Break);
+        }
+
+        if self.eat(CTokenKind::ReturnKeyword) {
+            let result = (!self.eat_punctuator(Punctuator::Semicolon))
+                .then(|| self.parse_expr_multiple())
+                .transpose()?;
+
+            if !self.eat_punctuator(Punctuator::Semicolon) {
+                return Err(ParseError::message(
+                    "Expected ';' after return statement",
+                    self.input.peek().source,
+                ));
+            }
+
+            return Ok(JumpStatement::Return(result));
+        }
+
+        Err(ParseError::message(
+            "Expected jump statement",
+            self.input.peek().source,
+        ))
     }
 
     fn parse_expr_statement(&mut self) -> Result<ExprStatement, ParseError> {
