@@ -19,8 +19,6 @@ pub fn lex_number(number: String) -> Result<CTokenKind, LexError> {
     let (number, radix) = lex_radix(&number);
     let (number, sign, longness) = lex_suffix(&number);
 
-    dbg!(&number, &sign, &longness);
-
     use IntegerSuffix::*;
 
     let requested = match (sign, longness) {
@@ -31,7 +29,6 @@ pub fn lex_number(number: String) -> Result<CTokenKind, LexError> {
         (Sign::Unsigned, Longness::Long) => UnsignedLong,
         (Sign::Unsigned, Longness::ExtraLong) => UnsignedLongLong,
     };
-    dbg!(&requested);
 
     // The correct type for an integer literal is whichever of these fits it first
     // (Section 6.4.4.1 of the C standard)
