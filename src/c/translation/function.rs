@@ -51,21 +51,26 @@ pub fn declare_function(
                     true,
                     diagnostics,
                 )?,
-                ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
-                ParameterDeclarationCore::Nothing => todo!(),
+                ParameterDeclarationCore::AbstractDeclarator(_) => {
+                    todo!("translate abstact declaration core")
+                }
+                ParameterDeclarationCore::Nothing => {
+                    todo!("translate parameter declaration core nothing")
+                }
             };
 
             if param_info.specifiers.storage_class.is_some() {
-                return Err(
-                    ParseErrorKind::Misc("Storage classes not support on typedef").at(param.source),
-                );
+                return Err(ParseError::message(
+                    "Storage classes not support on typedef",
+                    param.source,
+                ));
             }
 
             if param_info.specifiers.function_specifier.is_some() {
-                return Err(
-                    ParseErrorKind::Misc("Function specifiers cannot be used on typedef")
-                        .at(source),
-                );
+                return Err(ParseError::message(
+                    "Function specifiers cannot be used on typedef",
+                    source,
+                ));
             }
 
             required.push(Param::new(Some(param_info.name), param_info.ast_type));
@@ -75,9 +80,10 @@ pub fn declare_function(
     match func_info.specifiers.storage_class {
         Some(StorageClassSpecifier::Typedef) => {
             if body.is_some() {
-                return Err(
-                    ParseErrorKind::Misc("Cannot typedef function with body").at(declarator.source)
-                );
+                return Err(ParseError::message(
+                    "Cannot typedef function with body",
+                    declarator.source,
+                ));
             }
 
             let ast_type = ast::TypeKind::FuncPtr(ast::FuncPtr {

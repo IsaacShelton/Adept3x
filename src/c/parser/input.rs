@@ -51,6 +51,10 @@ impl<'a> Input<'a> {
         self.tokens.last().unwrap()
     }
 
+    pub fn here(&self) -> Source {
+        self.peek().source
+    }
+
     pub fn peek(&self) -> &CToken {
         self.tokens
             .get(*self.stack.last().unwrap())

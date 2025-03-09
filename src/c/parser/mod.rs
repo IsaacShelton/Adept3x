@@ -243,10 +243,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse type specifier qualifier"),
-            self.input.peek().source,
-        ))
+        Err(self.error("Failed to parse type specifier qualifier"))
     }
 
     fn parse_type_specifier(&mut self) -> Result<TypeSpecifier, ParseError> {
@@ -276,7 +273,7 @@ impl<'a> Parser<'a> {
             });
         }
 
-        let source = self.input.peek().source;
+        let source = self.here();
 
         #[allow(clippy::redundant_pattern_matching)]
         if let Ok(..) = speculate!(self.input, self.parse_atomic_type_specifier()) {
@@ -309,10 +306,7 @@ impl<'a> Parser<'a> {
             return Ok(todo!());
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse type specifier"),
-            self.input.peek().source,
-        ))
+        Err(self.error("Failed to parse type specifier"))
     }
 
     fn parse_type_qualifier(&mut self) -> Result<TypeQualifier, ParseError> {
@@ -321,12 +315,7 @@ impl<'a> Parser<'a> {
             CTokenKind::RestrictKeyword => TypeQualifierKind::Restrict,
             CTokenKind::VolatileKeyword => TypeQualifierKind::Volatile,
             CTokenKind::AtomicKeyword => TypeQualifierKind::Atomic,
-            _ => {
-                return Err(ParseError::new(
-                    ParseErrorKind::Misc("Failed to parse type qualifier"),
-                    self.input.peek().source,
-                ))
-            }
+            _ => return Err(self.error("Failed to parse type qualifier")),
         };
 
         let source = self.input.advance().source;
@@ -335,20 +324,14 @@ impl<'a> Parser<'a> {
 
     fn parse_alignment_specifier(&mut self) -> Result<AlignmentSpecifier, ParseError> {
         if !self.eat(CTokenKind::AlignasKeyword) {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected 'alignas' keyword to begin alignment specifier"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected 'alignas' keyword to begin alignment specifier"));
         }
 
         if !self.eat_open_paren() {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected '(' after 'alignas' keyword"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected '(' after 'alignas' keyword"));
         }
 
-        todo!()
+        todo!("parse_alignment_specifier")
     }
 
     fn parse_declarator(&mut self) -> Result<Declarator, ParseError> {
@@ -362,10 +345,7 @@ impl<'a> Parser<'a> {
         let declarator = self.parse_direct_abstract_declarator_or_nothing(pointers)?;
 
         if declarator.kind.is_nothing() {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected abstract declarator"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected abstract declarator"));
         }
 
         Ok(declarator)
@@ -409,18 +389,12 @@ impl<'a> Parser<'a> {
             let declarator = self.parse_declarator()?;
 
             if !self.eat_punctuator(Punctuator::CloseParen) {
-                return Err(ParseError::new(
-                    ParseErrorKind::Misc("Expected ')' to close nested direct declarator"),
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ')' to close nested direct declarator"));
             }
 
             declarator
         } else {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected declarator"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected declarator"));
         };
 
         for pointer in pointers.drain(..) {
@@ -453,15 +427,12 @@ impl<'a> Parser<'a> {
             let declarator = self.parse_abstract_declarator()?;
 
             if !self.eat_punctuator(Punctuator::CloseParen) {
-                return Err(ParseError::new(
-                    ParseErrorKind::Misc("Expected ')' to close nested direct abstract declarator"),
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ')' to close nested direct abstract declarator"));
             }
 
             declarator
         } else {
-            AbstractDeclaratorKind::Nothing.at(self.input.peek().source)
+            AbstractDeclaratorKind::Nothing.at(self.here())
         };
 
         for pointer in pointers.drain(..) {
@@ -493,10 +464,10 @@ impl<'a> Parser<'a> {
         &mut self,
         abstraction: Abstraction,
     ) -> Result<ArrayQualifier, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
 
         if !self.eat_punctuator(Punctuator::OpenBracket) {
-            return Err(ParseErrorKind::Misc("Expected '[' to begin array declarator").at(source));
+            return Err(self.error("Expected '[' to begin array declarator"));
         }
 
         let mut is_static = self.eat(CTokenKind::StaticKeyword);
@@ -510,14 +481,11 @@ impl<'a> Parser<'a> {
         let is_param_vla = expression.is_none() && self.eat_punctuator(Punctuator::Multiply);
 
         if !self.eat_punctuator(Punctuator::CloseBracket) {
-            return Err(ParseErrorKind::Misc("Expected ']' to close array declarator").at(source));
+            return Err(self.error("Expected ']' to close array declarator"));
         }
 
         if is_param_vla && !type_qualifiers.is_empty() && abstraction.is_abstract() {
-            return Err(ParseErrorKind::Misc(
-                "Cannot specify type qualifiers for abstract array declarator",
-            )
-            .at(source));
+            return Err(self.error("Cannot specify type qualifiers for abstract array declarator"));
         }
 
         Ok(ArrayQualifier {
@@ -530,7 +498,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_array_declarator(&mut self, declarator: Declarator) -> Result<Declarator, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
         let array_qualifier = self.parse_array_qualifier(Abstraction::Normal)?;
         Ok(DeclaratorKind::Array(Box::new(declarator), array_qualifier).at(source))
     }
@@ -539,7 +507,7 @@ impl<'a> Parser<'a> {
         &mut self,
         declarator: AbstractDeclarator,
     ) -> Result<AbstractDeclarator, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
         let array_qualifier = self.parse_array_qualifier(Abstraction::Abstract)?;
         Ok(AbstractDeclaratorKind::Array(Box::new(declarator), array_qualifier).at(source))
     }
@@ -548,20 +516,16 @@ impl<'a> Parser<'a> {
         &mut self,
         declarator: Declarator,
     ) -> Result<Declarator, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
 
         if !self.eat_open_paren() {
-            return Err(
-                ParseErrorKind::Misc("Expected '(' to begin function declarator").at(source),
-            );
+            return Err(self.error("Expected '(' to begin function declarator"));
         }
 
         let parameter_type_list = self.parse_parameter_type_list()?;
 
         if !self.eat_punctuator(Punctuator::CloseParen) {
-            return Err(
-                ParseErrorKind::Misc("Expected ')' to close function declarator").at(source),
-            );
+            return Err(self.error("Expected ')' to close function declarator"));
         }
 
         Ok(DeclaratorKind::Function(Box::new(declarator), parameter_type_list).at(source))
@@ -571,22 +535,16 @@ impl<'a> Parser<'a> {
         &mut self,
         declarator: AbstractDeclarator,
     ) -> Result<AbstractDeclarator, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
 
         if !self.eat_open_paren() {
-            return Err(
-                ParseErrorKind::Misc("Expected '(' to begin abstract function declarator")
-                    .at(source),
-            );
+            return Err(self.error("Expected '(' to begin abstract function declarator"));
         }
 
         let parameter_type_list = self.parse_parameter_type_list()?;
 
         if !self.eat_punctuator(Punctuator::CloseParen) {
-            return Err(
-                ParseErrorKind::Misc("Expected ')' to close abstract function declarator")
-                    .at(source),
-            );
+            return Err(self.error("Expected ')' to close abstract function declarator"));
         }
 
         Ok(AbstractDeclaratorKind::Function(Box::new(declarator), parameter_type_list).at(source))
@@ -612,12 +570,8 @@ impl<'a> Parser<'a> {
                     let _ = self.input.advance();
                 }
                 _ => {
-                    return Err(ParseError::new(
-                        ParseErrorKind::Misc(
-                            "Expected ',' after parameter declaration in parameter type list",
-                        ),
-                        self.input.peek().source,
-                    ))
+                    return Err(self
+                        .error("Expected ',' after parameter declaration in parameter type list"))
                 }
             }
         }
@@ -629,7 +583,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_parameter_declaration(&mut self) -> Result<ParameterDeclaration, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
         let attributes = self.parse_attribute_specifier_sequence()?;
         let declaration_specifiers = self.parse_declaration_specifiers()?;
 
@@ -661,25 +615,17 @@ impl<'a> Parser<'a> {
 
     fn parse_atomic_type_specifier(&mut self) -> Result<(), ParseError> {
         if self.input.peek_is(CTokenKind::AtomicKeyword) {
-            todo!()
+            todo!("parse atomic keyword")
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse atomic specifier"),
-            self.input.peek().source,
-        ))
+        Err(self.error("Failed to parse atomic specifier"))
     }
 
     fn parse_struct_or_union_specifier(&mut self) -> Result<Composite, ParseError> {
         let kind = match self.input.peek().kind {
             CTokenKind::StructKeyword => CompositeKind::Struct,
             CTokenKind::UnionKeyword => CompositeKind::Union,
-            _ => {
-                return Err(
-                    ParseErrorKind::Misc("Failed to parse struct or union specifier")
-                        .at(self.input.peek().source),
-                )
-            }
+            _ => return Err(self.error("Failed to parse struct or union specifier")),
         };
 
         let source = self.input.advance().source;
@@ -698,8 +644,7 @@ impl<'a> Parser<'a> {
         .ok();
 
         if name.is_none() && members.is_none() {
-            return Err(ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList
-                .at(self.input.peek().source));
+            return Err(ParseErrorKind::ExpectedTypeNameOrMemberDeclarationList.at(self.here()));
         }
 
         Ok(Composite {
@@ -715,10 +660,7 @@ impl<'a> Parser<'a> {
         &mut self,
     ) -> Result<Vec<MemberDeclaration>, ParseError> {
         if !self.eat_punctuator(Punctuator::OpenCurly) {
-            return Err(
-                ParseErrorKind::Misc("Expected '{' to begin member declaration list")
-                    .at(self.input.peek().source),
-            );
+            return Err(self.error("Expected '{' to begin member declaration list"));
         }
 
         let mut member_declarations = vec![];
@@ -731,10 +673,7 @@ impl<'a> Parser<'a> {
         }
 
         if !self.eat_punctuator(Punctuator::CloseCurly) {
-            return Err(
-                ParseErrorKind::Misc("Expected '}' to close member declaration list")
-                    .at(self.input.peek().source),
-            );
+            return Err(self.error("Expected '}' to close member declaration list"));
         }
 
         Ok(member_declarations)
@@ -750,7 +689,7 @@ impl<'a> Parser<'a> {
         let member_declarations = self.parse_member_declarator_list()?;
 
         if !self.eat_punctuator(Punctuator::Semicolon) {
-            return Err(ParseErrorKind::ExpectedSemicolon.at(self.input.peek().source));
+            return Err(ParseErrorKind::ExpectedSemicolon.at(self.here()));
         }
 
         Ok(MemberDeclaration::Member(Member {
@@ -798,7 +737,7 @@ impl<'a> Parser<'a> {
         } else if let Some(declarator) = declarator {
             Ok(MemberDeclarator::Declarator(declarator))
         } else {
-            Err(ParseErrorKind::ExpectedMemberDeclarator.at(self.input.peek().source))
+            Err(ParseErrorKind::ExpectedMemberDeclarator.at(self.here()))
         }
     }
 
@@ -834,23 +773,17 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Err(ParseError::new(
-            ParseErrorKind::Misc("Failed to parse typedef name"),
-            self.input.peek().source,
-        ))
+        Err(self.error("Failed to parse typedef name"))
     }
 
     fn parse_enum_specifier(&mut self) -> Result<Enumeration, ParseError> {
-        let source = self.input.peek().source;
+        let source = self.here();
 
         if !self.eat(CTokenKind::EnumKeyword) {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Failed to parse enum specifier"),
-                source,
-            ));
+            return Err(self.error("Failed to parse enum specifier"));
         }
 
-        let enum_start_of_head = self.input.peek().source;
+        let enum_start_of_head = self.here();
         let attributes = self.parse_attribute_specifier_sequence()?;
         let name = self.eat_identifier();
         let enum_type_specifier = self.parse_enum_type_specifier()?;
@@ -915,24 +848,21 @@ impl<'a> Parser<'a> {
                     .input
                     .peek_is(CTokenKind::Punctuator(Punctuator::CloseCurly))
             {
-                return Err(ParseErrorKind::Misc("Expected ',' or '}' after enumerator")
-                    .at(self.input.peek().source));
+                return Err(self.error("Expected ',' or '}' after enumerator"));
             }
         }
 
         if !self.eat_punctuator(Punctuator::CloseCurly) {
-            return Err(ParseErrorKind::Misc("Expected '}' after enumeration body")
-                .at(self.input.peek().source));
+            return Err(self.error("Expected '}' after enumeration body"));
         }
 
         Ok(Some(enumerators))
     }
 
     fn parse_enumerator(&mut self) -> Result<Enumerator, ParseError> {
-        let (name, source) = self.eat_identifier_source().ok_or_else(|| {
-            ParseErrorKind::Misc("Expected name of enumerator inside enumeration body")
-                .at(self.input.peek().source)
-        })?;
+        let (name, source) = self
+            .eat_identifier_source()
+            .ok_or_else(|| self.error("Expected name of enumerator inside enumeration body"))?;
 
         let attributes = self.parse_attribute_specifier_sequence()?;
 
@@ -954,22 +884,16 @@ impl<'a> Parser<'a> {
         match self.input.advance().kind {
             CTokenKind::TypeofKeyword => todo!(),
             CTokenKind::TypeofUnqualKeyword => todo!(),
-            _ => Err(ParseError::new(
-                ParseErrorKind::Misc("Failed to parse typeof specifier"),
-                self.input.peek().source,
-            )),
+            _ => Err(self.error("Failed to parse typeof specifier")),
         }
     }
 
     fn parse_static_assert(&mut self) -> Result<StaticAssertDeclaration, ParseError> {
         if !self.eat(CTokenKind::StaticAssertKeyword) {
-            return Err(ParseErrorKind::Misc(
-                "Expected 'static_assert' keyword to begin static assert",
-            )
-            .at(self.input.peek().source));
+            return Err(self.error("Expected 'static_assert' keyword to begin static assert"));
         }
 
-        todo!()
+        todo!("parse_static_assert")
     }
 
     fn parse_declaration(&mut self) -> Result<Declaration, ParseError> {
@@ -981,27 +905,20 @@ impl<'a> Parser<'a> {
 
         if !attribute_specifiers.is_empty() && self.eat_punctuator(Punctuator::Semicolon) {
             // attribute-declaration
-            todo!("parse attribute declaration");
-            return Ok(todo!());
+            return Ok(todo!("parse attribute declaration"));
         }
 
         let declaration_specifiers = self.parse_declaration_specifiers()?;
         let init_declarator_list = self.parse_init_declarator_list()?;
 
         if !attribute_specifiers.is_empty() && init_declarator_list.is_empty() {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc(
-                    "Expected at least one init declarator when attribute specifiers present",
-                ),
-                self.input.peek().source,
-            ));
+            return Err(self
+                .error("Expected at least one init declarator when attribute specifiers present"));
         }
 
         if !self.eat_punctuator(Punctuator::Semicolon) {
             // TODO: Improve error message
-            return Err(
-                ParseErrorKind::Misc("Expected ';' after declaration").at(self.input.peek().source)
-            );
+            return Err(self.error("Expected ';' after declaration"));
         }
 
         Ok(Declaration::Common(CommonDeclaration {
@@ -1052,15 +969,12 @@ impl<'a> Parser<'a> {
             return Ok(Initializer::Expression(expr));
         }
 
-        Err(ParseErrorKind::Misc("Expected initializer").at(self.input.peek().source))
+        Err(self.error("Expected initializer"))
     }
 
     fn parse_braced_initializer(&mut self) -> Result<BracedInitializer, ParseError> {
         if !self.eat_punctuator(Punctuator::OpenCurly) {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected '{' to begin braced initializer"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected '{' to begin braced initializer"));
         }
 
         let mut designated_initializers = Vec::new();
@@ -1076,18 +990,12 @@ impl<'a> Parser<'a> {
                     .input
                     .peek_is(CTokenKind::Punctuator(Punctuator::CloseCurly))
             {
-                return Err(ParseError::new(
-                    ParseErrorKind::Misc("Expected ',' or '}' after designated initializer"),
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ',' or '}' after designated initializer"));
             }
         }
 
         if !self.eat_punctuator(Punctuator::CloseCurly) {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected '}' to close braced initializer"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected '}' to close braced initializer"));
         }
 
         Ok(BracedInitializer {
@@ -1120,12 +1028,12 @@ impl<'a> Parser<'a> {
 
         loop {
             if self.eat_punctuator(Punctuator::OpenBracket) {
-                todo!("subscript designator");
+                todo!("parse_designation subscript designator");
                 continue;
             }
 
             if self.eat_punctuator(Punctuator::Dot) {
-                todo!("field designator");
+                todo!("parse_designation field designator");
                 continue;
             }
 
@@ -1133,7 +1041,7 @@ impl<'a> Parser<'a> {
         }
 
         if path.is_empty() {
-            return Err(ParseErrorKind::Misc("Expected designation").at(self.input.peek().source));
+            return Err(self.error("Expected designation"));
         }
 
         Ok(Designation { path })
@@ -1145,10 +1053,7 @@ impl<'a> Parser<'a> {
 
     fn parse_compound_statement(&mut self) -> Result<CompoundStatement, ParseError> {
         if !self.eat_punctuator(Punctuator::OpenCurly) {
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected '{' to begin compound statement"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected '{' to begin compound statement"));
         }
 
         let mut statements = vec![];
@@ -1175,10 +1080,7 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            return Err(ParseError::new(
-                ParseErrorKind::Misc("Expected '}' to end compound statement"),
-                self.input.peek().source,
-            ));
+            return Err(self.error("Expected '}' to end compound statement"));
         }
 
         Ok(CompoundStatement { statements })
@@ -1189,42 +1091,77 @@ impl<'a> Parser<'a> {
             return Ok(expr_statement.into());
         }
 
-        let _attribute_specifier_sequence = self.parse_attribute_specifier_sequence()?;
+        let attributes = self.parse_attribute_specifier_sequence()?;
 
         if let Ok(_primary_block) = speculate!(self.input, self.parse_primary_block()) {
             return todo!("handle parsed primary block");
         }
 
-        if let Ok(_jump_block) = speculate!(self.input, self.parse_jump_statement()) {
-            return todo!("handle parsed jump block");
+        if let Ok(jump_statement) = speculate!(self.input, self.parse_jump_statement()) {
+            return Ok(UnlabeledStatement::JumpStatement(
+                attributes,
+                jump_statement,
+            ));
         }
 
-        todo!("parse_unlabeled_statement");
-
-        return Err(ParseError::message(
-            "Expected unlabeled statement",
-            self.input.peek().source,
-        ));
+        return Err(self.error("Expected unlabeled statement"));
     }
 
     fn parse_primary_block(&mut self) -> Result<(), ParseError> {
-        todo!("parse_primary_block")
+        if let Ok(_compound_statement) = speculate!(self.input, self.parse_compound_statement()) {
+            todo!("handle parsed compound statement");
+        }
+
+        if let Ok(_selection_statement) = speculate!(self.input, self.parse_selection_statement()) {
+            todo!("handle parsed seletion statement");
+        }
+
+        if let Ok(_iteration_statement) = speculate!(self.input, self.parse_iteration_statement()) {
+            todo!("handle parsed iteration statement");
+        }
+
+        Err(self.error("Expected primary block"))
+    }
+
+    fn parse_selection_statement(&mut self) -> Result<(), ParseError> {
+        if self.eat(CTokenKind::IfKeyword) {
+            todo!("parse if");
+        }
+
+        if self.eat(CTokenKind::SwitchKeyword) {
+            todo!("parse switch");
+        }
+
+        Err(self.error("Expected selection statement"))
+    }
+
+    fn parse_iteration_statement(&mut self) -> Result<(), ParseError> {
+        if self.eat(CTokenKind::WhileKeyword) {
+            if !self.eat_open_paren() {
+                return Err(ParseError::message("", self.here()));
+            }
+            todo!("parse while loop");
+        }
+
+        if self.eat(CTokenKind::ForKeyword) {
+            todo!("parse for loop");
+        }
+
+        if self.eat(CTokenKind::DoKeyword) {
+            todo!("parse for loop");
+        }
+
+        Err(self.error("Expected iteration statement"))
     }
 
     fn parse_jump_statement(&mut self) -> Result<JumpStatement, ParseError> {
         if self.eat(CTokenKind::GotoKeyword) {
             let Some(label) = self.eat_identifier() else {
-                return Err(ParseError::message(
-                    "Expected label to goto",
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected label to goto"));
             };
 
             if !self.eat_punctuator(Punctuator::Semicolon) {
-                return Err(ParseError::message(
-                    "Expected ';' after goto statement",
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ';' after goto statement"));
             }
 
             return Ok(JumpStatement::Goto(label));
@@ -1232,10 +1169,7 @@ impl<'a> Parser<'a> {
 
         if self.eat(CTokenKind::ContinueKeyword) {
             if !self.eat_punctuator(Punctuator::Semicolon) {
-                return Err(ParseError::message(
-                    "Expected ';' after continue statement",
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ';' after continue statement"));
             }
 
             return Ok(JumpStatement::Continue);
@@ -1243,10 +1177,7 @@ impl<'a> Parser<'a> {
 
         if self.eat(CTokenKind::BreakKeyword) {
             if !self.eat_punctuator(Punctuator::Semicolon) {
-                return Err(ParseError::message(
-                    "Expected ';' after break statement",
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ';' after break statement"));
             }
 
             return Ok(JumpStatement::Break);
@@ -1258,19 +1189,13 @@ impl<'a> Parser<'a> {
                 .transpose()?;
 
             if !self.eat_punctuator(Punctuator::Semicolon) {
-                return Err(ParseError::message(
-                    "Expected ';' after return statement",
-                    self.input.peek().source,
-                ));
+                return Err(self.error("Expected ';' after return statement"));
             }
 
             return Ok(JumpStatement::Return(result));
         }
 
-        Err(ParseError::message(
-            "Expected jump statement",
-            self.input.peek().source,
-        ))
+        Err(self.error("Expected jump statement"))
     }
 
     fn parse_expr_statement(&mut self) -> Result<ExprStatement, ParseError> {
@@ -1313,7 +1238,7 @@ impl<'a> Parser<'a> {
             });
         }
 
-        return Err(ParseErrorKind::Misc("Expected label").at(self.input.peek().source));
+        return Err(self.error("Expected label"));
     }
 
     fn eat(&mut self, expected: CTokenKind) -> bool {
@@ -1373,6 +1298,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn here(&self) -> Source {
+        self.input.here()
+    }
+
+    pub fn error(&self, message: &'static str) -> ParseError {
+        ParseError::message(message, self.input.here())
+    }
+
     fn eat_sequence(&mut self, expected: &[CTokenKind]) -> bool {
         self.eat_sequence_source(expected).is_some()
     }
@@ -1384,7 +1317,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let source = (!expected.is_empty()).then(|| self.input.peek().source);
+        let source = (!expected.is_empty()).then(|| self.here());
 
         for _ in 0..expected.len() {
             self.input.advance();
