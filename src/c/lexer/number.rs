@@ -1,12 +1,14 @@
 use super::error::LexError;
 use crate::c::token::{CTokenKind, Integer, IntegerSuffix};
 
+#[derive(Copy, Clone, Debug)]
 enum Longness {
     Regular,
     Long,
     ExtraLong,
 }
 
+#[derive(Copy, Clone, Debug)]
 enum Sign {
     Regular,
     Unsigned,
@@ -17,16 +19,19 @@ pub fn lex_number(number: String) -> Result<CTokenKind, LexError> {
     let (number, radix) = lex_radix(&number);
     let (number, sign, longness) = lex_suffix(&number);
 
+    dbg!(&number, &sign, &longness);
+
     use IntegerSuffix::*;
 
     let requested = match (sign, longness) {
-        (Sign::Regular, Longness::Regular) => Long,
+        (Sign::Regular, Longness::Regular) => Int,
         (Sign::Regular, Longness::Long) => Long,
         (Sign::Regular, Longness::ExtraLong) => LongLong,
         (Sign::Unsigned, Longness::Regular) => UnsignedInt,
         (Sign::Unsigned, Longness::Long) => UnsignedLong,
         (Sign::Unsigned, Longness::ExtraLong) => UnsignedLongLong,
     };
+    dbg!(&requested);
 
     // The correct type for an integer literal is whichever of these fits it first
     // (Section 6.4.4.1 of the C standard)

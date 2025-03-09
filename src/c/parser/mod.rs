@@ -11,8 +11,8 @@ use super::{
     ast::{
         expr::{DesignatedInitializer, Designation},
         AbstractDeclarator, AbstractDeclaratorKind, Abstraction, AlignmentSpecifier,
-        ArrayQualifier, Attribute, BracedInitializer, CTypedef, CommonDeclaration, Composite,
-        CompositeKind, CompoundStatement, ConstExpr, Declaration, DeclarationSpecifier,
+        ArrayQualifier, Attribute, BlockItem, BracedInitializer, CTypedef, CommonDeclaration,
+        Composite, CompositeKind, CompoundStatement, ConstExpr, Declaration, DeclarationSpecifier,
         DeclarationSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind,
         EnumTypeSpecifier, Enumeration, EnumerationDefinition, EnumerationNamed, Enumerator,
         ExprStatement, ExternalDeclaration, FunctionDefinition, FunctionSpecifier, InitDeclarator,
@@ -24,7 +24,7 @@ use super::{
     },
     punctuator::Punctuator,
     token::{CToken, CTokenKind, Integer},
-    translation::{declare_function, declare_named_declaration},
+    translation::{declare_function, declare_named_declaration, TranslateCtx},
 };
 use crate::{
     ast::{AstFile, Type, TypeKind},
@@ -45,6 +45,10 @@ pub struct Parser<'a> {
 impl Parser<'_> {
     pub fn typedefs(&self) -> &HashMap<String, CTypedef> {
         &self.typedefs
+    }
+
+    pub fn typedefs_mut(&mut self) -> &mut HashMap<String, CTypedef> {
+        &mut self.typedefs
     }
 }
 
@@ -86,6 +90,12 @@ impl<'a> Parser<'a> {
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
 
+            let mut ctx = TranslateCtx {
+                ast_file: &mut ast_file,
+                typedefs: &mut self.typedefs,
+                diagnostics: self.diagnostics,
+            };
+
             match external_declaration {
                 ExternalDeclaration::Declaration(declaration) => match declaration {
                     Declaration::Common(declaration) => {
@@ -94,24 +104,20 @@ impl<'a> Parser<'a> {
                                 DeclaratorKind::Named(..)
                                 | DeclaratorKind::Pointer(..)
                                 | DeclaratorKind::Array(..) => declare_named_declaration(
-                                    &mut ast_file,
+                                    &mut ctx,
                                     &init_declarator.declarator,
                                     &declaration.attribute_specifiers[..],
                                     &declaration.declaration_specifiers,
-                                    &mut self.typedefs,
-                                    self.diagnostics,
                                     self.c_file_type,
                                 )?,
                                 DeclaratorKind::Function(declarator, parameter_type_list) => {
                                     declare_function(
-                                        &mut self.typedefs,
-                                        &mut ast_file,
+                                        &mut ctx,
                                         &declaration.attribute_specifiers[..],
                                         &declaration.declaration_specifiers,
                                         declarator,
                                         parameter_type_list,
                                         None,
-                                        self.diagnostics,
                                         self.c_file_type,
                                     )?;
                                 }
@@ -123,14 +129,12 @@ impl<'a> Parser<'a> {
                 },
                 ExternalDeclaration::FunctionDefinition(function_definition) => {
                     declare_function(
-                        &mut self.typedefs,
-                        &mut ast_file,
+                        &mut ctx,
                         &function_definition.attributes,
                         &function_definition.declaration_specifiers,
                         &function_definition.declarator,
                         &function_definition.parameter_type_list,
                         Some(function_definition.body),
-                        self.diagnostics,
                         self.c_file_type,
                     )?;
                 }
@@ -1063,20 +1067,31 @@ impl<'a> Parser<'a> {
                 break;
             }
 
+            let source = self.here();
+
             if let Ok(declaration) = speculate!(self.input, self.parse_declaration()) {
-                statements.push(declaration.into());
+                statements.push(BlockItem {
+                    kind: declaration.into(),
+                    source,
+                });
                 continue;
             }
 
             if let Ok(unlabeled_statement) =
                 speculate!(self.input, self.parse_unlabeled_statement())
             {
-                statements.push(unlabeled_statement.into());
+                statements.push(BlockItem {
+                    kind: unlabeled_statement.into(),
+                    source,
+                });
                 continue;
             }
 
             if let Ok(label) = speculate!(self.input, self.parse_label()) {
-                statements.push(label.into());
+                statements.push(BlockItem {
+                    kind: label.into(),
+                    source,
+                });
                 continue;
             }
 

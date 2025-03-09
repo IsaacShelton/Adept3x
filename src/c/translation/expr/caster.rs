@@ -1,20 +1,14 @@
+use super::TranslateCtx;
 use crate::{
-    ast::{self, AstFile},
+    ast::{self},
     c::{
-        ast::{expr::Caster, CTypedef},
+        ast::expr::Caster,
         parser::ParseError,
         translation::types::{build_type_specifier_qualifier, TypeBaseBuilder},
     },
-    diagnostics::Diagnostics,
 };
-use std::collections::HashMap;
 
-pub fn get_caster_type(
-    ast_file: &mut AstFile,
-    typedefs: &HashMap<String, CTypedef>,
-    caster: &Caster,
-    diagnostics: &Diagnostics,
-) -> Result<ast::Type, ParseError> {
+pub fn get_caster_type(ctx: &mut TranslateCtx, caster: &Caster) -> Result<ast::Type, ParseError> {
     let mut builder = TypeBaseBuilder::new(caster.source);
 
     if !caster.specializer_qualifiers.attributes.is_empty() {
@@ -26,7 +20,7 @@ pub fn get_caster_type(
         .type_specifier_qualifiers
         .iter()
     {
-        build_type_specifier_qualifier(ast_file, &mut builder, typedefs, tsq, diagnostics)?;
+        build_type_specifier_qualifier(ctx, &mut builder, tsq)?;
     }
 
     if let Some(_abstract_declarator) = &caster.abstract_declarator {

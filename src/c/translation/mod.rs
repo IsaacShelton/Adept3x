@@ -16,27 +16,24 @@ use crate::{
 };
 use std::collections::HashMap;
 
+pub struct TranslateCtx<'ast, 'typedefs, 'diagnostics, 'source_files> {
+    pub ast_file: &'ast mut AstFile,
+    pub typedefs: &'typedefs mut HashMap<String, CTypedef>,
+    pub diagnostics: &'diagnostics Diagnostics<'source_files>,
+}
+
 pub fn declare_named_declaration(
-    ast_file: &mut AstFile,
+    ctx: &mut TranslateCtx,
     declarator: &Declarator,
     _attribute_specifiers: &[Attribute],
     declaration_specifiers: &DeclarationSpecifiers,
-    typedefs: &mut HashMap<String, CTypedef>,
-    diagnostics: &Diagnostics,
     c_file_type: CFileType,
 ) -> Result<(), ParseError> {
-    let decl_info = get_name_and_type(
-        ast_file,
-        typedefs,
-        declarator,
-        declaration_specifiers,
-        false,
-        diagnostics,
-    )?;
+    let decl_info = get_name_and_type(ctx, declarator, declaration_specifiers, false)?;
 
     if let Some(StorageClassSpecifier::Typedef) = decl_info.specifiers.storage_class {
         if let Some(function_specifier) = decl_info.specifiers.function_specifier {
-            diagnostics.push(WarningDiagnostic::new(
+            ctx.diagnostics.push(WarningDiagnostic::new(
                 format!(
                     "Function specifier '{}' does nothing on typedef",
                     function_specifier.as_str()
@@ -45,7 +42,7 @@ pub fn declare_named_declaration(
             ));
         }
 
-        ast_file.type_aliases.push(ast::TypeAlias {
+        ctx.ast_file.type_aliases.push(ast::TypeAlias {
             name: decl_info.name.clone(),
             params: TypeParams::default(),
             value: decl_info.ast_type.clone(),
@@ -53,7 +50,7 @@ pub fn declare_named_declaration(
             privacy: c_file_type.privacy(),
         });
 
-        typedefs.insert(
+        ctx.typedefs.insert(
             decl_info.name,
             CTypedef {
                 ast_type: decl_info.ast_type,
@@ -66,7 +63,7 @@ pub fn declare_named_declaration(
         let is_foreign = decl_info.specifiers.storage_class.is_some();
 
         if let Some(function_specifier) = decl_info.specifiers.function_specifier {
-            diagnostics.push(WarningDiagnostic::new(
+            ctx.diagnostics.push(WarningDiagnostic::new(
                 format!(
                     "Function specifier '{}' on functions is not respected yet",
                     function_specifier.as_str()
@@ -75,7 +72,7 @@ pub fn declare_named_declaration(
             ));
         }
 
-        ast_file.global_variables.push(ast::GlobalVar {
+        ctx.ast_file.global_variables.push(ast::GlobalVar {
             name: decl_info.name,
             ast_type: decl_info.ast_type,
             source: declarator.source,

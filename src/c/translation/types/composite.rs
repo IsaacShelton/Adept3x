@@ -1,24 +1,20 @@
 use super::get_name_and_type;
 use crate::{
-    ast::{AnonymousStruct, AstFile, Field, Privacy, Struct, TypeKind, TypeParams},
+    ast::{AnonymousStruct, Field, Privacy, Struct, TypeKind, TypeParams},
     c::{
         ast::{
-            CTypedef, Composite, CompositeKind, DeclarationSpecifiers, MemberDeclaration,
-            MemberDeclarator,
+            Composite, CompositeKind, DeclarationSpecifiers, MemberDeclaration, MemberDeclarator,
         },
         parser::{error::ParseErrorKind, ParseError},
+        translation::TranslateCtx,
     },
-    diagnostics::Diagnostics,
     name::Name,
 };
 use indexmap::IndexMap;
-use std::collections::HashMap;
 
 pub fn make_composite(
-    ast_file: &mut AstFile,
-    typedefs: &HashMap<String, CTypedef>,
+    ctx: &mut TranslateCtx,
     composite: &Composite,
-    diagnostics: &Diagnostics,
 ) -> Result<TypeKind, ParseError> {
     if !composite.attributes.is_empty() {
         return Err(
@@ -58,12 +54,10 @@ pub fn make_composite(
                             match member_declarator {
                                 MemberDeclarator::Declarator(declarator) => {
                                     let member_info = get_name_and_type(
-                                        ast_file,
-                                        typedefs,
+                                        ctx,
                                         declarator,
                                         &DeclarationSpecifiers::from(&member.specifier_qualifiers),
                                         false,
-                                        diagnostics,
                                     )?;
 
                                     if member_info.specifiers.storage_class.is_some() {
@@ -106,7 +100,7 @@ pub fn make_composite(
             if let Some(name) = &composite.name {
                 let name = format!("struct<{}>", name);
 
-                ast_file.structs.push(Struct {
+                ctx.ast_file.structs.push(Struct {
                     name: name.clone(),
                     params: TypeParams::default(),
                     fields,

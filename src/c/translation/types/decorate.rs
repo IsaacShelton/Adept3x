@@ -1,14 +1,14 @@
 use crate::{
-    ast::{AstFile, FixedArray, FuncPtr, Type, TypeKind},
+    ast::{FixedArray, FuncPtr, Type, TypeKind},
     c::{
-        ast::{ArrayQualifier, CTypedef, FunctionQualifier, Pointer},
+        ast::{ArrayQualifier, FunctionQualifier, Pointer},
         parser::ParseError,
         translate_expr,
+        translation::TranslateCtx,
     },
     diagnostics::{Diagnostics, WarningDiagnostic},
     source_files::Source,
 };
-use std::collections::HashMap;
 
 pub fn decorate_pointer(
     ast_type: Type,
@@ -27,13 +27,11 @@ pub fn decorate_pointer(
 }
 
 pub fn decorate_array(
-    ast_file: &mut AstFile,
-    typedefs: &HashMap<String, CTypedef>,
+    ctx: &mut TranslateCtx,
     ast_type: Type,
     array: &ArrayQualifier,
     for_parameter: bool,
     source: Source,
-    diagnostics: &Diagnostics,
 ) -> Result<Type, ParseError> {
     if !array.type_qualifiers.is_empty() {
         todo!("array type qualifiers not supported yet");
@@ -55,7 +53,7 @@ pub fn decorate_array(
             Ok(Type::new(
                 TypeKind::FixedArray(Box::new(FixedArray {
                     ast_type,
-                    count: translate_expr(ast_file, typedefs, count, diagnostics)?,
+                    count: translate_expr(ctx, count)?,
                 })),
                 source,
             ))

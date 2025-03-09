@@ -365,8 +365,14 @@ pub enum ExternalDeclaration {
     FunctionDefinition(FunctionDefinition),
 }
 
+#[derive(Clone, Debug)]
+pub struct BlockItem {
+    pub kind: BlockItemKind,
+    pub source: Source,
+}
+
 #[derive(Clone, Debug, From)]
-pub enum BlockItem {
+pub enum BlockItemKind {
     Declaration(Declaration),
     UnlabeledStatement(UnlabeledStatement),
     Label(Label),

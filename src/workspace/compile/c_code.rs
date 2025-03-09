@@ -5,6 +5,7 @@ use crate::{
         lexer::lex_c_code,
         preprocessor::{DefineKind, ObjMacro, Preprocessed},
         translate_expr,
+        translation::TranslateCtx,
     },
     compiler::Compiler,
     show::{into_show, Show},
@@ -57,10 +58,12 @@ pub fn c_code(
 
                 if let Ok(value) = parser.parse_expr_singular().and_then(|expr| {
                     translate_expr(
-                        &mut ast_file,
-                        parser.typedefs(),
+                        &mut TranslateCtx {
+                            ast_file: &mut ast_file,
+                            typedefs: parser.typedefs_mut(),
+                            diagnostics: compiler.diagnostics,
+                        },
                         &expr,
-                        compiler.diagnostics,
                     )
                 }) {
                     ast_file.helper_exprs.push(ast::HelperExpr {

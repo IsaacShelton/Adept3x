@@ -1,21 +1,17 @@
 use super::{build_type_specifier_qualifier, TypeBase, TypeBaseBuilder};
 use crate::{
-    ast::AstFile,
     c::{
-        ast::{CTypedef, DeclarationSpecifierKind, DeclarationSpecifiers},
+        ast::{DeclarationSpecifierKind, DeclarationSpecifiers},
         parser::ParseError,
+        translation::TranslateCtx,
     },
-    diagnostics::Diagnostics,
     source_files::Source,
 };
-use std::collections::HashMap;
 
 pub fn get_type_base(
-    ast_file: &mut AstFile,
-    typedefs: &HashMap<String, CTypedef>,
+    ctx: &mut TranslateCtx,
     declaration_specifiers: &DeclarationSpecifiers,
     parent_source: Source,
-    diagnostics: &Diagnostics,
 ) -> Result<TypeBase, ParseError> {
     let mut builder = TypeBaseBuilder::new(parent_source);
 
@@ -34,9 +30,8 @@ pub fn get_type_base(
             DeclarationSpecifierKind::FunctionSpecifier(function_specifier) => {
                 builder.function_specifier = Some(*function_specifier);
             }
-
             DeclarationSpecifierKind::TypeSpecifierQualifier(tsq) => {
-                build_type_specifier_qualifier(ast_file, &mut builder, typedefs, tsq, diagnostics)?
+                build_type_specifier_qualifier(ctx, &mut builder, tsq)?
             }
         }
     }

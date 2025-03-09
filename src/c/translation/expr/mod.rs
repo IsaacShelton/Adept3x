@@ -7,25 +7,16 @@ use self::{
     compound_literal::translate_compound_literal, integer::translate_expr_integer,
     string::translate_expr_string,
 };
+use super::TranslateCtx;
 use crate::{
-    ast::{self, AstFile},
+    ast,
     c::{
-        ast::{
-            expr::{BinaryOperator, Expr, ExprKind},
-            CTypedef,
-        },
+        ast::expr::{BinaryOperator, Expr, ExprKind},
         parser::{error::ParseErrorKind, ParseError},
     },
-    diagnostics::Diagnostics,
 };
-use std::collections::HashMap;
 
-pub fn translate_expr(
-    ast_file: &mut AstFile,
-    typedefs: &HashMap<String, CTypedef>,
-    expr: &Expr,
-    diagnostics: &Diagnostics,
-) -> Result<ast::Expr, ParseError> {
+pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, ParseError> {
     Ok(match &expr.kind {
         ExprKind::Integer(integer) => translate_expr_integer(integer, expr.source)?,
         ExprKind::Float(_, _) => todo!(),
@@ -37,8 +28,8 @@ pub fn translate_expr(
         ExprKind::Character(_, _) => todo!(),
         ExprKind::Compound(_) => todo!(),
         ExprKind::BinaryOperation(operation) => {
-            let left = translate_expr(ast_file, typedefs, &operation.left, diagnostics)?;
-            let right = translate_expr(ast_file, typedefs, &operation.right, diagnostics)?;
+            let left = translate_expr(ctx, &operation.left)?;
+            let right = translate_expr(ctx, &operation.right)?;
 
             let operator: ast::BinaryOperator = match operation.operator {
                 BinaryOperator::LogicalOr => ast::ShortCircuitingBinaryOperator::Or.into(),
@@ -103,42 +94,38 @@ pub fn translate_expr(
             return Err(ParseErrorKind::UndefinedVariable(name.into()).at(expr.source));
         }
         ExprKind::EnumConstant(_, _) => todo!(),
-        ExprKind::CompoundLiteral(compound_literal) => translate_compound_literal(
-            ast_file,
-            typedefs,
-            compound_literal,
-            expr.source,
-            diagnostics,
-        )?,
+        ExprKind::CompoundLiteral(compound_literal) => {
+            translate_compound_literal(ctx, compound_literal, expr.source)?
+        }
         ExprKind::AddressOf(inner) => {
             ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
                 operator: ast::UnaryOperator::AddressOf,
-                inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+                inner: translate_expr(ctx, inner)?,
             }))
             .at(expr.source)
         }
         ExprKind::Dereference(inner) => {
             ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
                 operator: ast::UnaryOperator::Dereference,
-                inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+                inner: translate_expr(ctx, inner)?,
             }))
             .at(expr.source)
         }
         ExprKind::Negate(inner) => ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
             operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::Negate),
-            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+            inner: translate_expr(ctx, inner)?,
         }))
         .at(expr.source),
         ExprKind::BitComplement(inner) => {
             ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
                 operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::BitComplement),
-                inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+                inner: translate_expr(ctx, inner)?,
             }))
             .at(expr.source)
         }
         ExprKind::Not(inner) => ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
             operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::Not),
-            inner: translate_expr(ast_file, typedefs, inner, diagnostics)?,
+            inner: translate_expr(ctx, inner)?,
         }))
         .at(expr.source),
         ExprKind::Call(_target, _args) => todo!("translate C call expression"),
