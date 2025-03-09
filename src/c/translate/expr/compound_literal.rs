@@ -4,8 +4,8 @@ use crate::{
     c::{
         ast::expr::{CompoundLiteral, Initializer},
         parser::ParseError,
+        translate::expr::caster::get_caster_type,
         translate_expr,
-        translation::expr::caster::get_caster_type,
     },
     source_files::Source,
 };

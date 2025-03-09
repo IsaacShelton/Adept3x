@@ -4,7 +4,7 @@ use crate::{
     c::{
         ast::expr::Caster,
         parser::ParseError,
-        translation::types::{build_type_specifier_qualifier, TypeBaseBuilder},
+        translate::types::{build_type_specifier_qualifier, TypeBaseBuilder},
     },
 };
 

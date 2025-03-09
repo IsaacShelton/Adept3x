@@ -3,7 +3,7 @@ use crate::{
     c::{
         ast::Enumeration,
         parser::{error::ParseErrorKind, ParseError},
-        translation::eval::evaluate_to_const_integer,
+        translate::eval::evaluate_to_const_integer,
     },
     name::Name,
 };

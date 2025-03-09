@@ -6,7 +6,7 @@ use crate::{
             Composite, CompositeKind, DeclarationSpecifiers, MemberDeclaration, MemberDeclarator,
         },
         parser::{error::ParseErrorKind, ParseError},
-        translation::TranslateCtx,
+        translate::TranslateCtx,
     },
     name::Name,
 };

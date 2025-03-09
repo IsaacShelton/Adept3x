@@ -3,8 +3,8 @@ use crate::{
     c::{
         ast::{ArrayQualifier, FunctionQualifier, Pointer},
         parser::ParseError,
+        translate::TranslateCtx,
         translate_expr,
-        translation::TranslateCtx,
     },
     diagnostics::{Diagnostics, WarningDiagnostic},
     source_files::Source,

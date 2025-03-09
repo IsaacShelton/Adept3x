@@ -24,7 +24,7 @@ use super::{
     },
     punctuator::Punctuator,
     token::{CToken, CTokenKind, Integer},
-    translation::{declare_function, declare_named_declaration, TranslateCtx},
+    translate::{declare_function, declare_named_declaration, TranslateCtx},
 };
 use crate::{
     ast::{AstFile, Type, TypeKind},

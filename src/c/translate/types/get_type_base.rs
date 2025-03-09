@@ -3,7 +3,7 @@ use crate::{
     c::{
         ast::{DeclarationSpecifierKind, DeclarationSpecifiers},
         parser::ParseError,
-        translation::TranslateCtx,
+        translate::TranslateCtx,
     },
     source_files::Source,
 };

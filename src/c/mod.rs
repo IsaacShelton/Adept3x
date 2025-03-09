@@ -5,6 +5,6 @@ pub mod parser;
 pub mod preprocessor;
 pub mod punctuator;
 pub mod token;
-pub mod translation;
+pub mod translate;
 
-pub use self::translation::translate_expr;
+pub use self::translate::translate_expr;
