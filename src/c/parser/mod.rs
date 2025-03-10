@@ -1222,11 +1222,13 @@ impl<'a> Parser<'a> {
         }
 
         let attributes = self.parse_attribute_specifier_sequence()?;
+        let expr = self.parse_expr_multiple()?;
 
-        return Ok(ExprStatement::Normal(
-            attributes,
-            self.parse_expr_multiple()?,
-        ));
+        if !self.eat_punctuator(Punctuator::Semicolon) {
+            return Err(self.error("Expected ';' after statement"));
+        }
+
+        return Ok(ExprStatement::Normal(attributes, expr));
     }
 
     fn parse_label(&mut self) -> Result<Label, ParseError> {

@@ -114,7 +114,6 @@ pub fn declare_function(
     };
 
     ctx.ast_file.funcs.push(Func { head, stmts });
-
     Ok(())
 }
 

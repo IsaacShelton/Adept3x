@@ -11,9 +11,11 @@ use super::TranslateCtx;
 use crate::{
     ast,
     c::{
+        self,
         ast::expr::{BinaryOperator, Expr, ExprKind},
-        parser::{error::ParseErrorKind, ParseError},
+        parser::ParseError,
     },
+    name::Name,
 };
 
 pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, ParseError> {
@@ -91,7 +93,7 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
         ExprKind::PostIncrement(_) => todo!(),
         ExprKind::PostDecrement(_) => todo!(),
         ExprKind::Identifier(name) => {
-            return Err(ParseErrorKind::UndefinedVariable(name.into()).at(expr.source));
+            return Ok(ast::ExprKind::Variable(Name::plain(name)).at(expr.source));
         }
         ExprKind::EnumConstant(_, _) => todo!(),
         ExprKind::CompoundLiteral(compound_literal) => {
@@ -128,6 +130,30 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
             inner: translate_expr(ctx, inner)?,
         }))
         .at(expr.source),
-        ExprKind::Call(_target, _args) => todo!("translate C call expression"),
+        ExprKind::Call(target, c_args) => {
+            eprintln!("warning: c function call expression are not isolated yet to only call functions defined within then same file");
+            eprintln!("warning: c function call expression cannot call expression yet");
+
+            let c::ast::ExprKind::Identifier(target) = &target.as_ref().kind else {
+                return Err(ParseError::message(
+                    "Calling the result of expressions is not supported yet",
+                    expr.source,
+                ));
+            };
+
+            let args = c_args
+                .iter()
+                .map(|c_arg| translate_expr(ctx, c_arg))
+                .collect::<Result<Vec<ast::Expr>, ParseError>>()?;
+
+            ast::ExprKind::Call(Box::new(ast::Call {
+                name: Name::plain(target),
+                args,
+                expected_to_return: None,
+                generics: vec![],
+                using: vec![],
+            }))
+            .at(expr.source)
+        }
     })
 }
