@@ -131,7 +131,6 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
         }))
         .at(expr.source),
         ExprKind::Call(target, c_args) => {
-            eprintln!("warning: c function call expression are not isolated yet to only call functions defined within then same file");
             eprintln!("warning: c function call expression cannot call expression yet");
 
             let c::ast::ExprKind::Identifier(target) = &target.as_ref().kind else {
