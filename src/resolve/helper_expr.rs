@@ -9,6 +9,7 @@ use crate::{
     asg::{Asg, HelperExprDecl},
     ast::AstWorkspace,
 };
+use std::borrow::Cow;
 
 pub fn resolve_helper_expressions(
     ctx: &mut ResolveCtx,
@@ -20,17 +21,18 @@ pub fn resolve_helper_expressions(
         let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
 
         // NOTE: This module should already have a function haystack
-        let func_haystack = ctx
-            .func_haystacks
-            .get(&module_folder_id)
-            .expect("function haystack to exist for file");
+        let func_haystack = Cow::Borrowed(
+            ctx.func_haystacks
+                .get(&module_folder_id)
+                .expect("function haystack to exist for file"),
+        );
 
         for helper_expr in file.helper_exprs.iter() {
             let value = {
                 let variable_haystack = VariableHaystack::new();
                 let mut ctx = ResolveExprCtx {
                     asg,
-                    func_haystack,
+                    func_haystack: &func_haystack,
                     variable_haystack,
                     func_ref: None,
                     settings,

@@ -16,6 +16,9 @@ use crate::{
 use itertools::Itertools;
 use std::collections::HashMap;
 
+/// A function haystack for a module.
+/// Specific files can have additional restrictions based on
+/// `ctx.physical_fs_node_id`
 #[derive(Clone, Debug)]
 pub struct FuncHaystack {
     pub available: HashMap<ResolvedName, Vec<asg::FuncRef>>,
@@ -55,12 +58,25 @@ impl FuncHaystack {
     pub fn find_near_matches(&self, ctx: &ResolveExprCtx, name: &Name) -> Vec<String> {
         // TODO: Clean up this function
 
+        let isolate_from_module = ctx
+            .asg
+            .workspace
+            .fs
+            .get(ctx.physical_fs_node_id)
+            .isolate_from_module;
+
+        let local_fs_node_id = if isolate_from_module {
+            ctx.physical_fs_node_id
+        } else {
+            self.module_fs_node_id
+        };
+
         let local_matches = self
             .available
-            .get(&ResolvedName::new(self.module_fs_node_id, name))
+            .get(&ResolvedName::new(local_fs_node_id, name))
             .into_iter()
             .chain(
-                (self.module_fs_node_id != ctx.physical_fs_node_id)
+                (local_fs_node_id != ctx.physical_fs_node_id)
                     .then(|| {
                         self.available
                             .get(&ResolvedName::new(ctx.physical_fs_node_id, name))
@@ -202,12 +218,25 @@ impl FuncHaystack {
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
+        let isolate_from_module = ctx
+            .asg
+            .workspace
+            .fs
+            .get(ctx.physical_fs_node_id)
+            .isolate_from_module;
+
+        let local_fs_node_id = if isolate_from_module {
+            ctx.physical_fs_node_id
+        } else {
+            self.module_fs_node_id
+        };
+
         let mut local_matches = self
             .available
-            .get(&ResolvedName::new(self.module_fs_node_id, name))
+            .get(&ResolvedName::new(local_fs_node_id, name))
             .into_iter()
             .chain(
-                (self.module_fs_node_id != ctx.physical_fs_node_id)
+                (local_fs_node_id != ctx.physical_fs_node_id)
                     .then(|| {
                         self.available
                             .get(&ResolvedName::new(ctx.physical_fs_node_id, name))

@@ -34,6 +34,7 @@ impl Fs {
             parent: None,
             segment: OsString::new().into_boxed_os_str(),
             filename: OsString::new().into(),
+            isolate_from_module: false,
         };
 
         // We assume that the root is at index 0
@@ -100,6 +101,7 @@ pub struct FsNode {
     pub parent: Option<FsNodeId>,
     pub segment: Box<OsStr>,
     pub filename: Box<OsStr>,
+    pub isolate_from_module: bool,
 }
 
 impl FsNode {
@@ -136,6 +138,10 @@ impl FsNode {
                 .into_os_string()
                 .into_boxed_os_str();
 
+            let is_c_source_file = Path::new(&segment)
+                .extension()
+                .map_or(false, |extension| extension == "c");
+
             fs.new_node(FsNode {
                 last_modified_ms: last_modified_ms.into(),
                 node_type: rest
@@ -146,6 +152,7 @@ impl FsNode {
                 parent,
                 segment,
                 filename,
+                isolate_from_module: is_c_source_file,
             })
         };
 
