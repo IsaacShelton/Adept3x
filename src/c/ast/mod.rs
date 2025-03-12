@@ -550,3 +550,9 @@ pub struct EnumerationNamed {
     pub enum_type_specifier: Option<EnumTypeSpecifier>,
     pub source: Source,
 }
+
+#[derive(Clone, Debug)]
+pub struct TypeName {
+    pub specifier_qualifiers: SpecifierQualifierList,
+    pub abstract_declarator: Option<AbstractDeclarator>,
+}

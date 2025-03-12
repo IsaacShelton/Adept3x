@@ -46,7 +46,8 @@ pub enum ParseErrorKind {
     DuplicateEnumMember(String),
     MustBeConstantInteger,
     EnumMemberNameConflictsWithExistingSymbol { name: String },
-    UndefinedVariable(String),
+    UndeclaredVariable(String),
+    UndeclaredType(String),
     CannotContainNulInNullTerminatedString,
     Misc(&'static str),
 }
@@ -79,7 +80,8 @@ impl Display for ParseErrorKind {
                     "Enum member name conflicts with existing symbol '{name}'",
                 )
             }
-            ParseErrorKind::UndefinedVariable(name) => write!(f, "Undefined variable '{name}'"),
+            ParseErrorKind::UndeclaredVariable(name) => write!(f, "Undeclared variable '{name}'"),
+            ParseErrorKind::UndeclaredType(name) => write!(f, "Undeclared type '{name}'"),
             ParseErrorKind::CannotContainNulInNullTerminatedString => {
                 write!(f, "Cannot contain NUL byte in C-String'")
             }

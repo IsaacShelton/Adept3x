@@ -3,7 +3,7 @@ use crate::{
     c::{
         ast::{
             BinaryOperation, BinaryOperator, Caster, CompoundLiteral, Expr, ExprKind, Field,
-            Subscript, Ternary,
+            Subscript, Ternary, TypeName,
         },
         parser::speculate::speculate,
         punctuator::Punctuator,
@@ -257,10 +257,17 @@ impl<'a> Parser<'a> {
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::Not(Box::new(inner)).at(source));
             }
-            CTokenKind::Punctuator(Punctuator::Increment) => todo!(),
-            CTokenKind::Punctuator(Punctuator::Decrement) => todo!(),
-            CTokenKind::SizeofKeyword => todo!(),
-            CTokenKind::AlignofKeyword => todo!(),
+            CTokenKind::Punctuator(Punctuator::Increment) => todo!("parse increment expression"),
+            CTokenKind::Punctuator(Punctuator::Decrement) => todo!("parse decrement expression"),
+            CTokenKind::SizeofKeyword => {
+                if let Ok(_ty) = speculate!(self.input, self.parse_type_in_parens()) {
+                    return todo!("handle parsed sizeof(type)");
+                }
+
+                let _inner = self.parse_expr_primary_base()?;
+                todo!("parse sizeof expression")
+            }
+            CTokenKind::AlignofKeyword => todo!("parse alignof expression"),
             _ => (),
         }
 
@@ -283,10 +290,34 @@ impl<'a> Parser<'a> {
             }
 
             // Cast
-            return todo!("cast");
+            return todo!("parse cast expression");
         }
 
         self.parse_expr_atom()
+    }
+
+    fn parse_type_in_parens(&mut self) -> Result<TypeName, ParseError> {
+        if !self.eat_open_paren() {
+            return Err(self.error("Expected '(' to begin type in parentheses"));
+        }
+
+        let type_name = self.parse_type_name()?;
+
+        if !self.eat_open_paren() {
+            return Err(self.error("Expected ')' after type in parentheses"));
+        }
+
+        return Ok(type_name);
+    }
+
+    pub fn parse_type_name(&mut self) -> Result<TypeName, ParseError> {
+        let specifier_qualifiers = self.parse_specifier_qualifier_list()?;
+        let abstract_declarator = self.parse_abstract_declarator().ok();
+
+        Ok(TypeName {
+            specifier_qualifiers,
+            abstract_declarator,
+        })
     }
 
     fn parse_operator_expr(&mut self, precedence: usize, expr: Expr) -> Result<Expr, ParseError> {

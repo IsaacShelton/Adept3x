@@ -14,9 +14,10 @@ use crate::{
     ast::{CInteger, FloatSize, IntegerSign, Param, Type, TypeKind},
     c::{
         ast::{
-            AlignmentSpecifierKind, DeclarationSpecifiers, Declarator, DeclaratorKind, Decorator,
-            Decorators, FunctionQualifier, FunctionSpecifier, ParameterDeclarationCore,
-            StorageClassSpecifier, TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
+            AbstractDeclarator, AbstractDeclaratorKind, AlignmentSpecifierKind,
+            DeclarationSpecifiers, Declarator, DeclaratorKind, Decorator, Decorators,
+            FunctionQualifier, FunctionSpecifier, ParameterDeclarationCore, StorageClassSpecifier,
+            TypeQualifierKind, TypeSpecifierKind, TypeSpecifierQualifier,
         },
         parser::{error::ParseErrorKind, ParseError},
     },
@@ -169,14 +170,12 @@ pub fn build_type_specifier_qualifier(
                 builder.concrete(make_anonymous_enum(ctx.ast_file, enumeration)?, ts.source)?
             }
             TypeSpecifierKind::TypedefName(typedef_name) => {
-                let ast_type = ctx
-                    .typedefs
-                    .get(&typedef_name.name)
-                    .expect("typedef exists")
-                    .ast_type
-                    .clone();
+                let Some(typedef) = ctx.typedefs.get(&typedef_name.name) else {
+                    return Err(ParseErrorKind::UndeclaredType(typedef_name.name.clone())
+                        .at(typedef_name.source));
+                };
 
-                builder.concrete(ast_type.kind, typedef_name.source)?
+                builder.concrete(typedef.ast_type.kind.clone(), typedef_name.source)?
             }
         },
         TypeSpecifierQualifier::TypeQualifier(tq) => match &tq.kind {
@@ -283,6 +282,59 @@ fn get_name_and_decorators(
             let (name, mut decorators) = get_name_and_decorators(ctx, inner)?;
             decorators.then_array(array_qualifier.clone());
             Ok((name, decorators))
+        }
+    }
+}
+
+fn get_decorators(
+    ctx: &mut TranslateCtx,
+    abstract_declarator: &AbstractDeclarator,
+) -> Result<Decorators, ParseError> {
+    match &abstract_declarator.kind {
+        AbstractDeclaratorKind::Nothing => Ok(Decorators::default()),
+        AbstractDeclaratorKind::Pointer(inner, pointer) => {
+            let mut decorators = get_decorators(ctx, inner)?;
+            decorators.then_pointer(pointer.clone());
+            Ok(decorators)
+        }
+        AbstractDeclaratorKind::Function(inner, parameter_type_list) => {
+            let mut decorators = get_decorators(ctx, inner)?;
+            let mut params = Vec::with_capacity(parameter_type_list.parameter_declarations.len());
+
+            if has_parameters(parameter_type_list) {
+                for parameter in parameter_type_list.parameter_declarations.iter() {
+                    let (param_name, param_type) = match &parameter.core {
+                        ParameterDeclarationCore::Declarator(declarator) => {
+                            let declarator_info = get_name_and_type(
+                                ctx,
+                                declarator,
+                                &parameter.declaration_specifiers,
+                                true,
+                            )?;
+                            (declarator_info.name, declarator_info.ast_type)
+                        }
+                        ParameterDeclarationCore::AbstractDeclarator(_) => todo!(),
+                        ParameterDeclarationCore::Nothing => {
+                            todo!()
+                        }
+                    };
+
+                    params.push(Param::named(param_name, param_type));
+                }
+            }
+
+            decorators.then_function(FunctionQualifier {
+                params,
+                source: abstract_declarator.source,
+                is_cstyle_variadic: parameter_type_list.is_variadic,
+            });
+
+            Ok(decorators)
+        }
+        AbstractDeclaratorKind::Array(inner, array_qualifier) => {
+            let mut decorators = get_decorators(ctx, inner)?;
+            decorators.then_array(array_qualifier.clone());
+            Ok(decorators)
         }
     }
 }
