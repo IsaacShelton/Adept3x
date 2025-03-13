@@ -68,7 +68,7 @@
 // #define char *^&@#^%*@&%#^)@*#%&_@*#%&
 // #define const ,
 
-#pragma ADEPT PREPROCESSOR DISABLE
+#pragma adept preprocessor disable
 
 /*
     NOTE: These identifiers would normally be replaced by the
@@ -86,6 +86,6 @@ int printf(const char *__format, ...);
     of `char` for example
 */
 
-#pragma ADEPT PREPROCESSOR ENABLE
+#pragma adept preprocessor enable
 
 #endif // _HEADER_H_INCLUDED

@@ -366,7 +366,7 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
             }
         };
 
-        if name == "ADEPT" {
+        if name == "adept" {
             self.parse_adept_pragma(line)?;
             Ok(GroupPart::TextLine(TextLine { content: vec![] }))
         } else if name == "once" {
@@ -394,13 +394,13 @@ impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
 
         let start_source = line[2].source;
 
-        if let Some("PREPROCESSOR") = line.get(3).and_then(|category| category.get_identifier()) {
+        if let Some("preprocessor") = line.get(3).and_then(|category| category.get_identifier()) {
             match line.get(4).and_then(|action| action.get_identifier()) {
-                Some("ENABLE") => {
+                Some("enable") => {
                     self.disabled = false;
                     return Ok(());
                 }
-                Some("DISABLE") => {
+                Some("disable") => {
                     self.disabled = true;
                     return Ok(());
                 }
