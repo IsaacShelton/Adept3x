@@ -286,7 +286,7 @@ fn get_name_and_decorators(
     }
 }
 
-fn get_decorators(
+pub fn get_decorators(
     ctx: &mut TranslateCtx,
     abstract_declarator: &AbstractDeclarator,
 ) -> Result<Decorators, ParseError> {

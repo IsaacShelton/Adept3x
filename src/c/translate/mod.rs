@@ -15,6 +15,7 @@ use crate::{
     workspace::compile::c_code::CFileType,
 };
 use std::collections::HashMap;
+pub use types::get_decorators;
 
 pub struct TranslateCtx<'ast, 'typedefs, 'diagnostics, 'source_files> {
     pub ast_file: &'ast mut AstFile,

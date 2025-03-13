@@ -8,9 +8,11 @@ use crate::{
         parser::speculate::speculate,
         punctuator::Punctuator,
         token::CTokenKind,
+        translate::get_decorators,
     },
     source_files::Source,
 };
+use ignore::types::TypesBuilder;
 
 // Implements expression parsing for the C parser
 impl<'a> Parser<'a> {
@@ -237,30 +239,38 @@ impl<'a> Parser<'a> {
 
         match &self.input.peek().kind {
             CTokenKind::Punctuator(Punctuator::Ampersand) => {
+                self.input.advance();
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::AddressOf(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::Multiply) => {
+                self.input.advance();
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::Dereference(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::Add) => todo!(),
             CTokenKind::Punctuator(Punctuator::Subtract) => {
+                self.input.advance();
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::Negate(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::BitComplement) => {
+                self.input.advance();
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::BitComplement(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::Not) => {
+                self.input.advance();
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::Not(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::Increment) => todo!("parse increment expression"),
             CTokenKind::Punctuator(Punctuator::Decrement) => todo!("parse decrement expression"),
             CTokenKind::SizeofKeyword => {
-                if let Ok(_ty) = speculate!(self.input, self.parse_type_in_parens()) {
+                self.input.advance();
+
+                if let Ok(type_name) = speculate!(self.input, self.parse_type_in_parens()) {
+                    let mut type_builder = TypesBuilder::new();
                     return todo!("handle parsed sizeof(type)");
                 }
 
@@ -303,7 +313,7 @@ impl<'a> Parser<'a> {
 
         let type_name = self.parse_type_name()?;
 
-        if !self.eat_open_paren() {
+        if !self.eat_punctuator(Punctuator::CloseParen) {
             return Err(self.error("Expected ')' after type in parentheses"));
         }
 
