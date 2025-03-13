@@ -28,7 +28,7 @@ MSYS2 Setup:
 - `pacman -S mingw-w64-x86_64-llvm --noconfirm`
 - `git clone https://github.com/IsaacShelton/Adept3x`
 - `cd Adept3x`
-- `LLVM_SYS_181_PREFIX=/mingw64 ~/.cargo/bin/cargo +nightly build --release`
+- `LLVM_SYS_191_PREFIX=/mingw64 ~/.cargo/bin/cargo +nightly build --release`
 
 The output will be in `./target/release`.
 

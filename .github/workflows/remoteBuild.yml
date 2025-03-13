@@ -61,9 +61,11 @@ jobs:
       - name: Install LLVM and dependencies (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          curl --output mingw-w64-x86_64-llvm-19.1.7-1-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-19.1.7-1-any.pkg.tar.zst"
+          curl --output mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst"
+          curl --output mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst"
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-gcc --noconfirm
-          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-19.1.7-1-any.pkg.tar.zst --noconfirm
+          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst --noconfirm
+          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst --noconfirm
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-zlib --noconfirm
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-zstd --noconfirm
       - name: Install LLVM and dependencies (macOS)
