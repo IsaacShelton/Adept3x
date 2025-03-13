@@ -61,7 +61,6 @@ jobs:
       - name: Install LLVM and dependencies (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          ls C:\msys64\mingw64
           curl --output mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst"
           curl --output mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst"
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-gcc --noconfirm
