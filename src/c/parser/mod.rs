@@ -81,13 +81,11 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
     }
 
     pub fn parse(&mut self) -> Result<(), ParseError> {
-        let mut ast_file = AstFile::new();
-
         while !self.input.peek().is_end_of_file() {
             let external_declaration = self.parse_external_declaration()?;
 
             let mut ctx = TranslateCtx {
-                ast_file: &mut ast_file,
+                ast_file: &mut self.ast_file,
                 typedefs: &mut self.typedefs,
                 diagnostics: self.diagnostics,
             };
