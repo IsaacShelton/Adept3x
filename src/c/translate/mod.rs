@@ -15,12 +15,27 @@ use crate::{
     workspace::compile::c_code::CFileType,
 };
 use std::collections::HashMap;
-pub use types::get_decorators;
 
 pub struct TranslateCtx<'ast, 'typedefs, 'diagnostics, 'source_files> {
     pub ast_file: &'ast mut AstFile,
     pub typedefs: &'typedefs mut HashMap<String, CTypedef>,
     pub diagnostics: &'diagnostics Diagnostics<'source_files>,
+}
+
+impl<'ast, 'typedefs, 'diagnostics, 'source_files>
+    TranslateCtx<'ast, 'typedefs, 'diagnostics, 'source_files>
+{
+    pub fn new<'input>(
+        ast_file: &'ast mut AstFile,
+        typedefs: &'typedefs mut HashMap<String, CTypedef>,
+        diagnostics: &'diagnostics Diagnostics<'source_files>,
+    ) -> Self {
+        Self {
+            ast_file,
+            typedefs,
+            diagnostics,
+        }
+    }
 }
 
 pub fn declare_named_declaration(

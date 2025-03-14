@@ -48,7 +48,7 @@ pub fn c_code(
         c_file_type,
     );
 
-    let mut ast_file = parser.parse().map_err(into_show)?;
+    parser.parse().map_err(into_show)?;
 
     // Translate preprocessor #define object macros
     for (define_name, define) in &defines {
@@ -59,14 +59,14 @@ pub fn c_code(
                 if let Ok(value) = parser.parse_expr_singular().and_then(|expr| {
                     translate_expr(
                         &mut TranslateCtx {
-                            ast_file: &mut ast_file,
-                            typedefs: parser.typedefs_mut(),
+                            ast_file: &mut parser.ast_file,
+                            typedefs: &mut parser.typedefs,
                             diagnostics: compiler.diagnostics,
                         },
                         &expr,
                     )
                 }) {
-                    ast_file.helper_exprs.push(ast::HelperExpr {
+                    parser.ast_file.helper_exprs.push(ast::HelperExpr {
                         name: define_name.clone(),
                         value,
                         source: define.source,
@@ -79,5 +79,5 @@ pub fn c_code(
         }
     }
 
-    Ok(ast_file)
+    Ok(parser.ast_file)
 }

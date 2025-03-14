@@ -34,26 +34,21 @@ use crate::{
 };
 use std::collections::HashMap;
 
-pub struct Parser<'a> {
-    input: Input<'a>,
-    typedefs: HashMap<String, CTypedef>,
+pub struct Parser<'input, 'diagnostics> {
+    input: Input<'input>,
+    pub ast_file: AstFile,
+    pub typedefs: HashMap<String, CTypedef>,
+    pub diagnostics: &'diagnostics Diagnostics<'diagnostics>,
     enum_constants: HashMap<String, Integer>,
-    diagnostics: &'a Diagnostics<'a>,
     c_file_type: CFileType,
 }
 
-impl Parser<'_> {
-    pub fn typedefs(&self) -> &HashMap<String, CTypedef> {
-        &self.typedefs
-    }
-
-    pub fn typedefs_mut(&mut self) -> &mut HashMap<String, CTypedef> {
-        &mut self.typedefs
-    }
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(input: Input<'a>, diagnostics: &'a Diagnostics<'a>, c_file_type: CFileType) -> Self {
+impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
+    pub fn new(
+        input: Input<'input>,
+        diagnostics: &'diagnostics Diagnostics<'diagnostics>,
+        c_file_type: CFileType,
+    ) -> Self {
         let mut typedefs = HashMap::default();
 
         diagnostics.push(WarningDiagnostic::new(
@@ -72,6 +67,7 @@ impl<'a> Parser<'a> {
         );
 
         Self {
+            ast_file: AstFile::new(),
             input,
             typedefs,
             enum_constants: HashMap::default(),
@@ -84,7 +80,7 @@ impl<'a> Parser<'a> {
         self.input.switch_input(tokens);
     }
 
-    pub fn parse(&mut self) -> Result<AstFile, ParseError> {
+    pub fn parse(&mut self) -> Result<(), ParseError> {
         let mut ast_file = AstFile::new();
 
         while !self.input.peek().is_end_of_file() {
@@ -141,7 +137,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(ast_file)
+        Ok(())
     }
 
     fn parse_external_declaration(&mut self) -> Result<ExternalDeclaration, ParseError> {
