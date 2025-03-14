@@ -2,7 +2,7 @@ mod eval;
 mod expr;
 mod function;
 mod parameters;
-mod types;
+pub mod types;
 
 use self::types::get_name_and_type;
 pub use self::{expr::translate_expr, function::declare_function};

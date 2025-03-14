@@ -187,6 +187,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
     }
 
     fn parse_declaration_specifiers(&mut self) -> Result<DeclarationSpecifiers, ParseError> {
+        let source = self.here();
         let mut specifiers = vec![];
 
         while let Ok(specifier) = speculate!(self.input, self.parse_declaration_specifier()) {
@@ -197,6 +198,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
         Ok(DeclarationSpecifiers {
             specifiers,
             attributes,
+            source,
         })
     }
 
@@ -748,6 +750,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
     }
 
     fn parse_specifier_qualifier_list(&mut self) -> Result<SpecifierQualifierList, ParseError> {
+        let source = self.here();
         let mut type_specifier_qualifiers = vec![];
 
         while let Ok(qualifier) = speculate!(self.input, self.parse_type_specifier_qualifier()) {
@@ -759,6 +762,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
         Ok(SpecifierQualifierList {
             attributes,
             type_specifier_qualifiers,
+            source,
         })
     }
 

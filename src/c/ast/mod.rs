@@ -262,6 +262,7 @@ impl TypeSpecifierQualifier {
 pub struct SpecifierQualifierList {
     pub attributes: Vec<Attribute>,
     pub type_specifier_qualifiers: Vec<TypeSpecifierQualifier>,
+    pub source: Source,
 }
 
 #[derive(Clone, Debug)]
@@ -317,6 +318,7 @@ pub enum AlignmentSpecifierKind {
 pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub attributes: Vec<Attribute>,
+    pub source: Source,
 }
 
 impl From<&SpecifierQualifierList> for DeclarationSpecifiers {
@@ -330,6 +332,7 @@ impl From<&SpecifierQualifierList> for DeclarationSpecifiers {
         Self {
             attributes: value.attributes.clone(),
             specifiers,
+            source: value.source,
         }
     }
 }

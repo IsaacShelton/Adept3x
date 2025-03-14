@@ -207,10 +207,47 @@ pub fn get_name_and_type(
     for_parameter: bool,
 ) -> Result<DeclaratorInfo, ParseError> {
     let (name, decorators) = get_name_and_decorators(ctx, declarator)?;
-    let type_base = get_type_base(ctx, declaration_specifiers, declarator.source)?;
+    let type_base = get_type_base(ctx, declaration_specifiers, declaration_specifiers.source)?;
+    let ast_type = apply_decorators(ctx, &decorators, type_base.ast_type, for_parameter)?;
 
-    let mut ast_type = type_base.ast_type;
+    Ok(DeclaratorInfo {
+        name,
+        ast_type,
+        specifiers: type_base.specifiers,
+    })
+}
 
+#[derive(Clone, Debug)]
+pub struct AbstractDeclaratorInfo {
+    pub ast_type: Type,
+    pub specifiers: TypeBaseSpecifiers,
+}
+
+pub fn get_type(
+    ctx: &mut TranslateCtx,
+    abstract_declarator: Option<&AbstractDeclarator>,
+    declaration_specifiers: &DeclarationSpecifiers,
+    for_parameter: bool,
+) -> Result<AbstractDeclaratorInfo, ParseError> {
+    let decorators = abstract_declarator
+        .map(|abstract_declarator| get_decorators(ctx, abstract_declarator))
+        .transpose()?
+        .unwrap_or_default();
+    let type_base = get_type_base(ctx, declaration_specifiers, declaration_specifiers.source)?;
+    let ast_type = apply_decorators(ctx, &decorators, type_base.ast_type, for_parameter)?;
+
+    Ok(AbstractDeclaratorInfo {
+        ast_type,
+        specifiers: type_base.specifiers,
+    })
+}
+
+fn apply_decorators(
+    ctx: &mut TranslateCtx,
+    decorators: &Decorators,
+    mut ast_type: Type,
+    for_parameter: bool,
+) -> Result<Type, ParseError> {
     for decorator in decorators.iter() {
         match decorator {
             Decorator::Pointer(pointer) => {
@@ -223,14 +260,10 @@ pub fn get_name_and_type(
             Decorator::Function(function) => {
                 ast_type = decorate_function(ast_type, function, decorator.source())?;
             }
-        }
+        };
     }
 
-    Ok(DeclaratorInfo {
-        name,
-        ast_type,
-        specifiers: type_base.specifiers,
-    })
+    Ok(ast_type)
 }
 
 fn get_name_and_decorators(

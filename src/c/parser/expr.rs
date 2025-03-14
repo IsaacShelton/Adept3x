@@ -8,11 +8,10 @@ use crate::{
         parser::speculate::speculate,
         punctuator::Punctuator,
         token::CTokenKind,
-        translate::TranslateCtx,
+        translate::{types::get_type, TranslateCtx},
     },
     source_files::Source,
 };
-use ignore::types::TypesBuilder;
 
 // Implements expression parsing for the C parser
 impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
@@ -269,12 +268,21 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
             CTokenKind::SizeofKeyword => {
                 self.input.advance();
 
-                #[allow(unused)]
                 if let Ok(type_name) = speculate!(self.input, self.parse_type_in_parens()) {
-                    let ctx =
+                    let mut ctx =
                         TranslateCtx::new(&mut self.ast_file, &mut self.typedefs, self.diagnostics);
-                    let mut type_builder = TypesBuilder::new();
-                    return todo!("handle parsed sizeof(type)");
+                    let specifier_qualifiers = &type_name.specifier_qualifiers;
+
+                    let ty = get_type(
+                        &mut ctx,
+                        type_name.abstract_declarator.as_ref(),
+                        &specifier_qualifiers.into(),
+                        false,
+                    );
+
+                    if let Ok(ty) = ty {
+                        return todo!("handle parsed sizeof(type) - {:?}", ty);
+                    }
                 }
 
                 let _inner = self.parse_expr_primary_base()?;
