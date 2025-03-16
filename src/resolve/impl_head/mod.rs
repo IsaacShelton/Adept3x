@@ -186,9 +186,10 @@ fn matches(
         | asg::TypeKind::Boolean
         | asg::TypeKind::Integer(_, _)
         | asg::TypeKind::CInteger(_, _)
+        | asg::TypeKind::SizeInteger(_)
         | asg::TypeKind::IntegerLiteral(_)
         | asg::TypeKind::FloatLiteral(_)
-        | asg::TypeKind::Floating(_) => (ty_in_impl == ty_in_trait)
+        | asg::TypeKind::Floating(_) => (ty_in_impl.kind == ty_in_trait.kind)
             .then_some(Ok(()))
             .unwrap_or_else(|| Err(mismatch(ty_in_impl.source))),
         asg::TypeKind::Ptr(trait_inner) => match &ty_in_impl.kind {

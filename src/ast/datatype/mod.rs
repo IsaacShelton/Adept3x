@@ -41,6 +41,7 @@ impl Type {
             TypeKind::Boolean
             | TypeKind::Integer(_, _)
             | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
             | TypeKind::Floating(_) => None,
             TypeKind::Ptr(inner) => inner.contains_polymorph(),
             TypeKind::FixedArray(fixed_array) => fixed_array.ast_type.contains_polymorph(),

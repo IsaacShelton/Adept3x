@@ -24,6 +24,7 @@ pub enum TypeKind {
     Boolean,
     Integer(IntegerBits, IntegerSign),
     CInteger(CInteger, Option<IntegerSign>),
+    SizeInteger(IntegerSign),
     IntegerLiteral(BigInt),
     FloatLiteral(Option<NotNan<f64>>),
     Floating(FloatSize),
@@ -55,6 +56,7 @@ impl TypeKind {
             TypeKind::Boolean
             | TypeKind::Integer(_, _)
             | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
             | TypeKind::IntegerLiteral(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => false,
@@ -87,6 +89,7 @@ impl TypeKind {
             TypeKind::CInteger(integer, sign) => {
                 sign.or_else(|| target.map(|target| target.default_c_integer_sign(*integer)))
             }
+            TypeKind::SizeInteger(sign) => Some(*sign),
             TypeKind::TypeAlias(_, _, _) => panic!("sign of type alias"),
             TypeKind::Unresolved => panic!(),
             TypeKind::AnonymousEnum(enumeration) => enumeration.backing_type.kind.sign(target),
@@ -125,6 +128,7 @@ impl TypeKind {
             TypeKind::Boolean
             | TypeKind::Integer(_, _)
             | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
             | TypeKind::IntegerLiteral(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => (),
@@ -165,6 +169,7 @@ impl TypeKind {
             | TypeKind::Boolean
             | TypeKind::Integer(_, _)
             | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
             | TypeKind::IntegerLiteral(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => Ok(Cow::Borrowed(self)),
@@ -307,28 +312,30 @@ impl Display for TypeKind {
                 write_parameters(f, type_args)?;
             }
             TypeKind::Boolean => write!(f, "bool")?,
-            TypeKind::Integer(bits, sign) => {
-                f.write_str(match (bits, sign) {
-                    (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
-                    (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
-                    (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
-                    (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
-                    (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
-                    (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
-                    (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
-                    (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
-                })?;
-            }
+            TypeKind::Integer(bits, sign) => f.write_str(match (bits, sign) {
+                (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
+                (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
+                (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
+                (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
+                (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
+                (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
+                (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
+                (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
+            })?,
             TypeKind::CInteger(integer, sign) => {
                 fmt_c_integer(f, *integer, *sign)?;
             }
+            TypeKind::SizeInteger(sign) => f.write_str(match sign {
+                IntegerSign::Signed => "isize",
+                IntegerSign::Unsigned => "usize",
+            })?,
             TypeKind::IntegerLiteral(value) => {
                 write!(f, "integer {}", value)?;
             }
-            TypeKind::Floating(size) => match size {
-                FloatSize::Bits32 => f.write_str("f32")?,
-                FloatSize::Bits64 => f.write_str("f64")?,
-            },
+            TypeKind::Floating(size) => f.write_str(match size {
+                FloatSize::Bits32 => "f32",
+                FloatSize::Bits64 => "f64",
+            })?,
             TypeKind::FloatLiteral(value) => {
                 if let Some(value) = value {
                     write!(f, "float {}", value)?

@@ -44,7 +44,7 @@ pub fn resolve<'a>(
     resolve_type_definitions(&mut ctx, &mut asg, workspace)?;
     resolve_global_variables(&mut ctx, &mut asg, workspace)?;
     create_func_heads(&mut ctx, &mut asg, workspace, options)?;
-    resolve_helper_expressions(&mut ctx, &mut asg, workspace)?;
+    resolve_helper_expressions(&mut ctx, workspace)?;
     resolve_func_bodies(&mut ctx, &mut asg, workspace)?;
 
     Ok(asg)

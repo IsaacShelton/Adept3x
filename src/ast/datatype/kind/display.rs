@@ -11,21 +11,23 @@ impl Display for &TypeKind {
             TypeKind::Boolean => {
                 write!(f, "bool")?;
             }
-            TypeKind::Integer(bits, sign) => {
-                f.write_str(match (bits, sign) {
-                    (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
-                    (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
-                    (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
-                    (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
-                    (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
-                    (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
-                    (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
-                    (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
-                })?;
-            }
+            TypeKind::Integer(bits, sign) => f.write_str(match (bits, sign) {
+                (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
+                (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
+                (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
+                (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
+                (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
+                (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
+                (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
+                (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
+            })?,
             TypeKind::CInteger(integer, sign) => {
                 fmt_c_integer(f, *integer, *sign)?;
             }
+            TypeKind::SizeInteger(sign) => f.write_str(match sign {
+                IntegerSign::Signed => "isize",
+                IntegerSign::Unsigned => "usize",
+            })?,
             TypeKind::Ptr(inner) => {
                 write!(f, "ptr<{inner}>")?;
             }

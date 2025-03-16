@@ -89,4 +89,12 @@ impl TypeKind {
     pub fn ulonglong() -> Self {
         Self::CInteger(CInteger::LongLong, Some(IntegerSign::Unsigned))
     }
+
+    pub fn isize() -> Self {
+        Self::SizeInteger(IntegerSign::Signed)
+    }
+
+    pub fn usize() -> Self {
+        Self::SizeInteger(IntegerSign::Unsigned)
+    }
 }

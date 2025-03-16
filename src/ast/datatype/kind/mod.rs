@@ -12,6 +12,7 @@ pub enum TypeKind {
     Boolean,
     Integer(IntegerBits, IntegerSign),
     CInteger(CInteger, Option<IntegerSign>),
+    SizeInteger(IntegerSign),
     Floating(FloatSize),
     Ptr(Box<Type>),
     FixedArray(Box<FixedArray>),

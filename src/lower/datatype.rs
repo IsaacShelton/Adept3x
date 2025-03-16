@@ -43,6 +43,10 @@ pub fn lower_type(
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
         asg::TypeKind::CInteger(integer, sign) => Ok(lower_c_integer(target, *integer, *sign)),
+        asg::TypeKind::SizeInteger(sign) => Ok(match sign {
+            Sign::Signed => ir::Type::S64,
+            Sign::Unsigned => ir::Type::U64,
+        }),
         asg::TypeKind::IntegerLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
                 value: value.to_string(),

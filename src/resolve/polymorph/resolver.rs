@@ -48,6 +48,7 @@ impl<'a> PolyRecipeResolver<'a> {
             asg::TypeKind::Boolean
             | asg::TypeKind::Integer(_, _)
             | asg::TypeKind::CInteger(_, _)
+            | asg::TypeKind::SizeInteger(_)
             | asg::TypeKind::IntegerLiteral(_)
             | asg::TypeKind::FloatLiteral(_)
             | asg::TypeKind::Void

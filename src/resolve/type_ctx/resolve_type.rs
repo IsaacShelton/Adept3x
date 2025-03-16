@@ -55,6 +55,7 @@ impl<'a> ResolveTypeCtx<'a> {
             ast::TypeKind::Boolean => Ok(asg::TypeKind::Boolean),
             ast::TypeKind::Integer(bits, sign) => Ok(asg::TypeKind::Integer(*bits, *sign)),
             ast::TypeKind::CInteger(integer, sign) => Ok(asg::TypeKind::CInteger(*integer, *sign)),
+            ast::TypeKind::SizeInteger(sign) => Ok(asg::TypeKind::SizeInteger(*sign)),
             ast::TypeKind::Ptr(inner) => {
                 let inner = self.resolve_or_undeclared(inner, options)?;
                 Ok(asg::TypeKind::Ptr(Box::new(inner)))

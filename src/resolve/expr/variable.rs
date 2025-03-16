@@ -15,8 +15,9 @@ use crate::{
 pub fn resolve_variable_expr(
     ctx: &mut ResolveExprCtx,
     name: &Name,
-    _preferred_type: Option<PreferredType>,
-    _initialized: Initialized,
+    preferred_type: Option<PreferredType>,
+    initialized: Initialized,
+    mode: ResolveExprMode,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
     if let Some(variable) = name
@@ -71,7 +72,7 @@ pub fn resolve_variable_expr(
         }
 
         if let Some(found) = maybe_helper_expr {
-            return Ok(found.value.clone());
+            return resolve_expr(ctx, &found.value, preferred_type, initialized, mode);
         }
     }
 
@@ -136,7 +137,7 @@ pub fn resolve_variable_expr(
                 .at(source));
             }
 
-            return Ok(found.value.clone());
+            return resolve_expr(ctx, &found.value, preferred_type, initialized, mode);
         }
     }
 

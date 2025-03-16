@@ -25,7 +25,7 @@ use super::{
     Initialized, ResolveTypeCtx,
 };
 use crate::{
-    asg::{self, Asg, Expr, ExprKind, FuncRef, IntegerBits, StructRef, TypeKind, TypedExpr},
+    asg::{self, Asg, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
         UnaryOperator,
@@ -148,7 +148,7 @@ pub fn resolve_expr(
 
     let resolved_expr = match &ast_expr.kind {
         ast::ExprKind::Variable(name) => {
-            resolve_variable_expr(ctx, name, preferred_type, initialized, source)
+            resolve_variable_expr(ctx, name, preferred_type, initialized, mode, source)
         }
         ast::ExprKind::Char(content) => {
             if content.len() == 1 {
@@ -378,7 +378,9 @@ pub fn resolve_expr(
                 .resolve(ast_type, ResolveTypeOptions::Unalias)?;
 
             Ok(TypedExpr::new(
-                asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
+                // NOTE: This will used the unsigned size integer type in the future
+                // asg::TypeKind::SizeInteger(IntegerSign::Unsigned).at(source),
+                asg::TypeKind::Integer(asg::IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
                 asg::ExprKind::SizeOf(Box::new(ty)).at(source),
             ))
         }
@@ -393,7 +395,9 @@ pub fn resolve_expr(
             .ty;
 
             Ok(TypedExpr::new(
-                asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
+                // NOTE: This will used the unsigned size integer type in the future
+                // asg::TypeKind::SizeInteger(IntegerSign::Unsigned).at(source),
+                asg::TypeKind::Integer(asg::IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
                 asg::ExprKind::SizeOf(Box::new(ty)).at(source),
             ))
         }

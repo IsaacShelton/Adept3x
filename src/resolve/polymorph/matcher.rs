@@ -66,13 +66,14 @@ impl<'local, 'ast, 'root_ctx> TypeMatcher<'local, 'ast, 'root_ctx> {
             TypeKind::Boolean
             | TypeKind::Integer(_, _)
             | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
             | TypeKind::IntegerLiteral(_)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_)
             | TypeKind::Void
             | TypeKind::Never
             | TypeKind::Enum(_, _) => {
-                if *pattern == *concrete {
+                if pattern.kind == concrete.kind {
                     Ok(())
                 } else {
                     no_match()

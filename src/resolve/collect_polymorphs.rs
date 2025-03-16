@@ -7,6 +7,7 @@ pub fn collect_polymorphs(map: &mut IndexSet<String>, ty: &Type) {
         TypeKind::Boolean
         | TypeKind::Integer(_, _)
         | TypeKind::CInteger(_, _)
+        | TypeKind::SizeInteger(_)
         | TypeKind::IntegerLiteral(_)
         | TypeKind::FloatLiteral(_)
         | TypeKind::Floating(_) => (),

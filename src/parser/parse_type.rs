@@ -101,6 +101,8 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
             Some("u32") => Ok(TypeKind::u32()),
             Some("i64") => Ok(TypeKind::i64()),
             Some("u64") => Ok(TypeKind::u64()),
+            Some("usize") => Ok(TypeKind::usize()),
+            Some("isize") => Ok(TypeKind::isize()),
             Some("f32" | "float") => Ok(TypeKind::f32()),
             Some("f64" | "double") => Ok(TypeKind::f64()),
             Some("void") => Ok(TypeKind::Void),
