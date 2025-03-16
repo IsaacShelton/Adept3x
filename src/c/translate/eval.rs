@@ -48,7 +48,8 @@ pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
         | ExprKind::Negate(_)
         | ExprKind::BitComplement(_)
         | ExprKind::Not(_)
-        | ExprKind::Call(_, _) => (),
+        | ExprKind::Call(_, _)
+        | ExprKind::SizeOf(_) => (),
     }
 
     Err(ParseErrorKind::MustBeConstantInteger.at(expr.source))

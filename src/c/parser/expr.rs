@@ -273,15 +273,15 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                         TranslateCtx::new(&mut self.ast_file, &mut self.typedefs, self.diagnostics);
                     let specifier_qualifiers = &type_name.specifier_qualifiers;
 
-                    let ty = get_type(
+                    let abstract_declarator_info = get_type(
                         &mut ctx,
                         type_name.abstract_declarator.as_ref(),
                         &specifier_qualifiers.into(),
                         false,
                     );
 
-                    if let Ok(ty) = ty {
-                        return todo!("handle parsed sizeof(type) - {:?}", ty);
+                    if let Ok(abstract_declarator_info) = abstract_declarator_info {
+                        return Ok(ExprKind::SizeOf(abstract_declarator_info.ast_type).at(source));
                     }
                 }
 

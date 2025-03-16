@@ -1,5 +1,6 @@
 use super::{AbstractDeclarator, SpecifierQualifierList};
 use crate::{
+    ast,
     c::{
         encoding::Encoding,
         token::{FloatSuffix, Integer},
@@ -43,6 +44,7 @@ pub enum ExprKind {
     BitComplement(Box<Expr>),
     Not(Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
+    SizeOf(ast::Type),
 }
 
 impl ExprKind {
