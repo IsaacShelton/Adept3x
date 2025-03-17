@@ -378,7 +378,7 @@ pub fn resolve_expr(
                 .resolve(ast_type, ResolveTypeOptions::Unalias)?;
 
             Ok(TypedExpr::new(
-                // NOTE: This will used the unsigned size integer type in the future
+                // NOTE: This will be the unsigned size integer type in the future
                 // asg::TypeKind::SizeInteger(IntegerSign::Unsigned).at(source),
                 asg::TypeKind::Integer(asg::IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
                 asg::ExprKind::SizeOf(Box::new(ty)).at(source),
@@ -395,7 +395,7 @@ pub fn resolve_expr(
             .ty;
 
             Ok(TypedExpr::new(
-                // NOTE: This will used the unsigned size integer type in the future
+                // NOTE: This will used be unsigned size integer type in the future
                 // asg::TypeKind::SizeInteger(IntegerSign::Unsigned).at(source),
                 asg::TypeKind::Integer(asg::IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
                 asg::ExprKind::SizeOf(Box::new(ty)).at(source),

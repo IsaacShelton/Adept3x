@@ -8,7 +8,7 @@ use crate::{
 };
 use once_map::unsync::OnceMap;
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub enum AlignmentRequirement {
     #[default]
     None,
@@ -27,7 +27,7 @@ pub struct ASTRecordLayout {
     pub field_offsets: Vec<BitUnits>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TypeLayout {
     pub width: ByteUnits,
     pub alignment: ByteUnits,

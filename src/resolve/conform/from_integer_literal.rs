@@ -1,9 +1,9 @@
 use super::{Objective, ObjectiveResult};
 use crate::{
+    asg::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     ast::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerKnown, IntegerRigidity},
     data_units::BitUnits,
     ir::IntegerSign,
-    asg::{Expr, ExprKind, Type, TypeKind, TypedExpr},
     source_files::Source,
 };
 use num::{BigInt, Zero};
@@ -27,6 +27,9 @@ pub fn from_integer_literal<O: Objective>(
         ),
         TypeKind::Integer(to_bits, to_sign) => {
             from_integer_literal_to_integer::<O>(value, *to_bits, *to_sign, source)
+        }
+        TypeKind::SizeInteger(to_sign) => {
+            from_integer_literal_to_size_integer::<O>(value, *to_sign, source)
         }
         _ => O::fail(),
     }
@@ -81,6 +84,34 @@ fn from_integer_literal_to_c_integer<O: Objective>(
                 TypeKind::CInteger(to_c_integer, to_sign).at(source),
                 ExprKind::IntegerKnown(Box::new(IntegerKnown {
                     rigidity: IntegerRigidity::Loose(to_c_integer, to_sign),
+                    value: value.clone(),
+                }))
+                .at(source),
+            )
+        });
+    }
+
+    O::fail()
+}
+
+fn from_integer_literal_to_size_integer<O: Objective>(
+    value: &BigInt,
+    to_sign: IntegerSign,
+    source: Source,
+) -> ObjectiveResult<O> {
+    // Size types (i.e. size_t, ssize_t, usize, isize) are guananteed to be at least 16 bits
+    // Anything more than that will require explicit casts
+    let does_fit = match to_sign {
+        IntegerSign::Signed => i16::try_from(value).is_ok(),
+        IntegerSign::Unsigned => u16::try_from(value).is_ok(),
+    };
+
+    if does_fit {
+        return O::success(|| {
+            TypedExpr::new(
+                TypeKind::SizeInteger(to_sign).at(source),
+                ExprKind::IntegerKnown(Box::new(IntegerKnown {
+                    rigidity: IntegerRigidity::Size(to_sign),
                     value: value.clone(),
                 }))
                 .at(source),

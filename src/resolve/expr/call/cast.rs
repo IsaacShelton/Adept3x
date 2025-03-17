@@ -109,6 +109,8 @@ pub fn cast(
             CInteger::LongLong,
             Some(IntegerSign::Unsigned),
         )),
+        "isize" => Some(asg::TypeKind::SizeInteger(IntegerSign::Signed)),
+        "usize" => Some(asg::TypeKind::SizeInteger(IntegerSign::Unsigned)),
         _ => None,
     };
 

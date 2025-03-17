@@ -140,6 +140,10 @@ impl Target {
     pub fn double_layout(&self) -> TypeLayout {
         TypeLayout::basic(ByteUnits::of(8))
     }
+
+    pub fn size_layout(&self) -> TypeLayout {
+        TypeLayout::basic(ByteUnits::of(8))
+    }
 }
 
 impl Display for Target {

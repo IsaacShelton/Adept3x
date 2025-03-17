@@ -49,6 +49,11 @@ pub fn lower_expr(
 
                     (bits, sign)
                 }
+                IntegerRigidity::Size(sign) => {
+                    let bits = IntegerBits::try_from(ir_module.target.size_layout().width)
+                        .expect("supported integer size");
+                    (bits, *sign)
+                }
             };
 
             match (bits, sign) {

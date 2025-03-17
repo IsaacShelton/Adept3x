@@ -23,6 +23,7 @@ impl IntegerKnown {
         match self.rigidity {
             IntegerRigidity::Fixed(bits, sign) => TypeKind::Integer(bits, sign),
             IntegerRigidity::Loose(c_integer, sign) => TypeKind::CInteger(c_integer, sign),
+            IntegerRigidity::Size(sign) => TypeKind::SizeInteger(sign),
         }
         .at(source)
     }
@@ -32,6 +33,7 @@ impl IntegerKnown {
 pub enum IntegerRigidity {
     Fixed(IntegerBits, IntegerSign),
     Loose(CInteger, Option<IntegerSign>),
+    Size(IntegerSign),
 }
 
 impl Integer {

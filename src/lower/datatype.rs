@@ -2,9 +2,10 @@ use super::error::LowerError;
 use crate::{
     asg::{self, Asg},
     ast::{CInteger, FloatSize},
+    data_units::ByteUnits,
     ir::{self, IntegerSign},
     lower::{error::LowerErrorKind, structure::monomorphize_structure},
-    target::{Target, TargetOsExt},
+    target::{type_layout::TypeLayout, Target, TargetOsExt},
 };
 use std::borrow::{Borrow, Cow};
 
@@ -43,10 +44,15 @@ pub fn lower_type(
             (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
         }),
         asg::TypeKind::CInteger(integer, sign) => Ok(lower_c_integer(target, *integer, *sign)),
-        asg::TypeKind::SizeInteger(sign) => Ok(match sign {
-            Sign::Signed => ir::Type::S64,
-            Sign::Unsigned => ir::Type::U64,
-        }),
+        asg::TypeKind::SizeInteger(sign) => {
+            let layout = ir_module.target.size_layout();
+            assert_eq!(layout, TypeLayout::basic(ByteUnits::of(8)));
+
+            Ok(match sign {
+                Sign::Signed => ir::Type::S64,
+                Sign::Unsigned => ir::Type::U64,
+            })
+        }
         asg::TypeKind::IntegerLiteral(value) => {
             Err(LowerErrorKind::CannotLowerUnspecializedIntegerLiteral {
                 value: value.to_string(),
