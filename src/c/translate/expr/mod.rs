@@ -155,5 +155,9 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
             .at(expr.source)
         }
         ExprKind::SizeOf(ty) => ast::ExprKind::SizeOf(Box::new(ty.clone())).at(expr.source),
+        ExprKind::SizeOfValue(value) => {
+            let inner = translate_expr(ctx, value)?;
+            ast::ExprKind::SizeOfValue(Box::new(inner)).at(expr.source)
+        }
     })
 }

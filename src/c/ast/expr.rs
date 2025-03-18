@@ -45,6 +45,7 @@ pub enum ExprKind {
     Not(Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     SizeOf(ast::Type),
+    SizeOfValue(Box<Expr>),
 }
 
 impl ExprKind {

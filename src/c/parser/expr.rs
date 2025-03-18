@@ -285,8 +285,8 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                     }
                 }
 
-                let _inner = self.parse_expr_primary_base()?;
-                todo!("parse sizeof expression")
+                let inner = self.parse_expr_primary_base()?;
+                return Ok(ExprKind::SizeOfValue(Box::new(inner)).at(source));
             }
             CTokenKind::AlignofKeyword => todo!("parse alignof expression"),
             _ => (),
