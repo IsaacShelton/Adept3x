@@ -14,7 +14,7 @@ use itertools::Itertools;
 use num::BigInt;
 use ordered_float::NotNan;
 
-pub fn cast(
+pub fn find_builtin_cast_func(
     ctx: &mut ResolveExprCtx,
     call: &ast::Call,
     args: Vec<TypedExpr>,

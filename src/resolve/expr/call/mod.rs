@@ -15,7 +15,7 @@ use crate::{
     },
     source_files::Source,
 };
-use cast::cast;
+use cast::find_builtin_cast_func;
 use infer_impl::infer_callee_missing_impl_args;
 use itertools::Itertools;
 use specified_impl::resolve_impl_arg;
@@ -39,7 +39,7 @@ pub fn resolve_call_expr(
 
     let generics = resolve_type_args_to_poly_args(ctx, &call.generics)?;
 
-    let args = match cast(ctx, call, args, source)? {
+    let args = match find_builtin_cast_func(ctx, call, args, source)? {
         Ok(cast) => return Ok(cast),
         Err(args) => args,
     };

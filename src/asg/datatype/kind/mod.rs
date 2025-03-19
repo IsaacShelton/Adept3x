@@ -442,7 +442,10 @@ impl TypeKind {
     pub fn is_integer_like(&self) -> bool {
         matches!(
             self,
-            Self::Integer(..) | Self::IntegerLiteral(..) | Self::CInteger(..)
+            Self::Integer(..)
+                | Self::IntegerLiteral(..)
+                | Self::CInteger(..)
+                | Self::SizeInteger(..)
         )
     }
 

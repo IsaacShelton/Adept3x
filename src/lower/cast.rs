@@ -11,6 +11,7 @@ pub fn integer_like_type_size(target: &Target, ty: &asg::Type) -> Option<ByteUni
         asg::TypeKind::Boolean => Some(target.bool_layout().width),
         asg::TypeKind::Integer(bits, _) => Some(bits.bytes()),
         asg::TypeKind::CInteger(c_integer, _) => Some(c_integer.bytes(target)),
+        asg::TypeKind::SizeInteger(_) => Some(target.size_layout().width),
         _ => None,
     }
 }

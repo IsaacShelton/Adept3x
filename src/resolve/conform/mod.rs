@@ -5,6 +5,7 @@ mod from_float_literal;
 mod from_integer;
 mod from_integer_literal;
 mod from_pointer;
+mod from_size_integer;
 mod mode;
 pub mod to_default;
 
@@ -12,6 +13,7 @@ use self::{
     from_anonymous_enum::from_anonymous_enum, from_c_integer::from_c_integer,
     from_float::from_float, from_float_literal::from_float_literal, from_integer::from_integer,
     from_integer_literal::from_integer_literal, from_pointer::from_pointer,
+    from_size_integer::from_size_integer,
 };
 use super::{
     error::{ResolveError, ResolveErrorKind},
@@ -113,6 +115,15 @@ pub fn conform_expr<O: Objective>(
             mode,
             behavior,
             *from_size,
+            *from_sign,
+            &to_type,
+            conform_source,
+        ),
+        TypeKind::SizeInteger(from_sign) => from_size_integer::<O>(
+            &expr.expr,
+            &from_type,
+            mode,
+            behavior,
             *from_sign,
             &to_type,
             conform_source,
