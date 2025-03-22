@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod encoding;
+pub mod implicit_conversions;
 pub mod lexer;
 pub mod parser;
 pub mod preprocessor;

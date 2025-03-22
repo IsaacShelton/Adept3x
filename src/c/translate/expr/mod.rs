@@ -33,6 +33,9 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
             let left = translate_expr(ctx, &operation.left)?;
             let right = translate_expr(ctx, &operation.right)?;
 
+            // TODO: Perfrom usual arithmetic conversions or integer promotions depending on
+            // operator
+            // TODO: Array-to-Pointer and Function-to-Pointer conversions may also apply
             let operator: ast::BinaryOperator = match operation.operator {
                 BinaryOperator::LogicalOr => ast::ShortCircuitingBinaryOperator::Or.into(),
                 BinaryOperator::LogicalAnd => ast::ShortCircuitingBinaryOperator::And.into(),
@@ -113,12 +116,16 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
             }))
             .at(expr.source)
         }
-        ExprKind::Negate(inner) => ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
-            operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::Negate),
-            inner: translate_expr(ctx, inner)?,
-        }))
-        .at(expr.source),
+        ExprKind::Negate(inner) => {
+            // TODO: Perform integer promotion
+            ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
+                operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::Negate),
+                inner: translate_expr(ctx, inner)?,
+            }))
+            .at(expr.source)
+        }
         ExprKind::BitComplement(inner) => {
+            // TODO: Perform integer promotion
             ast::ExprKind::UnaryOperation(Box::new(ast::UnaryOperation {
                 operator: ast::UnaryOperator::Math(ast::UnaryMathOperator::BitComplement),
                 inner: translate_expr(ctx, inner)?,

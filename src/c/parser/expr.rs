@@ -248,7 +248,6 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                 return Ok(ExprKind::Dereference(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::Add) => {
-                // Is this a no-op?
                 self.input.advance();
                 let inner = self.parse_expr_primary()?;
                 return Ok(inner);
