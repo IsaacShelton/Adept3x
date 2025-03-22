@@ -10,14 +10,13 @@ pub enum IntegerRank {
     Int,
     Long,
     LongLong,
+    Size,
     FixedInt(BitUnits),
 }
 
 impl IntegerRank {
-    pub fn compare_for_target(left: Self, right: Self, target: &Target) -> Ordering {
-        let left_precision = left.precision(target);
-        let right_precision = right.precision(target);
-        left_precision.cmp(&right_precision)
+    pub fn compare_for_target(self, other: &Self, target: &Target) -> Ordering {
+        self.precision(target).cmp(&other.precision(target))
     }
 
     pub fn precision(&self, target: &Target) -> IntegerPrecision {
@@ -29,6 +28,11 @@ impl IntegerRank {
             IntegerRank::Long => IntegerPrecision::flexible(target.long_layout().width.to_bits()),
             IntegerRank::LongLong => {
                 IntegerPrecision::flexible(target.longlong_layout().width.to_bits())
+            }
+            IntegerRank::Size => {
+                // This means that size types have the same effective rank as the type they would
+                // be in C for this target.
+                IntegerPrecision::flexible(target.size_layout().width.to_bits())
             }
             IntegerRank::FixedInt(bits) => IntegerPrecision::fixed(*bits),
         }
