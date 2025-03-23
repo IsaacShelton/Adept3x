@@ -6,6 +6,7 @@ use super::Type;
 use crate::{
     asg::{human_name::HumanName, Asg, EnumRef, StructRef, TraitRef, TypeAliasRef},
     ast::{fmt_c_integer, CInteger, FloatSize, IntegerBits, IntegerSign},
+    c::implicit_conversions::IntegerRank,
     source_files::Source,
     target::Target,
 };
@@ -74,6 +75,17 @@ impl TypeKind {
                 .iter()
                 .any(|parameter| parameter.kind.contains_polymorph()),
             TypeKind::Polymorph(_) => true,
+        }
+    }
+
+    pub fn integer_rank(&self) -> Option<IntegerRank> {
+        match self {
+            TypeKind::Boolean => Some(IntegerRank::Bool),
+            TypeKind::Integer(integer_bits, _) => Some(IntegerRank::Fixed(integer_bits.bits())),
+            TypeKind::CInteger(c_integer, _) => Some(IntegerRank::Flexible(*c_integer)),
+            TypeKind::SizeInteger(_) => Some(IntegerRank::Size),
+            TypeKind::IntegerLiteral(_) => Some(IntegerRank::Flexible(CInteger::Int)),
+            _ => None,
         }
     }
 

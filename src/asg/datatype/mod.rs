@@ -1,6 +1,6 @@
 pub mod kind;
 
-use crate::source_files::Source;
+use crate::{c::implicit_conversions::IntegerRank, source_files::Source};
 use core::hash::Hash;
 pub use kind::*;
 use std::fmt::Display;
@@ -27,6 +27,10 @@ impl Type {
 
     pub fn is_ambiguous(&self) -> bool {
         self.kind.is_ambiguous()
+    }
+
+    pub fn integer_rank(self: &Type) -> Option<IntegerRank> {
+        self.kind.integer_rank()
     }
 }
 

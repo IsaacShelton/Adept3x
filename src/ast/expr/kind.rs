@@ -38,6 +38,7 @@ pub enum ExprKind {
     InterpreterSyscall(Box<InterpreterSyscall>),
     Break,
     Continue,
+    IntegerPromote(Box<Expr>),
 }
 
 impl ExprKind {

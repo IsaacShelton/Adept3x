@@ -1,17 +1,13 @@
-use crate::{data_units::BitUnits, target::Target};
+use crate::{ast::CInteger, data_units::BitUnits, target::Target};
 use derive_more::IsVariant;
 use std::cmp::Ordering;
 
 #[derive(Copy, Clone, Debug)]
 pub enum IntegerRank {
     Bool,
-    Char,
-    Short,
-    Int,
-    Long,
-    LongLong,
+    Flexible(CInteger),
     Size,
-    FixedInt(BitUnits),
+    Fixed(BitUnits),
 }
 
 impl IntegerRank {
@@ -22,11 +18,19 @@ impl IntegerRank {
     pub fn precision(&self, target: &Target) -> IntegerPrecision {
         match self {
             IntegerRank::Bool => IntegerPrecision::boolean(),
-            IntegerRank::Char => IntegerPrecision::flexible(target.char_layout().width.to_bits()),
-            IntegerRank::Short => IntegerPrecision::flexible(target.short_layout().width.to_bits()),
-            IntegerRank::Int => IntegerPrecision::flexible(target.int_layout().width.to_bits()),
-            IntegerRank::Long => IntegerPrecision::flexible(target.long_layout().width.to_bits()),
-            IntegerRank::LongLong => {
+            IntegerRank::Flexible(CInteger::Char) => {
+                IntegerPrecision::flexible(target.char_layout().width.to_bits())
+            }
+            IntegerRank::Flexible(CInteger::Short) => {
+                IntegerPrecision::flexible(target.short_layout().width.to_bits())
+            }
+            IntegerRank::Flexible(CInteger::Int) => {
+                IntegerPrecision::flexible(target.int_layout().width.to_bits())
+            }
+            IntegerRank::Flexible(CInteger::Long) => {
+                IntegerPrecision::flexible(target.long_layout().width.to_bits())
+            }
+            IntegerRank::Flexible(CInteger::LongLong) => {
                 IntegerPrecision::flexible(target.longlong_layout().width.to_bits())
             }
             IntegerRank::Size => {
@@ -34,7 +38,7 @@ impl IntegerRank {
                 // be in C for this target.
                 IntegerPrecision::flexible(target.size_layout().width.to_bits())
             }
-            IntegerRank::FixedInt(bits) => IntegerPrecision::fixed(*bits),
+            IntegerRank::Fixed(bits) => IntegerPrecision::fixed(*bits),
         }
     }
 }

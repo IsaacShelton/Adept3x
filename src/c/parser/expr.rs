@@ -250,7 +250,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
             CTokenKind::Punctuator(Punctuator::Add) => {
                 self.input.advance();
                 let inner = self.parse_expr_primary()?;
-                return Ok(inner);
+                return Ok(ExprKind::IntegerPromote(Box::new(inner)).at(source));
             }
             CTokenKind::Punctuator(Punctuator::Subtract) => {
                 self.input.advance();

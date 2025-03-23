@@ -46,6 +46,7 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     SizeOf(ast::Type),
     SizeOfValue(Box<Expr>),
+    IntegerPromote(Box<Expr>),
 }
 
 impl ExprKind {

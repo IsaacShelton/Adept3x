@@ -446,6 +446,29 @@ pub fn resolve_expr(
             asg::TypeKind::Never.at(source),
             asg::ExprKind::Continue.at(source),
         )),
+        ast::ExprKind::IntegerPromote(value) => {
+            let inner = resolve_expr(
+                ctx,
+                value,
+                None,
+                Initialized::AllowUninitialized,
+                ResolveExprMode::RequireValue,
+            )?;
+
+            let rank = inner.ty.integer_rank();
+
+            // After promotion, types will either be int, unsigned int, or the same
+            // Maybe we express this type as promoted<T>
+            // And then for combined
+            // a + b
+            // and other arithmetic expressions, the
+            // result could be a separate type like usual_arithmetic<promoted<ushort>,
+            // promoted<char>>
+            // I think we just need to be careful of the sign from promoted unsigned shorts.
+
+            Ok(todo!("integer promote expression - {:?}", rank))
+            // Ok(TypedExpr::new())
+        }
     }?;
 
     match initialized {
