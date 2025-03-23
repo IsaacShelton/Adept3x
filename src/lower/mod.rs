@@ -12,6 +12,7 @@ use self::error::LowerError;
 use crate::{
     asg::Asg,
     cli::BuildOptions,
+    data_units::ByteUnits,
     ir::{self},
     resolve::PolyRecipe,
 };
@@ -21,6 +22,18 @@ use structure::lower_struct;
 
 pub fn lower<'a>(options: &BuildOptions, asg: &Asg) -> Result<ir::Module, LowerError> {
     let mut ir_module = ir::Module::new(options.target.clone());
+
+    assert_eq!(
+        ir_module.target.short_layout().width,
+        ByteUnits::of(2),
+        "This target is not supported. Adept currently assumes that shorts are 16-bit integers (for integer promotion rules). Which does not hold for this target."
+    );
+
+    assert_eq!(
+        ir_module.target.int_layout().width,
+        ByteUnits::of(4),
+        "This target is not supported. Adept currently assumes that ints are 32-bit integers (for integer promotion rules). Which does not hold for this target."
+    );
 
     for (struct_ref, structure) in asg.structs.iter() {
         lower_struct(&mut ir_module, struct_ref, structure, asg)?;

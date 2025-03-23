@@ -25,11 +25,12 @@ use super::{
     Initialized, ResolveTypeCtx,
 };
 use crate::{
-    asg::{self, Asg, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
+    asg::{self, Asg, Cast, CastFrom, Expr, ExprKind, FuncRef, StructRef, TypeKind, TypedExpr},
     ast::{
         self, CInteger, CIntegerAssumptions, ConformBehavior, IntegerKnown, Language, Settings,
         UnaryOperator,
     },
+    data_units::BitUnits,
     ir::IntegerSign,
     resolve::{
         error::ResolveErrorKind,
@@ -447,6 +448,8 @@ pub fn resolve_expr(
             asg::ExprKind::Continue.at(source),
         )),
         ast::ExprKind::IntegerPromote(value) => {
+            // NOTE: Since this expression comes from C, there
+            // should not be any untyped literals.
             let inner = resolve_expr(
                 ctx,
                 value,
@@ -455,19 +458,59 @@ pub fn resolve_expr(
                 ResolveExprMode::RequireValue,
             )?;
 
-            let rank = inner.ty.integer_rank();
+            // WARNING: For now, we assume that shorts are 16 bits and ints are 32 bits
+            // since this is the case for the vast majority of systems.
+            // Targets where this does not hold will not be supported for now.
+            // If we do wish to support them in the future,
+            // We will probably need to add new types such as promoted<T> and arith<A, B>
+            // to represent the possible result types on non-conformant architectures.
 
-            // After promotion, types will either be int, unsigned int, or the same
-            // Maybe we express this type as promoted<T>
-            // And then for combined
-            // a + b
-            // and other arithmetic expressions, the
-            // result could be a separate type like usual_arithmetic<promoted<ushort>,
-            // promoted<char>>
-            // I think we just need to be careful of the sign from promoted unsigned shorts.
+            let promoted_type = match &inner.ty.kind {
+                TypeKind::Boolean => {
+                    Some(TypeKind::CInteger(CInteger::Int, Some(IntegerSign::Signed)))
+                }
+                TypeKind::Integer(bits, sign) => {
+                    if bits.bits() < BitUnits::of(32) {
+                        Some(TypeKind::CInteger(CInteger::Int, Some(IntegerSign::Signed)))
+                    } else if bits.bits() == BitUnits::of(32) {
+                        Some(TypeKind::CInteger(CInteger::Int, Some(*sign)))
+                    } else {
+                        None
+                    }
+                }
+                TypeKind::CInteger(c_integer, _) => match c_integer {
+                    CInteger::Char | CInteger::Short => {
+                        Some(TypeKind::CInteger(CInteger::Int, Some(IntegerSign::Signed)))
+                    }
+                    CInteger::Int | CInteger::Long | CInteger::LongLong => None,
+                },
+                TypeKind::SizeInteger(_) => {
+                    // We will treat size integers as if they don't get promoted
+                    None
+                }
+                TypeKind::IntegerLiteral(_) => {
+                    panic!("Cannot integer promote untyped integer literal. This should never happen since untyped integer literals do not exist in C.")
+                }
+                _ => None,
+            };
 
-            Ok(todo!("integer promote expression - {:?}", rank))
-            // Ok(TypedExpr::new())
+            if let Some(promoted_type) = promoted_type {
+                let promoted_type = promoted_type.at(ast_expr.source);
+
+                return Ok(TypedExpr::new(
+                    promoted_type.clone(),
+                    ExprKind::IntegerCast(Box::new(CastFrom {
+                        cast: Cast {
+                            target_type: promoted_type,
+                            value: inner.expr,
+                        },
+                        from_type: inner.ty,
+                    }))
+                    .at(ast_expr.source),
+                ));
+            }
+
+            return Ok(inner);
         }
     }?;
 
