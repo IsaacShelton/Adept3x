@@ -16,6 +16,13 @@ pub fn has_parameters(parameter_type_list: &ParameterTypeList) -> bool {
         {
             return false; // Function has parameters `(void)`, which means no parameters
         }
+
+        if param.core.is_nothing()
+            && param.attributes.is_empty()
+            && param.declaration_specifiers.is_empty()
+        {
+            return false; // Treat function with `()` parameters as not having any parameters
+        }
     }
 
     !parameter_type_list.parameter_declarations.is_empty()

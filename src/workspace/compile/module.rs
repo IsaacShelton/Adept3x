@@ -56,7 +56,7 @@ pub fn compile_module_file<'a>(
 
     let Some(settings) = settings else {
         return Err(Box::new(ErrorDiagnostic::new(
-            "Module file is missing pragma section",
+            "Module file is missing pragma section, consider adding `pragma => adept(\"3.0\")` at the top of your file",
             Source {
                 key,
                 location: Location { line: 1, column: 1 },

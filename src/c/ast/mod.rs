@@ -321,6 +321,12 @@ pub struct DeclarationSpecifiers {
     pub source: Source,
 }
 
+impl DeclarationSpecifiers {
+    pub fn is_empty(&self) -> bool {
+        self.specifiers.is_empty() && self.attributes.is_empty()
+    }
+}
+
 impl From<&SpecifierQualifierList> for DeclarationSpecifiers {
     fn from(value: &SpecifierQualifierList) -> Self {
         let specifiers = value
