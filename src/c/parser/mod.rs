@@ -895,7 +895,36 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
             return Err(self.error("Expected 'static_assert' keyword to begin static assert"));
         }
 
-        todo!("parse_static_assert")
+        if !self.eat_open_paren() {
+            return Err(self.error("Expected '(' after 'static_assert' keyword"));
+        }
+
+        let condition = self.parse_constant_expression()?;
+
+        let message = if self.eat_punctuator(Punctuator::Comma) {
+            let token = self.input.advance();
+
+            let CTokenKind::StringLiteral(_encoding, string) = &token.kind else {
+                return Err(ParseError::message(
+                    "Expected message for 'static_assert'",
+                    token.source,
+                ));
+            };
+
+            Some(string.clone())
+        } else {
+            None
+        };
+
+        if !self.eat_punctuator(Punctuator::CloseParen) {
+            return Err(self.error("Expected ')' to close 'static_assert' statement"));
+        }
+
+        if !self.eat_punctuator(Punctuator::Semicolon) {
+            return Err(self.error("Expected ';' after 'static_assert' statement"));
+        }
+
+        Ok(StaticAssertDeclaration { condition, message })
     }
 
     fn parse_declaration(&mut self) -> Result<Declaration, ParseError> {
@@ -1067,12 +1096,18 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
 
             let source = self.here();
 
-            if let Ok(declaration) = speculate!(self.input, self.parse_declaration()) {
-                statements.push(BlockItem {
-                    kind: declaration.into(),
-                    source,
-                });
-                continue;
+            match speculate!(self.input, self.parse_declaration()) {
+                Ok(declaration) => {
+                    statements.push(BlockItem {
+                        kind: declaration.into(),
+                        source,
+                    });
+                    continue;
+                }
+                Err(error) if self.input.peek().is_static_assert_keyword() => {
+                    return Err(error);
+                }
+                _ => (),
             }
 
             if let Ok(unlabeled_statement) =
@@ -1093,7 +1128,11 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                 continue;
             }
 
-            return Err(self.error("Expected '}' to end compound statement"));
+            return Err(ParseErrorKind::MiscGot(
+                "Expected '}' to end compound statement",
+                self.input.peek().kind.clone(),
+            )
+            .at(self.here()));
         }
 
         Ok(CompoundStatement { statements })

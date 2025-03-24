@@ -512,6 +512,13 @@ pub fn resolve_expr(
 
             return Ok(inner);
         }
+        ast::ExprKind::StaticAssert(_condition, _message) => {
+            todo!(
+                "resolve_expr - static_assert - {:?} {:?}",
+                _condition,
+                _message
+            )
+        }
     }?;
 
     match initialized {

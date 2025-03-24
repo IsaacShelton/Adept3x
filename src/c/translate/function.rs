@@ -4,7 +4,7 @@ use crate::{
     ast::{self, Func, FuncHead, Param, Params},
     c::{
         ast::{
-            Attribute, BlockItem, BlockItemKind, CTypedef, CompoundStatement,
+            Attribute, BlockItem, BlockItemKind, CTypedef, CompoundStatement, Declaration,
             DeclarationSpecifiers, Declarator, ExprStatement, JumpStatement,
             ParameterDeclarationCore, ParameterTypeList, StorageClassSpecifier, UnlabeledStatement,
         },
@@ -135,7 +135,16 @@ fn translate_block_item(
     block_item: &BlockItem,
 ) -> Result<ast::Stmt, ParseError> {
     match &block_item.kind {
-        BlockItemKind::Declaration(_) => todo!("translate_block_item declaration"),
+        BlockItemKind::Declaration(declaration) => match declaration {
+            Declaration::Common(_) => todo!("translate_block_item common declaration"),
+            Declaration::StaticAssert(static_assert) => Ok(ast::ExprKind::StaticAssert(
+                Box::new(translate_expr(ctx, &static_assert.condition.value)?),
+                static_assert.message.clone(),
+            )
+            .at(block_item.source)
+            .stmt()),
+            Declaration::Attribute(_) => todo!("translate_block_item attribute declaration"),
+        },
         BlockItemKind::UnlabeledStatement(unlabeled_statement) => {
             translate_unlabeled_statement(ctx, unlabeled_statement, block_item.source)
         }

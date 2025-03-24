@@ -12,6 +12,7 @@ mod struct_literal;
 mod unary;
 mod while_loop;
 
+use super::{Stmt, StmtKind};
 use crate::source_files::Source;
 pub use array_access::*;
 pub use binary::*;
@@ -37,6 +38,11 @@ pub struct Expr {
 impl Expr {
     pub fn new(kind: ExprKind, source: Source) -> Self {
         Self { kind, source }
+    }
+
+    pub fn stmt(self) -> Stmt {
+        let source = self.source;
+        return StmtKind::Expr(self).at(source);
     }
 }
 

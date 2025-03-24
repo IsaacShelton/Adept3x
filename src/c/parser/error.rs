@@ -1,4 +1,5 @@
 use crate::{
+    c::token::CTokenKind,
     show::Show,
     source_files::{Source, SourceFiles},
 };
@@ -49,6 +50,7 @@ pub enum ParseErrorKind {
     UndeclaredVariable(String),
     UndeclaredType(String),
     CannotContainNulInNullTerminatedString,
+    MiscGot(&'static str, CTokenKind),
     Misc(&'static str),
 }
 
@@ -84,6 +86,9 @@ impl Display for ParseErrorKind {
             ParseErrorKind::UndeclaredType(name) => write!(f, "Undeclared type '{name}'"),
             ParseErrorKind::CannotContainNulInNullTerminatedString => {
                 write!(f, "Cannot contain NUL byte in C-String'")
+            }
+            ParseErrorKind::MiscGot(message, got) => {
+                write!(f, "{}, got {}", message, got)
             }
             ParseErrorKind::Misc(message) => f.write_str(message),
         }
