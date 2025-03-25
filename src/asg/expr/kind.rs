@@ -46,6 +46,7 @@ pub enum ExprKind {
     InterpreterSyscall(InterpreterSyscallKind, Vec<Expr>),
     Break,
     Continue,
+    StaticAssert(Box<TypedExpr>, Option<String>),
 }
 
 // Make sure ExprKind doesn't accidentally become huge

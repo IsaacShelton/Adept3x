@@ -6,6 +6,7 @@ use crate::c::{
 use num_bigint::BigInt;
 use num_traits::Zero;
 
+// NOTE: Should this combined with the delayed version that can happen during lowering?
 pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
     match &expr.kind {
         ExprKind::Integer(integer) => {

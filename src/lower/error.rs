@@ -53,6 +53,7 @@ pub enum LowerErrorKind {
     CannotUseTraitDirectly {
         name: String,
     },
+    StaticAssertFailed(Option<String>),
     Other {
         message: String,
     },
@@ -123,6 +124,13 @@ impl Display for LowerErrorKind {
             LowerErrorKind::PolymorphError(e) => e.fmt(f),
             LowerErrorKind::CannotUseTraitDirectly { name } => {
                 write!(f, "Cannot use trait '{}' directly", name)
+            }
+            LowerErrorKind::StaticAssertFailed(message) => {
+                if let Some(message) = message {
+                    write!(f, "static_assert failed: {}", message)
+                } else {
+                    write!(f, "static_assert failed!")
+                }
             }
             LowerErrorKind::Other { message } => {
                 write!(f, "{}", message)

@@ -512,12 +512,19 @@ pub fn resolve_expr(
 
             return Ok(inner);
         }
-        ast::ExprKind::StaticAssert(_condition, _message) => {
-            todo!(
-                "resolve_expr - static_assert - {:?} {:?}",
-                _condition,
-                _message
-            )
+        ast::ExprKind::StaticAssert(condition, message) => {
+            let condition = resolve_expr(
+                ctx,
+                condition,
+                None,
+                Initialized::Require,
+                ResolveExprMode::RequireValue,
+            )?;
+
+            return Ok(TypedExpr::new(
+                asg::TypeKind::Void.at(ast_expr.source),
+                ExprKind::StaticAssert(Box::new(condition), message.clone()).at(ast_expr.source),
+            ));
         }
     }?;
 

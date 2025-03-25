@@ -14,11 +14,13 @@ use crate::{
         NumericMode, SignOrIndeterminate, StructLiteral, UnaryMathOperation, VariableStorageKey,
     },
     ast::{FloatSize, IntegerBits, IntegerRigidity},
+    data_units::BitUnits,
     ir::{self, Break, IntegerSign, Literal, OverflowOperator, Value, ValueReference},
     lower::structure::mono,
     resolve::PolyCatalog,
 };
 use call::{lower_expr_call, lower_expr_poly_call};
+use num::{BigInt, FromPrimitive};
 use short_circuit::lower_short_circuiting_binary_operation;
 
 pub fn lower_expr(
@@ -559,6 +561,88 @@ pub fn lower_expr(
 
             Ok(ir::Value::Literal(Literal::Void))
         }
+        ExprKind::StaticAssert(condition, message) => {
+            // TODO: How would this to make sense in generic functions?
+            // It would need access to polymorphs if used, so would only
+            // be able to do it when lowering (here).
+            // But if the condition doen't depend at all on polymorphs,
+            // then ideally we would evaluate it only once regardless
+            // of how many instances of the generic function are instatiated.
+            // (including zero)
+
+            let evaluated = evaluate_const_integer_expr(builder, ir_module, &condition.expr, asg)?;
+
+            if evaluated.is_zero() {
+                return Err(LowerErrorKind::StaticAssertFailed(message.clone()).at(expr.source));
+            }
+
+            Ok(ir::Value::Literal(Literal::Void))
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct EvaluatedConstInteger {
+    pub signed: bool,
+    pub bits: BitUnits,
+    pub value: BigInt,
+}
+
+impl EvaluatedConstInteger {
+    pub fn is_zero(&self) -> bool {
+        self.value == BigInt::ZERO
+    }
+}
+
+// NOTE: Should this be combined with the version that can happen at C parse-time?
+pub fn evaluate_const_integer_expr(
+    builder: &mut Builder,
+    ir_module: &ir::Module,
+    condition: &asg::Expr,
+    asg: &Asg,
+) -> Result<EvaluatedConstInteger, LowerError> {
+    match &condition.kind {
+        ExprKind::BooleanLiteral(value) => Ok(EvaluatedConstInteger {
+            signed: false,
+            bits: BitUnits::of(1),
+            value: BigInt::from_u8(*value as u8).unwrap(),
+        }),
+        ExprKind::IntegerLiteral(_)
+        | ExprKind::IntegerKnown(_)
+        | ExprKind::EnumMemberLiteral(_) => todo!(),
+        ExprKind::ResolvedNamedExpression(inner) => {
+            evaluate_const_integer_expr(builder, ir_module, inner, asg)
+        }
+        ExprKind::Variable(_)
+        | ExprKind::GlobalVariable(_)
+        | ExprKind::FloatingLiteral(_, _)
+        | ExprKind::String(_)
+        | ExprKind::NullTerminatedString(_)
+        | ExprKind::Null
+        | ExprKind::Call(_)
+        | ExprKind::PolyCall(_)
+        | ExprKind::DeclareAssign(_)
+        | ExprKind::BasicBinaryOperation(_) => todo!(),
+        ExprKind::ShortCircuitingBinaryOperation(_) => todo!(),
+        ExprKind::IntegerCast(_) => todo!(),
+        ExprKind::IntegerExtend(_) => todo!(),
+        ExprKind::IntegerTruncate(_) => todo!(),
+        ExprKind::FloatExtend(_)
+        | ExprKind::FloatToInteger(_)
+        | ExprKind::IntegerToFloat(_)
+        | ExprKind::Member(_)
+        | ExprKind::StructLiteral(_)
+        | ExprKind::UnaryMathOperation(_) => todo!(),
+        ExprKind::Dereference(_) | ExprKind::AddressOf(_) | ExprKind::Conditional(_) => todo!(),
+        ExprKind::While(_) | ExprKind::ArrayAccess(_) | ExprKind::Zeroed(_) => todo!(),
+        ExprKind::SizeOf(_)
+        | ExprKind::InterpreterSyscall(_, _)
+        | ExprKind::Break
+        | ExprKind::Continue
+        | ExprKind::StaticAssert(_, _) => Err(LowerError::other(
+            "Expected constant integer expression",
+            condition.source,
+        )),
     }
 }
 
