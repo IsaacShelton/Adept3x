@@ -66,7 +66,7 @@ impl TypeKind {
             TypeKind::AnonymousUnion() => false,
             TypeKind::AnonymousEnum(_) => false,
             TypeKind::FixedArray(fixed_array) => fixed_array.inner.kind.contains_polymorph(),
-            TypeKind::FuncPtr(_) => todo!(),
+            TypeKind::FuncPtr(_) => todo!("contains_polymorph FuncPtr"),
             TypeKind::Enum(_, _) => false,
             TypeKind::Structure(_, _, parameters)
             | TypeKind::Trait(_, _, parameters)
@@ -213,7 +213,7 @@ impl TypeKind {
                     inner: inner.into_owned(),
                 }))))
             }
-            TypeKind::FuncPtr(_) => todo!(),
+            TypeKind::FuncPtr(_) => todo!("map_type_params FuncPtr"),
             TypeKind::Enum(_, _) => Ok(Cow::Borrowed(self)),
             TypeKind::Structure(human_name, struct_ref, type_args) => {
                 if type_args.is_empty() {

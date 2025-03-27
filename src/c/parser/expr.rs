@@ -120,7 +120,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
 
         // Generic Selection
         if self.eat(CTokenKind::GenericKeyword) {
-            todo!()
+            todo!("parse _Generic");
         }
 
         Err(ParseErrorKind::Misc("Expected expression").at(source))
@@ -267,8 +267,16 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                 let inner = self.parse_expr_primary()?;
                 return Ok(ExprKind::Not(Box::new(inner)).at(source));
             }
-            CTokenKind::Punctuator(Punctuator::Increment) => todo!("parse increment expression"),
-            CTokenKind::Punctuator(Punctuator::Decrement) => todo!("parse decrement expression"),
+            CTokenKind::Punctuator(Punctuator::Increment) => {
+                self.input.advance();
+                let inner = self.parse_expr_primary_base()?;
+                return Ok(ExprKind::PreIncrement(Box::new(inner)).at(source));
+            }
+            CTokenKind::Punctuator(Punctuator::Decrement) => {
+                self.input.advance();
+                let inner = self.parse_expr_primary_base()?;
+                return Ok(ExprKind::PreDecrement(Box::new(inner)).at(source));
+            }
             CTokenKind::SizeofKeyword => {
                 self.input.advance();
 
@@ -292,7 +300,23 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                 let inner = self.parse_expr_primary_base()?;
                 return Ok(ExprKind::SizeOfValue(Box::new(inner)).at(source));
             }
-            CTokenKind::AlignofKeyword => todo!("parse alignof expression"),
+            CTokenKind::AlignofKeyword => {
+                self.input.advance();
+
+                let type_name = self.parse_type_in_parens()?;
+                let mut ctx =
+                    TranslateCtx::new(&mut self.ast_file, &mut self.typedefs, self.diagnostics);
+                let specifier_qualifiers = &type_name.specifier_qualifiers;
+
+                let abstract_declarator_info = get_type(
+                    &mut ctx,
+                    type_name.abstract_declarator.as_ref(),
+                    &specifier_qualifiers.into(),
+                    false,
+                )?;
+
+                return Ok(ExprKind::AlignOf(abstract_declarator_info.ast_type).at(source));
+            }
             _ => (),
         }
 

@@ -33,6 +33,8 @@ pub enum ExprKind {
     Cast(Box<Cast>),
     Subscript(Box<Subscript>),
     Field(Box<Field>),
+    PreIncrement(Box<Expr>),
+    PreDecrement(Box<Expr>),
     PostIncrement(Box<Expr>),
     PostDecrement(Box<Expr>),
     Identifier(String),
@@ -46,6 +48,7 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     SizeOf(ast::Type),
     SizeOfValue(Box<Expr>),
+    AlignOf(ast::Type),
     IntegerPromote(Box<Expr>),
 }
 

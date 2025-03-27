@@ -277,7 +277,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
 
         #[allow(clippy::redundant_pattern_matching)]
         if let Ok(..) = speculate!(self.input, self.parse_atomic_type_specifier()) {
-            return Ok(todo!());
+            return Ok(todo!("parse atomic type specifier"));
         }
 
         if let Ok(composite) = speculate!(self.input, self.parse_struct_or_union_specifier()) {
@@ -303,7 +303,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
 
         #[allow(clippy::redundant_pattern_matching)]
         if let Ok(..) = speculate!(self.input, self.parse_typeof_specifier()) {
-            return Ok(todo!());
+            return Ok(todo!("parse c typeof"));
         }
 
         Err(self.error("Failed to parse type specifier"))
@@ -884,8 +884,8 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
 
     fn parse_typeof_specifier(&mut self) -> Result<(), ParseError> {
         match self.input.advance().kind {
-            CTokenKind::TypeofKeyword => todo!(),
-            CTokenKind::TypeofUnqualKeyword => todo!(),
+            CTokenKind::TypeofKeyword => todo!("parse c typeof keyword"),
+            CTokenKind::TypeofUnqualKeyword => todo!("parse c typeof_unqual keyword"),
             _ => Err(self.error("Failed to parse typeof specifier")),
         }
     }

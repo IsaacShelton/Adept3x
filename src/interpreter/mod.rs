@@ -206,7 +206,9 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
                     Value::Literal(ir::Literal::Unsigned64(subject_pointer + offset))
                 }
-                ir::Instr::ArrayAccess { .. } => todo!(),
+                ir::Instr::ArrayAccess { .. } => {
+                    todo!("Interpreter / ir::Instruction::ArrayAccess")
+                }
                 ir::Instr::StructLiteral(ty, values) => {
                     let mut field_values = Vec::with_capacity(values.len());
 

@@ -32,8 +32,8 @@ pub fn size_of(ir_type: &ir::Type, ir_module: &ir::Module) -> u64 {
                 .iter()
                 .fold(0, |acc, field| acc + size_of(&field.ir_type, ir_module))
         }
-        ir::Type::FuncPtr => todo!(),
-        ir::Type::FixedArray(_) => todo!(),
+        ir::Type::FuncPtr => todo!("size_of ir::FuncPtr"),
+        ir::Type::FixedArray(_) => todo!("size_of ir::FixedArray"),
         ir::Type::Vector(_) => todo!("interpreting vector types not supported yet"),
         ir::Type::Complex(_) => todo!("interpreting complex numeric types not support yet"),
         ir::Type::Atomic(inner) => size_of(inner, ir_module),

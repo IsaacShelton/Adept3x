@@ -21,14 +21,14 @@ use crate::{
 pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, ParseError> {
     Ok(match &expr.kind {
         ExprKind::Integer(integer) => translate_expr_integer(integer, expr.source)?,
-        ExprKind::Float(_, _) => todo!(),
+        ExprKind::Float(_, _) => todo!("translate_expr float"),
         ExprKind::StringLiteral(encoding, content) => {
             translate_expr_string(encoding, content, expr.source)?
         }
         ExprKind::Bool(x) => ast::ExprKind::Boolean(*x).at(expr.source),
-        ExprKind::Nullptr => todo!(),
-        ExprKind::Character(_, _) => todo!(),
-        ExprKind::Compound(_) => todo!(),
+        ExprKind::Nullptr => todo!("translate_expr nullptr"),
+        ExprKind::Character(_, _) => todo!("translate_expr character"),
+        ExprKind::Compound(_) => todo!("translate_expr compound"),
         ExprKind::BinaryOperation(operation) => {
             let left = translate_expr(ctx, &operation.left)?;
             let right = translate_expr(ctx, &operation.right)?;
@@ -55,17 +55,17 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
                 BinaryOperator::Multiply => ast::BasicBinaryOperator::Multiply.into(),
                 BinaryOperator::Divide => ast::BasicBinaryOperator::Divide.into(),
                 BinaryOperator::Modulus => ast::BasicBinaryOperator::Modulus.into(),
-                BinaryOperator::Assign => todo!(),
-                BinaryOperator::AddAssign => todo!(),
-                BinaryOperator::SubtractAssign => todo!(),
-                BinaryOperator::MultiplyAssign => todo!(),
-                BinaryOperator::DivideAssign => todo!(),
-                BinaryOperator::ModulusAssign => todo!(),
-                BinaryOperator::LeftShiftAssign => todo!(),
-                BinaryOperator::RightShiftAssign => todo!(),
-                BinaryOperator::BitAndAssign => todo!(),
-                BinaryOperator::BitXorAssign => todo!(),
-                BinaryOperator::BitOrAssign => todo!(),
+                BinaryOperator::Assign => todo!("translate_expr assign"),
+                BinaryOperator::AddAssign => todo!("translate_expr add assign"),
+                BinaryOperator::SubtractAssign => todo!("translate_expr subtract assign"),
+                BinaryOperator::MultiplyAssign => todo!("translate_expr multiply assign"),
+                BinaryOperator::DivideAssign => todo!("translate_expr divide assign"),
+                BinaryOperator::ModulusAssign => todo!("translate_expr modulus assign"),
+                BinaryOperator::LeftShiftAssign => todo!("translate_expr left shift assign"),
+                BinaryOperator::RightShiftAssign => todo!("translate_expr right shift assign"),
+                BinaryOperator::BitAndAssign => todo!("translate_expr bitwise-and assign"),
+                BinaryOperator::BitXorAssign => todo!("translate_expr bitwise-xor assign"),
+                BinaryOperator::BitOrAssign => todo!("translate_expr bitwise-ox assign"),
             };
 
             match operator {
@@ -93,6 +93,8 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
         ExprKind::Cast(_) => todo!(),
         ExprKind::Subscript(_) => todo!(),
         ExprKind::Field(_) => todo!(),
+        ExprKind::PreIncrement(_) => todo!(),
+        ExprKind::PreDecrement(_) => todo!(),
         ExprKind::PostIncrement(_) => todo!(),
         ExprKind::PostDecrement(_) => todo!(),
         ExprKind::Identifier(name) => {
@@ -165,6 +167,7 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
         ExprKind::SizeOfValue(value) => {
             ast::ExprKind::SizeOfValue(Box::new(translate_expr(ctx, value)?)).at(expr.source)
         }
+        ExprKind::AlignOf(_) => todo!("translate_expr AlignOf"),
         ExprKind::IntegerPromote(value) => {
             ast::ExprKind::IntegerPromote(Box::new(translate_expr(ctx, value)?)).at(expr.source)
         }

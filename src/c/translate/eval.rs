@@ -41,6 +41,8 @@ pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
         ExprKind::Float(_, _)
         | ExprKind::StringLiteral(_, _)
         | ExprKind::Compound(_)
+        | ExprKind::PreIncrement(_)
+        | ExprKind::PreDecrement(_)
         | ExprKind::PostIncrement(_)
         | ExprKind::PostDecrement(_)
         | ExprKind::CompoundLiteral(_)
@@ -52,6 +54,7 @@ pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
         | ExprKind::Call(_, _)
         | ExprKind::SizeOf(_)
         | ExprKind::SizeOfValue(_)
+        | ExprKind::AlignOf(_)
         | ExprKind::IntegerPromote(_) => (),
     }
 

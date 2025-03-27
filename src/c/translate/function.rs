@@ -124,7 +124,7 @@ fn translate_compound_statement(
     let mut stmts = vec![];
 
     for block_item in &compound_statement.statements {
-        stmts.push(translate_block_item(ctx, block_item)?);
+        stmts.extend(translate_block_item(ctx, block_item)?);
     }
 
     Ok(stmts)
@@ -133,21 +133,23 @@ fn translate_compound_statement(
 fn translate_block_item(
     ctx: &mut TranslateCtx,
     block_item: &BlockItem,
-) -> Result<ast::Stmt, ParseError> {
+) -> Result<Option<ast::Stmt>, ParseError> {
     match &block_item.kind {
         BlockItemKind::Declaration(declaration) => match declaration {
             Declaration::Common(_) => todo!("translate_block_item common declaration"),
-            Declaration::StaticAssert(static_assert) => Ok(ast::ExprKind::StaticAssert(
-                Box::new(translate_expr(ctx, &static_assert.condition.value)?),
-                static_assert.message.clone(),
-            )
-            .at(block_item.source)
-            .stmt()),
+            Declaration::StaticAssert(static_assert) => Ok(Some(
+                ast::ExprKind::StaticAssert(
+                    Box::new(translate_expr(ctx, &static_assert.condition.value)?),
+                    static_assert.message.clone(),
+                )
+                .at(block_item.source)
+                .stmt(),
+            )),
             Declaration::Attribute(_) => todo!("translate_block_item attribute declaration"),
         },
-        BlockItemKind::UnlabeledStatement(unlabeled_statement) => {
-            translate_unlabeled_statement(ctx, unlabeled_statement, block_item.source)
-        }
+        BlockItemKind::UnlabeledStatement(unlabeled_statement) => Ok(
+            translate_unlabeled_statement(ctx, unlabeled_statement, block_item.source)?,
+        ),
         BlockItemKind::Label(_) => todo!("translate_block_item label"),
     }
 }
@@ -156,7 +158,7 @@ fn translate_unlabeled_statement(
     ctx: &mut TranslateCtx,
     unlabeled_statement: &UnlabeledStatement,
     source: Source,
-) -> Result<ast::Stmt, ParseError> {
+) -> Result<Option<ast::Stmt>, ParseError> {
     match unlabeled_statement {
         UnlabeledStatement::ExprStatement(expr_statement) => {
             translate_expr_statement(ctx, expr_statement)
@@ -172,7 +174,7 @@ fn translate_unlabeled_statement(
                 ));
             }
 
-            translate_jump_statement(ctx, jump_statement, source)
+            Ok(Some(translate_jump_statement(ctx, jump_statement, source)?))
         }
     }
 }
@@ -200,9 +202,9 @@ fn translate_jump_statement(
 fn translate_expr_statement(
     ctx: &mut TranslateCtx,
     expr_statement: &ExprStatement,
-) -> Result<ast::Stmt, ParseError> {
+) -> Result<Option<ast::Stmt>, ParseError> {
     match expr_statement {
-        ExprStatement::Empty => todo!(),
+        ExprStatement::Empty => Ok(None),
         ExprStatement::Normal(attributes, expr) => {
             if !attributes.is_empty() {
                 return Err(ParseError::message(
@@ -211,7 +213,9 @@ fn translate_expr_statement(
                 ));
             }
 
-            Ok(ast::StmtKind::Expr(translate_expr(ctx, expr)?).at(expr.source))
+            Ok(Some(
+                ast::StmtKind::Expr(translate_expr(ctx, expr)?).at(expr.source),
+            ))
         }
     }
 }
