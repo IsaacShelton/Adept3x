@@ -1,5 +1,5 @@
 use derive_more::{Deref, IsVariant, Unwrap};
-use inflow::InflowEnd;
+use infinite_iterator::InfiniteIteratorEnd;
 use num_bigint::BigInt;
 pub use pp_token::{Encoding, Punctuator};
 use source_files::Source;
@@ -198,8 +198,8 @@ impl CToken {
     }
 }
 
-impl InflowEnd for CToken {
-    fn is_inflow_end(&self) -> bool {
+impl InfiniteIteratorEnd for CToken {
+    fn is_end(&self) -> bool {
         matches!(&self.kind, CTokenKind::EndOfFile)
     }
 }

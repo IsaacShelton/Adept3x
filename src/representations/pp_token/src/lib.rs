@@ -3,7 +3,7 @@ mod punctuator;
 
 use derive_more::IsVariant;
 pub use encoding::Encoding;
-use inflow::InflowEnd;
+use infinite_iterator::InfiniteIteratorEnd;
 pub use punctuator::Punctuator;
 use source_files::Source;
 use std::fmt::Display;
@@ -180,14 +180,14 @@ fn escape(content: &str, around: char) -> String {
     result
 }
 
-impl InflowEnd for PreToken {
-    fn is_inflow_end(&self) -> bool {
-        self.kind.is_inflow_end()
+impl InfiniteIteratorEnd for PreToken {
+    fn is_end(&self) -> bool {
+        self.kind.is_end()
     }
 }
 
-impl InflowEnd for PreTokenKind {
-    fn is_inflow_end(&self) -> bool {
+impl InfiniteIteratorEnd for PreTokenKind {
+    fn is_end(&self) -> bool {
         matches!(self, PreTokenKind::EndOfSequence)
     }
 }

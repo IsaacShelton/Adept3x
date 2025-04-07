@@ -6,10 +6,10 @@ use super::{
 use ast::{Field, Struct};
 use attributes::Privacy;
 use indexmap::IndexMap;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_structure(&mut self, annotations: Vec<Annotation>) -> Result<Struct, ParseError> {
         let source = self.source_here();
         self.input.advance();

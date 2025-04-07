@@ -5,7 +5,7 @@ mod number;
 
 use c_token::CToken;
 pub use c_token::Invalid as LexError;
-use inflow::{InflowTools, IntoInflow, IntoInflowStream};
+use infinite_iterator::{Infinite, InfiniteIteratorPeeker, InfiniteIteratorTools};
 pub use lexer::Lexer;
 use pp_token::{PreToken, PreTokenKind};
 use source_files::Source;
@@ -16,11 +16,9 @@ use source_files::Source;
 // 1) Our C preprocessor produces a whole document at once (since designed for caching)
 // 2) It's much easier to parse C code when you don't do it streaming (since lots of backtracking)
 pub fn lex_c_code(preprocessed: Vec<PreToken>, eof_source: Source) -> Vec<CToken> {
-    Lexer::new(
-        preprocessed
-            .into_iter()
-            .into_inflow_stream(PreTokenKind::EndOfSequence.at(eof_source))
-            .into_inflow(),
-    )
+    Lexer::new(InfiniteIteratorPeeker::new(Infinite::new(
+        preprocessed.into_iter(),
+        PreTokenKind::EndOfSequence.at(eof_source),
+    )))
     .collect_vec(true)
 }

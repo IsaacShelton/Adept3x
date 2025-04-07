@@ -1,15 +1,13 @@
-use crate::{Inflow, InflowEnd, InflowStream};
+use crate::{InfiniteIterator, InfiniteIteratorEnd, InfinitePeekable};
 use std::{collections::VecDeque, mem::MaybeUninit};
 
-pub struct InflowPeeker<S: InflowStream> {
-    stream: S,
-    queue: VecDeque<S::Item>,
+pub struct Peeker<I: InfiniteIterator> {
+    stream: I,
+    queue: VecDeque<I::Item>,
 }
 
-unsafe impl<S: InflowStream + Send> Send for InflowPeeker<S> {}
-
-impl<S: InflowStream> InflowPeeker<S> {
-    pub fn new(stream: S) -> Self {
+impl<I: InfiniteIterator> Peeker<I> {
+    pub fn new(stream: I) -> Self {
         Self {
             stream,
             queue: VecDeque::with_capacity(8),
@@ -17,15 +15,21 @@ impl<S: InflowStream> InflowPeeker<S> {
     }
 }
 
-impl<S: InflowStream> InflowStream for InflowPeeker<S> {
-    type Item = S::Item;
+impl<I: InfiniteIterator> InfiniteIterator for Peeker<I> {
+    type Item = I::Item;
 
     fn next(&mut self) -> Self::Item {
         self.queue.pop_front().unwrap_or_else(|| self.stream.next())
     }
 }
 
-impl<T: InflowEnd, S: InflowStream<Item = T>> Inflow<T> for InflowPeeker<S> {
+unsafe impl<I: InfiniteIterator + Send> Send for Peeker<I> {}
+
+impl<T, I> InfinitePeekable<T> for Peeker<I>
+where
+    T: InfiniteIteratorEnd,
+    I: InfiniteIterator<Item = T>,
+{
     fn un_next(&mut self, item: Self::Item) {
         self.queue.push_front(item);
     }

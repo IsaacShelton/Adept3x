@@ -5,10 +5,10 @@ use super::{
 };
 use ast::GlobalVar;
 use attributes::{Privacy, SymbolOwnership};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_global_variable(
         &mut self,
         annotations: Vec<Annotation>,

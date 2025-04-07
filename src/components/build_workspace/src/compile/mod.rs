@@ -9,12 +9,12 @@ use compiler::Compiler;
 use data_units::ByteUnits;
 use diagnostics::Show;
 use fs_tree::FsNodeId;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use module::compile_rest_module_file;
 use normal::compile_normal_file;
 use token::Token;
 
-pub fn compile_code_file<'a, I: Inflow<Token>>(
+pub fn compile_code_file<'a, I: InfinitePeekable<Token>>(
     compiler: &Compiler,
     code_file: CodeFile<'a, I>,
     out_ast_files: &AppendOnlyVec<(FsNodeId, AstFile)>,

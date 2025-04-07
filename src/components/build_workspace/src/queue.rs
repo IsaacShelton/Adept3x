@@ -3,19 +3,19 @@ use append_only_vec::AppendOnlyVec;
 use ast::AstFile;
 use ast_workspace_settings::Settings;
 use fs_tree::FsNodeId;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use itertools::Itertools;
 use std::sync::Mutex;
 use token::Token;
 
-pub struct WorkspaceQueue<'a, I: Inflow<Token>> {
+pub struct WorkspaceQueue<'a, I: InfinitePeekable<Token>> {
     pub ast_files: AppendOnlyVec<(FsNodeId, AstFile)>,
     pub module_folders: AppendOnlyVec<(FsNodeId, Settings)>,
     code_files: Mutex<Vec<CodeFile<'a, I>>>,
     module_files: Mutex<Vec<ModuleFile>>,
 }
 
-impl<'a, I: Inflow<Token>> WorkspaceQueue<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> WorkspaceQueue<'a, I> {
     pub fn new(normal_files: Vec<NormalFile>, module_files: Vec<ModuleFile>) -> Self {
         Self {
             ast_files: AppendOnlyVec::new(),

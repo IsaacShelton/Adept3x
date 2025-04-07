@@ -1,6 +1,6 @@
 use crate::error::PreprocessorError;
 use derive_more::{From, IsVariant, Unwrap};
-use inflow::InflowEnd;
+use infinite_iterator::InfiniteIteratorEnd;
 use pp_token::PreToken;
 use source_files::Source;
 
@@ -35,8 +35,8 @@ impl LexedLine {
     }
 }
 
-impl InflowEnd for LexedLine {
-    fn is_inflow_end(&self) -> bool {
+impl InfiniteIteratorEnd for LexedLine {
+    fn is_end(&self) -> bool {
         match &self.0 {
             Ok(line) => line.is_end_of_file(),
             Err(_) => false,

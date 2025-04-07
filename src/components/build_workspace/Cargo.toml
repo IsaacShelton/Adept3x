@@ -28,7 +28,7 @@ fs_tree = { version = "0.1.0", path = "../../representations/fs_tree" }
 humansize.workspace = true
 ignore.workspace = true
 indexmap.workspace = true
-inflow = { version = "0.1.0", path = "../../support/inflow" }
+infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
 interpret = { version = "0.1.0", path = "../interpret" }
 interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }
 ir = { version = "0.1.0", path = "../../representations/ir" }

@@ -4,10 +4,10 @@ mod member;
 use super::Parser;
 use crate::error::ParseError;
 use ast::Expr;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_expr_primary_post(&mut self, mut base: Expr) -> Result<Expr, ParseError> {
         let mut ate_newline;
 

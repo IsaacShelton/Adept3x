@@ -3,11 +3,11 @@ use super::{
     error::{ParseError, ParseErrorKind},
 };
 use ast::{Name, Type, TypeArg, TypeKind};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_type(
         &mut self,
         prefix: Option<impl ToString>,
@@ -153,7 +153,7 @@ impl<'a, I: Inflow<Token>> Parser<'a, I> {
 
         /// Sub-function for properly handling trailing `=` signs
         /// resulting from partially consuming '>'-like tokens.
-        fn merge_trailing_equals<I: Inflow<Token>>(
+        fn merge_trailing_equals<I: InfinitePeekable<Token>>(
             parser: &mut Parser<I>,
             closer: Token,
             column_offset: u32,

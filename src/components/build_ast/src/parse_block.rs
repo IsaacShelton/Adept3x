@@ -1,10 +1,10 @@
 use super::{Parser, error::ParseError};
 use ast::Stmt;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use lazy_format::lazy_format;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_block(&mut self, to_begin_what_block: &str) -> Result<Vec<Stmt>, ParseError> {
         self.ignore_newlines();
 

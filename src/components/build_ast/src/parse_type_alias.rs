@@ -2,10 +2,10 @@ use super::{Parser, annotation::Annotation, error::ParseError};
 use crate::annotation::AnnotationKind;
 use ast::TypeAlias;
 use attributes::Privacy;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_type_alias(
         &mut self,
         annotations: Vec<Annotation>,

@@ -3,12 +3,12 @@ use super::{
     error::{ParseError, ParseErrorKind},
 };
 use ast::Name;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::{Source, Sourced};
 use std::borrow::Borrow;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_token(
         &mut self,
         expected_token: impl Borrow<TokenKind>,

@@ -7,10 +7,10 @@ use super::{
     error::{ParseError, ParseErrorKind},
 };
 use ast::{Stmt, StmtKind};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
         let stmt = self.parse_stmt_inner()?;
 

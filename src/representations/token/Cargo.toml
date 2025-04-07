@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 derivative.workspace = true
 derive_more.workspace = true
-inflow = { version = "0.1.0", path = "../../support/inflow" }
+infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
 num-bigint.workspace = true
 source_files = { version = "0.1.0", path = "../source_files" }

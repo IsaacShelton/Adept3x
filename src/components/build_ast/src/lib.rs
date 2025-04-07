@@ -25,25 +25,25 @@ mod parse_util;
 use self::error::ParseError;
 pub use self::input::Input;
 use ast::AstFile;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::{Source, SourceFileKey, SourceFiles};
 use std::mem::MaybeUninit;
 use token::{Token, TokenKind};
 
 pub fn parse(
-    tokens: impl Inflow<Token>,
+    tokens: impl InfinitePeekable<Token>,
     source_files: &SourceFiles,
     key: SourceFileKey,
 ) -> Result<AstFile, ParseError> {
     Parser::new(Input::new(tokens, source_files, key)).parse()
 }
 
-pub struct Parser<'a, I: Inflow<Token>> {
+pub struct Parser<'a, I: InfinitePeekable<Token>> {
     pub input: Input<'a, I>,
     pub treat_string_literals_as_cstring_literals: bool,
 }
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn new(input: Input<'a, I>) -> Self {
         Self {
             input,

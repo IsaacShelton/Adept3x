@@ -6,16 +6,16 @@ use build_ast::{Input, Parser};
 use build_token::Lexer;
 use compiler::Compiler;
 use data_units::ByteUnits;
-use diagnostics::{ErrorDiagnostic, Show, into_show};
+use diagnostics::{into_show, ErrorDiagnostic, Show};
 use fs_tree::FsNodeId;
-use inflow::{Inflow, IntoInflow};
+use infinite_iterator::{InfiniteIteratorPeeker, InfinitePeekable};
 use line_column::Location;
 use source_files::{Source, SourceFileKey};
 use std::path::Path;
 use text::{IntoText, IntoTextStream};
 use token::{Token, TokenKind};
 
-pub struct CompiledModule<'a, I: Inflow<Token> + 'a> {
+pub struct CompiledModule<'a, I: InfinitePeekable<Token> + 'a> {
     pub total_file_size: ByteUnits,
     pub remaining_input: Input<'a, I>,
     pub settings: Settings,
@@ -25,7 +25,7 @@ pub struct CompiledModule<'a, I: Inflow<Token> + 'a> {
 pub fn compile_module_file<'a>(
     compiler: &Compiler<'a>,
     path: &Path,
-) -> Result<CompiledModule<'a, impl Inflow<Token> + use<'a>>, Box<dyn Show>> {
+) -> Result<CompiledModule<'a, impl InfinitePeekable<Token> + use<'a>>, Box<dyn Show>> {
     let content = std::fs::read_to_string(path)
         .map_err(ErrorDiagnostic::plain)
         .map_err(into_show)?;
@@ -35,7 +35,7 @@ pub fn compile_module_file<'a>(
     let content = source_files.get(key).content();
 
     let text = content.chars().into_text_stream(key).into_text();
-    let lexer = Lexer::new(text).into_inflow();
+    let lexer = InfiniteIteratorPeeker::new(Lexer::new(text));
     let mut input = Input::new(lexer, compiler.source_files, key);
     input.ignore_newlines();
 
@@ -70,7 +70,7 @@ pub fn compile_module_file<'a>(
     })
 }
 
-pub fn compile_rest_module_file<'a, I: Inflow<Token>>(
+pub fn compile_rest_module_file<'a, I: InfinitePeekable<Token>>(
     module_file: &ModuleFile,
     rest_input: Input<'a, I>,
     out_ast_files: &AppendOnlyVec<(FsNodeId, AstFile)>,

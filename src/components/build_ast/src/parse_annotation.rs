@@ -4,10 +4,10 @@ use super::{
     error::{ParseError, ParseErrorKind},
 };
 use ast::Given;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_annotation(&mut self) -> Result<Vec<Annotation>, ParseError> {
         // #[annotation_name]
         // ^

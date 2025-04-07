@@ -11,7 +11,7 @@ use self::{
     state::State, string_state::StringState,
 };
 use compound_identifier_state::CompoundIdentifierState;
-use inflow::InflowStream;
+use infinite_iterator::InfiniteIterator;
 use polymorph_state::PolymorphState;
 use source_files::Source;
 use text::{Character, Text};
@@ -22,13 +22,19 @@ pub enum FeedResult<T> {
     Waiting,
 }
 
-pub struct Lexer<T: Text + Send> {
-    characters: T,
+pub struct Lexer<I>
+where
+    I: Text + Send,
+{
+    characters: I,
     state: State,
 }
 
-impl<T: Text + Send> Lexer<T> {
-    pub fn new(characters: T) -> Self {
+impl<I> Lexer<I>
+where
+    I: Text + Send,
+{
+    pub fn new(characters: I) -> Self {
         Self {
             characters,
             state: State::Idle,
@@ -532,7 +538,10 @@ impl<T: Text + Send> Lexer<T> {
     }
 }
 
-impl<T: Text + Send> InflowStream for Lexer<T> {
+impl<I> InfiniteIterator for Lexer<I>
+where
+    I: Text + Send,
+{
     type Item = Token;
 
     fn next(&mut self) -> Self::Item {

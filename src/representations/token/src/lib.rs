@@ -2,7 +2,7 @@ mod name;
 
 use derivative::Derivative;
 use derive_more::{Deref, IsVariant, Unwrap};
-use inflow::InflowEnd;
+use infinite_iterator::InfiniteIteratorEnd;
 pub use name::Name;
 use num_bigint::BigInt;
 use source_files::Source;
@@ -32,8 +32,8 @@ impl Token {
     }
 }
 
-impl InflowEnd for Token {
-    fn is_inflow_end(&self) -> bool {
+impl InfiniteIteratorEnd for Token {
+    fn is_end(&self) -> bool {
         self.kind.is_end_of_file()
     }
 }

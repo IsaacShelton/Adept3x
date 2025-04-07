@@ -32,7 +32,7 @@ members = [
     "src/representations/interpreter_api",
     "src/support/std_ext",
     "src/support/compiler",
-    "src/support/inflow",
+    "src/support/infinite_iterator",
     "src/support/text",
     "src/representations/token",
     "src/components/build_token",

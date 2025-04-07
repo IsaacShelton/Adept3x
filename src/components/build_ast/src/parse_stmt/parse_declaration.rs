@@ -1,9 +1,9 @@
 use super::{super::error::ParseError, Parser};
 use ast::{Declaration, Stmt, StmtKind};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
         let (name, source) = self
             .parse_identifier_keep_location(Some("for variable name"))?

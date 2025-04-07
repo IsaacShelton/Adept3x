@@ -10,7 +10,7 @@ derivative.workspace = true
 derive_more.workspace = true
 diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
 indexmap.workspace = true
-inflow = { version = "0.1.0", path = "../../support/inflow" }
+infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
 lazy_format.workspace = true
 num.workspace = true
 num-bigint.workspace = true

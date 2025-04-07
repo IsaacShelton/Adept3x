@@ -4,17 +4,20 @@ mod state;
 
 use self::{lex_line::lex_line, state::State};
 use super::{error::PreprocessorErrorKind, line_splice::LineSplicer};
-use inflow::InflowStream;
+use infinite_iterator::InfiniteIterator;
 use text::{IntoTextNoSend, Text};
 
 // Lexer for C preprocessor
-pub struct Lexer<T: Text> {
+pub struct Lexer<I: Text> {
     state: State,
-    line_splicer: LineSplicer<T>,
+    line_splicer: LineSplicer<I>,
 }
 
-impl<T: Text> Lexer<T> {
-    pub fn new(text: T) -> Self {
+impl<I> Lexer<I>
+where
+    I: Text,
+{
+    pub fn new(text: I) -> Self {
         Self {
             state: State::Idle,
             line_splicer: LineSplicer::new(text),
@@ -22,11 +25,12 @@ impl<T: Text> Lexer<T> {
     }
 }
 
-// Output from lexer
 pub use self::line::{LexedLine, PreTokenLine};
 
-// The lexer is used via the InflowStream trait
-impl<T: Text> InflowStream for Lexer<T> {
+impl<I> InfiniteIterator for Lexer<I>
+where
+    I: Text,
+{
     type Item = LexedLine;
 
     fn next(&mut self) -> Self::Item {

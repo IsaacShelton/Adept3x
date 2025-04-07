@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 derive_more.workspace = true
 diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
-inflow = { version = "0.1.0", path = "../../support/inflow" }
+infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
 itertools.workspace = true
 look_ahead = { version = "0.1.0", path = "../../support/look_ahead" }
 pp_ast = { version = "0.1.0", path = "../../representations/pp_ast" }

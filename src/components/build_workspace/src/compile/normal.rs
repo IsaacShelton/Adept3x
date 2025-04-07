@@ -9,7 +9,7 @@ use compiler::Compiler;
 use data_units::ByteUnits;
 use diagnostics::{ErrorDiagnostic, Show, into_show};
 use fs_tree::FsNodeId;
-use inflow::IntoInflow;
+use infinite_iterator::InfiniteIteratorPeeker;
 use text::{IntoText, IntoTextStream};
 
 pub fn compile_normal_file(
@@ -30,9 +30,10 @@ pub fn compile_normal_file(
 
     match &normal_file.kind {
         NormalFileKind::Adept => {
+            let lexer = InfiniteIteratorPeeker::new(Lexer::new(text));
             out_ast_files.push((
                 normal_file.fs_node_id,
-                parse(Lexer::new(text).into_inflow(), source_files, key).map_err(into_show)?,
+                parse(lexer, source_files, key).map_err(into_show)?,
             ));
         }
         NormalFileKind::CSource => {

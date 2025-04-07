@@ -2,10 +2,10 @@ use super::Parser;
 use crate::{error::ParseError, parse_util::into_plain_name};
 use ast::{Expr, ExprKind};
 use attributes::Privacy;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_member(&mut self, subject: Expr) -> Result<Expr, ParseError> {
         // subject.field_name
         //        ^

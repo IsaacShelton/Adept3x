@@ -19,7 +19,7 @@ mod stdc;
 */
 use self::{error::PreprocessorError, expand::expand_ast, lexer::Lexer, parser::parse, stdc::stdc};
 use diagnostics::Diagnostics;
-use inflow::IntoInflow;
+use infinite_iterator::InfiniteIteratorPeeker;
 use pp_ast::Define;
 use pp_token::PreToken;
 use source_files::Source;
@@ -38,7 +38,7 @@ pub fn preprocess(
     diagnostics: &Diagnostics,
 ) -> Result<Preprocessed, PreprocessorError> {
     let lexer = Lexer::new(text);
-    let ast = parse(lexer.into_inflow(), diagnostics)?;
+    let ast = parse(InfiniteIteratorPeeker::new(lexer), diagnostics)?;
     let (document, defines) = expand_ast(&ast, stdc())?;
 
     Ok(Preprocessed {

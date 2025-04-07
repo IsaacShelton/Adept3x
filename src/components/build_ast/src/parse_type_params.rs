@@ -4,10 +4,10 @@ use super::{
 };
 use ast::{TypeKind, TypeParams};
 use indexmap::IndexSet;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_type_param(&mut self, generics: &mut IndexSet<String>) -> Result<(), ParseError> {
         if !self.input.peek().is_polymorph() {
             return Err(ParseErrorKind::Expected {

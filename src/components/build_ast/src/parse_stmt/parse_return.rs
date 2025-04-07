@@ -1,9 +1,9 @@
 use super::{super::error::ParseError, Parser};
 use ast::{Stmt, StmtKind};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_return(&mut self) -> Result<Stmt, ParseError> {
         // return VALUE
         //          ^

@@ -3,11 +3,11 @@ use super::{
     annotation::Annotation,
     error::{ParseError, ParseErrorKind},
 };
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
 
-impl<I: Inflow<Token>> Parser<'_, I> {
+impl<I: InfinitePeekable<Token>> Parser<'_, I> {
     pub fn unexpected_token_is_next(&mut self) -> ParseError {
         let unexpected = self.input.advance();
         self.unexpected_token(&unexpected)

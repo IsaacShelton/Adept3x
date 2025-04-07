@@ -7,7 +7,7 @@ use super::{
 };
 use diagnostics::{Diagnostics, WarningDiagnostic};
 pub use error::{ParseError, ParseErrorKind};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use itertools::Itertools;
 use look_ahead::LookAhead;
 use pp_ast::*;
@@ -15,13 +15,13 @@ use pp_token::{PreToken, PreTokenKind, Punctuator};
 use source_files::Source;
 use std::borrow::Borrow;
 
-pub struct Parser<'a, T: Inflow<LexedLine>> {
+pub struct Parser<'a, T: InfinitePeekable<LexedLine>> {
     lines: T,
     disabled: bool,
     diagnostics: &'a Diagnostics<'a>,
 }
 
-impl<'a, T: Inflow<LexedLine>> Parser<'a, T> {
+impl<'a, T: InfinitePeekable<LexedLine>> Parser<'a, T> {
     pub fn new(lines: T, diagnostics: &'a Diagnostics) -> Self {
         Self {
             lines,
@@ -566,7 +566,7 @@ fn peek_directive_name(line: &(impl Borrow<[PreToken]> + ?Sized)) -> Option<&str
 }
 
 pub fn parse(
-    tokens: impl Inflow<LexedLine>,
+    tokens: impl InfinitePeekable<LexedLine>,
     diagnostics: &Diagnostics,
 ) -> Result<PreprocessorAst, PreprocessorError> {
     let mut parser = Parser::new(tokens, diagnostics);

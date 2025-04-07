@@ -1,18 +1,24 @@
 use super::number::lex_number;
 use c_token::{CToken, CTokenKind, Invalid};
-use inflow::{Inflow, InflowStream};
+use infinite_iterator::{InfiniteIterator, InfinitePeekable};
 use pp_token::{PreToken, PreTokenKind};
-pub struct Lexer<I: Inflow<PreToken>> {
+pub struct Lexer<I: InfinitePeekable<PreToken>> {
     pub input: I,
 }
 
-impl<I: Inflow<PreToken>> Lexer<I> {
+impl<I> Lexer<I>
+where
+    I: InfinitePeekable<PreToken>,
+{
     pub fn new(input: I) -> Self {
         Self { input }
     }
 }
 
-impl<I: Inflow<PreToken>> InflowStream for Lexer<I> {
+impl<I> InfiniteIterator for Lexer<I>
+where
+    I: InfinitePeekable<PreToken>,
+{
     type Item = CToken;
 
     fn next(&mut self) -> Self::Item {

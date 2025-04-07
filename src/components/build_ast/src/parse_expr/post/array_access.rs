@@ -1,10 +1,10 @@
 use super::Parser;
 use crate::error::ParseError;
 use ast::{ArrayAccess, Expr, ExprKind};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_array_access(&mut self, subject: Expr) -> Result<Expr, ParseError> {
         // subject[index]
         //        ^

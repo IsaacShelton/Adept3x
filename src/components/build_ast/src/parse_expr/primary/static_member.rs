@@ -1,11 +1,11 @@
 use super::Parser;
 use crate::error::{ParseError, ParseErrorKind};
 use ast::{Expr, ExprKind, Name, StaticMemberCall, StaticMemberValue, Type, TypeArg};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_static_member(
         &mut self,
         type_name: Name,

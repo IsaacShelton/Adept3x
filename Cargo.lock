@@ -176,7 +176,7 @@ dependencies = [
  "derive_more",
  "diagnostics",
  "indexmap",
- "inflow",
+ "infinite_iterator",
  "lazy_format",
  "num",
  "num-bigint",
@@ -208,7 +208,7 @@ name = "build_c_token"
 version = "0.1.0"
 dependencies = [
  "c_token",
- "inflow",
+ "infinite_iterator",
  "pp_token",
  "source_files",
 ]
@@ -271,7 +271,7 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "diagnostics",
- "inflow",
+ "infinite_iterator",
  "itertools",
  "look_ahead",
  "pp_ast",
@@ -285,7 +285,7 @@ name = "build_token"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "inflow",
+ "infinite_iterator",
  "num-bigint",
  "num-traits",
  "source_files",
@@ -321,7 +321,7 @@ dependencies = [
  "humansize",
  "ignore",
  "indexmap",
- "inflow",
+ "infinite_iterator",
  "interpret",
  "interpreter_api",
  "ir",
@@ -352,7 +352,7 @@ name = "c_token"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "inflow",
+ "infinite_iterator",
  "num-bigint",
  "pp_token",
  "source_files",
@@ -595,7 +595,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4c7245a08504955605670dbf141fceab975f15ca21570696aebe9d2e71576bd"
 
 [[package]]
-name = "inflow"
+name = "infinite_iterator"
 version = "0.1.0"
 
 [[package]]
@@ -883,7 +883,7 @@ name = "pp_token"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "inflow",
+ "infinite_iterator",
  "source_files",
 ]
 
@@ -1110,7 +1110,7 @@ version = "0.1.0"
 dependencies = [
  "derivative",
  "derive_more",
- "inflow",
+ "infinite_iterator",
  "num-bigint",
  "source_files",
 ]

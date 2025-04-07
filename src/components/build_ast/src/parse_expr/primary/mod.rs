@@ -10,11 +10,11 @@ use ast::{
     Block, Conditional, Expr, ExprKind, Integer, TypeArg, TypeKind, UnaryMathOperator,
     UnaryOperation, UnaryOperator, While,
 };
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use std::ffi::CString;
 use token::{StringLiteral, StringModifier, Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_expr_primary(&mut self) -> Result<Expr, ParseError> {
         let expr = self.parse_expr_primary_base()?;
         self.parse_expr_primary_post(expr)

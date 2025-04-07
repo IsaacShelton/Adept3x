@@ -4,10 +4,10 @@ use super::{
     error::ParseError,
 };
 use ast::AstFile;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_top_level(
         &mut self,
         ast_file: &mut AstFile,

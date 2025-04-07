@@ -1,17 +1,6 @@
-#![feature(maybe_uninit_array_assume_init)]
+use crate::{InfiniteIterator, InfiniteIteratorEnd};
 
-mod inflow_end;
-mod inflow_stream;
-mod into_inflow;
-mod into_inflow_stream;
-mod tools;
-
-pub use self::{
-    inflow_end::InflowEnd, inflow_stream::InflowStream, into_inflow::IntoInflow,
-    into_inflow_stream::IntoInflowStream, tools::InflowTools,
-};
-
-pub trait Inflow<T>: InflowStream<Item = T> {
+pub trait InfinitePeekable<T>: InfiniteIterator<Item = T> {
     fn un_next(&mut self, item: Self::Item);
 
     fn peek_nth_mut(&mut self, n: usize) -> &mut T;
@@ -30,7 +19,7 @@ pub trait Inflow<T>: InflowStream<Item = T> {
     }
 }
 
-impl<T: InflowEnd, I: Inflow<T>> Inflow<T> for &mut I {
+impl<T: InfiniteIteratorEnd, I: InfinitePeekable<T>> InfinitePeekable<T> for &mut I {
     fn un_next(&mut self, item: Self::Item) {
         (**self).un_next(item)
     }

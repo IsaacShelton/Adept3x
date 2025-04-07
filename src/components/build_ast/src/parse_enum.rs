@@ -3,11 +3,11 @@ use crate::annotation::AnnotationKind;
 use ast::{Enum, EnumMember};
 use attributes::Privacy;
 use indexmap::IndexMap;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use num::{BigInt, Zero};
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Enum, ParseError> {
         let source = self.source_here();
         assert!(self.input.advance().is_enum_keyword());

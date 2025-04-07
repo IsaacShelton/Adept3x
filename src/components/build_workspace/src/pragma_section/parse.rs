@@ -3,12 +3,12 @@ use ast::{AstFile, Expr, ExprKind, Func, FuncHead, Params, Stmt, StmtKind, TypeK
 use attributes::{Exposure, Privacy, SymbolOwnership};
 use build_ast::{Input, Parser, error::ParseError};
 use diagnostics::{ErrorDiagnostic, Show, into_show};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
 
 impl PragmaSection {
-    pub fn parse<'a, I: Inflow<Token>>(
+    pub fn parse<'a, I: InfinitePeekable<Token>>(
         allow_experimental_pragma_features: bool,
         mut input: Input<'a, I>,
         require_adept_version_first: bool,

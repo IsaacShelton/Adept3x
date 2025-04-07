@@ -5,10 +5,10 @@ use super::{
 };
 use ast::{Impl, TypeParams};
 use attributes::Privacy;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_impl(&mut self, annotations: Vec<Annotation>) -> Result<Impl, ParseError> {
         let source = self.input.peek().source;
         self.input.advance().kind.unwrap_impl_keyword();

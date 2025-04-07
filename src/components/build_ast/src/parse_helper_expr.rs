@@ -5,10 +5,10 @@ use super::{
 };
 use ast::HelperExpr;
 use attributes::Privacy;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_helper_expr(
         &mut self,
         annotations: Vec<Annotation>,

@@ -1,9 +1,9 @@
 use super::{ParseError, Parser};
 use ast::{Param, Params};
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_func_params(&mut self) -> Result<Params, ParseError> {
         // (arg1 Type1, arg2 Type2, arg3 Type3)
         // ^

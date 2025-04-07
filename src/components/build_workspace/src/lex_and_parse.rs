@@ -1,20 +1,20 @@
 use super::{
-    NUM_THREADS,
     compile::{
         compile_code_file,
-        module::{CompiledModule, compile_module_file},
+        module::{compile_module_file, CompiledModule},
     },
-    explore::{ExploreResult, explore},
+    explore::{explore, ExploreResult},
     file::CodeFile,
     module_file::ModuleFile,
     queue::WorkspaceQueue,
     stats::CompilationStats,
+    NUM_THREADS,
 };
 use ast_workspace_settings::Settings;
 use compiler::Compiler;
 use diagnostics::{ErrorDiagnostic, Show};
 use fs_tree::Fs;
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use line_column::Location;
 use path_absolutize::Absolutize;
 use source_files::{Source, SourceFileKey};
@@ -26,7 +26,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
     fs: &Fs,
     explored: ExploreResult,
     stats: &CompilationStats,
-) -> Result<WorkspaceQueue<'a, impl Inflow<Token> + 'a>, ()> {
+) -> Result<WorkspaceQueue<'a, impl InfinitePeekable<Token> + 'a>, ()> {
     let ExploreResult {
         normal_files,
         module_files,
@@ -91,7 +91,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
     Ok(queue)
 }
 
-fn process_module_file_output<'a, I: Inflow<Token>>(
+fn process_module_file_output<'a, I: InfinitePeekable<Token>>(
     compiler: &Compiler,
     fs: &Fs,
     module_file: ModuleFile,
@@ -123,7 +123,7 @@ fn process_module_file_output<'a, I: Inflow<Token>>(
     stats.process_bytes(total_file_size);
 }
 
-fn queue_dependencies<I: Inflow<Token>>(
+fn queue_dependencies<I: InfinitePeekable<Token>>(
     compiler: &Compiler,
     fs: &Fs,
     mut settings: Settings,

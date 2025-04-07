@@ -4,11 +4,11 @@ use ast::{
     BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind, Language,
     ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator,
 };
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
 
-impl<'a, I: Inflow<Token>> Parser<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_operator_expr(
         &mut self,
         precedence: usize,

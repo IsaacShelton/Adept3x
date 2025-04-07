@@ -1,42 +1,42 @@
-use inflow::Inflow;
+use infinite_iterator::InfinitePeekable;
 use source_files::{Source, SourceFileKey, SourceFiles};
 use std::{borrow::Borrow, fmt::Debug};
 use token::{Token, TokenKind};
 
-pub struct Input<'a, I: Inflow<Token>> {
+pub struct Input<'a, I: InfinitePeekable<Token>> {
     source_files: &'a SourceFiles,
-    inflow: I,
+    infinite_peekable: I,
     key: SourceFileKey,
 }
 
-impl<'a, I: Inflow<Token>> Debug for Input<'a, I> {
+impl<'a, I: InfinitePeekable<Token>> Debug for Input<'a, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Input<Inflow<Token>>").finish()
+        f.debug_struct("Input<InfiniteIterator<Token>>").finish()
     }
 }
 
 impl<'a, I> Input<'a, I>
 where
-    I: Inflow<Token>,
+    I: InfinitePeekable<Token>,
 {
-    pub fn new(inflow: I, source_files: &'a SourceFiles, key: SourceFileKey) -> Self {
+    pub fn new(infinite_peekable: I, source_files: &'a SourceFiles, key: SourceFileKey) -> Self {
         Self {
-            inflow,
+            infinite_peekable,
             source_files,
             key,
         }
     }
 
     pub fn peek(&mut self) -> &Token {
-        self.inflow.peek_nth(0)
+        self.infinite_peekable.peek_nth(0)
     }
 
     pub fn peek_nth(&mut self, n: usize) -> &Token {
-        self.inflow.peek_nth(n)
+        self.infinite_peekable.peek_nth(n)
     }
 
     pub fn peek_n<const N: usize>(&mut self) -> [&Token; N] {
-        self.inflow.peek_n::<N>()
+        self.infinite_peekable.peek_n::<N>()
     }
 
     pub fn peek_is(&mut self, token: impl Borrow<TokenKind>) -> bool {
@@ -49,7 +49,7 @@ where
     }
 
     pub fn advance(&mut self) -> Token {
-        self.inflow.next()
+        self.infinite_peekable.next()
     }
 
     pub fn eat(&mut self, token: impl Borrow<TokenKind>) -> bool {
@@ -102,6 +102,6 @@ where
     // Adds input to the front of the queue,
     // useful for partially consuming tokens during parsing.
     pub fn unadvance(&mut self, token: Token) {
-        self.inflow.un_next(token)
+        self.infinite_peekable.un_next(token)
     }
 }
