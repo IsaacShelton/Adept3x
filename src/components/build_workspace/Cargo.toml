@@ -1,0 +1,43 @@
+[package]
+name = "build_workspace"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+append-only-vec.workspace = true
+asg = { version = "0.1.0", path = "../../representations/asg" }
+ast = { version = "0.1.0", path = "../../representations/ast" }
+ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
+ast_workspace_settings = { version = "0.1.0", path = "../../representations/ast_workspace_settings" }
+attributes = { version = "0.1.0", path = "../../representations/attributes" }
+backend = { version = "0.1.0", path = "../../support/backend" }
+build_asg = { version = "0.1.0", path = "../build_asg" }
+build_ast = { version = "0.1.0", path = "../build_ast" }
+build_c_ast = { version = "0.1.0", path = "../build_c_ast" }
+build_c_token = { version = "0.1.0", path = "../build_c_token" }
+build_ir = { version = "0.1.0", path = "../build_ir" }
+build_llvm_ir = { version = "0.1.0", path = "../build_llvm_ir" }
+build_pp_ast = { version = "0.1.0", path = "../build_pp_ast" }
+build_token = { version = "0.1.0", path = "../build_token" }
+c_ast = { version = "0.1.0", path = "../../representations/c_ast" }
+compiler = { version = "0.1.0", path = "../../support/compiler" }
+data_units = { version = "0.1.0", path = "../../support/data_units" }
+derive_more.workspace = true
+diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
+fs_tree = { version = "0.1.0", path = "../../representations/fs_tree" }
+humansize.workspace = true
+ignore.workspace = true
+indexmap.workspace = true
+inflow = { version = "0.1.0", path = "../../support/inflow" }
+interpret = { version = "0.1.0", path = "../interpret" }
+interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }
+ir = { version = "0.1.0", path = "../../representations/ir" }
+itertools.workspace = true
+line_column = { version = "0.1.0", path = "../../support/line_column" }
+path-absolutize.workspace = true
+pp_ast = { version = "0.1.0", path = "../../representations/pp_ast" }
+source_files = { version = "0.1.0", path = "../../representations/source_files" }
+target = { version = "0.1.0", path = "../../support/target" }
+text = { version = "0.1.0", path = "../../support/text" }
+thousands.workspace = true
+token = { version = "0.1.0", path = "../../representations/token" }

@@ -1,0 +1,11 @@
+[package]
+name = "compiler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compiler_version = { version = "0.1.0", path = "../compiler_version" }
+diagnostics = { version = "0.1.0", path = "../diagnostics" }
+once_map.workspace = true
+source_files = { version = "0.1.0", path = "../../representations/source_files" }
+target = { version = "0.1.0", path = "../target" }

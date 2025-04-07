@@ -1,0 +1,20 @@
+[package]
+name = "build_ast"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ast = { version = "0.1.0", path = "../../representations/ast" }
+attributes = { version = "0.1.0", path = "../../representations/attributes" }
+derivative.workspace = true
+derive_more.workspace = true
+diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
+indexmap.workspace = true
+inflow = { version = "0.1.0", path = "../../support/inflow" }
+lazy_format.workspace = true
+num.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+source_files = { version = "0.1.0", path = "../../representations/source_files" }
+text = { version = "0.1.0", path = "../../support/text" }
+token = { version = "0.1.0", path = "../../representations/token" }

@@ -1,0 +1,9 @@
+[package]
+name = "ast_workspace_settings"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
+fs_tree = { version = "0.1.0", path = "../fs_tree" }
+primitives = { version = "0.1.0", path = "../primitives" }

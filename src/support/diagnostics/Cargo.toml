@@ -1,0 +1,8 @@
+[package]
+name = "diagnostics"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+append-only-vec.workspace = true
+source_files = { path = "../../representations/source_files" }

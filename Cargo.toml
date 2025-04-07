@@ -1,16 +1,54 @@
-[package]
-name = "adept"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "3"
+members = [
+    "src/components/build_asg",
+    "src/components/build_ast",
+    "src/components/build_c_ast",
+    "src/components/build_executable",
+    "src/components/build_ir",
+    "src/components/build_llvm_ir",
+    "src/components/build_pp_ast",
+    "src/components/build_workspace",
+    "src/components/cli",
+    "src/components/interpret",
+    "src/adept",
+    "src/representations/asg",
+    "src/representations/ast",
+    "src/representations/c_ast",
+    "src/representations/ir",
+    "src/representations/pp_ast",
+    "src/representations/source_files",
+    "src/support/line_column",
+    "src/support/diagnostics",
+    "src/support/data_units",
+    "src/support/target",
+    "src/support/target_layout",
+    "src/representations/fs_tree",
+    "src/representations/primitives",
+    "src/representations/attributes",
+    "src/support/compiler_version",
+    "src/representations/ast_workspace",
+    "src/representations/ast_workspace_settings",
+    "src/representations/interpreter_api",
+    "src/support/std_ext",
+    "src/support/compiler",
+    "src/support/inflow",
+    "src/support/text",
+    "src/representations/token",
+    "src/components/build_token",
+    "src/representations/c_token",
+    "src/representations/pp_token",
+    "src/components/build_c_token",
+    "src/support/look_ahead",
+    "src/support/repeating_last",
+    "src/support/backend",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[workspace.dependencies]
 colored = "2.1.0"
 derive_more = "0.99.17"
 num-bigint = "0.4.4"
 num-traits = "0.2.18"
-llvm-sys = { package = "llvm-sys", version = "181" }
 cstr = "0.2.11"
 slotmap = "1.0.7"
 append-only-vec = "0.1.3"
@@ -33,4 +71,3 @@ thousands = "0.2.0"
 path-absolutize = { version = "3.1.1", features = ["once_cell_cache"] }
 ordered-float = "4.5.0"
 enum_dispatch = "0.3.13"
-

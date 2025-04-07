@@ -1,0 +1,10 @@
+[package]
+name = "build_executable"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+backend = { version = "0.1.0", path = "../../support/backend" }
+compiler = { version = "0.1.0", path = "../../support/compiler" }
+diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
+target = { version = "0.1.0", path = "../../support/target" }

@@ -1,0 +1,8 @@
+[package]
+name = "text"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+line_column = { version = "0.1.0", path = "../line_column" }
+source_files = { version = "0.1.0", path = "../../representations/source_files" }

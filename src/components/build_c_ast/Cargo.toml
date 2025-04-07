@@ -1,0 +1,17 @@
+[package]
+name = "build_c_ast"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ast = { version = "0.1.0", path = "../../representations/ast" }
+ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
+attributes = { version = "0.1.0", path = "../../representations/attributes" }
+c_ast = { version = "0.1.0", path = "../../representations/c_ast" }
+c_token = { version = "0.1.0", path = "../../representations/c_token" }
+diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
+indexmap.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+primitives = { version = "0.1.0", path = "../../representations/primitives" }
+source_files = { version = "0.1.0", path = "../../representations/source_files" }

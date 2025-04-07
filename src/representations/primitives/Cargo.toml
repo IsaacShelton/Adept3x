@@ -1,0 +1,9 @@
+[package]
+name = "primitives"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+data_units = { version = "0.1.0", path = "../../support/data_units" }
+derive_more.workspace = true
+num.workspace = true

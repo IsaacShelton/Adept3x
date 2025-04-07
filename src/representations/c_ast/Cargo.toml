@@ -1,0 +1,11 @@
+[package]
+name = "c_ast"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ast = { version = "0.1.0", path = "../ast" }
+c_token = { version = "0.1.0", path = "../c_token" }
+derive_more.workspace = true
+itertools.workspace = true
+source_files = { version = "0.1.0", path = "../source_files" }

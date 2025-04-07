@@ -1,0 +1,13 @@
+[package]
+name = "interpret"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
+derive_more.workspace = true
+interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }
+ir = { version = "0.1.0", path = "../../representations/ir" }
+num.workspace = true
+num-derive.workspace = true
+num-traits.workspace = true

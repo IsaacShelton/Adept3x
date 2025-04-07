@@ -1,0 +1,32 @@
+use crate::{Type, TypedExpr};
+use primitives::{FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate};
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct BasicBinaryOperation {
+    pub operator: BasicBinaryOperator,
+    pub left: TypedExpr,
+    pub right: TypedExpr,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum BasicBinaryOperator {
+    PrimitiveAdd(Type),
+    Add(NumericMode),
+    Subtract(NumericMode),
+    Multiply(NumericMode),
+    Divide(FloatOrSignLax),
+    Modulus(FloatOrSignLax),
+    Equals(FloatOrInteger),
+    NotEquals(FloatOrInteger),
+    LessThan(FloatOrSignLax),
+    LessThanEq(FloatOrSignLax),
+    GreaterThan(FloatOrSignLax),
+    GreaterThanEq(FloatOrSignLax),
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    ArithmeticRightShift(SignOrIndeterminate),
+    LogicalLeftShift,
+    LogicalRightShift,
+}

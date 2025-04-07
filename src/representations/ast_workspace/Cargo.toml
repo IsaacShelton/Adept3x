@@ -1,0 +1,13 @@
+[package]
+name = "ast_workspace"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+append-only-vec.workspace = true
+ast = { version = "0.1.0", path = "../ast" }
+ast_workspace_settings = { version = "0.1.0", path = "../ast_workspace_settings" }
+compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
+fs_tree = { version = "0.1.0", path = "../fs_tree" }
+indexmap.workspace = true
+source_files = { version = "0.1.0", path = "../source_files" }
