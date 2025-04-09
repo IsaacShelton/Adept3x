@@ -6,6 +6,8 @@ pub struct Location {
     pub column: u32,
 }
 
+unsafe impl<I> Send for LineColumn<I> where I: Iterator<Item = char> + Send {}
+
 pub struct LineColumn<I: Iterator<Item = char>> {
     iterator: Fuse<I>,
     line: u32,

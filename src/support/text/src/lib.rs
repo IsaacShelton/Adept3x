@@ -1,26 +1,16 @@
 mod character;
 mod eatable;
-mod into_text;
-mod into_text_stream;
-mod text_stream;
+mod peeker;
+mod text_streamer;
 
 pub use character::{Character, is_c_non_digit};
 pub use eatable::Eatable;
-pub use into_text::{IntoText, IntoTextNoSend};
-pub use into_text_stream::IntoTextStream;
+use infinite_iterator::InfiniteIterator;
+pub use peeker::TextPeeker;
 use source_files::Source;
-pub use text_stream::TextStream;
+pub use text_streamer::TextStreamer;
 
-/*
-   General representation of incoming text.
-
-   Generally, you don't implement this trait directly. Instead,
-   you implement `TextStream`, and use the `IntoText` trait to
-   create an easy to use text stream.
-
-   This trait just provides nice wrappers around `TextStream`
-*/
-pub trait Text: TextStream {
+pub trait Text: InfiniteIterator<Item = Character> {
     fn peek_nth(&mut self, n: usize) -> Character;
 
     fn peek_n<const N: usize>(&mut self) -> [Character; N] {

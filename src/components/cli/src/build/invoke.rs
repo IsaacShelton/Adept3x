@@ -6,7 +6,7 @@ use compiler::Compiler;
 use diagnostics::{DiagnosticFlags, Diagnostics, unerror};
 use source_files::SourceFiles;
 use std::{fs::metadata, path::Path};
-use text::{IntoText, IntoTextStream};
+use text::{TextPeeker, TextStreamer};
 
 impl Invoke for BuildCommand {
     fn invoke(self) -> Result<(), ()> {
@@ -52,12 +52,10 @@ fn compile_header(compiler: &Compiler, filepath: &Path) -> Result<(), ()> {
 
     let header_key = source_files.add(filepath.into(), content);
 
-    let header_contents = source_files
-        .get(header_key)
-        .content()
-        .chars()
-        .into_text_stream(header_key)
-        .into_text();
+    let header_contents = TextPeeker::new(TextStreamer::new(
+        source_files.get(header_key).content().chars(),
+        header_key,
+    ));
 
     let preprocessed = unerror(
         preprocess(header_contents, &compiler.diagnostics),

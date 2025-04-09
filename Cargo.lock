@@ -1094,6 +1094,7 @@ dependencies = [
 name = "text"
 version = "0.1.0"
 dependencies = [
+ "infinite_iterator",
  "line_column",
  "source_files",
 ]

@@ -1,14 +1,18 @@
-use crate::{Character, TextStream};
+use crate::Character;
+use infinite_iterator::InfiniteIterator;
 use line_column::{LineColumn, Location};
 use source_files::{Source, SourceFileKey};
 
-pub struct TextStreamFromIterator<I: Iterator<Item = char> + Send> {
+pub struct TextStreamer<I: Iterator<Item = char>> {
     iterator: LineColumn<I>,
     file_key: SourceFileKey,
     last_location: Location,
 }
 
-impl<I: Iterator<Item = char> + Send> TextStreamFromIterator<I> {
+impl<I> TextStreamer<I>
+where
+    I: Iterator<Item = char>,
+{
     pub fn new(iterator: I, file_key: SourceFileKey) -> Self {
         Self {
             iterator: LineColumn::new(iterator),
@@ -18,8 +22,13 @@ impl<I: Iterator<Item = char> + Send> TextStreamFromIterator<I> {
     }
 }
 
-impl<I: Iterator<Item = char> + Send> TextStream for TextStreamFromIterator<I> {
-    fn next(&mut self) -> Character {
+impl<I> InfiniteIterator for TextStreamer<I>
+where
+    I: Iterator<Item = char>,
+{
+    type Item = Character;
+
+    fn next(&mut self) -> Self::Item {
         match self.iterator.next() {
             Some((character, location)) => {
                 self.last_location = location;
@@ -38,3 +47,5 @@ impl<I: Iterator<Item = char> + Send> TextStream for TextStreamFromIterator<I> {
         }
     }
 }
+
+unsafe impl<I> Send for TextStreamer<I> where I: Iterator<Item = char> + Send {}

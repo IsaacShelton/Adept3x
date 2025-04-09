@@ -1,3 +1,4 @@
+use infinite_iterator::InfiniteIteratorEnd;
 use source_files::Source;
 
 #[derive(Clone, Debug)]
@@ -98,4 +99,10 @@ impl Character {
 
 pub fn is_c_non_digit(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_' || c == '$'
+}
+
+impl InfiniteIteratorEnd for Character {
+    fn is_end(&self) -> bool {
+        matches!(self, Self::End(..))
+    }
 }

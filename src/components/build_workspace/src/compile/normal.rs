@@ -10,7 +10,7 @@ use data_units::ByteUnits;
 use diagnostics::{ErrorDiagnostic, Show, into_show};
 use fs_tree::FsNodeId;
 use infinite_iterator::InfiniteIteratorPeeker;
-use text::{IntoText, IntoTextStream};
+use text::{TextPeeker, TextStreamer};
 
 pub fn compile_normal_file(
     compiler: &Compiler,
@@ -26,7 +26,7 @@ pub fn compile_normal_file(
     let source_files = &compiler.source_files;
     let key = source_files.add(path.clone(), content);
     let content = source_files.get(key).content();
-    let text = content.chars().into_text_stream(key).into_text();
+    let text = TextPeeker::new(TextStreamer::new(content.chars(), key));
 
     match &normal_file.kind {
         NormalFileKind::Adept => {

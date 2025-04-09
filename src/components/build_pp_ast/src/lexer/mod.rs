@@ -5,7 +5,7 @@ mod state;
 use self::{lex_line::lex_line, state::State};
 use super::{error::PreprocessorErrorKind, line_splice::LineSplicer};
 use infinite_iterator::InfiniteIterator;
-use text::{IntoTextNoSend, Text};
+use text::{Text, TextPeeker};
 
 // Lexer for C preprocessor
 pub struct Lexer<I: Text> {
@@ -37,7 +37,7 @@ where
         loop {
             match self.line_splicer.next_line() {
                 Ok(line) => {
-                    let mut line = line.into_text_no_send();
+                    let mut line = TextPeeker::new(line);
 
                     if line.peek().is_present() {
                         let start_of_line = line.peek().source();

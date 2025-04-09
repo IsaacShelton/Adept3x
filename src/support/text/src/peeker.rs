@@ -1,14 +1,21 @@
-use crate::{Character, Text, TextStream};
+use crate::{Character, Text};
+use infinite_iterator::InfiniteIterator;
 use source_files::Source;
 use std::collections::VecDeque;
 
-pub struct TextPeeker<S: TextStream> {
-    stream: S,
+pub struct TextPeeker<I>
+where
+    I: InfiniteIterator<Item = Character>,
+{
+    stream: I,
     queue: VecDeque<(char, Source)>,
 }
 
-impl<S: TextStream> TextPeeker<S> {
-    pub fn new(stream: S) -> Self {
+impl<I> TextPeeker<I>
+where
+    I: InfiniteIterator<Item = Character>,
+{
+    pub fn new(stream: I) -> Self {
         Self {
             stream,
             queue: VecDeque::new(),
@@ -16,7 +23,12 @@ impl<S: TextStream> TextPeeker<S> {
     }
 }
 
-impl<S: TextStream> TextStream for TextPeeker<S> {
+impl<I> InfiniteIterator for TextPeeker<I>
+where
+    I: InfiniteIterator<Item = Character>,
+{
+    type Item = Character;
+
     fn next(&mut self) -> Character {
         self.queue
             .pop_front()
@@ -25,7 +37,10 @@ impl<S: TextStream> TextStream for TextPeeker<S> {
     }
 }
 
-impl<S: TextStream> Text for TextPeeker<S> {
+impl<I> Text for TextPeeker<I>
+where
+    I: InfiniteIterator<Item = Character>,
+{
     fn peek_nth(&mut self, n: usize) -> Character {
         while self.queue.len() <= n {
             match self.stream.next() {

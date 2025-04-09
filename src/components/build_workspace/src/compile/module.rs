@@ -6,13 +6,13 @@ use build_ast::{Input, Parser};
 use build_token::Lexer;
 use compiler::Compiler;
 use data_units::ByteUnits;
-use diagnostics::{into_show, ErrorDiagnostic, Show};
+use diagnostics::{ErrorDiagnostic, Show, into_show};
 use fs_tree::FsNodeId;
 use infinite_iterator::{InfiniteIteratorPeeker, InfinitePeekable};
 use line_column::Location;
 use source_files::{Source, SourceFileKey};
 use std::path::Path;
-use text::{IntoText, IntoTextStream};
+use text::{TextPeeker, TextStreamer};
 use token::{Token, TokenKind};
 
 pub struct CompiledModule<'a, I: InfinitePeekable<Token> + 'a> {
@@ -34,7 +34,7 @@ pub fn compile_module_file<'a>(
     let key = source_files.add(path.to_path_buf(), content);
     let content = source_files.get(key).content();
 
-    let text = content.chars().into_text_stream(key).into_text();
+    let text = TextPeeker::new(TextStreamer::new(content.chars(), key));
     let lexer = InfiniteIteratorPeeker::new(Lexer::new(text));
     let mut input = Input::new(lexer, compiler.source_files, key);
     input.ignore_newlines();

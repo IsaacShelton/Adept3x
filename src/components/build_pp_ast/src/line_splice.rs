@@ -6,9 +6,10 @@
    Each line that ends in a backslash will be joined with the following line
 */
 
+use infinite_iterator::InfiniteIterator;
 use source_files::Source;
 use std::{cell::RefCell, rc::Rc};
-use text::{Character, Text, TextStream};
+use text::{Character, Text};
 
 #[derive(Debug)]
 pub struct LineSplicer<T: Text> {
@@ -61,8 +62,10 @@ where
     }
 }
 
-impl<T: Text> TextStream for Line<T> {
-    fn next(&mut self) -> Character {
+impl<T: Text> InfiniteIterator for Line<T> {
+    type Item = Character;
+
+    fn next(&mut self) -> Self::Item {
         match &self.text {
             LineSource::Text(text) => {
                 let character = loop {
