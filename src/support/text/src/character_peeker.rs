@@ -3,7 +3,7 @@ use infinite_iterator::InfiniteIterator;
 use source_files::Source;
 use std::collections::VecDeque;
 
-pub struct TextPeeker<I>
+pub struct CharacterPeeker<I>
 where
     I: InfiniteIterator<Item = Character>,
 {
@@ -11,7 +11,7 @@ where
     queue: VecDeque<(char, Source)>,
 }
 
-impl<I> TextPeeker<I>
+impl<I> CharacterPeeker<I>
 where
     I: InfiniteIterator<Item = Character>,
 {
@@ -23,7 +23,7 @@ where
     }
 }
 
-impl<I> InfiniteIterator for TextPeeker<I>
+impl<I> InfiniteIterator for CharacterPeeker<I>
 where
     I: InfiniteIterator<Item = Character>,
 {
@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<I> Text for TextPeeker<I>
+impl<I> Text for CharacterPeeker<I>
 where
     I: InfiniteIterator<Item = Character>,
 {

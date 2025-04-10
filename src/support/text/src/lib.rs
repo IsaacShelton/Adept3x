@@ -1,14 +1,14 @@
 mod character;
+mod character_infinite_iterator;
+mod character_peeker;
 mod eatable;
-mod peeker;
-mod text_streamer;
 
 pub use character::{Character, is_c_non_digit};
+pub use character_infinite_iterator::CharacterInfiniteIterator;
+pub use character_peeker::CharacterPeeker;
 pub use eatable::Eatable;
 use infinite_iterator::InfiniteIterator;
-pub use peeker::TextPeeker;
 use source_files::Source;
-pub use text_streamer::TextStreamer;
 
 pub trait Text: InfiniteIterator<Item = Character> {
     fn peek_nth(&mut self, n: usize) -> Character;

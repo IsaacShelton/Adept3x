@@ -3,13 +3,13 @@ use infinite_iterator::InfiniteIterator;
 use line_column::{LineColumn, Location};
 use source_files::{Source, SourceFileKey};
 
-pub struct TextStreamer<I: Iterator<Item = char>> {
+pub struct CharacterInfiniteIterator<I: Iterator<Item = char>> {
     iterator: LineColumn<I>,
     file_key: SourceFileKey,
     last_location: Location,
 }
 
-impl<I> TextStreamer<I>
+impl<I> CharacterInfiniteIterator<I>
 where
     I: Iterator<Item = char>,
 {
@@ -22,7 +22,7 @@ where
     }
 }
 
-impl<I> InfiniteIterator for TextStreamer<I>
+impl<I> InfiniteIterator for CharacterInfiniteIterator<I>
 where
     I: Iterator<Item = char>,
 {
@@ -48,4 +48,4 @@ where
     }
 }
 
-unsafe impl<I> Send for TextStreamer<I> where I: Iterator<Item = char> + Send {}
+unsafe impl<I> Send for CharacterInfiniteIterator<I> where I: Iterator<Item = char> + Send {}

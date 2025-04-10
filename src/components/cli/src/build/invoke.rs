@@ -6,7 +6,7 @@ use compiler::Compiler;
 use diagnostics::{DiagnosticFlags, Diagnostics, unerror};
 use source_files::SourceFiles;
 use std::{fs::metadata, path::Path};
-use text::{TextPeeker, TextStreamer};
+use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 impl Invoke for BuildCommand {
     fn invoke(self) -> Result<(), ()> {
@@ -52,7 +52,7 @@ fn compile_header(compiler: &Compiler, filepath: &Path) -> Result<(), ()> {
 
     let header_key = source_files.add(filepath.into(), content);
 
-    let header_contents = TextPeeker::new(TextStreamer::new(
+    let header_contents = CharacterPeeker::new(CharacterInfiniteIterator::new(
         source_files.get(header_key).content().chars(),
         header_key,
     ));
