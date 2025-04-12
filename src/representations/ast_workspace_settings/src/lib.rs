@@ -1,3 +1,4 @@
+use arena::new_id;
 use compiler_version::AdeptVersion;
 use fs_tree::FsNodeId;
 use primitives::CIntegerAssumptions;
@@ -34,5 +35,4 @@ impl Settings {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SettingsId(pub usize);
+new_id!(SettingsId, u64);

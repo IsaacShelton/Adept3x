@@ -3,7 +3,7 @@ use attributes::{Privacy, SymbolOwnership};
 use source_files::Source;
 
 #[derive(Clone, Debug)]
-pub struct GlobalVar {
+pub struct Global {
     pub name: String,
     pub ast_type: Type,
     pub source: Source,

@@ -3,7 +3,7 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::ParseError,
 };
-use ast::HelperExpr;
+use ast::ExprAlias;
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
@@ -12,7 +12,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_helper_expr(
         &mut self,
         annotations: Vec<Annotation>,
-    ) -> Result<HelperExpr, ParseError> {
+    ) -> Result<ExprAlias, ParseError> {
         let source = self.source_here();
         self.input.advance();
 
@@ -33,7 +33,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         let value = self.parse_expr()?;
 
-        Ok(HelperExpr {
+        Ok(ExprAlias {
             name,
             value,
             source,

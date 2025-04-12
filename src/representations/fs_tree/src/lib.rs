@@ -1,4 +1,7 @@
+mod fs_node_id;
+
 use append_only_vec::AppendOnlyVec;
+pub use fs_node_id::FsNodeId;
 use once_map::OnceMap;
 use std::{
     ffi::{OsStr, OsString},
@@ -9,15 +12,6 @@ use std::{
 #[derive(Debug)]
 pub struct Fs {
     pub arena: AppendOnlyVec<FsNode>,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FsNodeId(usize);
-
-impl FsNodeId {
-    pub fn parent(self, fs: &Fs) -> Option<&FsNode> {
-        fs.get(self).parent.map(|parent| fs.get(parent))
-    }
 }
 
 impl Fs {

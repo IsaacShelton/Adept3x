@@ -10,7 +10,7 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 
 pub fn make_anonymous_enum(
-    ast_file: &mut ast::AstFile,
+    ast_file: &mut ast::RawAstFile,
     enumeration: &Enumeration,
 ) -> Result<ast::TypeKind, ParseError> {
     match enumeration {
@@ -64,7 +64,7 @@ pub fn make_anonymous_enum(
                         }))
                         .at(enumerator.source);
 
-                    ast_file.helper_exprs.push(ast::HelperExpr {
+                    ast_file.expr_aliases.push(ast::ExprAlias {
                         name: enumerator.name.clone(),
                         value: aka_value,
                         source: enumerator.source,

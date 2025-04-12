@@ -3,7 +3,7 @@ use attributes::Privacy;
 use source_files::Source;
 
 #[derive(Debug, Clone)]
-pub struct HelperExpr {
+pub struct ExprAlias {
     pub name: String,
     pub value: Expr,
     pub source: Source,

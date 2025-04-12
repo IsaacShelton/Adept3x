@@ -1,7 +1,7 @@
 use super::c_code::c_code;
 use crate::normal_file::{NormalFile, NormalFileKind};
 use append_only_vec::AppendOnlyVec;
-use ast::AstFile;
+use ast::RawAstFile;
 use build_ast::parse;
 use build_c_ast::CFileType;
 use build_token::Lexer;
@@ -15,7 +15,7 @@ use text::{CharacterInfiniteIterator, CharacterPeeker};
 pub fn compile_normal_file(
     compiler: &Compiler,
     normal_file: &NormalFile,
-    out_ast_files: &AppendOnlyVec<(FsNodeId, AstFile)>,
+    out_ast_files: &AppendOnlyVec<(FsNodeId, RawAstFile)>,
 ) -> Result<ByteUnits, Box<dyn Show>> {
     let path = &normal_file.path;
 

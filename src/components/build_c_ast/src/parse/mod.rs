@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 pub struct Parser<'input, 'diagnostics> {
     input: Input<'input>,
-    pub ast_file: ast::AstFile,
+    pub ast_file: ast::RawAstFile,
     pub typedefs: HashMap<String, CTypedef>,
     pub diagnostics: &'diagnostics Diagnostics<'diagnostics>,
     enum_constants: HashMap<String, Integer>,
@@ -53,7 +53,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
         );
 
         Self {
-            ast_file: ast::AstFile::new(),
+            ast_file: ast::RawAstFile::new(),
             input,
             typedefs,
             enum_constants: HashMap::default(),

@@ -1,5 +1,7 @@
 use super::PragmaSection;
-use ast::{AstFile, Expr, ExprKind, Func, FuncHead, Params, Stmt, StmtKind, TypeKind, TypeParams};
+use ast::{
+    Expr, ExprKind, Func, FuncHead, Params, RawAstFile, Stmt, StmtKind, TypeKind, TypeParams,
+};
 use attributes::{Exposure, Privacy, SymbolOwnership};
 use build_ast::{Input, Parser, error::ParseError};
 use diagnostics::{ErrorDiagnostic, Show, into_show};
@@ -29,7 +31,7 @@ impl PragmaSection {
         input.ignore_newlines();
 
         let mut parser = Parser::new_for_pragma(input);
-        let mut ast_file = AstFile::new();
+        let mut ast_file = RawAstFile::new();
 
         if parser.input.eat(TokenKind::OpenCurly) {
             // "Whole-file" mode

@@ -21,15 +21,7 @@ pub fn resolve_func_bodies(
             FuncJob::Regular(physical_file_id, ast_func_index, func_ref) => {
                 let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-                let ast_file = ast_workspace
-                    .files
-                    .get(&physical_file_id)
-                    .expect("file referenced by job to exist");
-
-                let ast_function = ast_file
-                    .funcs
-                    .get(ast_func_index)
-                    .expect("function referenced by job to exist");
+                let ast_function = &ast_workspace.all_funcs[ast_func_index];
 
                 resolve_func_body(
                     ctx,
@@ -49,15 +41,7 @@ pub fn resolve_func_bodies(
             ) => {
                 let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-                let ast_file = ast_workspace
-                    .files
-                    .get(&physical_file_id)
-                    .expect("file referenced by job to exist");
-
-                let ast_function = ast_file
-                    .impls
-                    .get(ast_impl_index)
-                    .expect("referenced impl to exist")
+                let ast_function = ast_workspace.all_impls[ast_impl_index]
                     .body
                     .get(ast_impl_function_index)
                     .expect("referenced impl function to exist");
@@ -103,10 +87,10 @@ fn resolve_func_body(
 
     let file = ast_workspace
         .files
-        .get(&physical_file_id)
+        .get(physical_file_id)
         .expect("referenced file exists");
 
-    let settings = &ast_workspace.settings[file.settings.unwrap_or_default().0];
+    let settings = &ast_workspace.settings[file.settings.unwrap_or(ast_workspace.default_settings)];
 
     let resolved_stmts = resolve_stmts(
         &mut ResolveExprCtx {

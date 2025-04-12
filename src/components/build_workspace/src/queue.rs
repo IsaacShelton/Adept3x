@@ -1,6 +1,6 @@
 use crate::{file::CodeFile, module_file::ModuleFile, normal_file::NormalFile};
 use append_only_vec::AppendOnlyVec;
-use ast::AstFile;
+use ast::RawAstFile;
 use ast_workspace_settings::Settings;
 use fs_tree::FsNodeId;
 use infinite_iterator::InfinitePeekable;
@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use token::Token;
 
 pub struct WorkspaceQueue<'a, I: InfinitePeekable<Token>> {
-    pub ast_files: AppendOnlyVec<(FsNodeId, AstFile)>,
+    pub ast_files: AppendOnlyVec<(FsNodeId, RawAstFile)>,
     pub module_folders: AppendOnlyVec<(FsNodeId, Settings)>,
     code_files: Mutex<Vec<CodeFile<'a, I>>>,
     module_files: Mutex<Vec<ModuleFile>>,

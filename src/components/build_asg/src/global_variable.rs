@@ -13,13 +13,13 @@ pub fn resolve_global_variables(
     ast_workspace: &AstWorkspace,
 ) -> Result<(), ResolveError> {
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_folder_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+        let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-        for global in file.global_variables.iter() {
+        for global in ast_workspace.view(file).globals.iter() {
             let type_ctx = ResolveTypeCtx::new(
                 &asg,
                 module_folder_id,
-                *physical_file_id,
+                physical_file_id,
                 &ctx.types_in_modules,
             );
 
@@ -35,7 +35,7 @@ pub fn resolve_global_variables(
             });
 
             let fs_node_id = if global.privacy.is_private() {
-                *physical_file_id
+                physical_file_id
             } else {
                 module_folder_id
             };

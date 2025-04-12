@@ -1,6 +1,6 @@
 use ast::{
-    AstFile, Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Func,
-    FuncHead, InterpreterSyscall, Language, Name, Param, Params, StmtKind, Struct, StructLiteral,
+    Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Func, FuncHead,
+    InterpreterSyscall, Language, Name, Param, Params, RawAstFile, StmtKind, Struct, StructLiteral,
     TypeKind, TypeParams,
 };
 use attributes::{Exposure, Privacy, SymbolOwnership, Tag};
@@ -87,7 +87,7 @@ fn thin_cstring_func(
     }
 }
 
-pub fn setup_build_system_interpreter_symbols(file: &mut AstFile) {
+pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
     let ptr_char = TypeKind::Ptr(Box::new(TypeKind::char().at(source))).at(source);

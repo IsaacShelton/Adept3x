@@ -4,7 +4,7 @@ pub mod normal;
 
 use super::file::CodeFile;
 use append_only_vec::AppendOnlyVec;
-use ast::AstFile;
+use ast::RawAstFile;
 use compiler::Compiler;
 use data_units::ByteUnits;
 use diagnostics::Show;
@@ -17,7 +17,7 @@ use token::Token;
 pub fn compile_code_file<'a, I: InfinitePeekable<Token>>(
     compiler: &Compiler,
     code_file: CodeFile<'a, I>,
-    out_ast_files: &AppendOnlyVec<(FsNodeId, AstFile)>,
+    out_ast_files: &AppendOnlyVec<(FsNodeId, RawAstFile)>,
 ) -> Result<ByteUnits, Box<(dyn Show + 'static)>> {
     match code_file {
         CodeFile::Normal(normal_file) => compile_normal_file(compiler, &normal_file, out_ast_files),

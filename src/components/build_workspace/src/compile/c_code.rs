@@ -1,4 +1,4 @@
-use ast::AstFile;
+use ast::RawAstFile;
 use attributes::Privacy;
 use build_c_ast::{
     CFileType,
@@ -19,7 +19,7 @@ pub fn c_code(
     text: impl Text,
     key: SourceFileKey,
     c_file_type: CFileType,
-) -> Result<AstFile, Box<(dyn Show + 'static)>> {
+) -> Result<RawAstFile, Box<(dyn Show + 'static)>> {
     let Preprocessed {
         document,
         defines,
@@ -52,7 +52,7 @@ pub fn c_code(
                         &expr,
                     )
                 }) {
-                    parser.ast_file.helper_exprs.push(ast::HelperExpr {
+                    parser.ast_file.expr_aliases.push(ast::ExprAlias {
                         name: define_name.clone(),
                         value,
                         source: define.source,

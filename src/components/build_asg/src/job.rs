@@ -1,10 +1,12 @@
+use arena::Idx;
 use asg::{EnumRef, StructRef, TraitRef, TypeAliasRef};
+use ast_workspace::{FuncId, ImplId};
 use fs_tree::FsNodeId;
 
 #[derive(Clone, Debug)]
 pub enum FuncJob {
-    Regular(FsNodeId, usize, asg::FuncRef),
-    Impling(FsNodeId, usize, usize, asg::FuncRef),
+    Regular(FsNodeId, Idx<FuncId, ast::Func>, asg::FuncRef),
+    Impling(FsNodeId, Idx<ImplId, ast::Impl>, usize, asg::FuncRef),
 }
 
 #[derive(Clone, Debug)]

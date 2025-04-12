@@ -3,16 +3,13 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
 };
-use ast::GlobalVar;
+use ast::Global;
 use attributes::{Privacy, SymbolOwnership};
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_global_variable(
-        &mut self,
-        annotations: Vec<Annotation>,
-    ) -> Result<GlobalVar, ParseError> {
+    pub fn parse_global(&mut self, annotations: Vec<Annotation>) -> Result<Global, ParseError> {
         // my_global_name Type
         //      ^
 
@@ -49,7 +46,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         let ownership = SymbolOwnership::from_foreign_and_exposed(is_foreign, is_exposed);
 
-        Ok(GlobalVar {
+        Ok(Global {
             name,
             ast_type,
             source,

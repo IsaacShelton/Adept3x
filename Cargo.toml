@@ -41,7 +41,7 @@ members = [
     "src/components/build_c_token",
     "src/support/look_ahead",
     "src/support/repeating_last",
-    "src/support/backend",
+    "src/support/backend", "src/components/job", "src/support/arena",
 ]
 
 [workspace.dependencies]
@@ -57,13 +57,9 @@ memo-map = "0.3.2"
 indexmap = "2.2.5"
 itertools = "0.13.0"
 lazy_format = "2.0.3"
-bit-vec = "0.8.0"
-thin-vec = "0.2.13"
-walkdir = "2.5.0"
 once_map = "0.4.18"
 num = "0.4.3"
 num-derive = "0.4.2"
-bitvec = "1.0.1"
 derivative = "2.2.0"
 ignore = "0.4.22"
 humansize = "2.1.3"

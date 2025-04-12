@@ -16,11 +16,10 @@ impl<'a> ResolveTypeCtx<'a> {
             .asg
             .workspace
             .files
-            .get(&self.file_fs_node_id)
+            .get(self.file_fs_node_id)
             .unwrap()
             .settings
-            .expect("valid settings id")
-            .0];
+            .expect("valid settings id")];
 
         let decl = name
             .as_plain_str()

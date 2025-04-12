@@ -7,14 +7,14 @@ pub mod types;
 use self::types::get_name_and_type;
 pub use self::{expr::translate_expr, function::declare_function};
 use crate::{CFileType, parse::ParseError};
-use ast::{AstFile, TypeParams};
+use ast::{RawAstFile, TypeParams};
 use attributes::{Exposure, SymbolOwnership};
 use c_ast::{Attribute, CTypedef, DeclarationSpecifiers, Declarator, StorageClassSpecifier};
 use diagnostics::{Diagnostics, WarningDiagnostic};
 use std::collections::HashMap;
 
 pub struct TranslateCtx<'ast, 'typedefs, 'diagnostics, 'source_files> {
-    pub ast_file: &'ast mut AstFile,
+    pub ast_file: &'ast mut RawAstFile,
     pub typedefs: &'typedefs mut HashMap<String, CTypedef>,
     pub diagnostics: &'diagnostics Diagnostics<'source_files>,
 }
@@ -23,7 +23,7 @@ impl<'ast, 'typedefs, 'diagnostics, 'source_files>
     TranslateCtx<'ast, 'typedefs, 'diagnostics, 'source_files>
 {
     pub fn new<'input>(
-        ast_file: &'ast mut AstFile,
+        ast_file: &'ast mut RawAstFile,
         typedefs: &'typedefs mut HashMap<String, CTypedef>,
         diagnostics: &'diagnostics Diagnostics<'source_files>,
     ) -> Self {
@@ -91,7 +91,7 @@ pub fn declare_named_declaration(
             SymbolOwnership::Owned(Exposure::Exposed)
         };
 
-        ctx.ast_file.global_variables.push(ast::GlobalVar {
+        ctx.ast_file.globals.push(ast::Global {
             name: decl_info.name,
             ast_type: decl_info.ast_type,
             source: declarator.source,

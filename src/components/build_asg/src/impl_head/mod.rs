@@ -5,7 +5,8 @@ use super::{
 };
 use crate::{error::ResolveErrorKind, type_ctx::ResolveTypeCtx};
 use asg::{Asg, Func, GenericTraitRef, ImplDecl, ImplRef, ResolvedName, TraitFunc, Type};
-use ast::{AstFile, Name};
+use ast::Name;
+use ast_workspace::AstFile;
 use attributes::Privacy;
 use compiler::BuildOptions;
 use for_alls::ForAlls;
@@ -20,9 +21,10 @@ pub fn create_impl_heads(
     options: &BuildOptions,
     module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
-    file: &AstFile,
+    ast_file: &AstFile,
 ) -> Result<(), ResolveError> {
-    for (impl_i, ast_impl) in file.impls.iter().enumerate() {
+    for impl_id in ast_file.impls.iter() {
+        let ast_impl = &asg.workspace.all_impls[impl_id];
         let impl_ref = create_impl_head(ctx, asg, module_folder_id, physical_file_id, ast_impl)?;
 
         for (func_i, func) in ast_impl.body.iter().enumerate() {
@@ -61,8 +63,12 @@ pub fn create_impl_heads(
 
             ensure_satisfies_trait_func(ctx, asg, expected, trait_func, impl_func)?;
 
-            ctx.jobs
-                .push_back(FuncJob::Impling(physical_file_id, impl_i, func_i, func_ref));
+            ctx.jobs.push_back(FuncJob::Impling(
+                physical_file_id,
+                impl_id,
+                func_i,
+                func_ref,
+            ));
 
             if asg
                 .impls

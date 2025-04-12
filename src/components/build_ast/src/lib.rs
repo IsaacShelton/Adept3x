@@ -10,7 +10,7 @@ mod parse_enum;
 mod parse_expr;
 mod parse_func;
 mod parse_func_params;
-mod parse_global_variable;
+mod parse_global;
 mod parse_helper_expr;
 mod parse_impl;
 mod parse_stmt;
@@ -24,7 +24,7 @@ mod parse_util;
 
 use self::error::ParseError;
 pub use self::input::Input;
-use ast::AstFile;
+use ast::RawAstFile;
 use infinite_iterator::InfinitePeekable;
 use source_files::{Source, SourceFileKey, SourceFiles};
 use std::mem::MaybeUninit;
@@ -34,7 +34,7 @@ pub fn parse(
     tokens: impl InfinitePeekable<Token>,
     source_files: &SourceFiles,
     key: SourceFileKey,
-) -> Result<AstFile, ParseError> {
+) -> Result<RawAstFile, ParseError> {
     Parser::new(Input::new(tokens, source_files, key)).parse()
 }
 
@@ -58,8 +58,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<AstFile, ParseError> {
-        let mut ast_file = AstFile::new();
+    pub fn parse(&mut self) -> Result<RawAstFile, ParseError> {
+        let mut ast_file = RawAstFile::new();
 
         // Parse into ast file
         while !self.input.peek().is_end_of_file() {

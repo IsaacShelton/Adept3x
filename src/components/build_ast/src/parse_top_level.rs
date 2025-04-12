@@ -3,14 +3,14 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::ParseError,
 };
-use ast::AstFile;
+use ast::RawAstFile;
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_top_level(
         &mut self,
-        ast_file: &mut AstFile,
+        ast_file: &mut RawAstFile,
         parent_annotations: Vec<Annotation>,
     ) -> Result<(), ParseError> {
         let mut annotations = parent_annotations;
@@ -49,9 +49,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 ast_file.funcs.push(self.parse_func(annotations)?);
             }
             TokenKind::Identifier(_) => {
-                ast_file
-                    .global_variables
-                    .push(self.parse_global_variable(annotations)?);
+                ast_file.globals.push(self.parse_global(annotations)?);
             }
             TokenKind::StructKeyword => ast_file.structs.push(self.parse_structure(annotations)?),
             TokenKind::TypeAliasKeyword => {
@@ -65,7 +63,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             }
             TokenKind::DefineKeyword => {
                 let helper_expr = self.parse_helper_expr(annotations)?;
-                ast_file.helper_exprs.push(helper_expr);
+                ast_file.expr_aliases.push(helper_expr);
             }
             TokenKind::TraitKeyword => {
                 let trait_decl = self.parse_trait(annotations)?;

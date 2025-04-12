@@ -44,6 +44,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7992085ec035cfe96992dd31bfd495a2ebd31969bb95f624471cb6c0b349e571"
 
 [[package]]
+name = "arena"
+version = "0.1.0"
+
+[[package]]
 name = "asg"
 version = "0.1.0"
 dependencies = [
@@ -69,6 +73,7 @@ name = "ast"
 version = "0.1.0"
 dependencies = [
  "append-only-vec",
+ "arena",
  "ast_workspace_settings",
  "attributes",
  "derive_more",
@@ -86,7 +91,7 @@ dependencies = [
 name = "ast_workspace"
 version = "0.1.0"
 dependencies = [
- "append-only-vec",
+ "arena",
  "ast",
  "ast_workspace_settings",
  "compiler_version",
@@ -99,6 +104,7 @@ dependencies = [
 name = "ast_workspace_settings"
 version = "0.1.0"
 dependencies = [
+ "arena",
  "compiler_version",
  "fs_tree",
  "primitives",
@@ -145,6 +151,7 @@ dependencies = [
 name = "build_asg"
 version = "0.1.0"
 dependencies = [
+ "arena",
  "asg",
  "ast",
  "ast_workspace",
@@ -520,6 +527,7 @@ name = "fs_tree"
 version = "0.1.0"
 dependencies = [
  "append-only-vec",
+ "arena",
  "once_map",
 ]
 
@@ -577,6 +585,12 @@ dependencies = [
  "walkdir",
  "winapi-util",
 ]
+
+[[package]]
+name = "indexed_arena"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee8d9ca693eae6ed3d35196d814b7afee89ec22dc257a896e2b70b8fd49edc39"
 
 [[package]]
 name = "indexmap"
@@ -637,6 +651,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
+]
+
+[[package]]
+name = "job"
+version = "0.1.0"
+dependencies = [
+ "append-only-vec",
+ "arena",
+ "indexed_arena",
 ]
 
 [[package]]

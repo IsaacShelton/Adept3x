@@ -19,10 +19,12 @@ pub fn resolve_type_jobs(
     type_jobs: &[TypeJob],
 ) -> Result<(), ResolveError> {
     for job in type_jobs.iter() {
-        let file = ast_workspace
-            .files
-            .get(&job.physical_file_id)
-            .expect("valid ast file");
+        let file = ast_workspace.view(
+            ast_workspace
+                .files
+                .get(job.physical_file_id)
+                .expect("valid ast file"),
+        );
 
         let module_folder_id = ast_workspace.get_owning_module_or_self(job.physical_file_id);
 

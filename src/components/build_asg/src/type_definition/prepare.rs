@@ -17,10 +17,11 @@ pub fn prepare_type_jobs(
     asg: &mut Asg,
     ast_workspace: &AstWorkspace,
 ) -> Result<Vec<TypeJob>, ResolveError> {
-    let mut type_jobs = Vec::with_capacity(ast_workspace.files.len());
+    let mut type_jobs = Vec::new();
 
     for (physical_file_id, file) in ast_workspace.files.iter() {
-        let physical_file_id = *physical_file_id;
+        let file = ast_workspace.view(file);
+        let physical_file_id = physical_file_id;
         let module_fs_node_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
         let mut job = TypeJob {

@@ -1,34 +1,31 @@
 use super::{
-    Func, HelperExpr, Trait, enumeration::Enum, global_variable::GlobalVar, implementation::Impl,
+    ExprAlias, Func, Trait, enumeration::Enum, global_variable::Global, implementation::Impl,
     structs::Struct, type_alias::TypeAlias,
 };
-use ast_workspace_settings::SettingsId;
 
 #[derive(Clone, Debug)]
-pub struct AstFile {
+pub struct RawAstFile {
     pub funcs: Vec<Func>,
     pub structs: Vec<Struct>,
-    pub type_aliases: Vec<TypeAlias>,
-    pub global_variables: Vec<GlobalVar>,
     pub enums: Vec<Enum>,
-    pub helper_exprs: Vec<HelperExpr>,
+    pub globals: Vec<Global>,
+    pub type_aliases: Vec<TypeAlias>,
+    pub expr_aliases: Vec<ExprAlias>,
     pub traits: Vec<Trait>,
     pub impls: Vec<Impl>,
-    pub settings: Option<SettingsId>,
 }
 
-impl AstFile {
-    pub fn new() -> AstFile {
-        AstFile {
+impl RawAstFile {
+    pub fn new() -> RawAstFile {
+        RawAstFile {
             funcs: vec![],
             structs: vec![],
-            type_aliases: vec![],
-            global_variables: vec![],
             enums: vec![],
-            helper_exprs: vec![],
+            globals: vec![],
+            type_aliases: vec![],
+            expr_aliases: vec![],
             traits: vec![],
             impls: vec![],
-            settings: None,
         }
     }
 }

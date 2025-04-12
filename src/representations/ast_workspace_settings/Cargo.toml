@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+arena = { version = "0.1.0", path = "../../support/arena" }
 compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
 fs_tree = { version = "0.1.0", path = "../fs_tree" }
 primitives = { version = "0.1.0", path = "../primitives" }

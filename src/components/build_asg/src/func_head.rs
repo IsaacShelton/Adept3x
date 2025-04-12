@@ -22,14 +22,23 @@ pub fn create_func_heads<'a>(
     ast_workspace: &AstWorkspace,
     options: &BuildOptions,
 ) -> Result<(), ResolveError> {
-    for (physical_file_id, file) in ast_workspace.files.iter() {
-        let module_folder_id = ast_workspace.get_owning_module_or_self(*physical_file_id);
+    for (physical_file_id, ast_file) in ast_workspace.files.iter() {
+        let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-        create_impl_heads(ctx, asg, options, module_folder_id, *physical_file_id, file)?;
+        create_impl_heads(
+            ctx,
+            asg,
+            options,
+            module_folder_id,
+            physical_file_id,
+            ast_file,
+        )?;
 
-        for (func_i, func) in file.funcs.iter().enumerate() {
+        for func_id in ast_file.funcs.iter() {
+            let func = &ast_workspace.all_funcs[func_id];
+
             let name = if func.head.privacy.is_private() {
-                ResolvedName::new(*physical_file_id, &Name::plain(&func.head.name))
+                ResolvedName::new(physical_file_id, &Name::plain(&func.head.name))
             } else {
                 ResolvedName::new(module_folder_id, &Name::plain(&func.head.name))
             };
@@ -41,7 +50,7 @@ pub fn create_func_heads<'a>(
                 name.clone(),
                 &func.head,
                 module_folder_id,
-                *physical_file_id,
+                physical_file_id,
             )?;
 
             if func.head.privacy.is_public() {
@@ -53,8 +62,10 @@ pub fn create_func_heads<'a>(
                     .push(func_ref);
             }
 
-            let settings = file.settings.map(|id| &ast_workspace.settings[id.0]);
-            let imported_namespaces = settings.map(|settings| &settings.imported_namespaces);
+            let imported_namespaces = ast_workspace
+                .view(ast_file)
+                .settings
+                .map(|settings| &settings.imported_namespaces);
 
             let func_haystack = ctx.func_haystacks.get_or_insert_with(module_folder_id, || {
                 FuncHaystack::new(
@@ -72,7 +83,7 @@ pub fn create_func_heads<'a>(
                 .or_insert_with(|| vec![func_ref]);
 
             ctx.jobs
-                .push_back(FuncJob::Regular(*physical_file_id, func_i, func_ref));
+                .push_back(FuncJob::Regular(physical_file_id, func_id, func_ref));
         }
     }
 

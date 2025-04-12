@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-append-only-vec.workspace = true
+arena = { version = "0.1.0", path = "../../support/arena" }
 ast = { version = "0.1.0", path = "../ast" }
 ast_workspace_settings = { version = "0.1.0", path = "../ast_workspace_settings" }
 compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
