@@ -46,11 +46,7 @@ pub fn resolve_member_expr(
         })
     })?;
 
-    let structure = ctx
-        .asg
-        .structs
-        .get(struct_ref)
-        .expect("referenced struct to exist");
+    let structure = &ctx.asg.structs[struct_ref];
 
     let (index, _key, found_field) = match structure.fields.get_full(field_name) {
         Some(found) => found,

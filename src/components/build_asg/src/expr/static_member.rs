@@ -152,11 +152,7 @@ pub fn resolve_impl_mention(
         Ok(imp)
     })?;
 
-    let imp = ctx
-        .asg
-        .impls
-        .get(impl_decl.impl_ref)
-        .expect("public impl of impl decl to exist");
+    let imp = &ctx.asg.impls[impl_decl.impl_ref];
 
     if imp.params.len() != impl_args.len() {
         return Err(ResolveError::other(
@@ -225,11 +221,7 @@ pub fn resolve_static_member_call_named(
 
     let generics = resolve_type_args_to_poly_args(ctx, &static_member_call.call.generics)?;
 
-    let imp = ctx
-        .asg
-        .impls
-        .get(impl_ref)
-        .expect("referenced impl to exist");
+    let imp = &ctx.asg.impls[impl_ref];
 
     let mut only_match = imp
         .body
@@ -294,11 +286,7 @@ pub fn resolve_static_member_call_polymorph(
         )?);
     }
 
-    let func = ctx
-        .asg
-        .funcs
-        .get(func_ref)
-        .expect("referenced function to exist");
+    let func = &ctx.asg.funcs[func_ref];
 
     let Some(generic_trait_ref) = func.impl_params.get(polymorph) else {
         return Err(ResolveError::other(
@@ -307,11 +295,7 @@ pub fn resolve_static_member_call_polymorph(
         ));
     };
 
-    let trait_decl = ctx
-        .asg
-        .traits
-        .get(generic_trait_ref.trait_ref)
-        .expect("referenced trait to exist");
+    let trait_decl = &ctx.asg.traits[generic_trait_ref.trait_ref];
 
     let member = call
         .name

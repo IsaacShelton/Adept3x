@@ -10,10 +10,7 @@ pub fn unalias<'a>(asg: &'a Asg<'a>, whole_type: &'a Type) -> Result<Cow<'a, Typ
     let mut depth = 0;
 
     while let TypeKind::TypeAlias(human_name, type_alias_ref, type_args) = &running.kind {
-        let alias = asg
-            .type_aliases
-            .get(*type_alias_ref)
-            .expect("valid type alias ref");
+        let alias = &asg.type_aliases[*type_alias_ref];
 
         if type_args.len() != alias.params.len() {
             return Err(UnaliasError::IncorrectNumberOfTypeArgsForAlias(
@@ -58,19 +55,16 @@ fn find_type_alias_self_reference(asg: &Asg, whole_type: &Type) -> UnaliasError 
     let mut depth = 0;
 
     while let TypeKind::TypeAlias(human_name, type_alias_ref, type_args) = &running.kind {
-        let alias = asg
-            .type_aliases
-            .get(*type_alias_ref)
-            .expect("valid type alias ref");
+        let type_alias = &asg.type_aliases[*type_alias_ref];
 
-        if !type_args.is_empty() || !alias.params.is_empty() {
+        if !type_args.is_empty() || !type_alias.params.is_empty() {
             todo!("unalias type alias with type args");
         }
 
-        running = &alias.becomes;
+        running = &type_alias.becomes;
 
         if !seen.insert(type_alias_ref) {
-            return UnaliasError::SelfReferentialTypeAlias(human_name.0.clone());
+            return UnaliasError::SelfReferentialTypeAlias(human_name.to_string());
         }
 
         depth += 1;

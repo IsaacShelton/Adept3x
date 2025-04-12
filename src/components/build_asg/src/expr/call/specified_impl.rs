@@ -35,14 +35,10 @@ fn resolve_concrete_impl_arg(
     let impl_arg_source = using.ty.source;
     let (impl_ref, impl_poly_catalog) = resolve_impl_mention_from_type(ctx, impl_arg)?;
 
-    let imp = ctx
-        .asg
-        .impls
-        .get(impl_ref)
-        .expect("referenced impl to exist");
+    let imp = &ctx.asg.impls[impl_ref];
 
     let arg_concrete_trait = impl_poly_catalog.resolver().resolve_trait(&imp.target)?;
-    let callee_func = ctx.asg.funcs.get(callee.func_ref).unwrap();
+    let callee_func = &ctx.asg.funcs[callee.func_ref];
 
     try_register_specified_impl(
         ctx,
@@ -66,7 +62,7 @@ fn resolve_polymorph_impl_arg(
     catalog: &mut PolyCatalog,
 ) -> Result<(), ResolveError> {
     let impl_arg_source = using.ty.source;
-    let callee_func = ctx.asg.funcs.get(callee.func_ref).unwrap();
+    let callee_func = &ctx.asg.funcs[callee.func_ref];
 
     let Some(current_func_ref) = ctx.func_ref else {
         return Err(ResolveError::other(
@@ -75,11 +71,7 @@ fn resolve_polymorph_impl_arg(
         ));
     };
 
-    let caller = ctx
-        .asg
-        .funcs
-        .get(current_func_ref)
-        .expect("referenced function to exist");
+    let caller = &ctx.asg.funcs[current_func_ref];
 
     let Some(arg_concrete_trait) = caller.impl_params.get(polymorph) else {
         return Err(ResolveError::other(

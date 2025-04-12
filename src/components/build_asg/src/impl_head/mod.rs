@@ -40,8 +40,8 @@ pub fn create_impl_heads(
                 physical_file_id,
             )?;
 
-            let asg_impl = asg.impls.get(impl_ref).unwrap();
-            let trait_def = asg.traits.get(asg_impl.target.trait_ref).unwrap();
+            let asg_impl = &asg.impls[impl_ref];
+            let trait_def = &asg.traits[asg_impl.target.trait_ref];
             let concrete_trait = &asg_impl.target;
 
             let mut expected = HashMap::new();
@@ -59,7 +59,7 @@ pub fn create_impl_heads(
                 ));
             };
 
-            let impl_func = asg.funcs.get(func_ref).unwrap();
+            let impl_func = &asg.funcs[func_ref];
 
             ensure_satisfies_trait_func(ctx, asg, expected, trait_func, impl_func)?;
 
@@ -70,10 +70,7 @@ pub fn create_impl_heads(
                 func_ref,
             ));
 
-            if asg
-                .impls
-                .get_mut(impl_ref)
-                .unwrap()
+            if asg.impls[impl_ref]
                 .body
                 .insert(func.head.name.clone(), func_ref)
                 .is_some()
@@ -336,10 +333,7 @@ pub fn create_impl_head<'a>(
         }
     }
 
-    let abstract_trait = asg
-        .traits
-        .get(concrete_trait.trait_ref)
-        .expect("referenced trait to exist");
+    let abstract_trait = &asg.traits[concrete_trait.trait_ref];
 
     if concrete_trait.args.len() != abstract_trait.params.len() {
         return Err(ResolveError::other(
@@ -370,7 +364,7 @@ pub fn create_impl_head<'a>(
         }
     }
 
-    let impl_ref = asg.impls.insert(asg::Impl {
+    let impl_ref = asg.impls.alloc(asg::Impl {
         params: imp.params.clone(),
         target: concrete_trait,
         source: imp.source,

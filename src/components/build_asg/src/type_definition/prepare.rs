@@ -85,7 +85,7 @@ fn prepare_structure(
     physical_fs_node_id: FsNodeId,
     structure: &ast::Struct,
 ) -> Result<StructRef, ResolveError> {
-    let struct_ref = asg.structs.insert(asg::Struct {
+    let struct_ref = asg.structs.alloc(asg::Struct {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
@@ -123,7 +123,7 @@ fn prepare_enum(
     physical_fs_node_id: FsNodeId,
     definition: &ast::Enum,
 ) -> Result<EnumRef, ResolveError> {
-    let enum_ref = asg.enums.insert(asg::Enum {
+    let enum_ref = asg.enums.alloc(asg::Enum {
         name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
         ty: asg::TypeKind::Unresolved.at(definition.source),
         source: definition.source,
@@ -150,7 +150,7 @@ fn prepare_trait(
     physical_fs_node_id: FsNodeId,
     definition: &ast::Trait,
 ) -> Result<TraitRef, ResolveError> {
-    let trait_ref = asg.traits.insert(asg::Trait {
+    let trait_ref = asg.traits.alloc(asg::Trait {
         human_name: HumanName(definition.name.clone()),
         funcs: IndexMap::default(),
         params: definition.params.clone(),
@@ -183,7 +183,7 @@ fn prepare_type_alias(
     physical_fs_node_id: FsNodeId,
     definition: &ast::TypeAlias,
 ) -> Result<TypeAliasRef, ResolveError> {
-    let type_alias_ref = asg.type_aliases.insert(asg::TypeAlias {
+    let type_alias_ref = asg.type_aliases.alloc(asg::TypeAlias {
         human_name: HumanName(definition.name.clone()),
         params: definition.params.clone(),
         becomes: asg::TypeKind::Unresolved.at(definition.value.source),

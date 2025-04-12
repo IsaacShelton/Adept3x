@@ -51,6 +51,7 @@ version = "0.1.0"
 name = "asg"
 version = "0.1.0"
 dependencies = [
+ "arena",
  "ast",
  "ast_workspace",
  "attributes",

@@ -119,7 +119,7 @@ pub fn create_func_head<'a>(
         ));
     }
 
-    Ok(asg.funcs.insert(asg::Func {
+    Ok(asg.funcs.alloc(asg::Func {
         name,
         type_params: head.type_params.clone(),
         params,

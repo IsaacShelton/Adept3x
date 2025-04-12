@@ -76,8 +76,8 @@ impl<K: Id, V> IdxSpan<K, V> {
 
 #[derive(Copy, Clone, Debug)]
 pub struct IdxSpanIter<K: Id, V> {
-    next: K,
-    end: K,
+    pub(crate) next: K,
+    pub(crate) end: K,
     pub(crate) phantom: PhantomData<fn() -> V>,
 }
 

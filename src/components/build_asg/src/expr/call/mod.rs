@@ -76,7 +76,7 @@ pub fn call_callee(
         resolve_impl_arg(ctx, &mut callee, using, &mut used_names, &mut catalog)?;
     }
 
-    let function = ctx.asg.funcs.get(callee.func_ref).unwrap();
+    let function = &ctx.asg.funcs[callee.func_ref];
     let num_required = function.params.required.len();
 
     infer_callee_missing_impl_args(ctx, function, &mut used_names, &mut catalog, source)?;
@@ -87,7 +87,7 @@ pub fn call_callee(
     callee.recipe = catalog.bake();
 
     for (i, arg) in args.iter_mut().enumerate() {
-        let function = ctx.asg.funcs.get(callee.func_ref).unwrap();
+        let function = &ctx.asg.funcs[callee.func_ref];
 
         let preferred_type =
             (i < num_required).then_some(PreferredType::of_parameter(callee.func_ref, i));

@@ -108,21 +108,11 @@ impl<'a> PreferredType<'a> {
         match self {
             PreferredType::Reference(reference) => reference,
             PreferredType::ParameterType(func_ref, index) => {
-                &asg.funcs
-                    .get(*func_ref)
-                    .unwrap()
-                    .params
-                    .required
-                    .get(*index)
-                    .unwrap()
-                    .ty
+                &asg.funcs[*func_ref].params.required.get(*index).unwrap().ty
             }
-            PreferredType::ReturnType(func_ref) => &asg.funcs.get(*func_ref).unwrap().return_type,
+            PreferredType::ReturnType(func_ref) => &asg.funcs[*func_ref].return_type,
             PreferredType::FieldType(struct_ref, field_name) => {
-                let (_, _, field) = asg
-                    .structs
-                    .get(*struct_ref)
-                    .expect("referenced structure to exist")
+                let (_, _, field) = asg.structs[*struct_ref]
                     .fields
                     .get_full::<str>(field_name)
                     .expect("referenced struct field type to exist");

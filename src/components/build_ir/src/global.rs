@@ -5,11 +5,7 @@ pub fn lower_global(
     mod_builder: &ModBuilder,
     global_ref: asg::GlobalRef,
 ) -> Result<(), LowerError> {
-    let global = mod_builder
-        .asg
-        .globals
-        .get(global_ref)
-        .expect("valid global reference");
+    let global = &mod_builder.asg.globals[global_ref];
 
     let mangled_name = if global.ownership.should_mangle() {
         global

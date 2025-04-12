@@ -19,10 +19,7 @@ pub fn resolve_variable_expr(
         .as_plain_str()
         .and_then(|name| ctx.variable_haystack.find(name))
     {
-        if let Some(function) = ctx
-            .func_ref
-            .map(|func_ref| ctx.asg.funcs.get_mut(func_ref).expect("valid function ref"))
-        {
+        if let Some(function) = ctx.func_ref.map(|func_ref| &mut ctx.asg.funcs[func_ref]) {
             let is_initialized = function
                 .vars
                 .get(variable.key)
@@ -143,7 +140,7 @@ pub fn resolve_variable_expr(
 }
 
 fn resolve_global_variable(ctx: &ResolveExprCtx, decl: &GlobalDecl, source: Source) -> TypedExpr {
-    let global = ctx.asg.globals.get(decl.global_ref).expect("valid global");
+    let global = &ctx.asg.globals[decl.global_ref];
 
     TypedExpr::new(
         global.ty.clone(),

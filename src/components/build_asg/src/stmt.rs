@@ -48,7 +48,7 @@ pub fn resolve_stmt(
                     ResolveExprMode::RequireValue,
                 )?;
 
-                let return_type = Cow::Borrowed(&ctx.asg.funcs.get(func_ref).unwrap().return_type);
+                let return_type = Cow::Borrowed(&ctx.asg.funcs[func_ref].return_type);
 
                 if let Ok(result) = conform_expr::<Perform>(
                     ctx,
@@ -67,7 +67,7 @@ pub fn resolve_stmt(
                     .at(source));
                 }
             } else {
-                let function = ctx.asg.funcs.get(func_ref).unwrap();
+                let function = &ctx.asg.funcs[func_ref];
 
                 if function.return_type.kind != asg::TypeKind::Void {
                     return Err(ResolveErrorKind::CannotReturnVoid {
@@ -141,9 +141,9 @@ pub fn resolve_stmt(
                 );
             };
 
-            let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
-
-            let key = function.vars.add_variable(ty.clone(), value.is_some());
+            let key = ctx.asg.funcs[func_ref]
+                .vars
+                .add_variable(ty.clone(), value.is_some());
 
             ctx.variable_haystack
                 .put(&declaration.name, ty.clone(), key);
@@ -197,9 +197,7 @@ pub fn resolve_stmt(
             // Mark destination as initialized
             match &destination.kind {
                 asg::DestinationKind::Variable(variable) => {
-                    let function = ctx.asg.funcs.get_mut(func_ref).unwrap();
-
-                    function
+                    ctx.asg.funcs[func_ref]
                         .vars
                         .get(variable.key)
                         .expect("variable being assigned to exists")

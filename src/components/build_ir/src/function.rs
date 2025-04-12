@@ -14,7 +14,7 @@ pub fn lower_func_body(
     poly_recipe: &PolyRecipe,
     asg: &Asg,
 ) -> Result<BasicBlocks, LowerError> {
-    let func = asg.funcs.get(func_ref).expect("valid function reference");
+    let func = &asg.funcs[func_ref];
 
     if !func.ownership.is_owned() {
         return Ok(BasicBlocks::new());
@@ -73,11 +73,7 @@ pub fn lower_func_head(
     func_ref: asg::FuncRef,
     poly_recipe: &PolyRecipe,
 ) -> Result<ir::FuncRef, LowerError> {
-    let func = mod_builder
-        .asg
-        .funcs
-        .get(func_ref)
-        .expect("valid function reference");
+    let func = &mod_builder.asg.funcs[func_ref];
     let basicblocks = BasicBlocks::default();
 
     let mut params = vec![];

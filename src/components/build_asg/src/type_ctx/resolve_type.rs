@@ -64,12 +64,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 match self.find(name, arguments, ast_type.source) {
                     Ok(found) => {
                         if let asg::TypeKind::Structure(_, struct_ref, arguments) = found.borrow() {
-                            let structure = self
-                                .asg
-                                .structs
-                                .get(*struct_ref)
-                                .expect("referenced struct to exist");
-
+                            let structure = &self.asg.structs[*struct_ref];
                             assert!(arguments.len() == structure.params.len());
                         }
 

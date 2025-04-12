@@ -112,7 +112,7 @@ fn resolve_structure(
 
         ensure_declared_polymorphs(&ty, &structure.params)?;
 
-        let resolved_struct = asg.structs.get_mut(struct_ref).expect("valid struct");
+        let resolved_struct = &mut asg.structs[struct_ref];
 
         resolved_struct.fields.insert(
             field_name.clone(),
@@ -149,7 +149,7 @@ fn resolve_enum(
         .unwrap_or_else(|| Cow::Owned(ast::TypeKind::u32().at(definition.source)));
 
     let ty = type_ctx.resolve_or_undeclared(&ast_type, ResolveTypeOptions::KeepAliases)?;
-    asg.enums.get_mut(enum_ref).unwrap().ty = ty;
+    asg.enums[enum_ref].ty = ty;
     Ok(())
 }
 
@@ -168,12 +168,12 @@ fn resolve_type_alias(
         &ctx.types_in_modules,
     );
 
-    let params = &asg.type_aliases.get(type_alias_ref).unwrap().params;
+    let params = &asg.type_aliases[type_alias_ref].params;
     let ty = type_ctx.resolve_or_undeclared(&definition.value, ResolveTypeOptions::KeepAliases)?;
 
     ensure_declared_polymorphs(&ty, params)?;
 
-    asg.type_aliases.get_mut(type_alias_ref).unwrap().becomes = ty;
+    asg.type_aliases[type_alias_ref].becomes = ty;
     Ok(())
 }
 
@@ -219,6 +219,6 @@ fn resolve_trait(
         }
     }
 
-    asg.traits.get_mut(trait_ref).unwrap().funcs = funcs;
+    asg.traits[trait_ref].funcs = funcs;
     Ok(())
 }

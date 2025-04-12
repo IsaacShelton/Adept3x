@@ -111,12 +111,10 @@ impl TypeKind {
 
     pub fn num_target_parameters(&self, asg: &Asg) -> usize {
         match self {
-            TypeKind::Structure(_, struct_ref, _) => {
-                asg.structs.get(*struct_ref).unwrap().params.len()
-            }
-            TypeKind::Trait(_, trait_ref, _) => asg.traits.get(*trait_ref).unwrap().params.len(),
+            TypeKind::Structure(_, struct_ref, _) => asg.structs[*struct_ref].params.len(),
+            TypeKind::Trait(_, trait_ref, _) => asg.traits[*trait_ref].params.len(),
             TypeKind::TypeAlias(_, type_alias_ref, _) => {
-                asg.type_aliases.get(*type_alias_ref).unwrap().params.len()
+                asg.type_aliases[*type_alias_ref].params.len()
             }
             _ => 0,
         }

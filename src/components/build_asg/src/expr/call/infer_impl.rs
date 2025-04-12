@@ -18,7 +18,7 @@ pub fn infer_callee_missing_impl_args(
 
         let Some(caller) = ctx
             .func_ref
-            .map(|caller_func_ref| ctx.asg.funcs.get(caller_func_ref).unwrap())
+            .map(|caller_func_ref| &ctx.asg.funcs[caller_func_ref])
         else {
             continue;
         };

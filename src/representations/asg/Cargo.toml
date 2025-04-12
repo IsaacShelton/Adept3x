@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+arena = { version = "0.1.0", path = "../../support/arena" }
 ast = { version = "0.1.0", path = "../ast" }
 ast_workspace = { version = "0.1.0", path = "../ast_workspace" }
 attributes = { version = "0.1.0", path = "../attributes" }

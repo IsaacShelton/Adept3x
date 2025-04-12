@@ -26,11 +26,7 @@ fn get_field_info<'a>(
     arguments: &[asg::Type],
     field_name: &str,
 ) -> Result<FieldInfo, PolymorphError> {
-    let structure = ctx
-        .asg
-        .structs
-        .get(struct_ref)
-        .expect("referenced structure to exist");
+    let structure = &ctx.asg.structs[struct_ref];
 
     let (index, _name, field) = structure
         .fields
@@ -83,12 +79,7 @@ pub fn resolve_struct_literal_expr(
     let mut resolved_fields = IndexMap::new();
 
     for field_initializer in fields.iter() {
-        let all_fields = &ctx
-            .asg
-            .structs
-            .get(struct_ref)
-            .expect("referenced struct to exist")
-            .fields;
+        let all_fields = &ctx.asg.structs[struct_ref].fields;
 
         let field_name = match field_initializer
             .name
@@ -102,11 +93,7 @@ pub fn resolve_struct_literal_expr(
 
         // Ensure field exists on structure
         {
-            let structure = ctx
-                .asg
-                .structs
-                .get(struct_ref)
-                .expect("referenced structure to exist");
+            let structure = &ctx.asg.structs[struct_ref];
 
             if !structure.fields.contains_key::<str>(&field_name) {
                 return Err(ResolveErrorKind::FieldDoesNotExist {
@@ -168,11 +155,7 @@ pub fn resolve_struct_literal_expr(
         next_index = field_info.index + 1;
     }
 
-    let structure = ctx
-        .asg
-        .structs
-        .get(struct_ref)
-        .expect("referenced structure to exist");
+    let structure = &ctx.asg.structs[struct_ref];
 
     if resolved_fields.len() != structure.fields.len() {
         let missing = structure

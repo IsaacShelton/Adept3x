@@ -116,11 +116,7 @@ pub fn lower_type(
         }
         asg::TypeKind::FuncPtr(_func_pointer) => Ok(ir::Type::FuncPtr),
         asg::TypeKind::Enum(_human_name, enum_ref) => {
-            let enum_definition = mod_builder
-                .asg
-                .enums
-                .get(*enum_ref)
-                .expect("referenced enum to exist");
+            let enum_definition = &mod_builder.asg.enums[*enum_ref];
 
             lower_type(
                 mod_builder,
@@ -132,11 +128,7 @@ pub fn lower_type(
                 todo!("lower_type for type alias with type args");
             }
 
-            let type_alias = mod_builder
-                .asg
-                .type_aliases
-                .get(*type_alias_ref)
-                .expect("referenced type alias to exist");
+            let type_alias = &mod_builder.asg.type_aliases[*type_alias_ref];
 
             lower_type(
                 mod_builder,

@@ -24,6 +24,7 @@ mod type_decl;
 mod variable_storage;
 
 pub use self::variable_storage::VariableStorageKey;
+use arena::{Arena, Idx, new_id_with_niche};
 use ast_workspace::AstWorkspace;
 pub use block::*;
 pub use datatype::*;
@@ -43,7 +44,6 @@ pub use poly_catalog::*;
 pub use poly_recipe::PolyRecipe;
 pub use poly_resolver::{IntoPolyRecipeResolver, PolyRecipeResolver};
 pub use poly_value::*;
-use slotmap::{SlotMap, new_key_type};
 use source_files::SourceFiles;
 pub use stmt::*;
 pub use structure::*;
@@ -52,27 +52,33 @@ pub use type_alias::TypeAlias;
 pub use type_decl::*;
 pub use variable_storage::*;
 
-new_key_type! {
-    pub struct FuncRef;
-    pub struct GlobalRef;
-    pub struct StructRef;
-    pub struct EnumRef;
-    pub struct TypeAliasRef;
-    pub struct TraitRef;
-    pub struct ImplRef;
-}
+new_id_with_niche!(FuncId, u64);
+new_id_with_niche!(StructId, u64);
+new_id_with_niche!(EnumId, u64);
+new_id_with_niche!(GlobalId, u64);
+new_id_with_niche!(TypeAliasId, u64);
+new_id_with_niche!(TraitId, u64);
+new_id_with_niche!(ImplId, u64);
+
+pub type FuncRef = Idx<FuncId, Func>;
+pub type StructRef = Idx<StructId, Struct>;
+pub type EnumRef = Idx<EnumId, Enum>;
+pub type GlobalRef = Idx<GlobalId, Global>;
+pub type TypeAliasRef = Idx<TypeAliasId, TypeAlias>;
+pub type TraitRef = Idx<TraitId, Trait>;
+pub type ImplRef = Idx<ImplId, Impl>;
 
 #[derive(Clone, Debug)]
 pub struct Asg<'a> {
     pub source_files: &'a SourceFiles,
     pub entry_point: Option<FuncRef>,
-    pub funcs: SlotMap<FuncRef, Func>,
-    pub structs: SlotMap<StructRef, Struct>,
-    pub globals: SlotMap<GlobalRef, Global>,
-    pub enums: SlotMap<EnumRef, Enum>,
-    pub type_aliases: SlotMap<TypeAliasRef, TypeAlias>,
-    pub traits: SlotMap<TraitRef, Trait>,
-    pub impls: SlotMap<ImplRef, Impl>,
+    pub funcs: Arena<FuncId, Func>,
+    pub structs: Arena<StructId, Struct>,
+    pub globals: Arena<GlobalId, Global>,
+    pub enums: Arena<EnumId, Enum>,
+    pub type_aliases: Arena<TypeAliasId, TypeAlias>,
+    pub traits: Arena<TraitId, Trait>,
+    pub impls: Arena<ImplId, Impl>,
     pub workspace: &'a AstWorkspace<'a>,
 }
 
@@ -81,13 +87,13 @@ impl<'a> Asg<'a> {
         Self {
             source_files,
             entry_point: None,
-            funcs: SlotMap::with_key(),
-            structs: SlotMap::with_key(),
-            globals: SlotMap::with_key(),
-            enums: SlotMap::with_key(),
-            type_aliases: SlotMap::with_key(),
-            traits: SlotMap::with_key(),
-            impls: SlotMap::with_key(),
+            funcs: Arena::new(),
+            structs: Arena::new(),
+            globals: Arena::new(),
+            enums: Arena::new(),
+            type_aliases: Arena::new(),
+            traits: Arena::new(),
+            impls: Arena::new(),
             workspace,
         }
     }

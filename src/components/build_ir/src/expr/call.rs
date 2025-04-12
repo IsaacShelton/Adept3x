@@ -30,11 +30,7 @@ pub fn lower_expr_poly_call(
         .resolve_impl(&poly_call.callee.polymorph, expr.source)
         .map_err(LowerError::from)?;
 
-    let imp = builder
-        .asg()
-        .impls
-        .get(impl_ref)
-        .expect("referenced impl to exist");
+    let imp = &builder.asg().impls[impl_ref];
 
     let func_ref = imp
         .body
@@ -62,11 +58,7 @@ fn lower_expr_call_core(
         .map(|arg| lower_expr(builder, &arg.expr))
         .collect::<Result<Box<[_]>, _>>()?;
 
-    let callee = builder
-        .asg()
-        .funcs
-        .get(callee_func_ref)
-        .expect("referenced function to exist");
+    let callee = &builder.asg().funcs[callee_func_ref];
 
     let variadic_arg_types = all_args[callee.params.required.len()..]
         .iter()

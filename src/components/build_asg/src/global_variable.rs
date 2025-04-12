@@ -26,7 +26,7 @@ pub fn resolve_global_variables(
             let ty = type_ctx.resolve(&global.ast_type, ResolveTypeOptions::Unalias)?;
             let resolved_name = ResolvedName::new(module_folder_id, &Name::plain(&global.name));
 
-            let global_ref = asg.globals.insert(asg::Global {
+            let global_ref = asg.globals.alloc(asg::Global {
                 name: resolved_name,
                 ty: ty.clone(),
                 source: global.source,

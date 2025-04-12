@@ -12,12 +12,7 @@ pub fn monomorphize_struct(
     asg_struct_ref: asg::StructRef,
     poly_recipe: PolyRecipe,
 ) -> Result<ir::StructRef, LowerError> {
-    let structure = mod_builder
-        .asg
-        .structs
-        .get(asg_struct_ref)
-        .expect("referenced structure exists");
-
+    let structure = &mod_builder.asg.structs[asg_struct_ref];
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     for field in structure.fields.values() {
@@ -48,11 +43,7 @@ pub fn monomorphize_struct_with_params(
     parameters: &[ConcreteType],
     source: Source,
 ) -> Result<ir::StructRef, LowerError> {
-    let structure = mod_builder
-        .asg
-        .structs
-        .get(asg_struct_ref)
-        .expect("referenced structure to exist");
+    let structure = &mod_builder.asg.structs[asg_struct_ref];
 
     if structure.params.len() != parameters.len() {
         return Err(LowerErrorKind::IncorrectNumberOfTypeArguments.at(source));
@@ -82,7 +73,7 @@ pub fn lower_struct(
     mod_builder: &mut ModBuilder,
     asg_struct_ref: asg::StructRef,
 ) -> Result<(), LowerError> {
-    let structure = mod_builder.asg.structs.get(asg_struct_ref).unwrap();
+    let structure = &mod_builder.asg.structs[asg_struct_ref];
     let mut fields = Vec::with_capacity(structure.fields.len());
 
     // NOTE: We only lower polymorphic structures on-demand, so skip them for now

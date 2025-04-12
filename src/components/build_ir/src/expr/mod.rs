@@ -234,13 +234,9 @@ pub fn lower_expr(builder: &mut FuncBuilder, expr: &asg::Expr) -> Result<ir::Val
 
             let subject_pointer = builder.lower_destination(subject)?;
 
-            let structure = builder
-                .asg()
-                .structs
-                .get(*asg_struct_ref)
-                .expect("referenced structure to exist");
-
+            let structure = &builder.asg().structs[*asg_struct_ref];
             assert!(structure.params.len() == arguments.len());
+
             let mut catalog = PolyCatalog::new();
             for (name, argument) in structure.params.names().zip(arguments.iter()) {
                 catalog
@@ -428,11 +424,7 @@ pub fn lower_expr(builder: &mut FuncBuilder, expr: &asg::Expr) -> Result<ir::Val
         ExprKind::EnumMemberLiteral(enum_member_literal) => {
             let (value, ir_type, source) = match &enum_member_literal.enum_target {
                 asg::EnumTarget::Named(enum_ref) => {
-                    let enum_definition = builder
-                        .asg()
-                        .enums
-                        .get(*enum_ref)
-                        .expect("referenced enum to exist for enum member literal");
+                    let enum_definition = &builder.asg().enums[*enum_ref];
 
                     let member = enum_definition
                         .members
@@ -625,19 +617,17 @@ pub fn lower_destination(
             index,
             ..
         } => {
+            // TODO: Combine this similar code with normal lowering?
+
             let subject_pointer = builder.lower_destination(subject)?;
 
             let asg::TypeKind::Structure(_name, _struct_ref, arguments) = &subject.ty.kind else {
                 todo!("member operator only supports structure types for now");
             };
 
-            let structure = builder
-                .asg()
-                .structs
-                .get(*asg_struct_ref)
-                .expect("referenced structure to exist");
-
+            let structure = &builder.asg().structs[*asg_struct_ref];
             assert!(structure.params.len() == arguments.len());
+
             let mut catalog = PolyCatalog::new();
             for (name, argument) in structure.params.names().zip(arguments.iter()) {
                 catalog

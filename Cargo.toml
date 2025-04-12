@@ -41,7 +41,9 @@ members = [
     "src/components/build_c_token",
     "src/support/look_ahead",
     "src/support/repeating_last",
-    "src/support/backend", "src/components/job", "src/support/arena",
+    "src/support/backend",
+    "src/components/job",
+    "src/support/arena",
 ]
 
 [workspace.dependencies]

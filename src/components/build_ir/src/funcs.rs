@@ -47,7 +47,7 @@ impl Funcs {
         self.jobs
             .push((func_ref, poly_recipe.borrow().clone(), ir_func_ref));
 
-        let asg_func = asg.funcs.get(func_ref).expect("valid asg function");
+        let asg_func = &asg.funcs[func_ref];
 
         if asg_func.tag == Some(Tag::InterpreterEntryPoint) {
             self.interpreter_entry_point.set(ir_func_ref).map_err(|_| {

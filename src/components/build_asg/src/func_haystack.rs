@@ -105,7 +105,7 @@ impl FuncHaystack {
         local_matches
             .chain(remote_matches)
             .map(|func_ref| {
-                let function = ctx.asg.funcs.get(*func_ref).unwrap();
+                let function = &ctx.asg.funcs[*func_ref];
 
                 format!(
                     "{}({})",
@@ -124,7 +124,7 @@ impl FuncHaystack {
         existing_catalog: Option<PolyCatalog>,
         source: Source,
     ) -> Option<Callee> {
-        let function = ctx.asg.funcs.get(func_ref).unwrap();
+        let function = &ctx.asg.funcs[func_ref];
         let params = &function.params;
 
         let mut catalog = existing_catalog.unwrap_or_default();
@@ -308,22 +308,12 @@ impl FuncHaystack {
             .and_then(|first_type| {
                 if let Ok(first_type) = unalias(ctx.asg, first_type) {
                     match &first_type.kind {
-                        TypeKind::Structure(_, struct_ref, _) => Some(
-                            ctx.asg
-                                .structs
-                                .get(*struct_ref)
-                                .expect("valid struct")
-                                .name
-                                .fs_node_id,
-                        ),
-                        TypeKind::Enum(_, enum_ref) => Some(
-                            ctx.asg
-                                .enums
-                                .get(*enum_ref)
-                                .expect("valid enum")
-                                .name
-                                .fs_node_id,
-                        ),
+                        TypeKind::Structure(_, struct_ref, _) => {
+                            Some(ctx.asg.structs[*struct_ref].name.fs_node_id)
+                        }
+                        TypeKind::Enum(_, enum_ref) => {
+                            Some(ctx.asg.enums[*enum_ref].name.fs_node_id)
+                        }
                         _ => None,
                     }
                 } else {

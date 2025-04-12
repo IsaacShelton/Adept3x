@@ -111,11 +111,7 @@ fn resolve_func_body(
         ResolveExprMode::NeglectValue,
     )?;
 
-    asg.funcs
-        .get_mut(func_ref)
-        .expect("resolved function head to exist")
-        .stmts = resolved_stmts;
-
+    asg.funcs[func_ref].stmts = resolved_stmts;
     Ok(())
 }
 
@@ -138,9 +134,7 @@ fn resolve_param_vars(
         );
 
         let ty = type_ctx.resolve(&param.ast_type, ResolveTypeOptions::Unalias)?;
-        let function = asg.funcs.get_mut(func_ref).unwrap();
-
-        let key = function.vars.add_param(ty.clone());
+        let key = asg.funcs[func_ref].vars.add_param(ty.clone());
 
         if let Some(name) = &param.name {
             variable_haystack.put(name.clone(), ty, key);

@@ -1,5 +1,6 @@
 use crate::{
     Id, Idx, IdxSpan,
+    idx_span::IdxSpanIter,
     iter::{IntoIter, Iter, IterMut},
     values::{Values, ValuesMut},
 };
@@ -237,6 +238,15 @@ impl<K: Id, V> Arena<K, V> {
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         IterMut {
             iter: self.data.iter_mut().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn keys(&self) -> impl Iterator<Item = Idx<K, V>> {
+        IdxSpanIter {
+            next: K::from_usize(0),
+            end: K::from_usize(self.data.len()),
             phantom: PhantomData,
         }
     }
