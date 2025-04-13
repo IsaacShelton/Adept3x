@@ -41,6 +41,14 @@ impl<K: Id, V> Arena<K, V> {
         }
     }
 
+    #[inline]
+    pub(crate) unsafe fn from_vec(data: Vec<V>) -> Self {
+        Self {
+            data,
+            phantom: PhantomData,
+        }
+    }
+
     /// Creates a new arena with the specified capacity.
     ///
     /// # Examples
@@ -140,15 +148,16 @@ impl<K: Id, V> Arena<K, V> {
     /// This method returns `None` if the arena is full.
     #[inline]
     pub fn try_alloc(&mut self, value: V) -> Option<Idx<K, V>> {
-        if self.data.len() > K::MAX {
-            None
-        } else {
+        if self.data.len() < K::MAX {
             let id = K::from_usize(self.data.len());
             self.data.push(value);
+
             Some(Idx {
                 raw: id,
                 phantom: PhantomData,
             })
+        } else {
+            None
         }
     }
 

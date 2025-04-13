@@ -16,7 +16,7 @@ pub unsafe fn to_backend_struct_type(
 
     // Get cached type or insert computed type
     ctx.struct_cache.cache.try_insert_cloned(struct_ref, |_| {
-        let ir_structure = ctx.ir_module.structs.get(struct_ref);
+        let ir_structure = &ctx.ir_module.structs[struct_ref];
 
         ctx.visited.borrow_mut().insert(struct_ref);
         let mut subtypes =

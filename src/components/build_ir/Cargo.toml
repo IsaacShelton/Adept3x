@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 append-only-vec.workspace = true
+arena = { version = "0.1.0", path = "../../support/arena" }
 asg = { version = "0.1.0", path = "../../representations/asg" }
 attributes = { version = "0.1.0", path = "../../representations/attributes" }
 compiler = { version = "0.1.0", path = "../../support/compiler" }

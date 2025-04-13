@@ -1,38 +1,59 @@
 mod field;
-mod funcs;
-mod global;
 mod instr;
-mod structs;
 mod value;
 
+use arena::{Arena, Idx, new_id_with_niche};
+use attributes::SymbolOwnership;
 use derivative::Derivative;
 use derive_more::{Deref, DerefMut, IsVariant};
 pub use field::*;
-pub use funcs::{Func, FuncRef, Funcs};
-pub use global::{Global, GlobalRef, Globals};
 pub use instr::*;
 use source_files::Source;
-pub use structs::{Struct, StructRef, Structs};
 use target::Target;
 pub use value::*;
 
+new_id_with_niche!(StructId, u64);
+new_id_with_niche!(GlobalId, u64);
+new_id_with_niche!(FuncId, u64);
+
+pub type FuncRef = Idx<FuncId, Func>;
+pub type GlobalRef = Idx<GlobalId, Global>;
+pub type StructRef = Idx<StructId, Struct>;
+
+#[derive(Clone, Debug)]
 pub struct Module {
     pub interpreter_entry_point: Option<FuncRef>,
     pub target: Target,
-    pub structs: Structs,
-    pub globals: Globals,
-    pub funcs: Funcs,
+    pub funcs: Arena<FuncId, Func>,
+    pub structs: Arena<StructId, Struct>,
+    pub globals: Arena<GlobalId, Global>,
 }
 
-impl std::fmt::Debug for Module {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "SlotMap {{")?;
-        for ir_function in self.funcs.values() {
-            ir_function.fmt(f)?;
-        }
-        write!(f, "SlotMap }}")?;
-        Ok(())
-    }
+#[derive(Clone, Debug)]
+pub struct Func {
+    pub mangled_name: String,
+    pub params: Vec<Type>,
+    pub return_type: Type,
+    pub basicblocks: BasicBlocks,
+    pub is_cstyle_variadic: bool,
+    pub ownership: SymbolOwnership,
+    pub abide_abi: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct Struct {
+    pub name: Option<String>,
+    pub fields: Vec<Field>,
+    pub is_packed: bool,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct Global {
+    pub mangled_name: String,
+    pub ir_type: Type,
+    pub is_thread_local: bool,
+    pub ownership: SymbolOwnership,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -156,7 +177,7 @@ impl Type {
 
     pub fn struct_fields<'a>(&'a self, ir_module: &'a Module) -> Option<&'a [Field]> {
         match self {
-            Type::Struct(struct_ref) => Some(&ir_module.structs.get(*struct_ref).fields[..]),
+            Type::Struct(struct_ref) => Some(&ir_module.structs[*struct_ref].fields[..]),
             Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
             _ => None,
         }

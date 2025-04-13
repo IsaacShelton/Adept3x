@@ -46,6 +46,9 @@ checksum = "7992085ec035cfe96992dd31bfd495a2ebd31969bb95f624471cb6c0b349e571"
 [[package]]
 name = "arena"
 version = "0.1.0"
+dependencies = [
+ "append-only-vec",
+]
 
 [[package]]
 name = "asg"
@@ -236,6 +239,7 @@ name = "build_ir"
 version = "0.1.0"
 dependencies = [
  "append-only-vec",
+ "arena",
  "asg",
  "attributes",
  "compiler",
@@ -635,6 +639,7 @@ name = "ir"
 version = "0.1.0"
 dependencies = [
  "append-only-vec",
+ "arena",
  "attributes",
  "data_units",
  "derivative",
@@ -1103,6 +1108,7 @@ dependencies = [
 name = "target_layout"
 version = "0.1.0"
 dependencies = [
+ "arena",
  "asg",
  "data_units",
  "derivative",

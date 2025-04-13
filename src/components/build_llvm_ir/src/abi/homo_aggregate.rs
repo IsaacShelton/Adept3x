@@ -39,7 +39,7 @@ pub fn is_homo_aggregate<'a>(
             })
         }
         ir::Type::Struct(struct_ref) => {
-            let structure = ir_module.structs.get(*struct_ref);
+            let structure = &ir_module.structs[*struct_ref];
 
             is_homo_aggregate_record(
                 decider,

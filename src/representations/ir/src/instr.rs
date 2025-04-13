@@ -1,4 +1,4 @@
-use crate::{Type, funcs::FuncRef, global::GlobalRef, value::Value};
+use crate::{FuncRef, GlobalRef, Type, value::Value};
 use primitives::{FloatOrInteger, FloatOrSign, IntegerBits, IntegerSign};
 
 #[derive(Clone, Debug)]

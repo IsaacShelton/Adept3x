@@ -1,26 +1,25 @@
 use crate::error::{LowerError, LowerErrorKind};
 use append_only_vec::AppendOnlyVec;
+use arena::{Arena, LockFreeArena};
 use asg::PolyRecipe;
 use attributes::Tag;
 use std::{borrow::Borrow, cell::OnceCell, collections::HashMap, sync::RwLock};
 
 #[derive(Default)]
 pub struct Funcs {
-    funcs: AppendOnlyVec<ir::Func>,
+    funcs: LockFreeArena<ir::FuncId, ir::Func>,
     monomorphized: RwLock<HashMap<(asg::FuncRef, PolyRecipe), ir::FuncRef>>,
     jobs: AppendOnlyVec<(asg::FuncRef, PolyRecipe, ir::FuncRef)>,
     interpreter_entry_point: OnceCell<ir::FuncRef>,
 }
 
 impl Funcs {
-    pub fn build(self) -> ir::Funcs {
-        ir::Funcs::new(self.funcs.into_iter().collect())
+    pub fn build(self) -> Arena<ir::FuncId, ir::Func> {
+        self.funcs.into_arena()
     }
 
     pub fn insert(&self, func_ref: asg::FuncRef, function: ir::Func) -> ir::FuncRef {
-        let index = self.funcs.len();
-        self.funcs.push(function);
-        let ir_func_ref = ir::FuncRef::new(index);
+        let ir_func_ref = self.funcs.alloc(function);
         self.monomorphized
             .write()
             .unwrap()
@@ -62,7 +61,7 @@ impl Funcs {
     }
 
     pub fn get_mut(&mut self, key: ir::FuncRef) -> &mut ir::Func {
-        &mut self.funcs[key.get()]
+        &mut self.funcs[key]
     }
 
     pub fn monomorphized<'a>(

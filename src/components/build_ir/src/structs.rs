@@ -1,16 +1,16 @@
-use append_only_vec::AppendOnlyVec;
+use arena::{Arena, LockFreeArena};
 use asg::PolyRecipe;
 use std::{collections::HashMap, sync::RwLock};
 
 #[derive(Debug, Default)]
 pub struct Structs {
-    structs: AppendOnlyVec<ir::Struct>,
+    structs: LockFreeArena<ir::StructId, ir::Struct>,
     monomorphized: RwLock<HashMap<(asg::StructRef, PolyRecipe), ir::StructRef>>,
 }
 
 impl Structs {
-    pub fn build(self) -> ir::Structs {
-        ir::Structs::new(self.structs.into_iter().collect())
+    pub fn build(self) -> Arena<ir::StructId, ir::Struct> {
+        self.structs.into_arena()
     }
 
     pub fn insert(
@@ -19,7 +19,7 @@ impl Structs {
         structure: ir::Struct,
         poly_recipe: PolyRecipe,
     ) -> ir::StructRef {
-        let ir_struct_ref = ir::StructRef::new(self.structs.push(structure));
+        let ir_struct_ref = self.structs.alloc(structure);
 
         let key = (asg_struct_ref, poly_recipe);
         self.monomorphized

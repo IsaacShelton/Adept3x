@@ -60,7 +60,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
         func_ref: ir::FuncRef,
         args: Vec<Value<'a>>,
     ) -> Result<Value<'a>, InterpreterError> {
-        let function = self.ir_module.funcs.get(func_ref);
+        let function = &self.ir_module.funcs[func_ref];
 
         if function.is_cstyle_variadic {
             todo!(

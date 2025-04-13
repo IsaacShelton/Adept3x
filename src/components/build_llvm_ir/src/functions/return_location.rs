@@ -69,7 +69,7 @@ impl ReturnLocation {
         inalloca: &InAlloca,
         inalloca_subtypes: &[LLVMTypeRef],
     ) -> Result<Self, BackendError> {
-        let ir_function = ctx.ir_module.funcs.get(skeleton.ir_func_ref);
+        let ir_function = &ctx.ir_module.funcs[skeleton.ir_func_ref];
         let last_argument = unsafe { LLVMGetLastParam(skeleton.function) };
 
         let inalloca_combined_struct = skeleton

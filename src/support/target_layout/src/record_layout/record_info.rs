@@ -40,7 +40,7 @@ impl<'a> RecordInfo<'a> {
                 todo!("RecordInfo::try_from_type for unions is not supported yet")
             }
             ir::Type::Struct(struct_ref) => {
-                Some(RecordInfo::from_struct(ir_module.structs.get(*struct_ref)))
+                Some(RecordInfo::from_struct(&ir_module.structs[*struct_ref]))
             }
             ir::Type::AnonymousComposite(composite) => Some(RecordInfo::from_composite(composite)),
             _ => None,

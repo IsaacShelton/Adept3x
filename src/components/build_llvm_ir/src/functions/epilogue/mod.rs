@@ -54,7 +54,7 @@ pub fn emit_epilogue(
         });
     };
 
-    let ir_function = ctx.ir_module.funcs.get(skeleton.ir_func_ref);
+    let ir_function = &ctx.ir_module.funcs[skeleton.ir_func_ref];
 
     let ir_return_type = &ir_function.return_type;
     let abi_return_info = &abi_function.return_type;

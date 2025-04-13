@@ -773,7 +773,7 @@ unsafe fn emit_call(
     fn_ctx: &FnCtx,
     value_catalog: &mut ValueCatalog,
 ) -> Result<LLVMValueRef, BackendError> {
-    let ir_function = ctx.ir_module.funcs.get(call.func);
+    let ir_function = &ctx.ir_module.funcs[call.func];
 
     let skeleton = ctx
         .func_skeletons

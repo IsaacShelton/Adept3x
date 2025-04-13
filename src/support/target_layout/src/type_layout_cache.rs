@@ -3,6 +3,7 @@ use crate::{
     record_layout::{ItaniumRecordLayoutBuilder, RecordInfo},
     type_layout::{AlignRequirement, TypeLayout},
 };
+use arena::Arena;
 use data_units::ByteUnits;
 use diagnostics::Diagnostics;
 use once_map::sync::OnceMap;
@@ -12,14 +13,14 @@ use target::Target;
 pub struct TypeLayoutCache<'a> {
     memo: OnceMap<ir::Type, TypeLayout>,
     pub target: &'a Target,
-    pub structs: &'a ir::Structs,
+    pub structs: &'a Arena<ir::StructId, ir::Struct>,
     pub diagnostics: &'a Diagnostics<'a>,
 }
 
 impl<'a> TypeLayoutCache<'a> {
     pub fn new(
         target: &'a Target,
-        structs: &'a ir::Structs,
+        structs: &'a Arena<ir::StructId, ir::Struct>,
         diagnostics: &'a Diagnostics<'a>,
     ) -> Self {
         Self {
@@ -57,7 +58,7 @@ impl<'a> TypeLayoutCache<'a> {
             },
             ir::Type::Union(_) => todo!("get_impl for ir::Type::Union"),
             ir::Type::Struct(struct_ref) => {
-                let structure = self.structs.get(*struct_ref);
+                let structure = &self.structs[*struct_ref];
 
                 let info = RecordInfo::from_struct(structure);
                 self.get_impl_record_layout(&info, structure.name.as_deref())
