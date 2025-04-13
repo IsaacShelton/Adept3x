@@ -5,9 +5,9 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-/// A index-based arena.
+/// A lock-free index-based arena.
 ///
-/// [`Arena`] provides a mechanism to allocate objects and refer to them by a
+/// [`LockFreeArena`] provides a mechanism to allocate objects and refer to them by a
 /// strongly-typed index ([`Idx<K, V>`]). The index not only represents the position
 /// in the underlying vector but also leverages the type system to prevent accidental misuse
 /// across different arenas.
@@ -70,7 +70,7 @@ impl<K: Id, V> LockFreeArena<K, V> {
     /// # Panics
     ///
     /// Panics if the arena is full (i.e. if the number of elements exceeds `I::MAX`).
-    /// If you hnadle this case, use [`Arena::try_alloc`] instead.
+    /// If you hnadle this case, use [`LockFreeArena::try_alloc`] instead.
     ///
     /// # Examples
     ///
@@ -86,7 +86,7 @@ impl<K: Id, V> LockFreeArena<K, V> {
         self.try_alloc(value).expect("arena is full")
     }
 
-    /// Fallible version of [`Arena::alloc`].
+    /// Fallible version of [`LockFreeArena::alloc`].
     ///
     /// This method returns `None` if the arena is full.
     #[inline]
@@ -104,8 +104,8 @@ impl<K: Id, V> LockFreeArena<K, V> {
     /// # Examples
     ///
     /// ```
-    /// # use arena::Arena;
-    /// let mut arena = Arena::<u32, _>::new();
+    /// # use arena::LockFreeArena;
+    /// let mut arena = LockFreeArena::<u32, _>::new();
     ///
     /// let idx1 = arena.alloc(20);
     /// let idx2 = arena.alloc(40);
