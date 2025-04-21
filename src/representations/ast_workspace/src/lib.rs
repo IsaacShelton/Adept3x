@@ -17,7 +17,15 @@ new_id_with_niche!(TypeAliasId, u64);
 new_id_with_niche!(ExprAliasId, u64);
 new_id_with_niche!(TraitId, u64);
 new_id_with_niche!(ImplId, u64);
-new_id_with_niche!(AstFileId, u64);
+
+pub type FuncRef = Idx<FuncId, Func>;
+pub type StructRef = Idx<StructId, Struct>;
+pub type EnumRef = Idx<EnumId, Enum>;
+pub type GlobalRef = Idx<GlobalId, Global>;
+pub type TypeAliasRef = Idx<TypeAliasId, TypeAlias>;
+pub type ExprAliasRef = Idx<ExprAliasId, ExprAlias>;
+pub type TraitRef = Idx<TraitId, Trait>;
+pub type ImplRef = Idx<ImplId, Impl>;
 
 #[derive(Debug)]
 pub struct AstFile {

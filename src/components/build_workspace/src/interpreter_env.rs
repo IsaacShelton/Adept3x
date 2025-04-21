@@ -29,9 +29,9 @@ fn thin_void_func(name: impl Into<String>, syscall: Syscall) -> Func {
         privacy: Privacy::Public,
     };
 
-    Func {
+    Func::new(
         head,
-        stmts: vec![
+        vec![
             StmtKind::Expr(
                 ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                     kind: syscall,
@@ -42,7 +42,7 @@ fn thin_void_func(name: impl Into<String>, syscall: Syscall) -> Func {
             )
             .at(source),
         ],
-    }
+    )
 }
 
 fn thin_cstring_func(
@@ -68,9 +68,9 @@ fn thin_cstring_func(
         privacy: Privacy::Public,
     };
 
-    Func {
+    Func::new(
         head,
-        stmts: vec![
+        vec![
             StmtKind::Expr(
                 ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                     kind: syscall,
@@ -84,7 +84,7 @@ fn thin_cstring_func(
             )
             .at(source),
         ],
-    }
+    )
 }
 
 pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
@@ -102,8 +102,8 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
     }))
     .at(Source::internal());
 
-    file.funcs.push(Func {
-        head: FuncHead {
+    file.funcs.push(Func::new(
+        FuncHead {
             name: "<interpreter entry point>".into(),
             type_params: TypeParams::default(),
             givens: vec![],
@@ -115,8 +115,8 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             tag: Some(Tag::InterpreterEntryPoint),
             privacy: Privacy::Public,
         },
-        stmts: vec![StmtKind::Return(Some(call)).at(Source::internal())],
-    });
+        vec![StmtKind::Return(Some(call)).at(Source::internal())],
+    ));
 
     file.enums.push(Enum {
         name: "ProjectKind".into(),
@@ -211,8 +211,8 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
         Syscall::DontAssumeIntAtLeast32Bits,
     ));
 
-    file.funcs.push(Func {
-        head: FuncHead {
+    file.funcs.push(Func::new(
+        FuncHead {
             name: "project".into(),
             type_params: TypeParams::default(),
             givens: vec![],
@@ -230,7 +230,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             privacy: Privacy::Public,
             ownership: SymbolOwnership::default(),
         },
-        stmts: vec![
+        vec![
             StmtKind::Expr(
                 ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                     kind: Syscall::BuildAddProject,
@@ -255,10 +255,10 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             )
             .at(source),
         ],
-    });
+    ));
 
-    file.funcs.push(Func {
-        head: FuncHead {
+    file.funcs.push(Func::new(
+        FuncHead {
             name: "use".into(),
             type_params: TypeParams::default(),
             givens: vec![],
@@ -276,7 +276,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             privacy: Privacy::Public,
             ownership: SymbolOwnership::default(),
         },
-        stmts: vec![
+        vec![
             StmtKind::Expr(
                 ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
                     kind: Syscall::UseDependency,
@@ -301,10 +301,10 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             )
             .at(source),
         ],
-    });
+    ));
 
-    file.funcs.push(Func {
-        head: FuncHead {
+    file.funcs.push(Func::new(
+        FuncHead {
             name: "import".into(),
             type_params: TypeParams::default(),
             givens: vec![],
@@ -316,7 +316,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             tag: None,
             privacy: Privacy::Public,
         },
-        stmts: vec![
+        vec![
             StmtKind::Return(Some(
                 ExprKind::StructLiteral(Box::new(StructLiteral {
                     ast_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
@@ -331,7 +331,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             ))
             .at(source),
         ],
-    });
+    ));
 }
 
 pub fn run_build_system_interpreter<'a>(

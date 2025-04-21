@@ -77,8 +77,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         let tag = (name == "main").then_some(Tag::Main);
         let ownership = SymbolOwnership::from_foreign_and_exposed(is_foreign, is_exposed);
 
-        Ok(Func {
-            head: FuncHead {
+        Ok(Func::new(
+            FuncHead {
                 name,
                 type_params,
                 givens,
@@ -91,6 +91,6 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 privacy,
             },
             stmts,
-        })
+        ))
     }
 }

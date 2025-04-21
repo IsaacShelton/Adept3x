@@ -100,8 +100,8 @@ impl PragmaSection {
                 }
             }
 
-            ast_file.funcs.push(Func {
-                head: FuncHead {
+            ast_file.funcs.push(Func::new(
+                FuncHead {
                     name: "main".into(),
                     type_params: TypeParams::default(),
                     givens: vec![],
@@ -114,7 +114,7 @@ impl PragmaSection {
                     privacy: Privacy::Public,
                 },
                 stmts,
-            });
+            ));
         } else {
             return Err(Box::new(ParseError::expected(
                 "'=>' or '{' after 'pragma' keyword",

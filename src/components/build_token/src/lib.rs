@@ -73,6 +73,15 @@ where
                         ['<', '=', ..] => (TokenKind::LeftShiftAssign, 2),
                         ['<', ..] => (TokenKind::LeftShift, 1),
                         ['=', ..] => (TokenKind::LessThanEq, 1),
+
+                        [':', ..] => {
+                            return FeedResult::Has(
+                                TokenKind::Error(
+                                    "Invalid operator '<:', did you mean ':<'?".into(),
+                                )
+                                .at(source),
+                            );
+                        }
                         _ => (TokenKind::LessThan, 0),
                     };
 
@@ -284,6 +293,8 @@ where
                     Has(TokenKind::DeclareAssign.at(source))
                 } else if self.characters.eat(':') {
                     Has(TokenKind::StaticMember.at(source))
+                } else if self.characters.eat('<') {
+                    Has(TokenKind::BindSymbol.at(source))
                 } else {
                     Has(TokenKind::Colon.at(source))
                 }

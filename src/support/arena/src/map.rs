@@ -1,8 +1,5 @@
-use crate::{Arena, Id, Idx, IdxSpan, MapIdx, MapIdxSpan, NewId};
-use core::{
-    marker::PhantomData,
-    ops::{Index, IndexMut},
-};
+use crate::{Arena, Idx, NewId};
+use core::marker::PhantomData;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ArenaMap<K: NewId, V> {

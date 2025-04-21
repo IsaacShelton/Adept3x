@@ -140,6 +140,7 @@ pub enum TokenKind {
     Increment,
     Decrement,
     StaticMember,
+    BindSymbol,
     Extend,
     FatArrow,
     ShortGeneric,
@@ -238,6 +239,7 @@ impl Display for TokenKind {
             TokenKind::Increment => f.write_str("'++'"),
             TokenKind::Decrement => f.write_str("'--'"),
             TokenKind::StaticMember => f.write_str("'::'"),
+            TokenKind::BindSymbol => f.write_str("':<'"),
             TokenKind::Extend => f.write_str("'..'"),
             TokenKind::FatArrow => f.write_str("'=>'"),
             TokenKind::ShortGeneric => f.write_str("short generic '#'"),
@@ -337,7 +339,8 @@ impl TokenKind {
             | TokenKind::StaticMember
             | TokenKind::Extend
             | TokenKind::FatArrow
-            | TokenKind::ShortGeneric => 0,
+            | TokenKind::ShortGeneric
+            | TokenKind::BindSymbol => 0,
         }
     }
 

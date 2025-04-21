@@ -665,7 +665,12 @@ version = "0.1.0"
 dependencies = [
  "append-only-vec",
  "arena",
+ "asg",
+ "ast",
+ "ast_workspace",
  "indexed_arena",
+ "ir",
+ "source_files",
 ]
 
 [[package]]

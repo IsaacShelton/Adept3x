@@ -20,6 +20,7 @@ pub fn resolve_conditional_expr(
     let ast::Conditional {
         conditions,
         otherwise,
+        ..
     } = conditional;
 
     let mut branches_without_else = Vec::with_capacity(conditions.len());

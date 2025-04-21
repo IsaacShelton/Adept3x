@@ -1,6 +1,7 @@
 mod params;
 
 use super::{Given, Stmt, Type, TypeParams};
+use crate::{UntypedCfg, flatten_func_ignore_const_evals};
 use attributes::{Privacy, SymbolOwnership, Tag};
 pub use params::{Param, Params};
 use source_files::Source;
@@ -9,6 +10,14 @@ use source_files::Source;
 pub struct Func {
     pub head: FuncHead,
     pub stmts: Vec<Stmt>,
+    pub cfg: UntypedCfg,
+}
+
+impl Func {
+    pub fn new(head: FuncHead, stmts: Vec<Stmt>) -> Self {
+        let cfg = flatten_func_ignore_const_evals(&stmts, head.source);
+        Self { head, stmts, cfg }
+    }
 }
 
 #[derive(Clone, Debug)]

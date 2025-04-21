@@ -272,6 +272,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     })
                     .transpose()?;
 
+                let conditions = conditions.into_boxed_slice();
+
                 let conditional = Conditional {
                     conditions,
                     otherwise,
