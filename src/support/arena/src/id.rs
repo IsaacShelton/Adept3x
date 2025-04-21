@@ -10,12 +10,12 @@ pub trait Id: Copy + Ord + Debug {
 
     /// Converts a `usize` value to this id type.
     ///
-    /// The input `idx` (should / is guaranteed to) be less than `Self::MAX`.
+    /// The input `idx` must be less or equal to `Self::MAX`
     fn from_usize(idx: usize) -> Self;
 
     /// Converts this id type into a `usize`.
     ///
-    /// The returned value (should / is guaranteed to) be less than `Self::MAX`.
+    /// The returned value must be less or equal to `Self::MAX`.
     fn into_usize(self) -> usize;
 
     /// Gets the successor of this id

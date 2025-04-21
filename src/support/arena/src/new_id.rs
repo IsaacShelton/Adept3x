@@ -13,6 +13,7 @@ macro_rules! new_id {
 
             #[inline]
             fn from_usize(idx: usize) -> Self {
+                ::arena::assert_fits_or_practically_impossible!(idx, $ty);
                 Self(idx as $ty)
             }
 
@@ -32,6 +33,17 @@ macro_rules! new_id {
 }
 
 #[macro_export]
+macro_rules! assert_fits_or_practically_impossible {
+    ($idx: expr, $ty: ty) => {
+        if const { ::core::mem::size_of::<$ty>() < ::core::mem::size_of::<u64>() }
+            || cfg!(debug_assertions)
+        {
+            assert!($idx <= <$ty>::MAX as usize);
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! new_id_with_niche {
     ($name: ident, $ty: ty) => {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -42,17 +54,8 @@ macro_rules! new_id_with_niche {
 
             #[inline]
             fn from_usize(idx: usize) -> Self {
-                if !cfg!(debug_assertions)
-                    && const { ::core::mem::size_of::<$ty>() < ::core::mem::size_of::<u64>() }
-                {
-                    // If NOT in debug mode and using a type smaller than u64, manually unwrap
-                    Self(::core::num::NonZero::new((idx + 1) as $ty).expect("arena id overflowed"))
-                } else {
-                    // Otherwise,
-                    // In release, we should run out of memory before this would ever happen
-                    // In debug, the overflow of the addition should panic
-                    unsafe { Self(::core::num::NonZero::new_unchecked((idx + 1) as $ty)) }
-                }
+                ::arena::assert_fits_or_practically_impossible!(idx, $ty);
+                unsafe { Self(::core::num::NonZero::new_unchecked((idx + 1) as $ty)) }
             }
 
             #[inline]

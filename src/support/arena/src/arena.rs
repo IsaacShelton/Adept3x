@@ -18,6 +18,8 @@ use core::{
 /// strongly-typed index ([`Idx<K, V>`]). The index not only represents the position
 /// in the underlying vector but also leverages the type system to prevent accidental misuse
 /// across different arenas.
+///
+/// The size of of `V` must not be zero.
 pub struct Arena<K: Id, V> {
     data: Vec<V>,
     phantom: PhantomData<(K, V)>,
