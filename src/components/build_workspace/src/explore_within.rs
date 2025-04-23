@@ -3,7 +3,10 @@ use super::{
     module_file::ModuleFile,
 };
 use fs_tree::{Fs, FsNodeId};
-use std::path::{Path, PathBuf};
+use std::{
+    num::NonZero,
+    path::{Path, PathBuf},
+};
 
 pub struct ExploreWithinResult {
     pub explored: ExploreResult,
@@ -14,10 +17,11 @@ pub fn explore_within(
     fs: &Fs,
     project_folder: &Path,
     single_file: Option<PathBuf>,
+    num_threads: NonZero<usize>,
 ) -> Result<ExploreWithinResult, ()> {
     Ok(match single_file {
         None => ExploreWithinResult {
-            explored: explore(fs, project_folder)?,
+            explored: explore(fs, project_folder, num_threads)?,
             entry: None,
         },
         Some(single_file) => {

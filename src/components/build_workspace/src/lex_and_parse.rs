@@ -1,14 +1,13 @@
 use super::{
     compile::{
         compile_code_file,
-        module::{compile_module_file, CompiledModule},
+        module::{CompiledModule, compile_module_file},
     },
-    explore::{explore, ExploreResult},
+    explore::{ExploreResult, explore},
     file::CodeFile,
     module_file::ModuleFile,
     queue::WorkspaceQueue,
     stats::CompilationStats,
-    NUM_THREADS,
 };
 use ast_workspace_settings::Settings;
 use compiler::Compiler;
@@ -18,7 +17,7 @@ use infinite_iterator::InfinitePeekable;
 use line_column::Location;
 use path_absolutize::Absolutize;
 use source_files::{Source, SourceFileKey};
-use std::sync::Barrier;
+use std::{num::NonZero, sync::Barrier};
 use token::Token;
 
 pub fn lex_and_parse_workspace_in_parallel<'a>(
@@ -33,7 +32,8 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
     } = explored;
 
     let source_files = compiler.source_files;
-    let thread_count = (normal_files.len() + module_files.len()).min(NUM_THREADS);
+    let thread_count =
+        (normal_files.len() + module_files.len()).min(compiler.options.available_parallelism.get());
 
     let all_modules_done = Barrier::new(thread_count);
     let queue = WorkspaceQueue::new(normal_files, module_files);
@@ -147,7 +147,10 @@ fn queue_dependencies<I: InfinitePeekable<Token>>(
 
         if !already_discovered {
             // Find files in dependency codebase
-            let Ok(new_files) = explore(&fs, &absolute_folder_path) else {
+            // NOTE: PERFORMANCE: We should probably have a better way
+            // to divide the parallelism or exploring files
+            let Ok(new_files) = explore(&fs, &absolute_folder_path, NonZero::new(1).unwrap())
+            else {
                 ErrorDiagnostic::new(
                     format!("Dependency '{}' could not be found", &**folder),
                     Source::new(source_file, Location::new(0, 1)),

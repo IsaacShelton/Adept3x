@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{num::NonZero, path::PathBuf};
 use target::Target;
 
 #[derive(Clone, Debug)]
@@ -12,6 +12,7 @@ pub struct BuildOptions {
     pub use_pic: Option<bool>,
     pub target: Target,
     pub infrastructure: Option<PathBuf>,
+    pub available_parallelism: NonZero<usize>,
 }
 
 impl Default for BuildOptions {
@@ -23,6 +24,7 @@ impl Default for BuildOptions {
             .to_path_buf();
 
         let infrastructure = current_exe.join("infrastructure");
+        let available_parallelism = NonZero::new(num_cpus::get()).unwrap();
 
         Self {
             emit_llvm_ir: false,
@@ -34,6 +36,7 @@ impl Default for BuildOptions {
             use_pic: None,
             target: Target::HOST,
             infrastructure: Some(infrastructure),
+            available_parallelism,
         }
     }
 }

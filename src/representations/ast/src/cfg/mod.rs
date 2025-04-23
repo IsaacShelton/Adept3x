@@ -14,6 +14,7 @@ pub struct Cursor {
     position: Option<CursorPosition>,
 }
 
+#[allow(dead_code)]
 impl Cursor {
     pub fn terminated() -> Self {
         Self { position: None }
@@ -62,6 +63,7 @@ pub struct Builder<'const_evals> {
     const_evals: &'const_evals mut Arena<ConstEvalId, ConstEval>,
 }
 
+#[allow(dead_code)]
 impl<'const_evals> Builder<'const_evals> {
     #[must_use]
     pub fn new(
@@ -320,6 +322,7 @@ new_id_with_niche!(ConstEvalId, u64);
 
 pub type ConstEvalRef = Idx<ConstEvalId, ConstEval>;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct ConstEval {
     context: HashMap<String, Vec<SymbolBinding>>,
@@ -876,6 +879,7 @@ pub struct UntypedCfg {
     pub ordered_nodes: Arena<NodeId, Node>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Node {
     kind: NodeKind,
@@ -909,12 +913,14 @@ pub fn connect(nodes: &mut Arena<NodeId, Node>, from: CursorPosition, to: NodeRe
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct SequentialNode {
     kind: SequentialNodeKind,
     next: Option<NodeRef>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Join {
     parent_a: NodeRef,
@@ -961,6 +967,7 @@ pub enum SequentialNodeKind {
     ConformToBool(Language),
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct NodeCall {
     name: Name,
@@ -1011,6 +1018,7 @@ pub struct NodeInterpreterSyscall {
     pub result_type: Type,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct BranchNode {
     condition: NodeRef,

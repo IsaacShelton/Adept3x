@@ -6,7 +6,6 @@
 */
 
 use super::{
-    NUM_THREADS,
     module_file::ModuleFile,
     normal_file::{NormalFile, NormalFileKind},
 };
@@ -17,6 +16,7 @@ use path_absolutize::Absolutize;
 use std::{
     ffi::OsStr,
     fs::FileType,
+    num::NonZero,
     path::Path,
     sync::atomic::{self, AtomicBool},
     time::UNIX_EPOCH,
@@ -27,7 +27,11 @@ pub struct ExploreResult {
     pub module_files: Vec<ModuleFile>,
 }
 
-pub fn explore(fs: &Fs, folder_path: &Path) -> Result<ExploreResult, ()> {
+pub fn explore(
+    fs: &Fs,
+    folder_path: &Path,
+    num_threads: NonZero<usize>,
+) -> Result<ExploreResult, ()> {
     let normal_files = AppendOnlyVec::new();
     let module_files = AppendOnlyVec::new();
 
@@ -36,7 +40,7 @@ pub fn explore(fs: &Fs, folder_path: &Path) -> Result<ExploreResult, ()> {
         .expect("failed to get absolute path");
 
     let walker = WalkBuilder::new(folder_path)
-        .threads(NUM_THREADS)
+        .threads(num_threads.get())
         .standard_filters(false)
         .hidden(true) // Ignore hidden files
         .build_parallel();

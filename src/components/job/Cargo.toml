@@ -6,9 +6,12 @@ edition = "2024"
 [dependencies]
 append-only-vec.workspace = true
 arena = { version = "0.1.0", path = "../../support/arena" }
+arrayvec = "0.7.6"
 asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
+compiler = { version = "0.1.0", path = "../../support/compiler" }
 indexed_arena = "0.4.0"
 ir = { version = "0.1.0", path = "../../representations/ir" }
+num_cpus = "1.16.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }

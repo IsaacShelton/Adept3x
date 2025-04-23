@@ -35,8 +35,6 @@ use std::{
 };
 use thousands::Separable;
 
-const NUM_THREADS: usize = 8;
-
 pub fn compile_single_file_only(
     compiler: &mut Compiler,
     project_folder: &Path,
@@ -56,10 +54,15 @@ pub fn compile_workspace(
     let source_files = compiler.source_files;
 
     // Find workspace files
-    let ExploreWithinResult { explored, entry } = explore_within(&fs, project_folder, single_file)
-        .map_err(|_| {
-            eprintln!("error: Failed to explore workspace folder");
-        })?;
+    let ExploreWithinResult { explored, entry } = explore_within(
+        &fs,
+        project_folder,
+        single_file,
+        compiler.options.available_parallelism,
+    )
+    .map_err(|_| {
+        eprintln!("error: Failed to explore workspace folder");
+    })?;
 
     // Lex, parse, apply per-file settings, and bring in dependencies as requested
     let queue = lex_and_parse_workspace_in_parallel(compiler, &fs, explored, &stats)?;
