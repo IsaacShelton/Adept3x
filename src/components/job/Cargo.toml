@@ -11,7 +11,8 @@ asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
 compiler = { version = "0.1.0", path = "../../support/compiler" }
-indexed_arena = "0.4.0"
+derive_more.workspace = true
+enum_dispatch.workspace = true
 ir = { version = "0.1.0", path = "../../representations/ir" }
 num_cpus = "1.16.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }

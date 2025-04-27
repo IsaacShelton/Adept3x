@@ -605,12 +605,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "indexed_arena"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8d9ca693eae6ed3d35196d814b7afee89ec22dc257a896e2b70b8fd49edc39"
-
-[[package]]
 name = "indexmap"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -683,7 +677,8 @@ dependencies = [
  "ast",
  "ast_workspace",
  "compiler",
- "indexed_arena",
+ "derive_more",
+ "enum_dispatch",
  "ir",
  "num_cpus",
  "source_files",
