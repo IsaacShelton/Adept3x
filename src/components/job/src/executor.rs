@@ -2,7 +2,7 @@ use crate::{Execution, Task, TaskRef, TaskState, Truth, WaitingCount, Worker};
 use crossbeam_deque::{Injector as InjectorQueue, Stealer};
 use std::{
     sync::{
-        Mutex, RwLock,
+        RwLock,
         atomic::{AtomicUsize, Ordering},
     },
     thread,
@@ -19,7 +19,6 @@ pub struct Executor {
     pub injector: InjectorQueue<TaskRef>,
     pub truth: RwLock<Truth>,
     pub stealers: Box<[Stealer<TaskRef>]>,
-    pub workers_done: Mutex<Box<[bool]>>,
     pub num_completed: AtomicUsize,
     pub num_scheduled: AtomicUsize,
     pub num_queued: AtomicUsize,
@@ -31,7 +30,6 @@ impl Executor {
         Self {
             truth: RwLock::new(Truth::new()),
             injector: InjectorQueue::new(),
-            workers_done: Mutex::new((0..stealers.len()).map(|_| false).collect()),
             stealers,
             num_scheduled: AtomicUsize::new(0),
             num_completed: AtomicUsize::new(0),

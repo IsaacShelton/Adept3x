@@ -40,12 +40,10 @@ impl Worker {
                 }
 
                 executor.num_cleared.fetch_add(1, Ordering::SeqCst);
-            } else {
-                if executor.num_cleared.load(Ordering::SeqCst)
-                    == executor.num_queued.load(Ordering::SeqCst)
-                {
-                    break;
-                }
+            } else if executor.num_cleared.load(Ordering::SeqCst)
+                == executor.num_queued.load(Ordering::SeqCst)
+            {
+                break;
             }
         }
     }
