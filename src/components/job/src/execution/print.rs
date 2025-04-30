@@ -17,12 +17,12 @@ impl Print {
 }
 
 impl Execute for Print {
-    fn execute(self, executor: &Executor) -> Progress {
+    fn execute(self, executor: &Executor, _: TaskRef) -> Progress {
         if !self.indented {
             print!("> ");
 
             return Progress::suspend(
-                vec![],
+                vec![self.message],
                 Print {
                     message: self.message,
                     indented: true,

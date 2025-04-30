@@ -17,7 +17,7 @@ impl PrintMessage {
 }
 
 impl Execute for PrintMessage {
-    fn execute(self, executor: &Executor) -> Progress {
+    fn execute(self, executor: &Executor, _: TaskRef) -> Progress {
         let Some(message_ref) = self.task_ref else {
             let message_ref = executor.push(CreateString::new(self.message));
 
@@ -30,11 +30,13 @@ impl Execute for PrintMessage {
             );
         };
 
-        let content = executor.truth.read().unwrap().tasks[message_ref]
-            .state
-            .unwrap_completed()
-            .unwrap_string()
-            .to_string();
+        let content = {
+            executor.truth.read().unwrap().tasks[message_ref]
+                .state
+                .unwrap_completed()
+                .unwrap_string()
+                .to_string()
+        };
 
         if content.len() < 1000 {
             let message_ref = executor.push(CreateString::new(format!("{} {}", content, content)));

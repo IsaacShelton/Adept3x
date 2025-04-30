@@ -2,57 +2,71 @@ use crate::{
     Artifact, Execute, Execution, Executor, Progression, TaskRef, TaskState, WaitingCount,
     WorkerRef,
 };
-use std::mem;
+use crossbeam_deque::{Stealer, Worker as WorkerQueue};
+use std::{iter, mem, sync::atomic::Ordering};
 
 pub struct Worker {
-    pub done: bool,
-    pub batch: Vec<TaskRef>,
+    pub worker_ref: WorkerRef,
+    pub queue: WorkerQueue<TaskRef>,
 }
 
 impl Worker {
-    pub fn new() -> Self {
+    pub fn new(worker_ref: WorkerRef) -> Self {
         Worker {
-            done: false,
-            batch: Vec::new(),
+            worker_ref,
+            queue: WorkerQueue::new_lifo(),
         }
     }
 
-    pub fn start(worker_ref: WorkerRef, executor: &Executor) {
-        let mut guard = executor.workers[worker_ref].0.lock().unwrap();
-
+    pub fn start(&self, executor: &Executor) {
         loop {
-            let (task_ref, execution) = loop {
-                if let Some(has) = guard.next_task(executor) {
-                    break has;
+            if let Some(task_ref) = self.find_task(executor, &executor.stealers) {
+                let (execution, _waiting_count) = {
+                    mem::replace(
+                        &mut executor.truth.write().unwrap().tasks[task_ref].state,
+                        TaskState::Running,
+                    )
+                    .unwrap_suspended()
+                };
+
+                match execution.execute(executor, task_ref).progression() {
+                    Progression::Complete(artifact) => {
+                        executor.num_completed.fetch_add(1, Ordering::SeqCst);
+                        self.complete(executor, task_ref, artifact);
+                    }
+                    Progression::Suspend(waiting, execution) => {
+                        self.suspend(executor, task_ref, waiting, execution);
+                    }
                 }
 
-                if guard.done {
-                    return;
-                }
-
-                guard = executor.workers[worker_ref].1.wait(guard).unwrap();
-            };
-
-            match execution.execute(executor).progression() {
-                Progression::Complete(artifact) => {
-                    guard.complete(executor, task_ref, artifact);
-                }
-                Progression::Suspend(waiting, execution) => {
-                    guard.suspend(executor, task_ref, waiting, execution);
+                executor.num_cleared.fetch_add(1, Ordering::SeqCst);
+            } else {
+                if executor.num_cleared.load(Ordering::SeqCst)
+                    == executor.num_queued.load(Ordering::SeqCst)
+                {
+                    break;
                 }
             }
         }
     }
 
-    fn next_task(&self, executor: &Executor) -> Option<(TaskRef, Execution)> {
-        let mut truth = executor.truth.write().unwrap();
-        let task_ref = truth.queue.pop_front()?;
-
-        let (execution, waiting_count) =
-            mem::replace(&mut truth.tasks[task_ref].state, TaskState::Running).unwrap_suspended();
-
-        assert_eq!(waiting_count.0, 0);
-        Some((task_ref, execution))
+    fn find_task(&self, executor: &Executor, stealers: &[Stealer<TaskRef>]) -> Option<TaskRef> {
+        // Pop a task from the local queue, if not empty.
+        self.queue.pop().or_else(|| {
+            // Otherwise, we need to look for a task elsewhere.
+            iter::repeat_with(|| {
+                // Try stealing a batch of tasks from the global queue.
+                executor
+                    .injector
+                    .steal_batch_and_pop(&self.queue)
+                    // Or try stealing a task from one of the other threads.
+                    .or_else(|| stealers.iter().map(|s| s.steal()).collect())
+            })
+            // Loop while no task was stolen and any steal operation needs to be retried.
+            .find(|s| !s.is_retry())
+            // Extract the stolen task, if there is one.
+            .and_then(|s| s.success())
+        })
     }
 
     fn complete(&self, executor: &Executor, task_ref: TaskRef, artifact: Artifact) {
@@ -67,7 +81,8 @@ impl Worker {
         for dependent in dependents {
             if let TaskState::Suspended(_, waiting_count) = &mut truth.tasks[dependent].state {
                 if waiting_count.decrement() {
-                    truth.queue.push_back(dependent);
+                    executor.num_queued.fetch_add(1, Ordering::SeqCst);
+                    self.queue.push(dependent);
                 }
             }
         }
@@ -80,16 +95,25 @@ impl Worker {
         waiting: Vec<TaskRef>,
         execution: Execution,
     ) {
-        let truth = &mut executor.truth.write().unwrap();
-        let task = &mut truth.tasks[task_ref];
-        task.state = TaskState::Suspended(execution, WaitingCount(waiting.len()));
+        let mut wait_on = 0;
 
-        for dependent in &waiting {
-            truth.tasks[*dependent].dependents.push(task_ref);
+        {
+            let truth = &mut executor.truth.write().unwrap();
+
+            truth.tasks[task_ref].state =
+                TaskState::Suspended(execution, WaitingCount(waiting.len()));
+
+            for dependent in &waiting {
+                if truth.tasks[*dependent].state.completed().is_none() {
+                    truth.tasks[*dependent].dependents.push(task_ref);
+                    wait_on += 1;
+                }
+            }
         }
 
-        if waiting.len() == 0 {
-            truth.queue.push_back(task_ref);
+        if wait_on == 0 {
+            executor.num_queued.fetch_add(1, Ordering::SeqCst);
+            self.queue.push(task_ref);
         }
     }
 }

@@ -677,6 +677,7 @@ dependencies = [
  "ast",
  "ast_workspace",
  "compiler",
+ "crossbeam-deque",
  "derive_more",
  "enum_dispatch",
  "ir",

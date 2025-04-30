@@ -1,91 +1,104 @@
 use crate::{Execution, Task, TaskRef, TaskState, Truth, WaitingCount, Worker};
-use arena::{Arena, Idx, IdxSpan, new_id_with_niche};
+use crossbeam_deque::{Injector as InjectorQueue, Stealer};
 use std::{
     sync::{
-        Condvar, Mutex, MutexGuard, RwLock,
+        Mutex, RwLock,
         atomic::{AtomicUsize, Ordering},
     },
     thread,
 };
 
-new_id_with_niche!(WorkerId, u8);
-pub type WorkerRef = Idx<WorkerId, Worker>;
+pub struct WorkerRef(pub usize);
+
+pub struct MainExecutor {
+    pub workers: Box<[Worker]>,
+    pub executor: Executor,
+}
 
 pub struct Executor {
+    pub injector: InjectorQueue<TaskRef>,
     pub truth: RwLock<Truth>,
-    pub workers: Arena<WorkerId, Worker>,
-    pub worker_refs: IdxSpan<WorkerId, Worker>,
-    pub workers_alive: AtomicUsize,
-    pub done: Mutex<bool>,
-    pub condvar: Condvar,
+    pub stealers: Box<[Stealer<TaskRef>]>,
+    pub workers_done: Mutex<Box<[bool]>>,
+    pub num_completed: AtomicUsize,
+    pub num_scheduled: AtomicUsize,
+    pub num_queued: AtomicUsize,
+    pub num_cleared: AtomicUsize,
 }
 
 impl Executor {
-    pub fn new(num_threads: usize) -> Self {
-        let mut workers = Arena::new();
-        let worker_refs =
-            workers.alloc_many(std::iter::from_fn(|| Some(Worker::new())).take(num_threads));
-
+    pub fn new(stealers: Box<[Stealer<TaskRef>]>) -> Self {
         Self {
             truth: RwLock::new(Truth::new()),
-            workers,
-            worker_refs,
-            workers_alive: AtomicUsize::new(num_threads),
-            done: Mutex::new(false),
-            condvar: Condvar::new(),
-        }
-    }
-}
-
-impl Executor {
-    pub fn start(&self) {
-        thread::scope(|scope| {
-            for worker_ref in self.worker_refs.iter() {
-                scope.spawn(move || Worker::start(worker_ref, self));
-            }
-        });
-    }
-
-    fn is_all_done<'a>(&self) -> bool {
-        let is_last_worker = self.workers_alive.fetch_sub(1, Ordering::SeqCst) == 1;
-
-        if is_last_worker {
-            *self.done.lock().unwrap() = true;
-            self.condvar.notify_all();
-            return true;
-        }
-
-        let mut all_done = self.done.lock().unwrap();
-
-        loop {
-            if *all_done {
-                return true;
-            }
-
-            if !self.truth.read().unwrap().queue.is_empty() {
-                self.workers_alive.fetch_add(1, Ordering::SeqCst);
-                return false;
-            }
-
-            all_done = self.condvar.wait(all_done).unwrap();
+            injector: InjectorQueue::new(),
+            workers_done: Mutex::new((0..stealers.len()).map(|_| false).collect()),
+            stealers,
+            num_scheduled: AtomicUsize::new(0),
+            num_completed: AtomicUsize::new(0),
+            num_queued: AtomicUsize::new(0),
+            num_cleared: AtomicUsize::new(0),
         }
     }
 
     pub fn push(&self, execution: impl Into<Execution>) -> TaskRef {
-        let mut truth = self.truth.write().unwrap();
+        self.num_scheduled.fetch_add(1, Ordering::SeqCst);
+        let task_ref = {
+            let mut truth = self.truth.write().unwrap();
 
-        let task_ref = truth.tasks.alloc(Task {
-            state: TaskState::Suspended(execution.into(), WaitingCount::default()),
-            dependents: vec![],
+            truth.tasks.alloc(Task {
+                state: TaskState::Suspended(execution.into(), WaitingCount::default()),
+                dependents: vec![],
+            })
+        };
+
+        self.num_queued.fetch_add(1, Ordering::SeqCst);
+        self.injector.push(task_ref);
+        task_ref
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MainExecutorStats {
+    pub num_completed: usize,
+    pub num_scheduled: usize,
+    pub num_cleared: usize,
+    pub num_queued: usize,
+}
+
+impl MainExecutor {
+    pub fn new(num_threads: usize) -> Self {
+        let workers = (0..num_threads)
+            .map(|worker_id| Worker::new(WorkerRef(worker_id)))
+            .collect::<Box<_>>();
+
+        let stealers = workers
+            .iter()
+            .map(|worker| worker.queue.stealer())
+            .collect::<Box<_>>();
+
+        Self {
+            executor: Executor::new(stealers),
+            workers,
+        }
+    }
+
+    pub fn start(self) -> MainExecutorStats {
+        thread::scope(|scope| {
+            for worker in self.workers.into_iter() {
+                let executor = &self.executor;
+                scope.spawn(move || worker.start(executor));
+            }
         });
 
-        truth.queue.push_back(task_ref);
-
-        // TODO: Improve this, and use separate queue for each worker
-        for (_, (_, condvar)) in self.workers.iter() {
-            condvar.notify_one();
+        MainExecutorStats {
+            num_completed: self.executor.num_completed.load(Ordering::Relaxed),
+            num_scheduled: self.executor.num_scheduled.load(Ordering::Relaxed),
+            num_cleared: self.executor.num_cleared.load(Ordering::Relaxed),
+            num_queued: self.executor.num_queued.load(Ordering::Relaxed),
         }
+    }
 
-        task_ref
+    pub fn push(&self, execution: impl Into<Execution>) -> TaskRef {
+        self.executor.push(execution)
     }
 }

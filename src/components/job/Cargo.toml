@@ -11,6 +11,7 @@ asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
 compiler = { version = "0.1.0", path = "../../support/compiler" }
+crossbeam-deque = "0.8.6"
 derive_more.workspace = true
 enum_dispatch.workspace = true
 ir = { version = "0.1.0", path = "../../representations/ir" }

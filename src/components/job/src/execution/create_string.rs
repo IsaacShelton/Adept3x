@@ -1,5 +1,5 @@
 use super::Execute;
-use crate::{Artifact, Executor, Progress};
+use crate::{Artifact, Executor, Progress, TaskRef};
 
 #[derive(Debug)]
 pub struct CreateString {
@@ -13,7 +13,7 @@ impl CreateString {
 }
 
 impl Execute for CreateString {
-    fn execute(self, _executor: &Executor) -> Progress {
+    fn execute(self, _executor: &Executor, _: TaskRef) -> Progress {
         Artifact::String(self.string).into()
     }
 }
