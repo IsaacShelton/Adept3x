@@ -10,10 +10,14 @@ arrayvec = "0.7.6"
 asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
+beef = "0.5.2"
 compiler = { version = "0.1.0", path = "../../support/compiler" }
 crossbeam-deque = "0.8.6"
 derive_more.workspace = true
+diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
 enum_dispatch.workspace = true
+fs_tree = { version = "0.1.0", path = "../../representations/fs_tree" }
 ir = { version = "0.1.0", path = "../../representations/ir" }
 num_cpus = "1.16.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
+target = { version = "0.1.0", path = "../../support/target" }

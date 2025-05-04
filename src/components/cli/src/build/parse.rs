@@ -10,6 +10,7 @@ impl BuildCommand {
 
         while let Some(option) = args.next() {
             match option.as_str() {
+                "-x" => options.new_compilation_system = true,
                 "-e" => options.execute_result = true,
                 "--emit-ir" => options.emit_ir = true,
                 "--emit-llvm-ir" => options.emit_llvm_ir = true,

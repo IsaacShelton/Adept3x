@@ -5,12 +5,12 @@ use crate::{
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
 
-pub struct Worker {
+pub struct Worker<'outside> {
     pub worker_ref: WorkerRef,
-    pub queue: WorkerQueue<TaskRef>,
+    pub queue: WorkerQueue<TaskRef<'outside>>,
 }
 
-impl Worker {
+impl<'outside> Worker<'outside> {
     pub fn new(worker_ref: WorkerRef) -> Self {
         Worker {
             worker_ref,
@@ -18,7 +18,7 @@ impl Worker {
         }
     }
 
-    pub fn start(&self, executor: &Executor) {
+    pub fn start(&self, executor: &Executor<'outside>) {
         loop {
             if let Some(task_ref) = self.find_task(executor, &executor.stealers) {
                 let (execution, _waiting_count) = {
@@ -37,6 +37,9 @@ impl Worker {
                     Progression::Suspend(waiting, execution) => {
                         self.suspend(executor, task_ref, waiting, execution);
                     }
+                    Progression::Error(error) => {
+                        eprintln!("error: {}", error);
+                    }
                 }
 
                 executor.num_cleared.fetch_add(1, Ordering::SeqCst);
@@ -48,7 +51,11 @@ impl Worker {
         }
     }
 
-    fn find_task(&self, executor: &Executor, stealers: &[Stealer<TaskRef>]) -> Option<TaskRef> {
+    fn find_task(
+        &self,
+        executor: &Executor<'outside>,
+        stealers: &[Stealer<TaskRef<'outside>>],
+    ) -> Option<TaskRef<'outside>> {
         // Pop a task from the local queue, if not empty.
         self.queue.pop().or_else(|| {
             // Otherwise, we need to look for a task elsewhere.
@@ -67,7 +74,12 @@ impl Worker {
         })
     }
 
-    fn complete(&self, executor: &Executor, task_ref: TaskRef, artifact: Artifact) {
+    fn complete(
+        &self,
+        executor: &Executor<'outside>,
+        task_ref: TaskRef<'outside>,
+        artifact: Artifact<'outside>,
+    ) {
         let truth = &mut executor.truth.write().unwrap();
 
         let dependents = {
@@ -88,10 +100,10 @@ impl Worker {
 
     fn suspend(
         &self,
-        executor: &Executor,
-        task_ref: TaskRef,
-        waiting: Vec<TaskRef>,
-        execution: Execution,
+        executor: &Executor<'outside>,
+        task_ref: TaskRef<'outside>,
+        waiting: Vec<TaskRef<'outside>>,
+        execution: Execution<'outside>,
     ) {
         let mut wait_on = 0;
 

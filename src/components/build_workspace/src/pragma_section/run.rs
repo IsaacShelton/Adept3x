@@ -33,6 +33,7 @@ impl PragmaSection {
                 target: Target::default(),
                 infrastructure: None,
                 available_parallelism: base_compiler.options.available_parallelism,
+                new_compilation_system: base_compiler.options.new_compilation_system,
             },
             source_files: base_compiler.source_files,
             diagnostics: base_compiler.diagnostics,

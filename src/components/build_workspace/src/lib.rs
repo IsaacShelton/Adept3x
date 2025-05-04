@@ -27,6 +27,7 @@ use export_and_link::export_and_link;
 use fs_tree::Fs;
 use indexmap::IndexMap;
 use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
+use job::Artifact;
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
 use stats::CompilationStats;
 use std::{
@@ -85,6 +86,56 @@ pub fn compile_workspace(
 
     // Compile ASTs into workspace and propagate module settings to each module's contained files
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
+
+    // Work-in-Progress: New compilation system
+    #[allow(unreachable_code)]
+    #[allow(unused_variables)]
+    if compiler.options.new_compilation_system {
+        let executor = job::MainExecutor::new(compiler.options.available_parallelism);
+
+        let first_fs_node_id = workspace
+            .files
+            .iter()
+            .next()
+            .map(|file| file.0)
+            .expect("at least one file");
+        let identifiers_task = executor.push(job::IdentifiersHashMap(&workspace, first_fs_node_id));
+
+        let executed = executor.start();
+        let show_executor_stats = false;
+
+        if executed.num_scheduled != executed.num_completed {
+            let num_cyclic = executed.num_scheduled - executed.num_completed;
+
+            if num_cyclic == 1 {
+                println!("error: {} cyclic dependency found!", num_cyclic);
+            } else {
+                println!("error: {} cyclic dependencies found!", num_cyclic);
+            }
+        } else if show_executor_stats {
+            println!(
+                "Tasks: {}/{}",
+                executed.num_completed, executed.num_scheduled,
+            );
+            println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
+        }
+
+        let Artifact::Identifiers(identifiers) = executed.truth.tasks[identifiers_task]
+            .state
+            .unwrap_completed()
+        else {
+            panic!("oops aameirmgogmo");
+        };
+
+        println!("{:?}", &identifiers);
+
+        let ir_module = todo!("need ir_module from executed tasks");
+
+        // Export and link to create executable
+        let export_details = export_and_link(compiler, project_folder, &ir_module)?;
+        print_summary(&stats);
+        return compiler.execute_result(&export_details.executable_filepath);
+    }
 
     // Resolve symbols and validate semantics for workspace
     let asg = unerror(resolve(&workspace, &compiler.options), source_files)?;

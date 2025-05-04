@@ -12,8 +12,8 @@ impl CreateString {
     }
 }
 
-impl Execute for CreateString {
-    fn execute(self, _executor: &Executor, _: TaskRef) -> Progress {
+impl<'outside> Execute<'outside> for CreateString {
+    fn execute(self, _executor: &Executor<'outside>, _: TaskRef<'outside>) -> Progress<'outside> {
         Artifact::String(self.string).into()
     }
 }

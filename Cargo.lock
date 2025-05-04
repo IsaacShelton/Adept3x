@@ -142,6 +142,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "beef"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
+
+[[package]]
 name = "bitflags"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -344,6 +350,7 @@ dependencies = [
  "interpreter_api",
  "ir",
  "itertools",
+ "job",
  "line_column",
  "path-absolutize",
  "pp_ast",
@@ -676,13 +683,17 @@ dependencies = [
  "asg",
  "ast",
  "ast_workspace",
+ "beef",
  "compiler",
  "crossbeam-deque",
  "derive_more",
+ "diagnostics",
  "enum_dispatch",
+ "fs_tree",
  "ir",
  "num_cpus",
  "source_files",
+ "target",
 ]
 
 [[package]]

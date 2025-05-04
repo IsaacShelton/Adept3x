@@ -33,6 +33,7 @@ interpret = { version = "0.1.0", path = "../interpret" }
 interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }
 ir = { version = "0.1.0", path = "../../representations/ir" }
 itertools.workspace = true
+job = { version = "0.1.0", path = "../job" }
 line_column = { version = "0.1.0", path = "../../support/line_column" }
 path-absolutize.workspace = true
 pp_ast = { version = "0.1.0", path = "../../representations/pp_ast" }

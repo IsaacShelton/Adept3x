@@ -13,6 +13,7 @@ pub struct BuildOptions {
     pub target: Target,
     pub infrastructure: Option<PathBuf>,
     pub available_parallelism: NonZero<usize>,
+    pub new_compilation_system: bool,
 }
 
 impl Default for BuildOptions {
@@ -37,6 +38,7 @@ impl Default for BuildOptions {
             target: Target::HOST,
             infrastructure: Some(infrastructure),
             available_parallelism,
+            new_compilation_system: false,
         }
     }
 }

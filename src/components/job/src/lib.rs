@@ -18,6 +18,17 @@ pub use truth::*;
 pub use waiting_count::*;
 pub use worker::*;
 
+/*
+fn main() -> Result<(), ()> {
+    let filename = "/Users/isaac/Projects/Adept3x/adept/tests/success/modules_simple".to_string();
+    let options = BuildOptions {
+        execute_result: true,
+        ..Default::default()
+    };
+
+    cli::Command::Build(BuildCommand { filename, options }).invoke()
+}
+
 fn main() {
     let executor = MainExecutor::new(num_cpus::get().try_into().unwrap());
     let my_string = executor.push(CreateString::new("Hello World".into()));
@@ -46,3 +57,4 @@ fn main() {
         println!("Queued: {}/{}", stats.num_cleared, stats.num_queued,);
     }
 }
+*/

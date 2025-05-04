@@ -10,8 +10,12 @@ impl Infin {
     }
 }
 
-impl Execute for Infin {
-    fn execute(self, _executor: &Executor, self_ref: TaskRef) -> Progress {
+impl<'outside> Execute<'outside> for Infin {
+    fn execute(
+        self,
+        _executor: &Executor<'outside>,
+        self_ref: TaskRef<'outside>,
+    ) -> Progress<'outside> {
         return Progress::suspend(vec![self_ref], Infin {});
     }
 }
