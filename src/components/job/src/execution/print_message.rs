@@ -17,9 +17,9 @@ impl PrintMessage<'_> {
 }
 
 impl<'outside> Execute<'outside> for PrintMessage<'outside> {
-    fn execute(self, executor: &Executor<'outside>, _: TaskRef<'outside>) -> Progress<'outside> {
+    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
         let Some(message_ref) = self.task_ref else {
-            let message_ref = executor.push(CreateString::new(self.message));
+            let message_ref = executor.push_unique(&[], CreateString::new(self.message));
 
             return Progress::suspend(
                 vec![message_ref],
@@ -39,7 +39,8 @@ impl<'outside> Execute<'outside> for PrintMessage<'outside> {
         };
 
         if content.len() < 1000 {
-            let message_ref = executor.push(CreateString::new(format!("{} {}", content, content)));
+            let message_ref =
+                executor.push_unique(&[], CreateString::new(format!("{} {}", content, content)));
 
             return Progress::suspend(
                 vec![message_ref],

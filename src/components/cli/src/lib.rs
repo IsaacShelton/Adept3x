@@ -2,10 +2,10 @@ mod build;
 mod help;
 mod new;
 
-pub use build::BuildCommand;
+use build::BuildCommand;
 use enum_dispatch::enum_dispatch;
-pub use help::HelpCommand;
-pub use new::NewCommand;
+use help::HelpCommand;
+use new::NewCommand;
 
 #[enum_dispatch(Invoke)]
 #[derive(Clone, Debug)]

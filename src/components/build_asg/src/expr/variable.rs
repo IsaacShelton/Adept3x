@@ -19,14 +19,8 @@ pub fn resolve_variable_expr(
         .as_plain_str()
         .and_then(|name| ctx.variable_haystack.find(name))
     {
-        if let Some(function) = ctx.func_ref.map(|func_ref| &mut ctx.asg.funcs[func_ref]) {
-            let is_initialized = function
-                .vars
-                .get(variable.key)
-                .expect("found variable to exist")
-                .is_initialized();
-
-            return Ok(TypedExpr::new_maybe_initialized(
+        if ctx.func_ref.is_some() {
+            return Ok(TypedExpr::new(
                 variable.ty.clone(),
                 asg::Expr::new(
                     asg::ExprKind::Variable(Box::new(asg::Variable {
@@ -35,7 +29,6 @@ pub fn resolve_variable_expr(
                     })),
                     source,
                 ),
-                is_initialized,
             ));
         }
     }

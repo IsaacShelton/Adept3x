@@ -515,31 +515,5 @@ pub fn resolve_expr(
         }
     }?;
 
-    match initialized {
-        Initialized::Require => {
-            ensure_initialized(ast_expr, &resolved_expr)?;
-        }
-        Initialized::AllowUninitialized => (),
-    }
-
     Ok(resolved_expr)
-}
-
-fn ensure_initialized(
-    subject: &ast::Expr,
-    resolved_subject: &TypedExpr,
-) -> Result<(), ResolveError> {
-    if resolved_subject.is_initialized {
-        Ok(())
-    } else {
-        Err(match &subject.kind {
-            ast::ExprKind::Variable(variable_name) => {
-                ResolveErrorKind::CannotUseUninitializedVariable {
-                    variable_name: variable_name.to_string(),
-                }
-            }
-            _ => ResolveErrorKind::CannotUseUninitializedValue,
-        }
-        .at(subject.source))
-    }
 }

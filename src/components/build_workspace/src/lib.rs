@@ -93,13 +93,11 @@ pub fn compile_workspace(
     if compiler.options.new_compilation_system {
         let executor = job::MainExecutor::new(compiler.options.available_parallelism);
 
-        let first_fs_node_id = workspace
-            .files
-            .iter()
-            .next()
-            .map(|file| file.0)
-            .expect("at least one file");
-        let identifiers_task = executor.push(job::IdentifiersHashMap(&workspace, first_fs_node_id));
+        let ast_workspace_task_ref = executor.push(&[], job::BuildAstWorkspace(&workspace));
+        let build_asg_task_ref = executor.push(
+            &[ast_workspace_task_ref],
+            job::BuildAsg::new(ast_workspace_task_ref),
+        );
 
         let executed = executor.start();
         let show_executor_stats = false;
@@ -120,16 +118,16 @@ pub fn compile_workspace(
             println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
         }
 
-        let Artifact::Identifiers(identifiers) = executed.truth.tasks[identifiers_task]
+        let Artifact::Asg(asg) = executed.truth.tasks[build_asg_task_ref]
             .state
             .unwrap_completed()
         else {
             panic!("oops aameirmgogmo");
         };
 
-        println!("{:?}", &identifiers);
-
-        let ir_module = todo!("need ir_module from executed tasks");
+        // Lower code to high level intermediate representation
+        let ir_module = unerror(lower(&compiler.options, &asg), source_files)?;
+        //let ir_module = todo!("need ir_module from executed tasks");
 
         // Export and link to create executable
         let export_details = export_and_link(compiler, project_folder, &ir_module)?;

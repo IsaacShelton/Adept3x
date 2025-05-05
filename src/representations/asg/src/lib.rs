@@ -83,9 +83,9 @@ pub struct Asg<'a> {
 }
 
 impl<'a> Asg<'a> {
-    pub fn new(source_files: &'a SourceFiles, workspace: &'a AstWorkspace) -> Self {
+    pub fn new(workspace: &'a AstWorkspace) -> Self {
         Self {
-            source_files,
+            source_files: workspace.source_files,
             entry_point: None,
             funcs: Arena::new(),
             structs: Arena::new(),

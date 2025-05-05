@@ -11,6 +11,7 @@ pub struct Worker<'outside> {
 }
 
 impl<'outside> Worker<'outside> {
+    #[must_use]
     pub fn new(worker_ref: WorkerRef) -> Self {
         Worker {
             worker_ref,
@@ -29,7 +30,7 @@ impl<'outside> Worker<'outside> {
                     .unwrap_suspended()
                 };
 
-                match execution.execute(executor, task_ref).progression() {
+                match execution.execute(executor).progression() {
                     Progression::Complete(artifact) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);

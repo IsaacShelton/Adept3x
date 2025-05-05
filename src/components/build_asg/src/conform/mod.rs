@@ -91,7 +91,6 @@ pub fn conform_expr<O: Objective>(
         return O::success(|| TypedExpr {
             ty: to_type.into_owned(),
             expr: expr.expr.clone(),
-            is_initialized: expr.is_initialized,
         });
     }
 

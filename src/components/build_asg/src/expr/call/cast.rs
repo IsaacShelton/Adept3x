@@ -30,7 +30,6 @@ pub fn find_builtin_cast_func(
                 if let asg::TypeKind::Ptr(inner) = &arg.ty.kind {
                     return Ok(Ok(TypedExpr {
                         ty: inner.as_ref().clone(),
-                        is_initialized: arg.is_initialized,
                         expr: asg::ExprKind::Dereference(Box::new(arg)).at(source),
                     }));
                 }
@@ -43,12 +42,10 @@ pub fn find_builtin_cast_func(
         },
         "ptr" => match args.into_iter().exactly_one() {
             Ok(arg) => {
-                let is_initialized = arg.is_initialized;
                 let destination = resolve_expr_to_destination(arg)?;
 
                 return Ok(Ok(TypedExpr {
                     ty: destination.ty.clone().pointer(source),
-                    is_initialized,
                     expr: asg::ExprKind::AddressOf(Box::new(destination)).at(source),
                 }));
             }
@@ -129,7 +126,6 @@ pub fn find_builtin_cast_func(
 
         if target_type_kind.is_boolean() && argument_type_kind.is_integer_literal() {
             let argument = args.into_iter().next().unwrap();
-            let is_initialized = argument.is_initialized;
 
             let asg::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
                 unreachable!();
@@ -138,7 +134,6 @@ pub fn find_builtin_cast_func(
             return Ok(Ok(TypedExpr {
                 ty: target_type_kind.at(source),
                 expr: asg::ExprKind::BooleanLiteral(*value != BigInt::ZERO).at(source),
-                is_initialized,
             }));
         }
 
@@ -147,7 +142,6 @@ pub fn find_builtin_cast_func(
         {
             let target_type = target_type_kind.at(source);
             let argument = args.into_iter().next().unwrap();
-            let is_initialized = argument.is_initialized;
 
             let expr = asg::ExprKind::UnaryMathOperation(Box::new(asg::UnaryMathOperation {
                 operator: asg::UnaryMathOperator::IsNonZero,
@@ -158,7 +152,6 @@ pub fn find_builtin_cast_func(
             return Ok(Ok(TypedExpr {
                 ty: target_type,
                 expr,
-                is_initialized,
             }));
         }
 
@@ -175,7 +168,6 @@ pub fn find_builtin_cast_func(
             return Ok(Ok(TypedExpr {
                 ty: target_type,
                 expr,
-                is_initialized: argument.is_initialized,
             }));
         }
 
@@ -195,7 +187,6 @@ pub fn find_builtin_cast_func(
             return Ok(Ok(TypedExpr {
                 ty: target_type,
                 expr,
-                is_initialized: argument.is_initialized,
             }));
         }
     }
@@ -209,7 +200,6 @@ pub fn find_builtin_cast_func(
     if let Some((target_type_kind, float_size)) = to_float {
         if argument_type_kind.is_integer_literal() {
             let argument = args.into_iter().next().unwrap();
-            let is_initialized = argument.is_initialized;
 
             let asg::ExprKind::IntegerLiteral(value) = &argument.expr.kind else {
                 unreachable!();
@@ -228,13 +218,11 @@ pub fn find_builtin_cast_func(
                 ty: target_type_kind.at(source),
                 expr: asg::ExprKind::FloatingLiteral(float_size, NotNan::new(value).ok())
                     .at(source),
-                is_initialized,
             }));
         }
 
         if argument_type_kind.is_float_literal() {
             let argument = args.into_iter().next().unwrap();
-            let is_initialized = argument.is_initialized;
 
             let asg::ExprKind::FloatingLiteral(_size, value) = &argument.expr.kind else {
                 unreachable!();
@@ -243,7 +231,6 @@ pub fn find_builtin_cast_func(
             return Ok(Ok(TypedExpr {
                 ty: target_type_kind.at(source),
                 expr: asg::ExprKind::FloatingLiteral(float_size, *value).at(source),
-                is_initialized,
             }));
         }
 
@@ -263,7 +250,6 @@ pub fn find_builtin_cast_func(
             return Ok(Ok(TypedExpr {
                 ty: target_type,
                 expr,
-                is_initialized: argument.is_initialized,
             }));
         }
     }

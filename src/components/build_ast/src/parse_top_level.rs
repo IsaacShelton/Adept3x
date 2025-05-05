@@ -1,7 +1,7 @@
 use super::{
     Parser,
     annotation::{Annotation, AnnotationKind},
-    error::ParseError,
+    error::{ParseError, ParseErrorKind},
 };
 use ast::RawAstFile;
 use infinite_iterator::InfinitePeekable;
@@ -44,6 +44,14 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 }
 
                 self.parse_token(TokenKind::CloseCurly, Some("to close annotation group"))?;
+            }
+            TokenKind::PragmaKeyword => {
+                return Err(ParseErrorKind::Other {
+                    message:
+                        "Cannot use 'pragma' keyword here, did you mean to compile as single file?"
+                            .into(),
+                }
+                .at(self.input.peek().source));
             }
             TokenKind::FuncKeyword => {
                 ast_file.funcs.push(self.parse_func(annotations)?);

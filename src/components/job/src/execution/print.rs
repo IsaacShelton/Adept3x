@@ -17,7 +17,7 @@ impl<'outside> Print<'outside> {
 }
 
 impl<'outside> Execute<'outside> for Print<'outside> {
-    fn execute(self, executor: &Executor<'outside>, _: TaskRef<'outside>) -> Progress<'outside> {
+    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
         if !self.indented {
             print!("> ");
 

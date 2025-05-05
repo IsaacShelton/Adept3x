@@ -42,8 +42,7 @@ pub fn resolve<'a>(
     options: &BuildOptions,
 ) -> Result<Asg<'a>, ResolveError> {
     let mut ctx = ResolveCtx::new();
-    let source_files = workspace.source_files;
-    let mut asg = Asg::new(source_files, &workspace);
+    let mut asg = Asg::new(&workspace);
 
     resolve_type_definitions(&mut ctx, &mut asg, workspace)?;
     resolve_global_variables(&mut ctx, &mut asg, workspace)?;

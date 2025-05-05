@@ -1,7 +1,9 @@
-use crate::{Execution, Task, TaskRef, TaskState, Truth, WaitingCount, Worker};
+use crate::{Execution, Request, Task, TaskId, TaskRef, TaskState, Truth, WaitingCount, Worker};
+use arena::Arena;
 use crossbeam_deque::{Injector as InjectorQueue, Stealer};
 use std::{
     num::NonZero,
+    ops::DerefMut,
     sync::{
         RwLock,
         atomic::{AtomicUsize, Ordering},
@@ -27,6 +29,7 @@ pub struct Executor<'outside> {
 }
 
 impl<'outside> Executor<'outside> {
+    #[must_use]
     pub fn new(stealers: Box<[Stealer<TaskRef<'outside>>]>) -> Self {
         Self {
             truth: RwLock::new(Truth::new()),
@@ -39,20 +42,66 @@ impl<'outside> Executor<'outside> {
         }
     }
 
-    pub fn push(&self, execution: impl Into<Execution<'outside>>) -> TaskRef<'outside> {
-        self.num_scheduled.fetch_add(1, Ordering::SeqCst);
-        let task_ref = {
-            let mut truth = self.truth.write().unwrap();
+    #[must_use]
+    pub fn request(&self, request: impl Into<Request<'outside>>) -> TaskRef<'outside> {
+        let request = request.into();
+        let mut truth_guard = self.truth.write().unwrap();
+        let truth = truth_guard.deref_mut();
 
-            truth.tasks.alloc(Task {
-                state: TaskState::Suspended(execution.into(), WaitingCount::default()),
+        let tasks = &mut truth.tasks;
+        let requests = &mut truth.requests;
+
+        *requests.entry(request).or_insert_with_key(|request| {
+            self.push_unique_into_tasks(tasks, &request.suspend_on(), request.to_execution())
+        })
+    }
+
+    #[must_use]
+    pub fn push_unique(
+        &self,
+        suspend_on: &[TaskRef<'outside>],
+        execution: impl Into<Execution<'outside>>,
+    ) -> TaskRef<'outside> {
+        self.push_unique_into_tasks(
+            &mut self.truth.write().unwrap().tasks,
+            suspend_on,
+            execution,
+        )
+    }
+
+    #[must_use]
+    pub fn push_unique_into_tasks(
+        &self,
+        tasks: &mut Arena<TaskId, Task<'outside>>,
+        suspend_on: &[TaskRef<'outside>],
+        execution: impl Into<Execution<'outside>>,
+    ) -> TaskRef<'outside> {
+        self.num_scheduled.fetch_add(1, Ordering::SeqCst);
+
+        let mut wait_on = 0;
+
+        let new_task_ref = {
+            let new_task_ref = tasks.alloc(Task {
+                state: TaskState::Suspended(execution.into(), WaitingCount(suspend_on.len())),
                 dependents: vec![],
-            })
+            });
+
+            for dependent in suspend_on {
+                if tasks[*dependent].state.completed().is_none() {
+                    tasks[*dependent].dependents.push(new_task_ref);
+                    wait_on += 1;
+                }
+            }
+
+            new_task_ref
         };
 
-        self.num_queued.fetch_add(1, Ordering::SeqCst);
-        self.injector.push(task_ref);
-        task_ref
+        if wait_on == 0 {
+            self.num_queued.fetch_add(1, Ordering::SeqCst);
+            self.injector.push(new_task_ref);
+        }
+
+        new_task_ref
     }
 }
 
@@ -66,6 +115,7 @@ pub struct Executed<'outside> {
 }
 
 impl<'outside> MainExecutor<'outside> {
+    #[must_use]
     pub fn new(num_threads: NonZero<usize>) -> Self {
         let workers = (0..num_threads.get())
             .map(|worker_id| Worker::new(WorkerRef(worker_id)))
@@ -82,6 +132,7 @@ impl<'outside> MainExecutor<'outside> {
         }
     }
 
+    #[must_use]
     pub fn start(self) -> Executed<'outside> {
         thread::scope(|scope| {
             for worker in self.workers.into_iter() {
@@ -99,7 +150,12 @@ impl<'outside> MainExecutor<'outside> {
         }
     }
 
-    pub fn push(&self, execution: impl Into<Execution<'outside>>) -> TaskRef<'outside> {
-        self.executor.push(execution)
+    #[must_use]
+    pub fn push(
+        &self,
+        suspend_on: &[TaskRef<'outside>],
+        execution: impl Into<Execution<'outside>>,
+    ) -> TaskRef<'outside> {
+        self.executor.push_unique(suspend_on, execution)
     }
 }

@@ -1,25 +1,27 @@
+mod build_asg;
+mod build_asg_for_struct;
+mod build_ast_workspace;
 mod create_string;
+mod identifiers_hashmap;
 mod infin;
 mod print;
 mod print_message;
 
-use crate::{Artifact, Executor, Progress, Progression, TaskRef};
-use ast_workspace::AstWorkspace;
+use crate::{Executor, Progress};
+pub use build_asg::*;
+pub use build_asg_for_struct::*;
+pub use build_ast_workspace::BuildAstWorkspace;
 pub use create_string::*;
 use enum_dispatch::enum_dispatch;
-use fs_tree::FsNodeId;
+pub use identifiers_hashmap::IdentifiersHashMap;
 pub use infin::Infin;
 pub use print::*;
 pub use print_message::*;
-use std::collections::HashMap;
 
 #[enum_dispatch]
 pub trait Execute<'outside> {
-    fn execute(
-        self,
-        executor: &Executor<'outside>,
-        task_ref: TaskRef<'outside>,
-    ) -> Progress<'outside>;
+    #[must_use]
+    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside>;
 }
 
 #[derive(Debug)]
@@ -29,116 +31,8 @@ pub enum Execution<'outside> {
     Print(Print<'outside>),
     PrintMessage(PrintMessage<'outside>),
     Infin(Infin),
-    PrintStr(&'outside str),
     IdentifiersHashMap(IdentifiersHashMap<'outside>),
-}
-
-impl<'outside> Execute<'outside> for &'outside str {
-    fn execute(
-        self,
-        _executor: &Executor<'outside>,
-        _task_ref: TaskRef<'outside>,
-    ) -> Progress<'outside> {
-        println!("{}", self);
-        Progress::complete(Artifact::Str(self))
-    }
-}
-
-#[derive(Debug)]
-pub struct IdentifiersHashMap<'outside>(pub &'outside AstWorkspace<'outside>, pub FsNodeId);
-
-impl<'outside> Execute<'outside> for IdentifiersHashMap<'outside> {
-    fn execute(
-        self,
-        _executor: &Executor<'outside>,
-        _task_ref: TaskRef<'outside>,
-    ) -> Progress<'outside> {
-        let ast_workspace = self.0;
-        let fs_node_id = self.1;
-        let mut identifiers = HashMap::new();
-
-        let duplicate_name = |name| {
-            return Progression::Error(format!("Multiple definitions for '{}'", name)).into();
-        };
-
-        let file = ast_workspace
-            .files
-            .get(fs_node_id)
-            .expect("file exists in workspace");
-
-        for func in &ast_workspace.all_funcs[file.funcs] {
-            if identifiers
-                .insert(func.head.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&func.head.name);
-            }
-        }
-
-        for structure in &ast_workspace.all_structs[file.structs] {
-            if identifiers
-                .insert(structure.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&structure.name);
-            }
-        }
-
-        for enumeration in &ast_workspace.all_enums[file.enums] {
-            if identifiers
-                .insert(enumeration.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&enumeration.name);
-            }
-        }
-
-        for global in &ast_workspace.all_globals[file.globals] {
-            if identifiers
-                .insert(global.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&global.name);
-            }
-        }
-
-        for type_alias in &ast_workspace.all_type_aliases[file.type_aliases] {
-            if identifiers
-                .insert(type_alias.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&type_alias.name);
-            }
-        }
-
-        for expr_alias in &ast_workspace.all_expr_aliases[file.expr_aliases] {
-            if identifiers
-                .insert(expr_alias.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&expr_alias.name);
-            }
-        }
-
-        for trait_def in &ast_workspace.all_traits[file.traits] {
-            if identifiers
-                .insert(trait_def.name.as_str().into(), ())
-                .is_some()
-            {
-                return duplicate_name(&trait_def.name);
-            }
-        }
-
-        for implementation in &ast_workspace.all_impls[file.impls] {
-            let Some(name) = &implementation.name else {
-                continue;
-            };
-
-            if identifiers.insert(name.as_str().into(), ()).is_some() {
-                return duplicate_name(name);
-            }
-        }
-
-        Artifact::Identifiers(identifiers).into()
-    }
+    BuildAstWorkspace(BuildAstWorkspace<'outside>),
+    BuildAsg(BuildAsg<'outside>),
+    BuildAsgForStruct(BuildAsgForStruct<'outside>),
 }

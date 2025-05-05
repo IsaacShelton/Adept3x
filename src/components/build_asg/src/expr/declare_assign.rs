@@ -29,9 +29,7 @@ pub fn resolve_declare_assign_expr(
         return Err(ResolveErrorKind::CannotDeclareVariableOutsideFunction.at(source));
     };
 
-    let key = ctx.asg.funcs[func_ref]
-        .vars
-        .add_variable(value.ty.clone(), true);
+    let key = ctx.asg.funcs[func_ref].vars.add_variable(value.ty.clone());
 
     ctx.variable_haystack
         .put(&declare_assign.name, value.ty.clone(), key);

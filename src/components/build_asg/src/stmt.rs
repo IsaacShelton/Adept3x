@@ -141,9 +141,7 @@ pub fn resolve_stmt(
                 );
             };
 
-            let key = ctx.asg.funcs[func_ref]
-                .vars
-                .add_variable(ty.clone(), value.is_some());
+            let key = ctx.asg.funcs[func_ref].vars.add_variable(ty.clone());
 
             ctx.variable_haystack
                 .put(&declaration.name, ty.clone(), key);
@@ -188,26 +186,11 @@ pub fn resolve_stmt(
 
             let destination = resolve_expr_to_destination(destination_expr)?;
 
-            let Some(func_ref) = ctx.func_ref else {
+            if ctx.func_ref.is_none() {
                 return Err(
                     ResolveErrorKind::CannotAssignVariableOutsideFunction.at(ast_stmt.source)
                 );
             };
-
-            // Mark destination as initialized
-            match &destination.kind {
-                asg::DestinationKind::Variable(variable) => {
-                    ctx.asg.funcs[func_ref]
-                        .vars
-                        .get(variable.key)
-                        .expect("variable being assigned to exists")
-                        .set_initialized();
-                }
-                asg::DestinationKind::GlobalVariable(..) => (),
-                asg::DestinationKind::Member { .. } => (),
-                asg::DestinationKind::ArrayAccess { .. } => (),
-                asg::DestinationKind::Dereference { .. } => (),
-            }
 
             let operator = assignment
                 .operator
