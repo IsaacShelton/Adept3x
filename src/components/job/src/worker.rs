@@ -111,15 +111,14 @@ impl<'outside> Worker<'outside> {
         {
             let truth = &mut executor.truth.write().unwrap();
 
-            truth.tasks[task_ref].state =
-                TaskState::Suspended(execution, WaitingCount(waiting.len()));
-
             for dependent in &waiting {
                 if truth.tasks[*dependent].state.completed().is_none() {
                     truth.tasks[*dependent].dependents.push(task_ref);
                     wait_on += 1;
                 }
             }
+
+            truth.tasks[task_ref].state = TaskState::Suspended(execution, WaitingCount(wait_on));
         }
 
         if wait_on == 0 {

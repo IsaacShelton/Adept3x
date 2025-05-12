@@ -692,6 +692,7 @@ dependencies = [
  "fs_tree",
  "ir",
  "num_cpus",
+ "smallvec",
  "source_files",
  "target",
 ]

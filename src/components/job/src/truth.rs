@@ -1,4 +1,4 @@
-use crate::{BuildAsgForStruct, Execution, Infin, Task, TaskId, TaskRef};
+use crate::{BuildAsgForStruct, BuildStaticScope, Execution, Infin, Task, TaskId, TaskRef};
 use arena::Arena;
 use derive_more::From;
 use std::collections::HashMap;
@@ -22,6 +22,7 @@ impl<'outside> Truth<'outside> {
 pub enum Request<'outside> {
     Infin(Infin),
     BuildAsgForStruct(BuildAsgForStruct<'outside>),
+    BuildStaticScope(BuildStaticScope<'outside>),
 }
 
 impl<'outside> Request<'outside> {
@@ -29,6 +30,7 @@ impl<'outside> Request<'outside> {
         match self {
             Self::Infin(_) => vec![],
             Self::BuildAsgForStruct(inner) => inner.suspend_on(),
+            Self::BuildStaticScope(inner) => inner.suspend_on(),
         }
     }
 
@@ -36,6 +38,7 @@ impl<'outside> Request<'outside> {
         match self {
             Self::Infin(inner) => inner.clone().into(),
             Self::BuildAsgForStruct(inner) => inner.clone().into(),
+            Self::BuildStaticScope(inner) => inner.clone().into(),
         }
     }
 }

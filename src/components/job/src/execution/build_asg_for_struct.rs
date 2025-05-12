@@ -32,6 +32,16 @@ impl<'outside> Execute<'outside> for BuildAsgForStruct<'outside> {
         let structure = &ast_workspace.all_structs[self.ast_struct_ref];
         println!("PROCESSING AST STRUCT: '{}'", structure.name);
 
+        // This is going to suspend on idenfier lookup
+        // And we expect each to give us back a TypeRef essentially
+
+        // We could for example, have each worker have it's own arena, and have a
+        // combined TypeRef that also says which arena to find it in, but maybe that wouldn't work
+        // actually,
+
+        // We will somehow have to keep a registery of all the created types,
+        // which "identifier modules" can then reference and we can lookup from for here.
+
         Artifact::Void.into()
     }
 }

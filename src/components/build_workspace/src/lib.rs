@@ -27,7 +27,7 @@ use export_and_link::export_and_link;
 use fs_tree::Fs;
 use indexmap::IndexMap;
 use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
-use job::Artifact;
+use job::{Artifact, TaskState};
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
 use stats::CompilationStats;
 use std::{
@@ -110,6 +110,12 @@ pub fn compile_workspace(
             } else {
                 println!("error: {} cyclic dependencies found!", num_cyclic);
             }
+
+            for task in executed.truth.tasks.values() {
+                if let TaskState::Suspended(execution, waiting_count) = &task.state {
+                    println!(" Incomplete: {:?}", task);
+                }
+            }
         } else if show_executor_stats {
             println!(
                 "Tasks: {}/{}",
@@ -118,9 +124,8 @@ pub fn compile_workspace(
             println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
         }
 
-        let Artifact::Asg(asg) = executed.truth.tasks[build_asg_task_ref]
-            .state
-            .unwrap_completed()
+        let TaskState::Completed(Artifact::Asg(asg)) =
+            &executed.truth.tasks[build_asg_task_ref].state
         else {
             panic!("oops aameirmgogmo");
         };

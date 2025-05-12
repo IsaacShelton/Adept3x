@@ -1,3 +1,4 @@
+use crate::repr::StaticScope;
 use asg::Asg;
 use ast_workspace::AstWorkspace;
 use beef::lean::Cow as LeanCow;
@@ -11,6 +12,7 @@ pub enum Artifact<'outside> {
     Identifiers(HashMap<LeanCow<'outside, str>, ()>),
     Asg(Asg<'outside>),
     AstWorkspace(&'outside AstWorkspace<'outside>),
+    StaticScope(StaticScope),
 }
 
 impl<'outside> Artifact<'outside> {
@@ -28,5 +30,13 @@ impl<'outside> Artifact<'outside> {
         }
 
         panic!("Expected execution artifact to be AstWorkspace");
+    }
+
+    pub fn unwrap_static_scope(&self) -> &StaticScope {
+        if let Self::StaticScope(static_scope) = self {
+            return static_scope;
+        }
+
+        panic!("Expected execution artifact to be StaticScope");
     }
 }

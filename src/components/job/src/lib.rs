@@ -4,6 +4,7 @@ mod artifact;
 mod execution;
 mod executor;
 mod progress;
+mod repr;
 mod task;
 mod task_state;
 mod truth;

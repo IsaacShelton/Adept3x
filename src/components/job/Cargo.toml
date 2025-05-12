@@ -19,5 +19,6 @@ enum_dispatch.workspace = true
 fs_tree = { version = "0.1.0", path = "../../representations/fs_tree" }
 ir = { version = "0.1.0", path = "../../representations/ir" }
 num_cpus = "1.16.0"
+smallvec = "1.15.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
 target = { version = "0.1.0", path = "../../support/target" }

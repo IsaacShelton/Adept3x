@@ -1,6 +1,7 @@
 mod build_asg;
 mod build_asg_for_struct;
 mod build_ast_workspace;
+mod build_static_scope;
 mod create_string;
 mod identifiers_hashmap;
 mod infin;
@@ -11,6 +12,7 @@ use crate::{Executor, Progress};
 pub use build_asg::*;
 pub use build_asg_for_struct::*;
 pub use build_ast_workspace::BuildAstWorkspace;
+pub use build_static_scope::BuildStaticScope;
 pub use create_string::*;
 use enum_dispatch::enum_dispatch;
 pub use identifiers_hashmap::IdentifiersHashMap;
@@ -35,4 +37,5 @@ pub enum Execution<'outside> {
     BuildAstWorkspace(BuildAstWorkspace<'outside>),
     BuildAsg(BuildAsg<'outside>),
     BuildAsgForStruct(BuildAsgForStruct<'outside>),
+    BuildStaticScope(BuildStaticScope<'outside>), // ----------
 }
