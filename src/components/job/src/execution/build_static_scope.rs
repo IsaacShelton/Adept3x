@@ -1,24 +1,25 @@
 use super::Execute;
 use crate::{
     Artifact, Executor, Progress, TaskRef,
+    prereqs::Prereqs,
     repr::{Decl, StaticScope, TypeRef},
 };
 use fs_tree::FsNodeId;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct BuildStaticScope<'outside> {
-    pub ast_workspace: TaskRef<'outside>,
+pub struct BuildStaticScope<'env> {
+    pub ast_workspace: TaskRef<'env>,
     pub fs_node_id: FsNodeId,
 }
 
-impl<'outside> BuildStaticScope<'outside> {
-    pub fn suspend_on(&self) -> Vec<TaskRef<'outside>> {
+impl<'env> Prereqs<'env> for BuildStaticScope<'env> {
+    fn prereqs(&self) -> Vec<TaskRef<'env>> {
         vec![self.ast_workspace]
     }
 }
 
-impl<'outside> Execute<'outside> for BuildStaticScope<'outside> {
-    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for BuildStaticScope<'env> {
+    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
         let mut scope = StaticScope {
             ..Default::default()
         };

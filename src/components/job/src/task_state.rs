@@ -1,14 +1,14 @@
 use crate::{Artifact, Execution, WaitingCount};
 
 #[derive(Debug)]
-pub enum TaskState<'outside> {
+pub enum TaskState<'env> {
     Running,
-    Suspended(Execution<'outside>, WaitingCount),
-    Completed(Artifact<'outside>),
+    Suspended(Execution<'env>, WaitingCount),
+    Completed(Artifact<'env>),
 }
 
-impl<'outside> TaskState<'outside> {
-    pub fn completed(&self) -> Option<&Artifact<'outside>> {
+impl<'env> TaskState<'env> {
+    pub fn completed(&self) -> Option<&Artifact<'env>> {
         match self {
             TaskState::Running => None,
             TaskState::Suspended(..) => None,
@@ -16,11 +16,11 @@ impl<'outside> TaskState<'outside> {
         }
     }
 
-    pub fn unwrap_completed(&self) -> &Artifact<'outside> {
+    pub fn unwrap_completed(&self) -> &Artifact<'env> {
         self.completed().unwrap()
     }
 
-    pub fn unwrap_suspended(self) -> (Execution<'outside>, WaitingCount) {
+    pub fn unwrap_suspended(self) -> (Execution<'env>, WaitingCount) {
         match self {
             TaskState::Suspended(execution, waiting_count) => (execution, waiting_count),
             _ => panic!("unwrap_suspended failed!"),

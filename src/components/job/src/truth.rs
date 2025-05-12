@@ -1,15 +1,18 @@
-use crate::{BuildAsgForStruct, BuildStaticScope, Execution, Infin, Task, TaskId, TaskRef};
+use crate::{
+    BuildAsgForStruct, BuildStaticScope, Diverge, Execution, Task, TaskId, TaskRef,
+    prereqs::Prereqs, spawn_execution::SpawnExecution,
+};
 use arena::Arena;
 use derive_more::From;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct Truth<'outside> {
-    pub tasks: Arena<TaskId, Task<'outside>>,
-    pub requests: HashMap<Request<'outside>, TaskRef<'outside>>,
+pub struct Truth<'env> {
+    pub tasks: Arena<TaskId, Task<'env>>,
+    pub requests: HashMap<Request<'env>, TaskRef<'env>>,
 }
 
-impl<'outside> Truth<'outside> {
+impl<'env> Truth<'env> {
     pub fn new() -> Self {
         Self {
             tasks: Arena::new(),
@@ -19,26 +22,29 @@ impl<'outside> Truth<'outside> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, From)]
-pub enum Request<'outside> {
-    Infin(Infin),
-    BuildAsgForStruct(BuildAsgForStruct<'outside>),
-    BuildStaticScope(BuildStaticScope<'outside>),
+pub enum Request<'env> {
+    Diverge(Diverge),
+    BuildAsgForStruct(BuildAsgForStruct<'env>),
+    BuildStaticScope(BuildStaticScope<'env>),
 }
 
-impl<'outside> Request<'outside> {
-    pub fn suspend_on(&self) -> Vec<TaskRef<'outside>> {
-        match self {
-            Self::Infin(_) => vec![],
-            Self::BuildAsgForStruct(inner) => inner.suspend_on(),
-            Self::BuildStaticScope(inner) => inner.suspend_on(),
+// enum_dispatch doesn't support the use case we need for this...
+macro_rules! dispatch_to_trait_for_request {
+    ($self:expr, $trait:ident, $callee:ident) => {
+        match $self {
+            Self::Diverge(inner) => $trait::$callee(inner),
+            Self::BuildAsgForStruct(inner) => $trait::$callee(inner),
+            Self::BuildStaticScope(inner) => $trait::$callee(inner),
         }
+    };
+}
+
+impl<'env> Request<'env> {
+    pub fn spawn_execution(&self) -> Execution<'env> {
+        dispatch_to_trait_for_request!(self, SpawnExecution, spawn_execution)
     }
 
-    pub fn to_execution(&self) -> Execution<'outside> {
-        match self {
-            Self::Infin(inner) => inner.clone().into(),
-            Self::BuildAsgForStruct(inner) => inner.clone().into(),
-            Self::BuildStaticScope(inner) => inner.clone().into(),
-        }
+    pub fn prereqs(&self) -> Vec<TaskRef<'env>> {
+        dispatch_to_trait_for_request!(self, Prereqs, prereqs)
     }
 }

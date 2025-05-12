@@ -3,15 +3,15 @@ use crate::{Artifact, BuildAsgForStruct, Executor, Progress, TaskRef};
 use asg::Asg;
 
 #[derive(Debug)]
-pub struct BuildAsg<'outside> {
-    pub ast_workspace_task_ref: TaskRef<'outside>,
+pub struct BuildAsg<'env> {
+    pub ast_workspace_task_ref: TaskRef<'env>,
     pub fanned_out: bool,
-    pub structs: Vec<TaskRef<'outside>>,
-    pub scopes: Vec<TaskRef<'outside>>,
+    pub structs: Vec<TaskRef<'env>>,
+    pub scopes: Vec<TaskRef<'env>>,
 }
 
-impl<'outside> BuildAsg<'outside> {
-    pub fn new(ast_workspace_task_ref: TaskRef<'outside>) -> Self {
+impl<'env> BuildAsg<'env> {
+    pub fn new(ast_workspace_task_ref: TaskRef<'env>) -> Self {
         Self {
             ast_workspace_task_ref,
             fanned_out: false,
@@ -21,8 +21,8 @@ impl<'outside> BuildAsg<'outside> {
     }
 }
 
-impl<'outside> Execute<'outside> for BuildAsg<'outside> {
-    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for BuildAsg<'env> {
+    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
         let ast_workspace = {
             let truth = executor.truth.read().unwrap();
 

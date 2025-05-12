@@ -3,8 +3,10 @@
 mod artifact;
 mod execution;
 mod executor;
+mod prereqs;
 mod progress;
 mod repr;
+mod spawn_execution;
 mod task;
 mod task_state;
 mod truth;

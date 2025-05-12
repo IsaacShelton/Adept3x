@@ -2,13 +2,13 @@ use super::Execute;
 use crate::{Artifact, Executor, Progress, TaskRef};
 
 #[derive(Debug)]
-pub struct Print<'outside> {
-    message: TaskRef<'outside>,
+pub struct Print<'env> {
+    message: TaskRef<'env>,
     indented: bool,
 }
 
-impl<'outside> Print<'outside> {
-    pub fn new(message: TaskRef<'outside>) -> Self {
+impl<'env> Print<'env> {
+    pub fn new(message: TaskRef<'env>) -> Self {
         Self {
             message,
             indented: false,
@@ -16,8 +16,8 @@ impl<'outside> Print<'outside> {
     }
 }
 
-impl<'outside> Execute<'outside> for Print<'outside> {
-    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for Print<'env> {
+    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
         if !self.indented {
             print!("> ");
 

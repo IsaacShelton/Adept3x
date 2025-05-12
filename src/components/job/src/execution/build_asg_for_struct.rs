@@ -1,28 +1,30 @@
 use super::Execute;
-use crate::{Artifact, Executor, Progress, TaskRef};
+use crate::{Artifact, Executor, Progress, TaskRef, prereqs::Prereqs};
 use ast_workspace::StructRef;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct BuildAsgForStruct<'outside> {
-    ast_workspace: TaskRef<'outside>,
+pub struct BuildAsgForStruct<'env> {
+    ast_workspace: TaskRef<'env>,
     ast_struct_ref: StructRef,
 }
 
-impl<'outside> BuildAsgForStruct<'outside> {
-    pub fn new(ast_workspace: TaskRef<'outside>, ast_struct_ref: StructRef) -> Self {
+impl<'env> BuildAsgForStruct<'env> {
+    pub fn new(ast_workspace: TaskRef<'env>, ast_struct_ref: StructRef) -> Self {
         Self {
             ast_workspace,
             ast_struct_ref,
         }
     }
+}
 
-    pub fn suspend_on(&self) -> Vec<TaskRef<'outside>> {
+impl<'env> Prereqs<'env> for BuildAsgForStruct<'env> {
+    fn prereqs(&self) -> Vec<TaskRef<'env>> {
         vec![self.ast_workspace]
     }
 }
 
-impl<'outside> Execute<'outside> for BuildAsgForStruct<'outside> {
-    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for BuildAsgForStruct<'env> {
+    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
         let ast_workspace = executor.truth.read().unwrap().tasks[self.ast_workspace]
             .state
             .completed()

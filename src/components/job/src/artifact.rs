@@ -5,17 +5,17 @@ use beef::lean::Cow as LeanCow;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub enum Artifact<'outside> {
+pub enum Artifact<'env> {
     Void,
     String(String),
-    Str(&'outside str),
-    Identifiers(HashMap<LeanCow<'outside, str>, ()>),
-    Asg(Asg<'outside>),
-    AstWorkspace(&'outside AstWorkspace<'outside>),
+    Str(&'env str),
+    Identifiers(HashMap<LeanCow<'env, str>, ()>),
+    Asg(Asg<'env>),
+    AstWorkspace(&'env AstWorkspace<'env>),
     StaticScope(StaticScope),
 }
 
-impl<'outside> Artifact<'outside> {
+impl<'env> Artifact<'env> {
     pub fn unwrap_string(&self) -> &str {
         if let Self::String(string) = self {
             return string;
@@ -24,7 +24,7 @@ impl<'outside> Artifact<'outside> {
         panic!("Expected execution artifact to be string");
     }
 
-    pub fn unwrap_ast_workspace(&self) -> &'outside AstWorkspace<'outside> {
+    pub fn unwrap_ast_workspace(&self) -> &'env AstWorkspace<'env> {
         if let Self::AstWorkspace(ast_workspace) = self {
             return ast_workspace;
         }

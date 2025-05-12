@@ -1,37 +1,34 @@
 use crate::{Artifact, Execution, TaskRef};
 use std::ops::{ControlFlow, FromResidual, Try};
 
-pub struct Progress<'outside>(Progression<'outside>);
+pub struct Progress<'env>(Progression<'env>);
 
-impl<'outside> Progress<'outside> {
+impl<'env> Progress<'env> {
     #[inline]
-    pub fn complete(artifact: Artifact<'outside>) -> Self {
+    pub fn complete(artifact: Artifact<'env>) -> Self {
         Self(Progression::Complete(artifact))
     }
 
     #[inline]
-    pub fn suspend(
-        before: Vec<TaskRef<'outside>>,
-        execution: impl Into<Execution<'outside>>,
-    ) -> Self {
+    pub fn suspend(before: Vec<TaskRef<'env>>, execution: impl Into<Execution<'env>>) -> Self {
         Self(Progression::Suspend(before, execution.into()))
     }
 
     #[inline]
-    pub fn progression(self) -> Progression<'outside> {
+    pub fn progression(self) -> Progression<'env> {
         self.0
     }
 }
 
-impl<'outside> From<Artifact<'outside>> for Progress<'outside> {
-    fn from(value: Artifact<'outside>) -> Self {
+impl<'env> From<Artifact<'env>> for Progress<'env> {
+    fn from(value: Artifact<'env>) -> Self {
         Self(Progression::Complete(value))
     }
 }
 
-impl<'outside> Try for Progress<'outside> {
-    type Output = Artifact<'outside>;
-    type Residual = Progression<'outside>;
+impl<'env> Try for Progress<'env> {
+    type Output = Artifact<'env>;
+    type Residual = Progression<'env>;
 
     fn from_output(output: Self::Output) -> Self {
         Self::complete(output)
@@ -48,21 +45,21 @@ impl<'outside> Try for Progress<'outside> {
     }
 }
 
-impl<'outside> FromResidual<Progression<'outside>> for Progress<'outside> {
+impl<'env> FromResidual<Progression<'env>> for Progress<'env> {
     fn from_residual(residual: <Self as Try>::Residual) -> Self {
         residual.into()
     }
 }
 
 // Implementation details of Progress with stricter constructors
-pub enum Progression<'outside> {
-    Complete(Artifact<'outside>),
-    Suspend(Vec<TaskRef<'outside>>, Execution<'outside>),
+pub enum Progression<'env> {
+    Complete(Artifact<'env>),
+    Suspend(Vec<TaskRef<'env>>, Execution<'env>),
     Error(String),
 }
 
-impl<'outside> From<Progression<'outside>> for Progress<'outside> {
-    fn from(value: Progression<'outside>) -> Self {
+impl<'env> From<Progression<'env>> for Progress<'env> {
+    fn from(value: Progression<'env>) -> Self {
         Self(value)
     }
 }

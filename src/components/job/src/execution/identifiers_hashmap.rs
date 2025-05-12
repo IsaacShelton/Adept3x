@@ -5,10 +5,10 @@ use fs_tree::FsNodeId;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct IdentifiersHashMap<'outside>(pub &'outside AstWorkspace<'outside>, pub FsNodeId);
+pub struct IdentifiersHashMap<'env>(pub &'env AstWorkspace<'env>, pub FsNodeId);
 
-impl<'outside> Execute<'outside> for IdentifiersHashMap<'outside> {
-    fn execute(self, _executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for IdentifiersHashMap<'env> {
+    fn execute(self, _executor: &Executor<'env>) -> Progress<'env> {
         let ast_workspace = self.0;
         let fs_node_id = self.1;
         let mut identifiers = HashMap::new();

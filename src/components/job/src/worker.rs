@@ -5,12 +5,12 @@ use crate::{
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
 
-pub struct Worker<'outside> {
+pub struct Worker<'env> {
     pub worker_ref: WorkerRef,
-    pub queue: WorkerQueue<TaskRef<'outside>>,
+    pub queue: WorkerQueue<TaskRef<'env>>,
 }
 
-impl<'outside> Worker<'outside> {
+impl<'env> Worker<'env> {
     #[must_use]
     pub fn new(worker_ref: WorkerRef) -> Self {
         Worker {
@@ -19,7 +19,7 @@ impl<'outside> Worker<'outside> {
         }
     }
 
-    pub fn start(&self, executor: &Executor<'outside>) {
+    pub fn start(&self, executor: &Executor<'env>) {
         loop {
             if let Some(task_ref) = self.find_task(executor, &executor.stealers) {
                 let (execution, _waiting_count) = {
@@ -54,9 +54,9 @@ impl<'outside> Worker<'outside> {
 
     fn find_task(
         &self,
-        executor: &Executor<'outside>,
-        stealers: &[Stealer<TaskRef<'outside>>],
-    ) -> Option<TaskRef<'outside>> {
+        executor: &Executor<'env>,
+        stealers: &[Stealer<TaskRef<'env>>],
+    ) -> Option<TaskRef<'env>> {
         // Pop a task from the local queue, if not empty.
         self.queue.pop().or_else(|| {
             // Otherwise, we need to look for a task elsewhere.
@@ -77,9 +77,9 @@ impl<'outside> Worker<'outside> {
 
     fn complete(
         &self,
-        executor: &Executor<'outside>,
-        task_ref: TaskRef<'outside>,
-        artifact: Artifact<'outside>,
+        executor: &Executor<'env>,
+        task_ref: TaskRef<'env>,
+        artifact: Artifact<'env>,
     ) {
         let truth = &mut executor.truth.write().unwrap();
 
@@ -101,10 +101,10 @@ impl<'outside> Worker<'outside> {
 
     fn suspend(
         &self,
-        executor: &Executor<'outside>,
-        task_ref: TaskRef<'outside>,
-        waiting: Vec<TaskRef<'outside>>,
-        execution: Execution<'outside>,
+        executor: &Executor<'env>,
+        task_ref: TaskRef<'env>,
+        waiting: Vec<TaskRef<'env>>,
+        execution: Execution<'env>,
     ) {
         let mut wait_on = 0;
 

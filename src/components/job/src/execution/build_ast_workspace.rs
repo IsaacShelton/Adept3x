@@ -3,10 +3,10 @@ use crate::{Artifact, Executor, Progress};
 use ast_workspace::AstWorkspace;
 
 #[derive(Debug)]
-pub struct BuildAstWorkspace<'outside>(pub &'outside AstWorkspace<'outside>);
+pub struct BuildAstWorkspace<'env>(pub &'env AstWorkspace<'env>);
 
-impl<'outside> Execute<'outside> for BuildAstWorkspace<'outside> {
-    fn execute(self, _executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for BuildAstWorkspace<'env> {
+    fn execute(self, _executor: &Executor<'env>) -> Progress<'env> {
         Artifact::AstWorkspace(self.0).into()
     }
 }

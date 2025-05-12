@@ -2,9 +2,9 @@ use super::Execute;
 use crate::{Artifact, CreateString, Executor, Progress, TaskRef};
 
 #[derive(Debug)]
-pub struct PrintMessage<'outside> {
+pub struct PrintMessage<'env> {
     message: String,
-    task_ref: Option<TaskRef<'outside>>,
+    task_ref: Option<TaskRef<'env>>,
 }
 
 impl PrintMessage<'_> {
@@ -16,8 +16,8 @@ impl PrintMessage<'_> {
     }
 }
 
-impl<'outside> Execute<'outside> for PrintMessage<'outside> {
-    fn execute(self, executor: &Executor<'outside>) -> Progress<'outside> {
+impl<'env> Execute<'env> for PrintMessage<'env> {
+    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
         let Some(message_ref) = self.task_ref else {
             let message_ref = executor.push_unique(&[], CreateString::new(self.message));
 
