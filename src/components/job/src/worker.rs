@@ -1,6 +1,6 @@
 use crate::{
-    Artifact, Execute, Execution, Executor, Progression, TaskRef, TaskState, WaitingCount,
-    WorkerRef,
+    Artifact, Execute, Execution, Executor, Progression, SuspendCondition, TaskRef, TaskState,
+    WaitingCount, WorkerRef,
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
@@ -22,12 +22,12 @@ impl<'env> Worker<'env> {
     pub fn start(&self, executor: &Executor<'env>) {
         loop {
             if let Some(task_ref) = self.find_task(executor, &executor.stealers) {
-                let (execution, _waiting_count) = {
+                let execution = {
                     mem::replace(
                         &mut executor.truth.write().unwrap().tasks[task_ref].state,
                         TaskState::Running,
                     )
-                    .unwrap_suspended()
+                    .unwrap_get_execution()
                 };
 
                 match execution.execute(executor).progression() {
@@ -90,10 +90,21 @@ impl<'env> Worker<'env> {
         };
 
         for dependent in dependents {
-            if let TaskState::Suspended(_, waiting_count) = &mut truth.tasks[dependent].state {
-                if waiting_count.decrement() {
-                    executor.num_queued.fetch_add(1, Ordering::SeqCst);
-                    self.queue.push(dependent);
+            if let TaskState::Suspended(_, condition) = &mut truth.tasks[dependent].state {
+                match condition {
+                    SuspendCondition::All(waiting_count) => {
+                        if waiting_count.decrement() {
+                            executor.num_queued.fetch_add(1, Ordering::SeqCst);
+                            self.queue.push(dependent);
+                        }
+                    }
+                    SuspendCondition::Any(of) => {
+                        if of.contains(&task_ref) {
+                            of.clear();
+                            executor.num_queued.fetch_add(1, Ordering::SeqCst);
+                            self.queue.push(dependent);
+                        }
+                    }
                 }
             }
         }
@@ -118,7 +129,8 @@ impl<'env> Worker<'env> {
                 }
             }
 
-            truth.tasks[task_ref].state = TaskState::Suspended(execution, WaitingCount(wait_on));
+            truth.tasks[task_ref].state =
+                TaskState::Suspended(execution, SuspendCondition::All(WaitingCount(wait_on)));
         }
 
         if wait_on == 0 {

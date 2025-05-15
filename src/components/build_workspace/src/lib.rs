@@ -93,11 +93,7 @@ pub fn compile_workspace(
     if compiler.options.new_compilation_system {
         let executor = job::MainExecutor::new(compiler.options.available_parallelism);
 
-        let ast_workspace_task_ref = executor.push(&[], job::BuildAstWorkspace(&workspace));
-        let build_asg_task_ref = executor.push(
-            &[ast_workspace_task_ref],
-            job::BuildAsg::new(ast_workspace_task_ref),
-        );
+        let build_asg_task_ref = executor.push(&[], job::BuildAsg::new(&workspace));
 
         let executed = executor.start();
         let show_executor_stats = false;

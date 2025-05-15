@@ -1,19 +1,21 @@
-use super::{Execute, build_static_scope::BuildStaticScope};
+use super::{Execute, estimate_decl_scope::EstimateDeclScope};
 use crate::{Artifact, BuildAsgForStruct, Executor, Progress, TaskRef};
 use asg::Asg;
+use ast_workspace::AstWorkspace;
+use by_address::ByAddress;
 
 #[derive(Debug)]
 pub struct BuildAsg<'env> {
-    pub ast_workspace_task_ref: TaskRef<'env>,
+    pub workspace: ByAddress<&'env AstWorkspace<'env>>,
     pub fanned_out: bool,
     pub structs: Vec<TaskRef<'env>>,
     pub scopes: Vec<TaskRef<'env>>,
 }
 
 impl<'env> BuildAsg<'env> {
-    pub fn new(ast_workspace_task_ref: TaskRef<'env>) -> Self {
+    pub fn new(workspace: &'env AstWorkspace<'env>) -> Self {
         Self {
-            ast_workspace_task_ref,
+            workspace: ByAddress(workspace),
             fanned_out: false,
             structs: Vec::new(),
             scopes: Vec::new(),
@@ -23,41 +25,28 @@ impl<'env> BuildAsg<'env> {
 
 impl<'env> Execute<'env> for BuildAsg<'env> {
     fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
-        let ast_workspace = {
-            let truth = executor.truth.read().unwrap();
-
-            let Some(Artifact::AstWorkspace(ast_workspace)) =
-                truth.tasks[self.ast_workspace_task_ref].state.completed()
-            else {
-                panic!("BuildAsg task expected completed AstWorkspace before running!");
-            };
-
-            *ast_workspace
-        };
+        let workspace = self.workspace;
 
         if !self.fanned_out {
             let mut suspend_on = vec![];
             let mut structs = vec![];
             let mut scopes = vec![];
 
-            for (fs_node_id, ast_file) in &ast_workspace.files {
+            for (fs_node_id, ast_file) in &workspace.files {
                 if ast_file.is_none() {
                     continue;
                 }
 
-                let new_scope = executor.request(BuildStaticScope {
-                    ast_workspace: self.ast_workspace_task_ref,
+                let new_scope = executor.request(EstimateDeclScope {
+                    workspace: self.workspace,
                     fs_node_id: fs_node_id.into_raw(),
                 });
                 scopes.push(new_scope);
                 suspend_on.push(new_scope);
             }
 
-            for (ast_struct_ref, _) in &ast_workspace.all_structs {
-                let spawned = executor.request(BuildAsgForStruct::new(
-                    self.ast_workspace_task_ref,
-                    ast_struct_ref,
-                ));
+            for (ast_struct_ref, _) in &workspace.all_structs {
+                let spawned = executor.request(BuildAsgForStruct::new(workspace, ast_struct_ref));
                 structs.push(spawned);
                 suspend_on.push(spawned);
             }
@@ -65,7 +54,7 @@ impl<'env> Execute<'env> for BuildAsg<'env> {
             return Progress::suspend(
                 suspend_on,
                 Self {
-                    ast_workspace_task_ref: self.ast_workspace_task_ref,
+                    workspace: self.workspace,
                     fanned_out: true,
                     structs,
                     scopes,
@@ -76,15 +65,13 @@ impl<'env> Execute<'env> for BuildAsg<'env> {
         {
             let truth = executor.truth.read().unwrap();
             for scope in self.scopes.iter().copied() {
-                let static_scope = truth.tasks[scope]
-                    .state
-                    .unwrap_completed()
-                    .unwrap_static_scope();
-                dbg!(&static_scope);
+                let estimated_decl_scope =
+                    truth.expect_artifact(scope).unwrap_estimated_decl_scope();
+                dbg!(&estimated_decl_scope);
             }
         }
 
-        let asg = Asg::new(ast_workspace);
+        let asg = Asg::new(*workspace);
         Artifact::Asg(asg).into()
     }
 }

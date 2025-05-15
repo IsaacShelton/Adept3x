@@ -11,6 +11,7 @@ asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
 beef = "0.5.2"
+by_address.workspace = true
 compiler = { version = "0.1.0", path = "../../support/compiler" }
 crossbeam-deque = "0.8.6"
 derive_more.workspace = true

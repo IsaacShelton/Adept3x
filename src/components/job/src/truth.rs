@@ -1,5 +1,5 @@
 use crate::{
-    BuildAsgForStruct, BuildStaticScope, Diverge, Execution, Task, TaskId, TaskRef,
+    Artifact, BuildAsgForStruct, Diverge, EstimateDeclScope, Execution, Task, TaskId, TaskRef,
     prereqs::Prereqs, spawn_execution::SpawnExecution,
 };
 use arena::Arena;
@@ -19,13 +19,20 @@ impl<'env> Truth<'env> {
             requests: HashMap::new(),
         }
     }
+
+    pub fn expect_artifact(&self, task_ref: TaskRef<'env>) -> &Artifact<'env> {
+        self.tasks[task_ref]
+            .completed()
+            .as_ref()
+            .expect("artifact expected")
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, From)]
 pub enum Request<'env> {
     Diverge(Diverge),
     BuildAsgForStruct(BuildAsgForStruct<'env>),
-    BuildStaticScope(BuildStaticScope<'env>),
+    BuildNamespace(EstimateDeclScope<'env>),
 }
 
 // enum_dispatch doesn't support the use case we need for this...
@@ -34,7 +41,7 @@ macro_rules! dispatch_to_trait_for_request {
         match $self {
             Self::Diverge(inner) => $trait::$callee(inner),
             Self::BuildAsgForStruct(inner) => $trait::$callee(inner),
-            Self::BuildStaticScope(inner) => $trait::$callee(inner),
+            Self::BuildNamespace(inner) => $trait::$callee(inner),
         }
     };
 }

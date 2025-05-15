@@ -1,9 +1,16 @@
-use crate::{Artifact, Execution, WaitingCount};
+use crate::{Artifact, Execution, TaskRef, WaitingCount};
+use smallvec::SmallVec;
+
+#[derive(Debug)]
+pub enum SuspendCondition<'env> {
+    All(WaitingCount),
+    Any(SmallVec<[TaskRef<'env>; 2]>),
+}
 
 #[derive(Debug)]
 pub enum TaskState<'env> {
     Running,
-    Suspended(Execution<'env>, WaitingCount),
+    Suspended(Execution<'env>, SuspendCondition<'env>),
     Completed(Artifact<'env>),
 }
 
@@ -20,10 +27,10 @@ impl<'env> TaskState<'env> {
         self.completed().unwrap()
     }
 
-    pub fn unwrap_suspended(self) -> (Execution<'env>, WaitingCount) {
+    pub fn unwrap_get_execution(self) -> Execution<'env> {
         match self {
-            TaskState::Suspended(execution, waiting_count) => (execution, waiting_count),
-            _ => panic!("unwrap_suspended failed!"),
+            TaskState::Suspended(execution, _condition) => execution,
+            _ => panic!("unwrap_get_condition failed!"),
         }
     }
 }

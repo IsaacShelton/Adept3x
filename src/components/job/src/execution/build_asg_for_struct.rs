@@ -1,17 +1,18 @@
 use super::Execute;
 use crate::{Artifact, Executor, Progress, TaskRef, prereqs::Prereqs};
-use ast_workspace::StructRef;
+use ast_workspace::{AstWorkspace, StructRef};
+use by_address::ByAddress;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BuildAsgForStruct<'env> {
-    ast_workspace: TaskRef<'env>,
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
     ast_struct_ref: StructRef,
 }
 
 impl<'env> BuildAsgForStruct<'env> {
-    pub fn new(ast_workspace: TaskRef<'env>, ast_struct_ref: StructRef) -> Self {
+    pub fn new(workspace: ByAddress<&'env AstWorkspace<'env>>, ast_struct_ref: StructRef) -> Self {
         Self {
-            ast_workspace,
+            workspace,
             ast_struct_ref,
         }
     }
@@ -19,19 +20,14 @@ impl<'env> BuildAsgForStruct<'env> {
 
 impl<'env> Prereqs<'env> for BuildAsgForStruct<'env> {
     fn prereqs(&self) -> Vec<TaskRef<'env>> {
-        vec![self.ast_workspace]
+        vec![]
     }
 }
 
 impl<'env> Execute<'env> for BuildAsgForStruct<'env> {
-    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
-        let ast_workspace = executor.truth.read().unwrap().tasks[self.ast_workspace]
-            .state
-            .completed()
-            .unwrap()
-            .unwrap_ast_workspace();
-
-        let structure = &ast_workspace.all_structs[self.ast_struct_ref];
+    fn execute(self, _executor: &Executor<'env>) -> Progress<'env> {
+        let workspace = self.workspace;
+        let structure = &workspace.all_structs[self.ast_struct_ref];
         println!("PROCESSING AST STRUCT: '{}'", structure.name);
 
         // This is going to suspend on idenfier lookup

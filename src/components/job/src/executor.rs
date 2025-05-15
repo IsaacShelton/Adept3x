@@ -1,4 +1,7 @@
-use crate::{Execution, Request, Task, TaskId, TaskRef, TaskState, Truth, WaitingCount, Worker};
+use crate::{
+    Execution, Request, SuspendCondition, Task, TaskId, TaskRef, TaskState, Truth, WaitingCount,
+    Worker,
+};
 use arena::Arena;
 use crossbeam_deque::{Injector as InjectorQueue, Stealer};
 use std::{
@@ -82,7 +85,10 @@ impl<'env> Executor<'env> {
 
         let new_task_ref = {
             let new_task_ref = tasks.alloc(Task {
-                state: TaskState::Suspended(execution.into(), WaitingCount(suspend_on.len())),
+                state: TaskState::Suspended(
+                    execution.into(),
+                    SuspendCondition::All(WaitingCount(suspend_on.len())),
+                ),
                 dependents: vec![],
             });
 
