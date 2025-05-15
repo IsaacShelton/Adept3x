@@ -32,7 +32,7 @@ impl<'env> Truth<'env> {
 pub enum Request<'env> {
     Diverge(Diverge),
     BuildAsgForStruct(BuildAsgForStruct<'env>),
-    BuildNamespace(EstimateDeclScope<'env>),
+    EstimateDeclScope(EstimateDeclScope<'env>),
 }
 
 // enum_dispatch doesn't support the use case we need for this...
@@ -41,7 +41,7 @@ macro_rules! dispatch_to_trait_for_request {
         match $self {
             Self::Diverge(inner) => $trait::$callee(inner),
             Self::BuildAsgForStruct(inner) => $trait::$callee(inner),
-            Self::BuildNamespace(inner) => $trait::$callee(inner),
+            Self::EstimateDeclScope(inner) => $trait::$callee(inner),
         }
     };
 }

@@ -13,7 +13,7 @@ impl DeclScopeRef {
     }
 }
 
-// A collection of identifiers mapped to declaration groups
+/// A collection of identifiers mapped to declaration sets
 #[derive(Debug)]
 pub struct DeclScope {
     parent: Option<DeclScopeRef>,

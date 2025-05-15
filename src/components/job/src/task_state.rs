@@ -30,7 +30,7 @@ impl<'env> TaskState<'env> {
     pub fn unwrap_get_execution(self) -> Execution<'env> {
         match self {
             TaskState::Suspended(execution, _condition) => execution,
-            _ => panic!("unwrap_get_condition failed!"),
+            _ => panic!("unwrap_get_execution failed!"),
         }
     }
 }
