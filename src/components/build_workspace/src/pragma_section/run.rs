@@ -10,10 +10,7 @@ use build_ir::lower;
 use compiler::{BuildOptions, Compiler};
 use diagnostics::{Show, into_show};
 use fs_tree::Fs;
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-};
+use std::{collections::HashMap, path::Path};
 use target::Target;
 
 impl PragmaSection {

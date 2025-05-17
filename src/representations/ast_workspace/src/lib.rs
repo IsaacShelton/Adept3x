@@ -17,6 +17,7 @@ new_id_with_niche!(ExprAliasId, u64);
 new_id_with_niche!(TraitId, u64);
 new_id_with_niche!(ImplId, u64);
 new_id_with_niche!(NamespaceId, u64);
+new_id_with_niche!(ModuleId, u64);
 
 pub type FuncRef = Idx<FuncId, Func>;
 pub type StructRef = Idx<StructId, Struct>;
@@ -27,6 +28,7 @@ pub type ExprAliasRef = Idx<ExprAliasId, ExprAlias>;
 pub type TraitRef = Idx<TraitId, Trait>;
 pub type ImplRef = Idx<ImplId, Impl>;
 pub type NamespaceRef = Idx<NamespaceId, Namespace>;
+pub type ModuleRef = Idx<ModuleId, Module>;
 
 #[derive(Clone, Debug)]
 pub struct AstFile {
@@ -46,6 +48,44 @@ pub struct AstFile {
 pub struct Module {
     pub settings: Option<SettingsRef>,
     pub files: Vec<AstFile>,
+}
+
+impl Module {
+    pub fn funcs(&self) -> impl Iterator<Item = FuncRef> {
+        self.files.iter().flat_map(|file| file.funcs.iter())
+    }
+
+    pub fn structs(&self) -> impl Iterator<Item = StructRef> {
+        self.files.iter().flat_map(|file| file.structs.iter())
+    }
+
+    pub fn enums(&self) -> impl Iterator<Item = EnumRef> {
+        self.files.iter().flat_map(|file| file.enums.iter())
+    }
+
+    pub fn globals(&self) -> impl Iterator<Item = GlobalRef> {
+        self.files.iter().flat_map(|file| file.globals.iter())
+    }
+
+    pub fn type_aliases(&self) -> impl Iterator<Item = TypeAliasRef> {
+        self.files.iter().flat_map(|file| file.type_aliases.iter())
+    }
+
+    pub fn expr_aliases(&self) -> impl Iterator<Item = ExprAliasRef> {
+        self.files.iter().flat_map(|file| file.expr_aliases.iter())
+    }
+
+    pub fn traits(&self) -> impl Iterator<Item = TraitRef> {
+        self.files.iter().flat_map(|file| file.traits.iter())
+    }
+
+    pub fn impls(&self) -> impl Iterator<Item = ImplRef> {
+        self.files.iter().flat_map(|file| file.impls.iter())
+    }
+
+    pub fn namespaces(&self) -> impl Iterator<Item = NamespaceRef> {
+        self.files.iter().flat_map(|file| file.namespaces.iter())
+    }
 }
 
 #[derive(Debug)]
@@ -78,7 +118,7 @@ pub struct AstWorkspace<'source_files> {
     pub all_traits: Arena<TraitId, Trait>,
     pub all_impls: Arena<ImplId, Impl>,
     pub all_namespaces: Arena<NamespaceId, Namespace>,
-    pub all_modules: Vec<Module>,
+    pub all_modules: Arena<ModuleId, Module>,
 }
 
 impl<'source_files> AstWorkspace<'source_files> {
@@ -235,15 +275,15 @@ fn compute_modules(
     files: &mut ArenaMap<FsNodeId, AstFile>,
     default_settings: SettingsRef,
     module_folders: &ArenaMap<FsNodeId, SettingsRef>,
-) -> Vec<Module> {
+) -> Arena<ModuleId, Module> {
     let mut jobs = VecDeque::new();
     jobs.push_back(ComputeModuleJob::new(Fs::ROOT, None, default_settings));
 
-    let mut modules = Vec::new();
+    let mut modules = Arena::new();
 
     while let Some(job) = jobs.pop_front() {
         let fs_node_id = job.fs_node_id;
-        let mut module_index = job.module_index;
+        let mut module_ref = job.module_ref;
 
         let settings = module_folders
             .get(fs_node_id)
@@ -251,24 +291,23 @@ fn compute_modules(
             .unwrap_or(job.settings);
 
         if module_folders.contains_key(fs_node_id) {
-            module_index = Some(modules.len());
-            modules.push(Module {
+            module_ref = Some(modules.alloc(Module {
                 settings: Some(settings),
                 files: vec![],
-            });
+            }));
         }
 
         if let Some(ast_file) = files.get_mut(fs_node_id) {
             ast_file.settings = Some(settings);
 
-            let Some(module_index) = module_index else {
+            let Some(module_ref) = module_ref else {
                 panic!(
                     "internal compiler error: This file is somehow not in a module - {}",
                     fs.get(job.fs_node_id).filename.to_string_lossy()
                 );
             };
 
-            modules[module_index].files.push(ast_file.clone());
+            modules[module_ref].files.push(ast_file.clone());
         }
 
         // SAFETY: `read_only_view` will never deadlock here because we promise
@@ -281,7 +320,7 @@ fn compute_modules(
                 .map(|(_, value)| value)
                 .copied()
                 .map(|child_fs_node_id| {
-                    ComputeModuleJob::new(child_fs_node_id, module_index, settings)
+                    ComputeModuleJob::new(child_fs_node_id, module_ref, settings)
                 }),
         );
     }
@@ -291,19 +330,19 @@ fn compute_modules(
 
 pub struct ComputeModuleJob {
     pub fs_node_id: FsNodeId,
-    pub module_index: Option<usize>,
+    pub module_ref: Option<ModuleRef>,
     pub settings: Idx<SettingsId, Settings>,
 }
 
 impl ComputeModuleJob {
     pub fn new(
         fs_node_id: FsNodeId,
-        module_index: Option<usize>,
+        module_ref: Option<ModuleRef>,
         settings: Idx<SettingsId, Settings>,
     ) -> Self {
         Self {
             fs_node_id,
-            module_index,
+            module_ref,
             settings,
         }
     }

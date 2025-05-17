@@ -5,7 +5,7 @@ use ast_workspace_settings::Settings;
 use fs_tree::FsNodeId;
 use infinite_iterator::InfinitePeekable;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     sync::Mutex,
 };
 use token::Token;

@@ -85,7 +85,6 @@ pub fn compile_workspace(
 
     // Compile ASTs into workspace and propagate module settings to each module's contained files
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, module_folders);
-    dbg!(&workspace.all_modules);
 
     // Work-in-Progress: New compilation system
     #[allow(unreachable_code)]

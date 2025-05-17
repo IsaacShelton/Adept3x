@@ -1,4 +1,7 @@
-use super::{Execute, estimate_decl_scope::EstimateDeclScope};
+use super::{
+    Execute,
+    estimate_decl_scope::{DeclScopeOrigin, EstimateDeclScope},
+};
 use crate::{Artifact, BuildAsgForStruct, Executor, Progress, TaskRef};
 use asg::Asg;
 use ast_workspace::AstWorkspace;
@@ -32,14 +35,10 @@ impl<'env> Execute<'env> for BuildAsg<'env> {
             let mut structs = vec![];
             let mut scopes = vec![];
 
-            for (fs_node_id, ast_file) in &workspace.files {
-                if ast_file.is_none() {
-                    continue;
-                }
-
+            for module_ref in workspace.all_modules.keys() {
                 let new_scope = executor.request(EstimateDeclScope {
                     workspace: self.workspace,
-                    fs_node_id: fs_node_id.into_raw(),
+                    scope_origin: DeclScopeOrigin::Module(module_ref),
                 });
                 scopes.push(new_scope);
                 suspend_on.push(new_scope);
