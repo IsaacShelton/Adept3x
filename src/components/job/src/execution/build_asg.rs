@@ -35,7 +35,7 @@ impl<'env> Execute<'env> for BuildAsg<'env> {
             let mut structs = vec![];
             let mut scopes = vec![];
 
-            for module_ref in workspace.all_modules.keys() {
+            for module_ref in workspace.modules.keys() {
                 let new_scope = executor.request(EstimateDeclScope {
                     workspace: self.workspace,
                     scope_origin: DeclScopeOrigin::Module(module_ref),
@@ -44,7 +44,7 @@ impl<'env> Execute<'env> for BuildAsg<'env> {
                 suspend_on.push(new_scope);
             }
 
-            for (ast_struct_ref, _) in &workspace.all_structs {
+            for (ast_struct_ref, _) in &workspace.symbols.all_structs {
                 let spawned = executor.request(BuildAsgForStruct::new(workspace, ast_struct_ref));
                 structs.push(spawned);
                 suspend_on.push(spawned);

@@ -21,7 +21,7 @@ pub fn resolve_func_bodies(
             FuncJob::Regular(physical_file_id, ast_func_index, func_ref) => {
                 let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-                let ast_function = &ast_workspace.all_funcs[ast_func_index];
+                let ast_function = &ast_workspace.symbols.all_funcs[ast_func_index];
 
                 resolve_func_body(
                     ctx,
@@ -41,7 +41,7 @@ pub fn resolve_func_bodies(
             ) => {
                 let module_folder_id = ast_workspace.get_owning_module_or_self(physical_file_id);
 
-                let ast_function = ast_workspace.all_impls[ast_impl_index]
+                let ast_function = ast_workspace.symbols.all_impls[ast_impl_index]
                     .body
                     .get(ast_impl_function_index)
                     .expect("referenced impl function to exist");

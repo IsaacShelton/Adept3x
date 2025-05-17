@@ -31,11 +31,14 @@ pub fn create_func_heads<'a>(
             options,
             module_folder_id,
             physical_file_id,
-            ast_file,
+            &ast_workspace.symbols.all_name_scopes[ast_file.names],
         )?;
 
-        for func_id in ast_file.funcs.iter() {
-            let func = &ast_workspace.all_funcs[func_id];
+        for func_id in ast_workspace.symbols.all_name_scopes[ast_file.names]
+            .funcs
+            .iter()
+        {
+            let func = &ast_workspace.symbols.all_funcs[func_id];
 
             let name = if func.head.privacy.is_private() {
                 ResolvedName::new(physical_file_id, &Name::plain(&func.head.name))

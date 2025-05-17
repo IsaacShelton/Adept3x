@@ -104,6 +104,7 @@ dependencies = [
  "arena",
  "ast",
  "ast_workspace_settings",
+ "attributes",
  "compiler_version",
  "fs_tree",
  "indexmap",

@@ -27,7 +27,7 @@ impl<'env> Prereqs<'env> for BuildAsgForStruct<'env> {
 impl<'env> Execute<'env> for BuildAsgForStruct<'env> {
     fn execute(self, _executor: &Executor<'env>) -> Progress<'env> {
         let workspace = self.workspace;
-        let structure = &workspace.all_structs[self.ast_struct_ref];
+        let structure = &workspace.symbols.all_structs[self.ast_struct_ref];
         println!("PROCESSING AST STRUCT: '{}'", structure.name);
 
         // This is going to suspend on idenfier lookup

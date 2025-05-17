@@ -6,7 +6,7 @@ use super::{
 use crate::{error::ResolveErrorKind, type_ctx::ResolveTypeCtx};
 use asg::{Asg, Func, GenericTraitRef, ImplDecl, ImplRef, ResolvedName, TraitFunc, Type};
 use ast::Name;
-use ast_workspace::AstFile;
+use ast_workspace::NameScope;
 use attributes::Privacy;
 use compiler::BuildOptions;
 use for_alls::ForAlls;
@@ -21,10 +21,10 @@ pub fn create_impl_heads(
     options: &BuildOptions,
     module_folder_id: FsNodeId,
     physical_file_id: FsNodeId,
-    ast_file: &AstFile,
+    ast_file: &NameScope,
 ) -> Result<(), ResolveError> {
     for impl_id in ast_file.impls.iter() {
-        let ast_impl = &asg.workspace.all_impls[impl_id];
+        let ast_impl = &asg.workspace.symbols.all_impls[impl_id];
         let impl_ref = create_impl_head(ctx, asg, module_folder_id, physical_file_id, ast_impl)?;
 
         for (func_i, func) in ast_impl.body.iter().enumerate() {
