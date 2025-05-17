@@ -5,6 +5,7 @@ use super::{
 };
 use ast::Given;
 use infinite_iterator::InfinitePeekable;
+use optional_string::NoneStr;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -12,13 +13,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         // #[annotation_name]
         // ^
 
-        self.parse_token(TokenKind::Hash, Some("to begin annotation"))?;
-        self.parse_token(TokenKind::OpenBracket, Some("to begin annotation body"))?;
+        self.input.expect(TokenKind::Hash, "to begin annotation")?;
+        self.input
+            .expect(TokenKind::OpenBracket, "to begin annotation body")?;
+
         let mut annotations = Vec::with_capacity(2);
 
         loop {
             let (annotation_name, source) = self
-                .parse_identifier_keep_location(Some("for annotation name"))?
+                .parse_identifier_keep_location("for annotation name")?
                 .tuple();
 
             let annotation = match annotation_name.as_str() {
@@ -31,11 +34,11 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 "private" => AnnotationKind::Private,
                 "template" => AnnotationKind::Template,
                 "using" => AnnotationKind::Using({
-                    let source = self.input.peek().source;
+                    let source = self.input.here();
 
                     Given {
                         name: self.input.eat_polymorph().map(|name| (name, source)),
-                        ty: self.parse_type(None::<&str>, Some("for context"))?,
+                        ty: self.parse_type(NoneStr, "for context")?,
                     }
                 }),
                 _ => {
@@ -54,7 +57,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             }
         }
 
-        self.parse_token(TokenKind::CloseBracket, Some("to close annotation body"))?;
+        self.input
+            .expect(TokenKind::CloseBracket, "to close annotation body")?;
         Ok(annotations)
     }
 

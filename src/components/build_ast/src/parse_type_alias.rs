@@ -3,6 +3,7 @@ use crate::annotation::AnnotationKind;
 use ast::TypeAlias;
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
+use optional_string::NoneStr;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -10,11 +11,11 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         &mut self,
         annotations: Vec<Annotation>,
     ) -> Result<TypeAlias, ParseError> {
-        let source = self.source_here();
+        let source = self.input.here();
         assert!(self.input.advance().is_type_alias_keyword());
 
         let mut privacy = Privacy::Protected;
-        let name = self.parse_identifier(Some("for alias name after 'typealias' keyword"))?;
+        let name = self.parse_identifier("for alias name after 'typealias' keyword")?;
         self.ignore_newlines();
 
         let params = self.parse_type_params()?;
@@ -23,13 +24,14 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             match annotation.kind {
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Private => privacy = Privacy::Private,
-                _ => return Err(self.unexpected_annotation(&annotation, Some("for type alias"))),
+                _ => return Err(self.unexpected_annotation(&annotation, "for type alias")),
             }
         }
 
-        self.parse_token(TokenKind::Assign, Some("after type alias name"))?;
+        self.input
+            .expect(TokenKind::Assign, "after type alias name")?;
 
-        let becomes_type = self.parse_type(None::<&str>, Some("for type alias"))?;
+        let becomes_type = self.parse_type(NoneStr, "for type alias")?;
 
         Ok(TypeAlias {
             name,

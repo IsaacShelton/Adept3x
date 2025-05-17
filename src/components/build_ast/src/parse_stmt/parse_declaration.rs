@@ -1,15 +1,16 @@
 use super::{super::error::ParseError, Parser};
 use ast::{Declaration, Stmt, StmtKind};
 use infinite_iterator::InfinitePeekable;
+use optional_string::NoneStr;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
         let (name, source) = self
-            .parse_identifier_keep_location(Some("for variable name"))?
+            .parse_identifier_keep_location("for variable name")?
             .tuple();
 
-        let variable_type = self.parse_type(None::<&str>, Some("for variable"))?;
+        let variable_type = self.parse_type(NoneStr, "for variable")?;
 
         let initial_value = self
             .input

@@ -1,7 +1,7 @@
 mod configure_job;
 
 use arena::{Arena, ArenaMap, Idx, IdxSpan, new_id_with_niche};
-use ast::{Enum, ExprAlias, Func, Global, Impl, RawAstFile, Struct, Trait, TypeAlias};
+use ast::{Enum, ExprAlias, Func, Global, Impl, Namespace, RawAstFile, Struct, Trait, TypeAlias};
 use ast_workspace_settings::{Settings, SettingsId};
 use configure_job::ConfigureJob;
 use fs_tree::{Fs, FsNodeId};
@@ -17,6 +17,7 @@ new_id_with_niche!(TypeAliasId, u64);
 new_id_with_niche!(ExprAliasId, u64);
 new_id_with_niche!(TraitId, u64);
 new_id_with_niche!(ImplId, u64);
+new_id_with_niche!(NamespaceId, u64);
 
 pub type FuncRef = Idx<FuncId, Func>;
 pub type StructRef = Idx<StructId, Struct>;
@@ -26,6 +27,7 @@ pub type TypeAliasRef = Idx<TypeAliasId, TypeAlias>;
 pub type ExprAliasRef = Idx<ExprAliasId, ExprAlias>;
 pub type TraitRef = Idx<TraitId, Trait>;
 pub type ImplRef = Idx<ImplId, Impl>;
+pub type NamespaceRef = Idx<NamespaceId, Namespace>;
 
 #[derive(Debug)]
 pub struct AstFile {
@@ -38,6 +40,7 @@ pub struct AstFile {
     pub expr_aliases: IdxSpan<ExprAliasId, ExprAlias>,
     pub traits: IdxSpan<TraitId, Trait>,
     pub impls: IdxSpan<ImplId, Impl>,
+    pub namespaces: IdxSpan<NamespaceId, Namespace>,
 }
 
 #[derive(Debug)]
@@ -69,6 +72,7 @@ pub struct AstWorkspace<'source_files> {
     pub all_expr_aliases: Arena<ExprAliasId, ExprAlias>,
     pub all_traits: Arena<TraitId, Trait>,
     pub all_impls: Arena<ImplId, Impl>,
+    pub all_namespaces: Arena<NamespaceId, Namespace>,
 }
 
 impl<'source_files> AstWorkspace<'source_files> {
@@ -96,6 +100,7 @@ impl<'source_files> AstWorkspace<'source_files> {
         let mut all_expr_aliases = Arena::new();
         let mut all_traits = Arena::new();
         let mut all_impls = Arena::new();
+        let mut all_namespaces = Arena::new();
 
         for (fs_node_id, raw_file) in raw_files {
             let funcs = all_funcs.alloc_many(raw_file.funcs);
@@ -106,6 +111,7 @@ impl<'source_files> AstWorkspace<'source_files> {
             let expr_aliases = all_expr_aliases.alloc_many(raw_file.expr_aliases);
             let traits = all_traits.alloc_many(raw_file.traits);
             let impls = all_impls.alloc_many(raw_file.impls);
+            let namespaces = all_namespaces.alloc_many(raw_file.namespaces);
 
             files.insert(
                 fs_node_id,
@@ -119,6 +125,7 @@ impl<'source_files> AstWorkspace<'source_files> {
                     expr_aliases,
                     traits,
                     impls,
+                    namespaces,
                 },
             );
         }
@@ -133,6 +140,7 @@ impl<'source_files> AstWorkspace<'source_files> {
             all_expr_aliases,
             all_traits,
             all_impls,
+            all_namespaces,
             files,
             source_files,
             settings,

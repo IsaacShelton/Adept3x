@@ -10,8 +10,12 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         // subject.field_name
         //        ^
 
-        let source = self.parse_token(TokenKind::Member, Some("for member expression"))?;
-        let member_name = self.parse_name(Some("for member name"))?;
+        let source = self.input.here();
+
+        self.input
+            .expect(TokenKind::Member, "for member expression")?;
+
+        let member_name = self.parse_name("for member name")?;
 
         let generics = self.parse_type_args()?;
 

@@ -31,7 +31,7 @@ impl PragmaSection {
         input.ignore_newlines();
 
         let mut parser = Parser::new_for_pragma(input);
-        let mut ast_file = RawAstFile::new();
+        let mut ast_file = RawAstFile::default();
 
         if parser.input.eat(TokenKind::OpenCurly) {
             // "Whole-file" mode

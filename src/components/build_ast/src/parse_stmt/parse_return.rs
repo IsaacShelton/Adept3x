@@ -8,7 +8,10 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         // return VALUE
         //          ^
 
-        let source = self.parse_token(TokenKind::ReturnKeyword, Some("for return statement"))?;
+        let source = self.input.here();
+
+        self.input
+            .expect(TokenKind::ReturnKeyword, "for return statement")?;
 
         let return_value = (!self.input.peek_is(TokenKind::Newline))
             .then(|| self.parse_expr())

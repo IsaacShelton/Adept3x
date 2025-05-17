@@ -1,4 +1,6 @@
+use crate::error::ParseError;
 use infinite_iterator::InfinitePeekable;
+use optional_string::OptionalString;
 use source_files::{Source, SourceFileKey, SourceFiles};
 use std::{borrow::Borrow, fmt::Debug};
 use token::{Token, TokenKind};
@@ -81,6 +83,28 @@ where
             .kind
             .is_polymorph()
             .then(|| self.advance().kind.unwrap_polymorph())
+    }
+
+    pub fn expect(
+        &mut self,
+        token_kind: impl Borrow<TokenKind>,
+        reason: impl OptionalString,
+    ) -> Result<(), ParseError> {
+        let token_kind = token_kind.borrow();
+
+        if !self.eat(token_kind) {
+            return Err(ParseError::expected(
+                token_kind,
+                reason.to_option_string(),
+                self.peek(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub fn here(&mut self) -> Source {
+        self.peek().source
     }
 
     pub fn ignore_newlines(&mut self) {

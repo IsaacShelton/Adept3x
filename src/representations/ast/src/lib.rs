@@ -10,6 +10,7 @@ mod func;
 mod given;
 mod global_variable;
 mod implementation;
+mod namespace;
 mod stmt;
 mod structs;
 mod traits;
@@ -28,6 +29,7 @@ pub use func::*;
 pub use given::*;
 pub use global_variable::*;
 pub use implementation::*;
+pub use namespace::*;
 #[allow(unused_imports)]
 pub use stmt::*;
 pub use structs::*;

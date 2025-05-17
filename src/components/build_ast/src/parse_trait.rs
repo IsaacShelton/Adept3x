@@ -10,10 +10,10 @@ use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_trait(&mut self, annotations: Vec<Annotation>) -> Result<Trait, ParseError> {
-        let source = self.source_here();
+        let source = self.input.here();
         self.input.advance();
 
-        let name = self.parse_identifier(Some("for trait name after 'trait' keyword"))?;
+        let name = self.parse_identifier("for trait name after 'trait' keyword")?;
         self.ignore_newlines();
 
         let mut privacy = Privacy::Protected;
@@ -22,14 +22,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             match annotation.kind {
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Private => privacy = Privacy::Private,
-                _ => return Err(self.unexpected_annotation(&annotation, Some("for trait"))),
+                _ => return Err(self.unexpected_annotation(&annotation, "for trait")),
             }
         }
 
         self.ignore_newlines();
 
         let params = self.parse_type_params()?;
-        self.parse_token(TokenKind::OpenCurly, Some("to begin trait body"))?;
+        self.input
+            .expect(TokenKind::OpenCurly, "to begin trait body")?;
         self.ignore_newlines();
 
         let mut funcs = vec![];
@@ -39,7 +40,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             self.ignore_newlines();
         }
 
-        self.parse_token(TokenKind::CloseCurly, Some("to end trait body"))?;
+        self.input
+            .expect(TokenKind::CloseCurly, "to end trait body")?;
 
         Ok(Trait {
             name,
@@ -56,12 +58,12 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         if !self.input.eat(TokenKind::FuncKeyword) {
             return Err(ParseError::expected(
                 "'func' keyword",
-                Some("to begin trait method"),
+                "to begin trait method",
                 self.input.peek(),
             ));
         }
 
-        let name = self.parse_identifier(Some("after 'func' keyword"))?;
+        let name = self.parse_identifier("after 'func' keyword")?;
         self.ignore_newlines();
 
         let parameters = if self.input.peek_is(TokenKind::OpenParen) {
@@ -72,7 +74,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         self.ignore_newlines();
 
-        let return_type = self.parse_type(Some("return"), Some("for trait method"))?;
+        let return_type = self.parse_type("return", "for trait method")?;
 
         Ok(TraitFunc {
             name,

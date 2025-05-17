@@ -47,12 +47,14 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         let starting_args_len = prefix_args.len();
         let mut args = prefix_args;
 
-        self.parse_token(TokenKind::OpenParen, Some("to begin call argument list"))?;
+        self.input
+            .expect(TokenKind::OpenParen, "to begin call argument list")?;
         self.ignore_newlines();
 
         while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
             if args.len() > starting_args_len {
-                self.parse_token(TokenKind::Comma, Some("to separate arguments"))?;
+                self.input
+                    .expect(TokenKind::Comma, "to separate arguments")?;
                 self.ignore_newlines();
             }
 
@@ -60,7 +62,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             self.ignore_newlines();
         }
 
-        self.parse_token(TokenKind::CloseParen, Some("to end call argument list"))?;
+        self.input
+            .expect(TokenKind::CloseParen, "to end call argument list")?;
 
         let mut using = vec![];
 
@@ -74,28 +77,25 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
             while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
                 if using.len() > starting_args_len {
-                    self.parse_token(
-                        TokenKind::Comma,
-                        Some("to separate implementation arguments"),
-                    )?;
+                    self.input
+                        .expect(TokenKind::Comma, "to separate implementation arguments")?;
                     self.ignore_newlines();
                 }
 
                 let name = (self.input.peek().is_identifier()
                     && self.input.peek_nth(1).could_start_type())
-                .then(|| {
-                    self.parse_identifier_keep_location(Some("for implementation parameter name"))
-                })
+                .then(|| self.parse_identifier_keep_location("for implementation parameter name"))
                 .transpose()?;
 
                 using.push(Using {
                     name,
-                    ty: self.parse_type(Some("implementation"), Some("for implementation"))?,
+                    ty: self.parse_type("implementation", "for implementation")?,
                 });
                 self.ignore_newlines();
             }
 
-            self.parse_token(TokenKind::CloseParen, Some("to end implementation list"))?;
+            self.input
+                .expect(TokenKind::CloseParen, "to end implementation list")?;
         }
 
         Ok(Call {

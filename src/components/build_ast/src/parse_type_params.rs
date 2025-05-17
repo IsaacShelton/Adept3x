@@ -5,6 +5,7 @@ use super::{
 use ast::{TypeKind, TypeParams};
 use indexmap::IndexSet;
 use infinite_iterator::InfinitePeekable;
+use optional_string::NoneStr;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -24,7 +25,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         if self.input.eat(TokenKind::Colon) {
             loop {
-                constraints.push(self.parse_type(None::<&str>, Some("for polymorph constraint"))?);
+                constraints.push(self.parse_type(NoneStr, "for polymorph constraint")?);
 
                 if let TypeKind::Polymorph(..) = constraints.last().unwrap().kind {
                     return Err(ParseErrorKind::PolymorphsCannotBeUsedAsConstraints

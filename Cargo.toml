@@ -43,7 +43,7 @@ members = [
     "src/support/repeating_last",
     "src/support/backend",
     "src/components/job",
-    "src/support/arena",
+    "src/support/arena", "src/support/optional_string",
 ]
 
 [workspace.dependencies]

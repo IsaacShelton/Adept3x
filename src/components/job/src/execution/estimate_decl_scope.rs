@@ -134,6 +134,11 @@ impl<'env> Execute<'env> for EstimateDeclScope<'env> {
             scope.push_unique(name.into(), Decl::ExprAlias(expr_alias_id));
         }
 
+        for namespace_id in ast_file.namespaces {
+            let name = &workspace.all_namespaces[namespace_id].name;
+            scope.push_unique(name.into(), Decl::Namespace(namespace_id));
+        }
+
         Artifact::EstimatedDeclScope(scope).into()
     }
 }

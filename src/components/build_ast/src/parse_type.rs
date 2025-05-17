@@ -4,14 +4,15 @@ use super::{
 };
 use ast::{Name, Type, TypeArg, TypeKind};
 use infinite_iterator::InfinitePeekable;
+use optional_string::{NoneStr, OptionalString};
 use source_files::Source;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_type(
         &mut self,
-        prefix: Option<impl ToString>,
-        for_reason: Option<impl ToString>,
+        prefix: impl OptionalString,
+        for_reason: impl OptionalString,
     ) -> Result<Type, ParseError> {
         let source = self.input.peek().source;
         let token = self.input.peek().clone();
@@ -22,8 +23,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             }
 
             return Err(ParseErrorKind::ExpectedType {
-                prefix: prefix.map(|prefix| prefix.to_string()),
-                for_reason: for_reason.map(|for_reason| for_reason.to_string()),
+                prefix: prefix.to_option_string(),
+                for_reason: for_reason.to_option_string(),
                 got: token.to_string(),
             }
             .at(source));
@@ -65,7 +66,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
     pub fn parse_type_arg(&mut self) -> Result<TypeArg, ParseError> {
         Ok(if self.input.peek().could_start_type() {
-            TypeArg::Type(self.parse_type(None::<&str>, Some("for compile time argument"))?)
+            TypeArg::Type(self.parse_type(NoneStr, "for compile time argument")?)
         } else {
             TypeArg::Expr(self.parse_expr_primary_base()?)
         })

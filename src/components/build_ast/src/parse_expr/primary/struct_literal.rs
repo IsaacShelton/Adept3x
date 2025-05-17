@@ -17,7 +17,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         //      ^
 
         let source = ast_type.source;
-        self.parse_token(TokenKind::OpenCurly, Some("to begin struct literal"))?;
+        self.input
+            .expect(TokenKind::OpenCurly, "to begin struct literal")?;
         self.ignore_newlines();
 
         let mut fill_behavior = FillBehavior::Forbid;
@@ -30,14 +31,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 }
             } else {
                 let dupe = self.input.eat(TokenKind::Colon);
-                let field_name = self.parse_identifier(Some("for field name in struct literal"))?;
+                let field_name = self.parse_identifier("for field name in struct literal")?;
 
                 self.ignore_newlines();
 
                 let field_value = if dupe {
                     ExprKind::Variable(Name::plain(field_name.clone())).at(source)
                 } else {
-                    self.parse_token(TokenKind::Colon, Some("after field name in struct literal"))?;
+                    self.input
+                        .expect(TokenKind::Colon, "after field name in struct literal")?;
                     self.ignore_newlines();
                     let value = self.parse_expr()?;
                     self.ignore_newlines();
@@ -52,12 +54,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
             self.ignore_newlines();
             if !self.input.peek_is(TokenKind::CloseCurly) {
-                self.parse_token(TokenKind::Comma, Some("after field in struct literal"))?;
+                self.input
+                    .expect(TokenKind::Comma, "after field in struct literal")?;
                 self.ignore_newlines();
             }
         }
 
-        self.parse_token(TokenKind::CloseCurly, Some("to end struct literal"))?;
+        self.input
+            .expect(TokenKind::CloseCurly, "to end struct literal")?;
+
         Ok(Expr::new(
             ExprKind::StructLiteral(Box::new(StructLiteral {
                 ast_type,

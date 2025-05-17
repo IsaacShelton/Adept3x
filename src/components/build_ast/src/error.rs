@@ -1,4 +1,5 @@
 use diagnostics::Show;
+use optional_string::OptionalString;
 use source_files::{Source, SourceFiles};
 use std::{borrow::Borrow, fmt::Display};
 use token::{Token, TokenKind};
@@ -12,7 +13,7 @@ pub struct ParseError {
 impl ParseError {
     pub fn expected(
         expected: impl ToString,
-        for_reason: Option<impl ToString>,
+        for_reason: impl OptionalString,
         got: impl Borrow<Token>,
     ) -> Self {
         match &got.borrow().kind {
@@ -21,11 +22,15 @@ impl ParseError {
             },
             _ => ParseErrorKind::Expected {
                 expected: expected.to_string(),
-                for_reason: for_reason.map(|reason| reason.to_string()),
+                for_reason: for_reason.to_option_string(),
                 got: got.borrow().kind.to_string(),
             },
         }
         .at(got.borrow().source)
+    }
+
+    pub fn other(message: impl ToString, source: Source) -> Self {
+        ParseErrorKind::other(message).at(source)
     }
 }
 
@@ -97,6 +102,12 @@ pub enum ParseErrorKind {
 impl ParseErrorKind {
     pub fn at(self, source: Source) -> ParseError {
         ParseError { kind: self, source }
+    }
+
+    pub fn other(message: impl ToString) -> Self {
+        Self::Other {
+            message: message.to_string(),
+        }
     }
 }
 

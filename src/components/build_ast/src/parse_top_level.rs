@@ -3,14 +3,23 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
 };
-use ast::RawAstFile;
+use ast::NamespaceItems;
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
+    pub fn parse_namespace_items(&mut self) -> Result<NamespaceItems, ParseError> {
+        let mut items = NamespaceItems::default();
+        while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+            self.parse_top_level(&mut items, vec![])?;
+            self.ignore_newlines();
+        }
+        Ok(items)
+    }
+
     pub fn parse_top_level(
         &mut self,
-        ast_file: &mut RawAstFile,
+        namespace_items: &mut NamespaceItems,
         parent_annotations: Vec<Annotation>,
     ) -> Result<(), ParseError> {
         let mut annotations = parent_annotations;
@@ -39,11 +48,12 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 self.ignore_newlines();
 
                 while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-                    self.parse_top_level(ast_file, annotations.clone())?;
+                    self.parse_top_level(namespace_items, annotations.clone())?;
                     self.ignore_newlines();
                 }
 
-                self.parse_token(TokenKind::CloseCurly, Some("to close annotation group"))?;
+                self.input
+                    .expect(TokenKind::CloseCurly, "to close annotation group")?;
             }
             TokenKind::PragmaKeyword => {
                 return Err(ParseErrorKind::Other {
@@ -54,31 +64,40 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 .at(self.input.peek().source));
             }
             TokenKind::FuncKeyword => {
-                ast_file.funcs.push(self.parse_func(annotations)?);
+                namespace_items.funcs.push(self.parse_func(annotations)?);
             }
             TokenKind::Identifier(_) => {
-                ast_file.globals.push(self.parse_global(annotations)?);
+                namespace_items
+                    .globals
+                    .push(self.parse_global(annotations)?);
             }
-            TokenKind::StructKeyword => ast_file.structs.push(self.parse_structure(annotations)?),
+            TokenKind::StructKeyword => namespace_items
+                .structs
+                .push(self.parse_structure(annotations)?),
             TokenKind::TypeAliasKeyword => {
                 let type_alias = self.parse_type_alias(annotations)?;
-                ast_file.type_aliases.push(type_alias);
+                namespace_items.type_aliases.push(type_alias);
             }
             TokenKind::EnumKeyword => {
                 let enum_definition = self.parse_enum(annotations)?;
 
-                ast_file.enums.push(enum_definition);
+                namespace_items.enums.push(enum_definition);
             }
             TokenKind::DefineKeyword => {
                 let helper_expr = self.parse_helper_expr(annotations)?;
-                ast_file.expr_aliases.push(helper_expr);
+                namespace_items.expr_aliases.push(helper_expr);
             }
             TokenKind::TraitKeyword => {
                 let trait_decl = self.parse_trait(annotations)?;
-                ast_file.traits.push(trait_decl);
+                namespace_items.traits.push(trait_decl);
             }
             TokenKind::ImplKeyword => {
-                ast_file.impls.push(self.parse_impl(annotations)?);
+                namespace_items.impls.push(self.parse_impl(annotations)?);
+            }
+            TokenKind::NamespaceKeyword => {
+                namespace_items
+                    .namespaces
+                    .push(self.parse_namespace(annotations)?);
             }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations

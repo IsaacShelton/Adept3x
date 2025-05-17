@@ -44,14 +44,21 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 
-        let ownership = SymbolOwnership::from_foreign_and_exposed(is_foreign, is_exposed);
+        if !self.input.peek_is(TokenKind::Newline) {
+            return Err(ParseErrorKind::Expected {
+                expected: "newline".into(),
+                for_reason: Some("after global variable".into()),
+                got: self.input.peek().kind.to_string(),
+            }
+            .at(source));
+        }
 
         Ok(Global {
             name,
             ast_type,
             source,
             is_thread_local,
-            ownership,
+            ownership: SymbolOwnership::from_foreign_and_exposed(is_foreign, is_exposed),
             privacy,
         })
     }

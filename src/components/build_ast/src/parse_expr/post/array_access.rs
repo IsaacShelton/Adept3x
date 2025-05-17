@@ -9,13 +9,17 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         // subject[index]
         //        ^
 
-        let source = self.parse_token(TokenKind::OpenBracket, Some("for array access"))?;
+        let source = self.input.here();
+
+        self.input
+            .expect(TokenKind::OpenBracket, "for array access")?;
 
         self.ignore_newlines();
         let index = self.parse_expr()?;
         self.ignore_newlines();
 
-        self.parse_token(TokenKind::CloseBracket, Some("to close array access"))?;
+        self.input
+            .expect(TokenKind::CloseBracket, "to close array access")?;
 
         Ok(ExprKind::ArrayAccess(Box::new(ArrayAccess { subject, index })).at(source))
     }

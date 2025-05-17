@@ -204,6 +204,7 @@ dependencies = [
  "num",
  "num-bigint",
  "num-traits",
+ "optional_string",
  "source_files",
  "text",
  "token",
@@ -891,6 +892,13 @@ dependencies = [
  "hashbrown",
  "parking_lot",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "optional_string"
+version = "0.1.0"
+dependencies = [
+ "lazy_format",
 ]
 
 [[package]]

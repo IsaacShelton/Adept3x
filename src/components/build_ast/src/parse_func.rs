@@ -39,7 +39,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 AnnotationKind::Using(given) => {
                     givens.push(given);
                 }
-                _ => return Err(self.unexpected_annotation(&annotation, Some("for function"))),
+                _ => return Err(self.unexpected_annotation(&annotation, "for function")),
             }
         }
 
@@ -48,7 +48,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             abide_abi = true;
         }
 
-        let name = self.parse_identifier(Some("after 'func' keyword"))?;
+        let name = self.parse_identifier("after 'func' keyword")?;
         self.ignore_newlines();
 
         let type_params = self.parse_type_params()?;
@@ -64,9 +64,9 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         self.ignore_newlines();
 
         let return_type = if self.input.peek_is(TokenKind::OpenCurly) {
-            TypeKind::Void.at(self.source_here())
+            TypeKind::Void.at(self.input.here())
         } else {
-            self.parse_type(Some("return"), Some("for function"))?
+            self.parse_type("return", "for function")?
         };
 
         let stmts = (!is_foreign)

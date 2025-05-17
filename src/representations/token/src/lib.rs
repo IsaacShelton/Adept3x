@@ -93,6 +93,7 @@ pub enum TokenKind {
     NullKeyword,
     BreakKeyword,
     ContinueKeyword,
+    NamespaceKeyword,
     Member,
     Add,
     Subtract,
@@ -192,6 +193,7 @@ impl Display for TokenKind {
             TokenKind::NullKeyword => f.write_str("'null' keyword"),
             TokenKind::BreakKeyword => f.write_str("'break' keyword"),
             TokenKind::ContinueKeyword => f.write_str("'continue' keyword"),
+            TokenKind::NamespaceKeyword => f.write_str("'namespace' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -329,6 +331,7 @@ impl TokenKind {
             | TokenKind::NullKeyword
             | TokenKind::BreakKeyword
             | TokenKind::ContinueKeyword
+            | TokenKind::NamespaceKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

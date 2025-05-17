@@ -30,7 +30,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     }
 
     fn parse_stmt_inner(&mut self) -> Result<Stmt, ParseError> {
-        let source = self.source_here();
+        let source = self.input.here();
 
         match self.input.peek().kind {
             TokenKind::Identifier(_) => {

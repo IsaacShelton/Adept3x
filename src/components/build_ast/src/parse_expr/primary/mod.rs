@@ -95,7 +95,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             TokenKind::OpenParen => {
                 self.input.advance().kind.unwrap_open_paren();
                 let inner = self.parse_expr()?;
-                self.parse_token(TokenKind::CloseParen, Some("to close nested expression"))?;
+                self.input
+                    .expect(TokenKind::CloseParen, "to close nested expression")?;
                 Ok(inner)
             }
             TokenKind::StructKeyword | TokenKind::UnionKeyword | TokenKind::EnumKeyword => {

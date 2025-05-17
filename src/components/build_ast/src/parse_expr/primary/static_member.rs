@@ -27,9 +27,10 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         // EnumName::EnumVariant
         //         ^
 
-        self.parse_token(TokenKind::StaticMember, Some("for static member access"))?;
+        self.input
+            .expect(TokenKind::StaticMember, "for static member access")?;
 
-        let action_source = self.source_here();
+        let action_source = self.input.here();
         let action_name = self
             .input
             .eat_identifier()

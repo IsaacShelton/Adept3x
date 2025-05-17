@@ -8,23 +8,21 @@ use token::{Token, TokenKind};
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_declare_assign(
         &mut self,
-        variable_name: String,
+        name: String,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // variable_name := value
         //               ^
 
-        self.parse_token(
+        self.input.expect(
             TokenKind::DeclareAssign,
             Some("for variable declaration assignment"),
         )?;
         self.ignore_newlines();
 
-        let value = self.parse_expr()?;
-
         Ok(ExprKind::DeclareAssign(Box::new(DeclareAssign {
-            name: variable_name,
-            value,
+            name,
+            value: self.parse_expr()?,
         }))
         .at(source))
     }

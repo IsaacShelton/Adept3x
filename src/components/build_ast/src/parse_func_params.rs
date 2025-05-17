@@ -1,6 +1,7 @@
 use super::{ParseError, Parser};
 use ast::{Param, Params};
 use infinite_iterator::InfinitePeekable;
+use optional_string::NoneStr;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -11,14 +12,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         let mut required = vec![];
         let mut is_cstyle_vararg = false;
 
-        self.parse_token(TokenKind::OpenParen, Some("to begin function parameters"))?;
+        self.input
+            .expect(TokenKind::OpenParen, "to begin function parameters")?;
         self.ignore_newlines();
 
         while !self.input.peek_is_or_eof(TokenKind::CloseParen) {
             // Parse argument
 
             if !required.is_empty() {
-                self.parse_token(TokenKind::Comma, Some("after parameter"))?;
+                self.input.expect(TokenKind::Comma, "after parameter")?;
                 self.ignore_newlines();
             }
 
@@ -29,14 +31,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 break;
             }
 
-            let name = self.parse_identifier(Some("for parameter name"))?;
+            let name = self.parse_identifier("for parameter name")?;
             self.ignore_newlines();
-            let ast_type = self.parse_type(None::<&str>, Some("for parameter"))?;
+            let ast_type = self.parse_type(NoneStr, "for parameter")?;
             self.ignore_newlines();
             required.push(Param::named(name, ast_type));
         }
 
-        self.parse_token(TokenKind::CloseParen, Some("to end function parameters"))?;
+        self.input
+            .expect(TokenKind::CloseParen, "to end function parameters")?;
 
         Ok(Params {
             required,

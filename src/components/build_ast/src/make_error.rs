@@ -4,6 +4,7 @@ use super::{
     error::{ParseError, ParseErrorKind},
 };
 use infinite_iterator::InfinitePeekable;
+use optional_string::OptionalString;
 use source_files::Source;
 use token::{Token, TokenKind};
 
@@ -33,7 +34,7 @@ impl<I: InfinitePeekable<Token>> Parser<'_, I> {
     pub fn unexpected_annotation(
         &self,
         annotation: &Annotation,
-        for_reason: Option<impl ToString>,
+        for_reason: impl OptionalString,
     ) -> ParseError {
         self.unexpected_annotation_ex(annotation.kind.to_string(), annotation.source, for_reason)
     }
@@ -42,11 +43,11 @@ impl<I: InfinitePeekable<Token>> Parser<'_, I> {
         &self,
         name: String,
         source: Source,
-        for_reason: Option<impl ToString>,
+        for_reason: impl OptionalString,
     ) -> ParseError {
         ParseErrorKind::UnexpectedAnnotation {
             name,
-            for_reason: for_reason.map(|reason| reason.to_string()),
+            for_reason: for_reason.to_option_string(),
         }
         .at(source)
     }

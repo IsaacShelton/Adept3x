@@ -47,6 +47,7 @@ impl IdentifierState {
             "null" => TokenKind::NullKeyword,
             "break" => TokenKind::BreakKeyword,
             "continue" => TokenKind::ContinueKeyword,
+            "namespace" => TokenKind::NamespaceKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)

@@ -1,11 +1,12 @@
 use super::{
     Parser,
     annotation::{Annotation, AnnotationKind},
-    error::{ParseError, ParseErrorKind},
+    error::ParseError,
 };
 use ast::{Impl, TypeParams};
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
+use optional_string::NoneStr;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -20,24 +21,19 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Private => privacy = Privacy::Private,
                 _ => {
-                    return Err(self.unexpected_annotation(&annotation, Some("for implementation")));
+                    return Err(self.unexpected_annotation(&annotation, "for implementation"));
                 }
             }
         }
 
-        let target = self.parse_type(Some("trait"), None::<&str>)?;
+        let target = self.parse_type("trait", NoneStr)?;
 
         let name = self.input.eat_identifier();
         let params = TypeParams::from(self.parse_type_params()?);
         let mut body = vec![];
 
-        if !self.input.eat(TokenKind::OpenCurly) {
-            return Err(ParseError::expected(
-                "'{'",
-                Some("to begin implementation body"),
-                self.input.peek(),
-            ));
-        }
+        self.input
+            .expect(TokenKind::OpenCurly, "to begin implementation body")?;
 
         self.input.ignore_newlines();
 
@@ -56,14 +52,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             self.input.ignore_newlines();
         }
 
-        if !self.input.eat(TokenKind::CloseCurly) {
-            return Err(ParseErrorKind::Expected {
-                expected: TokenKind::CloseCurly.to_string(),
-                for_reason: Some("to close implementation body".into()),
-                got: self.input.peek().to_string(),
-            }
-            .at(self.input.peek().source));
-        }
+        self.input
+            .expect(TokenKind::CloseCurly, "to end implementation body")?;
 
         Ok(Impl {
             name,

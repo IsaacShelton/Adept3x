@@ -13,6 +13,7 @@ mod parse_func_params;
 mod parse_global;
 mod parse_helper_expr;
 mod parse_impl;
+mod parse_namespace;
 mod parse_stmt;
 mod parse_structure;
 mod parse_top_level;
@@ -25,8 +26,9 @@ mod parse_util;
 use self::error::ParseError;
 pub use self::input::Input;
 use ast::RawAstFile;
+use error::ParseErrorKind;
 use infinite_iterator::InfinitePeekable;
-use source_files::{Source, SourceFileKey, SourceFiles};
+use source_files::{SourceFileKey, SourceFiles};
 use std::mem::MaybeUninit;
 use token::{Token, TokenKind};
 
@@ -59,18 +61,16 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     }
 
     pub fn parse(&mut self) -> Result<RawAstFile, ParseError> {
-        let mut ast_file = RawAstFile::new();
+        let ast_file = self.parse_namespace_items()?;
 
-        // Parse into ast file
-        while !self.input.peek().is_end_of_file() {
-            self.parse_top_level(&mut ast_file, vec![])?;
+        if !self.input.peek().is_end_of_file() {
+            return Err(ParseErrorKind::UnexpectedToken {
+                unexpected: self.input.peek().to_string(),
+            }
+            .at(self.input.here()));
         }
 
         Ok(ast_file)
-    }
-
-    fn source_here(&mut self) -> Source {
-        self.input.peek().source
     }
 }
 

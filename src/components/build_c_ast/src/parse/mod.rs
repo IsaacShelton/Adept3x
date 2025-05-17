@@ -53,7 +53,7 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
         );
 
         Self {
-            ast_file: ast::RawAstFile::new(),
+            ast_file: ast::RawAstFile::default(),
             input,
             typedefs,
             enum_constants: HashMap::default(),
