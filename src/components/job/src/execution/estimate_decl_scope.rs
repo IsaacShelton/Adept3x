@@ -153,7 +153,7 @@ impl<'env> Execute<'env> for EstimateDeclScope<'env> {
 
             for namespace_id in name_scope.namespaces.iter() {
                 let namespace = &workspace.symbols.all_namespaces[namespace_id];
-                scope.push_unique(namespace.name.clone(), Decl::Namespace(namespace.names));
+                scope.push_unique(namespace.name.clone(), Decl::Namespace(namespace_id));
             }
         }
 

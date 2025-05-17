@@ -71,6 +71,6 @@ pub enum Decl {
     Func(ast_workspace::FuncRef),
     Type(TypeRef),
     Impl(ast_workspace::ImplRef),
-    Namespace(ast_workspace::NameScopeRef),
+    Namespace(ast_workspace::NamespaceRef),
     ExprAlias(ast_workspace::ExprAliasRef),
 }
