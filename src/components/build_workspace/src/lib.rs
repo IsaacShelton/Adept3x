@@ -25,15 +25,12 @@ use diagnostics::unerror;
 use explore_within::{ExploreWithinResult, explore_within};
 use export_and_link::export_and_link;
 use fs_tree::Fs;
-use indexmap::IndexMap;
 use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
 use job::{Artifact, TaskState};
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
+use queue::LexParseInfo;
 use stats::CompilationStats;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use thousands::Separable;
 
 pub fn compile_single_file_only(
@@ -69,8 +66,10 @@ pub fn compile_workspace(
     let queue = lex_and_parse_workspace_in_parallel(compiler, &fs, explored, &stats)?;
 
     // Collect lists of all needed ASTs and module folders
-    let module_folders = HashMap::from_iter(queue.module_folders.into_iter());
-    let mut files = IndexMap::from_iter(queue.ast_files.into_iter());
+    let LexParseInfo {
+        module_folders,
+        mut files,
+    } = queue.destructure();
 
     // Setup interpreter symbols if requesting to be run in interpreter
     if compiler.options.interpret {
@@ -85,7 +84,8 @@ pub fn compile_workspace(
     }
 
     // Compile ASTs into workspace and propagate module settings to each module's contained files
-    let workspace = AstWorkspace::new(fs, files, compiler.source_files, Some(module_folders));
+    let workspace = AstWorkspace::new(fs, files, compiler.source_files, module_folders);
+    dbg!(&workspace.all_modules);
 
     // Work-in-Progress: New compilation system
     #[allow(unreachable_code)]

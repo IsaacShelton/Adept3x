@@ -4,24 +4,31 @@ use ast::RawAstFile;
 use ast_workspace_settings::Settings;
 use fs_tree::FsNodeId;
 use infinite_iterator::InfinitePeekable;
-use itertools::Itertools;
-use std::sync::Mutex;
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    sync::Mutex,
+};
 use token::Token;
 
-pub struct WorkspaceQueue<'a, I: InfinitePeekable<Token>> {
+pub struct LexParseQueue<'a, I: InfinitePeekable<Token>> {
     pub ast_files: AppendOnlyVec<(FsNodeId, RawAstFile)>,
-    pub module_folders: AppendOnlyVec<(FsNodeId, Settings)>,
-    code_files: Mutex<Vec<CodeFile<'a, I>>>,
-    module_files: Mutex<Vec<ModuleFile>>,
+    module_folders: AppendOnlyVec<(FsNodeId, Settings)>,
+    code_files: Mutex<VecDeque<CodeFile<'a, I>>>,
+    module_files: Mutex<VecDeque<ModuleFile>>,
 }
 
-impl<'a, I: InfinitePeekable<Token>> WorkspaceQueue<'a, I> {
+pub struct LexParseInfo {
+    pub module_folders: HashMap<FsNodeId, Settings>,
+    pub files: HashMap<FsNodeId, RawAstFile>,
+}
+
+impl<'a, I: InfinitePeekable<Token>> LexParseQueue<'a, I> {
     pub fn new(normal_files: Vec<NormalFile>, module_files: Vec<ModuleFile>) -> Self {
         Self {
             ast_files: AppendOnlyVec::new(),
             module_folders: AppendOnlyVec::new(),
-            code_files: Mutex::new(normal_files.into_iter().map(CodeFile::Normal).collect_vec()),
-            module_files: Mutex::new(module_files),
+            code_files: Mutex::new(normal_files.into_iter().map(CodeFile::Normal).collect()),
+            module_files: Mutex::new(module_files.into()),
         }
     }
 
@@ -29,22 +36,32 @@ impl<'a, I: InfinitePeekable<Token>> WorkspaceQueue<'a, I> {
         self.module_folders.push((folder_fs_node_id, settings));
     }
 
-    pub fn push_code_file(&self, code_file: CodeFile<'a, I>) {
-        self.code_files.lock().unwrap().push(code_file);
+    pub fn enqueue_code_file(&self, code_file: CodeFile<'a, I>) {
+        self.code_files.lock().unwrap().push_back(code_file);
     }
 
-    pub fn push_code_files(&self, code_files: impl Iterator<Item = CodeFile<'a, I>>) {
+    pub fn enqueue_code_files(&self, code_files: impl Iterator<Item = CodeFile<'a, I>>) {
         self.code_files.lock().unwrap().extend(code_files);
     }
 
-    pub fn push_module_files(&self, module_files: impl Iterator<Item = ModuleFile>) {
+    pub fn enqueue_module_files(&self, module_files: impl Iterator<Item = ModuleFile>) {
         self.module_files.lock().unwrap().extend(module_files);
+    }
+
+    pub fn destructure(self) -> LexParseInfo {
+        let module_folders = HashMap::from_iter(self.module_folders.into_iter());
+        let files = HashMap::from_iter(self.ast_files.into_iter());
+
+        LexParseInfo {
+            module_folders,
+            files,
+        }
     }
 
     pub fn for_module_files(&self, f: impl Fn(ModuleFile)) {
         loop {
             // CAREFUL: Lock doesn't immediately drop unless we do it this way (while loop is not equivalent)
-            let Some(module_file) = self.module_files.lock().unwrap().pop() else {
+            let Some(module_file) = self.module_files.lock().unwrap().pop_front() else {
                 break;
             };
             f(module_file);
@@ -54,7 +71,7 @@ impl<'a, I: InfinitePeekable<Token>> WorkspaceQueue<'a, I> {
     pub fn for_code_files(&self, f: impl Fn(CodeFile<'a, I>)) {
         loop {
             // CAREFUL: Lock doesn't immediately drop unless we do it this way (while loop is not equivalent)
-            let Some(code_file) = self.code_files.lock().unwrap().pop() else {
+            let Some(code_file) = self.code_files.lock().unwrap().pop_front() else {
                 break;
             };
             f(code_file);

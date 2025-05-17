@@ -1,4 +1,4 @@
-use arena::new_id;
+use arena::{Idx, new_id};
 use compiler_version::AdeptVersion;
 use fs_tree::FsNodeId;
 use primitives::CIntegerAssumptions;
@@ -36,3 +36,4 @@ impl Settings {
 }
 
 new_id!(SettingsId, u64);
+pub type SettingsRef = Idx<SettingsId, Settings>;

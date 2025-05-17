@@ -10,8 +10,10 @@ use build_ir::lower;
 use compiler::{BuildOptions, Compiler};
 use diagnostics::{Show, into_show};
 use fs_tree::Fs;
-use indexmap::IndexMap;
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 use target::Target;
 
 impl PragmaSection {
@@ -46,8 +48,16 @@ impl PragmaSection {
 
         let fs = Fs::new();
         let fs_node_id = fs.insert(path, None).expect("inserted");
-        let files = IndexMap::from_iter(std::iter::once((fs_node_id, self.ast_file)));
-        let workspace = AstWorkspace::new(fs, files, base_compiler.source_files, None);
+        let files = HashMap::from_iter(std::iter::once((fs_node_id, self.ast_file)));
+
+        let module_folders = HashMap::from_iter(std::iter::once((
+            fs.get(fs_node_id)
+                .parent
+                .expect("expected file to be in a folder (to run pragma)"),
+            Settings::default(),
+        )));
+
+        let workspace = AstWorkspace::new(fs, files, base_compiler.source_files, module_folders);
 
         let asg = resolve(&workspace, &compiler.options).map_err(into_show)?;
         let ir_module = lower(&compiler.options, &asg).map_err(into_show)?;

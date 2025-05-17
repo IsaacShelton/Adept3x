@@ -2,10 +2,9 @@ mod configure_job;
 
 use arena::{Arena, ArenaMap, Idx, IdxSpan, new_id_with_niche};
 use ast::{Enum, ExprAlias, Func, Global, Impl, Namespace, RawAstFile, Struct, Trait, TypeAlias};
-use ast_workspace_settings::{Settings, SettingsId};
+use ast_workspace_settings::{Settings, SettingsId, SettingsRef};
 use configure_job::ConfigureJob;
 use fs_tree::{Fs, FsNodeId};
-use indexmap::IndexMap;
 use source_files::SourceFiles;
 use std::collections::{HashMap, VecDeque};
 
@@ -29,9 +28,9 @@ pub type TraitRef = Idx<TraitId, Trait>;
 pub type ImplRef = Idx<ImplId, Impl>;
 pub type NamespaceRef = Idx<NamespaceId, Namespace>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstFile {
-    pub settings: Option<Idx<SettingsId, Settings>>,
+    pub settings: Option<SettingsRef>,
     pub funcs: IdxSpan<FuncId, Func>,
     pub structs: IdxSpan<StructId, Struct>,
     pub enums: IdxSpan<EnumId, Enum>,
@@ -41,6 +40,12 @@ pub struct AstFile {
     pub traits: IdxSpan<TraitId, Trait>,
     pub impls: IdxSpan<ImplId, Impl>,
     pub namespaces: IdxSpan<NamespaceId, Namespace>,
+}
+
+#[derive(Debug)]
+pub struct Module {
+    pub settings: Option<SettingsRef>,
+    pub files: Vec<AstFile>,
 }
 
 #[derive(Debug)]
@@ -73,23 +78,18 @@ pub struct AstWorkspace<'source_files> {
     pub all_traits: Arena<TraitId, Trait>,
     pub all_impls: Arena<ImplId, Impl>,
     pub all_namespaces: Arena<NamespaceId, Namespace>,
+    pub all_modules: Vec<Module>,
 }
 
 impl<'source_files> AstWorkspace<'source_files> {
     pub fn new(
         fs: Fs,
-        raw_files: IndexMap<FsNodeId, RawAstFile>,
+        raw_files: HashMap<FsNodeId, RawAstFile>,
         source_files: &'source_files SourceFiles,
-        module_folders_settings: Option<HashMap<FsNodeId, Settings>>,
+        original_module_folders: HashMap<FsNodeId, Settings>,
     ) -> Self {
-        let mut override_settings = ArenaMap::new();
-
         let mut settings = Arena::new();
         let default_settings = settings.alloc(Settings::default());
-
-        for (fs_node_id, module) in module_folders_settings.into_iter().flatten() {
-            override_settings.insert(fs_node_id, settings.alloc(module));
-        }
 
         let mut files = ArenaMap::new();
         let mut all_funcs = Arena::new();
@@ -130,6 +130,15 @@ impl<'source_files> AstWorkspace<'source_files> {
             );
         }
 
+        // For old ASG resolution system
+        let mut module_folders = ArenaMap::new();
+        for (fs_node_id, module) in original_module_folders.into_iter() {
+            module_folders.insert(fs_node_id, settings.alloc(module));
+        }
+
+        // For new ASG resolution job system
+        let all_modules = compute_modules(&fs, &mut files, default_settings, &module_folders);
+
         let mut workspace = Self {
             fs,
             all_funcs,
@@ -145,7 +154,8 @@ impl<'source_files> AstWorkspace<'source_files> {
             source_files,
             settings,
             default_settings,
-            module_folders: override_settings,
+            module_folders,
+            all_modules,
         };
         workspace.configure();
         workspace
@@ -216,6 +226,85 @@ impl<'source_files> AstWorkspace<'source_files> {
                     .copied()
                     .map(|child_fs_node_id| ConfigureJob::new(child_fs_node_id, settings)),
             );
+        }
+    }
+}
+
+fn compute_modules(
+    fs: &Fs,
+    files: &mut ArenaMap<FsNodeId, AstFile>,
+    default_settings: SettingsRef,
+    module_folders: &ArenaMap<FsNodeId, SettingsRef>,
+) -> Vec<Module> {
+    let mut jobs = VecDeque::new();
+    jobs.push_back(ComputeModuleJob::new(Fs::ROOT, None, default_settings));
+
+    let mut modules = Vec::new();
+
+    while let Some(job) = jobs.pop_front() {
+        let fs_node_id = job.fs_node_id;
+        let mut module_index = job.module_index;
+
+        let settings = module_folders
+            .get(fs_node_id)
+            .copied()
+            .unwrap_or(job.settings);
+
+        if module_folders.contains_key(fs_node_id) {
+            module_index = Some(modules.len());
+            modules.push(Module {
+                settings: Some(settings),
+                files: vec![],
+            });
+        }
+
+        if let Some(ast_file) = files.get_mut(fs_node_id) {
+            ast_file.settings = Some(settings);
+
+            let Some(module_index) = module_index else {
+                panic!(
+                    "internal compiler error: This file is somehow not in a module - {}",
+                    fs.get(job.fs_node_id).filename.to_string_lossy()
+                );
+            };
+
+            modules[module_index].files.push(ast_file.clone());
+        }
+
+        // SAFETY: `read_only_view` will never deadlock here because we promise
+        // to not insert any children while viewing it on this same thread
+        jobs.extend(
+            fs.get(fs_node_id)
+                .children
+                .read_only_view()
+                .iter()
+                .map(|(_, value)| value)
+                .copied()
+                .map(|child_fs_node_id| {
+                    ComputeModuleJob::new(child_fs_node_id, module_index, settings)
+                }),
+        );
+    }
+
+    modules
+}
+
+pub struct ComputeModuleJob {
+    pub fs_node_id: FsNodeId,
+    pub module_index: Option<usize>,
+    pub settings: Idx<SettingsId, Settings>,
+}
+
+impl ComputeModuleJob {
+    pub fn new(
+        fs_node_id: FsNodeId,
+        module_index: Option<usize>,
+        settings: Idx<SettingsId, Settings>,
+    ) -> Self {
+        Self {
+            fs_node_id,
+            module_index,
+            settings,
         }
     }
 }

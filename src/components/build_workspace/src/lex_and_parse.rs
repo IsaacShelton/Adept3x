@@ -6,7 +6,7 @@ use super::{
     explore::{ExploreResult, explore},
     file::CodeFile,
     module_file::ModuleFile,
-    queue::WorkspaceQueue,
+    queue::LexParseQueue,
     stats::CompilationStats,
 };
 use ast_workspace_settings::Settings;
@@ -25,7 +25,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
     fs: &Fs,
     explored: ExploreResult,
     stats: &CompilationStats,
-) -> Result<WorkspaceQueue<'a, impl InfinitePeekable<Token> + 'a>, ()> {
+) -> Result<LexParseQueue<'a, impl InfinitePeekable<Token> + 'a>, ()> {
     let ExploreResult {
         normal_files,
         module_files,
@@ -36,7 +36,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
         (normal_files.len() + module_files.len()).min(compiler.options.available_parallelism.get());
 
     let all_modules_done = Barrier::new(thread_count);
-    let queue = WorkspaceQueue::new(normal_files, module_files);
+    let queue = LexParseQueue::new(normal_files, module_files);
 
     std::thread::scope(|scope| {
         for _ in 0..thread_count {
@@ -97,7 +97,7 @@ fn process_module_file_output<'a, I: InfinitePeekable<Token>>(
     module_file: ModuleFile,
     compiled_module: CompiledModule<'a, I>,
     stats: &CompilationStats,
-    queue: &WorkspaceQueue<'a, I>,
+    queue: &LexParseQueue<'a, I>,
 ) {
     let folder_fs_node_id = fs
         .get(module_file.fs_node_id)
@@ -116,7 +116,7 @@ fn process_module_file_output<'a, I: InfinitePeekable<Token>>(
 
     // Add ourself as a module
     queue.push_module_folder(folder_fs_node_id, settings);
-    queue.push_code_file(CodeFile::Module(module_file, remaining_input));
+    queue.enqueue_code_file(CodeFile::Module(module_file, remaining_input));
 
     // Track statistics
     stats.process_file();
@@ -129,7 +129,7 @@ fn queue_dependencies<I: InfinitePeekable<Token>>(
     mut settings: Settings,
     source_file: SourceFileKey,
     stats: &CompilationStats,
-    queue: &WorkspaceQueue<I>,
+    queue: &LexParseQueue<I>,
 ) -> Settings {
     let infrastructure = compiler
         .options
@@ -161,8 +161,8 @@ fn queue_dependencies<I: InfinitePeekable<Token>>(
             };
 
             // Add the files of the dependency to the queue
-            queue.push_module_files(new_files.module_files.into_iter());
-            queue.push_code_files(new_files.normal_files.into_iter().map(CodeFile::Normal));
+            queue.enqueue_module_files(new_files.module_files.into_iter());
+            queue.enqueue_code_files(new_files.normal_files.into_iter().map(CodeFile::Normal));
         }
 
         // Remember where this dependency lives so this module can later use it
