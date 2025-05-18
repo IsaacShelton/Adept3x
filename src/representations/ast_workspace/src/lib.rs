@@ -53,6 +53,7 @@ pub struct NameScope {
     pub traits: IdxSpan<TraitId, Trait>,
     pub impls: IdxSpan<ImplId, Impl>,
     pub namespaces: IdxSpan<NamespaceId, Namespace>,
+    pub parent: Option<NameScopeRef>,
 }
 
 #[derive(Clone, Debug)]
@@ -167,12 +168,16 @@ pub struct AstWorkspaceSymbols {
     pub all_expr_aliases: Arena<ExprAliasId, ExprAlias>,
     pub all_traits: Arena<TraitId, Trait>,
     pub all_impls: Arena<ImplId, Impl>,
-    pub all_name_scopes: Arena<NameScopeId, NameScope>,
     pub all_namespaces: Arena<NamespaceId, Namespace>,
+    pub all_name_scopes: Arena<NameScopeId, NameScope>,
 }
 
 impl AstWorkspaceSymbols {
-    pub fn new_name_scope(&mut self, items: NamespaceItems) -> NameScopeRef {
+    pub fn new_name_scope(
+        &mut self,
+        items: NamespaceItems,
+        parent: Option<NameScopeRef>,
+    ) -> NameScopeRef {
         let funcs = self.all_funcs.alloc_many(items.funcs);
         let structs = self.all_structs.alloc_many(items.structs);
         let enums = self.all_enums.alloc_many(items.enums);
@@ -182,18 +187,7 @@ impl AstWorkspaceSymbols {
         let traits = self.all_traits.alloc_many(items.traits);
         let impls = self.all_impls.alloc_many(items.impls);
 
-        let mut namespaces = Vec::with_capacity(items.namespaces.len());
-        for namespace in items.namespaces {
-            namespaces.push(Namespace {
-                name: namespace.name,
-                names: self.new_name_scope(namespace.items),
-                privacy: namespace.privacy,
-            });
-        }
-
-        let namespaces = self.all_namespaces.alloc_many(namespaces.into_iter());
-
-        self.all_name_scopes.alloc(NameScope {
+        let new_name_scope = self.all_name_scopes.alloc(NameScope {
             funcs,
             structs,
             enums,
@@ -202,8 +196,22 @@ impl AstWorkspaceSymbols {
             expr_aliases,
             traits,
             impls,
-            namespaces,
-        })
+            namespaces: IdxSpan::default(),
+            parent,
+        });
+
+        let mut namespaces = Vec::with_capacity(items.namespaces.len());
+        for namespace in items.namespaces {
+            namespaces.push(Namespace {
+                name: namespace.name,
+                names: self.new_name_scope(namespace.items, Some(new_name_scope)),
+                privacy: namespace.privacy,
+            });
+        }
+
+        self.all_name_scopes[new_name_scope].namespaces =
+            self.all_namespaces.alloc_many(namespaces.into_iter());
+        new_name_scope
     }
 }
 
@@ -221,7 +229,7 @@ impl<'source_files> AstWorkspace<'source_files> {
         let mut symbols = AstWorkspaceSymbols::default();
 
         for (fs_node_id, raw_file) in raw_files {
-            let name_scope_ref = symbols.new_name_scope(raw_file);
+            let name_scope_ref = symbols.new_name_scope(raw_file, None);
 
             files.insert(
                 fs_node_id,

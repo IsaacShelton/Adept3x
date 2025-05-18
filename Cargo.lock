@@ -898,9 +898,6 @@ dependencies = [
 [[package]]
 name = "optional_string"
 version = "0.1.0"
-dependencies = [
- "lazy_format",
-]
 
 [[package]]
 name = "ordered-float"

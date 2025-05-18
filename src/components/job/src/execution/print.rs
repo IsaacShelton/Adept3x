@@ -1,42 +1,20 @@
-use super::Execute;
-use crate::{Artifact, Executor, Progress, TaskRef};
+use super::{Executable, Execution, Spawnable};
+use crate::{Continuation, Executor, TaskRef};
 
-#[derive(Debug)]
-pub struct Print<'env> {
-    message: TaskRef<'env>,
-    indented: bool,
-}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Print<'env>(pub &'env str);
 
-impl<'env> Print<'env> {
-    pub fn new(message: TaskRef<'env>) -> Self {
-        Self {
-            message,
-            indented: false,
-        }
+impl<'env> Executable<'env> for Print<'env> {
+    type Output = ();
+
+    fn execute(self, _executor: &Executor<'env>) -> Result<Self::Output, Continuation<'env>> {
+        println!("{}", self.0);
+        Ok(())
     }
 }
 
-impl<'env> Execute<'env> for Print<'env> {
-    fn execute(self, executor: &Executor<'env>) -> Progress<'env> {
-        if !self.indented {
-            print!("> ");
-
-            return Progress::suspend(
-                vec![self.message],
-                Print {
-                    message: self.message,
-                    indented: true,
-                },
-            );
-        }
-
-        println!(
-            "{}",
-            executor.truth.read().unwrap().tasks[self.message]
-                .state
-                .unwrap_completed()
-                .unwrap_string()
-        );
-        Artifact::Void.into()
+impl<'env> Spawnable<'env> for Print<'env> {
+    fn spawn(&self) -> (Vec<TaskRef<'env>>, Execution<'env>) {
+        (vec![], self.clone().into())
     }
 }

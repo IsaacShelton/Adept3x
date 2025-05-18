@@ -1,91 +1,10 @@
-use super::Execute;
+use super::{Executable, Execution, Spawnable};
 use crate::{
-    Artifact, Executor, Progress, TaskRef,
-    prereqs::Prereqs,
-    repr::{Decl, DeclScope, TypeRef},
+    Continuation, Executor, TaskRef,
+    repr::{Decl, DeclScope, DeclScopeOrigin, TypeRef},
 };
-use ast_workspace::{AstWorkspace, ModuleRef, NameScopeRef};
+use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
-use smallvec::{SmallVec, smallvec};
-
-/*
-// NOTE: Maybe "Find" tasks are functions instead of tasks? Like sub-tasks that
-// the parent task is responsible for advancing? (No dedicated artifact result)
-
-pub enum FindTypeSubTask {}
-
-impl FindTypeSubTask {
-    fn resume() -> Option<FuncId> {}
-}
-
-let Some(func_id) = self.find_func.resume() else {
-    return self;
-};
-*/
-
-/*
-    Tasks:
-    FindType
-    FindFunc
-    FindImpl
-    EstimateDeclScope                    - Gets initially known names in decl scope and its parent
-    SearchExpandedDeclScope(name)        - Gets a generated decl set by name from a decl scope, or none if never generated
-    Incorporate("scope1", "alias_star_1"),
-    FuncHead,
-    FuncBody,
-    TypeHead,
-    TypeBody,
-
-    {
-        alias * = createRealFunctions()
-        alias * = createHelperFunctions()
-
-        alias printHelloWorld = generate()
-
-        func test() {
-            printHelloWorld()
-        }
-    }
-
-    FuncBody("test")
-    FindFunc("printHelloWorld")
-        EstimateDeclScope("scope1")
-        SearchExpandedDeclScope("scope1", "printHelloWorld")
-            // ...
-            FindFunc("generate")
-                EstimateDeclScope("scope1")
-                SearchExpandedDeclScope("scope1", "generate")
-            // ...
-
-    FuncBody("test")
-    FindFunc("printHelloWorld")
-        EstimateDeclScope("scope1")
-        IsDeclFunc("scope1", "printHelloWorld")
-            FindFunc("generate")
-                EstimateDeclScope("scope1")
-                SearchExpandedDeclScope("scope1", "generate")
-                    ...
-                    Incorporate() Incorporate() Incorporate()
-
-*/
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DeclScopeOrigin {
-    Module(ModuleRef),
-    NameScope(NameScopeRef),
-}
-
-impl DeclScopeOrigin {
-    pub fn name_scopes(&self, workspace: &AstWorkspace) -> SmallVec<[NameScopeRef; 4]> {
-        match self {
-            DeclScopeOrigin::Module(module_ref) => {
-                let module = &workspace.modules[*module_ref];
-                module.files.iter().map(|file| file.names).collect()
-            }
-            DeclScopeOrigin::NameScope(name_scope_ref) => smallvec![*name_scope_ref],
-        }
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EstimateDeclScope<'env> {
@@ -93,14 +12,10 @@ pub struct EstimateDeclScope<'env> {
     pub scope_origin: DeclScopeOrigin,
 }
 
-impl<'env> Prereqs<'env> for EstimateDeclScope<'env> {
-    fn prereqs(&self) -> Vec<TaskRef<'env>> {
-        vec![]
-    }
-}
+impl<'env> Executable<'env> for EstimateDeclScope<'env> {
+    type Output = DeclScope;
 
-impl<'env> Execute<'env> for EstimateDeclScope<'env> {
-    fn execute(self, _executor: &Executor<'env>) -> Progress<'env> {
+    fn execute(self, _executor: &Executor<'env>) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace;
         let mut scope = DeclScope::new();
 
@@ -157,6 +72,12 @@ impl<'env> Execute<'env> for EstimateDeclScope<'env> {
             }
         }
 
-        Artifact::EstimatedDeclScope(scope).into()
+        Ok(scope)
+    }
+}
+
+impl<'env> Spawnable<'env> for EstimateDeclScope<'env> {
+    fn spawn(&self) -> (Vec<TaskRef<'env>>, Execution<'env>) {
+        (vec![], self.clone().into())
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
-    Execution, Request, SuspendCondition, Task, TaskId, TaskRef, TaskState, Truth, WaitingCount,
-    Worker,
+    Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, Task, TaskId,
+    TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount, Worker,
 };
 use arena::Arena;
 use crossbeam_deque::{Injector as InjectorQueue, Stealer};
@@ -19,6 +19,72 @@ pub struct WorkerRef(pub usize);
 pub struct MainExecutor<'env> {
     pub workers: Box<[Worker<'env>]>,
     pub executor: Executor<'env>,
+}
+
+#[derive(Debug)]
+pub struct Executed<'env> {
+    pub num_completed: usize,
+    pub num_scheduled: usize,
+    pub num_cleared: usize,
+    pub num_queued: usize,
+    pub truth: Truth<'env>,
+}
+
+impl<'env> MainExecutor<'env> {
+    #[must_use]
+    pub fn new(num_threads: NonZero<usize>) -> Self {
+        let workers = (0..num_threads.get())
+            .map(|worker_id| Worker::new(WorkerRef(worker_id)))
+            .collect::<Box<_>>();
+
+        let stealers = workers
+            .iter()
+            .map(|worker| worker.queue.stealer())
+            .collect::<Box<_>>();
+
+        Self {
+            executor: Executor::new(stealers),
+            workers,
+        }
+    }
+
+    #[must_use]
+    pub fn start(self) -> Executed<'env> {
+        thread::scope(|scope| {
+            for worker in self.workers.into_iter() {
+                let executor = &self.executor;
+                scope.spawn(move || worker.start(executor));
+            }
+        });
+
+        Executed {
+            num_completed: self.executor.num_completed.load(Ordering::Relaxed),
+            num_scheduled: self.executor.num_scheduled.load(Ordering::Relaxed),
+            num_cleared: self.executor.num_cleared.load(Ordering::Relaxed),
+            num_queued: self.executor.num_queued.load(Ordering::Relaxed),
+            truth: self.executor.truth.into_inner().unwrap(),
+        }
+    }
+
+    #[must_use]
+    pub fn spawn<E>(&self, execution: E) -> Pending<'env, <E as Executable<'env>>::Output>
+    where
+        E: Into<Execution<'env>> + Executable<'env>,
+    {
+        Pending::new_unchecked(self.executor.push_unique(&[], execution))
+    }
+
+    #[must_use]
+    pub fn spawn_suspended<E>(
+        &self,
+        suspend_on: &[TaskRef<'env>],
+        execution: E,
+    ) -> Pending<'env, <E as Executable<'env>>::Output>
+    where
+        E: Into<Execution<'env>> + Executable<'env>,
+    {
+        Pending::new_unchecked(self.executor.push_unique(suspend_on, execution))
+    }
 }
 
 pub struct Executor<'env> {
@@ -46,7 +112,29 @@ impl<'env> Executor<'env> {
     }
 
     #[must_use]
-    pub fn request(&self, request: impl Into<Request<'env>>) -> TaskRef<'env> {
+    pub fn request<R, T>(&self, request: R) -> Pending<'env, T>
+    where
+        R: Into<Request<'env>> + Executable<'env, Output = T>,
+        T: UnwrapFrom<Artifact<'env>>,
+    {
+        let request = request.into();
+        let mut truth_guard = self.truth.write().unwrap();
+        let truth = truth_guard.deref_mut();
+
+        let tasks = &mut truth.tasks;
+        let requests = &mut truth.requests;
+
+        Pending::new_unchecked(*requests.entry(request).or_insert_with_key(|request| {
+            let (prereqs, execution) = request.spawn();
+            self.push_unique_into_tasks(tasks, &prereqs, execution)
+        }))
+    }
+
+    #[must_use]
+    pub fn request_raw<R>(&self, request: R) -> TaskRef<'env>
+    where
+        R: Into<Request<'env>>,
+    {
         let request = request.into();
         let mut truth_guard = self.truth.write().unwrap();
         let truth = truth_guard.deref_mut();
@@ -55,7 +143,8 @@ impl<'env> Executor<'env> {
         let requests = &mut truth.requests;
 
         *requests.entry(request).or_insert_with_key(|request| {
-            self.push_unique_into_tasks(tasks, &request.prereqs(), request.spawn_execution())
+            let (prereqs, execution) = request.spawn();
+            self.push_unique_into_tasks(tasks, &prereqs, execution)
         })
     }
 
@@ -108,60 +197,5 @@ impl<'env> Executor<'env> {
         }
 
         new_task_ref
-    }
-}
-
-#[derive(Debug)]
-pub struct Executed<'env> {
-    pub num_completed: usize,
-    pub num_scheduled: usize,
-    pub num_cleared: usize,
-    pub num_queued: usize,
-    pub truth: Truth<'env>,
-}
-
-impl<'env> MainExecutor<'env> {
-    #[must_use]
-    pub fn new(num_threads: NonZero<usize>) -> Self {
-        let workers = (0..num_threads.get())
-            .map(|worker_id| Worker::new(WorkerRef(worker_id)))
-            .collect::<Box<_>>();
-
-        let stealers = workers
-            .iter()
-            .map(|worker| worker.queue.stealer())
-            .collect::<Box<_>>();
-
-        Self {
-            executor: Executor::new(stealers),
-            workers,
-        }
-    }
-
-    #[must_use]
-    pub fn start(self) -> Executed<'env> {
-        thread::scope(|scope| {
-            for worker in self.workers.into_iter() {
-                let executor = &self.executor;
-                scope.spawn(move || worker.start(executor));
-            }
-        });
-
-        Executed {
-            num_completed: self.executor.num_completed.load(Ordering::Relaxed),
-            num_scheduled: self.executor.num_scheduled.load(Ordering::Relaxed),
-            num_cleared: self.executor.num_cleared.load(Ordering::Relaxed),
-            num_queued: self.executor.num_queued.load(Ordering::Relaxed),
-            truth: self.executor.truth.into_inner().unwrap(),
-        }
-    }
-
-    #[must_use]
-    pub fn push(
-        &self,
-        suspend_on: &[TaskRef<'env>],
-        execution: impl Into<Execution<'env>>,
-    ) -> TaskRef<'env> {
-        self.executor.push_unique(suspend_on, execution)
     }
 }

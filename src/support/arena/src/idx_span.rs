@@ -74,6 +74,12 @@ impl<K: Id, V> IdxSpan<K, V> {
     }
 }
 
+impl<K: Id, V> Default for IdxSpan<K, V> {
+    fn default() -> Self {
+        Self::new(K::from_usize(0)..K::from_usize(0))
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct IdxSpanIter<K: Id, V> {
     pub(crate) next: K,

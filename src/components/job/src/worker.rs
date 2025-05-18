@@ -1,6 +1,6 @@
 use crate::{
-    Artifact, Execute, Execution, Executor, Progression, SuspendCondition, TaskRef, TaskState,
-    WaitingCount, WorkerRef,
+    Artifact, Continuation, Execution, Executor, RawExecutable, SuspendCondition, TaskRef,
+    TaskState, WaitingCount, WorkerRef,
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
@@ -30,15 +30,15 @@ impl<'env> Worker<'env> {
                     .unwrap_get_execution()
                 };
 
-                match execution.execute(executor).progression() {
-                    Progression::Complete(artifact) => {
+                match execution.execute_raw(executor) {
+                    Ok(artifact) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);
                     }
-                    Progression::Suspend(waiting, execution) => {
+                    Err(Continuation::Suspend(waiting, execution)) => {
                         self.suspend(executor, task_ref, waiting, execution);
                     }
-                    Progression::Error(error) => {
+                    Err(Continuation::Error(error)) => {
                         eprintln!("error: {}", error);
                     }
                 }

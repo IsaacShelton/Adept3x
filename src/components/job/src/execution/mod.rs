@@ -1,48 +1,55 @@
 mod build_asg;
-mod build_asg_for_struct;
-mod build_ast_workspace;
-mod create_string;
 mod diverge;
 mod estimate_decl_scope;
-mod find;
 mod print;
-mod print_message;
 
-use crate::{Executor, Progress, spawn_execution::SpawnExecution};
-pub use build_asg::*;
-pub use build_asg_for_struct::*;
-pub use build_ast_workspace::BuildAstWorkspace;
-pub use create_string::*;
+use crate::{Artifact, Continuation, Executor, TaskRef, UnwrapFrom};
+pub use build_asg::BuildAsg;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use estimate_decl_scope::EstimateDeclScope;
-pub use print::*;
-pub use print_message::*;
+pub use print::Print;
 
 #[enum_dispatch]
-pub trait Execute<'env> {
+pub trait RawExecutable<'env> {
     #[must_use]
-    fn execute(self, executor: &Executor<'env>) -> Progress<'env>;
+    fn execute_raw(self, executor: &Executor<'env>) -> Result<Artifact<'env>, Continuation<'env>>;
+}
+
+pub trait Executable<'env> {
+    type Output: Into<Artifact<'env>> + UnwrapFrom<Artifact<'env>>;
+
+    #[must_use]
+    fn execute(self, executor: &Executor<'env>) -> Result<Self::Output, Continuation<'env>>;
+}
+
+#[enum_dispatch]
+pub trait Spawnable<'env> {
+    fn spawn(&self) -> (Vec<TaskRef<'env>>, Execution<'env>);
 }
 
 #[derive(Debug)]
-#[enum_dispatch(Execute)]
+#[enum_dispatch(RawExecutable)]
 pub enum Execution<'env> {
-    CreateString(CreateString),
-    Print(Print<'env>),
-    PrintMessage(PrintMessage<'env>),
     Diverge(Diverge),
-    BuildAstWorkspace(BuildAstWorkspace<'env>),
+    Print(Print<'env>),
     BuildAsg(BuildAsg<'env>),
-    BuildAsgForStruct(BuildAsgForStruct<'env>),
-    BuildStaticScope(EstimateDeclScope<'env>),
+    EstimateDeclScope(EstimateDeclScope<'env>),
 }
 
-impl<'env, E> SpawnExecution<'env> for E
+#[derive(Debug, PartialEq, Eq, Hash)]
+#[enum_dispatch(Spawnable)]
+pub enum Request<'env> {
+    Diverge(Diverge),
+    Print(Print<'env>),
+    EstimateDeclScope(EstimateDeclScope<'env>),
+}
+
+impl<'env, E> RawExecutable<'env> for E
 where
-    E: Clone + Into<Execution<'env>>,
+    E: Executable<'env>,
 {
-    fn spawn_execution(&self) -> Execution<'env> {
-        self.clone().into()
+    fn execute_raw(self, executor: &Executor<'env>) -> Result<Artifact<'env>, Continuation<'env>> {
+        self.execute(executor).map(|value| value.into())
     }
 }

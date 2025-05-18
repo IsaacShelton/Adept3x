@@ -26,7 +26,7 @@ use explore_within::{ExploreWithinResult, explore_within};
 use export_and_link::export_and_link;
 use fs_tree::Fs;
 use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
-use job::{Artifact, TaskState};
+use job::TaskState;
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
 use queue::LexParseInfo;
 use stats::CompilationStats;
@@ -92,7 +92,7 @@ pub fn compile_workspace(
     if compiler.options.new_compilation_system {
         let executor = job::MainExecutor::new(compiler.options.available_parallelism);
 
-        let build_asg_task_ref = executor.push(&[], job::BuildAsg::new(&workspace));
+        let build_asg_task = executor.spawn(job::BuildAsg::new(&workspace));
 
         let executed = executor.start();
         let show_executor_stats = false;
@@ -119,11 +119,7 @@ pub fn compile_workspace(
             println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
         }
 
-        let TaskState::Completed(Artifact::Asg(asg)) =
-            &executed.truth.tasks[build_asg_task_ref].state
-        else {
-            panic!("oops aameirmgogmo");
-        };
+        let asg = executed.truth.demand(build_asg_task);
 
         // Lower code to high level intermediate representation
         let ir_module = unerror(lower(&compiler.options, &asg), source_files)?;
