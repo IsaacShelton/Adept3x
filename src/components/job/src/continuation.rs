@@ -1,3 +1,12 @@
+/*
+    ==================  components/job/src/continuation.rs  ===================
+    List of (non-completion) continuations that tasks can perform.
+
+    Completion continuations are handled separately by returning Ok(result),
+    instead of Err(continuation).
+    ---------------------------------------------------------------------------
+*/
+
 use crate::{Execution, TaskRef};
 
 pub enum Continuation<'env> {

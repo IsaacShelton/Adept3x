@@ -1,13 +1,15 @@
 use crate::{
     Artifact, Continuation, Execution, Executor, RawExecutable, SuspendCondition, TaskRef,
-    TaskState, WaitingCount, WorkerRef,
+    TaskState, WaitingCount,
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
 
+pub struct WorkerRef(pub usize);
+
 pub struct Worker<'env> {
     pub worker_ref: WorkerRef,
-    pub queue: WorkerQueue<TaskRef<'env>>,
+    pub local_queue: WorkerQueue<TaskRef<'env>>,
 }
 
 impl<'env> Worker<'env> {
@@ -15,21 +17,13 @@ impl<'env> Worker<'env> {
     pub fn new(worker_ref: WorkerRef) -> Self {
         Worker {
             worker_ref,
-            queue: WorkerQueue::new_lifo(),
+            local_queue: WorkerQueue::new_lifo(),
         }
     }
 
     pub fn start(&self, executor: &Executor<'env>) {
         loop {
-            if let Some(task_ref) = self.find_task(executor, &executor.stealers) {
-                let execution = {
-                    mem::replace(
-                        &mut executor.truth.write().unwrap().tasks[task_ref].state,
-                        TaskState::Running,
-                    )
-                    .unwrap_get_execution()
-                };
-
+            if let Some((task_ref, execution)) = self.find_task(executor, &executor.stealers) {
                 match execution.execute_raw(executor) {
                     Ok(artifact) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
@@ -52,26 +46,31 @@ impl<'env> Worker<'env> {
         }
     }
 
+    #[must_use]
     fn find_task(
         &self,
         executor: &Executor<'env>,
         stealers: &[Stealer<TaskRef<'env>>],
-    ) -> Option<TaskRef<'env>> {
-        // Pop a task from the local queue, if not empty.
-        self.queue.pop().or_else(|| {
-            // Otherwise, we need to look for a task elsewhere.
+    ) -> Option<(TaskRef<'env>, Execution<'env>)> {
+        // Try to find task (in the order of local queue, global queue, other worker queues)
+        let task_ref = self.local_queue.pop().or_else(|| {
             iter::repeat_with(|| {
-                // Try stealing a batch of tasks from the global queue.
                 executor
                     .injector
-                    .steal_batch_and_pop(&self.queue)
-                    // Or try stealing a task from one of the other threads.
+                    .steal_batch_and_pop(&self.local_queue)
                     .or_else(|| stealers.iter().map(|s| s.steal()).collect())
             })
-            // Loop while no task was stolen and any steal operation needs to be retried.
             .find(|s| !s.is_retry())
-            // Extract the stolen task, if there is one.
             .and_then(|s| s.success())
+        });
+
+        // If found a task, extract it's execution that needs to be run
+        task_ref.map(|task_ref| {
+            (
+                task_ref,
+                mem::take(&mut executor.truth.write().unwrap().tasks[task_ref].state)
+                    .unwrap_suspended_execution(),
+            )
         })
     }
 
@@ -95,14 +94,14 @@ impl<'env> Worker<'env> {
                     SuspendCondition::All(waiting_count) => {
                         if waiting_count.decrement() {
                             executor.num_queued.fetch_add(1, Ordering::SeqCst);
-                            self.queue.push(dependent);
+                            self.local_queue.push(dependent);
                         }
                     }
                     SuspendCondition::Any(of) => {
                         if of.contains(&task_ref) {
                             of.clear();
                             executor.num_queued.fetch_add(1, Ordering::SeqCst);
-                            self.queue.push(dependent);
+                            self.local_queue.push(dependent);
                         }
                     }
                 }
@@ -135,7 +134,7 @@ impl<'env> Worker<'env> {
 
         if wait_on == 0 {
             executor.num_queued.fetch_add(1, Ordering::SeqCst);
-            self.queue.push(task_ref);
+            self.local_queue.push(task_ref);
         }
     }
 }

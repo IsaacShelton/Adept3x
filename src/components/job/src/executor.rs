@@ -1,91 +1,26 @@
+/*
+    ====================  components/job/src/executor.rs  =====================
+    Defines what a worker sees as it's `Executor`.
+
+    This only contains parts of the executor that workers are allowed to see.
+
+    Data that must be kept inaccessible to workers is instead kept in `MainExecutor`.
+    ---------------------------------------------------------------------------
+*/
+
 use crate::{
     Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, Task, TaskId,
-    TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount, Worker,
+    TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
 };
 use arena::Arena;
 use crossbeam_deque::{Injector as InjectorQueue, Stealer};
 use std::{
-    num::NonZero,
     ops::DerefMut,
     sync::{
         RwLock,
         atomic::{AtomicUsize, Ordering},
     },
-    thread,
 };
-
-pub struct WorkerRef(pub usize);
-
-pub struct MainExecutor<'env> {
-    pub workers: Box<[Worker<'env>]>,
-    pub executor: Executor<'env>,
-}
-
-#[derive(Debug)]
-pub struct Executed<'env> {
-    pub num_completed: usize,
-    pub num_scheduled: usize,
-    pub num_cleared: usize,
-    pub num_queued: usize,
-    pub truth: Truth<'env>,
-}
-
-impl<'env> MainExecutor<'env> {
-    #[must_use]
-    pub fn new(num_threads: NonZero<usize>) -> Self {
-        let workers = (0..num_threads.get())
-            .map(|worker_id| Worker::new(WorkerRef(worker_id)))
-            .collect::<Box<_>>();
-
-        let stealers = workers
-            .iter()
-            .map(|worker| worker.queue.stealer())
-            .collect::<Box<_>>();
-
-        Self {
-            executor: Executor::new(stealers),
-            workers,
-        }
-    }
-
-    #[must_use]
-    pub fn start(self) -> Executed<'env> {
-        thread::scope(|scope| {
-            for worker in self.workers.into_iter() {
-                let executor = &self.executor;
-                scope.spawn(move || worker.start(executor));
-            }
-        });
-
-        Executed {
-            num_completed: self.executor.num_completed.load(Ordering::Relaxed),
-            num_scheduled: self.executor.num_scheduled.load(Ordering::Relaxed),
-            num_cleared: self.executor.num_cleared.load(Ordering::Relaxed),
-            num_queued: self.executor.num_queued.load(Ordering::Relaxed),
-            truth: self.executor.truth.into_inner().unwrap(),
-        }
-    }
-
-    #[must_use]
-    pub fn spawn<E>(&self, execution: E) -> Pending<'env, <E as Executable<'env>>::Output>
-    where
-        E: Into<Execution<'env>> + Executable<'env>,
-    {
-        Pending::new_unchecked(self.executor.push_unique(&[], execution))
-    }
-
-    #[must_use]
-    pub fn spawn_suspended<E>(
-        &self,
-        suspend_on: &[TaskRef<'env>],
-        execution: E,
-    ) -> Pending<'env, <E as Executable<'env>>::Output>
-    where
-        E: Into<Execution<'env>> + Executable<'env>,
-    {
-        Pending::new_unchecked(self.executor.push_unique(suspend_on, execution))
-    }
-}
 
 pub struct Executor<'env> {
     pub injector: InjectorQueue<TaskRef<'env>>,
@@ -171,12 +106,17 @@ impl<'env> Executor<'env> {
         self.num_scheduled.fetch_add(1, Ordering::SeqCst);
 
         let mut wait_on = 0;
+        for dependent in suspend_on {
+            if tasks[*dependent].state.completed().is_none() {
+                wait_on += 1;
+            }
+        }
 
         let new_task_ref = {
             let new_task_ref = tasks.alloc(Task {
                 state: TaskState::Suspended(
                     execution.into(),
-                    SuspendCondition::All(WaitingCount(suspend_on.len())),
+                    SuspendCondition::All(WaitingCount(wait_on)),
                 ),
                 dependents: vec![],
             });
@@ -184,7 +124,6 @@ impl<'env> Executor<'env> {
             for dependent in suspend_on {
                 if tasks[*dependent].state.completed().is_none() {
                     tasks[*dependent].dependents.push(new_task_ref);
-                    wait_on += 1;
                 }
             }
 

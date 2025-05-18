@@ -9,6 +9,6 @@ pub enum Artifact<'env> {
     DeclScope(DeclScope),
 }
 
-impl_unwrap_from!(Void, ());
-impl_unwrap_from!(Asg, asg::Asg<'env>);
-impl_unwrap_from!(DeclScope, DeclScope);
+impl_unwrap_from_artifact!(Void, ());
+impl_unwrap_from_artifact!(Asg, asg::Asg<'env>);
+impl_unwrap_from_artifact!(DeclScope, DeclScope);

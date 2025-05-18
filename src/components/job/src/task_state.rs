@@ -1,14 +1,14 @@
-use crate::{Artifact, Execution, TaskRef, WaitingCount};
-use smallvec::SmallVec;
+/*
+    ===================  components/job/src/task_state.rs  ====================
+    Defines the different states that a task can be in.
+    ---------------------------------------------------------------------------
+*/
 
-#[derive(Debug)]
-pub enum SuspendCondition<'env> {
-    All(WaitingCount),
-    Any(SmallVec<[TaskRef<'env>; 2]>),
-}
+use crate::{Artifact, Execution, SuspendCondition};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum TaskState<'env> {
+    #[default]
     Running,
     Suspended(Execution<'env>, SuspendCondition<'env>),
     Completed(Artifact<'env>),
@@ -23,14 +23,10 @@ impl<'env> TaskState<'env> {
         }
     }
 
-    pub fn unwrap_completed(&self) -> &Artifact<'env> {
-        self.completed().unwrap()
-    }
-
-    pub fn unwrap_get_execution(self) -> Execution<'env> {
+    pub fn unwrap_suspended_execution(self) -> Execution<'env> {
         match self {
             TaskState::Suspended(execution, _condition) => execution,
-            _ => panic!("unwrap_get_execution failed!"),
+            _ => panic!("unwrap_suspended_execution failed!"),
         }
     }
 }
