@@ -52,17 +52,7 @@ impl<'env> Executor<'env> {
         R: Into<Request<'env>> + Executable<'env, Output = T>,
         T: UnwrapFrom<Artifact<'env>>,
     {
-        let request = request.into();
-        let mut truth_guard = self.truth.write().unwrap();
-        let truth = truth_guard.deref_mut();
-
-        let tasks = &mut truth.tasks;
-        let requests = &mut truth.requests;
-
-        Pending::new_unchecked(*requests.entry(request).or_insert_with_key(|request| {
-            let (prereqs, execution) = request.spawn();
-            self.push_unique_into_tasks(tasks, &prereqs, execution)
-        }))
+        Pending::new_unchecked(self.request_raw(request))
     }
 
     #[must_use]
