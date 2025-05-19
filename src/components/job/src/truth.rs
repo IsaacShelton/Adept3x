@@ -1,6 +1,6 @@
 use crate::{Artifact, Pending, Request, Task, TaskId, TaskRef, UnwrapFrom};
 use arena::Arena;
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash, ops::Deref};
 
 #[derive(Debug)]
 pub struct Truth<'env> {
@@ -26,6 +26,41 @@ impl<'env> Truth<'env> {
                 .as_ref()
                 .expect("artifact expected"),
         )
+    }
+
+    pub fn demand_many<T, D>(&self, pending_list: impl Iterator<Item = D>) -> Vec<&T>
+    where
+        T: UnwrapFrom<Artifact<'env>>,
+        D: Deref<Target = Pending<'env, T>>,
+    {
+        pending_list
+            .map(|pending| {
+                T::unwrap_from(
+                    self.tasks[pending.raw_task_ref()]
+                        .completed()
+                        .as_ref()
+                        .expect("artifact expected"),
+                )
+            })
+            .collect()
+    }
+
+    pub fn demand_map<K, T>(&self, pending_map: &HashMap<K, Pending<'env, T>>) -> HashMap<K, &T>
+    where
+        K: Clone + PartialEq + Eq + Hash,
+        T: UnwrapFrom<Artifact<'env>>,
+    {
+        HashMap::from_iter(pending_map.iter().map(|(key, pending)| {
+            (
+                key.clone(),
+                T::unwrap_from(
+                    self.tasks[pending.raw_task_ref()]
+                        .completed()
+                        .as_ref()
+                        .expect("artifact expected"),
+                ),
+            )
+        }))
     }
 
     pub fn expect_artifact(&self, task_ref: TaskRef<'env>) -> &Artifact<'env> {

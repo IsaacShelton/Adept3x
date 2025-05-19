@@ -11,8 +11,7 @@ impl DeclScopeOrigin {
     pub fn name_scopes(&self, workspace: &AstWorkspace) -> SmallVec<[NameScopeRef; 4]> {
         match self {
             DeclScopeOrigin::Module(module_ref) => {
-                let module = &workspace.modules[*module_ref];
-                module.files.iter().map(|file| file.names).collect()
+                workspace.modules[*module_ref].name_scopes().collect()
             }
             DeclScopeOrigin::NameScope(name_scope_ref) => smallvec![*name_scope_ref],
         }

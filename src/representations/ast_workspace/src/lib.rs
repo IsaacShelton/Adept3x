@@ -1,15 +1,24 @@
+mod all_symbols;
+mod ast_file;
 mod configure_job;
+mod module;
+mod name_scope;
+mod namespace;
+mod type_decl_ref;
 
-use arena::{Arena, ArenaMap, Idx, IdxSpan, new_id_with_niche};
-use ast::{
-    Enum, ExprAlias, Func, Global, Impl, NamespaceItems, RawAstFile, Struct, Trait, TypeAlias,
-};
+pub use all_symbols::AstWorkspaceSymbols;
+use arena::{Arena, ArenaMap, Idx, new_id_with_niche};
+use ast::{Enum, ExprAlias, Func, Global, Impl, RawAstFile, Struct, Trait, TypeAlias};
+pub use ast_file::*;
 use ast_workspace_settings::{Settings, SettingsId, SettingsRef};
-use attributes::Privacy;
 use configure_job::ConfigureJob;
 use fs_tree::{Fs, FsNodeId};
+pub use module::*;
+pub use name_scope::*;
+pub use namespace::*;
 use source_files::SourceFiles;
 use std::collections::{HashMap, VecDeque};
+pub use type_decl_ref::TypeDeclRef;
 
 new_id_with_niche!(FuncId, u64);
 new_id_with_niche!(StructId, u64);
@@ -35,117 +44,6 @@ pub type NameScopeRef = Idx<NameScopeId, NameScope>;
 pub type ModuleRef = Idx<ModuleId, Module>;
 pub type NamespaceRef = Idx<NamespaceId, Namespace>;
 
-#[derive(Clone, Debug)]
-pub struct Namespace {
-    pub name: String,
-    pub names: NameScopeRef,
-    pub privacy: Privacy,
-}
-
-#[derive(Clone, Debug)]
-pub struct NameScope {
-    pub funcs: IdxSpan<FuncId, Func>,
-    pub structs: IdxSpan<StructId, Struct>,
-    pub enums: IdxSpan<EnumId, Enum>,
-    pub globals: IdxSpan<GlobalId, Global>,
-    pub type_aliases: IdxSpan<TypeAliasId, TypeAlias>,
-    pub expr_aliases: IdxSpan<ExprAliasId, ExprAlias>,
-    pub traits: IdxSpan<TraitId, Trait>,
-    pub impls: IdxSpan<ImplId, Impl>,
-    pub namespaces: IdxSpan<NamespaceId, Namespace>,
-    pub parent: Option<NameScopeRef>,
-}
-
-#[derive(Clone, Debug)]
-pub struct AstFile {
-    pub settings: Option<SettingsRef>,
-    pub names: NameScopeRef,
-}
-
-#[derive(Debug)]
-pub struct Module {
-    pub settings: Option<SettingsRef>,
-    pub files: Vec<AstFile>,
-}
-
-impl Module {
-    pub fn funcs(&self, symbols: &AstWorkspaceSymbols) -> impl Iterator<Item = FuncRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].funcs.iter())
-    }
-
-    pub fn structs(&self, symbols: &AstWorkspaceSymbols) -> impl Iterator<Item = StructRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].structs.iter())
-    }
-
-    pub fn enums(&self, symbols: &AstWorkspaceSymbols) -> impl Iterator<Item = EnumRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].enums.iter())
-    }
-
-    pub fn globals(&self, symbols: &AstWorkspaceSymbols) -> impl Iterator<Item = GlobalRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].globals.iter())
-    }
-
-    pub fn type_aliases(
-        &self,
-        symbols: &AstWorkspaceSymbols,
-    ) -> impl Iterator<Item = TypeAliasRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].type_aliases.iter())
-    }
-
-    pub fn expr_aliases(
-        &self,
-        symbols: &AstWorkspaceSymbols,
-    ) -> impl Iterator<Item = ExprAliasRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].expr_aliases.iter())
-    }
-
-    pub fn traits(&self, symbols: &AstWorkspaceSymbols) -> impl Iterator<Item = TraitRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].traits.iter())
-    }
-
-    pub fn impls(&self, symbols: &AstWorkspaceSymbols) -> impl Iterator<Item = ImplRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].impls.iter())
-    }
-
-    pub fn namespaces<'a>(
-        &'a self,
-        symbols: &'a AstWorkspaceSymbols,
-    ) -> impl Iterator<Item = NamespaceRef> {
-        self.files
-            .iter()
-            .flat_map(|file| symbols.all_name_scopes[file.names].namespaces.iter())
-    }
-}
-
-#[derive(Debug)]
-pub struct AstFileView<'workspace> {
-    pub settings: Option<&'workspace Settings>,
-    pub funcs: &'workspace [Func],
-    pub structs: &'workspace [Struct],
-    pub enums: &'workspace [Enum],
-    pub globals: &'workspace [Global],
-    pub type_aliases: &'workspace [TypeAlias],
-    pub expr_aliases: &'workspace [ExprAlias],
-    pub traits: &'workspace [Trait],
-    pub impls: &'workspace [Impl],
-}
-
 #[derive(Debug)]
 pub struct AstWorkspace<'source_files> {
     pub source_files: &'source_files SourceFiles,
@@ -156,63 +54,6 @@ pub struct AstWorkspace<'source_files> {
     pub default_settings: Idx<SettingsId, Settings>,
     pub symbols: AstWorkspaceSymbols,
     pub modules: Arena<ModuleId, Module>,
-}
-
-#[derive(Debug, Default)]
-pub struct AstWorkspaceSymbols {
-    pub all_funcs: Arena<FuncId, Func>,
-    pub all_structs: Arena<StructId, Struct>,
-    pub all_enums: Arena<EnumId, Enum>,
-    pub all_globals: Arena<GlobalId, Global>,
-    pub all_type_aliases: Arena<TypeAliasId, TypeAlias>,
-    pub all_expr_aliases: Arena<ExprAliasId, ExprAlias>,
-    pub all_traits: Arena<TraitId, Trait>,
-    pub all_impls: Arena<ImplId, Impl>,
-    pub all_namespaces: Arena<NamespaceId, Namespace>,
-    pub all_name_scopes: Arena<NameScopeId, NameScope>,
-}
-
-impl AstWorkspaceSymbols {
-    pub fn new_name_scope(
-        &mut self,
-        items: NamespaceItems,
-        parent: Option<NameScopeRef>,
-    ) -> NameScopeRef {
-        let funcs = self.all_funcs.alloc_many(items.funcs);
-        let structs = self.all_structs.alloc_many(items.structs);
-        let enums = self.all_enums.alloc_many(items.enums);
-        let globals = self.all_globals.alloc_many(items.globals);
-        let type_aliases = self.all_type_aliases.alloc_many(items.type_aliases);
-        let expr_aliases = self.all_expr_aliases.alloc_many(items.expr_aliases);
-        let traits = self.all_traits.alloc_many(items.traits);
-        let impls = self.all_impls.alloc_many(items.impls);
-
-        let new_name_scope = self.all_name_scopes.alloc(NameScope {
-            funcs,
-            structs,
-            enums,
-            globals,
-            type_aliases,
-            expr_aliases,
-            traits,
-            impls,
-            namespaces: IdxSpan::default(),
-            parent,
-        });
-
-        let mut namespaces = Vec::with_capacity(items.namespaces.len());
-        for namespace in items.namespaces {
-            namespaces.push(Namespace {
-                name: namespace.name,
-                names: self.new_name_scope(namespace.items, Some(new_name_scope)),
-                privacy: namespace.privacy,
-            });
-        }
-
-        self.all_name_scopes[new_name_scope].namespaces =
-            self.all_namespaces.alloc_many(namespaces.into_iter());
-        new_name_scope
-    }
 }
 
 impl<'source_files> AstWorkspace<'source_files> {

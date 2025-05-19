@@ -1,4 +1,4 @@
-use super::{AbstractDeclarator, SpecifierQualifierList};
+use crate::{AbstractDeclarator, SpecifierQualifierList};
 use c_token::{Encoding, FloatSuffix, Integer};
 use source_files::Source;
 

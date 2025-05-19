@@ -1,9 +1,9 @@
 use super::{Executable, Execution, Spawnable};
 use crate::{
     Continuation, Executor, TaskRef,
-    repr::{Decl, DeclScope, DeclScopeOrigin, TypeRef},
+    repr::{Decl, DeclScope, DeclScopeOrigin},
 };
-use ast_workspace::AstWorkspace;
+use ast_workspace::{AstWorkspace, TypeDeclRef};
 use by_address::ByAddress;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -38,22 +38,22 @@ impl<'env> Executable<'env> for EstimateDeclScope<'env> {
 
             for trait_id in name_scope.traits.iter() {
                 let name = &workspace.symbols.all_traits[trait_id].name;
-                scope.push_unique(name.into(), Decl::Type(TypeRef::Trait(trait_id)));
+                scope.push_unique(name.into(), Decl::Type(TypeDeclRef::Trait(trait_id)));
             }
 
             for struct_id in name_scope.structs.iter() {
                 let name = &workspace.symbols.all_structs[struct_id].name;
-                scope.push_unique(name.into(), Decl::Type(TypeRef::Struct(struct_id)));
+                scope.push_unique(name.into(), Decl::Type(TypeDeclRef::Struct(struct_id)));
             }
 
             for enum_id in name_scope.enums.iter() {
                 let name = &workspace.symbols.all_enums[enum_id].name;
-                scope.push_unique(name.into(), Decl::Type(TypeRef::Enum(enum_id)));
+                scope.push_unique(name.into(), Decl::Type(TypeDeclRef::Enum(enum_id)));
             }
 
             for type_alias_id in name_scope.type_aliases.iter() {
                 let name = &workspace.symbols.all_type_aliases[type_alias_id].name;
-                scope.push_unique(name.into(), Decl::Type(TypeRef::Alias(type_alias_id)));
+                scope.push_unique(name.into(), Decl::Type(TypeDeclRef::Alias(type_alias_id)));
             }
 
             for global_id in name_scope.globals.iter() {

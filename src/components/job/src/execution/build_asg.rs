@@ -3,13 +3,14 @@ use crate::{
     Continuation, EstimateDeclScope, Executor, Pending, TaskRef,
     repr::{DeclScope, DeclScopeOrigin},
 };
-use ast_workspace::AstWorkspace;
+use ast_workspace::{AstWorkspace, ModuleRef};
 use by_address::ByAddress;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BuildAsg<'env> {
     pub workspace: ByAddress<&'env AstWorkspace<'env>>,
-    pub scopes: Option<Vec<Pending<'env, DeclScope>>>,
+    pub scopes: Option<HashMap<ModuleRef, Pending<'env, DeclScope>>>,
 }
 
 impl<'env> BuildAsg<'env> {
@@ -28,18 +29,18 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
         let workspace = self.workspace.0;
 
         let Some(scopes) = self.scopes.as_ref() else {
-            let mut scopes = vec![];
+            let mut scopes = HashMap::new();
 
             for module_ref in workspace.modules.keys() {
                 let new_scope = executor.request(EstimateDeclScope {
                     workspace: self.workspace,
                     scope_origin: DeclScopeOrigin::Module(module_ref),
                 });
-                scopes.push(new_scope);
+                scopes.insert(module_ref, new_scope);
             }
 
             return Err(Continuation::suspend(
-                scopes.iter().map(|scope| scope.raw_task_ref()).collect(),
+                scopes.values().map(|scope| scope.raw_task_ref()).collect(),
                 Self {
                     scopes: Some(scopes),
                     ..self
@@ -47,14 +48,27 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
             ));
         };
 
-        let truth = executor.truth.read().unwrap();
-        let scopes = scopes
-            .into_iter()
-            .copied()
-            .map(|scope| truth.demand(scope))
-            .collect::<Vec<_>>();
+        for module in workspace.modules.values() {
+            for name_scope in module
+                .name_scopes()
+                .map(|scope| &workspace.symbols.all_name_scopes[scope])
+            {
+                for type_decl in name_scope.direct_type_decls() {
+                    println!(">>> TYPE DECL {:?}", type_decl);
+                }
 
-        dbg!(scopes);
+                // NOTE: We'll probably want to preemptively spawn TypeHead tasks for all types
+                // at the beginning of ASG building...
+                //executor.request(TypeHead());
+                //println!("{:?}", &name_scope);
+            }
+        }
+
+        {
+            let truth = executor.truth.read().unwrap();
+            let scopes = truth.demand_map(scopes);
+            dbg!(scopes);
+        }
 
         Ok(asg::Asg::new(self.workspace.0))
     }
