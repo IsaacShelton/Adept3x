@@ -108,14 +108,34 @@ impl<'source_files> AstWorkspace<'source_files> {
         let name_scope = &self.symbols.all_name_scopes[file.names];
         AstFileView {
             settings: file.settings.map(|id| &self.settings[id]),
-            funcs: &self.symbols.all_funcs[name_scope.funcs],
-            structs: &self.symbols.all_structs[name_scope.structs],
-            enums: &self.symbols.all_enums[name_scope.enums],
-            globals: &self.symbols.all_globals[name_scope.globals],
-            type_aliases: &self.symbols.all_type_aliases[name_scope.type_aliases],
-            expr_aliases: &self.symbols.all_expr_aliases[name_scope.expr_aliases],
-            traits: &self.symbols.all_traits[name_scope.traits],
-            impls: &self.symbols.all_impls[name_scope.impls],
+            funcs: self.symbols.all_funcs.get_span(name_scope.funcs).collect(),
+            structs: self
+                .symbols
+                .all_structs
+                .get_span(name_scope.structs)
+                .collect(),
+            enums: self.symbols.all_enums.get_span(name_scope.enums).collect(),
+            globals: self
+                .symbols
+                .all_globals
+                .get_span(name_scope.globals)
+                .collect(),
+            type_aliases: self
+                .symbols
+                .all_type_aliases
+                .get_span(name_scope.type_aliases)
+                .collect(),
+            expr_aliases: self
+                .symbols
+                .all_expr_aliases
+                .get_span(name_scope.expr_aliases)
+                .collect(),
+            traits: self
+                .symbols
+                .all_traits
+                .get_span(name_scope.traits)
+                .collect(),
+            impls: self.symbols.all_impls.get_span(name_scope.impls).collect(),
         }
     }
 

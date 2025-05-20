@@ -1,4 +1,4 @@
-use super::{Executable, Execution, Spawnable};
+use super::{Executable, Execution, GetTypeHead, Spawnable};
 use crate::{
     Continuation, EstimateDeclScope, Executor, Pending, TaskRef,
     repr::{DeclScope, DeclScopeOrigin},
@@ -53,14 +53,10 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                 .name_scopes()
                 .map(|scope| &workspace.symbols.all_name_scopes[scope])
             {
-                for type_decl in name_scope.direct_type_decls() {
-                    println!(">>> TYPE DECL {:?}", type_decl);
+                for type_decl_ref in name_scope.direct_type_decls() {
+                    // Spawn request ahead of time
+                    let _ = executor.request(GetTypeHead::new(workspace, type_decl_ref));
                 }
-
-                // NOTE: We'll probably want to preemptively spawn TypeHead tasks for all types
-                // at the beginning of ASG building...
-                //executor.request(TypeHead());
-                //println!("{:?}", &name_scope);
             }
         }
 

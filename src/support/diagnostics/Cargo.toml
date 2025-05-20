@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-append-only-vec.workspace = true
+append_only_vec = { version = "0.1.0", path = "../../support/append_only_vec" }
 source_files = { path = "../../representations/source_files" }

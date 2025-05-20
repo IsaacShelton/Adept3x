@@ -45,6 +45,7 @@ members = [
     "src/components/job",
     "src/support/arena",
     "src/support/optional_string",
+    "src/support/append_only_vec",
 ]
 
 [workspace.dependencies]
@@ -54,7 +55,6 @@ num-bigint = "0.4.4"
 num-traits = "0.2.18"
 cstr = "0.2.11"
 slotmap = "1.0.7"
-append-only-vec = "0.1.3"
 indoc = "2"
 memo-map = "0.3.2"
 indexmap = "2.2.5"

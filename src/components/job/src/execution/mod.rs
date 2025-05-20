@@ -1,6 +1,7 @@
 mod build_asg;
 mod diverge;
 mod estimate_decl_scope;
+mod get_type_head;
 mod print;
 
 use crate::{Artifact, Continuation, Executor, TaskRef, UnwrapFrom};
@@ -8,6 +9,7 @@ pub use build_asg::BuildAsg;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use estimate_decl_scope::EstimateDeclScope;
+pub use get_type_head::GetTypeHead;
 pub use print::Print;
 
 #[enum_dispatch]
@@ -35,6 +37,7 @@ pub enum Execution<'env> {
     Print(Print<'env>),
     BuildAsg(BuildAsg<'env>),
     EstimateDeclScope(EstimateDeclScope<'env>),
+    GetTypeHead(GetTypeHead<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -43,6 +46,7 @@ pub enum Request<'env> {
     Diverge(Diverge),
     Print(Print<'env>),
     EstimateDeclScope(EstimateDeclScope<'env>),
+    GetTypeHead(GetTypeHead<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

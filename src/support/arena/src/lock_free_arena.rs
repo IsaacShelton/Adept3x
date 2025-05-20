@@ -1,4 +1,4 @@
-use crate::{Arena, Id, Idx, idx_span::IdxSpanIter};
+use crate::{Arena, Id, Idx, IdxSpan, idx_span::IdxSpanIter};
 use append_only_vec::AppendOnlyVec;
 use core::{
     marker::PhantomData,
@@ -99,6 +99,45 @@ impl<K: Id, V> LockFreeArena<K, V> {
         })
     }
 
+    /// Allocates multiple elements in the arena and returns the index span covering them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the arena cannot allocate all elements (i.e. if the arena becomes full).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use arena::{Arena, IdxSpan};
+    ///
+    /// let mut arena: Arena<u32, i32> = Arena::new();
+    /// let span: IdxSpan<u32, i32> = arena.alloc_many([10, 20, 30]);
+    /// assert_eq!(&arena[span], &[10, 20, 30]);
+    /// ```
+    #[inline]
+    pub fn alloc_many(&mut self, values: impl IntoIterator<Item = V>) -> IdxSpan<K, V> {
+        self.try_alloc_many(values).expect("arena is full")
+    }
+
+    /// Fallible version of [`Arena::alloc_many`].
+    ///
+    /// This method returns `None` if the arena becomes full.
+    #[inline]
+    pub fn try_alloc_many(&mut self, values: impl IntoIterator<Item = V>) -> Option<IdxSpan<K, V>> {
+        let start = K::from_usize(self.data.len());
+        let mut len = self.data.len();
+        for value in values {
+            if len >= K::MAX {
+                return None;
+            }
+            self.data.push_mut(value);
+            len += 1;
+        }
+        let end = K::from_usize(len);
+        assert!(start <= end);
+        Some(IdxSpan::new(start..end))
+    }
+
     /// Returns a iterator over the elements and their indices in the arena.
     ///
     /// # Examples
@@ -137,6 +176,11 @@ impl<K: Id, V> LockFreeArena<K, V> {
             end: K::from_usize(self.data.len()),
             phantom: PhantomData,
         }
+    }
+
+    #[inline]
+    pub fn get_span(&self, span: IdxSpan<K, V>) -> impl Iterator<Item = &V> {
+        (span.start.into_usize()..span.end.into_usize()).map(|index| &self.data[index])
     }
 }
 

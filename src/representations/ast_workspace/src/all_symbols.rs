@@ -2,24 +2,28 @@ use crate::{
     EnumId, ExprAliasId, FuncId, GlobalId, ImplId, NameScope, NameScopeId, NameScopeRef, Namespace,
     NamespaceId, StructId, TraitId, TypeAliasId,
 };
-use arena::{Arena, IdxSpan};
+use arena::{IdxSpan, LockFreeArena};
 use ast::{Enum, ExprAlias, Func, Global, Impl, NamespaceItems, Struct, Trait, TypeAlias};
 
 #[derive(Debug, Default)]
 pub struct AstWorkspaceSymbols {
-    pub all_funcs: Arena<FuncId, Func>,
-    pub all_structs: Arena<StructId, Struct>,
-    pub all_enums: Arena<EnumId, Enum>,
-    pub all_globals: Arena<GlobalId, Global>,
-    pub all_type_aliases: Arena<TypeAliasId, TypeAlias>,
-    pub all_expr_aliases: Arena<ExprAliasId, ExprAlias>,
-    pub all_traits: Arena<TraitId, Trait>,
-    pub all_impls: Arena<ImplId, Impl>,
-    pub all_namespaces: Arena<NamespaceId, Namespace>,
-    pub all_name_scopes: Arena<NameScopeId, NameScope>,
+    pub all_funcs: LockFreeArena<FuncId, Func>,
+    pub all_structs: LockFreeArena<StructId, Struct>,
+    pub all_enums: LockFreeArena<EnumId, Enum>,
+    pub all_globals: LockFreeArena<GlobalId, Global>,
+    pub all_type_aliases: LockFreeArena<TypeAliasId, TypeAlias>,
+    pub all_expr_aliases: LockFreeArena<ExprAliasId, ExprAlias>,
+    pub all_traits: LockFreeArena<TraitId, Trait>,
+    pub all_impls: LockFreeArena<ImplId, Impl>,
+    pub all_namespaces: LockFreeArena<NamespaceId, Namespace>,
+    pub all_name_scopes: LockFreeArena<NameScopeId, NameScope>,
 }
 
 impl AstWorkspaceSymbols {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn new_name_scope(
         &mut self,
         items: NamespaceItems,

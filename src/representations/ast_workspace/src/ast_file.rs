@@ -11,12 +11,12 @@ pub struct AstFile {
 #[derive(Debug)]
 pub struct AstFileView<'workspace> {
     pub settings: Option<&'workspace Settings>,
-    pub funcs: &'workspace [Func],
-    pub structs: &'workspace [Struct],
-    pub enums: &'workspace [Enum],
-    pub globals: &'workspace [Global],
-    pub type_aliases: &'workspace [TypeAlias],
-    pub expr_aliases: &'workspace [ExprAlias],
-    pub traits: &'workspace [Trait],
-    pub impls: &'workspace [Impl],
+    pub funcs: Vec<&'workspace Func>,
+    pub structs: Vec<&'workspace Struct>,
+    pub enums: Vec<&'workspace Enum>,
+    pub globals: Vec<&'workspace Global>,
+    pub type_aliases: Vec<&'workspace TypeAlias>,
+    pub expr_aliases: Vec<&'workspace ExprAlias>,
+    pub traits: Vec<&'workspace Trait>,
+    pub impls: Vec<&'workspace Impl>,
 }
