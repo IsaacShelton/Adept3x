@@ -197,7 +197,7 @@ jobs:
         with:
           token: ${{secrets.GITHUB_TOKEN}}
           release: ${{env.releaseName}}
-          body: ${{ format('Last built on {0} - {1}', steps.date.outputs.date, github.sha) }}
+          body: ${{ format('Last built on {0} - {1}. **WARNING:** DO NOT DOWNLOAD THESE. THEY ARE SOLELY FOR TESTING CI/CD. NO PRE-BUILT BINARIES WILL BE PROVIDED AT THIS TIME.', steps.date.outputs.date, github.sha) }}
           tag: ${{env.releaseTagName}}
           replace: true
           files: >
