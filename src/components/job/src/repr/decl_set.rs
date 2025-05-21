@@ -1,12 +1,23 @@
 use super::Decl;
-use smallvec::SmallVec;
+use ast_workspace::TypeDeclRef;
+use std_ext::SmallVec4;
 
 /// A group of declarations under the same name
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct DeclSet(SmallVec<[Decl; 4]>);
+pub struct DeclSet(SmallVec4<Decl>);
 
 impl<'env> DeclSet {
     pub fn push_unique(&mut self, decl: Decl) {
         self.0.push(decl);
+    }
+
+    pub fn type_decls(&self) -> SmallVec4<TypeDeclRef> {
+        self.0
+            .iter()
+            .filter_map(|decl| match decl {
+                Decl::Type(type_decl_ref) => Some(*type_decl_ref),
+                _ => None,
+            })
+            .collect()
     }
 }

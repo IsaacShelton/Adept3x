@@ -1,11 +1,11 @@
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TypeHead {
-    pub name: String,
+pub struct TypeHead<'env> {
+    pub name: &'env str,
     pub arity: usize,
 }
 
-impl TypeHead {
-    pub fn new(name: String, arity: usize) -> Self {
+impl<'env> TypeHead<'env> {
+    pub fn new(name: &'env str, arity: usize) -> Self {
         Self { name, arity }
     }
 }

@@ -13,7 +13,7 @@ use crate::{
     TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
 };
 use arena::Arena;
-use crossbeam_deque::{Injector as InjectorQueue, Stealer};
+use crossbeam_deque::Injector as InjectorQueue;
 use std::{
     ops::DerefMut,
     sync::{
@@ -25,7 +25,6 @@ use std::{
 pub struct Executor<'env> {
     pub injector: InjectorQueue<TaskRef<'env>>,
     pub truth: RwLock<Truth<'env>>,
-    pub stealers: Box<[Stealer<TaskRef<'env>>]>,
     pub num_completed: AtomicUsize,
     pub num_scheduled: AtomicUsize,
     pub num_queued: AtomicUsize,
@@ -34,11 +33,10 @@ pub struct Executor<'env> {
 
 impl<'env> Executor<'env> {
     #[must_use]
-    pub fn new(stealers: Box<[Stealer<TaskRef<'env>>]>) -> Self {
+    pub fn new() -> Self {
         Self {
             truth: RwLock::new(Truth::new()),
             injector: InjectorQueue::new(),
-            stealers,
             num_scheduled: AtomicUsize::new(0),
             num_completed: AtomicUsize::new(0),
             num_queued: AtomicUsize::new(0),

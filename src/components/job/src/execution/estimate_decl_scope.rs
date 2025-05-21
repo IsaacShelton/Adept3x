@@ -1,6 +1,6 @@
-use super::{Executable, Execution, Spawnable};
+use super::Executable;
 use crate::{
-    Continuation, Executor, TaskRef,
+    BumpAllocator, Continuation, Executor,
     repr::{Decl, DeclScope, DeclScopeOrigin},
 };
 use ast_workspace::{AstWorkspace, TypeDeclRef};
@@ -12,10 +12,23 @@ pub struct EstimateDeclScope<'env> {
     pub scope_origin: DeclScopeOrigin,
 }
 
-impl<'env> Executable<'env> for EstimateDeclScope<'env> {
-    type Output = DeclScope;
+impl<'env> EstimateDeclScope<'env> {
+    pub fn new(workspace: &'env AstWorkspace<'env>, scope_origin: DeclScopeOrigin) -> Self {
+        Self {
+            workspace: ByAddress(workspace),
+            scope_origin,
+        }
+    }
+}
 
-    fn execute(self, _executor: &Executor<'env>) -> Result<Self::Output, Continuation<'env>> {
+impl<'env> Executable<'env> for EstimateDeclScope<'env> {
+    type Output = &'env DeclScope;
+
+    fn execute(
+        self,
+        _executor: &Executor<'env>,
+        allocator: &'env BumpAllocator,
+    ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace;
         let mut scope = DeclScope::new();
 
@@ -72,12 +85,6 @@ impl<'env> Executable<'env> for EstimateDeclScope<'env> {
             }
         }
 
-        Ok(scope)
-    }
-}
-
-impl<'env> Spawnable<'env> for EstimateDeclScope<'env> {
-    fn spawn(&self) -> (Vec<TaskRef<'env>>, Execution<'env>) {
-        (vec![], self.clone().into())
+        Ok(allocator.alloc(scope))
     }
 }

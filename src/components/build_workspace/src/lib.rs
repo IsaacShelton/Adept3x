@@ -26,7 +26,7 @@ use explore_within::{ExploreWithinResult, explore_within};
 use export_and_link::export_and_link;
 use fs_tree::Fs;
 use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
-use job::TaskState;
+use job::{BumpAllocatorPool, TaskState};
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
 use queue::LexParseInfo;
 use stats::CompilationStats;
@@ -90,11 +90,11 @@ pub fn compile_workspace(
     #[allow(unreachable_code)]
     #[allow(unused_variables)]
     if compiler.options.new_compilation_system {
-        let executor = job::MainExecutor::new(compiler.options.available_parallelism);
-
+        let executor = job::MainExecutor::new();
         let build_asg_task = executor.spawn(&[], job::BuildAsg::new(&workspace));
 
-        let executed = executor.start();
+        let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
+        let executed = executor.start(&mut allocator);
         let show_executor_stats = false;
 
         if executed.num_scheduled != executed.num_completed {

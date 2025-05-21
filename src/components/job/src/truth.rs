@@ -1,6 +1,7 @@
 use crate::{Artifact, Pending, Request, Task, TaskId, TaskRef, UnwrapFrom};
 use arena::Arena;
 use std::{collections::HashMap, hash::Hash, ops::Deref};
+use std_ext::BoxedSlice;
 
 #[derive(Debug)]
 pub struct Truth<'env> {
@@ -16,6 +17,16 @@ impl<'env> Truth<'env> {
         }
     }
 
+    pub fn ask<T>(&self, pending: Pending<'env, T>) -> Option<&T>
+    where
+        T: UnwrapFrom<Artifact<'env>>,
+    {
+        self.tasks[pending.raw_task_ref()]
+            .completed()
+            .as_ref()
+            .map(|artifact| T::unwrap_from(artifact))
+    }
+
     pub fn demand<T>(&self, pending: Pending<'env, T>) -> &T
     where
         T: UnwrapFrom<Artifact<'env>>,
@@ -28,14 +39,14 @@ impl<'env> Truth<'env> {
         )
     }
 
-    pub fn demand_many<T, D>(&self, pending_list: impl Iterator<Item = D>) -> Vec<&T>
+    pub fn demand_many<T, D>(&self, pending_list: impl Iterator<Item = D>) -> BoxedSlice<T>
     where
-        T: UnwrapFrom<Artifact<'env>>,
+        T: UnwrapFrom<Artifact<'env>> + Copy,
         D: Deref<Target = Pending<'env, T>>,
     {
         pending_list
             .map(|pending| {
-                T::unwrap_from(
+                *T::unwrap_from(
                     self.tasks[pending.raw_task_ref()]
                         .completed()
                         .as_ref()
@@ -45,15 +56,15 @@ impl<'env> Truth<'env> {
             .collect()
     }
 
-    pub fn demand_map<K, T>(&self, pending_map: &HashMap<K, Pending<'env, T>>) -> HashMap<K, &T>
+    pub fn demand_map<K, T>(&self, pending_map: &HashMap<K, Pending<'env, T>>) -> HashMap<K, T>
     where
         K: Clone + PartialEq + Eq + Hash,
-        T: UnwrapFrom<Artifact<'env>>,
+        T: UnwrapFrom<Artifact<'env>> + Copy,
     {
-        HashMap::from_iter(pending_map.iter().map(|(key, pending)| {
+        HashMap::<K, T>::from_iter(pending_map.iter().map(|(key, pending)| {
             (
                 key.clone(),
-                T::unwrap_from(
+                *T::unwrap_from(
                     self.tasks[pending.raw_task_ref()]
                         .completed()
                         .as_ref()

@@ -69,8 +69,8 @@ pub type TraitRef = Idx<TraitId, Trait>;
 pub type ImplRef = Idx<ImplId, Impl>;
 
 #[derive(Clone, Debug)]
-pub struct Asg<'a> {
-    pub source_files: &'a SourceFiles,
+pub struct Asg<'env> {
+    pub source_files: &'env SourceFiles,
     pub entry_point: Option<FuncRef>,
     pub funcs: Arena<FuncId, Func>,
     pub structs: Arena<StructId, Struct>,
@@ -79,11 +79,11 @@ pub struct Asg<'a> {
     pub type_aliases: Arena<TypeAliasId, TypeAlias>,
     pub traits: Arena<TraitId, Trait>,
     pub impls: Arena<ImplId, Impl>,
-    pub workspace: &'a AstWorkspace<'a>,
+    pub workspace: &'env AstWorkspace<'env>,
 }
 
-impl<'a> Asg<'a> {
-    pub fn new(workspace: &'a AstWorkspace) -> Self {
+impl<'env> Asg<'env> {
+    pub fn new(workspace: &'env AstWorkspace) -> Self {
         Self {
             source_files: workspace.source_files,
             entry_point: None,

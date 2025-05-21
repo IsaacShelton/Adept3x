@@ -1,5 +1,4 @@
-/*
-    ==================  components/job/src/main_executor.rs  ==================
+/* ==================  components/job/src/main_executor.rs  ==================
     The main overarching executor that encompasses the entire job system.
 
     It's used to hold state that workers aren't allowed to access.
@@ -8,18 +7,26 @@
     ---------------------------------------------------------------------------
 */
 
-use crate::{Executable, Execution, Executor, Pending, TaskRef, Truth, Worker, WorkerRef};
-use std::{num::NonZero, sync::atomic::Ordering, thread};
+use crate::{
+    BumpAllocatorPool, Executable, Execution, Executor, Pending, TaskRef, Truth, Worker, WorkerRef,
+};
+use std::{sync::atomic::Ordering, thread};
 
 pub struct MainExecutor<'env> {
-    pub workers: Box<[Worker<'env>]>,
     pub executor: Executor<'env>,
 }
 
 impl<'env> MainExecutor<'env> {
     #[must_use]
-    pub fn new(num_threads: NonZero<usize>) -> Self {
-        let workers = (0..num_threads.get())
+    pub fn new() -> Self {
+        Self {
+            executor: Executor::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn start(self, allocator_pool: &'env mut BumpAllocatorPool) -> MainExecutorStats<'env> {
+        let workers = (0..allocator_pool.len().get())
             .map(|worker_id| Worker::new(WorkerRef(worker_id)))
             .collect::<Box<_>>();
 
@@ -28,18 +35,14 @@ impl<'env> MainExecutor<'env> {
             .map(|worker| worker.local_queue.stealer())
             .collect::<Box<_>>();
 
-        Self {
-            executor: Executor::new(stealers),
-            workers,
-        }
-    }
-
-    #[must_use]
-    pub fn start(self) -> MainExecutorStats<'env> {
         thread::scope(|scope| {
-            for worker in self.workers.into_iter() {
+            for (worker, allocator) in workers
+                .into_iter()
+                .zip(allocator_pool.allocators.iter_mut())
+            {
                 let executor = &self.executor;
-                scope.spawn(move || worker.start(executor));
+                let stealers = &stealers;
+                scope.spawn(move || worker.start(executor, allocator, stealers));
             }
         });
 

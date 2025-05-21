@@ -1,7 +1,7 @@
 use ast_workspace::{AstWorkspace, ModuleRef, NameScopeRef};
 use smallvec::{SmallVec, smallvec};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DeclScopeOrigin {
     Module(ModuleRef),
     NameScope(NameScopeRef),

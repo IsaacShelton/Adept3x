@@ -1,10 +1,11 @@
 use crate::{
-    Artifact, Continuation, Execution, Executor, RawExecutable, SuspendCondition, TaskRef,
-    TaskState, WaitingCount,
+    Artifact, BumpAllocator, Continuation, Execution, Executor, RawExecutable, SuspendCondition,
+    TaskRef, TaskState, WaitingCount,
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
 
+#[derive(Copy, Clone, Debug)]
 pub struct WorkerRef(pub usize);
 
 pub struct Worker<'env> {
@@ -21,15 +22,21 @@ impl<'env> Worker<'env> {
         }
     }
 
-    pub fn start(&self, executor: &Executor<'env>) {
+    pub fn start(
+        &self,
+        executor: &Executor<'env>,
+        allocator: &'env BumpAllocator,
+        stealers: &[Stealer<TaskRef<'env>>],
+    ) {
         loop {
-            if let Some((task_ref, execution)) = self.find_task(executor, &executor.stealers) {
-                match execution.execute_raw(executor) {
+            if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
+                match execution.execute_raw(executor, allocator) {
                     Ok(artifact) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);
                     }
                     Err(Continuation::Suspend(waiting, execution)) => {
+                        assert_ne!(waiting.len(), 0);
                         self.suspend(executor, task_ref, waiting, execution);
                     }
                     Err(Continuation::Error(error)) => {

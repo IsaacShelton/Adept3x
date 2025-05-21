@@ -1,5 +1,5 @@
-use super::{Executable, Execution, Spawnable};
-use crate::{Continuation, Executor, TaskRef};
+use super::Executable;
+use crate::{BumpAllocator, Continuation, Executor};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Diverge;
@@ -7,14 +7,12 @@ pub struct Diverge;
 impl<'env> Executable<'env> for Diverge {
     type Output = ();
 
-    fn execute(self, executor: &Executor<'env>) -> Result<Self::Output, Continuation<'env>> {
+    fn execute(
+        self,
+        executor: &Executor<'env>,
+        _allocator: &'env BumpAllocator,
+    ) -> Result<Self::Output, Continuation<'env>> {
         let cyclic = executor.request(Diverge);
         Err(Continuation::suspend(vec![cyclic.raw_task_ref()], Diverge))
-    }
-}
-
-impl<'env> Spawnable<'env> for Diverge {
-    fn spawn(&self) -> (Vec<TaskRef<'env>>, Execution<'env>) {
-        (vec![], self.clone().into())
     }
 }

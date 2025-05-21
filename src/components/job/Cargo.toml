@@ -11,6 +11,7 @@ asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
 beef = "0.5.2"
+bumpalo = "3.17.0"
 by_address.workspace = true
 compiler = { version = "0.1.0", path = "../../support/compiler" }
 crossbeam-deque = "0.8.6"
@@ -22,4 +23,5 @@ ir = { version = "0.1.0", path = "../../representations/ir" }
 num_cpus = "1.16.0"
 smallvec = "1.15.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
+std_ext = { version = "0.1.0", path = "../../support/std_ext" }
 target = { version = "0.1.0", path = "../../support/target" }

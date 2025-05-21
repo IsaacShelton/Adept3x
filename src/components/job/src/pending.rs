@@ -7,9 +7,14 @@
 */
 
 use crate::{Artifact, TaskRef, UnwrapFrom};
-use std::marker::PhantomData;
+use std::{hash::Hash, marker::PhantomData};
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+pub type PendingMany<'env, T> = Box<[Pending<'env, T>]>;
+
+pub type Suspend<'env, T> = Option<Pending<'env, T>>;
+pub type SuspendMany<'env, T> = Option<PendingMany<'env, T>>;
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Pending<'env, T>
 where
     T: UnwrapFrom<Artifact<'env>>,
@@ -26,6 +31,15 @@ where
 {
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+impl<'env, T> Hash for Pending<'env, T>
+where
+    T: UnwrapFrom<Artifact<'env>>,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.task_ref.hash(state)
     }
 }
 
