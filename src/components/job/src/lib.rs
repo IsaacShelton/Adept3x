@@ -12,30 +12,28 @@ macro_rules! impl_unwrap_from_artifact {
 }
 
 macro_rules! suspend {
-    ($self:ident.$field:ident, $task_ref:expr) => {{
+    ($self:ident.$field:ident, $task_ref:expr, $ctx:expr) => {{
         let pending = $task_ref;
 
-        Err(Continuation::suspend(
-            vec![pending.raw_task_ref()],
-            Self {
-                $field: Some(pending),
-                ..$self
-            },
-        ))
+        $ctx.suspend_on(::std::iter::once(pending.raw_task_ref()));
+
+        Err(Continuation::suspend(Self {
+            $field: Some(pending),
+            ..$self
+        }))
     }};
 }
 
 macro_rules! suspend_many {
-    ($self:ident.$field:ident, $task_refs:expr) => {{
+    ($self:ident.$field:ident, $task_refs:expr, $ctx:expr) => {{
         let pending: Box<[crate::Pending<'env, _>]> = $task_refs;
 
-        Err(Continuation::suspend(
-            pending.iter().map(|pend| pend.raw_task_ref()).collect(),
-            Self {
-                $field: Some(pending),
-                ..$self
-            },
-        ))
+        $ctx.suspend_on(pending.iter());
+
+        Err(Continuation::suspend(Self {
+            $field: Some(pending),
+            ..$self
+        }))
     }};
 }
 
@@ -43,6 +41,7 @@ mod allocator;
 mod artifact;
 mod continuation;
 mod execution;
+mod execution_ctx;
 mod executor;
 mod main_executor;
 mod pending;
@@ -59,6 +58,7 @@ pub use allocator::*;
 pub use artifact::*;
 pub use continuation::*;
 pub use execution::*;
+pub use execution_ctx::*;
 pub use executor::*;
 pub use main_executor::*;
 pub use pending::*;

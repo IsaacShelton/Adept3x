@@ -1,6 +1,6 @@
 use super::Executable;
 use crate::{
-    BumpAllocator, Continuation, Executor,
+    Continuation, ExecutionCtx, Executor,
     repr::{Decl, DeclScope, DeclScopeOrigin},
 };
 use ast_workspace::{AstWorkspace, TypeDeclRef};
@@ -27,7 +27,7 @@ impl<'env> Executable<'env> for EstimateDeclScope<'env> {
     fn execute(
         self,
         _executor: &Executor<'env>,
-        allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace;
         let mut scope = DeclScope::new();
@@ -85,6 +85,6 @@ impl<'env> Executable<'env> for EstimateDeclScope<'env> {
             }
         }
 
-        Ok(allocator.alloc(scope))
+        Ok(ctx.alloc(scope))
     }
 }

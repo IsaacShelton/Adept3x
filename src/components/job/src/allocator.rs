@@ -1,5 +1,6 @@
 use std::num::NonZero;
 use std_ext::BoxedSlice;
+
 pub type BumpAllocator = bumpalo::Bump;
 
 pub struct BumpAllocatorPool {

@@ -7,7 +7,7 @@ mod find_type_in_estimated;
 mod get_type_head;
 mod print;
 
-use crate::{Artifact, BumpAllocator, Continuation, Executor, TaskRef, UnwrapFrom};
+use crate::{Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom};
 pub use build_asg::BuildAsg;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
@@ -24,7 +24,7 @@ pub trait RawExecutable<'env> {
     fn execute_raw(
         self,
         executor: &Executor<'env>,
-        allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Artifact<'env>, Continuation<'env>>;
 }
 
@@ -35,7 +35,7 @@ pub trait Executable<'env> {
     fn execute(
         self,
         executor: &Executor<'env>,
-        allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>>;
 }
 
@@ -85,8 +85,8 @@ where
     fn execute_raw(
         self,
         executor: &Executor<'env>,
-        allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Artifact<'env>, Continuation<'env>> {
-        self.execute(executor, allocator).map(|value| value.into())
+        self.execute(executor, ctx).map(|value| value.into())
     }
 }

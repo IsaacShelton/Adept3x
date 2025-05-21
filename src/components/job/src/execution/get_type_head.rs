@@ -1,5 +1,5 @@
 use super::Executable;
-use crate::{BumpAllocator, Continuation, Executor, repr::TypeHead};
+use crate::{Continuation, ExecutionCtx, Executor, repr::TypeHead};
 use ast_workspace::{AstWorkspace, TypeDeclRef};
 use by_address::ByAddress;
 
@@ -24,7 +24,7 @@ impl<'env> Executable<'env> for GetTypeHead<'env> {
     fn execute(
         self,
         _executor: &Executor<'env>,
-        allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
         let symbols = &workspace.symbols;
@@ -48,6 +48,6 @@ impl<'env> Executable<'env> for GetTypeHead<'env> {
             }
         };
 
-        Ok(allocator.alloc(TypeHead::new(name, arity)))
+        Ok(ctx.alloc(TypeHead::new(name, arity)))
     }
 }

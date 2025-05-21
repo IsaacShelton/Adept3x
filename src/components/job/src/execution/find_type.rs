@@ -1,5 +1,5 @@
 use super::{Executable, FindTypeInEstimated};
-use crate::{BumpAllocator, Continuation, Executor, Suspend, repr::DeclScope};
+use crate::{Continuation, ExecutionCtx, Executor, Suspend, repr::DeclScope};
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
 
@@ -35,10 +35,8 @@ impl<'env> Executable<'env> for FindType<'env> {
     fn execute(
         self,
         executor: &Executor<'env>,
-        _allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let workspace = self.workspace.0;
-
         if let Some(estimation_pass) = self.estimation_pass {
             let found = *executor.truth.read().unwrap().demand(estimation_pass);
             return Ok(found);
@@ -47,11 +45,12 @@ impl<'env> Executable<'env> for FindType<'env> {
         suspend!(
             self.estimation_pass,
             executor.request(FindTypeInEstimated::new(
-                workspace,
+                &self.workspace,
                 &self.decl_scope,
                 self.name,
-                self.arity,
-            ))
+                self.arity
+            )),
+            ctx
         )
     }
 }

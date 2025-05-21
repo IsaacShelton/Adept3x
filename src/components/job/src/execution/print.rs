@@ -1,5 +1,5 @@
 use super::Executable;
-use crate::{BumpAllocator, Continuation, Executor};
+use crate::{Continuation, ExecutionCtx, Executor};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Print<'env>(pub &'env str);
@@ -10,7 +10,7 @@ impl<'env> Executable<'env> for Print<'env> {
     fn execute(
         self,
         _executor: &Executor<'env>,
-        _allocator: &'env BumpAllocator,
+        _ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         println!("{}", self.0);
         Ok(())

@@ -1,5 +1,5 @@
 use super::Executable;
-use crate::{BumpAllocator, Continuation, Executor, repr::DeclScope};
+use crate::{Continuation, ExecutionCtx, Executor, repr::DeclScope};
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
 
@@ -33,7 +33,7 @@ impl<'env> Executable<'env> for FindTypeInEstimated<'env> {
     fn execute(
         self,
         _executor: &Executor<'env>,
-        _allocator: &'env BumpAllocator,
+        _ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let _workspace = self.workspace.0;
         let _decl_scope = self.decl_scope.0;

@@ -1,6 +1,7 @@
-use super::{Executable, GetTypeHead, estimate_type_heads::EstimateTypeHeads};
+use super::{Executable, GetTypeHead};
 use crate::{
-    BumpAllocator, Continuation, EstimateDeclScope, Executor, SuspendMany,
+    Continuation, EstimateDeclScope, ExecutionCtx, Executor, SuspendMany,
+    execution::estimate_type_heads::EstimateTypeHeads,
     repr::{DeclScope, DeclScopeOrigin, TypeHead},
 };
 use ast_workspace::AstWorkspace;
@@ -29,7 +30,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
     fn execute(
         self,
         executor: &Executor<'env>,
-        allocator: &'env BumpAllocator,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
 
@@ -37,7 +38,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
             let truth = executor.truth.read().unwrap();
             let type_heads = truth.demand_many(test_estimates.iter());
             dbg!(type_heads);
-            return Ok(allocator.alloc(asg::Asg::new(self.workspace.0)));
+            return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
         }
 
         if let Some(scopes) = self.scopes.as_ref() {
@@ -60,7 +61,8 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                 scopes
                     .iter()
                     .map(|scope| executor.request(EstimateTypeHeads::new(workspace, scope, "Test")))
-                    .collect()
+                    .collect(),
+                ctx
             );
         }
 
@@ -75,7 +77,8 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                         scope_origin: DeclScopeOrigin::Module(module_ref),
                     })
                 })
-                .collect()
+                .collect(),
+            ctx
         )
     }
 }

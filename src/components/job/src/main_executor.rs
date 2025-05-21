@@ -1,4 +1,5 @@
-/* ==================  components/job/src/main_executor.rs  ==================
+/*
+    ==================  components/job/src/main_executor.rs  ==================
     The main overarching executor that encompasses the entire job system.
 
     It's used to hold state that workers aren't allowed to access.

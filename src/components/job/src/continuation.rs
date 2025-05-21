@@ -7,17 +7,19 @@
     ---------------------------------------------------------------------------
 */
 
-use crate::{Execution, TaskRef};
+use crate::Execution;
 
 pub enum Continuation<'env> {
-    Suspend(Vec<TaskRef<'env>>, Execution<'env>),
+    // NOTE: To delay waking back up, tasks must be waited on using `ctx.suspend_on` before
+    // returning. Usually this is handled indirectly via macro.
+    Suspend(Execution<'env>),
     Error(String),
 }
 
 impl<'env> Continuation<'env> {
     #[inline]
-    pub fn suspend(before: Vec<TaskRef<'env>>, execution: impl Into<Execution<'env>>) -> Self {
-        Self::Suspend(before, execution.into())
+    pub fn suspend(execution: impl Into<Execution<'env>>) -> Self {
+        Self::Suspend(execution.into())
     }
 
     #[inline]

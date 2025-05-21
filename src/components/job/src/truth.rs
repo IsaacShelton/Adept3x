@@ -1,6 +1,6 @@
 use crate::{Artifact, Pending, Request, Task, TaskId, TaskRef, UnwrapFrom};
 use arena::Arena;
-use std::{collections::HashMap, hash::Hash, ops::Deref};
+use std::{collections::HashMap, ops::Deref};
 use std_ext::BoxedSlice;
 
 #[derive(Debug)]
@@ -54,24 +54,6 @@ impl<'env> Truth<'env> {
                 )
             })
             .collect()
-    }
-
-    pub fn demand_map<K, T>(&self, pending_map: &HashMap<K, Pending<'env, T>>) -> HashMap<K, T>
-    where
-        K: Clone + PartialEq + Eq + Hash,
-        T: UnwrapFrom<Artifact<'env>> + Copy,
-    {
-        HashMap::<K, T>::from_iter(pending_map.iter().map(|(key, pending)| {
-            (
-                key.clone(),
-                *T::unwrap_from(
-                    self.tasks[pending.raw_task_ref()]
-                        .completed()
-                        .as_ref()
-                        .expect("artifact expected"),
-                ),
-            )
-        }))
     }
 
     pub fn expect_artifact(&self, task_ref: TaskRef<'env>) -> &Artifact<'env> {

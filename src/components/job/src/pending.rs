@@ -58,3 +58,33 @@ where
         self.task_ref
     }
 }
+
+impl<'env, T> From<Pending<'env, T>> for TaskRef<'env>
+where
+    T: UnwrapFrom<Artifact<'env>>,
+{
+    fn from(value: Pending<'env, T>) -> Self {
+        value.raw_task_ref()
+    }
+}
+
+impl<'env, T> From<&Pending<'env, T>> for TaskRef<'env>
+where
+    T: UnwrapFrom<Artifact<'env>>,
+{
+    fn from(value: &Pending<'env, T>) -> Self {
+        value.raw_task_ref()
+    }
+}
+
+impl<'env, T> IntoIterator for Pending<'env, T>
+where
+    T: UnwrapFrom<Artifact<'env>>,
+{
+    type Item = TaskRef<'env>;
+    type IntoIter = std::iter::Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::once(self.into())
+    }
+}

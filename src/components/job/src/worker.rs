@@ -1,6 +1,6 @@
 use crate::{
-    Artifact, BumpAllocator, Continuation, Execution, Executor, RawExecutable, SuspendCondition,
-    TaskRef, TaskState, WaitingCount,
+    Artifact, BumpAllocator, Continuation, Execution, ExecutionCtx, Executor, RawExecutable,
+    SuspendCondition, TaskRef, TaskState, WaitingCount,
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use std::{iter, mem, sync::atomic::Ordering};
@@ -28,16 +28,20 @@ impl<'env> Worker<'env> {
         allocator: &'env BumpAllocator,
         stealers: &[Stealer<TaskRef<'env>>],
     ) {
+        let mut ctx = ExecutionCtx::new(allocator);
+
         loop {
             if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
-                match execution.execute_raw(executor, allocator) {
+                let result = execution.execute_raw(executor, &mut ctx);
+
+                match result {
                     Ok(artifact) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);
                     }
-                    Err(Continuation::Suspend(waiting, execution)) => {
-                        assert_ne!(waiting.len(), 0);
-                        self.suspend(executor, task_ref, waiting, execution);
+                    Err(Continuation::Suspend(execution)) => {
+                        self.suspend(executor, task_ref, ctx.waiting_on(), execution);
+                        ctx.reset_waiting_on();
                     }
                     Err(Continuation::Error(error)) => {
                         eprintln!("error: {}", error);
@@ -120,7 +124,7 @@ impl<'env> Worker<'env> {
         &self,
         executor: &Executor<'env>,
         task_ref: TaskRef<'env>,
-        waiting: Vec<TaskRef<'env>>,
+        waiting: &[TaskRef<'env>],
         execution: Execution<'env>,
     ) {
         let mut wait_on = 0;
@@ -128,7 +132,7 @@ impl<'env> Worker<'env> {
         {
             let truth = &mut executor.truth.write().unwrap();
 
-            for dependent in &waiting {
+            for dependent in waiting {
                 if truth.tasks[*dependent].state.completed().is_none() {
                     truth.tasks[*dependent].dependents.push(task_ref);
                     wait_on += 1;
