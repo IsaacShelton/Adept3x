@@ -3,6 +3,7 @@ mod diverge;
 mod estimate_decl_scope;
 mod estimate_type_heads;
 mod find_type;
+mod find_type_in_decl_set;
 mod find_type_in_estimated;
 mod get_type_head;
 mod print;
@@ -14,6 +15,7 @@ use enum_dispatch::enum_dispatch;
 pub use estimate_decl_scope::EstimateDeclScope;
 use estimate_type_heads::EstimateTypeHeads;
 pub use find_type::FindType;
+use find_type_in_decl_set::FindTypeInDeclSet;
 pub use find_type_in_estimated::FindTypeInEstimated;
 pub use get_type_head::GetTypeHead;
 pub use print::Print;
@@ -63,6 +65,7 @@ pub enum Execution<'env> {
     GetTypeHead(GetTypeHead<'env>),
     EstimateTypeHeads(EstimateTypeHeads<'env>),
     FindTypeInEstimated(FindTypeInEstimated<'env>),
+    FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
 }
 
@@ -75,6 +78,7 @@ pub enum Request<'env> {
     GetTypeHead(GetTypeHead<'env>),
     EstimateTypeHeads(EstimateTypeHeads<'env>),
     FindTypeInEstimated(FindTypeInEstimated<'env>),
+    FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
 }
 

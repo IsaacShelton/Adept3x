@@ -5,12 +5,16 @@ use crate::{
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
+use derive_more::Debug;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EstimateTypeHeads<'env> {
+    #[debug(skip)]
     workspace: ByAddress<&'env AstWorkspace<'env>>,
+    #[debug(skip)]
     decl_scope: ByAddress<&'env DeclScope>,
     name: &'env str,
+    #[debug(skip)]
     type_head_tasks: SuspendMany<'env, &'env TypeHead<'env>>,
 }
 
@@ -39,15 +43,8 @@ impl<'env> Executable<'env> for EstimateTypeHeads<'env> {
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
 
-        if let Some(type_head_tasks) = self.type_head_tasks {
-            return Ok(ctx.alloc_slice_fill_iter(
-                executor
-                    .truth
-                    .read()
-                    .unwrap()
-                    .demand_many(type_head_tasks.iter())
-                    .into_iter(),
-            ));
+        if let Some(type_heads) = executor.demand_many(&self.type_head_tasks) {
+            return Ok(ctx.alloc_slice_fill_iter(type_heads));
         }
 
         let decl_set = self.decl_scope.get(&self.name);

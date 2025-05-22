@@ -1,6 +1,6 @@
 use crate::{Artifact, Pending, Request, Task, TaskId, TaskRef, UnwrapFrom};
 use arena::Arena;
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 use std_ext::BoxedSlice;
 
 #[derive(Debug)]
@@ -39,10 +39,12 @@ impl<'env> Truth<'env> {
         )
     }
 
-    pub fn demand_many<T, D>(&self, pending_list: impl Iterator<Item = D>) -> BoxedSlice<T>
+    pub fn demand_many<T>(
+        &self,
+        pending_list: impl Iterator<Item = Pending<'env, T>>,
+    ) -> BoxedSlice<T>
     where
         T: UnwrapFrom<Artifact<'env>> + Copy,
-        D: Deref<Target = Pending<'env, T>>,
     {
         pending_list
             .map(|pending| {
@@ -51,6 +53,29 @@ impl<'env> Truth<'env> {
                         .completed()
                         .as_ref()
                         .expect("artifact expected"),
+                )
+            })
+            .collect()
+    }
+
+    pub fn demand_many_assoc<T, K>(
+        &self,
+        pending_list: impl Iterator<Item = (K, Pending<'env, T>)>,
+    ) -> BoxedSlice<(K, T)>
+    where
+        T: UnwrapFrom<Artifact<'env>> + Copy,
+        K: Copy,
+    {
+        pending_list
+            .map(|(key, pending)| {
+                (
+                    key,
+                    *T::unwrap_from(
+                        self.tasks[pending.raw_task_ref()]
+                            .completed()
+                            .as_ref()
+                            .expect("artifact expected"),
+                    ),
                 )
             })
             .collect()

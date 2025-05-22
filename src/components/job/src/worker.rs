@@ -32,9 +32,7 @@ impl<'env> Worker<'env> {
 
         loop {
             if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
-                let result = execution.execute_raw(executor, &mut ctx);
-
-                match result {
+                match execution.execute_raw(executor, &mut ctx) {
                     Ok(artifact) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);

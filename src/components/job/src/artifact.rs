@@ -1,4 +1,4 @@
-use crate::repr::{DeclScope, TypeHead};
+use crate::repr::{AmbiguousType, DeclScope, TypeHead};
 use asg::Asg;
 use ast_workspace::TypeDeclRef;
 use derive_more::From;
@@ -12,6 +12,7 @@ pub enum Artifact<'env> {
     TypeHeads(&'env [&'env TypeHead<'env>]),
     OptionTypeDeclRef(Option<TypeDeclRef>),
     OptionAsgType(Option<&'env asg::Type>),
+    FindType(Result<Option<TypeDeclRef>, AmbiguousType>),
 }
 
 impl_unwrap_from_artifact!(Void, ());
@@ -21,3 +22,4 @@ impl_unwrap_from_artifact!(TypeHead, &'env TypeHead<'env>);
 impl_unwrap_from_artifact!(TypeHeads, &'env [&'env TypeHead<'env>]);
 impl_unwrap_from_artifact!(OptionTypeDeclRef, Option<TypeDeclRef>);
 impl_unwrap_from_artifact!(OptionAsgType, Option<&'env asg::Type>);
+impl_unwrap_from_artifact!(FindType, Result<Option<TypeDeclRef>, AmbiguousType>);

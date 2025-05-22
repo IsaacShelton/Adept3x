@@ -50,7 +50,7 @@ members = [
 
 [workspace.dependencies]
 colored = "2.1.0"
-derive_more = "0.99.17"
+derive_more = { version = "2.0.1", features = ["full"] }
 num-bigint = "0.4.4"
 num-traits = "0.2.18"
 cstr = "0.2.11"

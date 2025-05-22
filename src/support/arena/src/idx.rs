@@ -51,6 +51,14 @@ impl<K: Id, V> Idx<K, V> {
     {
         MapIdx { raw: self.raw }
     }
+
+    #[inline]
+    pub unsafe fn from_raw(raw: K) -> Self {
+        Self {
+            raw,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<K: Id, V> Clone for Idx<K, V> {

@@ -10,9 +10,11 @@ use crate::{Artifact, TaskRef, UnwrapFrom};
 use std::{hash::Hash, marker::PhantomData};
 
 pub type PendingMany<'env, T> = Box<[Pending<'env, T>]>;
+pub type PendingManyAssoc<'env, K, T> = Box<[(K, Pending<'env, T>)]>;
 
 pub type Suspend<'env, T> = Option<Pending<'env, T>>;
 pub type SuspendMany<'env, T> = Option<PendingMany<'env, T>>;
+pub type SuspendManyAssoc<'env, K, T> = Option<PendingManyAssoc<'env, K, T>>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Pending<'env, T>

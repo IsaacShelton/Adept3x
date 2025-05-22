@@ -12,8 +12,7 @@ impl<'env> Executable<'env> for Diverge {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let cyclic = executor.request(Diverge);
-        ctx.suspend_on(cyclic);
+        ctx.suspend_on(executor.request(Diverge));
         Err(Continuation::suspend(Diverge))
     }
 }

@@ -5,9 +5,11 @@ use crate::{
 };
 use ast_workspace::{AstWorkspace, TypeDeclRef};
 use by_address::ByAddress;
+use derive_more::Debug;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EstimateDeclScope<'env> {
+    #[debug(skip)]
     pub workspace: ByAddress<&'env AstWorkspace<'env>>,
     pub scope_origin: DeclScopeOrigin,
 }

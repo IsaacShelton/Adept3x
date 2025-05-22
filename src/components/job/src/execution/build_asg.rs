@@ -1,17 +1,20 @@
 use super::{Executable, GetTypeHead};
 use crate::{
-    Continuation, EstimateDeclScope, ExecutionCtx, Executor, SuspendMany,
+    Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, Suspend, SuspendMany,
     execution::estimate_type_heads::EstimateTypeHeads,
-    repr::{DeclScope, DeclScopeOrigin, TypeHead},
+    repr::{DeclScope, DeclScopeOrigin, FindTypeResult, TypeHead},
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
+use derive_more::Debug;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[debug("...")]
 pub struct BuildAsg<'env> {
     pub workspace: ByAddress<&'env AstWorkspace<'env>>,
     pub scopes: SuspendMany<'env, &'env DeclScope>,
     pub test_estimate_type_heads: SuspendMany<'env, &'env [&'env TypeHead<'env>]>,
+    pub find_type: Suspend<'env, FindTypeResult>,
 }
 
 impl<'env> BuildAsg<'env> {
@@ -20,6 +23,7 @@ impl<'env> BuildAsg<'env> {
             workspace: ByAddress(workspace),
             scopes: None,
             test_estimate_type_heads: None,
+            find_type: None,
         }
     }
 }
@@ -34,14 +38,28 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
 
-        if let Some(test_estimates) = self.test_estimate_type_heads {
-            let truth = executor.truth.read().unwrap();
-            let type_heads = truth.demand_many(test_estimates.iter());
-            dbg!(type_heads);
+        if let Some(found) = executor.demand(self.find_type) {
+            dbg!(&found);
             return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
         }
 
-        if let Some(scopes) = self.scopes.as_ref() {
+        if let Some(type_heads) = executor.demand_many(&self.test_estimate_type_heads) {
+            dbg!(type_heads);
+            let first_module_ref = workspace.modules.iter().next().unwrap().0;
+
+            return suspend!(
+                self.find_type,
+                executor.request(FindType::new(
+                    workspace,
+                    DeclScopeOrigin::Module(first_module_ref),
+                    "Test",
+                    0
+                )),
+                ctx
+            );
+        }
+
+        if let Some(scopes) = executor.demand_many(&self.scopes) {
             for module in workspace.modules.values() {
                 for name_scope in module
                     .name_scopes()
@@ -53,8 +71,6 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                     }
                 }
             }
-
-            let scopes = executor.truth.read().unwrap().demand_many(scopes.iter());
 
             return suspend_many!(
                 self.test_estimate_type_heads,

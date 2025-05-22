@@ -9,8 +9,8 @@
 */
 
 use crate::{
-    Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, Task, TaskId,
-    TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
+    Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, SuspendMany,
+    SuspendManyAssoc, Task, TaskId, TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
 };
 use arena::Arena;
 use crossbeam_deque::Injector as InjectorQueue;
@@ -21,6 +21,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
 };
+use std_ext::BoxedSlice;
 
 pub struct Executor<'env> {
     pub injector: InjectorQueue<TaskRef<'env>>,
@@ -124,5 +125,43 @@ impl<'env> Executor<'env> {
         }
 
         new_task_ref
+    }
+
+    #[inline]
+    pub fn demand<T>(&self, pending: Option<Pending<'env, T>>) -> Option<T>
+    where
+        T: UnwrapFrom<Artifact<'env>> + Clone,
+    {
+        pending.map(|pending| self.truth.read().unwrap().demand(pending).clone())
+    }
+
+    #[inline]
+    pub fn demand_many<T>(&self, pending_list: &SuspendMany<'env, T>) -> Option<BoxedSlice<T>>
+    where
+        T: UnwrapFrom<Artifact<'env>> + Copy,
+    {
+        pending_list.as_ref().map(|pending_list| {
+            self.truth
+                .read()
+                .unwrap()
+                .demand_many(pending_list.iter().copied())
+        })
+    }
+
+    #[inline]
+    pub fn demand_many_assoc<T, K>(
+        &self,
+        pending_list: &SuspendManyAssoc<'env, K, T>,
+    ) -> Option<BoxedSlice<(K, T)>>
+    where
+        T: UnwrapFrom<Artifact<'env>> + Copy,
+        K: Copy,
+    {
+        pending_list.as_ref().map(|pending_list| {
+            self.truth
+                .read()
+                .unwrap()
+                .demand_many_assoc(pending_list.into_iter().copied())
+        })
     }
 }

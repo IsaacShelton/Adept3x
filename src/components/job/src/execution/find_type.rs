@@ -1,27 +1,34 @@
 use super::{Executable, FindTypeInEstimated};
-use crate::{Continuation, ExecutionCtx, Executor, Suspend, repr::DeclScope};
+use crate::{
+    Continuation, ExecutionCtx, Executor, Suspend,
+    repr::{DeclScopeOrigin, FindTypeResult},
+};
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
+use derive_more::Debug;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FindType<'env> {
+    #[debug(skip)]
     workspace: ByAddress<&'env AstWorkspace<'env>>,
-    decl_scope: ByAddress<&'env DeclScope>,
+    decl_scope_origin: DeclScopeOrigin,
+    #[debug(skip)]
     name: &'env str,
     arity: usize,
-    estimation_pass: Suspend<'env, Option<&'env asg::Type>>,
+    #[debug(skip)]
+    estimation_pass: Suspend<'env, FindTypeResult>,
 }
 
 impl<'env> FindType<'env> {
     pub fn new(
         workspace: &'env AstWorkspace<'env>,
-        decl_scope: &'env DeclScope,
+        decl_scope_origin: DeclScopeOrigin,
         name: &'env str,
         arity: usize,
     ) -> Self {
         Self {
             workspace: ByAddress(workspace),
-            decl_scope: ByAddress(decl_scope),
+            decl_scope_origin,
             name,
             arity,
             estimation_pass: None,
@@ -30,23 +37,22 @@ impl<'env> FindType<'env> {
 }
 
 impl<'env> Executable<'env> for FindType<'env> {
-    type Output = Option<&'env asg::Type>;
+    type Output = FindTypeResult;
 
     fn execute(
         self,
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        if let Some(estimation_pass) = self.estimation_pass {
-            let found = *executor.truth.read().unwrap().demand(estimation_pass);
-            return Ok(found);
+        if let Some(estimation_pass) = executor.demand(self.estimation_pass) {
+            return Ok(estimation_pass);
         }
 
         suspend!(
             self.estimation_pass,
             executor.request(FindTypeInEstimated::new(
                 &self.workspace,
-                &self.decl_scope,
+                self.decl_scope_origin,
                 self.name,
                 self.arity
             )),

@@ -11,13 +11,10 @@ impl<'env> DeclSet {
         self.0.push(decl);
     }
 
-    pub fn type_decls(&self) -> SmallVec4<TypeDeclRef> {
-        self.0
-            .iter()
-            .filter_map(|decl| match decl {
-                Decl::Type(type_decl_ref) => Some(*type_decl_ref),
-                _ => None,
-            })
-            .collect()
+    pub fn type_decls(&self) -> impl Iterator<Item = TypeDeclRef> {
+        self.0.iter().filter_map(|decl| match decl {
+            Decl::Type(type_decl_ref) => Some(*type_decl_ref),
+            _ => None,
+        })
     }
 }

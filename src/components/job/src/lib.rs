@@ -37,6 +37,19 @@ macro_rules! suspend_many {
     }};
 }
 
+macro_rules! suspend_many_assoc {
+    ($self:ident.$field:ident, $task_refs:expr, $ctx:expr) => {{
+        let pending: crate::PendingManyAssoc<'env, _, _> = $task_refs;
+
+        $ctx.suspend_on(pending.iter().map(|(_k, v)| v));
+
+        Err(Continuation::suspend(Self {
+            $field: Some(pending),
+            ..$self
+        }))
+    }};
+}
+
 mod allocator;
 mod artifact;
 mod continuation;
