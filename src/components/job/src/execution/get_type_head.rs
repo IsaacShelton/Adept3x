@@ -2,13 +2,15 @@ use super::Executable;
 use crate::{Continuation, ExecutionCtx, Executor, repr::TypeHead};
 use ast_workspace::{AstWorkspace, TypeDeclRef};
 use by_address::ByAddress;
-use derive_more::Debug;
+use derivative::Derivative;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct GetTypeHead<'env> {
-    #[debug(skip)]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
     type_decl_ref: TypeDeclRef,
+
+    #[derivative(Debug = "ignore")]
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
 }
 
 impl<'env> GetTypeHead<'env> {

@@ -5,17 +5,23 @@ use crate::{
 };
 use ast_workspace::{AstWorkspace, TypeDeclRef};
 use by_address::ByAddress;
-use derive_more::Debug;
+use derivative::Derivative;
 use itertools::Itertools;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct FindTypeInDeclSet<'env> {
-    #[debug(skip)]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
-    #[debug(skip)]
-    decl_set: &'env DeclSet,
     arity: usize,
-    #[debug(skip)]
+
+    #[derivative(Debug = "ignore")]
+    decl_set: ByAddress<&'env DeclSet>,
+
+    #[derivative(Debug = "ignore")]
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
     type_heads: SuspendManyAssoc<'env, TypeDeclRef, &'env TypeHead<'env>>,
 }
 
@@ -23,7 +29,7 @@ impl<'env> FindTypeInDeclSet<'env> {
     pub fn new(workspace: &'env AstWorkspace<'env>, decl_set: &'env DeclSet, arity: usize) -> Self {
         Self {
             workspace: ByAddress(workspace),
-            decl_set,
+            decl_set: ByAddress(decl_set),
             arity,
             type_heads: None,
         }
@@ -53,13 +59,12 @@ impl<'env> Executable<'env> for FindTypeInDeclSet<'env> {
 
         suspend_many_assoc!(
             self.type_heads,
-            self.decl_set
-                .type_decls()
-                .map(|type_decl_ref| (
+            executor.request_many_assoc(
+                self.decl_set.type_decls().map(|type_decl_ref| (
                     type_decl_ref,
-                    executor.request(GetTypeHead::new(workspace, type_decl_ref))
+                    GetTypeHead::new(workspace, type_decl_ref)
                 ))
-                .collect(),
+            ),
             ctx
         )
     }

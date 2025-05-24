@@ -73,6 +73,91 @@ impl<'env> Executor<'env> {
     }
 
     #[must_use]
+    pub fn request_many<R, T>(
+        &self,
+        requests_iter: impl Iterator<Item = R>,
+    ) -> BoxedSlice<Pending<'env, T>>
+    where
+        R: Into<Request<'env>> + Executable<'env, Output = T>,
+        T: UnwrapFrom<Artifact<'env>>,
+    {
+        self.request_many_raw(requests_iter)
+            .into_iter()
+            .map(Pending::new_unchecked)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn request_many_raw<R>(
+        &self,
+        requests_iter: impl Iterator<Item = R>,
+    ) -> BoxedSlice<TaskRef<'env>>
+    where
+        R: Into<Request<'env>>,
+    {
+        let mut truth_guard = self.truth.write().unwrap();
+        let truth = truth_guard.deref_mut();
+
+        requests_iter
+            .map(|request| {
+                let tasks = &mut truth.tasks;
+                let requests = &mut truth.requests;
+
+                *requests
+                    .entry(request.into())
+                    .or_insert_with_key(|request| {
+                        let (prereqs, execution) = request.spawn();
+                        self.push_unique_into_tasks(tasks, &prereqs, execution)
+                    })
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn request_many_assoc<R, K, T>(
+        &self,
+        requests_iter: impl Iterator<Item = (K, R)>,
+    ) -> BoxedSlice<(K, Pending<'env, T>)>
+    where
+        R: Into<Request<'env>> + Executable<'env, Output = T>,
+        T: UnwrapFrom<Artifact<'env>>,
+    {
+        self.request_many_assoc_raw(requests_iter)
+            .into_iter()
+            .map(|(k, v)| (k, Pending::new_unchecked(v)))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn request_many_assoc_raw<K, R>(
+        &self,
+        requests_iter: impl Iterator<Item = (K, R)>,
+    ) -> BoxedSlice<(K, TaskRef<'env>)>
+    where
+        R: Into<Request<'env>>,
+    {
+        let mut truth_guard = self.truth.write().unwrap();
+        let truth = truth_guard.deref_mut();
+
+        requests_iter
+            .map(|(key, request)| {
+                let tasks = &mut truth.tasks;
+                let requests = &mut truth.requests;
+
+                (
+                    key,
+                    *requests
+                        .entry(request.into())
+                        .or_insert_with_key(|request| {
+                            let (prereqs, execution) = request.spawn();
+                            self.push_unique_into_tasks(tasks, &prereqs, execution)
+                        }),
+                )
+            })
+            .collect()
+    }
+
+    #[must_use]
     pub fn push_unique(
         &self,
         suspend_on: &[TaskRef<'env>],

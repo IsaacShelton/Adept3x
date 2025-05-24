@@ -5,16 +5,22 @@ use crate::{
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
-use derive_more::Debug;
+use derivative::Derivative;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct EstimateTypeHeads<'env> {
-    #[debug(skip)]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
-    #[debug(skip)]
-    decl_scope: ByAddress<&'env DeclScope>,
     name: &'env str,
-    #[debug(skip)]
+
+    #[derivative(Debug = "ignore")]
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
+
+    #[derivative(Debug = "ignore")]
+    decl_scope: ByAddress<&'env DeclScope>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
     type_head_tasks: SuspendMany<'env, &'env TypeHead<'env>>,
 }
 
@@ -51,11 +57,12 @@ impl<'env> Executable<'env> for EstimateTypeHeads<'env> {
 
         suspend_many!(
             self.type_head_tasks,
-            decl_set
-                .into_iter()
-                .flat_map(|decl_set| decl_set.type_decls())
-                .map(|type_decl_ref| executor.request(GetTypeHead::new(workspace, type_decl_ref)))
-                .collect(),
+            executor.request_many(
+                decl_set
+                    .into_iter()
+                    .flat_map(|decl_set| decl_set.type_decls())
+                    .map(|type_decl_ref| GetTypeHead::new(workspace, type_decl_ref))
+            ),
             ctx
         )
     }

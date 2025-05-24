@@ -5,13 +5,15 @@ use crate::{
 };
 use ast_workspace::{AstWorkspace, TypeDeclRef};
 use by_address::ByAddress;
-use derive_more::Debug;
+use derivative::Derivative;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Derivative, PartialEq, Eq, Hash)]
+#[derivative(Debug)]
 pub struct EstimateDeclScope<'env> {
-    #[debug(skip)]
-    pub workspace: ByAddress<&'env AstWorkspace<'env>>,
     pub scope_origin: DeclScopeOrigin,
+
+    #[derivative(Debug = "ignore")]
+    pub workspace: ByAddress<&'env AstWorkspace<'env>>,
 }
 
 impl<'env> EstimateDeclScope<'env> {

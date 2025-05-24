@@ -1,0 +1,141 @@
+use super::{Executable, FindType, ResolveTypeArg};
+use crate::{
+    Continuation, ExecutionCtx, Executor, Suspend, SuspendMany,
+    repr::{DeclScope, FindTypeResult, Type, TypeArg, TypeKind},
+};
+use ast_workspace::AstWorkspace;
+use by_address::ByAddress;
+use derivative::Derivative;
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug, PartialEq, Eq, Hash)]
+pub struct ResolveType<'env> {
+    ast_type: ByAddress<&'env ast::Type>,
+
+    #[derivative(Debug = "ignore")]
+    decl_scope: ByAddress<&'env DeclScope>,
+
+    #[derivative(Debug = "ignore")]
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    inner_type: Suspend<'env, &'env Type<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    inner_find_type: Suspend<'env, FindTypeResult>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    type_args: SuspendMany<'env, &'env TypeArg<'env>>,
+}
+
+impl<'env> ResolveType<'env> {
+    pub fn new(
+        workspace: &'env AstWorkspace<'env>,
+        ast_type: &'env ast::Type,
+        decl_scope: &'env DeclScope,
+    ) -> Self {
+        Self {
+            ast_type: ByAddress(ast_type),
+            decl_scope: ByAddress(decl_scope),
+            workspace: ByAddress(workspace),
+            inner_type: None,
+            inner_find_type: None,
+            type_args: None,
+        }
+    }
+}
+
+impl<'env> Executable<'env> for ResolveType<'env> {
+    type Output = &'env Type<'env>;
+
+    fn execute(
+        self,
+        executor: &Executor<'env>,
+        ctx: &mut ExecutionCtx<'env>,
+    ) -> Result<Self::Output, Continuation<'env>> {
+        let workspace = self.workspace.0;
+
+        let kind = match &self.ast_type.kind {
+            ast::TypeKind::Boolean => TypeKind::Boolean,
+            ast::TypeKind::Integer(bits, sign) => TypeKind::Integer(*bits, *sign),
+            ast::TypeKind::CInteger(cinteger, sign) => TypeKind::CInteger(*cinteger, *sign),
+            ast::TypeKind::SizeInteger(sign) => TypeKind::SizeInteger(*sign),
+            ast::TypeKind::Floating(size) => TypeKind::Floating(*size),
+            ast::TypeKind::Ptr(inner) => {
+                let Some(inner) = executor.demand(self.inner_type) else {
+                    return suspend!(
+                        self.inner_type,
+                        executor.request(ResolveType::new(workspace, inner, &self.decl_scope)),
+                        ctx
+                    );
+                };
+
+                TypeKind::Ptr(inner)
+            }
+            ast::TypeKind::FixedArray(_) => {
+                unimplemented!("we don't resolve fixed array types yet")
+            }
+            ast::TypeKind::Void => TypeKind::Void,
+            ast::TypeKind::Never => TypeKind::Never,
+            ast::TypeKind::Named(name, type_args) => {
+                let Some(name) = name.as_plain_str() else {
+                    unimplemented!("we don't handle namespaced types yet");
+                };
+
+                let Some(inner) = executor.demand(self.inner_find_type) else {
+                    return suspend!(
+                        self.inner_find_type,
+                        executor.request(FindType::new(
+                            workspace,
+                            &self.decl_scope,
+                            name,
+                            type_args.len()
+                        )),
+                        ctx
+                    );
+                };
+
+                let Ok(Some(found)) = inner else {
+                    unimplemented!("we don't report errors yet for failing to find a type!");
+                };
+
+                let Some(type_args) = executor.demand_many(&self.type_args) else {
+                    return suspend_many!(
+                        self.type_args,
+                        executor.request_many(type_args.iter().map(
+                            |type_arg| ResolveTypeArg::new(workspace, type_arg, &self.decl_scope)
+                        )),
+                        ctx
+                    );
+                };
+
+                let type_args = ctx.alloc_slice_fill_iter(type_args.into_iter().cloned());
+                TypeKind::UserDefined(name.into(), found, type_args)
+            }
+            ast::TypeKind::AnonymousStruct(_) => {
+                unimplemented!("we don't resolve anonymous structs yet")
+            }
+            ast::TypeKind::AnonymousUnion(_) => {
+                unimplemented!("we don't resolve anonymous unions yet")
+            }
+            ast::TypeKind::AnonymousEnum(_) => {
+                unimplemented!("we don't resolve anonymous enums yet")
+            }
+            ast::TypeKind::FuncPtr(_) => {
+                unimplemented!("we don't resolve function pointer types yet")
+            }
+            ast::TypeKind::Polymorph(name) => TypeKind::Polymorph(name),
+        };
+
+        Ok(ctx.alloc(Type {
+            kind,
+            source: self.ast_type.source,
+        }))
+    }
+}

@@ -1,4 +1,6 @@
-use crate::repr::{AmbiguousType, DeclScope, TypeHead};
+use crate::repr::{
+    AmbiguousType, DeclScope, Field, FindTypeResult, Type, TypeArg, TypeBody, TypeHead,
+};
 use asg::Asg;
 use ast_workspace::TypeDeclRef;
 use derive_more::From;
@@ -13,6 +15,10 @@ pub enum Artifact<'env> {
     OptionTypeDeclRef(Option<TypeDeclRef>),
     OptionAsgType(Option<&'env asg::Type>),
     FindType(Result<Option<TypeDeclRef>, AmbiguousType>),
+    TypeBody(&'env TypeBody<'env>),
+    Field(Field<'env>),
+    Type(&'env Type<'env>),
+    TypeArg(&'env TypeArg<'env>),
 }
 
 impl_unwrap_from_artifact!(Void, ());
@@ -22,4 +28,8 @@ impl_unwrap_from_artifact!(TypeHead, &'env TypeHead<'env>);
 impl_unwrap_from_artifact!(TypeHeads, &'env [&'env TypeHead<'env>]);
 impl_unwrap_from_artifact!(OptionTypeDeclRef, Option<TypeDeclRef>);
 impl_unwrap_from_artifact!(OptionAsgType, Option<&'env asg::Type>);
-impl_unwrap_from_artifact!(FindType, Result<Option<TypeDeclRef>, AmbiguousType>);
+impl_unwrap_from_artifact!(FindType, FindTypeResult);
+impl_unwrap_from_artifact!(TypeBody, &'env TypeBody<'env>);
+impl_unwrap_from_artifact!(Field, Field<'env>);
+impl_unwrap_from_artifact!(Type, &'env Type<'env>);
+impl_unwrap_from_artifact!(TypeArg, &'env TypeArg<'env>);

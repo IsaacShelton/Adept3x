@@ -5,8 +5,11 @@ mod estimate_type_heads;
 mod find_type;
 mod find_type_in_decl_set;
 mod find_type_in_estimated;
+mod get_type_body;
 mod get_type_head;
 mod print;
+mod resolve_type;
+mod resolve_type_arg;
 
 use crate::{Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom};
 pub use build_asg::BuildAsg;
@@ -17,8 +20,11 @@ use estimate_type_heads::EstimateTypeHeads;
 pub use find_type::FindType;
 use find_type_in_decl_set::FindTypeInDeclSet;
 pub use find_type_in_estimated::FindTypeInEstimated;
+pub use get_type_body::GetTypeBody;
 pub use get_type_head::GetTypeHead;
 pub use print::Print;
+pub use resolve_type::ResolveType;
+pub use resolve_type_arg::*;
 
 #[enum_dispatch]
 pub trait RawExecutable<'env> {
@@ -67,6 +73,9 @@ pub enum Execution<'env> {
     FindTypeInEstimated(FindTypeInEstimated<'env>),
     FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
+    GetTyp1Body(GetTypeBody<'env>),
+    ResolveType(ResolveType<'env>),
+    ResolveTypeArg(ResolveTypeArg<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -80,6 +89,9 @@ pub enum Request<'env> {
     FindTypeInEstimated(FindTypeInEstimated<'env>),
     FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
+    GetTypeBody(GetTypeBody<'env>),
+    ResolveType(ResolveType<'env>),
+    ResolveTypeArg(ResolveTypeArg<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

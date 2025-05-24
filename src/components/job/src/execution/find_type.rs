@@ -1,34 +1,40 @@
 use super::{Executable, FindTypeInEstimated};
 use crate::{
     Continuation, ExecutionCtx, Executor, Suspend,
-    repr::{DeclScopeOrigin, FindTypeResult},
+    repr::{DeclScope, FindTypeResult},
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
-use derive_more::Debug;
+use derivative::Derivative;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct FindType<'env> {
-    #[debug(skip)]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
-    decl_scope_origin: DeclScopeOrigin,
-    #[debug(skip)]
     name: &'env str,
     arity: usize,
-    #[debug(skip)]
+
+    #[derivative(Debug = "ignore")]
+    decl_scope: ByAddress<&'env DeclScope>,
+
+    #[derivative(Debug = "ignore")]
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
     estimation_pass: Suspend<'env, FindTypeResult>,
 }
 
 impl<'env> FindType<'env> {
     pub fn new(
         workspace: &'env AstWorkspace<'env>,
-        decl_scope_origin: DeclScopeOrigin,
+        decl_scope: &'env DeclScope,
         name: &'env str,
         arity: usize,
     ) -> Self {
         Self {
             workspace: ByAddress(workspace),
-            decl_scope_origin,
+            decl_scope: ByAddress(decl_scope),
             name,
             arity,
             estimation_pass: None,
@@ -52,7 +58,7 @@ impl<'env> Executable<'env> for FindType<'env> {
             self.estimation_pass,
             executor.request(FindTypeInEstimated::new(
                 &self.workspace,
-                self.decl_scope_origin,
+                &self.decl_scope,
                 self.name,
                 self.arity
             )),
