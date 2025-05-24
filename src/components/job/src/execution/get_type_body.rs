@@ -1,7 +1,10 @@
 use super::Executable;
 use crate::{
     Continuation, ExecutionCtx, Executor, ResolveType, Suspend, SuspendMany,
-    repr::{DeclScope, EnumBody, EnumVariant, Field, StructBody, Type, TypeAliasBody, TypeBody},
+    repr::{
+        DeclScope, EnumBody, EnumVariant, Field, Param, Params, StructBody, TraitBody, TraitFunc,
+        Type, TypeAliasBody, TypeBody,
+    },
 };
 use ast_workspace::{AstWorkspace, EnumRef, StructRef, TraitRef, TypeAliasRef, TypeDeclRef};
 use by_address::ByAddress;
@@ -23,7 +26,7 @@ pub struct GetTypeBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    field_types: SuspendMany<'env, &'env Type<'env>>,
+    inner_types: SuspendMany<'env, &'env Type<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -41,7 +44,7 @@ impl<'env> GetTypeBody<'env> {
             workspace: ByAddress(workspace),
             decl_scope: ByAddress(decl_scope),
             type_decl_ref,
-            field_types: None,
+            inner_types: None,
             backing_type: None,
         }
     }
@@ -54,7 +57,7 @@ impl<'env> GetTypeBody<'env> {
     ) -> Result<<Self as Executable<'env>>::Output, Continuation<'env>> {
         let def = &self.workspace.symbols.all_structs[idx];
 
-        if let Some(fields_types) = executor.demand_many(&self.field_types) {
+        if let Some(fields_types) = executor.demand_many(&self.inner_types) {
             let fields = IndexMap::from_iter(def.fields.iter().zip(fields_types.into_iter()).map(
                 |((name, ast_field), resolved_type)| {
                     (
@@ -77,7 +80,7 @@ impl<'env> GetTypeBody<'env> {
         }
 
         suspend_many!(
-            self.field_types,
+            self.inner_types,
             executor.request_many(def.fields.iter().map(|(_name, field)| ResolveType::new(
                 &self.workspace,
                 &field.ast_type,
@@ -149,6 +152,7 @@ impl<'env> GetTypeBody<'env> {
 
         Ok(ctx.alloc(TypeBody::TypeAlias(TypeAliasBody {
             target,
+            params: def.params.clone(),
             privacy: def.privacy,
             source: def.source,
         })))
@@ -156,11 +160,59 @@ impl<'env> GetTypeBody<'env> {
 
     fn do_trait(
         self,
-        _executor: &Executor<'env>,
-        _ctx: &mut ExecutionCtx<'env>,
+        executor: &Executor<'env>,
+        ctx: &mut ExecutionCtx<'env>,
         idx: TraitRef,
     ) -> Result<<Self as Executable<'env>>::Output, Continuation<'env>> {
-        todo!("do_trait {:?}", idx)
+        let def = &self.workspace.symbols.all_traits[idx];
+
+        let Some(inner_types) = executor.demand_many(&self.inner_types) else {
+            let all_inner_types = def
+                .funcs
+                .iter()
+                .flat_map(|func| {
+                    func.params
+                        .required
+                        .iter()
+                        .map(|param| &param.ast_type)
+                        .chain(std::iter::once(&func.return_type))
+                })
+                .map(|ast_type| ResolveType::new(&self.workspace, ast_type, &self.decl_scope));
+
+            return suspend_many!(
+                self.inner_types,
+                executor.request_many(all_inner_types),
+                ctx
+            );
+        };
+
+        let mut inner_types = inner_types.iter();
+
+        let funcs = IndexMap::from_iter(def.funcs.iter().map(|func| {
+            (
+                func.name.as_str(),
+                TraitFunc {
+                    params: Params {
+                        required: ctx.alloc_slice_fill_iter(func.params.required.iter().map(
+                            |param| Param {
+                                name: param.name.as_ref().map(|name| name.as_str()),
+                                ty: inner_types.next().unwrap(),
+                            },
+                        )),
+                        is_cstyle_vararg: func.params.is_cstyle_vararg,
+                    },
+                    return_type: inner_types.next().unwrap(),
+                    source: func.source,
+                },
+            )
+        }));
+
+        Ok(ctx.alloc(TypeBody::Trait(TraitBody {
+            params: def.params.clone(),
+            funcs,
+            source: def.source,
+            privacy: def.privacy,
+        })))
     }
 }
 
