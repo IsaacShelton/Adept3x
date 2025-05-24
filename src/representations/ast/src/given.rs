@@ -1,8 +1,8 @@
 use super::Type;
-use source_files::Source;
+use source_files::Sourced;
 
 #[derive(Clone, Debug)]
 pub struct Given {
-    pub name: Option<(String, Source)>,
+    pub name: Option<Sourced<String>>,
     pub ty: Type,
 }

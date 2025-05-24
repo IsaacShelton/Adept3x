@@ -5,6 +5,7 @@ mod estimate_type_heads;
 mod find_type;
 mod find_type_in_decl_set;
 mod find_type_in_estimated;
+mod get_func_head;
 mod get_type_body;
 mod get_type_head;
 mod print;
@@ -20,6 +21,7 @@ use estimate_type_heads::EstimateTypeHeads;
 pub use find_type::FindType;
 use find_type_in_decl_set::FindTypeInDeclSet;
 pub use find_type_in_estimated::FindTypeInEstimated;
+pub use get_func_head::*;
 pub use get_type_body::GetTypeBody;
 pub use get_type_head::GetTypeHead;
 pub use print::Print;
@@ -64,18 +66,19 @@ where
 #[derive(Debug)]
 #[enum_dispatch(RawExecutable)]
 pub enum Execution<'env> {
+    BuildAsg(BuildAsg<'env>),
     Diverge(Diverge),
     Print(Print<'env>),
-    BuildAsg(BuildAsg<'env>),
     EstimateDeclScope(EstimateDeclScope<'env>),
     GetTypeHead(GetTypeHead<'env>),
     EstimateTypeHeads(EstimateTypeHeads<'env>),
     FindTypeInEstimated(FindTypeInEstimated<'env>),
     FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
-    GetTyp1Body(GetTypeBody<'env>),
+    GetTypeBody(GetTypeBody<'env>),
     ResolveType(ResolveType<'env>),
     ResolveTypeArg(ResolveTypeArg<'env>),
+    GetFuncHead(GetFuncHead<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -92,6 +95,7 @@ pub enum Request<'env> {
     GetTypeBody(GetTypeBody<'env>),
     ResolveType(ResolveType<'env>),
     ResolveTypeArg(ResolveTypeArg<'env>),
+    GetFuncHead(GetFuncHead<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

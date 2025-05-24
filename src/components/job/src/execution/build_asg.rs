@@ -1,9 +1,9 @@
 use super::Executable;
 use crate::{
-    Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, GetTypeBody, Suspend,
-    SuspendManyAssoc,
+    Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, GetFuncHead, GetTypeBody,
+    Suspend, SuspendManyAssoc,
     execution::estimate_type_heads::EstimateTypeHeads,
-    repr::{DeclScope, DeclScopeOrigin, FindTypeResult, TypeBody, TypeHead},
+    repr::{DeclScope, DeclScopeOrigin, FindTypeResult, FuncHead, TypeBody, TypeHead},
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
@@ -35,6 +35,10 @@ pub struct BuildAsg<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(PartialEq = "ignore")]
     pub type_body: Suspend<'env, &'env TypeBody<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    pub func_head: Suspend<'env, &'env FuncHead<'env>>,
 }
 
 impl<'env> BuildAsg<'env> {
@@ -46,6 +50,7 @@ impl<'env> BuildAsg<'env> {
             find_type: None,
             decl_scope: None,
             type_body: None,
+            func_head: None,
         }
     }
 }
@@ -60,9 +65,33 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
 
+        if let Some(func_head) = executor.demand(self.func_head) {
+            dbg!("{:?}", func_head);
+            return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
+        }
+
         if let Some(type_body) = executor.demand(self.type_body) {
             dbg!("{:?}", type_body);
-            return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
+
+            let func_ref = self
+                .workspace
+                .symbols
+                .all_funcs
+                .iter()
+                .filter(|(_, func)| func.head.name == "exampleFunction")
+                .map(|(func_ref, _)| func_ref)
+                .next()
+                .unwrap();
+
+            return suspend!(
+                self.func_head,
+                executor.request(GetFuncHead::new(
+                    workspace,
+                    func_ref,
+                    self.decl_scope.unwrap()
+                )),
+                ctx
+            );
         }
 
         if let Some(found) = executor.demand(self.find_type) {

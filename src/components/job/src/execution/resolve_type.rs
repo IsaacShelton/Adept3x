@@ -1,7 +1,7 @@
 use super::{Executable, FindType, ResolveTypeArg};
 use crate::{
     Continuation, ExecutionCtx, Executor, Suspend, SuspendMany,
-    repr::{DeclScope, FindTypeResult, Type, TypeArg, TypeKind},
+    repr::{DeclScope, FindTypeResult, Type, TypeArg, TypeKind, UserDefinedType},
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
@@ -115,8 +115,11 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                     );
                 };
 
-                let type_args = ctx.alloc_slice_fill_iter(type_args.into_iter().cloned());
-                TypeKind::UserDefined(name.into(), found, type_args)
+                TypeKind::UserDefined(UserDefinedType {
+                    name: name.into(),
+                    type_decl_ref: found,
+                    args: ctx.alloc_slice_fill_iter(type_args.into_iter().cloned()),
+                })
             }
             ast::TypeKind::AnonymousStruct(_) => {
                 unimplemented!("we don't resolve anonymous structs yet")

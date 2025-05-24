@@ -13,6 +13,7 @@ use attributes::{Exposure, SymbolOwnership, Tag};
 use compiler::BuildOptions;
 use fs_tree::FsNodeId;
 use indexmap::IndexMap;
+use source_files::Sourced;
 use std::borrow::Cow;
 use std_ext::{HashMapExt, IndexMapExt};
 
@@ -181,19 +182,27 @@ pub fn create_func_impl_params(
             args: trait_args.to_vec(),
         };
 
-        let (name, name_source) = given
+        let sourced_name = given
             .name
             .as_ref()
-            .map(|(name, name_source)| (Cow::Borrowed(name), *name_source))
-            .unwrap_or_else(|| (Cow::Owned(format!(".{}", i)), given.ty.source));
+            .map(|sourced_name| {
+                Sourced::new(
+                    Cow::Borrowed(sourced_name.inner().as_str()),
+                    sourced_name.source,
+                )
+            })
+            .unwrap_or_else(|| Sourced::new(Cow::Owned(format!(".{}", i)), given.ty.source));
 
         if params
-            .insert(name.as_ref().clone(), generic_trait_ref)
+            .insert(sourced_name.inner().as_ref().to_string(), generic_trait_ref)
             .is_some()
         {
             return Err(ResolveError::other(
-                format!("Trait implementation polymorph '${}' already exists", name),
-                name_source,
+                format!(
+                    "Trait implementation polymorph '${}' already exists",
+                    sourced_name.inner()
+                ),
+                sourced_name.source,
             ));
         }
     }

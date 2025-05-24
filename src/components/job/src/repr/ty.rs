@@ -43,7 +43,14 @@ pub enum TypeKind<'env> {
     // Fixed-Size Array
     FixedArray(&'env Type<'env>, usize),
     // User-Defined
-    UserDefined(&'env str, TypeDeclRef, &'env [TypeArg<'env>]),
+    UserDefined(UserDefinedType<'env>),
     // Polymorph
     Polymorph(&'env str),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UserDefinedType<'env> {
+    pub name: &'env str,
+    pub type_decl_ref: TypeDeclRef,
+    pub args: &'env [TypeArg<'env>],
 }
