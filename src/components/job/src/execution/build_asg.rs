@@ -86,12 +86,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
         if let Some(_type_heads) = executor.demand_many_assoc(&self.estimate_type_heads) {
             return suspend!(
                 self.find_type,
-                executor.request(FindType::new(
-                    workspace,
-                    self.decl_scope.unwrap(),
-                    "AnEnum",
-                    0
-                )),
+                executor.request(FindType::new(workspace, self.decl_scope.unwrap(), "X", 0)),
                 ctx
             );
         }

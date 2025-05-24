@@ -1,7 +1,7 @@
 use super::Executable;
 use crate::{
     Continuation, ExecutionCtx, Executor, ResolveType, Suspend, SuspendMany,
-    repr::{DeclScope, EnumBody, EnumVariant, Field, StructBody, Type, TypeBody},
+    repr::{DeclScope, EnumBody, EnumVariant, Field, StructBody, Type, TypeAliasBody, TypeBody},
 };
 use ast_workspace::{AstWorkspace, EnumRef, StructRef, TraitRef, TypeAliasRef, TypeDeclRef};
 use by_address::ByAddress;
@@ -129,11 +129,29 @@ impl<'env> GetTypeBody<'env> {
 
     fn do_alias(
         self,
-        _executor: &Executor<'env>,
-        _ctx: &mut ExecutionCtx<'env>,
+        executor: &Executor<'env>,
+        ctx: &mut ExecutionCtx<'env>,
         idx: TypeAliasRef,
     ) -> Result<<Self as Executable<'env>>::Output, Continuation<'env>> {
-        todo!("do_alias {:?}", idx)
+        let def = &self.workspace.symbols.all_type_aliases[idx];
+
+        let Some(target) = executor.demand(self.backing_type) else {
+            return suspend!(
+                self.backing_type,
+                executor.request(ResolveType::new(
+                    &self.workspace,
+                    &def.value,
+                    &self.decl_scope
+                )),
+                ctx
+            );
+        };
+
+        Ok(ctx.alloc(TypeBody::TypeAlias(TypeAliasBody {
+            target,
+            privacy: def.privacy,
+            source: def.source,
+        })))
     }
 
     fn do_trait(

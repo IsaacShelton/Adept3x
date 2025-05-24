@@ -1,4 +1,4 @@
-use super::{EnumBody, StructBody};
+use super::{EnumBody, StructBody, TypeAliasBody};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeHead<'env> {
@@ -16,6 +16,6 @@ impl<'env> TypeHead<'env> {
 pub enum TypeBody<'env> {
     Struct(StructBody<'env>),
     Enum(EnumBody<'env>),
-    Alias(),
+    TypeAlias(TypeAliasBody<'env>),
     Trait(),
 }
