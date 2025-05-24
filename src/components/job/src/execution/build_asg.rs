@@ -89,7 +89,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                 executor.request(FindType::new(
                     workspace,
                     self.decl_scope.unwrap(),
-                    "Test",
+                    "AnEnum",
                     0
                 )),
                 ctx

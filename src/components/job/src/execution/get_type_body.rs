@@ -1,12 +1,13 @@
 use super::Executable;
 use crate::{
-    Continuation, ExecutionCtx, Executor, ResolveType, SuspendMany,
-    repr::{DeclScope, Field, StructBody, Type, TypeBody},
+    Continuation, ExecutionCtx, Executor, ResolveType, Suspend, SuspendMany,
+    repr::{DeclScope, EnumBody, EnumVariant, Field, StructBody, Type, TypeBody},
 };
 use ast_workspace::{AstWorkspace, EnumRef, StructRef, TraitRef, TypeAliasRef, TypeDeclRef};
 use by_address::ByAddress;
 use derivative::Derivative;
 use indexmap::IndexMap;
+use source_files::Source;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -23,6 +24,11 @@ pub struct GetTypeBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     field_types: SuspendMany<'env, &'env Type<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    backing_type: Suspend<'env, &'env Type<'env>>,
 }
 
 impl<'env> GetTypeBody<'env> {
@@ -36,6 +42,7 @@ impl<'env> GetTypeBody<'env> {
             decl_scope: ByAddress(decl_scope),
             type_decl_ref,
             field_types: None,
+            backing_type: None,
         }
     }
 
@@ -82,11 +89,42 @@ impl<'env> GetTypeBody<'env> {
 
     fn do_enum(
         self,
-        _executor: &Executor<'env>,
-        _ctx: &mut ExecutionCtx<'env>,
+        executor: &Executor<'env>,
+        ctx: &mut ExecutionCtx<'env>,
         idx: EnumRef,
     ) -> Result<<Self as Executable<'env>>::Output, Continuation<'env>> {
-        todo!("do_enum {:?}", idx)
+        let def = &self.workspace.symbols.all_enums[idx];
+
+        let Some(backing_type) = executor.demand(self.backing_type) else {
+            return suspend!(
+                self.backing_type,
+                executor.request(ResolveType::new(
+                    &self.workspace,
+                    def.backing_type
+                        .as_ref()
+                        .unwrap_or_else(|| ctx.alloc(ast::TypeKind::u32().at(Source::internal()))),
+                    &self.decl_scope
+                )),
+                ctx
+            );
+        };
+
+        let variants = IndexMap::from_iter(def.members.iter().map(|(name, variant)| {
+            (
+                name.as_str(),
+                EnumVariant {
+                    value: variant.value.clone(),
+                    explicit_value: variant.explicit_value,
+                },
+            )
+        }));
+
+        Ok(ctx.alloc(TypeBody::Enum(EnumBody {
+            variants,
+            backing_type,
+            privacy: def.privacy,
+            source: def.source,
+        })))
     }
 
     fn do_alias(
