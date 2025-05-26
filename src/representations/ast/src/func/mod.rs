@@ -15,7 +15,9 @@ pub struct Func {
 
 impl Func {
     pub fn new(head: FuncHead, stmts: Vec<Stmt>) -> Self {
-        let cfg = flatten_func_ignore_const_evals(&stmts, head.source);
+        // NOTE: We only need to clone right now during transition phase
+        let cfg = flatten_func_ignore_const_evals(stmts.clone(), head.source);
+
         Self { head, stmts, cfg }
     }
 }

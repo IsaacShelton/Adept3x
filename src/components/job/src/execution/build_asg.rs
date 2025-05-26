@@ -1,9 +1,9 @@
 use super::Executable;
 use crate::{
-    Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, GetFuncHead, GetTypeBody,
-    Suspend, SuspendManyAssoc,
+    Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, GetFuncBody, GetFuncHead,
+    GetTypeBody, Suspend, SuspendManyAssoc,
     execution::estimate_type_heads::EstimateTypeHeads,
-    repr::{DeclScope, DeclScopeOrigin, FindTypeResult, FuncHead, TypeBody, TypeHead},
+    repr::{DeclScope, DeclScopeOrigin, FindTypeResult, FuncBody, FuncHead, TypeBody, TypeHead},
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
@@ -39,6 +39,10 @@ pub struct BuildAsg<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(PartialEq = "ignore")]
     pub func_head: Suspend<'env, &'env FuncHead<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    pub func_body: Suspend<'env, &'env FuncBody<'env>>,
 }
 
 impl<'env> BuildAsg<'env> {
@@ -51,6 +55,7 @@ impl<'env> BuildAsg<'env> {
             decl_scope: None,
             type_body: None,
             func_head: None,
+            func_body: None,
         }
     }
 }
@@ -65,13 +70,42 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
 
-        if let Some(func_head) = executor.demand(self.func_head) {
-            dbg!("{:?}", func_head);
+        if let Some(func_body) = executor.demand(self.func_body) {
+            dbg!(func_body);
             return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
         }
 
+        if let Some(func_head) = executor.demand(self.func_head) {
+            dbg!(func_head);
+
+            let func_ref = self
+                .workspace
+                .symbols
+                .all_funcs
+                .iter()
+                .filter(|(_, func)| func.head.name == "exampleFunction")
+                .map(|(func_ref, _)| func_ref)
+                .next()
+                .unwrap();
+
+            let def = &workspace.symbols.all_funcs[func_ref];
+            dbg!(&def.cfg);
+            def.cfg.write_to_graphviz_file("cfg.gv");
+            let _ = dbg!(def.cfg.validate_scoping());
+
+            return suspend!(
+                self.func_body,
+                executor.request(GetFuncBody::new(
+                    workspace,
+                    func_ref,
+                    self.decl_scope.unwrap()
+                )),
+                ctx
+            );
+        }
+
         if let Some(type_body) = executor.demand(self.type_body) {
-            dbg!("{:?}", type_body);
+            dbg!(type_body);
 
             let func_ref = self
                 .workspace

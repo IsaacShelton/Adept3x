@@ -3,7 +3,6 @@ use crate::{
     CFileType,
     parse::{ParseError, error::ParseErrorKind},
 };
-use ast::flatten_func_ignore_const_evals;
 use attributes::{Exposure, SymbolOwnership, Tag};
 use c_ast::*;
 use source_files::Source;
@@ -114,9 +113,7 @@ pub fn declare_function(
         privacy: c_file_type.privacy(),
     };
 
-    let cfg = flatten_func_ignore_const_evals(&stmts, source);
-
-    ctx.ast_file.funcs.push(ast::Func { head, stmts, cfg });
+    ctx.ast_file.funcs.push(ast::Func::new(head, stmts));
     Ok(())
 }
 

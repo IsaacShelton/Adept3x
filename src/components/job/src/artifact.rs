@@ -1,5 +1,6 @@
 use crate::repr::{
-    AmbiguousType, DeclScope, Field, FindTypeResult, FuncHead, Type, TypeArg, TypeBody, TypeHead,
+    AmbiguousType, DeclScope, Field, FindTypeResult, FuncBody, FuncHead, Type, TypeArg, TypeBody,
+    TypeHead,
 };
 use asg::Asg;
 use ast_workspace::TypeDeclRef;
@@ -20,6 +21,7 @@ pub enum Artifact<'env> {
     Type(&'env Type<'env>),
     TypeArg(&'env TypeArg<'env>),
     FuncHead(&'env FuncHead<'env>),
+    FuncBody(&'env FuncBody<'env>),
 }
 
 impl_unwrap_from_artifact!(Void, ());
@@ -35,3 +37,4 @@ impl_unwrap_from_artifact!(Field, Field<'env>);
 impl_unwrap_from_artifact!(Type, &'env Type<'env>);
 impl_unwrap_from_artifact!(TypeArg, &'env TypeArg<'env>);
 impl_unwrap_from_artifact!(FuncHead, &'env FuncHead<'env>);
+impl_unwrap_from_artifact!(FuncBody, &'env FuncBody<'env>);
