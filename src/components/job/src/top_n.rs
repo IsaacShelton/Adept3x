@@ -1,16 +1,16 @@
 use itertools::Itertools;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::VecDeque};
 
 #[derive(Clone, Debug)]
 pub struct TopN<T> {
-    items: Vec<T>,
+    items: VecDeque<T>,
     capacity: usize,
 }
 
 impl<T> TopN<T> {
     pub fn new(capacity: usize) -> Self {
         Self {
-            items: Vec::with_capacity(capacity),
+            items: VecDeque::with_capacity(capacity),
             capacity,
         }
     }
@@ -39,23 +39,39 @@ impl<T> TopN<T> {
     pub fn push(&mut self, new_item: T, mut comparator: impl FnMut(&T, &T) -> Ordering) {
         // Normally `n` should be small, so we will do naive way for now
 
-        // Find insert position within array
-        if let Some(i) =
-            self.items.iter().enumerate().rev().find_map(|(i, item)| {
-                (comparator(&new_item, item) != Ordering::Greater).then_some(i)
-            })
+        // Find existing item that new item should come after
+        if let Some(i) = self
+            .items
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, item)| comparator(&new_item, item).is_ge().then_some(i))
         {
-            self.items.insert(i + 1, new_item);
-            if self.items.len() > self.capacity {
-                self.items.pop();
+            // Don't do anything if existing items are more important than new item
+            if i + 1 >= self.capacity {
+                return;
             }
+
+            // Shave off back if too many items
+            if self.items.len() >= self.capacity {
+                self.items.pop_back();
+            }
+
+            // Insert new item into place
+            self.items.insert(i + 1, new_item);
             return;
         }
 
-        // Otherwise try to add to end
-        if self.items.len() < self.capacity {
-            self.items.push(new_item);
+        // Otherwise, nothing is more important than the new item,
+        // so put it at the front.
+
+        // Shave off back if too many items
+        if self.items.len() >= self.capacity {
+            self.items.pop_back();
         }
+
+        // Insert new item as new most important item
+        self.items.push_front(new_item);
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &T> {
@@ -65,7 +81,7 @@ impl<T> TopN<T> {
 
 impl<T> IntoIterator for TopN<T> {
     type Item = T;
-    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+    type IntoIter = <VecDeque<T> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
