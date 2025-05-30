@@ -513,6 +513,9 @@ pub fn resolve_expr(
                 ExprKind::StaticAssert(Box::new(condition), message.clone()).at(ast_expr.source),
             ));
         }
+        ast::ExprKind::Is(..) => {
+            unimplemented!("legacy resolution of `is` expression");
+        }
     }?;
 
     Ok(resolved_expr)

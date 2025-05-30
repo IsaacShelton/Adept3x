@@ -46,7 +46,7 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::Null => "null".into(),
             SequentialNodeKind::Void => "void".into(),
             SequentialNodeKind::Call(..) => "call".into(),
-            SequentialNodeKind::DeclareAssign(..) => "declare_assign".into(),
+            SequentialNodeKind::DeclareAssign(name, _) => format!("declare_assign {}", name).into(),
             SequentialNodeKind::Member(..) => "member".into(),
             SequentialNodeKind::ArrayAccess(..) => "array_access".into(),
             SequentialNodeKind::StructLiteral(..) => "struct_literal".into(),
@@ -59,6 +59,7 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::IntegerPromote(..) => "integer_promote".into(),
             SequentialNodeKind::StaticAssert(..) => "static_assert".into(),
             SequentialNodeKind::ConformToBool(..) => "conform_to_bool".into(),
+            SequentialNodeKind::Is(_, variant) => format!("is {}", variant).into(),
         }
     }
 }

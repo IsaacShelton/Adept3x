@@ -38,6 +38,7 @@ pub enum ExprKind {
     Continue,
     IntegerPromote(Box<Expr>),
     StaticAssert(Box<Expr>, Option<String>),
+    Is(Box<Expr>, String),
 }
 
 impl ExprKind {

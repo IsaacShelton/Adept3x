@@ -39,7 +39,7 @@ pub fn connect(nodes: &mut Arena<NodeId, Node>, from: CursorPosition, to: NodeRe
             1 => branch.when_false = Some(to),
             _ => panic!("invalid from edge index for branching node"),
         },
-        NodeKind::Terminating(_) => panic!("cannot connect terminationg node"),
+        NodeKind::Terminating(_) => panic!("cannot connect terminating node"),
     }
 }
 
@@ -95,6 +95,7 @@ pub enum SequentialNodeKind {
     IntegerPromote(NodeRef),
     StaticAssert(ConstEvalRef, Option<String>),
     ConformToBool(NodeRef, Language),
+    Is(NodeRef, String),
 }
 
 #[allow(dead_code)]

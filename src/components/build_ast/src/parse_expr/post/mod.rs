@@ -1,4 +1,5 @@
 mod array_access;
+mod is_match;
 mod member;
 
 use super::Parser;
@@ -22,6 +23,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             match self.input.peek().kind {
                 TokenKind::Member => base = self.parse_member(base)?,
                 TokenKind::OpenBracket => base = self.parse_array_access(base)?,
+                TokenKind::IsKeyword => base = self.parse_is_match(base)?,
                 _ => break,
             }
         }

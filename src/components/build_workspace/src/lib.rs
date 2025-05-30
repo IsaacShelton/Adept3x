@@ -21,7 +21,7 @@ use ast_workspace::AstWorkspace;
 use build_asg::resolve;
 use build_ir::lower;
 use compiler::Compiler;
-use diagnostics::unerror;
+use diagnostics::{Show, unerror};
 use explore_within::{ExploreWithinResult, explore_within};
 use export_and_link::export_and_link;
 use fs_tree::Fs;
@@ -94,10 +94,15 @@ pub fn compile_workspace(
         let build_asg_task = executor.spawn(&[], job::BuildAsg::new(&workspace));
 
         let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
-        let executed = executor.start(&mut allocator);
+        let executed = executor.start(compiler.source_files, &mut allocator);
         let show_executor_stats = false;
 
-        if executed.num_scheduled != executed.num_completed {
+        if executed.errors.len() > 0 {
+            for error in executed.errors.iter() {
+                error.eprintln(source_files);
+            }
+            return Err(());
+        } else if executed.num_scheduled != executed.num_completed {
             let num_cyclic = executed.num_scheduled - executed.num_completed;
 
             if num_cyclic == 1 {

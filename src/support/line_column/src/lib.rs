@@ -6,6 +6,20 @@ pub struct Location {
     pub column: u32,
 }
 
+impl PartialOrd for Location {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Location {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.line
+            .cmp(&other.line)
+            .then_with(|| self.column.cmp(&other.column))
+    }
+}
+
 unsafe impl<I> Send for LineColumn<I> where I: Iterator<Item = char> + Send {}
 
 pub struct LineColumn<I: Iterator<Item = char>> {

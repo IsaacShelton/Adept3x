@@ -9,8 +9,11 @@
 */
 
 use crate::{
-    BumpAllocatorPool, Executable, Execution, Executor, Pending, TaskRef, Truth, Worker, WorkerRef,
+    BumpAllocatorPool, Executable, Execution, Executor, Pending, TaskRef, TopN, Truth, Worker,
+    WorkerRef,
 };
+use diagnostics::ErrorDiagnostic;
+use source_files::SourceFiles;
 use std::{sync::atomic::Ordering, thread};
 
 pub struct MainExecutor<'env> {
@@ -26,7 +29,11 @@ impl<'env> MainExecutor<'env> {
     }
 
     #[must_use]
-    pub fn start(self, allocator_pool: &'env mut BumpAllocatorPool) -> MainExecutorStats<'env> {
+    pub fn start(
+        self,
+        source_files: &SourceFiles,
+        allocator_pool: &'env mut BumpAllocatorPool,
+    ) -> MainExecutorStats<'env> {
         let workers = (0..allocator_pool.len().get())
             .map(|worker_id| Worker::new(WorkerRef(worker_id)))
             .collect::<Box<_>>();
@@ -36,15 +43,30 @@ impl<'env> MainExecutor<'env> {
             .map(|worker| worker.local_queue.stealer())
             .collect::<Box<_>>();
 
-        thread::scope(|scope| {
+        let max_top_errors = 5;
+
+        let errors = thread::scope(|scope| {
+            let mut top_n_trackers = Vec::with_capacity(workers.len());
+
             for (worker, allocator) in workers
                 .into_iter()
                 .zip(allocator_pool.allocators.iter_mut())
             {
                 let executor = &self.executor;
                 let stealers = &stealers;
-                scope.spawn(move || worker.start(executor, allocator, stealers));
+                top_n_trackers.push(scope.spawn(move || {
+                    worker.start(source_files, max_top_errors, executor, allocator, stealers)
+                }));
             }
+
+            TopN::from_iter(
+                max_top_errors,
+                top_n_trackers
+                    .into_iter()
+                    .flat_map(|tracker| tracker.join().unwrap().into_iter()),
+                source_files,
+                |a, b, _| a.cmp_with(b, source_files),
+            )
         });
 
         MainExecutorStats {
@@ -53,6 +75,7 @@ impl<'env> MainExecutor<'env> {
             num_cleared: self.executor.num_cleared.load(Ordering::Relaxed),
             num_queued: self.executor.num_queued.load(Ordering::Relaxed),
             truth: self.executor.truth.into_inner().unwrap(),
+            errors,
         }
     }
 
@@ -76,4 +99,5 @@ pub struct MainExecutorStats<'env> {
     pub num_cleared: usize,
     pub num_queued: usize,
     pub truth: Truth<'env>,
+    pub errors: TopN<ErrorDiagnostic>,
 }

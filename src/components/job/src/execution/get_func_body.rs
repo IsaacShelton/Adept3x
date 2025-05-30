@@ -6,6 +6,7 @@ use crate::{
 use ast_workspace::{AstWorkspace, FuncRef};
 use by_address::ByAddress;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -51,6 +52,12 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
     ) -> Result<Self::Output, Continuation<'env>> {
         let def = &self.workspace.symbols.all_funcs[self.func_ref];
 
-        Ok(ctx.alloc(todo!("compute func body")))
+        Err(ErrorDiagnostic::new(
+            "Computing function bodies is not implemented yet!",
+            def.head.source,
+        )
+        .into())
+
+        // Ok(ctx.alloc(todo!("compute func body")))
     }
 }

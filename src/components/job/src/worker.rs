@@ -1,9 +1,15 @@
 use crate::{
     Artifact, BumpAllocator, Continuation, Execution, ExecutionCtx, Executor, RawExecutable,
-    SuspendCondition, TaskRef, TaskState, WaitingCount,
+    SuspendCondition, TaskRef, TaskState, TopN, WaitingCount,
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
-use std::{iter, mem, sync::atomic::Ordering};
+use diagnostics::ErrorDiagnostic;
+use source_files::SourceFiles;
+use std::{
+    iter::{self},
+    mem,
+    sync::atomic::Ordering,
+};
 
 #[derive(Copy, Clone, Debug)]
 pub struct WorkerRef(pub usize);
@@ -24,11 +30,14 @@ impl<'env> Worker<'env> {
 
     pub fn start(
         &self,
+        source_files: &SourceFiles,
+        max_top_errors: usize,
         executor: &Executor<'env>,
         allocator: &'env BumpAllocator,
         stealers: &[Stealer<TaskRef<'env>>],
-    ) {
+    ) -> TopN<ErrorDiagnostic> {
         let mut ctx = ExecutionCtx::new(allocator);
+        let mut top_n_errors = TopN::new(max_top_errors);
 
         loop {
             if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
@@ -42,7 +51,7 @@ impl<'env> Worker<'env> {
                         ctx.reset_waiting_on();
                     }
                     Err(Continuation::Error(error)) => {
-                        eprintln!("error: {}", error);
+                        top_n_errors.push(error, |a, b| a.cmp_with(b, source_files));
                     }
                 }
 
@@ -53,6 +62,8 @@ impl<'env> Worker<'env> {
                 break;
             }
         }
+
+        top_n_errors
     }
 
     #[must_use]

@@ -113,7 +113,6 @@ impl<'const_evals> Builder<'const_evals> {
         )
     }
 
-    #[must_use]
     pub fn push_terminating(
         &mut self,
         cursor: Cursor,
@@ -185,7 +184,7 @@ impl<'const_evals> Builder<'const_evals> {
     #[must_use]
     pub fn push_join_n(
         &mut self,
-        incoming: Vec<(Cursor, Option<NodeRef>)>,
+        incoming: impl IntoIterator<Item = (Cursor, Option<NodeRef>)>,
         source: Source,
     ) -> Cursor {
         let incoming: Vec<_> = incoming

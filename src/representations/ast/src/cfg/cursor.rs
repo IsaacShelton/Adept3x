@@ -1,6 +1,6 @@
 use super::NodeRef;
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Cursor {
     pub position: Option<CursorPosition>,
 }
@@ -36,7 +36,7 @@ impl From<CursorPosition> for Cursor {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct CursorPosition {
     pub from: NodeRef,
     pub edge_index: usize,

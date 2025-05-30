@@ -1,9 +1,14 @@
 use super::{
-    ConstEval, ConstEvalId, IsValue, NodeCall, NodeFieldInitializer, NodeInterpreterSyscall,
-    NodeStaticMemberCall, NodeStructLiteral, NodeTypeArg, SequentialNodeKind, TerminatingNode,
-    UntypedCfg, builder::Builder, cursor::Cursor,
+    ConstEval, ConstEvalId, IsValue, Node, NodeCall, NodeFieldInitializer, NodeInterpreterSyscall,
+    NodeKind, NodeRef, NodeStaticMemberCall, NodeStructLiteral, NodeTypeArg, SequentialNode,
+    SequentialNodeKind, TerminatingNode, UntypedCfg,
+    builder::Builder,
+    connect,
+    cursor::{Cursor, CursorPosition},
 };
-use crate::{Call, Expr, ExprKind, ShortCircuitingBinaryOperator, Stmt, StmtKind, TypeArg};
+use crate::{
+    Call, Expr, ExprKind, Language, ShortCircuitingBinaryOperator, Stmt, StmtKind, TypeArg,
+};
 use arena::Arena;
 use source_files::Source;
 
@@ -105,6 +110,109 @@ pub fn flatten_stmt(
 }
 
 #[must_use]
+pub fn flatten_condition(
+    builder: &mut Builder,
+    mut cursor: Cursor,
+    expr: Expr,
+    language: Language,
+) -> (Cursor, Cursor) {
+    let source = expr.source;
+    let mut when_true = vec![];
+    let mut when_false = vec![];
+
+    cursor = builder.push_sequential(cursor, SequentialNodeKind::Void, source);
+    let Some(void) = cursor.value() else {
+        return (Cursor::terminated(), Cursor::terminated());
+    };
+
+    flatten_condition_inner(
+        builder,
+        cursor,
+        expr,
+        language,
+        &mut when_true,
+        &mut when_false,
+        void,
+    );
+
+    let when_true = builder.push_join_n(when_true, source);
+    let when_false = builder.push_join_n(when_false, source);
+    (when_true, when_false)
+}
+
+pub fn flatten_condition_inner(
+    builder: &mut Builder,
+    mut cursor: Cursor,
+    expr: Expr,
+    language: Language,
+    join_when_true: &mut Vec<(Cursor, Option<NodeRef>)>,
+    join_when_false: &mut Vec<(Cursor, Option<NodeRef>)>,
+    void: NodeRef,
+) {
+    let source = expr.source;
+
+    match expr.kind {
+        ExprKind::ShortCircuitingBinaryOperation(short_circuiting_binary_operation) => {
+            let mut more_to_compute = Vec::new();
+
+            match short_circuiting_binary_operation.operator {
+                ShortCircuitingBinaryOperator::And => flatten_condition_inner(
+                    builder,
+                    cursor,
+                    short_circuiting_binary_operation.left,
+                    short_circuiting_binary_operation.language,
+                    &mut more_to_compute,
+                    join_when_false,
+                    void,
+                ),
+                ShortCircuitingBinaryOperator::Or => flatten_condition_inner(
+                    builder,
+                    cursor,
+                    short_circuiting_binary_operation.left,
+                    short_circuiting_binary_operation.language,
+                    join_when_true,
+                    &mut more_to_compute,
+                    void,
+                ),
+            };
+
+            cursor = builder.push_join_n(more_to_compute, source);
+
+            flatten_condition_inner(
+                builder,
+                cursor,
+                short_circuiting_binary_operation.right,
+                short_circuiting_binary_operation.language,
+                join_when_true,
+                join_when_false,
+                void,
+            );
+        }
+        _ => {
+            cursor = flatten_expr(builder, cursor, expr, IsValue::RequireValue);
+
+            let Some(value) = cursor.value() else {
+                return;
+            };
+
+            cursor = builder.push_sequential(
+                cursor,
+                SequentialNodeKind::ConformToBool(value, language),
+                source,
+            );
+
+            let Some(value) = cursor.value() else {
+                return;
+            };
+
+            let (when_true, when_false) = builder.push_branch(cursor, value, source);
+            join_when_true.push((when_true, Some(void)));
+            join_when_false.push((when_false, Some(void)));
+        }
+    }
+}
+
+#[must_use]
 pub fn flatten_expr(
     builder: &mut Builder,
     mut cursor: Cursor,
@@ -182,72 +290,42 @@ pub fn flatten_expr(
             }
         }
         ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
-            let left_source = bin_op.left.source;
             let right_source = bin_op.right.source;
 
-            cursor = flatten_expr(builder, cursor, bin_op.left, IsValue::RequireValue);
+            let (mut when_true, mut when_false) =
+                flatten_condition(builder, cursor, bin_op.left, bin_op.language);
 
-            let Some(inner) = cursor.value() else {
-                return cursor;
+            let when_more_calc = match bin_op.operator {
+                ShortCircuitingBinaryOperator::And => &mut when_true,
+                ShortCircuitingBinaryOperator::Or => &mut when_false,
             };
-
-            cursor = builder.push_sequential(
-                cursor,
-                SequentialNodeKind::ConformToBool(inner, bin_op.language),
-                left_source,
-            );
-
-            let Some(left) = cursor.value() else {
-                return cursor;
-            };
-
-            let (mut when_true, mut when_false) = builder.push_branch(cursor, left, expr.source);
 
             // NOTE: For C, the pre-conforming value should be the result, but we don't do that yet
-            let (true_gives, false_gives) = match bin_op.operator {
-                ShortCircuitingBinaryOperator::And => {
-                    // When true, result should be right hand side
-                    when_true = builder.open_scope(when_true, expr.source);
-                    when_true =
-                        flatten_expr(builder, when_true, bin_op.right, IsValue::RequireValue);
+            *when_more_calc = builder.open_scope(*when_more_calc, expr.source);
+            *when_more_calc = flatten_expr(
+                builder,
+                *when_more_calc,
+                bin_op.right,
+                IsValue::RequireValue,
+            );
 
-                    if let Some(inner) = when_true.value() {
-                        when_true = builder.push_sequential(
-                            when_true,
-                            SequentialNodeKind::ConformToBool(inner, bin_op.language),
-                            right_source,
-                        );
-                    }
+            if let Some(inner) = when_more_calc.value() {
+                *when_more_calc = builder.push_sequential(
+                    *when_more_calc,
+                    SequentialNodeKind::ConformToBool(inner, bin_op.language),
+                    right_source,
+                );
+            }
 
-                    let right = when_true.value();
-                    when_true = builder.close_scope(when_true, expr.source);
+            *when_more_calc = builder.close_scope(*when_more_calc, expr.source);
 
-                    // When false, result should be left hand side
-                    (right, Some(left))
-                }
-                ShortCircuitingBinaryOperator::Or => {
-                    // When true, result should be left hand side
-
-                    // When false, result should be right hand side
-                    when_false = builder.open_scope(when_false, expr.source);
-                    when_false =
-                        flatten_expr(builder, when_false, bin_op.right, IsValue::RequireValue);
-
-                    if let Some(inner) = when_false.value() {
-                        when_false = builder.push_sequential(
-                            when_false,
-                            SequentialNodeKind::ConformToBool(inner, bin_op.language),
-                            right_source,
-                        );
-                    }
-
-                    let right = when_false.value();
-                    when_false = builder.close_scope(when_false, expr.source);
-                    (Some(left), right)
-                }
-            };
-
-            builder.push_join(when_true, true_gives, when_false, false_gives, expr.source)
+            builder.push_join(
+                when_true,
+                when_true.value(),
+                when_false,
+                when_false.value(),
+                expr.source,
+            )
         }
         ExprKind::Member(subject, member, privacy) => {
             cursor = flatten_expr(builder, cursor, *subject, IsValue::RequireValue);
@@ -343,14 +421,9 @@ pub fn flatten_expr(
             for (condition, block) in conditional.conditions {
                 // Open scope before evaluating condition
                 cursor = builder.open_scope(cursor, expr.source);
-                cursor = flatten_expr(builder, cursor, condition, IsValue::RequireValue);
-
-                let Some(condition) = cursor.value() else {
-                    return cursor;
-                };
 
                 let (mut when_true, mut when_false) =
-                    builder.push_branch(cursor, condition, expr.source);
+                    flatten_condition(builder, cursor, condition, conditional.language);
 
                 when_false = builder.close_scope(when_false, expr.source);
 
@@ -389,6 +462,21 @@ pub fn flatten_expr(
                 return cursor;
             };
 
+            let Some(start_position) = cursor.position else {
+                return cursor;
+            };
+
+            let repeat_node_ref = builder.ordered_nodes.alloc(Node {
+                kind: NodeKind::Sequential(SequentialNode {
+                    kind: SequentialNodeKind::JoinN(vec![(start_position, void_result)]),
+                    next: None,
+                }),
+                source: expr.source,
+            });
+
+            connect(&mut builder.ordered_nodes, start_position, repeat_node_ref);
+            cursor = CursorPosition::new(repeat_node_ref, 0).into();
+
             cursor = builder.open_scope(cursor, expr.source);
 
             cursor = flatten_expr(builder, cursor, while_loop.condition, IsValue::RequireValue);
@@ -396,8 +484,7 @@ pub fn flatten_expr(
                 return cursor;
             };
 
-            let (mut when_true, mut when_false) =
-                builder.push_branch(cursor, condition, expr.source);
+            let (mut when_true, when_false) = builder.push_branch(cursor, condition, expr.source);
 
             when_true = flatten_stmts(
                 builder,
@@ -407,15 +494,21 @@ pub fn flatten_expr(
             );
 
             when_true = builder.close_scope(when_true, expr.source);
-            when_false = builder.close_scope(when_false, expr.source);
 
-            builder.push_join(
-                when_true,
-                Some(void_result),
-                when_false,
-                Some(void_result),
-                expr.source,
-            )
+            if let Some(end_position) = when_true.position {
+                connect(&mut builder.ordered_nodes, end_position, repeat_node_ref);
+                match &mut builder.ordered_nodes[repeat_node_ref].kind {
+                    NodeKind::Sequential(sequential_node) => match &mut sequential_node.kind {
+                        SequentialNodeKind::JoinN(items) => {
+                            items.push((end_position, void_result));
+                        }
+                        _ => unreachable!(),
+                    },
+                    _ => unreachable!(),
+                }
+            }
+
+            builder.close_scope(when_false, expr.source)
         }
         ExprKind::StaticMemberValue(static_member_value) => builder.push_sequential(
             cursor,
@@ -494,6 +587,14 @@ pub fn flatten_expr(
                 SequentialNodeKind::StaticAssert(condition, message),
                 expr.source,
             )
+        }
+        ExprKind::Is(value, variant) => {
+            cursor = flatten_expr(builder, cursor, *value, IsValue::RequireValue);
+            let Some(value) = cursor.value() else {
+                return cursor;
+            };
+
+            builder.push_sequential(cursor, SequentialNodeKind::Is(value, variant), expr.source)
         }
     }
 }
