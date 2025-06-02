@@ -18,10 +18,7 @@ pub fn unify_types(
     conform_source: Source,
 ) -> Option<asg::Type> {
     // Compute the unifying type for the supplied expressions
-    let Some(unified_type) = compute_unifying_type(preferred_type, exprs, behavior, conform_source)
-    else {
-        return None;
-    };
+    let unified_type = compute_unifying_type(preferred_type, exprs, behavior, conform_source)?;
 
     // Conform the supplied expressions if a unifying type was found
     for expr in exprs {

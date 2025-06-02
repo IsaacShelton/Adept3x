@@ -1,6 +1,7 @@
 use super::{module_file::ModuleFile, normal_file::NormalFile};
 use build_ast::Input;
 use derive_more::IsVariant;
+use fs_tree::FsNodeId;
 use infinite_iterator::InfinitePeekable;
 use std::path::Path;
 use token::Token;
@@ -16,6 +17,13 @@ impl<'a, I: InfinitePeekable<Token>> CodeFile<'a, I> {
         match self {
             CodeFile::Normal(normal_file) => &normal_file.path,
             CodeFile::Module(module_file, _) => &module_file.path,
+        }
+    }
+
+    pub fn fs_node_id(&self) -> FsNodeId {
+        match self {
+            CodeFile::Normal(normal_file) => normal_file.fs_node_id,
+            CodeFile::Module(module_file, _) => module_file.fs_node_id,
         }
     }
 }

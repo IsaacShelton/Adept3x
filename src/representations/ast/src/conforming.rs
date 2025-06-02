@@ -15,15 +15,22 @@ pub enum ConformBehavior {
 impl ConformBehavior {
     pub fn c_integer_assumptions(&self) -> CIntegerAssumptions {
         match self {
-            ConformBehavior::Adept(assumptions) => *assumptions,
-            ConformBehavior::C => Default::default(),
+            Self::Adept(assumptions) => *assumptions,
+            Self::C => Default::default(),
         }
     }
 
     pub fn auto_c_integer_to_bool_conversion(&self) -> bool {
         match self {
-            ConformBehavior::Adept(_) => false,
-            ConformBehavior::C => true,
+            Self::Adept(_) => false,
+            Self::C => true,
+        }
+    }
+
+    pub fn language(&self) -> Language {
+        match self {
+            ConformBehavior::Adept(_) => Language::Adept,
+            ConformBehavior::C => Language::C,
         }
     }
 }

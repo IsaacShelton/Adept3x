@@ -70,9 +70,17 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
                     return;
                 }
 
+                let module_folders = queue.module_folders_so_far();
+
                 // ===== Process normal files =====
                 queue.for_code_files(|code_file| {
-                    match compile_code_file(compiler, code_file, &queue.ast_files) {
+                    match compile_code_file(
+                        compiler,
+                        code_file,
+                        fs,
+                        &module_folders,
+                        &queue.ast_files,
+                    ) {
                         Ok(did_bytes) => {
                             stats.process_file();
                             stats.process_bytes(did_bytes);
@@ -182,7 +190,7 @@ fn print_syntax_errors(compiler: &Compiler, stats: &CompilationStats) -> Result<
     let num_module_files_failed = stats.failed_modules_estimate();
     if num_module_files_failed != 0 {
         eprintln!(
-            "error: {num_module_files_failed} module file(s) were determined to have errors in {in_how_many_seconds:.2} seconds",
+            "error: {num_module_files_failed} module file(s) were determined to have errors in {in_how_many_seconds:.2} seconds"
         );
         return Err(());
     }

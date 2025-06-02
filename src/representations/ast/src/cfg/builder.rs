@@ -4,10 +4,11 @@ use super::{
     cursor::{Cursor, CursorPosition},
     flatten_expr,
 };
-use crate::Expr;
+use crate::{ConformBehavior, Expr};
 use arena::Arena;
 use source_files::Source;
 use std::collections::HashMap;
+use std_ext::SmallVec2;
 
 #[derive(Debug)]
 pub struct Builder<'const_evals> {
@@ -139,6 +140,7 @@ impl<'const_evals> Builder<'const_evals> {
         a_gives: Option<NodeRef>,
         cursor_b: Cursor,
         b_gives: Option<NodeRef>,
+        conform_behavior: Option<ConformBehavior>,
         source: Source,
     ) -> Cursor {
         if (cursor_a.is_terminated() && cursor_b.is_terminated())
@@ -157,6 +159,7 @@ impl<'const_evals> Builder<'const_evals> {
                         a_gives,
                         b_position.clone(),
                         b_gives,
+                        conform_behavior,
                     ),
                     next: None,
                 }),
@@ -185,12 +188,13 @@ impl<'const_evals> Builder<'const_evals> {
     pub fn push_join_n(
         &mut self,
         incoming: impl IntoIterator<Item = (Cursor, Option<NodeRef>)>,
+        conform_behavior: Option<ConformBehavior>,
         source: Source,
     ) -> Cursor {
-        let incoming: Vec<_> = incoming
+        let incoming = incoming
             .into_iter()
             .filter_map(|(cursor, value)| cursor.position.zip(value))
-            .collect();
+            .collect::<SmallVec2<_>>();
 
         match incoming.len() {
             0 => Cursor::terminated(),
@@ -216,6 +220,7 @@ impl<'const_evals> Builder<'const_evals> {
                             a_gives,
                             b_position.clone(),
                             b_gives,
+                            conform_behavior,
                         ),
                         next: None,
                     }),
@@ -235,7 +240,7 @@ impl<'const_evals> Builder<'const_evals> {
 
                 let new_node_ref = self.ordered_nodes.alloc(Node {
                     kind: NodeKind::Sequential(SequentialNode {
-                        kind: SequentialNodeKind::JoinN(incoming),
+                        kind: SequentialNodeKind::JoinN(incoming, conform_behavior),
                         next: None,
                     }),
                     source,

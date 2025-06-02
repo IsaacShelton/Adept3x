@@ -1,7 +1,7 @@
 use super::{Parser, is_right_associative, is_terminating_token};
 use crate::error::ParseError;
 use ast::{
-    BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind, Language,
+    BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind,
     ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator,
 };
 use infinite_iterator::InfinitePeekable;
@@ -46,8 +46,10 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 TokenKind::LogicalLeftShift => BasicBinaryOperator::LogicalLeftShift.into(),
                 TokenKind::RightShift => BasicBinaryOperator::RightShift.into(),
                 TokenKind::LogicalRightShift => BasicBinaryOperator::LogicalRightShift.into(),
-                TokenKind::And => ShortCircuitingBinaryOperator::And.into(),
-                TokenKind::Or => ShortCircuitingBinaryOperator::Or.into(),
+                TokenKind::And => {
+                    BinaryOperator::ShortCircuiting(ShortCircuitingBinaryOperator::And)
+                }
+                TokenKind::Or => BinaryOperator::ShortCircuiting(ShortCircuitingBinaryOperator::Or),
                 _ => return Ok(lhs),
             };
 
@@ -77,7 +79,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     operator: short_circuiting_operator,
                     left: lhs,
                     right: rhs,
-                    language: Language::Adept,
+                    conform_behavior: self.conform_behavior,
                 }))
             }
         }

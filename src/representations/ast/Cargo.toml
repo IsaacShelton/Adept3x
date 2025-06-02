@@ -15,5 +15,7 @@ interpreter_api = { version = "0.1.0", path = "../interpreter_api" }
 num.workspace = true
 num-bigint.workspace = true
 primitives = { version = "0.1.0", path = "../primitives" }
+smallvec = "1.15.0"
 source_files = { version = "0.1.0", path = "../source_files" }
+std_ext = { version = "0.1.0", path = "../../support/std_ext" }
 token = { version = "0.1.0", path = "../token" }

@@ -83,8 +83,8 @@ impl<'source_files> AstWorkspace<'source_files> {
 
         // For old ASG resolution system
         let mut module_folders = ArenaMap::new();
-        for (fs_node_id, module) in original_module_folders.into_iter() {
-            module_folders.insert(fs_node_id, settings.alloc(module));
+        for (fs_node_id, module_settings) in original_module_folders.into_iter() {
+            module_folders.insert(fs_node_id, settings.alloc(module_settings));
         }
 
         // For new ASG resolution job system

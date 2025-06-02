@@ -7,9 +7,11 @@ use super::{
     cursor::{Cursor, CursorPosition},
 };
 use crate::{
-    Call, Expr, ExprKind, Language, ShortCircuitingBinaryOperator, Stmt, StmtKind, TypeArg,
+    Call, ConformBehavior, Expr, ExprKind, Language, ShortCircuitingBinaryOperator, Stmt, StmtKind,
+    TypeArg,
 };
 use arena::Arena;
+use smallvec::smallvec;
 use source_files::Source;
 
 pub fn flatten_func_ignore_const_evals(stmts: Vec<Stmt>, source: Source) -> UntypedCfg {
@@ -115,6 +117,7 @@ pub fn flatten_condition(
     mut cursor: Cursor,
     expr: Expr,
     language: Language,
+    conform_behavior: Option<ConformBehavior>,
 ) -> (Cursor, Cursor) {
     let source = expr.source;
     let mut when_true = vec![];
@@ -135,8 +138,8 @@ pub fn flatten_condition(
         void,
     );
 
-    let when_true = builder.push_join_n(when_true, source);
-    let when_false = builder.push_join_n(when_false, source);
+    let when_true = builder.push_join_n(when_true, conform_behavior, source);
+    let when_false = builder.push_join_n(when_false, conform_behavior, source);
     (when_true, when_false)
 }
 
@@ -152,15 +155,15 @@ pub fn flatten_condition_inner(
     let source = expr.source;
 
     match expr.kind {
-        ExprKind::ShortCircuitingBinaryOperation(short_circuiting_binary_operation) => {
+        ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
             let mut more_to_compute = Vec::new();
 
-            match short_circuiting_binary_operation.operator {
+            match bin_op.operator {
                 ShortCircuitingBinaryOperator::And => flatten_condition_inner(
                     builder,
                     cursor,
-                    short_circuiting_binary_operation.left,
-                    short_circuiting_binary_operation.language,
+                    bin_op.left,
+                    bin_op.conform_behavior.language(),
                     &mut more_to_compute,
                     join_when_false,
                     void,
@@ -168,21 +171,21 @@ pub fn flatten_condition_inner(
                 ShortCircuitingBinaryOperator::Or => flatten_condition_inner(
                     builder,
                     cursor,
-                    short_circuiting_binary_operation.left,
-                    short_circuiting_binary_operation.language,
+                    bin_op.left,
+                    bin_op.conform_behavior.language(),
                     join_when_true,
                     &mut more_to_compute,
                     void,
                 ),
             };
 
-            cursor = builder.push_join_n(more_to_compute, source);
+            cursor = builder.push_join_n(more_to_compute, Some(bin_op.conform_behavior), source);
 
             flatten_condition_inner(
                 builder,
                 cursor,
-                short_circuiting_binary_operation.right,
-                short_circuiting_binary_operation.language,
+                bin_op.right,
+                bin_op.conform_behavior.language(),
                 join_when_true,
                 join_when_false,
                 void,
@@ -292,8 +295,13 @@ pub fn flatten_expr(
         ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
             let right_source = bin_op.right.source;
 
-            let (mut when_true, mut when_false) =
-                flatten_condition(builder, cursor, bin_op.left, bin_op.language);
+            let (mut when_true, mut when_false) = flatten_condition(
+                builder,
+                cursor,
+                bin_op.left,
+                bin_op.conform_behavior.language(),
+                Some(bin_op.conform_behavior),
+            );
 
             let when_more_calc = match bin_op.operator {
                 ShortCircuitingBinaryOperator::And => &mut when_true,
@@ -312,7 +320,7 @@ pub fn flatten_expr(
             if let Some(inner) = when_more_calc.value() {
                 *when_more_calc = builder.push_sequential(
                     *when_more_calc,
-                    SequentialNodeKind::ConformToBool(inner, bin_op.language),
+                    SequentialNodeKind::ConformToBool(inner, bin_op.conform_behavior.language()),
                     right_source,
                 );
             }
@@ -324,6 +332,7 @@ pub fn flatten_expr(
                 when_true.value(),
                 when_false,
                 when_false.value(),
+                Some(bin_op.conform_behavior),
                 expr.source,
             )
         }
@@ -422,8 +431,13 @@ pub fn flatten_expr(
                 // Open scope before evaluating condition
                 cursor = builder.open_scope(cursor, expr.source);
 
-                let (mut when_true, mut when_false) =
-                    flatten_condition(builder, cursor, condition, conditional.language);
+                let (mut when_true, mut when_false) = flatten_condition(
+                    builder,
+                    cursor,
+                    condition,
+                    conditional.conform_behavior.language(),
+                    Some(conditional.conform_behavior),
+                );
 
                 when_false = builder.close_scope(when_false, expr.source);
 
@@ -453,7 +467,7 @@ pub fn flatten_expr(
                 incoming.push((cursor.clone(), no_result));
             }
 
-            builder.push_join_n(incoming, expr.source)
+            builder.push_join_n(incoming, Some(conditional.conform_behavior), expr.source)
         }
         ExprKind::While(while_loop) => {
             cursor = builder.push_sequential(cursor, SequentialNodeKind::Void, expr.source);
@@ -468,7 +482,7 @@ pub fn flatten_expr(
 
             let repeat_node_ref = builder.ordered_nodes.alloc(Node {
                 kind: NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::JoinN(vec![(start_position, void_result)]),
+                    kind: SequentialNodeKind::JoinN(smallvec![(start_position, void_result)], None),
                     next: None,
                 }),
                 source: expr.source,
@@ -499,7 +513,7 @@ pub fn flatten_expr(
                 connect(&mut builder.ordered_nodes, end_position, repeat_node_ref);
                 match &mut builder.ordered_nodes[repeat_node_ref].kind {
                     NodeKind::Sequential(sequential_node) => match &mut sequential_node.kind {
-                        SequentialNodeKind::JoinN(items) => {
+                        SequentialNodeKind::JoinN(items, _) => {
                             items.push((end_position, void_result));
                         }
                         _ => unreachable!(),

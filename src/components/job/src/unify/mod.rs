@@ -1,27 +1,30 @@
-use super::integer_literals::integer_literals_all_fit;
-use asg::{Type, TypeKind, TypedExpr};
+/*
+    ====================  components/job/src/unify/mod.rs  ====================
+    Definitions for unifying types
+    ---------------------------------------------------------------------------
+*/
+
+use crate::repr::{Type, TypeKind};
 use ast::ConformBehavior;
 use data_units::BitUnits;
 use itertools::Itertools;
-use num::BigInt;
+use num_bigint::BigInt;
 use primitives::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
-use std::borrow::Borrow;
 
-pub fn compute_unifying_type(
-    preferred_type: Option<&Type>,
-    values: &[impl Borrow<TypedExpr>],
+pub fn unify_types<'a, 't, 'env: 'a + 't>(
+    preferred_type: Option<&Type<'env>>,
+    types_iter: impl Iterator<Item = &'a Type<'env>> + Clone,
     behavior: ConformBehavior,
     source: Source,
-) -> Option<Type> {
-    let types_iter = values.iter().map(|expr| &expr.borrow().ty);
-
+) -> Option<Type<'env>> {
     // If all the values have the same type, the unifying type is that type
     if types_iter.clone().all_equal() {
         return Some(
-            values
-                .first()
-                .map(|expr| expr.borrow().ty.clone())
+            types_iter
+                .clone()
+                .next()
+                .cloned()
                 .unwrap_or_else(|| TypeKind::Void.at(source)),
         );
     }
@@ -35,7 +38,7 @@ pub fn compute_unifying_type(
         }
 
         // Otherwise, use the default integer type
-        return Some(TypeKind::Integer(IntegerBits::Bits32, IntegerSign::Signed).at(source));
+        return Some(TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Signed).at(source));
     }
 
     // If all the values are float literals, the unifying type is f64
@@ -60,7 +63,7 @@ pub fn compute_unifying_type(
     }
 
     // If all values are integers and integer literals
-    if types_iter.clone().all(|ty| ty.kind.is_integer_like()) {
+    if types_iter.clone().all(|ty| ty.kind.is_integer()) {
         return compute_unifying_integer_type(types_iter, behavior, source);
     }
 
@@ -87,11 +90,11 @@ pub fn compute_unifying_type(
     None
 }
 
-fn compute_unifying_integer_type<'a>(
-    types_iter: impl Iterator<Item = &'a Type>,
+fn compute_unifying_integer_type<'a, 'env: 'a>(
+    types_iter: impl Iterator<Item = &'a Type<'env>>,
     behavior: ConformBehavior,
     source: Source,
-) -> Option<Type> {
+) -> Option<Type<'env>> {
     let IntegerProperties {
         largest_loose_used,
         required_bits,
@@ -112,7 +115,7 @@ fn compute_unifying_integer_type<'a>(
 
     let required_bits = required_bits.unwrap_or(IntegerBits::Bits32);
 
-    return Some(TypeKind::Integer(required_bits, required_sign).at(source));
+    return Some(TypeKind::BitInteger(required_bits, required_sign).at(source));
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -133,7 +136,7 @@ impl IntegerProperties {
 
     pub fn new(ty: &Type, assumptions: CIntegerAssumptions) -> Option<Self> {
         match &ty.kind {
-            TypeKind::Integer(bits, sign) => Some(Self {
+            TypeKind::BitInteger(bits, sign) => Some(Self {
                 largest_loose_used: None,
                 required_bits: Some(*bits),
                 required_sign: Some(*sign),
@@ -167,8 +170,8 @@ impl IntegerProperties {
         }
     }
 
-    pub fn compute<'a>(
-        mut types: impl Iterator<Item = &'a Type>,
+    pub fn compute<'a, 'env: 'a>(
+        mut types: impl Iterator<Item = &'a Type<'env>>,
         assumptions: CIntegerAssumptions,
     ) -> Option<IntegerProperties> {
         types.try_fold(IntegerProperties::NONE, |properties, ty| {
@@ -278,5 +281,33 @@ fn unify_integer_properties_flexible(
         required_bits: Some(bits),
         required_sign: maybe_sign,
         is_concrete: true,
+    })
+}
+
+fn integer_literals_all_fit<'a, 'env: 'a>(
+    preferred_type: Option<&Type>,
+    mut types: impl Iterator<Item = &'a Type<'env>>,
+) -> bool {
+    let Some(Type {
+        kind: TypeKind::BitInteger(preferred_bits, preferred_sign),
+        ..
+    }) = preferred_type
+    else {
+        return false;
+    };
+
+    types.all(|ty| match &ty.kind {
+        TypeKind::IntegerLiteral(value) => {
+            let literal_sign = IntegerSign::from(value);
+
+            let literal_bits = BitUnits::of(match literal_sign {
+                IntegerSign::Unsigned => value.bits(),
+                IntegerSign::Signed => value.bits() + 1,
+            });
+
+            (preferred_sign.is_signed() || literal_sign.is_unsigned())
+                && literal_bits <= preferred_bits.bits()
+        }
+        _ => false,
     })
 }

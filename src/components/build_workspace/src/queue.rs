@@ -48,6 +48,14 @@ impl<'a, I: InfinitePeekable<Token>> LexParseQueue<'a, I> {
         self.module_files.lock().unwrap().extend(module_files);
     }
 
+    pub fn module_folders_so_far(&self) -> HashMap<FsNodeId, &Settings> {
+        HashMap::from_iter(
+            self.module_folders
+                .iter()
+                .map(|(fs_node_id, settings)| (*fs_node_id, settings)),
+        )
+    }
+
     pub fn destructure(self) -> LexParseInfo {
         let module_folders = HashMap::from_iter(self.module_folders.into_iter());
         let files = HashMap::from_iter(self.ast_files.into_iter());

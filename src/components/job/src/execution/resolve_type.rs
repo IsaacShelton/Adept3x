@@ -63,7 +63,7 @@ impl<'env> Executable<'env> for ResolveType<'env> {
 
         let kind = match &self.ast_type.kind {
             ast::TypeKind::Boolean => TypeKind::Boolean,
-            ast::TypeKind::Integer(bits, sign) => TypeKind::Integer(*bits, *sign),
+            ast::TypeKind::Integer(bits, sign) => TypeKind::BitInteger(*bits, *sign),
             ast::TypeKind::CInteger(cinteger, sign) => TypeKind::CInteger(*cinteger, *sign),
             ast::TypeKind::SizeInteger(sign) => TypeKind::SizeInteger(*sign),
             ast::TypeKind::Floating(size) => TypeKind::Floating(*size),

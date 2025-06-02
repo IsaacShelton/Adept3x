@@ -75,7 +75,7 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
                             operator,
                             left,
                             right,
-                            language: ast::Language::C,
+                            conform_behavior: ast::ConformBehavior::C,
                         },
                     ))
                 }

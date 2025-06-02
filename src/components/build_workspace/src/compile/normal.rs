@@ -1,7 +1,7 @@
 use super::c_code::c_code;
 use crate::normal_file::{NormalFile, NormalFileKind};
 use append_only_vec::AppendOnlyVec;
-use ast::RawAstFile;
+use ast::{ConformBehavior, RawAstFile};
 use build_ast::parse;
 use build_c_ast::CFileType;
 use build_token::Lexer;
@@ -15,6 +15,7 @@ use text::{CharacterInfiniteIterator, CharacterPeeker};
 pub fn compile_normal_file(
     compiler: &Compiler,
     normal_file: &NormalFile,
+    conform_behavior: ConformBehavior,
     out_ast_files: &AppendOnlyVec<(FsNodeId, RawAstFile)>,
 ) -> Result<ByteUnits, Box<dyn Show>> {
     let path = &normal_file.path;
@@ -33,7 +34,7 @@ pub fn compile_normal_file(
             let lexer = InfiniteIteratorPeeker::new(Lexer::new(text));
             out_ast_files.push((
                 normal_file.fs_node_id,
-                parse(lexer, source_files, key).map_err(into_show)?,
+                parse(lexer, source_files, key, conform_behavior).map_err(into_show)?,
             ));
         }
         NormalFileKind::CSource => {

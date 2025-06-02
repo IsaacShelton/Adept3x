@@ -63,6 +63,7 @@ impl<'env> BuildAsg<'env> {
 impl<'env> Executable<'env> for BuildAsg<'env> {
     type Output = &'env asg::Asg<'env>;
 
+    #[allow(unused_variables)]
     fn execute(
         mut self,
         executor: &Executor<'env>,
@@ -76,7 +77,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
         }
 
         if let Some(func_head) = executor.demand(self.func_head) {
-            dbg!(func_head);
+            // dbg!(func_head);
 
             let func_ref = self
                 .workspace
@@ -87,11 +88,6 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                 .map(|(func_ref, _)| func_ref)
                 .next()
                 .unwrap();
-
-            let def = &workspace.symbols.all_funcs[func_ref];
-            dbg!(&def.cfg);
-            def.cfg.write_to_graphviz_file("cfg.gv");
-            let _ = dbg!(def.cfg.validate_scoping());
 
             return suspend!(
                 self.func_body,
@@ -105,7 +101,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
         }
 
         if let Some(type_body) = executor.demand(self.type_body) {
-            dbg!(type_body);
+            // dbg!(type_body);
 
             let func_ref = self
                 .workspace
@@ -129,7 +125,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
         }
 
         if let Some(found) = executor.demand(self.find_type) {
-            dbg!(&found);
+            // dbg!(&found);
 
             if let Ok(Some(type_decl_ref)) = found {
                 return suspend!(

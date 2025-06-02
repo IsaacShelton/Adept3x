@@ -16,6 +16,7 @@ num.workspace = true
 num-bigint.workspace = true
 num-traits.workspace = true
 optional_string = { version = "0.1.0", path = "../../support/optional_string" }
+primitives = { version = "0.1.0", path = "../../representations/primitives" }
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
 text = { version = "0.1.0", path = "../../support/text" }
 token = { version = "0.1.0", path = "../../representations/token" }

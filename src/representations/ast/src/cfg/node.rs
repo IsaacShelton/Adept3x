@@ -1,12 +1,13 @@
 use super::{ConstEvalRef, NodeId, NodeRef, UntypedCfg, cursor::CursorPosition};
 use crate::{
-    BasicBinaryOperator, FillBehavior, Integer, Language, StaticMemberValue, Type, UnaryOperator,
-    Using,
+    BasicBinaryOperator, ConformBehavior, FillBehavior, Integer, Language, StaticMemberValue, Type,
+    UnaryOperator, Using,
 };
 use arena::Arena;
 use attributes::Privacy;
 use source_files::Source;
 use std::{ffi::CString, fmt::Debug};
+use std_ext::SmallVec2;
 use token::Name;
 
 #[allow(dead_code)]
@@ -62,8 +63,17 @@ pub struct Join {
 #[derive(Clone, Debug)]
 pub enum SequentialNodeKind {
     Join1(NodeRef),
-    Join2(CursorPosition, NodeRef, CursorPosition, NodeRef),
-    JoinN(Vec<(CursorPosition, NodeRef)>),
+    Join2(
+        CursorPosition,
+        NodeRef,
+        CursorPosition,
+        NodeRef,
+        Option<ConformBehavior>,
+    ),
+    JoinN(
+        SmallVec2<(CursorPosition, NodeRef)>,
+        Option<ConformBehavior>,
+    ),
     Const(UntypedCfg),
     Name(Name),
     OpenScope,

@@ -16,6 +16,7 @@ bumpalo = "3.17.0"
 by_address.workspace = true
 compiler = { version = "0.1.0", path = "../../support/compiler" }
 crossbeam-deque = "0.8.6"
+data_units = { version = "0.1.0", path = "../../support/data_units" }
 derivative.workspace = true
 derive_more.workspace = true
 diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }

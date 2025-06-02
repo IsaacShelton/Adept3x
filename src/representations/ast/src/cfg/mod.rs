@@ -59,6 +59,12 @@ pub enum CfgScopingError {
 }
 
 impl UntypedCfg {
+    pub fn assert_valid_scoping(&self) {
+        if let Err(err) = self.validate_scoping() {
+            panic!("assert_validate_scoping failed! {:?}", err);
+        }
+    }
+
     pub fn validate_scoping(&self) -> Result<HashMap<(NodeRef, NodeRef), i32>, CfgScopingError> {
         assert!(self.ordered_nodes.len() > 0);
 

@@ -19,16 +19,15 @@ impl<T> TopN<T> {
         self.items.len()
     }
 
-    pub fn from_iter<CTX>(
+    pub fn from_iter(
         capacity: usize,
         iter: impl IntoIterator<Item = T>,
-        ctx: &CTX,
-        comparator: impl Fn(&T, &T, &CTX) -> Ordering,
+        comparator: impl Fn(&T, &T) -> Ordering,
     ) -> Self {
         Self {
             items: iter
                 .into_iter()
-                .k_smallest_by(capacity, |a, b| comparator(a, b, ctx))
+                .k_smallest_by(capacity, |a, b| comparator(a, b))
                 .collect(),
             capacity,
         }

@@ -64,8 +64,7 @@ impl<'env> MainExecutor<'env> {
                 top_n_trackers
                     .into_iter()
                     .flat_map(|tracker| tracker.join().unwrap().into_iter()),
-                source_files,
-                |a, b, _| a.cmp_with(b, source_files),
+                |a, b| a.cmp_with(b, source_files),
             )
         });
 

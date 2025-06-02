@@ -127,6 +127,8 @@ pub fn compile_workspace(
         let asg = executed.truth.demand(build_asg_task);
 
         // Lower code to high level intermediate representation
+        // NOTE: This will have to be converted into executor tasks
+        // before we can really do anything
         let ir_module = unerror(lower(&compiler.options, &asg), source_files)?;
         //let ir_module = todo!("need ir_module from executed tasks");
 

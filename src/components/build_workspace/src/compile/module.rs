@@ -1,6 +1,6 @@
 use crate::{module_file::ModuleFile, pragma_section::PragmaSection};
 use append_only_vec::AppendOnlyVec;
-use ast::RawAstFile;
+use ast::{ConformBehavior, RawAstFile};
 use ast_workspace_settings::Settings;
 use build_ast::{Input, Parser};
 use build_token::Lexer;
@@ -73,9 +73,10 @@ pub fn compile_module_file<'a>(
 pub fn compile_rest_module_file<'a, I: InfinitePeekable<Token>>(
     module_file: &ModuleFile,
     rest_input: Input<'a, I>,
+    conform_behavior: ConformBehavior,
     out_ast_files: &AppendOnlyVec<(FsNodeId, RawAstFile)>,
 ) -> Result<ByteUnits, Box<(dyn Show + 'static)>> {
-    let mut parser = Parser::new(rest_input);
+    let mut parser = Parser::new(rest_input, conform_behavior);
     out_ast_files.push((module_file.fs_node_id, parser.parse().map_err(into_show)?));
     Ok(ByteUnits::ZERO) // No new bytes processed
 }

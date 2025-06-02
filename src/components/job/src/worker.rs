@@ -4,10 +4,11 @@ use crate::{
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use diagnostics::ErrorDiagnostic;
-use source_files::SourceFiles;
+use source_files::{Source, SourceFiles};
 use std::{
     iter::{self},
     mem,
+    panic::{self, AssertUnwindSafe},
     sync::atomic::Ordering,
 };
 
@@ -41,17 +42,30 @@ impl<'env> Worker<'env> {
 
         loop {
             if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
-                match execution.execute_raw(executor, &mut ctx) {
-                    Ok(artifact) => {
+                let result = panic::catch_unwind(AssertUnwindSafe(|| {
+                    execution.execute_raw(executor, &mut ctx)
+                }));
+
+                match result {
+                    Ok(Ok(artifact)) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);
                     }
-                    Err(Continuation::Suspend(execution)) => {
+                    Ok(Err(Continuation::Suspend(execution))) => {
                         self.suspend(executor, task_ref, ctx.waiting_on(), execution);
                         ctx.reset_waiting_on();
                     }
-                    Err(Continuation::Error(error)) => {
+                    Ok(Err(Continuation::Error(error))) => {
                         top_n_errors.push(error, |a, b| a.cmp_with(b, source_files));
+                    }
+                    Err(_) => {
+                        top_n_errors.push(
+                            ErrorDiagnostic::new(
+                                format!("Internal Compiler Error! Task paniced during execution!"),
+                                Source::internal(),
+                            ),
+                            |a, b| a.cmp_with(b, source_files),
+                        );
                     }
                 }
 

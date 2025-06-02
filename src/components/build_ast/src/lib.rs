@@ -25,9 +25,10 @@ mod parse_util;
 
 use self::error::ParseError;
 pub use self::input::Input;
-use ast::RawAstFile;
+use ast::{ConformBehavior, RawAstFile};
 use error::ParseErrorKind;
 use infinite_iterator::InfinitePeekable;
+use primitives::CIntegerAssumptions;
 use source_files::{SourceFileKey, SourceFiles};
 use std::mem::MaybeUninit;
 use token::{Token, TokenKind};
@@ -36,20 +37,23 @@ pub fn parse(
     tokens: impl InfinitePeekable<Token>,
     source_files: &SourceFiles,
     key: SourceFileKey,
+    conform_behavior: ConformBehavior,
 ) -> Result<RawAstFile, ParseError> {
-    Parser::new(Input::new(tokens, source_files, key)).parse()
+    Parser::new(Input::new(tokens, source_files, key), conform_behavior).parse()
 }
 
 pub struct Parser<'a, I: InfinitePeekable<Token>> {
     pub input: Input<'a, I>,
     pub treat_string_literals_as_cstring_literals: bool,
+    pub conform_behavior: ConformBehavior,
 }
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn new(input: Input<'a, I>) -> Self {
+    pub fn new(input: Input<'a, I>, conform_behavior: ConformBehavior) -> Self {
         Self {
             input,
             treat_string_literals_as_cstring_literals: false,
+            conform_behavior,
         }
     }
 
@@ -57,6 +61,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         Self {
             input,
             treat_string_literals_as_cstring_literals: true,
+            conform_behavior: ConformBehavior::Adept(CIntegerAssumptions::stable()),
         }
     }
 

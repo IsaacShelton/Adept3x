@@ -1,4 +1,4 @@
-use crate::{Expr, Language};
+use crate::{ConformBehavior, Expr};
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
@@ -6,7 +6,7 @@ pub struct ShortCircuitingBinaryOperation {
     pub operator: ShortCircuitingBinaryOperator,
     pub left: Expr,
     pub right: Expr,
-    pub language: Language,
+    pub conform_behavior: ConformBehavior,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]

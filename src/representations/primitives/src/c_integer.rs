@@ -57,11 +57,7 @@ impl CInteger {
                 return Some(possible);
             }
 
-            possible = if let Some(bigger) = possible.next() {
-                bigger
-            } else {
-                return None;
-            }
+            possible = possible.next()?;
         }
     }
 }
@@ -97,10 +93,11 @@ pub struct CIntegerAssumptions {
     pub int_at_least_32_bits: bool,
 }
 
-// impl CIntegerAssumptions {
-//     pub fn new(settings: &Settings) -> Self {
-//         Self {
-//             int_at_least_32_bits: settings.assume_int_at_least_32_bits,
-//         }
-//     }
-// }
+impl CIntegerAssumptions {
+    pub fn stable() -> Self {
+        // Assumptions we can make for when we compile
+        Self {
+            int_at_least_32_bits: true,
+        }
+    }
+}
