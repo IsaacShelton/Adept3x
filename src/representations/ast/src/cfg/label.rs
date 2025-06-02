@@ -26,7 +26,6 @@ impl Label for SequentialNodeKind {
     fn label(&self) -> Cow<str> {
         match self {
             SequentialNodeKind::Join1(..) => "join_1".into(),
-            SequentialNodeKind::Join2(..) => "join_2".into(),
             SequentialNodeKind::JoinN(..) => "join_n".into(),
             SequentialNodeKind::Const(_) => "const".into(),
             SequentialNodeKind::Name(name) => format!("name {}", name).into(),

@@ -80,32 +80,6 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                 NodeKind::Start(_) => Typed::void(node.source),
                 NodeKind::Sequential(sequential_node) => match &sequential_node.kind {
                     SequentialNodeKind::Join1(incoming) => self.get_typed(*incoming).clone(),
-                    SequentialNodeKind::Join2(_, incoming_a, _, incoming_b, conform_behavior) => {
-                        if let Some(conform_behavior) = conform_behavior {
-                            let edges: [_; 2] = [Value::new(*incoming_a), Value::new(*incoming_b)];
-
-                            let Some(unified) = unify_types(
-                                None,
-                                edges.iter().map(|value| value.ty(&self.types)),
-                                *conform_behavior,
-                                node.source,
-                            ) else {
-                                return Err(ErrorDiagnostic::new(
-                                    format!(
-                                        "Incompatible types '{}' and '{}'",
-                                        edges[0].ty(&self.types),
-                                        edges[1].ty(&self.types)
-                                    ),
-                                    node.source,
-                                )
-                                .into());
-                            };
-
-                            Typed::from_type(unified)
-                        } else {
-                            Typed::void(node.source)
-                        }
-                    }
                     SequentialNodeKind::JoinN(items, conform_behavior) => {
                         if let Some(conform_behavior) = conform_behavior {
                             let edges = items

@@ -6,6 +6,7 @@ use super::{
 };
 use crate::{ConformBehavior, Expr};
 use arena::Arena;
+use smallvec::smallvec;
 use source_files::Source;
 use std::collections::HashMap;
 use std_ext::SmallVec2;
@@ -154,11 +155,8 @@ impl<'const_evals> Builder<'const_evals> {
         {
             let new_node_ref = self.ordered_nodes.alloc(Node {
                 kind: NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::Join2(
-                        a_position.clone(),
-                        a_gives,
-                        b_position.clone(),
-                        b_gives,
+                    kind: SequentialNodeKind::JoinN(
+                        smallvec![(a_position.clone(), a_gives), (b_position.clone(), b_gives)],
                         conform_behavior,
                     ),
                     next: None,
@@ -215,11 +213,8 @@ impl<'const_evals> Builder<'const_evals> {
 
                 let new_node_ref = self.ordered_nodes.alloc(Node {
                     kind: NodeKind::Sequential(SequentialNode {
-                        kind: SequentialNodeKind::Join2(
-                            a_position.clone(),
-                            a_gives,
-                            b_position.clone(),
-                            b_gives,
+                        kind: SequentialNodeKind::JoinN(
+                            smallvec![(a_position.clone(), a_gives), (b_position.clone(), b_gives)],
                             conform_behavior,
                         ),
                         next: None,

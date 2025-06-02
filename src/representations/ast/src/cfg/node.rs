@@ -63,13 +63,6 @@ pub struct Join {
 #[derive(Clone, Debug)]
 pub enum SequentialNodeKind {
     Join1(NodeRef),
-    Join2(
-        CursorPosition,
-        NodeRef,
-        CursorPosition,
-        NodeRef,
-        Option<ConformBehavior>,
-    ),
     JoinN(
         SmallVec2<(CursorPosition, NodeRef)>,
         Option<ConformBehavior>,
