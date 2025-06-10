@@ -1,7 +1,9 @@
+mod dominators;
+
 use super::Executable;
 use crate::{
     Continuation, ExecutionCtx, Executor, SuspendMany, Typed, Value,
-    repr::{DeclScope, FuncBody, Type},
+    repr::{DeclScope, FuncBody, Type, TypeKind},
     unify::unify_types,
 };
 use arena::Id;
@@ -10,7 +12,9 @@ use ast_workspace::{AstWorkspace, FuncRef};
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
+use dominators::compute_idom_tree;
 use itertools::Itertools;
+use primitives::CInteger;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -67,6 +71,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         let def = &self.workspace.symbols.all_funcs[self.func_ref];
         let cfg = &def.cfg;
 
+        let idom_tree = compute_idom_tree(cfg);
+        dbg!(idom_tree);
+
         if self.types.capacity() == 0 {
             self.types.reserve_exact(cfg.ordered_nodes.len());
         }
@@ -112,29 +119,26 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         unimplemented!("SequentialNodeKind::Const not supported yet")
                     }
                     SequentialNodeKind::Name(name) => {
-                        // We will probably have to keep a stack of some sort to keep
-                        // track of which variables are still alive and/or refer to what
-                        // and different points within the CFG, unless there is a
-                        // smarter way to do it
-                        todo!()
+                        todo!("Name")
                     }
-                    SequentialNodeKind::OpenScope => todo!(),
-                    SequentialNodeKind::CloseScope => todo!(),
-                    SequentialNodeKind::NewVariable(_, _) => todo!(),
-                    SequentialNodeKind::Declare(_, _, idx) => todo!(),
-                    SequentialNodeKind::Assign(idx, idx1) => todo!(),
-                    SequentialNodeKind::BinOp(idx, basic_binary_operator, idx1) => todo!(),
-                    SequentialNodeKind::Boolean(_) => todo!(),
-                    SequentialNodeKind::Integer(integer) => todo!(),
-                    SequentialNodeKind::Float(_) => todo!(),
-                    SequentialNodeKind::AsciiChar(_) => todo!(),
-                    SequentialNodeKind::Utf8Char(_) => todo!(),
-                    SequentialNodeKind::String(_) => todo!(),
+                    SequentialNodeKind::OpenScope => todo!("OpenScope"),
+                    SequentialNodeKind::CloseScope => todo!("CloseScope"),
+                    SequentialNodeKind::NewVariable(_, _) => todo!("NewVariable"),
+                    SequentialNodeKind::Declare(_, _, idx) => todo!("Declare"),
+                    SequentialNodeKind::Assign(idx, idx1) => todo!("Assign"),
+                    SequentialNodeKind::BinOp(idx, basic_binary_operator, idx1) => todo!("BinOp"),
+                    SequentialNodeKind::Boolean(_) => todo!("Boolean"),
+                    SequentialNodeKind::Integer(integer) => todo!("Integer"),
+                    SequentialNodeKind::Float(_) => todo!("Float"),
+                    SequentialNodeKind::AsciiChar(_) => todo!("AsciiChar"),
+                    SequentialNodeKind::Utf8Char(_) => todo!("Utf8Char"),
+                    SequentialNodeKind::String(_) => todo!("String"),
                     SequentialNodeKind::NullTerminatedString(cstring) => {
-                        todo!("null terminated string is not implemented")
+                        let char = TypeKind::CInteger(CInteger::Char, None).at(node.source);
+                        Typed::from_type(TypeKind::Ptr(ctx.alloc(char)).at(node.source))
                     }
-                    SequentialNodeKind::Null => todo!(),
-                    SequentialNodeKind::Void => todo!(),
+                    SequentialNodeKind::Null => todo!("Null"),
+                    SequentialNodeKind::Void => todo!("Void"),
                     SequentialNodeKind::Call(node_call) => {
                         todo!()
                         // let found = find_or_suspend();
@@ -143,22 +147,30 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
                         // result
                     }
-                    SequentialNodeKind::DeclareAssign(_, idx) => todo!(),
-                    SequentialNodeKind::Member(idx, _, privacy) => todo!(),
-                    SequentialNodeKind::ArrayAccess(idx, idx1) => todo!(),
-                    SequentialNodeKind::StructLiteral(node_struct_literal) => todo!(),
-                    SequentialNodeKind::UnaryOperation(unary_operator, idx) => todo!(),
-                    SequentialNodeKind::StaticMemberValue(static_member_value) => todo!(),
-                    SequentialNodeKind::StaticMemberCall(node_static_member_call) => todo!(),
-                    SequentialNodeKind::SizeOf(_) => todo!(),
-                    SequentialNodeKind::SizeOfValue(idx) => todo!(),
-                    SequentialNodeKind::InterpreterSyscall(node_interpreter_syscall) => {
-                        todo!()
+                    SequentialNodeKind::DeclareAssign(_, idx) => todo!("DeclareAssign"),
+                    SequentialNodeKind::Member(idx, _, privacy) => todo!("Member"),
+                    SequentialNodeKind::ArrayAccess(idx, idx1) => todo!("ArrayAccess"),
+                    SequentialNodeKind::StructLiteral(node_struct_literal) => {
+                        todo!("StructLiteral")
                     }
-                    SequentialNodeKind::IntegerPromote(idx) => todo!(),
-                    SequentialNodeKind::StaticAssert(idx, _) => todo!(),
-                    SequentialNodeKind::ConformToBool(idx, language) => todo!(),
-                    SequentialNodeKind::Is(idx, _) => unimplemented!("SequentialNodeKind::Is"),
+                    SequentialNodeKind::UnaryOperation(unary_operator, idx) => {
+                        todo!("UnaryOperation")
+                    }
+                    SequentialNodeKind::StaticMemberValue(static_member_value) => {
+                        todo!("StaticMemberValue")
+                    }
+                    SequentialNodeKind::StaticMemberCall(node_static_member_call) => {
+                        todo!("StaticMemberCall")
+                    }
+                    SequentialNodeKind::SizeOf(_) => todo!("SizeOf"),
+                    SequentialNodeKind::SizeOfValue(idx) => todo!("SizeOfValue"),
+                    SequentialNodeKind::InterpreterSyscall(node_interpreter_syscall) => {
+                        todo!("InterpreterSyscall")
+                    }
+                    SequentialNodeKind::IntegerPromote(idx) => todo!("IntegerPromote"),
+                    SequentialNodeKind::StaticAssert(idx, _) => todo!("StaticAssert"),
+                    SequentialNodeKind::ConformToBool(idx, language) => todo!("ConformToBool"),
+                    SequentialNodeKind::Is(idx, _) => unimplemented!("Is"),
                 },
                 NodeKind::Branching(branch_node) => Typed::void(node.source),
                 NodeKind::Terminating(terminating_node) => Typed::void(node.source),

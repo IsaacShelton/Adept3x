@@ -53,8 +53,9 @@ impl UntypedCfg {
 
         for (node_ref, node) in self.ordered_nodes.iter().skip(1) {
             content.push_str(&format!(
-                "a{} [label=\"{}\"];\n",
+                "a{} [label=\"{:?}: {}\"];\n",
                 node_ref.into_raw().into_usize(),
+                node_ref.into_raw(),
                 node.label().replace("\"", "<quote>")
             ));
         }

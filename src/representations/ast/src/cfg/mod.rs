@@ -59,6 +59,17 @@ pub enum CfgScopingError {
 }
 
 impl UntypedCfg {
+    #[inline]
+    pub fn start(&self) -> NodeRef {
+        assert_ne!(self.len(), 0);
+        unsafe { NodeRef::from_raw(NodeId::from_usize(0)) }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.ordered_nodes.len()
+    }
+
     pub fn assert_valid_scoping(&self) {
         if let Err(err) = self.validate_scoping() {
             panic!("assert_validate_scoping failed! {:?}", err);

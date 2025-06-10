@@ -12,6 +12,7 @@ ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
 attributes = { version = "0.1.0", path = "../../representations/attributes" }
 beef = "0.5.2"
+bit-vec = "0.8.0"
 bumpalo = "3.17.0"
 by_address.workspace = true
 compiler = { version = "0.1.0", path = "../../support/compiler" }

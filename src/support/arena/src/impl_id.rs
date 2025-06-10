@@ -8,6 +8,7 @@ macro_rules! impl_id_for_nums {
 
             #[inline]
             fn from_usize(idx: usize) -> Self {
+                assert!(idx <= <Self as Id>::MAX);
                 idx as $ty
             }
 
@@ -27,6 +28,7 @@ macro_rules! impl_id_for_nums {
 
             #[inline]
             fn from_usize(idx: usize) -> Self {
+                assert!(idx <= <Self as Id>::MAX);
                 unsafe { NonZero::new_unchecked((idx + 1) as $ty) }
             }
 

@@ -10,7 +10,6 @@ use std::{ffi::CString, fmt::Debug};
 use std_ext::SmallVec2;
 use token::Name;
 
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Node {
     pub kind: NodeKind,
