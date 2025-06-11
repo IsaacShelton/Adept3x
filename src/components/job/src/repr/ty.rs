@@ -1,9 +1,10 @@
+use ast::IntegerKnown;
 use ast_workspace::TypeDeclRef;
 use derivative::Derivative;
 use derive_more::IsVariant;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
-use primitives::{CInteger, FloatSize, IntegerBits, IntegerSign, fmt_c_integer};
+use primitives::{CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, fmt_c_integer};
 use source_files::Source;
 use std::fmt::Display;
 
@@ -78,6 +79,16 @@ impl<'env> TypeKind<'env> {
                 | Self::CInteger(..)
                 | Self::SizeInteger(..)
         )
+    }
+}
+
+impl<'env> From<&IntegerKnown> for TypeKind<'env> {
+    fn from(value: &IntegerKnown) -> Self {
+        match value.rigidity {
+            IntegerRigidity::Fixed(bits, sign) => TypeKind::BitInteger(bits, sign),
+            IntegerRigidity::Loose(c_integer, sign) => TypeKind::CInteger(c_integer, sign),
+            IntegerRigidity::Size(sign) => TypeKind::SizeInteger(sign),
+        }
     }
 }
 

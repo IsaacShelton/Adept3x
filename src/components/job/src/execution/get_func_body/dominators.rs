@@ -1,18 +1,12 @@
 use arena::{ArenaMap, Id};
 use ast::{NodeId, NodeKind, NodeRef, UntypedCfg};
 use bit_vec::BitVec;
-use indexmap::IndexMap;
 use std::{
     cmp::Ordering,
     collections::{HashSet, VecDeque},
 };
 
-#[derive(Debug)]
-pub struct IdomTree {
-    pub _idom: ArenaMap<NodeId, NodeId>,
-}
-
-pub fn compute_idom_tree(cfg: &UntypedCfg) -> IdomTree {
+pub fn compute_idom_tree(cfg: &UntypedCfg) -> ArenaMap<NodeId, NodeRef> {
     let start = cfg.start();
     let (post_order, post_order_map, pred_sets) = depth_first_search(cfg);
 
@@ -52,10 +46,7 @@ pub fn compute_idom_tree(cfg: &UntypedCfg) -> IdomTree {
         }
     }
 
-    dbg!(IndexMap::<NodeId, NodeRef>::from_iter(
-        dominators.iter().map(|(x, y)| (x, *y))
-    ));
-    todo!("use computed idoms")
+    dominators
 }
 
 fn intersect(

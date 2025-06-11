@@ -71,8 +71,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         let def = &self.workspace.symbols.all_funcs[self.func_ref];
         let cfg = &def.cfg;
 
-        let idom_tree = compute_idom_tree(cfg);
-        dbg!(idom_tree);
+        let dominators = compute_idom_tree(cfg);
 
         if self.types.capacity() == 0 {
             self.types.reserve_exact(cfg.ordered_nodes.len());
@@ -118,17 +117,74 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         // of the calcuation is complete
                         unimplemented!("SequentialNodeKind::Const not supported yet")
                     }
-                    SequentialNodeKind::Name(name) => {
-                        todo!("Name")
+                    SequentialNodeKind::Name(needle) => {
+                        let mut dominator_ref = *dominators.get(node_ref.into_raw()).unwrap();
+                        let mut var_ty = None::<Type<'env>>;
+
+                        while dominator_ref != cfg.start() {
+                            let dom = &cfg.ordered_nodes[dominator_ref];
+
+                            match &dom.kind {
+                                NodeKind::Sequential(sequential_node) => {
+                                    match &sequential_node.kind {
+                                        SequentialNodeKind::NewVariable(name, ty) => {
+                                            if needle.as_plain_str() == Some(name) {
+                                                todo!("resolve variable ty for non-declare-assign");
+                                                // var_ty = Some(ty.clone());
+                                                break;
+                                            }
+                                        }
+                                        SequentialNodeKind::Declare(name, ty, idx) => {
+                                            if needle.as_plain_str() == Some(name) {
+                                                todo!("resolve variable ty for non-declare-assign");
+                                                // var_ty = Some(ty.clone());
+                                                break;
+                                            }
+                                        }
+                                        SequentialNodeKind::DeclareAssign(name, value) => {
+                                            if needle.as_plain_str() == Some(name) {
+                                                var_ty = Some(self.get_typed(*value).ty().clone());
+                                                break;
+                                            }
+                                        }
+                                        _ => (),
+                                    }
+                                }
+                                _ => (),
+                            }
+
+                            dominator_ref = *dominators.get(dominator_ref.into_raw()).unwrap();
+                        }
+
+                        let Some(var_ty) = var_ty else {
+                            return Err(ErrorDiagnostic::new(
+                                format!("Undefined variable '{}'", needle),
+                                node.source,
+                            )
+                            .into());
+                        };
+
+                        todo!("Name {:?}", var_ty);
                     }
-                    SequentialNodeKind::OpenScope => todo!("OpenScope"),
-                    SequentialNodeKind::CloseScope => todo!("CloseScope"),
+                    SequentialNodeKind::OpenScope => Typed::void(node.source),
+                    SequentialNodeKind::CloseScope => Typed::void(node.source),
                     SequentialNodeKind::NewVariable(_, _) => todo!("NewVariable"),
                     SequentialNodeKind::Declare(_, _, idx) => todo!("Declare"),
                     SequentialNodeKind::Assign(idx, idx1) => todo!("Assign"),
                     SequentialNodeKind::BinOp(idx, basic_binary_operator, idx1) => todo!("BinOp"),
                     SequentialNodeKind::Boolean(_) => todo!("Boolean"),
-                    SequentialNodeKind::Integer(integer) => todo!("Integer"),
+                    SequentialNodeKind::Integer(integer) => {
+                        let source = node.source;
+
+                        let ty = match integer {
+                            ast::Integer::Known(known) => TypeKind::from(known.as_ref()).at(source),
+                            ast::Integer::Generic(value) => {
+                                TypeKind::IntegerLiteral(value.clone()).at(source)
+                            }
+                        };
+
+                        Typed::from_type(ty)
+                    }
                     SequentialNodeKind::Float(_) => todo!("Float"),
                     SequentialNodeKind::AsciiChar(_) => todo!("AsciiChar"),
                     SequentialNodeKind::Utf8Char(_) => todo!("Utf8Char"),
@@ -138,7 +194,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         Typed::from_type(TypeKind::Ptr(ctx.alloc(char)).at(node.source))
                     }
                     SequentialNodeKind::Null => todo!("Null"),
-                    SequentialNodeKind::Void => todo!("Void"),
+                    SequentialNodeKind::Void => Typed::void(node.source),
                     SequentialNodeKind::Call(node_call) => {
                         todo!()
                         // let found = find_or_suspend();
@@ -147,7 +203,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
                         // result
                     }
-                    SequentialNodeKind::DeclareAssign(_, idx) => todo!("DeclareAssign"),
+                    SequentialNodeKind::DeclareAssign(_name, value) => {
+                        self.get_typed(*value).clone()
+                    }
                     SequentialNodeKind::Member(idx, _, privacy) => todo!("Member"),
                     SequentialNodeKind::ArrayAccess(idx, idx1) => todo!("ArrayAccess"),
                     SequentialNodeKind::StructLiteral(node_struct_literal) => {
