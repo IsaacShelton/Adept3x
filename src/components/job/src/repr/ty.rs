@@ -44,6 +44,7 @@ pub enum TypeKind<'env> {
     // Literals
     IntegerLiteral(BigInt),
     FloatLiteral(Option<NotNan<f64>>),
+    BooleanLiteral(bool),
     // Boolean
     Boolean,
     // Integer
@@ -99,6 +100,7 @@ impl<'env> Display for TypeKind<'env> {
             TypeKind::FloatLiteral(Some(float)) => write!(f, "float {}", float),
             TypeKind::FloatLiteral(None) => write!(f, "float NaN"),
             TypeKind::Boolean => write!(f, "bool"),
+            TypeKind::BooleanLiteral(value) => write!(f, "bool {}", value),
             TypeKind::BitInteger(bits, sign) => f.write_str(match (bits, sign) {
                 (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
                 (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",

@@ -705,11 +705,6 @@ pub fn lower_basic_binary_operation(
     operands: ir::BinaryOperands,
 ) -> Result<ir::Value, LowerError> {
     match operator {
-        asg::BasicBinaryOperator::PrimitiveAdd(ty) => {
-            let ty = builder.unpoly(ty)?;
-            let numeric_mode = &ty.0.numeric_mode().expect("PrimitiveAdd to be addable");
-            lower_add(builder, &numeric_mode, operands)
-        }
         asg::BasicBinaryOperator::Add(mode) => lower_add(builder, mode, operands),
         asg::BasicBinaryOperator::Subtract(mode) => Ok(builder.push(match mode {
             NumericMode::Integer(_) | NumericMode::LooseIndeterminateSignInteger(_) => {

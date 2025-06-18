@@ -1,14 +1,16 @@
+mod basic_bin_op;
 mod dominators;
 
 use super::Executable;
 use crate::{
-    Continuation, ExecutionCtx, Executor, SuspendMany, Typed, Value,
+    Continuation, ExecutionCtx, Executor, ResolveType, Suspend, SuspendMany, Typed, Value,
     repr::{DeclScope, FuncBody, Type, TypeKind},
     unify::unify_types,
 };
 use arena::Id;
 use ast::{NodeId, NodeKind, NodeRef, SequentialNodeKind};
 use ast_workspace::{AstWorkspace, FuncRef};
+use basic_bin_op::resolve_basic_binary_operation_expr_on_literals;
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
@@ -36,6 +38,16 @@ pub struct GetFuncBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     types: Vec<Typed<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    dominator_type: Suspend<'env, &'env Type<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    dominator: Option<NodeRef>,
 }
 
 impl<'env> GetFuncBody<'env> {
@@ -50,6 +62,8 @@ impl<'env> GetFuncBody<'env> {
             decl_scope: ByAddress(decl_scope),
             inner_types: None,
             types: Vec::new(),
+            dominator: None,
+            dominator_type: None,
         }
     }
 
@@ -118,27 +132,43 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         unimplemented!("SequentialNodeKind::Const not supported yet")
                     }
                     SequentialNodeKind::Name(needle) => {
-                        let mut dominator_ref = *dominators.get(node_ref.into_raw()).unwrap();
-                        let mut var_ty = None::<Type<'env>>;
+                        let var_ty = if let Some(var_ty) = executor.demand(self.dominator_type) {
+                            var_ty.clone()
+                        } else {
+                            let mut dominator_ref = *dominators.get(node_ref.into_raw()).unwrap();
+                            let mut var_ty = None::<Type<'env>>;
 
-                        while dominator_ref != cfg.start() {
-                            let dom = &cfg.ordered_nodes[dominator_ref];
+                            while dominator_ref != cfg.start() {
+                                let dom = &cfg.ordered_nodes[dominator_ref];
 
-                            match &dom.kind {
-                                NodeKind::Sequential(sequential_node) => {
-                                    match &sequential_node.kind {
+                                match &dom.kind {
+                                    NodeKind::Sequential(sequential_node) => match &sequential_node
+                                        .kind
+                                    {
                                         SequentialNodeKind::NewVariable(name, ty) => {
                                             if needle.as_plain_str() == Some(name) {
-                                                todo!("resolve variable ty for non-declare-assign");
-                                                // var_ty = Some(ty.clone());
-                                                break;
+                                                return suspend!(
+                                                    self.dominator_type,
+                                                    executor.request(ResolveType::new(
+                                                        &self.workspace,
+                                                        ty,
+                                                        &self.decl_scope
+                                                    )),
+                                                    ctx
+                                                );
                                             }
                                         }
                                         SequentialNodeKind::Declare(name, ty, idx) => {
                                             if needle.as_plain_str() == Some(name) {
-                                                todo!("resolve variable ty for non-declare-assign");
-                                                // var_ty = Some(ty.clone());
-                                                break;
+                                                return suspend!(
+                                                    self.dominator_type,
+                                                    executor.request(ResolveType::new(
+                                                        &self.workspace,
+                                                        ty,
+                                                        &self.decl_scope
+                                                    )),
+                                                    ctx
+                                                );
                                             }
                                         }
                                         SequentialNodeKind::DeclareAssign(name, value) => {
@@ -148,31 +178,92 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                             }
                                         }
                                         _ => (),
-                                    }
+                                    },
+                                    _ => (),
                                 }
-                                _ => (),
+
+                                dominator_ref = *dominators.get(dominator_ref.into_raw()).unwrap();
                             }
 
-                            dominator_ref = *dominators.get(dominator_ref.into_raw()).unwrap();
-                        }
+                            let Some(var_ty) = var_ty else {
+                                return Err(ErrorDiagnostic::new(
+                                    format!("Undefined variable '{}'", needle),
+                                    node.source,
+                                )
+                                .into());
+                            };
 
-                        let Some(var_ty) = var_ty else {
-                            return Err(ErrorDiagnostic::new(
-                                format!("Undefined variable '{}'", needle),
-                                node.source,
-                            )
-                            .into());
+                            var_ty
                         };
 
-                        todo!("Name {:?}", var_ty);
+                        eprintln!("Variable {} has type {:?}", needle, var_ty.kind);
+                        Typed::from_type(var_ty)
                     }
                     SequentialNodeKind::OpenScope => Typed::void(node.source),
                     SequentialNodeKind::CloseScope => Typed::void(node.source),
                     SequentialNodeKind::NewVariable(_, _) => todo!("NewVariable"),
-                    SequentialNodeKind::Declare(_, _, idx) => todo!("Declare"),
-                    SequentialNodeKind::Assign(idx, idx1) => todo!("Assign"),
-                    SequentialNodeKind::BinOp(idx, basic_binary_operator, idx1) => todo!("BinOp"),
-                    SequentialNodeKind::Boolean(_) => todo!("Boolean"),
+                    SequentialNodeKind::Declare(_, _, _) => Typed::void(node.source),
+                    SequentialNodeKind::Assign(_, _) => Typed::void(node.source),
+                    SequentialNodeKind::BinOp(left, bin_op, right) => {
+                        let left_ty = self.get_typed(*left).ty();
+                        let right_ty = self.get_typed(*right).ty();
+
+                        if let (TypeKind::IntegerLiteral(left), TypeKind::IntegerLiteral(right)) =
+                            (&left_ty.kind, &right_ty.kind)
+                        {
+                            resolve_basic_binary_operation_expr_on_literals(
+                                bin_op,
+                                &left,
+                                &right,
+                                node.source,
+                            )
+                            .map_err(Continuation::Error)?
+                        } else {
+                            /*
+                                let unified_type = unify_types(
+                                    ctx,
+                                    preferred_type.map(|preferred_type| preferred_type.view(ctx.asg)),
+                                    &mut [&mut left, &mut right],
+                                    ctx.adept_conform_behavior(),
+                                    source,
+                                )
+                                .ok_or_else(|| {
+                                    ResolveErrorKind::IncompatibleTypesForBinaryOperator {
+                                        operator: binary_operation.operator.to_string(),
+                                        left: left.ty.to_string(),
+                                        right: right.ty.to_string(),
+                                    }
+                                    .at(source)
+                                })?;
+
+                                let operator =
+                                    resolve_basic_binary_operator(ctx, &binary_operation.operator, &unified_type, source)?;
+
+                                let result_type = if binary_operation.operator.returns_boolean() {
+                                    asg::TypeKind::Boolean.at(source)
+                                } else {
+                                    unified_type
+                                };
+
+                                Ok(TypedExpr::new(
+                                    result_type,
+                                    asg::Expr::new(
+                                        asg::ExprKind::BasicBinaryOperation(Box::new(asg::BasicBinaryOperation {
+                                            operator,
+                                            left,
+                                            right,
+                                        })),
+                                        source,
+                                    ),
+                                ))
+                            */
+
+                            unimplemented!("BinOp non-constant")
+                        }
+                    }
+                    SequentialNodeKind::Boolean(value) => {
+                        Typed::from_type(TypeKind::BooleanLiteral(*value).at(node.source))
+                    }
                     SequentialNodeKind::Integer(integer) => {
                         let source = node.source;
 

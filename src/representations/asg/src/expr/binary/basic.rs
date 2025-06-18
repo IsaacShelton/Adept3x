@@ -1,4 +1,4 @@
-use crate::{Type, TypedExpr};
+use crate::TypedExpr;
 use primitives::{FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -10,7 +10,6 @@ pub struct BasicBinaryOperation {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum BasicBinaryOperator {
-    PrimitiveAdd(Type),
     Add(NumericMode),
     Subtract(NumericMode),
     Multiply(NumericMode),
