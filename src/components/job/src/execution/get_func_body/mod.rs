@@ -3,7 +3,9 @@ mod dominators;
 
 use super::Executable;
 use crate::{
-    Continuation, ExecutionCtx, Executor, ResolveType, Suspend, SuspendMany, Typed, Value,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, ResolveType, Resolved, Suspend,
+    SuspendMany, Value,
+    conform::conform_to_default,
     repr::{DeclScope, FuncBody, Type, TypeKind},
     unify::unify_types,
 };
@@ -37,7 +39,7 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    types: Vec<Typed<'env>>,
+    types: Vec<Resolved<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -48,6 +50,11 @@ pub struct GetFuncBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     dominator: Option<NodeRef>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    builtin_types: &'env BuiltinTypes<'env>,
 }
 
 impl<'env> GetFuncBody<'env> {
@@ -55,6 +62,7 @@ impl<'env> GetFuncBody<'env> {
         workspace: &'env AstWorkspace<'env>,
         func_ref: FuncRef,
         decl_scope: &'env DeclScope,
+        builtin_types: &'env BuiltinTypes<'env>,
     ) -> Self {
         Self {
             workspace: ByAddress(workspace),
@@ -64,10 +72,11 @@ impl<'env> GetFuncBody<'env> {
             types: Vec::new(),
             dominator: None,
             dominator_type: None,
+            builtin_types,
         }
     }
 
-    fn get_typed(&self, node_ref: NodeRef) -> &Typed<'env> {
+    fn get_typed(&self, node_ref: NodeRef) -> &Resolved<'env> {
         &self.types[node_ref.into_raw().into_usize()]
     }
 }
@@ -91,13 +100,17 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             self.types.reserve_exact(cfg.ordered_nodes.len());
         }
 
+        let settings =
+            &self.workspace.settings[def.settings.expect("settings assigned for function")];
+        let c_integer_assumptions = settings.c_integer_assumptions();
+
         while self.types.len() < cfg.ordered_nodes.len() {
             let node_index = self.types.len();
             let node_ref = unsafe { NodeRef::from_raw(NodeId::from_usize(node_index)) };
             let node = &cfg.ordered_nodes[node_ref];
 
             self.types.push(match &node.kind {
-                NodeKind::Start(_) => Typed::void(node.source),
+                NodeKind::Start(_) => Resolved::void(node.source),
                 NodeKind::Sequential(sequential_node) => match &sequential_node.kind {
                     SequentialNodeKind::Join1(incoming) => self.get_typed(*incoming).clone(),
                     SequentialNodeKind::JoinN(items, conform_behavior) => {
@@ -121,9 +134,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 .into());
                             };
 
-                            Typed::from_type(unified)
+                            Resolved::from_type(unified)
                         } else {
-                            Typed::void(node.source)
+                            Resolved::void(node.source)
                         }
                     }
                     SequentialNodeKind::Const(_) => {
@@ -142,43 +155,45 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 let dom = &cfg.ordered_nodes[dominator_ref];
 
                                 match &dom.kind {
-                                    NodeKind::Sequential(sequential_node) => match &sequential_node
-                                        .kind
-                                    {
-                                        SequentialNodeKind::NewVariable(name, ty) => {
-                                            if needle.as_plain_str() == Some(name) {
-                                                return suspend!(
-                                                    self.dominator_type,
-                                                    executor.request(ResolveType::new(
-                                                        &self.workspace,
-                                                        ty,
-                                                        &self.decl_scope
-                                                    )),
-                                                    ctx
-                                                );
+                                    NodeKind::Sequential(sequential_node) => {
+                                        match &sequential_node.kind {
+                                            SequentialNodeKind::NewVariable(name, ty) => {
+                                                if needle.as_plain_str() == Some(name) {
+                                                    return suspend!(
+                                                        self.dominator_type,
+                                                        executor.request(ResolveType::new(
+                                                            &self.workspace,
+                                                            ty,
+                                                            &self.decl_scope
+                                                        )),
+                                                        ctx
+                                                    );
+                                                }
                                             }
-                                        }
-                                        SequentialNodeKind::Declare(name, ty, idx) => {
-                                            if needle.as_plain_str() == Some(name) {
-                                                return suspend!(
-                                                    self.dominator_type,
-                                                    executor.request(ResolveType::new(
-                                                        &self.workspace,
-                                                        ty,
-                                                        &self.decl_scope
-                                                    )),
-                                                    ctx
-                                                );
+                                            SequentialNodeKind::Declare(name, ty, idx) => {
+                                                if needle.as_plain_str() == Some(name) {
+                                                    return suspend!(
+                                                        self.dominator_type,
+                                                        executor.request(ResolveType::new(
+                                                            &self.workspace,
+                                                            ty,
+                                                            &self.decl_scope
+                                                        )),
+                                                        ctx
+                                                    );
+                                                }
                                             }
-                                        }
-                                        SequentialNodeKind::DeclareAssign(name, value) => {
-                                            if needle.as_plain_str() == Some(name) {
-                                                var_ty = Some(self.get_typed(*value).ty().clone());
-                                                break;
+                                            SequentialNodeKind::DeclareAssign(name, value) => {
+                                                if needle.as_plain_str() == Some(name) {
+                                                    var_ty = Some(
+                                                        self.get_typed(dominator_ref).ty().clone(),
+                                                    );
+                                                    break;
+                                                }
                                             }
+                                            _ => (),
                                         }
-                                        _ => (),
-                                    },
+                                    }
                                     _ => (),
                                 }
 
@@ -196,14 +211,14 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             var_ty
                         };
 
-                        eprintln!("Variable {} has type {:?}", needle, var_ty.kind);
-                        Typed::from_type(var_ty)
+                        eprintln!("Variable {} has type {:?}", needle, var_ty);
+                        Resolved::from_type(var_ty)
                     }
-                    SequentialNodeKind::OpenScope => Typed::void(node.source),
-                    SequentialNodeKind::CloseScope => Typed::void(node.source),
+                    SequentialNodeKind::OpenScope => Resolved::void(node.source),
+                    SequentialNodeKind::CloseScope => Resolved::void(node.source),
                     SequentialNodeKind::NewVariable(_, _) => todo!("NewVariable"),
-                    SequentialNodeKind::Declare(_, _, _) => Typed::void(node.source),
-                    SequentialNodeKind::Assign(_, _) => Typed::void(node.source),
+                    SequentialNodeKind::Declare(_, _, _) => Resolved::void(node.source),
+                    SequentialNodeKind::Assign(_, _) => Resolved::void(node.source),
                     SequentialNodeKind::BinOp(left, bin_op, right) => {
                         let left_ty = self.get_typed(*left).ty();
                         let right_ty = self.get_typed(*right).ty();
@@ -262,7 +277,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         }
                     }
                     SequentialNodeKind::Boolean(value) => {
-                        Typed::from_type(TypeKind::BooleanLiteral(*value).at(node.source))
+                        Resolved::from_type(TypeKind::BooleanLiteral(*value).at(node.source))
                     }
                     SequentialNodeKind::Integer(integer) => {
                         let source = node.source;
@@ -274,7 +289,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             }
                         };
 
-                        Typed::from_type(ty)
+                        Resolved::from_type(ty)
                     }
                     SequentialNodeKind::Float(_) => todo!("Float"),
                     SequentialNodeKind::AsciiChar(_) => todo!("AsciiChar"),
@@ -282,10 +297,10 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     SequentialNodeKind::String(_) => todo!("String"),
                     SequentialNodeKind::NullTerminatedString(cstring) => {
                         let char = TypeKind::CInteger(CInteger::Char, None).at(node.source);
-                        Typed::from_type(TypeKind::Ptr(ctx.alloc(char)).at(node.source))
+                        Resolved::from_type(TypeKind::Ptr(ctx.alloc(char)).at(node.source))
                     }
                     SequentialNodeKind::Null => todo!("Null"),
-                    SequentialNodeKind::Void => Typed::void(node.source),
+                    SequentialNodeKind::Void => Resolved::void(node.source),
                     SequentialNodeKind::Call(node_call) => {
                         todo!()
                         // let found = find_or_suspend();
@@ -294,9 +309,11 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
                         // result
                     }
-                    SequentialNodeKind::DeclareAssign(_name, value) => {
-                        self.get_typed(*value).clone()
-                    }
+                    SequentialNodeKind::DeclareAssign(_name, value) => conform_to_default(
+                        self.get_typed(*value).ty(),
+                        c_integer_assumptions,
+                        self.builtin_types,
+                    )?,
                     SequentialNodeKind::Member(idx, _, privacy) => todo!("Member"),
                     SequentialNodeKind::ArrayAccess(idx, idx1) => todo!("ArrayAccess"),
                     SequentialNodeKind::StructLiteral(node_struct_literal) => {
@@ -321,8 +338,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     SequentialNodeKind::ConformToBool(idx, language) => todo!("ConformToBool"),
                     SequentialNodeKind::Is(idx, _) => unimplemented!("Is"),
                 },
-                NodeKind::Branching(branch_node) => Typed::void(node.source),
-                NodeKind::Terminating(terminating_node) => Typed::void(node.source),
+                NodeKind::Branching(branch_node) => Resolved::void(node.source),
+                NodeKind::Terminating(terminating_node) => Resolved::void(node.source),
             });
         }
 

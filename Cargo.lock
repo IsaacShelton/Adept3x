@@ -738,6 +738,7 @@ dependencies = [
  "ir",
  "itertools",
  "num-bigint",
+ "num-traits",
  "num_cpus",
  "ordered-float",
  "primitives",

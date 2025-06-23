@@ -4,13 +4,13 @@ use ast_workspace_settings::{Settings, SettingsRef};
 
 #[derive(Clone, Debug)]
 pub struct AstFile {
-    pub settings: Option<SettingsRef>,
+    pub settings: SettingsRef,
     pub names: NameScopeRef,
 }
 
 #[derive(Debug)]
 pub struct AstFileView<'workspace> {
-    pub settings: Option<&'workspace Settings>,
+    pub settings: &'workspace Settings,
     pub funcs: Vec<&'workspace Func>,
     pub structs: Vec<&'workspace Struct>,
     pub enums: Vec<&'workspace Enum>,

@@ -18,8 +18,7 @@ impl<'a> ResolveTypeCtx<'a> {
             .files
             .get(self.file_fs_node_id)
             .unwrap()
-            .settings
-            .expect("valid settings id")];
+            .settings];
 
         let decl = name
             .as_plain_str()

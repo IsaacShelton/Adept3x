@@ -27,6 +27,7 @@ indexmap.workspace = true
 ir = { version = "0.1.0", path = "../../representations/ir" }
 itertools.workspace = true
 num-bigint.workspace = true
+num-traits.workspace = true
 num_cpus = "1.16.0"
 ordered-float.workspace = true
 primitives = { version = "0.1.0", path = "../../representations/primitives" }

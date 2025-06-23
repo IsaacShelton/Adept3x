@@ -1,14 +1,19 @@
 use super::Executable;
 use crate::{
-    Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, GetFuncBody, GetFuncHead,
-    GetTypeBody, Suspend, SuspendManyAssoc,
+    BuiltinTypes, Continuation, EstimateDeclScope, ExecutionCtx, Executor, FindType, GetFuncBody,
+    GetFuncHead, GetTypeBody, Suspend, SuspendManyAssoc,
     execution::estimate_type_heads::EstimateTypeHeads,
-    repr::{DeclScope, DeclScopeOrigin, FindTypeResult, FuncBody, FuncHead, TypeBody, TypeHead},
+    repr::{
+        DeclScope, DeclScopeOrigin, FindTypeResult, FuncBody, FuncHead, TypeBody, TypeHead,
+        TypeKind,
+    },
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
 use derivative::Derivative;
 use derive_more::Debug;
+use primitives::{FloatSize, IntegerBits, IntegerSign};
+use source_files::Source;
 
 #[derive(Debug, Derivative)]
 #[derivative(PartialEq, Eq)]
@@ -43,6 +48,10 @@ pub struct BuildAsg<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(PartialEq = "ignore")]
     pub func_body: Suspend<'env, &'env FuncBody<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    pub builtin_types: Option<&'env BuiltinTypes<'env>>,
 }
 
 impl<'env> BuildAsg<'env> {
@@ -56,6 +65,7 @@ impl<'env> BuildAsg<'env> {
             type_body: None,
             func_head: None,
             func_body: None,
+            builtin_types: None,
         }
     }
 }
@@ -70,6 +80,25 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let workspace = self.workspace.0;
+
+        if self.builtin_types.is_none() {
+            self.builtin_types = Some(
+                ctx.alloc(BuiltinTypes {
+                    bool: TypeKind::Boolean.at(Source::internal()),
+                    i32: TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Signed)
+                        .at(Source::internal()),
+                    u32: TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Unsigned)
+                        .at(Source::internal()),
+                    i64: TypeKind::BitInteger(IntegerBits::Bits64, IntegerSign::Signed)
+                        .at(Source::internal()),
+                    u64: TypeKind::BitInteger(IntegerBits::Bits64, IntegerSign::Unsigned)
+                        .at(Source::internal()),
+                    f64: TypeKind::Floating(FloatSize::Bits64).at(Source::internal()),
+                }),
+            );
+        }
+
+        let builtin_types = self.builtin_types.as_ref().unwrap();
 
         if let Some(func_body) = executor.demand(self.func_body) {
             dbg!(func_body);
@@ -94,7 +123,8 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                 executor.request(GetFuncBody::new(
                     workspace,
                     func_ref,
-                    self.decl_scope.unwrap()
+                    self.decl_scope.unwrap(),
+                    builtin_types,
                 )),
                 ctx
             );

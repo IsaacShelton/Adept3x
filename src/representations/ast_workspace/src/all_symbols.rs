@@ -4,6 +4,7 @@ use crate::{
 };
 use arena::{IdxSpan, LockFreeArena};
 use ast::{Enum, ExprAlias, Func, Global, Impl, NamespaceItems, Struct, Trait, TypeAlias};
+use ast_workspace_settings::SettingsRef;
 
 #[derive(Debug, Default)]
 pub struct AstWorkspaceSymbols {
@@ -28,8 +29,14 @@ impl AstWorkspaceSymbols {
         &mut self,
         items: NamespaceItems,
         parent: Option<NameScopeRef>,
+        settings: SettingsRef,
     ) -> NameScopeRef {
-        let funcs = self.all_funcs.alloc_many(items.funcs);
+        let funcs = self
+            .all_funcs
+            .alloc_many(items.funcs.into_iter().map(|f| Func {
+                settings: Some(settings),
+                ..f
+            }));
         let structs = self.all_structs.alloc_many(items.structs);
         let enums = self.all_enums.alloc_many(items.enums);
         let globals = self.all_globals.alloc_many(items.globals);
@@ -55,7 +62,7 @@ impl AstWorkspaceSymbols {
         for namespace in items.namespaces {
             namespaces.push(Namespace {
                 name: namespace.name,
-                names: self.new_name_scope(namespace.items, Some(new_name_scope)),
+                names: self.new_name_scope(namespace.items, Some(new_name_scope), settings),
                 privacy: namespace.privacy,
             });
         }

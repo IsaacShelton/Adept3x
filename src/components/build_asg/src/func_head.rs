@@ -66,18 +66,10 @@ pub fn create_func_heads<'a>(
                     .push(func_ref);
             }
 
-            let imported_namespaces = ast_workspace
-                .view(ast_file)
-                .settings
-                .map(|settings| &settings.imported_namespaces);
+            let imported_namespaces = &ast_workspace.view(ast_file).settings.imported_namespaces;
 
             let func_haystack = ctx.func_haystacks.get_or_insert_with(module_folder_id, || {
-                FuncHaystack::new(
-                    imported_namespaces
-                        .map(|namespaces| namespaces.clone())
-                        .unwrap_or_else(|| vec![]),
-                    module_folder_id,
-                )
+                FuncHaystack::new(imported_namespaces.clone(), module_folder_id)
             });
 
             func_haystack
