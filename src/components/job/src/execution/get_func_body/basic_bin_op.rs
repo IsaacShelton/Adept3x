@@ -1,4 +1,4 @@
-use crate::{Typed, repr::TypeKind};
+use crate::{Resolved, repr::TypeKind};
 use diagnostics::ErrorDiagnostic;
 use num_bigint::{BigInt, Sign};
 use source_files::Source;
@@ -8,7 +8,7 @@ pub fn resolve_basic_binary_operation_expr_on_literals<'env>(
     left: &BigInt,
     right: &BigInt,
     source: Source,
-) -> Result<Typed<'env>, ErrorDiagnostic> {
+) -> Result<Resolved<'env>, ErrorDiagnostic> {
     let result = match operator {
         ast::BasicBinaryOperator::Add => left + right,
         ast::BasicBinaryOperator::Subtract => left - right,
@@ -24,32 +24,32 @@ pub fn resolve_basic_binary_operation_expr_on_literals<'env>(
             }
         }
         ast::BasicBinaryOperator::Equals => {
-            return Ok(Typed::from_type(
+            return Ok(Resolved::from_type(
                 TypeKind::BooleanLiteral(left == right).at(source),
             ));
         }
         ast::BasicBinaryOperator::NotEquals => {
-            return Ok(Typed::from_type(
+            return Ok(Resolved::from_type(
                 TypeKind::BooleanLiteral(left != right).at(source),
             ));
         }
         ast::BasicBinaryOperator::LessThan => {
-            return Ok(Typed::from_type(
+            return Ok(Resolved::from_type(
                 TypeKind::BooleanLiteral(left < right).at(source),
             ));
         }
         ast::BasicBinaryOperator::LessThanEq => {
-            return Ok(Typed::from_type(
+            return Ok(Resolved::from_type(
                 TypeKind::BooleanLiteral(left < right).at(source),
             ));
         }
         ast::BasicBinaryOperator::GreaterThan => {
-            return Ok(Typed::from_type(
+            return Ok(Resolved::from_type(
                 TypeKind::BooleanLiteral(left > right).at(source),
             ));
         }
         ast::BasicBinaryOperator::GreaterThanEq => {
-            return Ok(Typed::from_type(
+            return Ok(Resolved::from_type(
                 TypeKind::BooleanLiteral(left >= right).at(source),
             ));
         }
@@ -97,7 +97,7 @@ pub fn resolve_basic_binary_operation_expr_on_literals<'env>(
         }
     };
 
-    Ok(Typed::from_type(
+    Ok(Resolved::from_type(
         TypeKind::IntegerLiteral(result).at(source),
     ))
 }

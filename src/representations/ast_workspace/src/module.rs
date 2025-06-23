@@ -2,11 +2,9 @@ use crate::{
     AstFile, AstWorkspaceSymbols, EnumRef, ExprAliasRef, FuncRef, GlobalRef, ImplRef, NameScopeRef,
     NamespaceRef, StructRef, TraitRef, TypeAliasRef,
 };
-use ast_workspace_settings::SettingsRef;
 
 #[derive(Debug)]
 pub struct Module {
-    pub settings: Option<SettingsRef>,
     pub files: Vec<AstFile>,
 }
 

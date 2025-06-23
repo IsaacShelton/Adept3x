@@ -17,7 +17,7 @@ pub use module::*;
 pub use name_scope::*;
 pub use namespace::*;
 use source_files::SourceFiles;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 pub use type_decl_ref::TypeDeclRef;
 
 new_id_with_niche!(FuncId, u64);
@@ -56,6 +56,18 @@ pub struct AstWorkspace<'source_files> {
     pub modules: Arena<ModuleId, Module>,
 }
 
+// File <----> FS Node ID
+// Module <----> Module FS Node ID
+// File -----> Module
+// Source Symbol -----> Namespace Scope Ref of File
+
+// Each file has a root NamespaceScopeRef (possibly nested)
+// Each file has a parent module
+// Each file has an FS Node ID
+// Each module has an FS Node ID
+
+pub struct NewFile {}
+
 impl<'source_files> AstWorkspace<'source_files> {
     pub fn new(
         fs: Fs,
@@ -66,20 +78,7 @@ impl<'source_files> AstWorkspace<'source_files> {
         let mut settings = Arena::new();
         let default_settings = settings.alloc(Settings::default());
 
-        let mut files = ArenaMap::new();
         let mut symbols = AstWorkspaceSymbols::default();
-
-        for (fs_node_id, raw_file) in raw_files {
-            let name_scope_ref = symbols.new_name_scope(raw_file, None);
-
-            files.insert(
-                fs_node_id,
-                AstFile {
-                    settings: None,
-                    names: name_scope_ref,
-                },
-            );
-        }
 
         // For old ASG resolution system
         let mut module_folders = ArenaMap::new();
@@ -87,8 +86,36 @@ impl<'source_files> AstWorkspace<'source_files> {
             module_folders.insert(fs_node_id, settings.alloc(module_settings));
         }
 
-        // For new ASG resolution job system
-        let all_modules = compute_modules(&fs, &mut files, default_settings, &module_folders);
+        let attention = raw_files.keys().copied().collect();
+        let (module_for_file, files_for_module) = compute_modules(&fs, &attention, &module_folders);
+
+        let mut files = ArenaMap::new();
+
+        for (fs_node_id, raw_file) in raw_files {
+            let settings = module_folders
+                .get(*module_for_file.get(&fs_node_id).unwrap())
+                .unwrap();
+            let name_scope_ref = symbols.new_name_scope(raw_file, None, *settings);
+
+            files.insert(
+                fs_node_id,
+                AstFile {
+                    settings: *settings,
+                    names: name_scope_ref,
+                },
+            );
+        }
+
+        let mut all_modules = Arena::new();
+        for (_, fs_node_ids) in files_for_module {
+            let mut vec = Vec::new();
+
+            for fs_node_id in fs_node_ids {
+                vec.push(files.get(fs_node_id).unwrap().clone());
+            }
+
+            all_modules.alloc(Module { files: vec });
+        }
 
         let mut workspace = Self {
             fs,
@@ -107,7 +134,7 @@ impl<'source_files> AstWorkspace<'source_files> {
     pub fn view(&self, file: &AstFile) -> AstFileView {
         let name_scope = &self.symbols.all_name_scopes[file.names];
         AstFileView {
-            settings: file.settings.map(|id| &self.settings[id]),
+            settings: &self.settings[file.settings],
             funcs: self.symbols.all_funcs.get_span(name_scope.funcs).collect(),
             structs: self
                 .symbols
@@ -174,10 +201,6 @@ impl<'source_files> AstWorkspace<'source_files> {
                 .copied()
                 .unwrap_or(job.settings);
 
-            if let Some(ast_file) = self.files.get_mut(fs_node_id) {
-                ast_file.settings = Some(settings);
-            }
-
             // SAFETY: `read_only_view` will never deadlock here because we promise
             // to not insert any children while viewing it on this same thread
             jobs.extend(
@@ -196,78 +219,58 @@ impl<'source_files> AstWorkspace<'source_files> {
 
 fn compute_modules(
     fs: &Fs,
-    files: &mut ArenaMap<FsNodeId, AstFile>,
-    default_settings: SettingsRef,
+    attention: &HashSet<FsNodeId>,
     module_folders: &ArenaMap<FsNodeId, SettingsRef>,
-) -> Arena<ModuleId, Module> {
-    let mut jobs = VecDeque::new();
-    jobs.push_back(ComputeModuleJob::new(Fs::ROOT, None, default_settings));
+) -> (
+    HashMap<FsNodeId, FsNodeId>,
+    HashMap<FsNodeId, Vec<FsNodeId>>,
+) {
+    let mut module_for_file = HashMap::new();
+    let mut files_for_module = HashMap::<FsNodeId, Vec<_>>::new();
 
-    let mut modules = Arena::new();
+    struct Pair {
+        cursor: FsNodeId,
+        module: Option<FsNodeId>,
+    }
+
+    let mut jobs = VecDeque::new();
+    jobs.push_back(Pair {
+        cursor: Fs::ROOT,
+        module: None,
+    });
 
     while let Some(job) = jobs.pop_front() {
-        let fs_node_id = job.fs_node_id;
-        let mut module_ref = job.module_ref;
+        let module = if module_folders.contains_key(job.cursor) {
+            Some(job.cursor)
+        } else {
+            job.module
+        };
 
-        let settings = module_folders
-            .get(fs_node_id)
-            .copied()
-            .unwrap_or(job.settings);
+        if attention.contains(&job.cursor) {
+            let module_fs_node_id = job.module.expect("file to be in module");
+            module_for_file.insert(job.cursor, module_fs_node_id);
 
-        if module_folders.contains_key(fs_node_id) {
-            module_ref = Some(modules.alloc(Module {
-                settings: Some(settings),
-                files: vec![],
-            }));
-        }
-
-        if let Some(ast_file) = files.get_mut(fs_node_id) {
-            ast_file.settings = Some(settings);
-
-            let Some(module_ref) = module_ref else {
-                panic!(
-                    "internal compiler error: This file is somehow not in a module - {}",
-                    fs.get(job.fs_node_id).filename.to_string_lossy()
-                );
-            };
-
-            modules[module_ref].files.push(ast_file.clone());
+            files_for_module
+                .entry(module_fs_node_id)
+                .or_default()
+                .push(job.cursor);
         }
 
         // SAFETY: `read_only_view` will never deadlock here because we promise
         // to not insert any children while viewing it on this same thread
         jobs.extend(
-            fs.get(fs_node_id)
+            fs.get(job.cursor)
                 .children
                 .read_only_view()
                 .iter()
                 .map(|(_, value)| value)
                 .copied()
-                .map(|child_fs_node_id| {
-                    ComputeModuleJob::new(child_fs_node_id, module_ref, settings)
+                .map(|child_fs_node_id| Pair {
+                    cursor: child_fs_node_id,
+                    module,
                 }),
         );
     }
 
-    modules
-}
-
-pub struct ComputeModuleJob {
-    pub fs_node_id: FsNodeId,
-    pub module_ref: Option<ModuleRef>,
-    pub settings: Idx<SettingsId, Settings>,
-}
-
-impl ComputeModuleJob {
-    pub fn new(
-        fs_node_id: FsNodeId,
-        module_ref: Option<ModuleRef>,
-        settings: Idx<SettingsId, Settings>,
-    ) -> Self {
-        Self {
-            fs_node_id,
-            module_ref,
-            settings,
-        }
-    }
+    (module_for_file, files_for_module)
 }

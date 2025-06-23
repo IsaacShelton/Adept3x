@@ -90,7 +90,7 @@ fn resolve_func_body(
         .get(physical_file_id)
         .expect("referenced file exists");
 
-    let settings = &ast_workspace.settings[file.settings.unwrap_or(ast_workspace.default_settings)];
+    let settings = &ast_workspace.settings[file.settings];
 
     let resolved_stmts = resolve_stmts(
         &mut ResolveExprCtx {

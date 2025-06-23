@@ -2,6 +2,7 @@ mod params;
 
 use super::{Given, Stmt, Type, TypeParams};
 use crate::{UntypedCfg, flatten_func_ignore_const_evals};
+use ast_workspace_settings::SettingsRef;
 use attributes::{Privacy, SymbolOwnership, Tag};
 pub use params::{Param, Params};
 use source_files::Source;
@@ -11,6 +12,7 @@ pub struct Func {
     pub head: FuncHead,
     pub stmts: Vec<Stmt>,
     pub cfg: UntypedCfg,
+    pub settings: Option<SettingsRef>,
 }
 
 impl Func {
@@ -18,7 +20,12 @@ impl Func {
         // NOTE: We only need to clone right now during transition phase
         let cfg = flatten_func_ignore_const_evals(stmts.clone(), head.source);
         cfg.assert_valid_scoping();
-        Self { head, stmts, cfg }
+        Self {
+            head,
+            stmts,
+            cfg,
+            settings: None,
+        }
     }
 }
 
