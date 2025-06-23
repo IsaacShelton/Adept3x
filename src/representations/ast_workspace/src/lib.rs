@@ -56,18 +56,6 @@ pub struct AstWorkspace<'source_files> {
     pub modules: Arena<ModuleId, Module>,
 }
 
-// File <----> FS Node ID
-// Module <----> Module FS Node ID
-// File -----> Module
-// Source Symbol -----> Namespace Scope Ref of File
-
-// Each file has a root NamespaceScopeRef (possibly nested)
-// Each file has a parent module
-// Each file has an FS Node ID
-// Each module has an FS Node ID
-
-pub struct NewFile {}
-
 impl<'source_files> AstWorkspace<'source_files> {
     pub fn new(
         fs: Fs,
@@ -106,16 +94,16 @@ impl<'source_files> AstWorkspace<'source_files> {
             );
         }
 
-        let mut all_modules = Arena::new();
-        for (_, fs_node_ids) in files_for_module {
-            let mut vec = Vec::new();
-
-            for fs_node_id in fs_node_ids {
-                vec.push(files.get(fs_node_id).unwrap().clone());
-            }
-
-            all_modules.alloc(Module { files: vec });
-        }
+        let all_modules = files_for_module
+            .values()
+            .map(|fs_node_ids| Module {
+                files: fs_node_ids
+                    .iter()
+                    .copied()
+                    .map(|fs_node_id| *files.get(fs_node_id).unwrap())
+                    .collect(),
+            })
+            .collect();
 
         let mut workspace = Self {
             fs,

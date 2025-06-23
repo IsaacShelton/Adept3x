@@ -15,7 +15,6 @@ pub fn conform_to_default<'env>(
     assumptions: CIntegerAssumptions,
     builtin_types: &'env BuiltinTypes<'env>,
 ) -> Result<Resolved<'env>, ErrorDiagnostic> {
-    // Result<Cast<'env>, Resolved<'env>> {
     let source = ty.source;
 
     Ok(match &ty.kind {

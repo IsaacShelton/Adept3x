@@ -2,7 +2,7 @@ use crate::NameScopeRef;
 use ast::{Enum, ExprAlias, Func, Global, Impl, Struct, Trait, TypeAlias};
 use ast_workspace_settings::{Settings, SettingsRef};
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct AstFile {
     pub settings: SettingsRef,
     pub names: NameScopeRef,

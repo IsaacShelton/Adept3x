@@ -443,3 +443,12 @@ impl<K: Id, V> IntoIterator for Arena<K, V> {
         }
     }
 }
+
+impl<K: Id, V> FromIterator<V> for Arena<K, V> {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        Self {
+            data: iter.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
