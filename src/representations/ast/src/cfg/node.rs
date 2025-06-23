@@ -70,7 +70,7 @@ pub enum SequentialNodeKind {
     Name(Name),
     OpenScope,
     CloseScope,
-    NewVariable(String, Type),
+    Parameter(String, Type, usize),
     Declare(String, Type, Option<NodeRef>),
     Assign(NodeRef, NodeRef),
     BinOp(NodeRef, BasicBinaryOperator, NodeRef),

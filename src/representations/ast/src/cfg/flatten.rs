@@ -7,27 +7,45 @@ use super::{
     cursor::{Cursor, CursorPosition},
 };
 use crate::{
-    Call, ConformBehavior, Expr, ExprKind, Language, ShortCircuitingBinaryOperator, Stmt, StmtKind,
-    TypeArg,
+    Call, ConformBehavior, Expr, ExprKind, Language, Params, ShortCircuitingBinaryOperator, Stmt,
+    StmtKind, TypeArg,
 };
 use arena::Arena;
 use smallvec::smallvec;
 use source_files::Source;
 
-pub fn flatten_func_ignore_const_evals(stmts: Vec<Stmt>, source: Source) -> UntypedCfg {
+pub fn flatten_func_ignore_const_evals(
+    params: &Params,
+    stmts: Vec<Stmt>,
+    source: Source,
+) -> UntypedCfg {
     let mut const_evals = Arena::new();
-    flatten_func(stmts, &mut const_evals, source)
+    flatten_func(params, stmts, &mut const_evals, source)
 }
 
 pub fn flatten_func(
+    params: &Params,
     stmts: Vec<Stmt>,
     const_evals: &mut Arena<ConstEvalId, ConstEval>,
     source: Source,
 ) -> UntypedCfg {
     let stmts = stmts.clone();
 
-    let (mut builder, cursor) = Builder::new(const_evals, source);
-    let cursor = flatten_stmts(&mut builder, cursor, stmts, IsValue::NeglectValue);
+    let (mut builder, mut cursor) = Builder::new(const_evals, source);
+
+    for (index, param) in params.required.iter().enumerate() {
+        let Some(name) = &param.name else {
+            continue;
+        };
+
+        cursor = builder.push_sequential(
+            cursor,
+            SequentialNodeKind::Parameter(name.clone(), param.ast_type.clone(), index),
+            source,
+        );
+    }
+
+    cursor = flatten_stmts(&mut builder, cursor, stmts, IsValue::NeglectValue);
     let _ = builder.push_terminating(cursor, TerminatingNode::Return(None), source);
 
     UntypedCfg {

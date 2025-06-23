@@ -31,7 +31,7 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::Name(name) => format!("name {}", name).into(),
             SequentialNodeKind::OpenScope => "open_scope".into(),
             SequentialNodeKind::CloseScope => "close_scope".into(),
-            SequentialNodeKind::NewVariable(name, _) => format!("new_variable {}", name).into(),
+            SequentialNodeKind::Parameter(name, _, _) => format!("parameter {}", name).into(),
             SequentialNodeKind::Declare(name, _, _) => format!("declare_variable {}", name).into(),
             SequentialNodeKind::Assign(..) => "assign".into(),
             SequentialNodeKind::BinOp(..) => "bin_op".into(),

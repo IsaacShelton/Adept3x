@@ -151,7 +151,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 match &dom.kind {
                                     NodeKind::Sequential(sequential_node) => {
                                         match &sequential_node.kind {
-                                            SequentialNodeKind::NewVariable(name, ty) => {
+                                            SequentialNodeKind::Parameter(name, ty, _) => {
                                                 if needle.as_plain_str() == Some(name) {
                                                     return suspend!(
                                                         self.dominator_type,
@@ -213,7 +213,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     }
                     SequentialNodeKind::OpenScope => Resolved::void(node.source),
                     SequentialNodeKind::CloseScope => Resolved::void(node.source),
-                    SequentialNodeKind::NewVariable(_, _) => todo!("NewVariable"),
+                    SequentialNodeKind::Parameter(_, _, _) => Resolved::void(node.source),
                     SequentialNodeKind::Declare(_, _, _) => Resolved::void(node.source),
                     SequentialNodeKind::Assign(_, _) => Resolved::void(node.source),
                     SequentialNodeKind::BinOp(left, bin_op, right) => {
