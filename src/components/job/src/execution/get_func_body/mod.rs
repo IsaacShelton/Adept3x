@@ -49,11 +49,6 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    dominator: Option<NodeRef>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
     builtin_types: &'env BuiltinTypes<'env>,
 }
 
@@ -70,7 +65,6 @@ impl<'env> GetFuncBody<'env> {
             decl_scope: ByAddress(decl_scope),
             inner_types: None,
             types: Vec::new(),
-            dominator: None,
             dominator_type: None,
             builtin_types,
         }
@@ -207,6 +201,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 )
                                 .into());
                             };
+
+                            // Reset dominator type for next node that needs it
+                            self.dominator_type = None;
 
                             var_ty
                         };
