@@ -209,5 +209,7 @@ pub fn resolve_stmt(
                 source,
             ))
         }
+        ast::StmtKind::Label(_) => unimplemented!("Label for old resolution system"),
+        ast::StmtKind::Goto(_) => unimplemented!("Goto for old resolution system"),
     }
 }

@@ -94,6 +94,7 @@ pub enum TokenKind {
     BreakKeyword,
     ContinueKeyword,
     NamespaceKeyword,
+    GotoKeyword,
     Member,
     Add,
     Subtract,
@@ -145,6 +146,8 @@ pub enum TokenKind {
     Extend,
     FatArrow,
     ShortGeneric,
+    Label(String),
+    MacroName(String),
 }
 
 impl Display for TokenKind {
@@ -194,6 +197,7 @@ impl Display for TokenKind {
             TokenKind::BreakKeyword => f.write_str("'break' keyword"),
             TokenKind::ContinueKeyword => f.write_str("'continue' keyword"),
             TokenKind::NamespaceKeyword => f.write_str("'namespace' keyword"),
+            TokenKind::GotoKeyword => f.write_str("'goto' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -245,6 +249,8 @@ impl Display for TokenKind {
             TokenKind::Extend => f.write_str("'..'"),
             TokenKind::FatArrow => f.write_str("'=>'"),
             TokenKind::ShortGeneric => f.write_str("short generic '#'"),
+            TokenKind::Label(name) => write!(f, "goto label '@{}@'", name),
+            TokenKind::MacroName(name) => write!(f, "macro name '@{}'", name),
         }
     }
 }
@@ -332,6 +338,7 @@ impl TokenKind {
             | TokenKind::BreakKeyword
             | TokenKind::ContinueKeyword
             | TokenKind::NamespaceKeyword
+            | TokenKind::GotoKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon
@@ -343,7 +350,9 @@ impl TokenKind {
             | TokenKind::Extend
             | TokenKind::FatArrow
             | TokenKind::ShortGeneric
-            | TokenKind::BindSymbol => 0,
+            | TokenKind::BindSymbol
+            | TokenKind::Label(_)
+            | TokenKind::MacroName(_) => 0,
         }
     }
 

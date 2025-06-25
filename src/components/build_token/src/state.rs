@@ -3,6 +3,7 @@ use super::{
     identifier_state::IdentifierState, number_state::NumberState, polymorph_state::PolymorphState,
     string_state::StringState,
 };
+use crate::macro_state::MacroState;
 use derive_more::Unwrap;
 
 #[derive(Unwrap)]
@@ -11,6 +12,7 @@ pub enum State {
     Identifier(IdentifierState),
     CompoundIdentifier(CompoundIdentifierState),
     Polymorph(PolymorphState),
+    Macro(MacroState),
     String(StringState),
     Number(NumberState),
     HexNumber(HexNumberState),
@@ -35,6 +37,13 @@ impl State {
     pub fn as_mut_polymorph(&mut self) -> &mut PolymorphState {
         match self {
             State::Polymorph(polymorph) => polymorph,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_mut_macro(&mut self) -> &mut MacroState {
+        match self {
+            State::Macro(macro_state) => macro_state,
             _ => panic!(),
         }
     }

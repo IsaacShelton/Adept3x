@@ -76,14 +76,21 @@ impl<'env> GetFuncBody<'env> {
 }
 
 /*
+- For both implementation simplicity and mental processing simplicity, we will forbid gotos, break, and continue within expression aliases
+    - Macros can be used if non-trivial control flow modifications are necessary, e.g. @await or @yield or @break(2) or @try etc.
+
 #### Function Body Resolution Order
  - Flatten AST to CFG nodes and GOTO relocations
-...
- - Resolve macros to CFG flows and GOTO relocations
+ - Resolve macros to CFG flows
  - Resolve GOTO relocations
  - Determine post order traversal
  - Determine immediate dominators tree
  - Resolve variable names to corresponding nodes
+ - Any unresolved variable names are global variables or expression aliases.
+   - If global variable, the process is trivial.
+   - If an expression alias, we have to inject the flattened version in place of the variable usage.
+     - We must forbid any control flow that doesn't stay within the range / return.
+       For example, `goto`, `break`, `continue`, and `@label@` are not allowed as they don't operate "as sequential values" but rather non-trivially alter control flow.
 */
 
 impl<'env> Executable<'env> for GetFuncBody<'env> {
@@ -222,8 +229,6 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         eprintln!("Variable {} has type {:?}", needle, var_ty);
                         Resolved::from_type(var_ty)
                     }
-                    SequentialNodeKind::OpenScope => Resolved::void(node.source),
-                    SequentialNodeKind::CloseScope => Resolved::void(node.source),
                     SequentialNodeKind::Parameter(_, _, _) => Resolved::void(node.source),
                     SequentialNodeKind::Declare(_, _, _) => Resolved::void(node.source),
                     SequentialNodeKind::Assign(_, _) => Resolved::void(node.source),

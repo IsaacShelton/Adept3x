@@ -126,6 +126,28 @@ pub fn flatten_stmt(
                 cursor
             }
         }
+        StmtKind::Label(name) => {
+            let incoming = smallvec![];
+
+            let new_node_ref = builder.ordered_nodes.alloc(Node {
+                kind: NodeKind::Sequential(SequentialNode {
+                    kind: SequentialNodeKind::JoinN(incoming, None),
+                    next: None,
+                }),
+                source: stmt.source,
+            });
+
+            if let Some(position) = cursor.position {
+                connect(&mut builder.ordered_nodes, position, new_node_ref);
+            }
+
+            let position = CursorPosition::new(new_node_ref, 0);
+            builder.labels.push((name, position.from));
+            Cursor::from(position)
+        }
+        StmtKind::Goto(name) => {
+            todo!("flatten_stmt Goto")
+        }
     }
 }
 

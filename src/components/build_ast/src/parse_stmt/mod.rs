@@ -44,6 +44,10 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 ()
             }
             TokenKind::ReturnKeyword => return self.parse_return(),
+            TokenKind::Label(_) => {
+                let name = self.input.advance().kind.unwrap_label();
+                return Ok(StmtKind::Label(name).at(source));
+            }
             TokenKind::EndOfFile => return Err(self.unexpected_token_is_next()),
             _ => (),
         }

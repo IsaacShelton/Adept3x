@@ -1,6 +1,7 @@
 mod compound_identifier_state;
 mod hex_number_state;
 mod identifier_state;
+mod macro_state;
 mod number_state;
 mod polymorph_state;
 mod state;
@@ -12,6 +13,7 @@ use self::{
 };
 use compound_identifier_state::CompoundIdentifierState;
 use infinite_iterator::InfiniteIterator;
+use macro_state::MacroState;
 use polymorph_state::PolymorphState;
 use source_files::Source;
 use text::{Character, Text};
@@ -47,6 +49,7 @@ where
             State::Identifier(_) => self.feed_identifier(),
             State::CompoundIdentifier(_) => self.feed_compound_identifier(),
             State::Polymorph(_) => self.feed_polymorph(),
+            State::Macro(_) => self.feed_macro(),
             State::String(_) => self.feed_string(),
             State::Number(_) => self.feed_number(),
             State::HexNumber(_) => self.feed_hex_number(),
@@ -356,6 +359,13 @@ where
                 });
                 Waiting
             }
+            '@' => {
+                self.state = State::Macro(MacroState {
+                    identifier: String::new(),
+                    start_source: source,
+                });
+                Waiting
+            }
             _ if c.is_alphabetic() || c == '_' => {
                 self.state = State::Identifier(IdentifierState {
                     identifier: String::from(c),
@@ -429,6 +439,30 @@ where
                 let token = state.finalize();
                 self.state = State::Idle;
                 Has(token)
+            }
+        }
+    }
+
+    fn feed_macro(&mut self) -> FeedResult<Token> {
+        use FeedResult::*;
+
+        let state = self.state.as_mut_macro();
+
+        match self.characters.peek() {
+            Character::At(c, _) if c.is_alphabetic() || c.is_ascii_digit() || c == '_' => {
+                state.identifier.push(self.characters.next().unwrap().0);
+                Waiting
+            }
+            Character::At('@', _) => {
+                self.characters.next();
+                let (name, source) = state.finalize();
+                self.state = State::Idle;
+                Has(TokenKind::Label(name).at(source))
+            }
+            _ => {
+                let (name, source) = state.finalize();
+                self.state = State::Idle;
+                Has(TokenKind::MacroName(name).at(source))
             }
         }
     }

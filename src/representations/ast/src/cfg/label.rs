@@ -29,8 +29,6 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::JoinN(..) => "join_n".into(),
             SequentialNodeKind::Const(_) => "const".into(),
             SequentialNodeKind::Name(name) => format!("name {}", name).into(),
-            SequentialNodeKind::OpenScope => "open_scope".into(),
-            SequentialNodeKind::CloseScope => "close_scope".into(),
             SequentialNodeKind::Parameter(name, _, _) => format!("parameter {}", name).into(),
             SequentialNodeKind::Declare(name, _, _) => format!("declare_variable {}", name).into(),
             SequentialNodeKind::Assign(..) => "assign".into(),

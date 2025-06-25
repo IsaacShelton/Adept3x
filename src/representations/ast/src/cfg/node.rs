@@ -68,8 +68,6 @@ pub enum SequentialNodeKind {
     ),
     Const(UntypedCfg),
     Name(Name),
-    OpenScope,
-    CloseScope,
     Parameter(String, Type, usize),
     Declare(String, Type, Option<NodeRef>),
     Assign(NodeRef, NodeRef),

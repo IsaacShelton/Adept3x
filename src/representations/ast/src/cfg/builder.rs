@@ -14,6 +14,7 @@ use std_ext::SmallVec2;
 #[derive(Debug)]
 pub struct Builder<'const_evals> {
     pub ordered_nodes: Arena<NodeId, Node>,
+    pub labels: Vec<(String, NodeRef)>,
     const_evals: &'const_evals mut Arena<ConstEvalId, ConstEval>,
 }
 
@@ -35,6 +36,7 @@ impl<'const_evals> Builder<'const_evals> {
             Self {
                 ordered_nodes,
                 const_evals,
+                labels: Vec::new(),
             },
             CursorPosition {
                 from: start_ref,

@@ -8,6 +8,8 @@ pub enum StmtKind {
     Expr(Expr),
     Declaration(Box<Declaration>),
     Assignment(Box<Assignment>),
+    Label(String),
+    Goto(Expr),
 }
 
 impl StmtKind {
