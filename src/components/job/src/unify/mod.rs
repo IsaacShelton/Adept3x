@@ -18,6 +18,8 @@ pub fn unify_types<'a, 't, 'env: 'a + 't>(
     behavior: ConformBehavior,
     source: Source,
 ) -> Option<Type<'env>> {
+    let types_iter = types_iter.filter(|ty| !ty.kind.is_never());
+
     // If all the values have the same type, the unifying type is that type
     if types_iter.clone().all_equal() {
         return Some(

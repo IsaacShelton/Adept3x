@@ -83,6 +83,7 @@ pub enum SequentialNodeKind {
     NullTerminatedString(CString),
     Null,
     Void,
+    Never,
     Call(Box<NodeCall>),
     DeclareAssign(String, NodeRef),
     Member(NodeRef, String, Privacy),

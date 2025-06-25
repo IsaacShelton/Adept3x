@@ -44,6 +44,7 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::NullTerminatedString(..) => "c-string".into(),
             SequentialNodeKind::Null => "null".into(),
             SequentialNodeKind::Void => "void".into(),
+            SequentialNodeKind::Never => "never".into(),
             SequentialNodeKind::Call(..) => "call".into(),
             SequentialNodeKind::DeclareAssign(name, _) => format!("declare_assign {}", name).into(),
             SequentialNodeKind::Member(..) => "member".into(),

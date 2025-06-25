@@ -75,6 +75,17 @@ impl<'env> GetFuncBody<'env> {
     }
 }
 
+/*
+#### Function Body Resolution Order
+ - Flatten AST to CFG nodes and GOTO relocations
+...
+ - Resolve macros to CFG flows and GOTO relocations
+ - Resolve GOTO relocations
+ - Determine post order traversal
+ - Determine immediate dominators tree
+ - Resolve variable names to corresponding nodes
+*/
+
 impl<'env> Executable<'env> for GetFuncBody<'env> {
     type Output = &'env FuncBody<'env>;
 
@@ -232,6 +243,18 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             .map_err(Continuation::Error)?
                         } else {
                             /*
+                            // TODO: This should be determined by the binary operator
+                            let conform_behavior = ConformBehavior::Adept(c_integer_assumptions);
+
+                            let unified_type = unify_types(
+                                preferred_type,
+                                [left_ty, right_ty].into_iter(),
+                                conform_behavior,
+                                node.source,
+                            );
+                            */
+
+                            /*
                                 let unified_type = unify_types(
                                     ctx,
                                     preferred_type.map(|preferred_type| preferred_type.view(ctx.asg)),
@@ -298,6 +321,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     }
                     SequentialNodeKind::Null => todo!("Null"),
                     SequentialNodeKind::Void => Resolved::void(node.source),
+                    SequentialNodeKind::Never => Resolved::never(node.source),
                     SequentialNodeKind::Call(node_call) => {
                         todo!()
                         // let found = find_or_suspend();
@@ -332,7 +356,13 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     }
                     SequentialNodeKind::IntegerPromote(idx) => todo!("IntegerPromote"),
                     SequentialNodeKind::StaticAssert(idx, _) => todo!("StaticAssert"),
-                    SequentialNodeKind::ConformToBool(idx, language) => todo!("ConformToBool"),
+                    SequentialNodeKind::ConformToBool(idx, language) => {
+                        if let ast::Language::Adept = language {
+                            Resolved::from_type(self.builtin_types.bool.clone())
+                        } else {
+                            todo!("ConformToBool")
+                        }
+                    }
                     SequentialNodeKind::Is(idx, _) => unimplemented!("Is"),
                 },
                 NodeKind::Branching(branch_node) => Resolved::void(node.source),

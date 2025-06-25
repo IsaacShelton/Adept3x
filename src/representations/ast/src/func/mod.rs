@@ -19,7 +19,6 @@ impl Func {
     pub fn new(head: FuncHead, stmts: Vec<Stmt>) -> Self {
         // NOTE: We only need to clone right now during transition phase
         let cfg = flatten_func_ignore_const_evals(&head.params, stmts.clone(), head.source);
-        cfg.assert_valid_scoping();
         Self {
             head,
             stmts,

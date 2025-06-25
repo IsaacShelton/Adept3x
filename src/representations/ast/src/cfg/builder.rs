@@ -78,16 +78,6 @@ impl<'const_evals> Builder<'const_evals> {
     }
 
     #[must_use]
-    pub fn open_scope(&mut self, cursor: Cursor, source: Source) -> Cursor {
-        self.push_sequential(cursor, SequentialNodeKind::OpenScope, source)
-    }
-
-    #[must_use]
-    pub fn close_scope(&mut self, cursor: Cursor, source: Source) -> Cursor {
-        self.push_sequential(cursor, SequentialNodeKind::CloseScope, source)
-    }
-
-    #[must_use]
     pub fn push_branch(
         &mut self,
         cursor: Cursor,

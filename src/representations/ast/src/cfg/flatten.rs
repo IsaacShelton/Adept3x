@@ -327,7 +327,6 @@ pub fn flatten_expr(
             };
 
             // NOTE: For C, the pre-conforming value should be the result, but we don't do that yet
-            *when_more_calc = builder.open_scope(*when_more_calc, expr.source);
             *when_more_calc = flatten_expr(
                 builder,
                 *when_more_calc,
@@ -342,8 +341,6 @@ pub fn flatten_expr(
                     right_source,
                 );
             }
-
-            *when_more_calc = builder.close_scope(*when_more_calc, expr.source);
 
             builder.push_join(
                 when_true,
@@ -434,6 +431,28 @@ pub fn flatten_expr(
         ExprKind::Conditional(conditional) => {
             let mut incoming = vec![];
 
+            // Create a fake code path to enforce branch scoping.
+            // This greatly reduces the cognitive burden of finding where
+            // variables are declared.
+            // (as otherwise you have to be able to mentally calculate which branches diverge)
+            // See the below example:
+            // -----------------
+            // x := c"Hello"
+            // if random() { return } else { x := 10 }
+            // print(x)
+            // -----------------
+            // Without this artifical code path, `x` would be overridden to 10.
+            // This means that the type of x hinges on whether all other branches diverge,
+            // which can cause unexpected behavior when refactoring.
+            // In this case, we recommend moving the exclusive code path after the
+            // conditional to make this dependency clearer to the reader.
+            // See `&&` for a conditional which doesn't have this behavior.
+            cursor = builder.push_sequential(cursor, SequentialNodeKind::Never, expr.source);
+            let Some(never) = cursor.value() else {
+                return cursor;
+            };
+            incoming.push((cursor, Some(never)));
+
             let no_result = match is_value {
                 IsValue::RequireValue => None,
                 IsValue::NeglectValue => {
@@ -447,9 +466,7 @@ pub fn flatten_expr(
 
             for (condition, block) in conditional.conditions {
                 // Open scope before evaluating condition
-                cursor = builder.open_scope(cursor, expr.source);
-
-                let (mut when_true, mut when_false) = flatten_condition(
+                let (mut when_true, when_false) = flatten_condition(
                     builder,
                     cursor,
                     condition,
@@ -457,10 +474,7 @@ pub fn flatten_expr(
                     Some(conditional.conform_behavior),
                 );
 
-                when_false = builder.close_scope(when_false, expr.source);
-
                 when_true = flatten_stmts(builder, when_true, block.stmts, is_value);
-                when_true = builder.close_scope(when_true, expr.source);
                 let value = no_result.or_else(|| when_true.value());
 
                 incoming.push((when_true.clone(), value));
@@ -468,11 +482,8 @@ pub fn flatten_expr(
             }
 
             if let Some(otherwise) = conditional.otherwise {
-                cursor = builder.open_scope(cursor, expr.source);
                 cursor = flatten_stmts(builder, cursor, otherwise.stmts, is_value);
                 let value = no_result.or_else(|| cursor.value());
-                cursor = builder.close_scope(cursor, expr.source);
-
                 incoming.push((cursor, value));
             } else {
                 let no_result = if let Some(no_result) = no_result {
@@ -509,8 +520,6 @@ pub fn flatten_expr(
             connect(&mut builder.ordered_nodes, start_position, repeat_node_ref);
             cursor = CursorPosition::new(repeat_node_ref, 0).into();
 
-            cursor = builder.open_scope(cursor, expr.source);
-
             cursor = flatten_expr(builder, cursor, while_loop.condition, IsValue::RequireValue);
             let Some(condition) = cursor.value() else {
                 return cursor;
@@ -525,8 +534,6 @@ pub fn flatten_expr(
                 IsValue::NeglectValue,
             );
 
-            when_true = builder.close_scope(when_true, expr.source);
-
             if let Some(end_position) = when_true.position {
                 connect(&mut builder.ordered_nodes, end_position, repeat_node_ref);
                 match &mut builder.ordered_nodes[repeat_node_ref].kind {
@@ -540,7 +547,7 @@ pub fn flatten_expr(
                 }
             }
 
-            builder.close_scope(when_false, expr.source)
+            when_false
         }
         ExprKind::StaticMemberValue(static_member_value) => builder.push_sequential(
             cursor,

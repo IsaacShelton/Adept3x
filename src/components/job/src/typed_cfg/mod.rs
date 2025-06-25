@@ -37,6 +37,13 @@ impl<'env> Resolved<'env> {
         })
     }
 
+    pub fn never(source: Source) -> Self {
+        Self::from_type(Type {
+            kind: TypeKind::Never,
+            source,
+        })
+    }
+
     pub fn ty(&self) -> &Type<'env> {
         &self.ty
     }
