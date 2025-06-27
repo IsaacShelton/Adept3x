@@ -157,11 +157,11 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         let c_integer_assumptions = settings.c_integer_assumptions();
 
         // Annotate each CFG node (may suspend)
-        while self.num_processed < cfg.ordered_nodes.len() {
+        while self.num_processed < cfg.nodes.len() {
             let node_ref = *post_order
                 .get(post_order.len() - 1 - self.num_processed)
                 .unwrap();
-            let node = &cfg.ordered_nodes[node_ref];
+            let node = &cfg.nodes[node_ref];
 
             self.types.insert(
                 node_ref.into_raw(),
@@ -211,7 +211,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 let mut var_ty = None::<Type<'env>>;
 
                                 while dominator_ref != cfg.start() {
-                                    let dom = &cfg.ordered_nodes[dominator_ref];
+                                    let dom = &cfg.nodes[dominator_ref];
 
                                     match &dom.kind {
                                         NodeKind::Sequential(sequential_node) => {

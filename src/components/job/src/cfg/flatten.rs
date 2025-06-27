@@ -126,7 +126,7 @@ pub fn flatten_stmt(
         StmtKind::Label(name) => {
             let incoming = smallvec![];
 
-            let new_node_ref = builder.ordered_nodes.alloc(Node {
+            let new_node_ref = builder.nodes.alloc(Node {
                 kind: NodeKind::Sequential(SequentialNode {
                     kind: SequentialNodeKind::JoinN(incoming, None),
                     next: None,
@@ -135,7 +135,7 @@ pub fn flatten_stmt(
             });
 
             if let Some(position) = cursor.position {
-                connect(&mut builder.ordered_nodes, position, new_node_ref);
+                connect(&mut builder.nodes, position, new_node_ref);
             }
 
             let position = CursorPosition::new(new_node_ref, 0);
@@ -534,7 +534,7 @@ pub fn flatten_expr(
                 return cursor;
             };
 
-            let repeat_node_ref = builder.ordered_nodes.alloc(Node {
+            let repeat_node_ref = builder.nodes.alloc(Node {
                 kind: NodeKind::Sequential(SequentialNode {
                     kind: SequentialNodeKind::JoinN(smallvec![(start_position, void_result)], None),
                     next: None,
@@ -542,7 +542,7 @@ pub fn flatten_expr(
                 source: expr.source,
             });
 
-            connect(&mut builder.ordered_nodes, start_position, repeat_node_ref);
+            connect(&mut builder.nodes, start_position, repeat_node_ref);
             cursor = CursorPosition::new(repeat_node_ref, 0).into();
 
             cursor = flatten_expr(builder, cursor, while_loop.condition, IsValue::RequireValue);
@@ -560,8 +560,8 @@ pub fn flatten_expr(
             );
 
             if let Some(end_position) = when_true.position {
-                connect(&mut builder.ordered_nodes, end_position, repeat_node_ref);
-                match &mut builder.ordered_nodes[repeat_node_ref].kind {
+                connect(&mut builder.nodes, end_position, repeat_node_ref);
+                match &mut builder.nodes[repeat_node_ref].kind {
                     NodeKind::Sequential(sequential_node) => match &mut sequential_node.kind {
                         SequentialNodeKind::JoinN(items, _) => {
                             items.push((end_position, void_result));

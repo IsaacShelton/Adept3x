@@ -33,13 +33,13 @@ pub struct Label {
 
 #[derive(Clone)]
 pub struct UntypedCfg {
-    pub ordered_nodes: Arena<NodeId, Node>,
+    pub nodes: Arena<NodeId, Node>,
     pub labels: Vec<Label>,
 }
 
 impl Debug for UntypedCfg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_map().entries(self.ordered_nodes.iter()).finish()
+        f.debug_map().entries(self.nodes.iter()).finish()
     }
 }
 
@@ -52,7 +52,7 @@ impl UntypedCfg {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.ordered_nodes.len()
+        self.nodes.len()
     }
 
     pub fn finalize_gotos(mut self) -> Result<Self, ErrorDiagnostic> {
@@ -69,7 +69,7 @@ impl UntypedCfg {
             assert_eq!(labels.insert(label.name, label.node_ref), None);
         }
 
-        for node in self.ordered_nodes.values_mut() {
+        for node in self.nodes.values_mut() {
             match &mut node.kind {
                 NodeKind::Sequential(SequentialNode {
                     kind: SequentialNodeKind::DirectGoto(label_name),

@@ -29,7 +29,7 @@ impl UntypedCfg {
         };
 
         while let Some(node_ref) = queue.pop_front() {
-            let node = &self.ordered_nodes[node_ref];
+            let node = &self.nodes[node_ref];
 
             match &node.kind {
                 NodeKind::Start(next) => {
@@ -59,7 +59,7 @@ impl UntypedCfg {
             }
         }
 
-        for (node_ref, node) in self.ordered_nodes.iter().skip(1) {
+        for (node_ref, node) in self.nodes.iter().skip(1) {
             content.push_str(&format!(
                 "a{} [label=\"{:?}: {}\"];\n",
                 node_ref.into_raw().into_usize(),
@@ -86,7 +86,7 @@ impl UntypedCfg {
             ));
         }
 
-        for (node_ref, node) in &self.ordered_nodes {
+        for (node_ref, node) in &self.nodes {
             if let NodeKind::Terminating(_) = &node.kind {
                 content.push_str(&format!(
                     "a{} [shape=Msquare];\n",

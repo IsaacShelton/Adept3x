@@ -13,7 +13,7 @@ use std_ext::SmallVec2;
 
 #[derive(Debug)]
 pub struct Builder<'const_evals> {
-    pub ordered_nodes: Arena<NodeId, Node>,
+    pub nodes: Arena<NodeId, Node>,
     pub labels: Vec<Label>,
     const_evals: &'const_evals mut Arena<ConstEvalId, ConstEval>,
 }
@@ -25,16 +25,16 @@ impl<'const_evals> Builder<'const_evals> {
         const_evals: &'const_evals mut Arena<ConstEvalId, ConstEval>,
         source: Source,
     ) -> (Self, Cursor) {
-        let mut ordered_nodes = Arena::new();
+        let mut nodes = Arena::new();
 
-        let start_ref = ordered_nodes.alloc(Node {
+        let start_ref = nodes.alloc(Node {
             kind: NodeKind::Start(None),
             source,
         });
 
         (
             Self {
-                ordered_nodes,
+                nodes,
                 const_evals,
                 labels: Vec::new(),
             },
@@ -48,12 +48,12 @@ impl<'const_evals> Builder<'const_evals> {
 
     #[must_use]
     pub fn get(&self, idx: NodeRef) -> &Node {
-        &self.ordered_nodes[idx]
+        &self.nodes[idx]
     }
 
     #[must_use]
     pub fn get_mut(&mut self, idx: NodeRef) -> &mut Node {
-        &mut self.ordered_nodes[idx]
+        &mut self.nodes[idx]
     }
 
     #[must_use]
@@ -67,7 +67,7 @@ impl<'const_evals> Builder<'const_evals> {
             return cursor;
         };
 
-        let new_node_ref = self.ordered_nodes.alloc(Node {
+        let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Sequential(SequentialNode {
                 kind: node,
                 next: None,
@@ -75,7 +75,7 @@ impl<'const_evals> Builder<'const_evals> {
             source,
         });
 
-        connect(&mut self.ordered_nodes, position, new_node_ref);
+        connect(&mut self.nodes, position, new_node_ref);
         CursorPosition::new(new_node_ref, 0).into()
     }
 
@@ -90,7 +90,7 @@ impl<'const_evals> Builder<'const_evals> {
             return (cursor.clone(), cursor);
         };
 
-        let new_node_ref = self.ordered_nodes.alloc(Node {
+        let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Branching(BranchNode {
                 condition,
                 when_true: None,
@@ -99,7 +99,7 @@ impl<'const_evals> Builder<'const_evals> {
             source,
         });
 
-        connect(&mut self.ordered_nodes, position, new_node_ref);
+        connect(&mut self.nodes, position, new_node_ref);
 
         (
             CursorPosition::new(new_node_ref, 0).into(),
@@ -117,12 +117,12 @@ impl<'const_evals> Builder<'const_evals> {
             return cursor;
         };
 
-        let new_node_ref = self.ordered_nodes.alloc(Node {
+        let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Terminating(node),
             source,
         });
 
-        connect(&mut self.ordered_nodes, position, new_node_ref);
+        connect(&mut self.nodes, position, new_node_ref);
         Cursor::terminated()
     }
 
@@ -132,7 +132,7 @@ impl<'const_evals> Builder<'const_evals> {
             return (cursor.clone(), cursor);
         };
 
-        let new_node_ref = self.ordered_nodes.alloc(Node {
+        let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Scope(ScopeNode {
                 inner: None,
                 closed_at: None,
@@ -140,7 +140,7 @@ impl<'const_evals> Builder<'const_evals> {
             source,
         });
 
-        connect(&mut self.ordered_nodes, position, new_node_ref);
+        connect(&mut self.nodes, position, new_node_ref);
 
         (
             CursorPosition::new(new_node_ref, 0).into(),
@@ -167,7 +167,7 @@ impl<'const_evals> Builder<'const_evals> {
         if let (Some(a_position), Some(b_position), Some(a_gives), Some(b_gives)) =
             (&cursor_a.position, &cursor_b.position, a_gives, b_gives)
         {
-            let new_node_ref = self.ordered_nodes.alloc(Node {
+            let new_node_ref = self.nodes.alloc(Node {
                 kind: NodeKind::Sequential(SequentialNode {
                     kind: SequentialNodeKind::JoinN(
                         smallvec![(a_position.clone(), a_gives), (b_position.clone(), b_gives)],
@@ -178,8 +178,8 @@ impl<'const_evals> Builder<'const_evals> {
                 source,
             });
 
-            connect(&mut self.ordered_nodes, a_position.clone(), new_node_ref);
-            connect(&mut self.ordered_nodes, b_position.clone(), new_node_ref);
+            connect(&mut self.nodes, a_position.clone(), new_node_ref);
+            connect(&mut self.nodes, b_position.clone(), new_node_ref);
             return CursorPosition::new(new_node_ref, 0).into();
         }
 
@@ -225,7 +225,7 @@ impl<'const_evals> Builder<'const_evals> {
                 let (a_position, a_gives) = incoming.next().unwrap();
                 let (b_position, b_gives) = incoming.next().unwrap();
 
-                let new_node_ref = self.ordered_nodes.alloc(Node {
+                let new_node_ref = self.nodes.alloc(Node {
                     kind: NodeKind::Sequential(SequentialNode {
                         kind: SequentialNodeKind::JoinN(
                             smallvec![(a_position.clone(), a_gives), (b_position.clone(), b_gives)],
@@ -236,8 +236,8 @@ impl<'const_evals> Builder<'const_evals> {
                     source,
                 });
 
-                connect(&mut self.ordered_nodes, a_position, new_node_ref);
-                connect(&mut self.ordered_nodes, b_position, new_node_ref);
+                connect(&mut self.nodes, a_position, new_node_ref);
+                connect(&mut self.nodes, b_position, new_node_ref);
                 return CursorPosition::new(new_node_ref, 0).into();
             }
             _ => {
@@ -247,7 +247,7 @@ impl<'const_evals> Builder<'const_evals> {
                     .cloned()
                     .collect();
 
-                let new_node_ref = self.ordered_nodes.alloc(Node {
+                let new_node_ref = self.nodes.alloc(Node {
                     kind: NodeKind::Sequential(SequentialNode {
                         kind: SequentialNodeKind::JoinN(incoming, conform_behavior),
                         next: None,
@@ -256,7 +256,7 @@ impl<'const_evals> Builder<'const_evals> {
                 });
 
                 for position in edges {
-                    connect(&mut self.ordered_nodes, position, new_node_ref);
+                    connect(&mut self.nodes, position, new_node_ref);
                 }
                 return CursorPosition::new(new_node_ref, 0).into();
             }
@@ -283,7 +283,7 @@ impl<'const_evals> Builder<'const_evals> {
     #[must_use]
     pub fn finish(self) -> UntypedCfg {
         UntypedCfg {
-            ordered_nodes: self.ordered_nodes,
+            nodes: self.nodes,
             labels: self.labels,
         }
     }

@@ -96,7 +96,7 @@ fn depth_first_search(cfg: &UntypedCfg) -> (Vec<NodeRef>, PostOrderIndexMap, Pre
             break;
         };
 
-        let node = &cfg.ordered_nodes[node_ref];
+        let node = &cfg.nodes[node_ref];
 
         let mut enqueue = |next: Option<NodeRef>| {
             if let Some(next) = next {
