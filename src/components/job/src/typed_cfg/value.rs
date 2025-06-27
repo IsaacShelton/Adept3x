@@ -46,12 +46,20 @@ pub struct BuiltinTypes<'env> {
     pub i64: Type<'env>,
     pub u64: Type<'env>,
     pub f64: Type<'env>,
+    pub never: Type<'env>,
 }
 
 impl<'env> Value<'env> {
-    pub fn ty<'a>(&'a self, types: &'a ArenaMap<NodeId, Resolved<'env>>) -> &'a Type<'env> {
+    pub fn ty<'a>(
+        &'a self,
+        types: &'a ArenaMap<NodeId, Resolved<'env>>,
+        builtin_types: &'a BuiltinTypes<'env>,
+    ) -> &'a Type<'env> {
         match &self.cast_to {
-            Cast::Identity => &types.get(self.node_ref.into_raw()).unwrap().ty,
+            Cast::Identity => types
+                .get(self.node_ref.into_raw())
+                .map(|x| &x.ty)
+                .unwrap_or(&builtin_types.never),
             Cast::Reinterpret(inner) => inner,
             Cast::BuiltinCast(inner) => inner,
         }

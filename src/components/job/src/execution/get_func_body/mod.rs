@@ -158,9 +158,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
         // Annotate each CFG node (may suspend)
         while self.num_processed < cfg.nodes.len() {
-            let node_ref = *post_order
-                .get(post_order.len() - 1 - self.num_processed)
-                .unwrap();
+            // We must process nodes in reverse post-order to ensure proper ordering, lexical
+            // ordering is not enough! Consider `goto` for example.
+            let node_ref = post_order[post_order.len() - 1 - self.num_processed];
             let node = &cfg.nodes[node_ref];
 
             self.types.insert(
@@ -178,7 +178,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
                                 let Some(unified) = unify_types(
                                     None,
-                                    edges.iter().map(|value| value.ty(&self.types)),
+                                    edges
+                                        .iter()
+                                        .map(|value| value.ty(&self.types, self.builtin_types)),
                                     *conform_behavior,
                                     node.source,
                                 ) else {

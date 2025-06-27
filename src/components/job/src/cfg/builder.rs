@@ -63,10 +63,6 @@ impl<'const_evals> Builder<'const_evals> {
         node: SequentialNodeKind,
         source: Source,
     ) -> Cursor {
-        let Some(position) = cursor.position else {
-            return cursor;
-        };
-
         let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Sequential(SequentialNode {
                 kind: node,
@@ -75,7 +71,10 @@ impl<'const_evals> Builder<'const_evals> {
             source,
         });
 
-        connect(&mut self.nodes, position, new_node_ref);
+        if let Some(position) = cursor.position {
+            connect(&mut self.nodes, position, new_node_ref);
+        }
+
         CursorPosition::new(new_node_ref, 0).into()
     }
 
@@ -86,10 +85,6 @@ impl<'const_evals> Builder<'const_evals> {
         condition: NodeRef,
         source: Source,
     ) -> (Cursor, Cursor) {
-        let Some(position) = cursor.position else {
-            return (cursor.clone(), cursor);
-        };
-
         let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Branching(BranchNode {
                 condition,
@@ -99,7 +94,9 @@ impl<'const_evals> Builder<'const_evals> {
             source,
         });
 
-        connect(&mut self.nodes, position, new_node_ref);
+        if let Some(position) = cursor.position {
+            connect(&mut self.nodes, position, new_node_ref);
+        }
 
         (
             CursorPosition::new(new_node_ref, 0).into(),
@@ -113,25 +110,20 @@ impl<'const_evals> Builder<'const_evals> {
         node: TerminatingNode,
         source: Source,
     ) -> Cursor {
-        let Some(position) = cursor.position else {
-            return cursor;
-        };
-
         let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Terminating(node),
             source,
         });
 
-        connect(&mut self.nodes, position, new_node_ref);
+        if let Some(position) = cursor.position {
+            connect(&mut self.nodes, position, new_node_ref);
+        }
+
         Cursor::terminated()
     }
 
     #[must_use]
     pub fn push_scope(&mut self, cursor: Cursor, source: Source) -> (Cursor, Cursor) {
-        let Some(position) = cursor.position else {
-            return (cursor.clone(), cursor);
-        };
-
         let new_node_ref = self.nodes.alloc(Node {
             kind: NodeKind::Scope(ScopeNode {
                 inner: None,
@@ -140,7 +132,9 @@ impl<'const_evals> Builder<'const_evals> {
             source,
         });
 
-        connect(&mut self.nodes, position, new_node_ref);
+        if let Some(position) = cursor.position {
+            connect(&mut self.nodes, position, new_node_ref);
+        }
 
         (
             CursorPosition::new(new_node_ref, 0).into(),

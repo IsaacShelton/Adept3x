@@ -94,6 +94,7 @@ impl<'env> Executable<'env> for BuildAsg<'env> {
                     u64: TypeKind::BitInteger(IntegerBits::Bits64, IntegerSign::Unsigned)
                         .at(Source::internal()),
                     f64: TypeKind::Floating(FloatSize::Bits64).at(Source::internal()),
+                    never: TypeKind::Never.at(Source::internal()),
                 }),
             );
         }
