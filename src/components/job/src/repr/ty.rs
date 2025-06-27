@@ -65,6 +65,10 @@ pub enum TypeKind<'env> {
     UserDefined(UserDefinedType<'env>),
     // Polymorph
     Polymorph(&'env str),
+    // Goto Label
+    DirectLabel(&'env str),
+    // NOTE: Once we want to support computed GOTOs, we can add the following:
+    // IndirectLabel(&'env [&'env str]),
 }
 
 impl<'env> TypeKind<'env> {
@@ -147,6 +151,9 @@ impl<'env> Display for TypeKind<'env> {
                 Ok(())
             }
             TypeKind::Polymorph(polymorph) => write!(f, "${}", polymorph),
+            // NOTE: Direct labels are not "real types". They are zero-sized, compile-time-known,
+            // and can't be named, returned, etc.
+            TypeKind::DirectLabel(name) => write!(f, "@{}@", name),
         }
     }
 }

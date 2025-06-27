@@ -20,6 +20,11 @@ pub fn unify_types<'a, 't, 'env: 'a + 't>(
 ) -> Option<Type<'env>> {
     let types_iter = types_iter.filter(|ty| !ty.kind.is_never());
 
+    // If unreachable, the unifying type is the never type
+    if types_iter.clone().next().is_none() {
+        return Some(TypeKind::Never.at(source));
+    }
+
     // If all the values have the same type, the unifying type is that type
     if types_iter.clone().all_equal() {
         return Some(

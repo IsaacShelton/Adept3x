@@ -1,11 +1,11 @@
 use super::{
-    BranchNode, ConstEval, ConstEvalId, ConstEvalRef, IsValue, Node, NodeId, NodeKind, NodeRef,
-    SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg, connect,
+    BranchNode, ConstEval, ConstEvalId, ConstEvalRef, IsValue, Label, Node, NodeId, NodeKind,
+    NodeRef, ScopeNode, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg, connect,
     cursor::{Cursor, CursorPosition},
     flatten_expr,
 };
-use crate::{ConformBehavior, Expr};
 use arena::Arena;
+use ast::{ConformBehavior, Expr};
 use smallvec::smallvec;
 use source_files::Source;
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ use std_ext::SmallVec2;
 #[derive(Debug)]
 pub struct Builder<'const_evals> {
     pub ordered_nodes: Arena<NodeId, Node>,
-    pub labels: Vec<(String, NodeRef)>,
+    pub labels: Vec<Label>,
     const_evals: &'const_evals mut Arena<ConstEvalId, ConstEval>,
 }
 
@@ -124,6 +124,28 @@ impl<'const_evals> Builder<'const_evals> {
 
         connect(&mut self.ordered_nodes, position, new_node_ref);
         Cursor::terminated()
+    }
+
+    #[must_use]
+    pub fn push_scope(&mut self, cursor: Cursor, source: Source) -> (Cursor, Cursor) {
+        let Some(position) = cursor.position else {
+            return (cursor.clone(), cursor);
+        };
+
+        let new_node_ref = self.ordered_nodes.alloc(Node {
+            kind: NodeKind::Scope(ScopeNode {
+                inner: None,
+                closed_at: None,
+            }),
+            source,
+        });
+
+        connect(&mut self.ordered_nodes, position, new_node_ref);
+
+        (
+            CursorPosition::new(new_node_ref, 0).into(),
+            CursorPosition::new(new_node_ref, 1).into(),
+        )
     }
 
     #[must_use]
@@ -249,14 +271,20 @@ impl<'const_evals> Builder<'const_evals> {
             cursor = flatten_expr(&mut builder, cursor, expr, IsValue::RequireValue);
             let value = cursor.value();
             let _ = builder.push_terminating(cursor, TerminatingNode::Computed(value), source);
-            UntypedCfg {
-                ordered_nodes: builder.ordered_nodes,
-            }
+            builder.finish()
         };
 
         self.const_evals.alloc(ConstEval {
             context: HashMap::default(),
             cfg,
         })
+    }
+
+    #[must_use]
+    pub fn finish(self) -> UntypedCfg {
+        UntypedCfg {
+            ordered_nodes: self.ordered_nodes,
+            labels: self.labels,
+        }
     }
 }

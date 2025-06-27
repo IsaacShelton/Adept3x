@@ -9,7 +9,8 @@ pub enum StmtKind {
     Declaration(Box<Declaration>),
     Assignment(Box<Assignment>),
     Label(String),
-    Goto(Expr),
+    // NOTE: This should eventually be an Expr to support computed gotos
+    Goto(String),
 }
 
 impl StmtKind {

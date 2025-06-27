@@ -516,6 +516,9 @@ pub fn resolve_expr(
         ast::ExprKind::Is(..) => {
             unimplemented!("legacy resolution of `is` expression");
         }
+        ast::ExprKind::LabelLiteral(..) => {
+            unimplemented!("legacy resolution of label expression");
+        }
     }?;
 
     Ok(resolved_expr)

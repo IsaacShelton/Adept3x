@@ -1,16 +1,16 @@
 use super::{
-    ConstEval, ConstEvalId, IsValue, Node, NodeCall, NodeFieldInitializer, NodeInterpreterSyscall,
-    NodeKind, NodeRef, NodeStaticMemberCall, NodeStructLiteral, NodeTypeArg, SequentialNode,
-    SequentialNodeKind, TerminatingNode, UntypedCfg,
+    ConstEval, ConstEvalId, IsValue, Label, Node, NodeCall, NodeFieldInitializer,
+    NodeInterpreterSyscall, NodeKind, NodeRef, NodeStaticMemberCall, NodeStructLiteral,
+    NodeTypeArg, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
     builder::Builder,
     connect,
     cursor::{Cursor, CursorPosition},
 };
-use crate::{
+use arena::Arena;
+use ast::{
     Call, ConformBehavior, Expr, ExprKind, Language, Params, ShortCircuitingBinaryOperator, Stmt,
     StmtKind, TypeArg,
 };
-use arena::Arena;
 use smallvec::smallvec;
 use source_files::Source;
 
@@ -47,10 +47,7 @@ pub fn flatten_func(
 
     cursor = flatten_stmts(&mut builder, cursor, stmts, IsValue::NeglectValue);
     let _ = builder.push_terminating(cursor, TerminatingNode::Return(None), source);
-
-    UntypedCfg {
-        ordered_nodes: builder.ordered_nodes,
-    }
+    builder.finish()
 }
 
 #[must_use]
@@ -142,12 +139,18 @@ pub fn flatten_stmt(
             }
 
             let position = CursorPosition::new(new_node_ref, 0);
-            builder.labels.push((name, position.from));
+            builder.labels.push(Label {
+                name,
+                node_ref: position.from,
+                source: stmt.source,
+            });
             Cursor::from(position)
         }
-        StmtKind::Goto(name) => {
-            todo!("flatten_stmt Goto")
-        }
+        StmtKind::Goto(label_name) => builder.push_sequential(
+            cursor,
+            SequentialNodeKind::DirectGoto(label_name),
+            stmt.source,
+        ),
     }
 }
 
@@ -469,11 +472,11 @@ pub fn flatten_expr(
             // In this case, we recommend moving the exclusive code path after the
             // conditional to make this dependency clearer to the reader.
             // See `&&` for a conditional which doesn't have this behavior.
-            cursor = builder.push_sequential(cursor, SequentialNodeKind::Never, expr.source);
-            let Some(never) = cursor.value() else {
+            let (mut cursor, close_cursor) = builder.push_scope(cursor, expr.source);
+            let Some(never) = close_cursor.value() else {
                 return cursor;
             };
-            incoming.push((cursor, Some(never)));
+            incoming.push((close_cursor, Some(never)));
 
             let no_result = match is_value {
                 IsValue::RequireValue => None,
@@ -656,6 +659,9 @@ pub fn flatten_expr(
             };
 
             builder.push_sequential(cursor, SequentialNodeKind::Is(value, variant), expr.source)
+        }
+        ExprKind::LabelLiteral(name) => {
+            builder.push_sequential(cursor, SequentialNodeKind::LabelLiteral(name), expr.source)
         }
     }
 }

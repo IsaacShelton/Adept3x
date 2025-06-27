@@ -24,6 +24,7 @@ diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
 enum_dispatch.workspace = true
 fs_tree = { version = "0.1.0", path = "../../representations/fs_tree" }
 indexmap.workspace = true
+interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }
 ir = { version = "0.1.0", path = "../../representations/ir" }
 itertools.workspace = true
 num-bigint.workspace = true

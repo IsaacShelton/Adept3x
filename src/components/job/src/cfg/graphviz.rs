@@ -1,5 +1,4 @@
-use super::{UntypedCfg, label::Label};
-use crate::{Node, NodeId, NodeKind, NodeRef};
+use super::{Node, NodeId, NodeKind, NodeRef, UntypedCfg, human_label::HumanLabel};
 use arena::{Id, Idx};
 use indexmap::IndexMap;
 use std::collections::VecDeque;
@@ -46,6 +45,15 @@ impl UntypedCfg {
                 NodeKind::Branching(branch_node) => {
                     explore(&mut queue, node_ref, branch_node.when_true, "true".into());
                     explore(&mut queue, node_ref, branch_node.when_false, "false".into());
+                }
+                NodeKind::Scope(scope_node) => {
+                    explore(&mut queue, node_ref, scope_node.inner, "always".into());
+                    explore(
+                        &mut queue,
+                        node_ref,
+                        scope_node.closed_at,
+                        "closed_at".into(),
+                    );
                 }
                 NodeKind::Terminating(_) => (),
             }

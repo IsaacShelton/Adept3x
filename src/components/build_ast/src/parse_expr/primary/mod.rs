@@ -306,6 +306,10 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 self.input.advance().kind.unwrap_continue_keyword();
                 Ok(ExprKind::Continue.at(source))
             }
+            TokenKind::Label(_) => {
+                let name = self.input.advance().kind.unwrap_label();
+                Ok(ExprKind::LabelLiteral(name).at(source))
+            }
             unexpected => Err(ParseError {
                 kind: match unexpected {
                     TokenKind::Error(message) => ParseErrorKind::Lexical {

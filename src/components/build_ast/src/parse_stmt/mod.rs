@@ -1,5 +1,6 @@
 mod parse_assignment;
 mod parse_declaration;
+mod parse_goto;
 mod parse_return;
 
 use super::{
@@ -44,6 +45,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 ()
             }
             TokenKind::ReturnKeyword => return self.parse_return(),
+            TokenKind::GotoKeyword => return self.parse_goto(),
             TokenKind::Label(_) => {
                 let name = self.input.advance().kind.unwrap_label();
                 return Ok(StmtKind::Label(name).at(source));

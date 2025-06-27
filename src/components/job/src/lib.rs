@@ -52,6 +52,7 @@ macro_rules! suspend_many_assoc {
 
 mod allocator;
 mod artifact;
+mod cfg;
 mod conform;
 mod continuation;
 mod execution;

@@ -1,7 +1,9 @@
 use super::Resolved;
-use crate::repr::Type;
-use arena::Id;
-use ast::NodeRef;
+use crate::{
+    cfg::{NodeId, NodeRef},
+    repr::Type,
+};
+use arena::ArenaMap;
 
 #[derive(Clone, Debug)]
 pub struct Value<'env> {
@@ -47,9 +49,9 @@ pub struct BuiltinTypes<'env> {
 }
 
 impl<'env> Value<'env> {
-    pub fn ty<'a>(&'a self, types: &'a [Resolved<'env>]) -> &'a Type<'env> {
+    pub fn ty<'a>(&'a self, types: &'a ArenaMap<NodeId, Resolved<'env>>) -> &'a Type<'env> {
         match &self.cast_to {
-            Cast::Identity => &types[self.node_ref.into_raw().into_usize()].ty,
+            Cast::Identity => &types.get(self.node_ref.into_raw()).unwrap().ty,
             Cast::Reinterpret(inner) => inner,
             Cast::BuiltinCast(inner) => inner,
         }

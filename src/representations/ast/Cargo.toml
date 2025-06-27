@@ -9,6 +9,7 @@ arena = { version = "0.1.0", path = "../../support/arena" }
 ast_workspace_settings = { version = "0.1.0", path = "../ast_workspace_settings" }
 attributes = { version = "0.1.0", path = "../attributes" }
 derive_more.workspace = true
+diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
 fs_tree = { version = "0.1.0", path = "../fs_tree" }
 indexmap.workspace = true
 interpreter_api = { version = "0.1.0", path = "../interpreter_api" }

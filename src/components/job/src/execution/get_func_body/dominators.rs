@@ -1,12 +1,14 @@
+use crate::cfg::{NodeId, NodeKind, NodeRef, UntypedCfg};
 use arena::{ArenaMap, Id};
-use ast::{NodeId, NodeKind, NodeRef, UntypedCfg};
 use bit_vec::BitVec;
 use std::{
     cmp::Ordering,
     collections::{HashSet, VecDeque},
 };
 
-pub fn compute_idom_tree(cfg: &UntypedCfg) -> ArenaMap<NodeId, NodeRef> {
+pub type PostOrder = Vec<NodeRef>;
+
+pub fn compute_idom_tree(cfg: &UntypedCfg) -> (ArenaMap<NodeId, NodeRef>, PostOrder) {
     let start = cfg.start();
     let (post_order, post_order_map, pred_sets) = depth_first_search(cfg);
 
@@ -46,7 +48,7 @@ pub fn compute_idom_tree(cfg: &UntypedCfg) -> ArenaMap<NodeId, NodeRef> {
         }
     }
 
-    dominators
+    (dominators, post_order)
 }
 
 fn intersect(
@@ -126,6 +128,7 @@ fn depth_first_search(cfg: &UntypedCfg) -> (Vec<NodeRef>, PostOrderIndexMap, Pre
             NodeKind::Sequential(seq) => enqueue(seq.next),
             NodeKind::Branching(branch) => enqueue(branch.when_true) || enqueue(branch.when_false),
             NodeKind::Terminating(_) => false,
+            NodeKind::Scope(scope) => enqueue(scope.inner) || enqueue(scope.closed_at),
         };
 
         if !pending {

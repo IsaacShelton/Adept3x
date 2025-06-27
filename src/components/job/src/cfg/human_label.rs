@@ -1,28 +1,29 @@
 use super::{BranchNode, Node, NodeKind, SequentialNodeKind, TerminatingNode};
 use std::borrow::Cow;
 
-pub trait Label {
+pub trait HumanLabel {
     fn label(&self) -> Cow<str>;
 }
 
-impl Label for Node {
+impl HumanLabel for Node {
     fn label(&self) -> Cow<str> {
         self.kind.label()
     }
 }
 
-impl Label for NodeKind {
+impl HumanLabel for NodeKind {
     fn label(&self) -> Cow<str> {
         match self {
             NodeKind::Start(_) => "start".into(),
             NodeKind::Sequential(sequential_node) => sequential_node.kind.label(),
             NodeKind::Branching(branch_node) => branch_node.label(),
             NodeKind::Terminating(terminating_node) => terminating_node.label(),
+            NodeKind::Scope(_) => "scope".into(),
         }
     }
 }
 
-impl Label for SequentialNodeKind {
+impl HumanLabel for SequentialNodeKind {
     fn label(&self) -> Cow<str> {
         match self {
             SequentialNodeKind::Join1(..) => "join_1".into(),
@@ -42,7 +43,6 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::NullTerminatedString(..) => "c-string".into(),
             SequentialNodeKind::Null => "null".into(),
             SequentialNodeKind::Void => "void".into(),
-            SequentialNodeKind::Never => "never".into(),
             SequentialNodeKind::Call(..) => "call".into(),
             SequentialNodeKind::DeclareAssign(name, _) => format!("declare_assign {}", name).into(),
             SequentialNodeKind::Member(..) => "member".into(),
@@ -58,17 +58,19 @@ impl Label for SequentialNodeKind {
             SequentialNodeKind::StaticAssert(..) => "static_assert".into(),
             SequentialNodeKind::ConformToBool(..) => "conform_to_bool".into(),
             SequentialNodeKind::Is(_, variant) => format!("is {}", variant).into(),
+            SequentialNodeKind::DirectGoto(_) => "goto".into(),
+            SequentialNodeKind::LabelLiteral(_) => "label literal".into(),
         }
     }
 }
 
-impl Label for BranchNode {
+impl HumanLabel for BranchNode {
     fn label(&self) -> Cow<str> {
         "branch".into()
     }
 }
 
-impl Label for TerminatingNode {
+impl HumanLabel for TerminatingNode {
     fn label(&self) -> Cow<str> {
         match self {
             TerminatingNode::Return(_) => "return".into(),

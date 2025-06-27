@@ -1,5 +1,4 @@
 mod block;
-mod cfg;
 mod conforming;
 mod datatype;
 mod enumeration;
@@ -18,7 +17,6 @@ mod type_alias;
 mod type_params;
 
 pub use block::*;
-pub use cfg::*;
 pub use conforming::*;
 pub use datatype::*;
 pub use enumeration::*;

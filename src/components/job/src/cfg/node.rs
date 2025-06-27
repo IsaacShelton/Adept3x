@@ -1,14 +1,14 @@
-use super::{ConstEvalRef, NodeId, NodeRef, UntypedCfg, cursor::CursorPosition};
-use crate::{
-    BasicBinaryOperator, ConformBehavior, FillBehavior, Integer, Language, StaticMemberValue, Type,
-    UnaryOperator, Using,
-};
+use super::{ConstEvalRef, CursorPosition, NodeId, NodeRef};
+use crate::cfg::UntypedCfg;
 use arena::Arena;
+use ast::{
+    BasicBinaryOperator, ConformBehavior, FillBehavior, Integer, Language, Name, StaticMemberValue,
+    Type, UnaryOperator, Using,
+};
 use attributes::Privacy;
 use source_files::Source;
 use std::{ffi::CString, fmt::Debug};
 use std_ext::SmallVec2;
-use token::Name;
 
 #[derive(Clone)]
 pub struct Node {
@@ -38,6 +38,11 @@ pub fn connect(nodes: &mut Arena<NodeId, Node>, from: CursorPosition, to: NodeRe
             0 => branch.when_true = Some(to),
             1 => branch.when_false = Some(to),
             _ => panic!("invalid from edge index for branching node"),
+        },
+        NodeKind::Scope(scope) => match from.edge_index {
+            0 => scope.inner = Some(to),
+            1 => scope.closed_at = Some(to),
+            _ => panic!("invalid from edge index for scope node"),
         },
         NodeKind::Terminating(_) => panic!("cannot connect terminating node"),
     }
@@ -81,7 +86,6 @@ pub enum SequentialNodeKind {
     NullTerminatedString(CString),
     Null,
     Void,
-    Never,
     Call(Box<NodeCall>),
     DeclareAssign(String, NodeRef),
     Member(NodeRef, String, Privacy),
@@ -97,6 +101,8 @@ pub enum SequentialNodeKind {
     StaticAssert(ConstEvalRef, Option<String>),
     ConformToBool(NodeRef, Language),
     Is(NodeRef, String),
+    DirectGoto(String),
+    LabelLiteral(String),
 }
 
 #[allow(dead_code)]
@@ -138,12 +144,6 @@ pub struct NodeFieldInitializer {
 }
 
 #[derive(Clone, Debug)]
-pub struct NodeDeclareAssign {
-    pub name: String,
-    pub value: NodeRef,
-}
-
-#[derive(Clone, Debug)]
 pub struct NodeInterpreterSyscall {
     pub kind: interpreter_api::Syscall,
     pub args: Vec<(Type, NodeRef)>,
@@ -166,10 +166,18 @@ pub enum TerminatingNode {
     Continue,
 }
 
+// A fake branch used only for variable scoping
+#[derive(Clone, Debug)]
+pub struct ScopeNode {
+    pub inner: Option<NodeRef>,
+    pub closed_at: Option<NodeRef>,
+}
+
 #[derive(Clone, Debug)]
 pub enum NodeKind {
     Start(Option<NodeRef>),
     Sequential(SequentialNode),
     Branching(BranchNode),
+    Scope(ScopeNode),
     Terminating(TerminatingNode),
 }
