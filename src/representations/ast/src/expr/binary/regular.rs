@@ -1,4 +1,4 @@
-use crate::expr::Expr;
+use crate::{Language, expr::Expr};
 use derive_more::IsVariant;
 use std::fmt::Display;
 
@@ -7,6 +7,7 @@ pub struct BasicBinaryOperation {
     pub operator: BasicBinaryOperator,
     pub left: Expr,
     pub right: Expr,
+    pub language: Language,
 }
 
 #[derive(Clone, Debug, IsVariant)]

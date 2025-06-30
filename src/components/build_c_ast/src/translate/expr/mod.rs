@@ -9,6 +9,7 @@ use self::{
 };
 use super::TranslateCtx;
 use crate::parse::ParseError;
+use ast::Language;
 use c_ast::{BinaryOperator, Expr, ExprKind};
 
 pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, ParseError> {
@@ -67,6 +68,7 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
                         operator,
                         left,
                         right,
+                        language: Language::C,
                     }))
                 }
                 ast::BinaryOperator::ShortCircuiting(operator) => {

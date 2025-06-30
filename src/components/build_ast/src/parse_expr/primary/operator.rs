@@ -1,7 +1,7 @@
 use super::{Parser, is_right_associative, is_terminating_token};
 use crate::error::ParseError;
 use ast::{
-    BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind,
+    BasicBinaryOperation, BasicBinaryOperator, BinaryOperator, Expr, ExprKind, Language,
     ShortCircuitingBinaryOperation, ShortCircuitingBinaryOperator,
 };
 use infinite_iterator::InfinitePeekable;
@@ -72,6 +72,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     operator: basic_operator,
                     left: lhs,
                     right: rhs,
+                    language: Language::Adept,
                 }))
             }
             BinaryOperator::ShortCircuiting(short_circuiting_operator) => {

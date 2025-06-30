@@ -24,6 +24,7 @@ impl Name {
         }
     }
 
+    #[inline]
     pub fn into_plain(self) -> Option<String> {
         if self.namespace.is_empty() {
             Some(self.basename.to_string())
@@ -32,6 +33,7 @@ impl Name {
         }
     }
 
+    #[inline]
     pub fn as_plain_str(&self) -> Option<&str> {
         if self.namespace.is_empty() {
             Some(&self.basename)

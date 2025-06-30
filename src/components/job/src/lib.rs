@@ -50,6 +50,16 @@ macro_rules! suspend_many_assoc {
     }};
 }
 
+macro_rules! sub_task_suspend {
+    ($self:ident, $field:ident, $task_ref:expr, $ctx:expr) => {{
+        let pending = $task_ref;
+
+        $ctx.suspend_on(::std::iter::once(pending.raw_task_ref()));
+        $self.$field = Some(pending);
+        Err(Ok(()))
+    }};
+}
+
 mod allocator;
 mod artifact;
 mod cfg;
@@ -61,6 +71,7 @@ mod executor;
 mod main_executor;
 mod pending;
 mod repr;
+mod sub_task;
 mod suspend_condition;
 mod task;
 mod task_state;

@@ -328,7 +328,7 @@ pub fn flatten_expr(
             if let Some((left, right)) = left.zip(right) {
                 builder.push_sequential(
                     cursor,
-                    SequentialNodeKind::BinOp(left, bin_op.operator, right),
+                    SequentialNodeKind::BinOp(left, bin_op.operator, right, bin_op.language),
                     expr.source,
                 )
             } else {

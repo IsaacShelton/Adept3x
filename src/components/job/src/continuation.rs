@@ -25,3 +25,12 @@ impl<'env> Continuation<'env> {
         Self::Suspend(execution.into())
     }
 }
+
+impl<'env> From<Result<Execution<'env>, ErrorDiagnostic>> for Continuation<'env> {
+    fn from(value: Result<Execution<'env>, ErrorDiagnostic>) -> Self {
+        match value {
+            Ok(ok) => ok.into(),
+            Err(err) => err.into(),
+        }
+    }
+}

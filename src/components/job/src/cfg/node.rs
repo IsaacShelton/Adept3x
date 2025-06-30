@@ -76,7 +76,7 @@ pub enum SequentialNodeKind {
     Parameter(String, Type, usize),
     Declare(String, Type, Option<NodeRef>),
     Assign(NodeRef, NodeRef),
-    BinOp(NodeRef, BasicBinaryOperator, NodeRef),
+    BinOp(NodeRef, BasicBinaryOperator, NodeRef, Language),
     Boolean(bool),
     Integer(Integer),
     Float(f64),
