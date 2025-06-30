@@ -60,17 +60,21 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                     kind: SequentialNodeKind::Declare(_, expected_var_ty, Some(value)),
                     ..
                 }) => {
-                    let Some(fulfilled) = &mut self.waiting_on_type.take() else {
-                        let t = ResolveType::<'env>::new(
-                            user_data.workspace,
-                            expected_var_ty,
-                            user_data.decl_scope,
+                    let Some(fulfilled) = self.waiting_on_type.take() else {
+                        return sub_task_suspend!(
+                            self,
+                            waiting_on_type,
+                            executor.request(ResolveType::new(
+                                user_data.workspace,
+                                expected_var_ty,
+                                user_data.decl_scope,
+                            )),
+                            ctx
                         );
-                        return sub_task_suspend!(self, waiting_on_type, executor.request(t), ctx);
                     };
 
                     preferred_types
-                        .insert(value.into_raw(), executor.demand(Some(*fulfilled)).unwrap());
+                        .insert(value.into_raw(), executor.demand(Some(fulfilled)).unwrap());
                 }
                 NodeKind::Sequential(SequentialNode {
                     kind: SequentialNodeKind::Join1(value),
@@ -120,7 +124,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                 }
                 NodeKind::Sequential(..) => (),
                 NodeKind::Terminating(TerminatingNode::Return(Some(value))) => {
-                    let Some(fulfilled) = &mut self.waiting_on_type.take() else {
+                    let Some(fulfilled) = self.waiting_on_type.take() else {
                         return sub_task_suspend!(
                             self,
                             waiting_on_type,
@@ -134,7 +138,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                     };
 
                     preferred_types
-                        .insert(value.into_raw(), executor.demand(Some(*fulfilled)).unwrap());
+                        .insert(value.into_raw(), executor.demand(Some(fulfilled)).unwrap());
                 }
                 NodeKind::Branching(branch) => {
                     preferred_types
