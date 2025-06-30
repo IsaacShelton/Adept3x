@@ -21,7 +21,9 @@ pub enum IsValue {
     NeglectValue,
 }
 
-new_id_with_niche!(NodeId, u64);
+// If a single function has more than 4 billion nodes, we might have a problem.
+// This should never happen though, so we will take the 50% space bonus instead.
+new_id_with_niche!(NodeId, u32);
 pub type NodeRef = Idx<NodeId, Node>;
 
 #[derive(Clone, Debug)]
