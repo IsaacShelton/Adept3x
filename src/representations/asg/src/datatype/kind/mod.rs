@@ -11,9 +11,7 @@ pub use fixed_array::FixedArray;
 pub use func_ptr::FuncPtr;
 use num::{BigInt, Zero};
 use ordered_float::NotNan;
-use primitives::{
-    CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, NumericMode, fmt_c_integer,
-};
+use primitives::{CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, fmt_c_integer};
 use source_files::Source;
 use std::{borrow::Cow, fmt::Display};
 use target::Target;
@@ -117,21 +115,6 @@ impl TypeKind {
                 asg.type_aliases[*type_alias_ref].params.len()
             }
             _ => 0,
-        }
-    }
-
-    pub fn numeric_mode(unified_type: &Type) -> Option<NumericMode> {
-        match &unified_type.kind {
-            TypeKind::Integer(_, sign) => Some(NumericMode::Integer(*sign)),
-            TypeKind::CInteger(c_integer, sign) => {
-                if let Some(sign) = sign {
-                    Some(NumericMode::Integer(*sign))
-                } else {
-                    Some(NumericMode::LooseIndeterminateSignInteger(*c_integer))
-                }
-            }
-            TypeKind::Floating(_) => Some(NumericMode::Float),
-            _ => None,
         }
     }
 

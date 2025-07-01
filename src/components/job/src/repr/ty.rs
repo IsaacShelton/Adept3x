@@ -4,7 +4,9 @@ use derivative::Derivative;
 use derive_more::IsVariant;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
-use primitives::{CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, fmt_c_integer};
+use primitives::{
+    CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, NumericMode, fmt_c_integer,
+};
 use source_files::Source;
 use std::fmt::Display;
 
@@ -16,6 +18,12 @@ pub struct Type<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(PartialEq = "ignore")]
     pub source: Source,
+}
+
+impl<'env> Type<'env> {
+    pub fn numeric_mode(&self) -> Option<NumericMode> {
+        self.kind.numeric_mode()
+    }
 }
 
 impl<'env> Display for Type<'env> {
@@ -84,6 +92,19 @@ impl<'env> TypeKind<'env> {
                 | Self::CInteger(..)
                 | Self::SizeInteger(..)
         )
+    }
+
+    pub fn numeric_mode(&self) -> Option<NumericMode> {
+        match self {
+            Self::BitInteger(_, sign) => Some(NumericMode::Integer(*sign)),
+            Self::CInteger(c_integer, sign) => Some(if let Some(sign) = sign {
+                NumericMode::Integer(*sign)
+            } else {
+                NumericMode::LooseIndeterminateSignInteger(*c_integer)
+            }),
+            Self::Floating(_) => Some(NumericMode::Float),
+            _ => None,
+        }
     }
 }
 

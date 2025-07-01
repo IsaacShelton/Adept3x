@@ -1,6 +1,10 @@
-use crate::{Resolved, repr::TypeKind};
+use crate::{
+    BasicBinaryOperator, Resolved,
+    repr::{Type, TypeKind},
+};
 use diagnostics::ErrorDiagnostic;
 use num_bigint::{BigInt, Sign};
+use primitives::{FloatOrInteger, FloatOrSignLax, IntegerSign, SignOrIndeterminate};
 use source_files::Source;
 
 pub fn resolve_basic_binary_operation_expr_on_literals<'env>(
@@ -100,4 +104,105 @@ pub fn resolve_basic_binary_operation_expr_on_literals<'env>(
     Ok(Resolved::from_type(
         TypeKind::IntegerLiteral(result).at(source),
     ))
+}
+
+pub fn resolve_basic_binary_operator(
+    ast_operator: &ast::BasicBinaryOperator,
+    ty: &Type,
+    source: Source,
+) -> Result<BasicBinaryOperator, ErrorDiagnostic> {
+    let resolved_operator = match ast_operator {
+        ast::BasicBinaryOperator::Add => ty.numeric_mode().map(BasicBinaryOperator::Add),
+        ast::BasicBinaryOperator::Subtract => ty.numeric_mode().map(BasicBinaryOperator::Subtract),
+        ast::BasicBinaryOperator::Multiply => ty.numeric_mode().map(BasicBinaryOperator::Multiply),
+        ast::BasicBinaryOperator::Divide => {
+            float_or_sign_lax_from_type(ty, false).map(BasicBinaryOperator::Divide)
+        }
+        ast::BasicBinaryOperator::Modulus => {
+            float_or_sign_lax_from_type(ty, false).map(BasicBinaryOperator::Modulus)
+        }
+        ast::BasicBinaryOperator::Equals => {
+            float_or_integer_from_type(ty, true).map(BasicBinaryOperator::Equals)
+        }
+        ast::BasicBinaryOperator::NotEquals => {
+            float_or_integer_from_type(ty, true).map(BasicBinaryOperator::NotEquals)
+        }
+        ast::BasicBinaryOperator::LessThan => {
+            float_or_sign_lax_from_type(ty, false).map(BasicBinaryOperator::LessThan)
+        }
+        ast::BasicBinaryOperator::LessThanEq => {
+            float_or_sign_lax_from_type(ty, false).map(BasicBinaryOperator::LessThanEq)
+        }
+        ast::BasicBinaryOperator::GreaterThan => {
+            float_or_sign_lax_from_type(ty, false).map(BasicBinaryOperator::GreaterThan)
+        }
+        ast::BasicBinaryOperator::GreaterThanEq => {
+            float_or_sign_lax_from_type(ty, false).map(BasicBinaryOperator::GreaterThanEq)
+        }
+        ast::BasicBinaryOperator::BitwiseAnd => {
+            (ty.kind.is_integer() || ty.kind.is_c_integer() || ty.kind.is_boolean())
+                .then_some(BasicBinaryOperator::BitwiseAnd)
+        }
+        ast::BasicBinaryOperator::BitwiseOr => {
+            (ty.kind.is_integer() || ty.kind.is_c_integer() || ty.kind.is_boolean())
+                .then_some(BasicBinaryOperator::BitwiseOr)
+        }
+        ast::BasicBinaryOperator::BitwiseXor => (ty.kind.is_integer() || ty.kind.is_c_integer())
+            .then_some(BasicBinaryOperator::BitwiseXor),
+        ast::BasicBinaryOperator::LeftShift | ast::BasicBinaryOperator::LogicalLeftShift => {
+            (ty.kind.is_integer() || ty.kind.is_c_integer())
+                .then_some(BasicBinaryOperator::LogicalLeftShift)
+        }
+        ast::BasicBinaryOperator::RightShift => match ty.kind {
+            TypeKind::BitInteger(_, sign) => Some(BasicBinaryOperator::ArithmeticRightShift(
+                SignOrIndeterminate::Sign(sign),
+            )),
+            TypeKind::CInteger(c_integer, sign) => Some(if let Some(sign) = sign {
+                BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Sign(sign))
+            } else {
+                BasicBinaryOperator::ArithmeticRightShift(SignOrIndeterminate::Indeterminate(
+                    c_integer,
+                ))
+            }),
+            _ => None,
+        },
+        ast::BasicBinaryOperator::LogicalRightShift => (ty.kind.is_integer()
+            || ty.kind.is_c_integer())
+        .then_some(BasicBinaryOperator::LogicalRightShift),
+    };
+
+    resolved_operator.ok_or_else(|| {
+        ErrorDiagnostic::new(
+            format!("Cannot perform '{}' on '{}'", ast_operator, ty),
+            source,
+        )
+    })
+}
+
+fn float_or_sign_lax_from_type(
+    unified_type: &Type,
+    allow_on_bools: bool,
+) -> Option<FloatOrSignLax> {
+    match &unified_type.kind {
+        TypeKind::Boolean if allow_on_bools => Some(FloatOrSignLax::Integer(IntegerSign::Unsigned)),
+        TypeKind::BitInteger(_, sign) => Some(FloatOrSignLax::Integer(*sign)),
+        TypeKind::CInteger(c_integer, sign) => {
+            if let Some(sign) = sign {
+                Some(FloatOrSignLax::Integer(*sign))
+            } else {
+                Some(FloatOrSignLax::IndeterminateInteger(*c_integer))
+            }
+        }
+        TypeKind::Floating(_) => Some(FloatOrSignLax::Float),
+        _ => None,
+    }
+}
+
+fn float_or_integer_from_type(unified_type: &Type, allow_on_bools: bool) -> Option<FloatOrInteger> {
+    match &unified_type.kind {
+        TypeKind::Boolean if allow_on_bools => Some(FloatOrInteger::Integer),
+        TypeKind::BitInteger(..) | TypeKind::CInteger(..) => Some(FloatOrInteger::Integer),
+        TypeKind::Floating(_) => Some(FloatOrInteger::Float),
+        _ => None,
+    }
 }

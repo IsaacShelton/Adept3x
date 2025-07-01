@@ -4,8 +4,8 @@ mod dominators;
 
 use super::Executable;
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, ResolveType, Resolved, Suspend,
-    SuspendMany, Value,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, ResolveType, Resolved, ResolvedData,
+    Suspend, SuspendMany, Value,
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, UntypedCfg,
         flatten_func_ignore_const_evals,
@@ -18,7 +18,9 @@ use crate::{
 use arena::ArenaMap;
 use ast::ConformBehavior;
 use ast_workspace::{AstWorkspace, FuncRef};
-use basic_bin_op::resolve_basic_binary_operation_expr_on_literals;
+use basic_bin_op::{
+    resolve_basic_binary_operation_expr_on_literals, resolve_basic_binary_operator,
+};
 use by_address::ByAddress;
 use compute_preferred_types::{ComputePreferredTypes, ComputePreferredTypesUserData};
 use derivative::Derivative;
@@ -135,8 +137,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         let def = &self.workspace.symbols.all_funcs[self.func_ref];
 
         // 1) Compute control flow graph
-        let cfg = match &mut self.cfg {
-            Some(value) => *value,
+        let cfg = match self.cfg {
+            Some(value) => value,
             None => self.cfg.insert(
                 ctx.alloc(
                     flatten_func_ignore_const_evals(
@@ -330,32 +332,18 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 .into());
                             };
 
-                            dbg!(preferred_type, unified_type);
+                            let operator =
+                                resolve_basic_binary_operator(bin_op, &unified_type, node.source)
+                                    .map_err(Continuation::Error)?;
 
-                            /*
-                                let operator =
-                                    resolve_basic_binary_operator(ctx, &binary_operation.operator, &unified_type, source)?;
+                            dbg!(&preferred_type, &unified_type, &operator);
+                            let result_type = if bin_op.returns_boolean() {
+                                self.builtin_types.bool.kind.clone().at(node.source)
+                            } else {
+                                unified_type
+                            };
 
-                                let result_type = if binary_operation.operator.returns_boolean() {
-                                    asg::TypeKind::Boolean.at(source)
-                                } else {
-                                    unified_type
-                                };
-
-                                Ok(TypedExpr::new(
-                                    result_type,
-                                    asg::Expr::new(
-                                        asg::ExprKind::BasicBinaryOperation(Box::new(asg::BasicBinaryOperation {
-                                            operator,
-                                            left,
-                                            right,
-                                        })),
-                                        source,
-                                    ),
-                                ))
-                            */
-
-                            unimplemented!("BinOp non-constant")
+                            Resolved::new(result_type, ResolvedData::BasicBinaryOperator(operator))
                         }
                     }
                     SequentialNodeKind::Boolean(value) => {
