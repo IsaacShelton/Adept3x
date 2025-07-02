@@ -26,7 +26,7 @@ use by_address::ByAddress;
 use compute_preferred_types::{ComputePreferredTypes, ComputePreferredTypesUserData};
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
-use dominators::compute_idom_tree;
+use dominators::{PostOrder, compute_idom_tree};
 use itertools::Itertools;
 use primitives::CInteger;
 use variables::{VariableTracker, VariableTrackers};
@@ -60,7 +60,7 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    dominators_and_post_order: Option<(ArenaMap<NodeId, NodeRef>, Box<[NodeRef]>)>,
+    dominators_and_post_order: Option<(ArenaMap<NodeId, NodeRef>, PostOrder)>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
