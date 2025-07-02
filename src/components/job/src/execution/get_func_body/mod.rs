@@ -1,6 +1,7 @@
 mod basic_bin_op;
 mod compute_preferred_types;
 mod dominators;
+mod variables;
 
 use super::Executable;
 use crate::{
@@ -28,6 +29,7 @@ use diagnostics::ErrorDiagnostic;
 use dominators::compute_idom_tree;
 use itertools::Itertools;
 use primitives::CInteger;
+use variables::{VariableTracker, VariableTrackers};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -48,6 +50,26 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
+    builtin_types: &'env BuiltinTypes<'env>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    cfg: Option<&'env UntypedCfg>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    dominators_and_post_order: Option<&'env (ArenaMap<NodeId, NodeRef>, Vec<NodeRef>)>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    variables: Option<VariableTrackers<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
     compute_preferred_types: ComputePreferredTypes<'env>,
 
     #[derivative(Hash = "ignore")]
@@ -63,22 +85,7 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    dominator_type: Suspend<'env, &'env Type<'env>>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    builtin_types: &'env BuiltinTypes<'env>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    cfg: Option<&'env UntypedCfg>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    dominators_and_post_order: Option<&'env (ArenaMap<NodeId, NodeRef>, Vec<NodeRef>)>,
+    resolved_type: Suspend<'env, &'env Type<'env>>,
 }
 
 impl<'env> GetFuncBody<'env> {
@@ -96,10 +103,11 @@ impl<'env> GetFuncBody<'env> {
             compute_preferred_types: ComputePreferredTypes::default(),
             resolved_nodes: ArenaMap::new(),
             num_resolved_nodes: 0,
-            dominator_type: None,
+            resolved_type: None,
             builtin_types,
             cfg: None,
             dominators_and_post_order: None,
+            variables: None,
         }
     }
 }
@@ -161,7 +169,32 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             &self.workspace.settings[def.settings.expect("settings assigned for function")];
         let c_integer_assumptions = settings.c_integer_assumptions();
 
-        // 4) Determine what type each CFG node prefers to be.
+        // 4) Allocate variable storage for each variable
+        let variables = self.variables.get_or_insert_with(|| {
+            // NOTE: We include all nodes even if they aren't a part of the actual graph.
+            // We can prune these after type resolution by removing the variables who never
+            // had a type determined for them.
+            // The new indices for each variable after this filtering are then the "slot"
+            // each will occupy during IR generation.
+            cfg.nodes
+                .iter()
+                .flat_map(|(node_ref, node)| match &node.kind {
+                    NodeKind::Sequential(SequentialNode {
+                        kind:
+                            SequentialNodeKind::Declare(..)
+                            | SequentialNodeKind::DeclareAssign(..)
+                            | SequentialNodeKind::Parameter(..),
+                        ..
+                    }) => Some(VariableTracker {
+                        declared_at: node_ref,
+                        ty: None,
+                    }),
+                    _ => None,
+                })
+                .collect()
+        });
+
+        // 5) Determine what type each CFG node prefers to be.
         let preferred_types = match self.compute_preferred_types.execute_sub_task(
             executor,
             ctx,
@@ -178,7 +211,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             Err(e) => return Err(e.map(|_| self.into()).into()),
         };
 
-        // 5) Resolve types and linked data for each CFG node (may suspend)
+        // 6) Resolve types and linked data for each CFG node (may suspend)
         while self.num_resolved_nodes < post_order.len() {
             // We must process nodes in reverse post-order to ensure proper ordering, lexical
             // ordering is not enough! Consider `goto` for example.
@@ -224,73 +257,67 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         unimplemented!("SequentialNodeKind::Const not supported yet")
                     }
                     SequentialNodeKind::Name(needle) => {
-                        let var_ty = if let Some(ty) = executor.demand(self.dominator_type) {
-                            ty.clone()
-                        } else {
-                            let mut dominator_ref = *dominators
-                                .get(node_ref.into_raw())
-                                .expect("dominator to exist");
+                        let mut dominator_ref = *dominators
+                            .get(node_ref.into_raw())
+                            .expect("dominator to exist");
 
-                            loop {
-                                let dom = &cfg.nodes[dominator_ref];
+                        let found = loop {
+                            let dom = &cfg.nodes[dominator_ref];
 
-                                match &dom.kind {
-                                    NodeKind::Start(_) => {
-                                        return Err(ErrorDiagnostic::new(
-                                            format!("Undefined variable '{}'", needle),
-                                            node.source,
-                                        )
-                                        .into());
-                                    }
-                                    NodeKind::Sequential(SequentialNode {
-                                        kind: SequentialNodeKind::Parameter(name, ty, _),
-                                        ..
-                                    }) if needle.as_plain_str() == Some(name) => {
-                                        return suspend!(
-                                            self.dominator_type,
-                                            executor.request(ResolveType::new(
-                                                &self.workspace,
-                                                ty,
-                                                &self.decl_scope
-                                            )),
-                                            ctx
-                                        );
-                                    }
-                                    NodeKind::Sequential(SequentialNode {
-                                        kind: SequentialNodeKind::Declare(name, ty, idx),
-                                        ..
-                                    }) if needle.as_plain_str() == Some(name) => {
-                                        return suspend!(
-                                            self.dominator_type,
-                                            executor.request(ResolveType::new(
-                                                &self.workspace,
-                                                ty,
-                                                &self.decl_scope
-                                            )),
-                                            ctx
-                                        );
-                                    }
-                                    NodeKind::Sequential(SequentialNode {
-                                        kind: SequentialNodeKind::DeclareAssign(name, value),
-                                        ..
-                                    }) if needle.as_plain_str() == Some(name) => {
-                                        break get_typed(dominator_ref).ty().clone();
-                                    }
-                                    _ => (),
+                            match &dom.kind {
+                                NodeKind::Start(_) => {
+                                    return Err(ErrorDiagnostic::new(
+                                        format!("Undefined variable '{}'", needle),
+                                        node.source,
+                                    )
+                                    .into());
                                 }
-
-                                dominator_ref = *dominators.get(dominator_ref.into_raw()).unwrap();
+                                NodeKind::Sequential(SequentialNode {
+                                    kind:
+                                        SequentialNodeKind::Parameter(name, _, _)
+                                        | SequentialNodeKind::Declare(name, _, _)
+                                        | SequentialNodeKind::DeclareAssign(name, _),
+                                    ..
+                                }) if needle.as_plain_str() == Some(name) => {
+                                    break dominator_ref;
+                                }
+                                _ => (),
                             }
+
+                            dominator_ref = *dominators.get(dominator_ref.into_raw()).unwrap();
                         };
 
-                        // Reset dominator type for next node that needs it
-                        self.dominator_type = None;
+                        let var_ty = variables
+                            .get(found)
+                            .expect("variable to be tracked")
+                            .ty
+                            .expect("variable to have had type resolved");
 
                         eprintln!("Variable {} has type {:?}", needle, var_ty);
-                        Resolved::from_type(var_ty)
+                        Resolved::from_type(var_ty.clone())
                     }
-                    SequentialNodeKind::Parameter(_, _, _) => Resolved::void(node.source),
-                    SequentialNodeKind::Declare(_, _, _) => Resolved::void(node.source),
+                    SequentialNodeKind::Declare(_, ast_type, _)
+                    | SequentialNodeKind::Parameter(_, ast_type, _) => {
+                        // Resolve variable type
+                        let Some(resolved_type) = executor.demand(self.resolved_type) else {
+                            return suspend!(
+                                self.resolved_type,
+                                executor.request(ResolveType::new(
+                                    &self.workspace,
+                                    ast_type,
+                                    &self.decl_scope
+                                )),
+                                ctx
+                            );
+                        };
+
+                        variables.assign_resolved_type(node_ref, resolved_type);
+
+                        // Reset suspend on type for next node that needs it
+                        self.resolved_type = None;
+
+                        Resolved::void(node.source)
+                    }
                     SequentialNodeKind::Assign(_, _) => Resolved::void(node.source),
                     SequentialNodeKind::BinOp(left, bin_op, right, language) => {
                         let left_ty = get_typed(*left).ty();
@@ -379,11 +406,15 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
                         // result
                     }
-                    SequentialNodeKind::DeclareAssign(_name, value) => conform_to_default(
-                        get_typed(*value).ty(),
-                        c_integer_assumptions,
-                        self.builtin_types,
-                    )?,
+                    SequentialNodeKind::DeclareAssign(_name, value) => {
+                        let declared = conform_to_default(
+                            get_typed(*value).ty(),
+                            c_integer_assumptions,
+                            self.builtin_types,
+                        )?;
+                        variables.assign_resolved_type(node_ref, ctx.alloc(declared.ty().clone()));
+                        declared
+                    }
                     SequentialNodeKind::Member(idx, _, privacy) => todo!("Member"),
                     SequentialNodeKind::ArrayAccess(idx, idx1) => todo!("ArrayAccess"),
                     SequentialNodeKind::StructLiteral(node_struct_literal) => {
@@ -438,12 +469,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             self.num_resolved_nodes += 1;
         }
 
-        Err(ErrorDiagnostic::new(
-            "Computing function bodies is not implemented yet!",
-            def.head.source,
-        )
-        .into())
-
-        // Ok(ctx.alloc(todo!("compute func body")))
+        Ok(ctx.alloc(FuncBody {
+            variables: std::mem::take(variables).prune(),
+        }))
     }
 }

@@ -12,6 +12,7 @@ mod trait_body;
 mod ty;
 mod type_alias_body;
 mod type_head;
+mod variables;
 
 use ast_workspace::TypeDeclRef;
 pub use decl::*;
@@ -28,6 +29,7 @@ pub use trait_body::*;
 pub use ty::*;
 pub use type_alias_body::*;
 pub use type_head::*;
+pub use variables::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AmbiguousType;

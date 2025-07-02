@@ -1,8 +1,7 @@
-use std::marker::PhantomData;
+use super::Variables;
 
 #[derive(Clone, Debug)]
 pub struct FuncBody<'env> {
-    _phantom: PhantomData<&'env ()>,
     // pub stmts: Vec<Stmt>,
-    // pub vars: VariableStorage,
+    pub variables: Variables<'env>,
 }

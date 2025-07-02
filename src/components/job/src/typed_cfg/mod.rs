@@ -26,6 +26,7 @@ impl<'env> Resolved<'env> {
             data: Some(data),
         }
     }
+
     pub fn from_type(ty: Type<'env>) -> Self {
         Self { ty, data: None }
     }
