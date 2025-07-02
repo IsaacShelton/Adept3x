@@ -60,7 +60,7 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    dominators_and_post_order: Option<(ArenaMap<NodeId, NodeRef>, Vec<NodeRef>)>,
+    dominators_and_post_order: Option<(ArenaMap<NodeId, NodeRef>, Box<[NodeRef]>)>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -199,7 +199,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             executor,
             ctx,
             ComputePreferredTypesUserData {
-                post_order: post_order.as_slice(),
+                post_order,
                 cfg,
                 func_return_type: &def.head.return_type,
                 workspace: &self.workspace,
@@ -470,6 +470,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         }
 
         Ok(ctx.alloc(FuncBody {
+            resolved: self.resolved_nodes,
             variables: std::mem::take(variables).prune(),
         }))
     }

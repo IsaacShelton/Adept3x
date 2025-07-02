@@ -6,7 +6,7 @@ use std::{
     collections::{HashSet, VecDeque},
 };
 
-pub type PostOrder = Vec<NodeRef>;
+pub type PostOrder = Box<[NodeRef]>;
 
 pub fn compute_idom_tree(cfg: &UntypedCfg) -> (ArenaMap<NodeId, NodeRef>, PostOrder) {
     let start = cfg.start();
@@ -48,7 +48,7 @@ pub fn compute_idom_tree(cfg: &UntypedCfg) -> (ArenaMap<NodeId, NodeRef>, PostOr
         }
     }
 
-    (dominators, post_order)
+    (dominators, post_order.into())
 }
 
 fn intersect(
