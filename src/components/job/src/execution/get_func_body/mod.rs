@@ -60,7 +60,7 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    dominators_and_post_order: Option<&'env (ArenaMap<NodeId, NodeRef>, Vec<NodeRef>)>,
+    dominators_and_post_order: Option<(ArenaMap<NodeId, NodeRef>, Vec<NodeRef>)>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -162,7 +162,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         // 2) Compute immediate dominators and post order traversal
         let (dominators, post_order) = self
             .dominators_and_post_order
-            .get_or_insert_with(|| ctx.alloc(compute_idom_tree(&cfg)));
+            .get_or_insert_with(|| compute_idom_tree(&cfg));
 
         // 3) Acquire settings and configuration
         let settings =
