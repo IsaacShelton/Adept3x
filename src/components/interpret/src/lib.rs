@@ -11,7 +11,7 @@ use self::{
     ip::InstructionPointer, memory::Memory, size_of::size_of, syscall_handler::SyscallHandler,
 };
 use crate::{registers::Registers, value::StructLiteral};
-use ast::SizeofMode;
+use ast::SizeOfMode;
 pub use error::InterpreterError;
 use ir;
 use std::collections::HashMap;
@@ -142,11 +142,11 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     ValueKind::Literal(ir::Literal::Void).untainted()
                 }
                 ir::Instr::SizeOf(ty, mode) => match mode {
-                    Some(SizeofMode::Target) => {
+                    Some(SizeOfMode::Target) => {
                         // TODO: We don't support getting the target sizeof here yet...
                         todo!("sizeof<\"target\", T> is not supported yet");
                     }
-                    Some(SizeofMode::Compilation) => {
+                    Some(SizeOfMode::Compilation) => {
                         // If explicitly marked as compilation sizeof, then don't consider tainted
                         ValueKind::Literal(ir::Literal::Unsigned64(self.size_of(ty))).untainted()
                     }

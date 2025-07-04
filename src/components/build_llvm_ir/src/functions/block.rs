@@ -29,7 +29,7 @@ use crate::{
     value_catalog::ValueCatalog,
     values::build_value,
 };
-use ast::SizeofMode;
+use ast::SizeOfMode;
 use backend::BackendError;
 use cstr::cstr;
 use data_units::{BitUnits, ByteUnits};
@@ -127,12 +127,12 @@ pub unsafe fn create_function_block(
                 let size = ctx.target_data.abi_size_of_type(backend_type);
 
                 match mode {
-                    Some(SizeofMode::Compilation) => {
+                    Some(SizeOfMode::Compilation) => {
                         return Err(BackendError::plain(
                             "Cannot use result of sizeof<\"compilation\", T> at runtime",
                         ));
                     }
-                    Some(SizeofMode::Target) | None => Some(LLVMValueRef::new_u64(size.bytes())),
+                    Some(SizeOfMode::Target) | None => Some(LLVMValueRef::new_u64(size.bytes())),
                 }
             }
             Instr::Parameter(index) => Some(if let Some(prologue) = fn_ctx.prologue.as_ref() {

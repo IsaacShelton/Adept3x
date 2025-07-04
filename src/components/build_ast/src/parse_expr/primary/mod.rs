@@ -7,7 +7,7 @@ mod struct_literal;
 use super::{super::error::ParseError, Parser, is_right_associative, is_terminating_token};
 use crate::{array_last, error::ParseErrorKind, parse_util::into_plain_name};
 use ast::{
-    Block, Conditional, Expr, ExprKind, Integer, SizeofMode, TypeArg, TypeKind, UnaryMathOperator,
+    Block, Conditional, Expr, ExprKind, Integer, SizeOfMode, TypeArg, TypeKind, UnaryMathOperator,
     UnaryOperation, UnaryOperator, While,
 };
 use infinite_iterator::InfinitePeekable;
@@ -170,8 +170,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                                         kind: ExprKind::String(mode),
                                         ..
                                     })) => match mode.as_str() {
-                                        "target" => Some(SizeofMode::Target),
-                                        "compilation" => Some(SizeofMode::Compilation),
+                                        "target" => Some(SizeOfMode::Target),
+                                        "compilation" => Some(SizeOfMode::Compilation),
                                         _ => {
                                             return Err(ParseError::other(
                                                 format!(

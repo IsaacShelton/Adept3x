@@ -4,7 +4,7 @@ use super::{
     StructLiteral, TypedExpr, UnaryMathOperation, Variable, While,
 };
 use crate::{Destination, Type};
-use ast::{IntegerKnown, SizeofMode};
+use ast::{IntegerKnown, SizeOfMode};
 use num::BigInt;
 use ordered_float::NotNan;
 use primitives::FloatSize;
@@ -44,7 +44,7 @@ pub enum ExprKind {
     EnumMemberLiteral(Box<EnumMemberLiteral>),
     ResolvedNamedExpression(Box<Expr>),
     Zeroed(Box<Type>),
-    SizeOf(Box<Type>, Option<SizeofMode>),
+    SizeOf(Box<Type>, Option<SizeOfMode>),
     InterpreterSyscall(interpreter_api::Syscall, Vec<Expr>),
     Break,
     Continue,

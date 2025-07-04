@@ -31,8 +31,8 @@ pub enum ExprKind {
     While(Box<While>),
     StaticMemberValue(Box<StaticMemberValue>),
     StaticMemberCall(Box<StaticMemberCall>),
-    SizeOf(Box<Type>, Option<SizeofMode>),
-    SizeOfValue(Box<Expr>, Option<SizeofMode>),
+    SizeOf(Box<Type>, Option<SizeOfMode>),
+    SizeOfValue(Box<Expr>, Option<SizeOfMode>),
     InterpreterSyscall(Box<InterpreterSyscall>),
     Break,
     Continue,
@@ -49,7 +49,7 @@ impl ExprKind {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub enum SizeofMode {
+pub enum SizeOfMode {
     Target,
     Compilation,
 }

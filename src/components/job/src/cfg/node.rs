@@ -2,7 +2,7 @@ use super::{ConstEvalRef, CursorPosition, NodeId, NodeRef};
 use crate::cfg::UntypedCfg;
 use arena::Arena;
 use ast::{
-    BasicBinaryOperator, ConformBehavior, FillBehavior, Integer, Language, Name, SizeofMode,
+    BasicBinaryOperator, ConformBehavior, FillBehavior, Integer, Language, Name, SizeOfMode,
     StaticMemberValue, Type, UnaryOperator, Using,
 };
 use attributes::Privacy;
@@ -94,8 +94,8 @@ pub enum SequentialNodeKind {
     UnaryOperation(UnaryOperator, NodeRef),
     StaticMemberValue(Box<StaticMemberValue>),
     StaticMemberCall(Box<NodeStaticMemberCall>),
-    SizeOf(Type, Option<SizeofMode>),
-    SizeOfValue(NodeRef, Option<SizeofMode>),
+    SizeOf(Type, Option<SizeOfMode>),
+    SizeOfValue(NodeRef, Option<SizeOfMode>),
     InterpreterSyscall(NodeInterpreterSyscall),
     IntegerPromote(NodeRef),
     StaticAssert(ConstEvalRef, Option<String>),
