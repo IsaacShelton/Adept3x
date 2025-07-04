@@ -284,12 +284,14 @@ impl<'input, 'diagnostics> Parser<'input, 'diagnostics> {
                     );
 
                     if let Ok(abstract_declarator_info) = abstract_declarator_info {
-                        return Ok(ExprKind::SizeOf(abstract_declarator_info.ast_type).at(source));
+                        return Ok(
+                            ExprKind::SizeOf(abstract_declarator_info.ast_type, None).at(source)
+                        );
                     }
                 }
 
                 let inner = self.parse_expr_primary_base()?;
-                return Ok(ExprKind::SizeOfValue(Box::new(inner)).at(source));
+                return Ok(ExprKind::SizeOfValue(Box::new(inner), None).at(source));
             }
             CTokenKind::AlignofKeyword => {
                 self.input.advance();

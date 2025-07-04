@@ -11,10 +11,12 @@ use self::{
     ip::InstructionPointer, memory::Memory, size_of::size_of, syscall_handler::SyscallHandler,
 };
 use crate::{registers::Registers, value::StructLiteral};
+use ast::SizeofMode;
 pub use error::InterpreterError;
 use ir;
 use std::collections::HashMap;
 pub use value::Value;
+use value::{Tainted, ValueKind};
 
 #[derive(Debug)]
 pub struct Interpreter<'a, S: SyscallHandler> {
@@ -62,6 +64,12 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
     ) -> Result<Value<'a>, InterpreterError> {
         let function = &self.ir_module.funcs[func_ref];
 
+        if function.ownership.is_reference() {
+            return Err(InterpreterError::CannotCallForeignFunction(
+                function.mangled_name.clone(),
+            ));
+        }
+
         if function.is_cstyle_variadic {
             todo!(
                 "c-style variadic functions are not supported in interpreter yet - (for function {:?})",
@@ -104,14 +112,15 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                     self.call(call.func, arguments)?
                 }
                 ir::Instr::Alloca(ty) => {
-                    Value::Literal(self.memory.alloc_stack(self.size_of(&ty))?)
+                    ValueKind::Literal(self.memory.alloc_stack(self.size_of(&ty))?).untainted()
                 }
+
                 ir::Instr::Store(store) => {
                     let new_value = self.eval(&registers, &store.new_value);
                     let dest = self.eval(&registers, &store.destination).as_u64().unwrap();
 
                     self.memory.write(dest, new_value, self.ir_module)?;
-                    Value::Undefined
+                    ValueKind::Undefined.untainted()
                 }
                 ir::Instr::Load((value, ty)) => {
                     let address = self.eval(&registers, &value).as_u64().unwrap();
@@ -119,23 +128,41 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 }
                 ir::Instr::Malloc(ir_type) => {
                     let bytes = self.size_of(ir_type);
-                    Value::Literal(self.memory.alloc_heap(bytes))
+                    ValueKind::Literal(self.memory.alloc_heap(bytes)).untainted()
                 }
                 ir::Instr::MallocArray(ir_type, count) => {
                     let count = self.eval(&registers, count);
                     let count = count.as_u64().unwrap();
                     let bytes = self.size_of(ir_type);
-                    Value::Literal(self.memory.alloc_heap(bytes * count))
+                    ValueKind::Literal(self.memory.alloc_heap(bytes * count)).untainted()
                 }
                 ir::Instr::Free(value) => {
-                    let value = self.eval(&registers, value).unwrap_literal();
+                    let value = self.eval(&registers, value).kind.unwrap_literal();
                     self.memory.free_heap(value);
-                    Value::Literal(ir::Literal::Void)
+                    ValueKind::Literal(ir::Literal::Void).untainted()
                 }
-                ir::Instr::SizeOf(ty) => Value::Literal(ir::Literal::Unsigned64(self.size_of(ty))),
+                ir::Instr::SizeOf(ty, mode) => match mode {
+                    Some(SizeofMode::Target) => {
+                        // TODO: We don't support getting the target sizeof here yet...
+                        todo!("sizeof<\"target\", T> is not supported yet");
+                    }
+                    Some(SizeofMode::Compilation) => {
+                        // If explicitly marked as compilation sizeof, then don't consider tainted
+                        ValueKind::Literal(ir::Literal::Unsigned64(self.size_of(ty))).untainted()
+                    }
+                    None => {
+                        // To help prevent accidentally mixing "compilation sizeof" and "target sizeof"
+                        // when running code at compile time, mark the ambiguous sizeof as tainted,
+                        // which we will throw an error for if it any derived value obviously leaks
+                        // into the parent time.
+                        ValueKind::Literal(ir::Literal::Unsigned64(self.size_of(ty)))
+                            .tainted(Tainted::ByCompilationHostSizeof)
+                    }
+                },
                 ir::Instr::Parameter(index) => args[usize::try_from(*index).unwrap()].clone(),
                 ir::Instr::GlobalVariable(global_ref) => {
-                    Value::Literal(self.global_addresses.get(global_ref).unwrap().clone())
+                    ValueKind::Literal(self.global_addresses.get(global_ref).unwrap().clone())
+                        .untainted()
                 }
                 ir::Instr::Add(ops, _f_or_i) => self.add(ops, &registers),
                 ir::Instr::Checked(_, _) => todo!(),
@@ -205,7 +232,8 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         .fold(0, |acc, f| acc + self.size_of(&f.ir_type));
 
                     let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
-                    Value::Literal(ir::Literal::Unsigned64(subject_pointer + offset))
+                    ValueKind::Literal(ir::Literal::Unsigned64(subject_pointer + offset))
+                        .untainted()
                 }
                 ir::Instr::ArrayAccess { .. } => {
                     todo!("Interpreter / ir::Instruction::ArrayAccess")
@@ -217,10 +245,18 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         field_values.push(self.eval(&registers, value));
                     }
 
-                    Value::StructLiteral(StructLiteral {
-                        values: field_values,
-                        fields: ty.struct_fields(self.ir_module).unwrap(),
-                    })
+                    let tainted = field_values
+                        .iter()
+                        .flat_map(|field_value| field_value.tainted)
+                        .next();
+
+                    Value {
+                        kind: ValueKind::StructLiteral(StructLiteral {
+                            values: field_values,
+                            fields: ty.struct_fields(self.ir_module).unwrap(),
+                        }),
+                        tainted,
+                    }
                 }
                 ir::Instr::IsZero(_value, _) => {
                     todo!("Interpreter / ir::Instruction::IsZero")
@@ -228,28 +264,29 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                 ir::Instr::IsNonZero(value, _) => {
                     let value = self.eval(&registers, value);
 
-                    match value {
-                        Value::Undefined => Value::Undefined,
-                        Value::Literal(literal) => {
-                            Value::Literal(ir::Literal::Boolean(match literal {
+                    match &value.kind {
+                        ValueKind::Undefined => ValueKind::Undefined,
+                        ValueKind::Literal(literal) => {
+                            ValueKind::Literal(ir::Literal::Boolean(match literal {
                                 ir::Literal::Void => false,
-                                ir::Literal::Boolean(x) => x,
-                                ir::Literal::Signed8(x) => x != 0,
-                                ir::Literal::Signed16(x) => x != 0,
-                                ir::Literal::Signed32(x) => x != 0,
-                                ir::Literal::Signed64(x) => x != 0,
-                                ir::Literal::Unsigned8(x) => x != 0,
-                                ir::Literal::Unsigned16(x) => x != 0,
-                                ir::Literal::Unsigned32(x) => x != 0,
-                                ir::Literal::Unsigned64(x) => x != 0,
-                                ir::Literal::Float32(x) => x != 0.0,
-                                ir::Literal::Float64(x) => x != 0.0,
+                                ir::Literal::Boolean(x) => *x,
+                                ir::Literal::Signed8(x) => *x != 0,
+                                ir::Literal::Signed16(x) => *x != 0,
+                                ir::Literal::Signed32(x) => *x != 0,
+                                ir::Literal::Signed64(x) => *x != 0,
+                                ir::Literal::Unsigned8(x) => *x != 0,
+                                ir::Literal::Unsigned16(x) => *x != 0,
+                                ir::Literal::Unsigned32(x) => *x != 0,
+                                ir::Literal::Unsigned64(x) => *x != 0,
+                                ir::Literal::Float32(x) => *x != 0.0,
+                                ir::Literal::Float64(x) => *x != 0.0,
                                 ir::Literal::NullTerminatedString(_) => true,
                                 ir::Literal::Zeroed(_) => false,
                             }))
                         }
-                        Value::StructLiteral(_) => Value::Undefined,
+                        ValueKind::StructLiteral(_) => ValueKind::Undefined,
                     }
+                    .untainted()
                 }
                 ir::Instr::Negate(..) => todo!("Interpreter / ir::Instruction::Negate"),
                 ir::Instr::BitComplement(_) => {
@@ -260,13 +297,13 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         basicblock_id: break_info.basicblock_id,
                         instruction_id: 0,
                     });
-                    Value::Undefined
+                    ValueKind::Undefined.untainted()
                 }
                 ir::Instr::ConditionalBreak(value, break_info) => {
                     let value = self.eval(&registers, value);
 
-                    let should = match value {
-                        Value::Literal(ir::Literal::Boolean(value)) => value,
+                    let should = match &value.kind {
+                        ValueKind::Literal(ir::Literal::Boolean(value)) => *value,
                         _ => false,
                     };
 
@@ -279,7 +316,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         instruction_id: 0,
                     });
 
-                    Value::Undefined
+                    ValueKind::Undefined.untainted()
                 }
                 ir::Instr::Phi(phi) => {
                     let mut found = None;
@@ -291,7 +328,7 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
                         }
                     }
 
-                    found.unwrap_or(Value::Undefined)
+                    found.unwrap_or(ValueKind::Undefined.untainted())
                 }
                 ir::Instr::InterpreterSyscall(syscall, supplied_args) => {
                     let mut args = Vec::with_capacity(args.len());
@@ -317,16 +354,25 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
             });
         };
 
+        if let Some(tainted) = return_value
+            .as_ref()
+            .map(|value| self.eval(&registers, value))
+            .unwrap_or(ValueKind::Literal(ir::Literal::Void).untainted())
+            .tainted
+        {
+            dbg!(tainted);
+        }
+
         self.memory.stack_restore(fp);
         Ok(return_value
             .as_ref()
             .map(|value| self.eval(&registers, value))
-            .unwrap_or(Value::Literal(ir::Literal::Void)))
+            .unwrap_or(ValueKind::Literal(ir::Literal::Void).untainted()))
     }
 
     pub fn eval(&self, registers: &Registers<'a>, value: &ir::Value) -> Value<'a> {
         match value {
-            ir::Value::Literal(literal) => Value::Literal(literal.clone()),
+            ir::Value::Literal(literal) => ValueKind::Literal(literal.clone()).untainted(),
             ir::Value::Reference(reference) => registers.get(reference).clone(),
         }
     }

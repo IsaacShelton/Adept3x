@@ -87,7 +87,7 @@ fn thin_cstring_func(
     )
 }
 
-pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
+pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile, is_pragma: bool) {
     let source = Source::internal();
     let void = TypeKind::Void.at(Source::internal());
     let ptr_char = TypeKind::Ptr(Box::new(TypeKind::char().at(source))).at(source);
@@ -96,7 +96,7 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
     let call = ExprKind::Call(Box::new(Call {
         name: Name::plain("main"),
         args: vec![],
-        expected_to_return: Some(void.clone()),
+        expected_to_return: is_pragma.then(|| void.clone()),
         generics: vec![],
         using: vec![],
     }))
@@ -115,223 +115,231 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile) {
             tag: Some(Tag::InterpreterEntryPoint),
             privacy: Privacy::Public,
         },
-        vec![StmtKind::Return(Some(call)).at(Source::internal())],
+        if is_pragma {
+            vec![StmtKind::Return(Some(call)).at(Source::internal())]
+        } else {
+            vec![StmtKind::Expr(call).at(Source::internal())]
+        },
     ));
-
-    file.enums.push(Enum {
-        name: "ProjectKind".into(),
-        backing_type: Some(TypeKind::u64().at(source)),
-        source,
-        members: IndexMap::from_iter([
-            (
-                "ConsoleApp".into(),
-                EnumMember {
-                    value: (ProjectKind::ConsoleApp as u64).into(),
-                    explicit_value: true,
-                },
-            ),
-            (
-                "WindowedApp".into(),
-                EnumMember {
-                    value: (ProjectKind::WindowedApp as u64).into(),
-                    explicit_value: true,
-                },
-            ),
-        ]),
-        privacy: Privacy::Private,
-    });
-
-    file.structs.push(Struct {
-        name: "Project".into(),
-        params: TypeParams::default(),
-        fields: IndexMap::from_iter([(
-            "kind".into(),
-            Field {
-                ast_type: TypeKind::Named(Name::plain("ProjectKind"), vec![]).at(source),
-                privacy: Privacy::Public,
-                source,
-            },
-        )]),
-        is_packed: false,
-        source,
-        privacy: Privacy::Private,
-    });
-
-    file.structs.push(Struct {
-        name: "Dependency".into(),
-        params: TypeParams::default(),
-        fields: IndexMap::from_iter([(
-            "name".into(),
-            Field {
-                ast_type: ptr_char.clone(),
-                privacy: Privacy::Private,
-                source,
-            },
-        )]),
-        is_packed: false,
-        source,
-        privacy: Privacy::Private,
-    });
 
     file.funcs
         .push(thin_cstring_func("println", "message", Syscall::Println));
 
-    file.funcs.push(thin_cstring_func(
-        "adept",
-        "version",
-        Syscall::BuildSetAdeptVersion,
-    ));
-
-    file.funcs.push(thin_cstring_func(
-        "link",
-        "filename",
-        Syscall::BuildLinkFilename,
-    ));
-
-    file.funcs.push(thin_cstring_func(
-        "linkFramework",
-        "framework_name",
-        Syscall::BuildLinkFrameworkName,
-    ));
-
-    file.funcs.push(thin_cstring_func(
-        "experimental",
-        "experiment",
-        Syscall::Experimental,
-    ));
-
-    file.funcs.push(thin_cstring_func(
-        "importNamespace",
-        "namespace",
-        Syscall::ImportNamespace,
-    ));
-
-    file.funcs.push(thin_void_func(
-        "dontAssumeIntAtLeast32Bits",
-        Syscall::DontAssumeIntAtLeast32Bits,
-    ));
-
-    file.funcs.push(Func::new(
-        FuncHead {
-            name: "project".into(),
-            type_params: TypeParams::default(),
-            givens: vec![],
-            params: Params::normal([
-                Param::named("name".into(), ptr_char.clone()),
-                Param::named(
-                    "project".into(),
-                    TypeKind::Named(Name::plain("Project"), vec![]).at(source),
+    if is_pragma {
+        file.enums.push(Enum {
+            name: "ProjectKind".into(),
+            backing_type: Some(TypeKind::u64().at(source)),
+            source,
+            members: IndexMap::from_iter([
+                (
+                    "ConsoleApp".into(),
+                    EnumMember {
+                        value: (ProjectKind::ConsoleApp as u64).into(),
+                        explicit_value: true,
+                    },
+                ),
+                (
+                    "WindowedApp".into(),
+                    EnumMember {
+                        value: (ProjectKind::WindowedApp as u64).into(),
+                        explicit_value: true,
+                    },
                 ),
             ]),
-            return_type: void.clone(),
-            abide_abi: false,
-            source,
-            tag: None,
-            privacy: Privacy::Public,
-            ownership: SymbolOwnership::default(),
-        },
-        vec![
-            StmtKind::Expr(
-                ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
-                    kind: Syscall::BuildAddProject,
-                    args: vec![
-                        (
-                            ptr_char.clone(),
-                            ExprKind::Variable(Name::plain("name")).at(source),
-                        ),
-                        (
-                            TypeKind::Named(Name::plain("ProjectKind"), vec![]).at(source),
-                            ExprKind::Member(
-                                Box::new(ExprKind::Variable(Name::plain("project")).at(source)),
-                                "kind".into(),
-                                Privacy::Public,
-                            )
-                            .at(source),
-                        ),
-                    ],
-                    result_type: void.clone(),
-                }))
-                .at(source),
-            )
-            .at(source),
-        ],
-    ));
+            privacy: Privacy::Private,
+        });
 
-    file.funcs.push(Func::new(
-        FuncHead {
-            name: "use".into(),
-            type_params: TypeParams::default(),
-            givens: vec![],
-            params: Params::normal([
-                Param::named("as_namespace".into(), ptr_char.clone()),
-                Param::named(
-                    "dependency".into(),
-                    TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
-                ),
-            ]),
-            return_type: void.clone(),
-            abide_abi: false,
+        file.structs.push(Struct {
+            name: "Project".into(),
+            params: TypeParams::default(),
+            fields: IndexMap::from_iter([(
+                "kind".into(),
+                Field {
+                    ast_type: TypeKind::Named(Name::plain("ProjectKind"), vec![]).at(source),
+                    privacy: Privacy::Public,
+                    source,
+                },
+            )]),
+            is_packed: false,
             source,
-            tag: None,
-            privacy: Privacy::Public,
-            ownership: SymbolOwnership::default(),
-        },
-        vec![
-            StmtKind::Expr(
-                ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
-                    kind: Syscall::UseDependency,
-                    args: vec![
-                        (
-                            ptr_char.clone(),
-                            ExprKind::Variable(Name::plain("as_namespace")).at(source),
-                        ),
-                        (
-                            TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
-                            ExprKind::Member(
-                                Box::new(ExprKind::Variable(Name::plain("dependency")).at(source)),
-                                "name".into(),
-                                Privacy::Private,
-                            )
-                            .at(source),
-                        ),
-                    ],
-                    result_type: void.clone(),
-                }))
-                .at(source),
-            )
-            .at(source),
-        ],
-    ));
+            privacy: Privacy::Private,
+        });
 
-    file.funcs.push(Func::new(
-        FuncHead {
-            name: "import".into(),
-            type_params: TypeParams::default(),
-            givens: vec![],
-            params: Params::normal([Param::named("namespace".into(), ptr_char.clone())]),
-            return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
-            abide_abi: false,
-            ownership: SymbolOwnership::default(),
+        file.structs.push(Struct {
+            name: "Dependency".into(),
+            params: TypeParams::default(),
+            fields: IndexMap::from_iter([(
+                "name".into(),
+                Field {
+                    ast_type: ptr_char.clone(),
+                    privacy: Privacy::Private,
+                    source,
+                },
+            )]),
+            is_packed: false,
             source,
-            tag: None,
-            privacy: Privacy::Public,
-        },
-        vec![
-            StmtKind::Return(Some(
-                ExprKind::StructLiteral(Box::new(StructLiteral {
-                    ast_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
-                    fields: vec![FieldInitializer {
-                        name: None,
-                        value: ExprKind::Variable(Name::plain("namespace")).at(source),
-                    }],
-                    fill_behavior: FillBehavior::Forbid,
-                    language: Language::Adept,
-                }))
+            privacy: Privacy::Private,
+        });
+
+        file.funcs.push(thin_cstring_func(
+            "adept",
+            "version",
+            Syscall::BuildSetAdeptVersion,
+        ));
+
+        file.funcs.push(thin_cstring_func(
+            "link",
+            "filename",
+            Syscall::BuildLinkFilename,
+        ));
+
+        file.funcs.push(thin_cstring_func(
+            "linkFramework",
+            "framework_name",
+            Syscall::BuildLinkFrameworkName,
+        ));
+
+        file.funcs.push(thin_cstring_func(
+            "experimental",
+            "experiment",
+            Syscall::Experimental,
+        ));
+
+        file.funcs.push(thin_cstring_func(
+            "importNamespace",
+            "namespace",
+            Syscall::ImportNamespace,
+        ));
+
+        file.funcs.push(thin_void_func(
+            "dontAssumeIntAtLeast32Bits",
+            Syscall::DontAssumeIntAtLeast32Bits,
+        ));
+
+        file.funcs.push(Func::new(
+            FuncHead {
+                name: "project".into(),
+                type_params: TypeParams::default(),
+                givens: vec![],
+                params: Params::normal([
+                    Param::named("name".into(), ptr_char.clone()),
+                    Param::named(
+                        "project".into(),
+                        TypeKind::Named(Name::plain("Project"), vec![]).at(source),
+                    ),
+                ]),
+                return_type: void.clone(),
+                abide_abi: false,
+                source,
+                tag: None,
+                privacy: Privacy::Public,
+                ownership: SymbolOwnership::default(),
+            },
+            vec![
+                StmtKind::Expr(
+                    ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
+                        kind: Syscall::BuildAddProject,
+                        args: vec![
+                            (
+                                ptr_char.clone(),
+                                ExprKind::Variable(Name::plain("name")).at(source),
+                            ),
+                            (
+                                TypeKind::Named(Name::plain("ProjectKind"), vec![]).at(source),
+                                ExprKind::Member(
+                                    Box::new(ExprKind::Variable(Name::plain("project")).at(source)),
+                                    "kind".into(),
+                                    Privacy::Public,
+                                )
+                                .at(source),
+                            ),
+                        ],
+                        result_type: void.clone(),
+                    }))
+                    .at(source),
+                )
                 .at(source),
-            ))
-            .at(source),
-        ],
-    ));
+            ],
+        ));
+
+        file.funcs.push(Func::new(
+            FuncHead {
+                name: "use".into(),
+                type_params: TypeParams::default(),
+                givens: vec![],
+                params: Params::normal([
+                    Param::named("as_namespace".into(), ptr_char.clone()),
+                    Param::named(
+                        "dependency".into(),
+                        TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
+                    ),
+                ]),
+                return_type: void.clone(),
+                abide_abi: false,
+                source,
+                tag: None,
+                privacy: Privacy::Public,
+                ownership: SymbolOwnership::default(),
+            },
+            vec![
+                StmtKind::Expr(
+                    ExprKind::InterpreterSyscall(Box::new(InterpreterSyscall {
+                        kind: Syscall::UseDependency,
+                        args: vec![
+                            (
+                                ptr_char.clone(),
+                                ExprKind::Variable(Name::plain("as_namespace")).at(source),
+                            ),
+                            (
+                                TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
+                                ExprKind::Member(
+                                    Box::new(
+                                        ExprKind::Variable(Name::plain("dependency")).at(source),
+                                    ),
+                                    "name".into(),
+                                    Privacy::Private,
+                                )
+                                .at(source),
+                            ),
+                        ],
+                        result_type: void.clone(),
+                    }))
+                    .at(source),
+                )
+                .at(source),
+            ],
+        ));
+
+        file.funcs.push(Func::new(
+            FuncHead {
+                name: "import".into(),
+                type_params: TypeParams::default(),
+                givens: vec![],
+                params: Params::normal([Param::named("namespace".into(), ptr_char.clone())]),
+                return_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
+                abide_abi: false,
+                ownership: SymbolOwnership::default(),
+                source,
+                tag: None,
+                privacy: Privacy::Public,
+            },
+            vec![
+                StmtKind::Return(Some(
+                    ExprKind::StructLiteral(Box::new(StructLiteral {
+                        ast_type: TypeKind::Named(Name::plain("Dependency"), vec![]).at(source),
+                        fields: vec![FieldInitializer {
+                            name: None,
+                            value: ExprKind::Variable(Name::plain("namespace")).at(source),
+                        }],
+                        fill_behavior: FillBehavior::Forbid,
+                        language: Language::Adept,
+                    }))
+                    .at(source),
+                ))
+                .at(source),
+            ],
+        ));
+    }
 }
 
 pub fn run_build_system_interpreter<'a>(
@@ -346,6 +354,7 @@ pub fn run_build_system_interpreter<'a>(
     let mut interpreter = Interpreter::new(handler, ir_module, max_steps);
 
     let result = interpreter.run(interpreter_entry_point)?;
-    assert!(result.is_literal() && result.unwrap_literal().is_void());
+
+    assert!(result.kind.is_literal() && result.kind.unwrap_literal().is_void());
     Ok(interpreter)
 }

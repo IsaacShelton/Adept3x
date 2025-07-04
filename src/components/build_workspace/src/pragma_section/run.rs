@@ -41,7 +41,7 @@ impl PragmaSection {
             link_frameworks: Default::default(),
         };
 
-        setup_build_system_interpreter_symbols(&mut self.ast_file);
+        setup_build_system_interpreter_symbols(&mut self.ast_file, true);
 
         let fs = Fs::new();
         let fs_node_id = fs.insert(path, None).expect("inserted");

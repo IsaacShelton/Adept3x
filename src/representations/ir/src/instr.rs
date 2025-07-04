@@ -1,4 +1,5 @@
 use crate::{FuncRef, GlobalRef, Type, value::Value};
+use ast::SizeofMode;
 use primitives::{FloatOrInteger, FloatOrSign, IntegerBits, IntegerSign};
 
 #[derive(Clone, Debug)]
@@ -11,7 +12,7 @@ pub enum Instr {
     Malloc(Type),
     MallocArray(Type, Value),
     Free(Value),
-    SizeOf(Type),
+    SizeOf(Type, Option<SizeofMode>),
     Parameter(u32),
     GlobalVariable(GlobalRef),
     Add(BinaryOperands, FloatOrInteger),

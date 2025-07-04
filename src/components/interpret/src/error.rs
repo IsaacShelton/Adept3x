@@ -9,24 +9,32 @@ pub enum InterpreterError {
     DivideByZero,
     RemainderByZero,
     PolymorphicEntryPoint,
+    CannotCallForeignFunction(String),
 }
 
 impl Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let message = match self {
-            InterpreterError::TimedOut => "exceeded max computation time",
-            InterpreterError::StackOverflow => "stack overflow",
+        match self {
+            InterpreterError::TimedOut => write!(f, "Exceeded max computation time"),
+            InterpreterError::StackOverflow => write!(f, "Stack overflow"),
             InterpreterError::SegfaultWrite => {
-                "write segfault - tried to write to null or reserved address"
+                write!(
+                    f,
+                    "Write segfault - tried to write to null or reserved address"
+                )
             }
             InterpreterError::SegfaultRead => {
-                "read segfault - tried to read from null or reserved address"
+                write!(
+                    f,
+                    "Read segfault - tried to read from null or reserved address"
+                )
             }
-            InterpreterError::DivideByZero => "divide by zero",
-            InterpreterError::RemainderByZero => "remainder by zero",
-            InterpreterError::PolymorphicEntryPoint => "polymorphic entry point",
-        };
-
-        f.write_str(message)
+            InterpreterError::DivideByZero => write!(f, "Divide by Zero"),
+            InterpreterError::RemainderByZero => write!(f, "Remainder by Zero"),
+            InterpreterError::PolymorphicEntryPoint => write!(f, "Entry point is polymorphic"),
+            InterpreterError::CannotCallForeignFunction(name) => {
+                write!(f, "Cannot call foreign function '{}' at compile-time", name)
+            }
+        }
     }
 }

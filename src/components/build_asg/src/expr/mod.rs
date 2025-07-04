@@ -358,7 +358,7 @@ pub fn resolve_expr(
         ast::ExprKind::StaticMemberCall(static_access_call) => {
             resolve_static_member_call(ctx, static_access_call)
         }
-        ast::ExprKind::SizeOf(ast_type) => {
+        ast::ExprKind::SizeOf(ast_type, mode) => {
             let ty = ctx
                 .type_ctx()
                 .resolve(ast_type, ResolveTypeOptions::Unalias)?;
@@ -367,10 +367,10 @@ pub fn resolve_expr(
                 // NOTE: This will be the unsigned size integer type in the future
                 // asg::TypeKind::SizeInteger(IntegerSign::Unsigned).at(source),
                 asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
-                asg::ExprKind::SizeOf(Box::new(ty)).at(source),
+                asg::ExprKind::SizeOf(Box::new(ty), *mode).at(source),
             ))
         }
-        ast::ExprKind::SizeOfValue(value) => {
+        ast::ExprKind::SizeOfValue(value, mode) => {
             let ty = resolve_expr(
                 ctx,
                 value,
@@ -384,7 +384,7 @@ pub fn resolve_expr(
                 // NOTE: This will used be unsigned size integer type in the future
                 // asg::TypeKind::SizeInteger(IntegerSign::Unsigned).at(source),
                 asg::TypeKind::Integer(IntegerBits::Bits64, IntegerSign::Unsigned).at(source),
-                asg::ExprKind::SizeOf(Box::new(ty)).at(source),
+                asg::ExprKind::SizeOf(Box::new(ty), *mode).at(source),
             ))
         }
         ast::ExprKind::InterpreterSyscall(info) => {

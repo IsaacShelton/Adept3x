@@ -1,4 +1,4 @@
-mod build_asg;
+mod build_workspace;
 mod diverge;
 mod estimate_decl_scope;
 mod estimate_type_heads;
@@ -14,7 +14,7 @@ mod resolve_type;
 mod resolve_type_arg;
 
 use crate::{Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom};
-pub use build_asg::BuildAsg;
+pub use build_workspace::BuildWorkspace;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use estimate_decl_scope::EstimateDeclScope;
@@ -68,7 +68,7 @@ where
 #[derive(Debug)]
 #[enum_dispatch(RawExecutable)]
 pub enum Execution<'env> {
-    BuildAsg(BuildAsg<'env>),
+    BuildAsg(BuildWorkspace<'env>),
     Diverge(Diverge),
     Print(Print<'env>),
     EstimateDeclScope(EstimateDeclScope<'env>),

@@ -50,8 +50,8 @@ pub fn evaluate_to_const_integer(expr: &Expr) -> Result<BigInt, ParseError> {
         | ExprKind::BitComplement(_)
         | ExprKind::Not(_)
         | ExprKind::Call(_, _)
-        | ExprKind::SizeOf(_)
-        | ExprKind::SizeOfValue(_)
+        | ExprKind::SizeOf(_, _)
+        | ExprKind::SizeOfValue(_, _)
         | ExprKind::AlignOf(_)
         | ExprKind::IntegerPromote(_) => (),
     }

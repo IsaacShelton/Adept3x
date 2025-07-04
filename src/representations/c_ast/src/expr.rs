@@ -1,4 +1,5 @@
 use crate::{AbstractDeclarator, SpecifierQualifierList};
+use ast::SizeofMode;
 use c_token::{Encoding, FloatSuffix, Integer};
 use source_files::Source;
 
@@ -40,8 +41,8 @@ pub enum ExprKind {
     BitComplement(Box<Expr>),
     Not(Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
-    SizeOf(ast::Type),
-    SizeOfValue(Box<Expr>),
+    SizeOf(ast::Type, Option<SizeofMode>),
+    SizeOfValue(Box<Expr>, Option<SizeofMode>),
     AlignOf(ast::Type),
     IntegerPromote(Box<Expr>),
 }

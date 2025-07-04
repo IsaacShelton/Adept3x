@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 append_only_vec = { version = "0.1.0", path = "../../support/append_only_vec" }
 arena = { version = "0.1.0", path = "../../support/arena" }
+ast = { version = "0.1.0", path = "../ast" }
 attributes = { version = "0.1.0", path = "../attributes" }
 data_units = { version = "0.1.0", path = "../../support/data_units" }
 derivative.workspace = true

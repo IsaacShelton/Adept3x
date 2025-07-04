@@ -1,4 +1,5 @@
 use super::{Value, memory::Memory};
+use crate::value::ValueKind;
 use compiler_version::AdeptVersion;
 use interpreter_api::Syscall;
 use num::FromPrimitive;
@@ -83,24 +84,24 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             Syscall::Println => {
                 assert_eq!(args.len(), 1);
                 println!("{}", read_cstring(memory, &args[0]));
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::BuildAddProject => {
                 assert_eq!(args.len(), 2);
                 let name = read_cstring(memory, &args[0]);
                 let kind = ProjectKind::from_u64(args[1].as_u64().unwrap()).unwrap();
                 self.projects.push(Project { name, kind });
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::BuildLinkFilename => {
                 assert_eq!(args.len(), 1);
                 self.link_filenames.insert(read_cstring(memory, &args[0]));
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::BuildLinkFrameworkName => {
                 assert_eq!(args.len(), 1);
                 self.link_frameworks.insert(read_cstring(memory, &args[0]));
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::BuildSetAdeptVersion => {
                 assert_eq!(args.len(), 1);
@@ -115,7 +116,7 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                     );
                 }
 
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::Experimental => {
                 assert_eq!(args.len(), 1);
@@ -134,18 +135,18 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                     }
                 }
 
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::ImportNamespace => {
                 assert_eq!(args.len(), 1);
                 self.imported_namespaces
                     .push(read_cstring(memory, &args[0]).into_boxed_str());
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::DontAssumeIntAtLeast32Bits => {
                 assert_eq!(args.len(), 0);
                 self.assume_int_at_least_32_bits = false;
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::UseDependency => {
                 assert_eq!(args.len(), 2);
@@ -159,7 +160,7 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                     .push(dependency_name);
 
                 #[allow(unreachable_code)]
-                Value::Literal(ir::Literal::Void)
+                ValueKind::Literal(ir::Literal::Void).untainted()
             }
         }
     }

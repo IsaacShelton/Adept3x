@@ -429,8 +429,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     SequentialNodeKind::StaticMemberCall(node_static_member_call) => {
                         todo!("StaticMemberCall")
                     }
-                    SequentialNodeKind::SizeOf(_) => todo!("SizeOf"),
-                    SequentialNodeKind::SizeOfValue(idx) => todo!("SizeOfValue"),
+                    SequentialNodeKind::SizeOf(_, _) => todo!("SizeOf"),
+                    SequentialNodeKind::SizeOfValue(_, _) => todo!("SizeOfValue"),
                     SequentialNodeKind::InterpreterSyscall(node_interpreter_syscall) => {
                         todo!("InterpreterSyscall")
                     }

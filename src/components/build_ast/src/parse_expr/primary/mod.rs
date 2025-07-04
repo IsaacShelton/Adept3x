@@ -7,7 +7,7 @@ mod struct_literal;
 use super::{super::error::ParseError, Parser, is_right_associative, is_terminating_token};
 use crate::{array_last, error::ParseErrorKind, parse_util::into_plain_name};
 use ast::{
-    Block, Conditional, Expr, ExprKind, Integer, TypeArg, TypeKind, UnaryMathOperator,
+    Block, Conditional, Expr, ExprKind, Integer, SizeofMode, TypeArg, TypeKind, UnaryMathOperator,
     UnaryOperation, UnaryOperator, While,
 };
 use infinite_iterator::InfinitePeekable;
@@ -158,10 +158,41 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                                     .at(source));
                                 };
 
+                                let (arg, mode) = if let Some(type_arg) = generics.next() {
+                                    (type_arg, Some(arg))
+                                } else {
+                                    (arg, None)
+                                };
+
+                                let mode = match mode {
+                                    Some(TypeArg::Expr(Expr {
+                                        kind: ExprKind::String(mode),
+                                        ..
+                                    })) => match mode.as_str() {
+                                        "target" => Some(SizeofMode::Target),
+                                        "compilation" => Some(SizeofMode::Compilation),
+                                        _ => {
+                                            return Err(ParseError::other(
+                                                format!(
+                                                    "Mode must be either 'target' or 'compilation'"
+                                                ),
+                                                source,
+                                            ));
+                                        }
+                                    },
+                                    Some(..) => {
+                                        return Err(ParseError::other(
+                                            "Mode for sizeof must be a string",
+                                            source,
+                                        ));
+                                    }
+                                    None => None,
+                                };
+
                                 let expr = if let TypeArg::Type(ty) = arg {
-                                    ExprKind::SizeOf(Box::new(ty)).at(source)
+                                    ExprKind::SizeOf(Box::new(ty), mode).at(source)
                                 } else if let TypeArg::Expr(value) = arg {
-                                    ExprKind::SizeOfValue(Box::new(value)).at(source)
+                                    ExprKind::SizeOfValue(Box::new(value), mode).at(source)
                                 } else {
                                     return Err(ParseErrorKind::Other {
                                         message:

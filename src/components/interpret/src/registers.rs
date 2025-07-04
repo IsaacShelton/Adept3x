@@ -1,5 +1,8 @@
-use super::{ip::InstructionPointer, Value};
-use crate::ir::{BasicBlocks, ValueReference};
+use super::{Value, ip::InstructionPointer};
+use crate::{
+    ir::{BasicBlocks, ValueReference},
+    value::ValueKind,
+};
 
 #[derive(Debug)]
 pub struct Registers<'a> {
@@ -12,7 +15,7 @@ impl<'a> Registers<'a> {
 
         for block in basicblocks.iter() {
             registers.push(Vec::from_iter(
-                std::iter::repeat(Value::Undefined).take(block.instructions.len()),
+                std::iter::repeat(ValueKind::Undefined.untainted()).take(block.instructions.len()),
             ));
         }
 

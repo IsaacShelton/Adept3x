@@ -1,5 +1,9 @@
 use super::{Registers, SyscallHandler};
-use crate::{Interpreter, error::InterpreterError, value::Value};
+use crate::{
+    Interpreter,
+    error::InterpreterError,
+    value::{Tainted, Value, ValueKind},
+};
 use ir::BinaryOperands;
 
 macro_rules! impl_op_basic {
@@ -9,7 +13,7 @@ macro_rules! impl_op_basic {
             operands: &BinaryOperands,
             registers: &Registers<'a>,
         ) -> Value<'a> {
-            let (left, right) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
                 ir::Literal::Void => ir::Literal::Void,
@@ -50,7 +54,7 @@ macro_rules! impl_op_basic {
                 ir::Literal::Zeroed(ty) => ir::Literal::Zeroed(ty.clone()),
             };
 
-            Value::Literal(literal)
+            Value { kind: ValueKind::Literal(literal), tainted }
         }
     };
 }
@@ -62,7 +66,7 @@ macro_rules! impl_op_divmod {
             operands: &BinaryOperands,
             registers: &Registers<'a>,
         ) -> Result<Value<'a>, InterpreterError> {
-            let (left, right) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
                 ir::Literal::Void => ir::Literal::Void,
@@ -123,7 +127,10 @@ macro_rules! impl_op_divmod {
                 ir::Literal::Zeroed(_) => return Err(InterpreterError::$error_name),
             };
 
-            Ok(Value::Literal(literal))
+            Ok(Value{
+                kind: ValueKind::Literal(literal),
+                tainted
+            })
         }
     };
 }
@@ -135,7 +142,7 @@ macro_rules! impl_op_cmp {
             operands: &BinaryOperands,
             registers: &Registers<'a>,
         ) -> Value<'a> {
-            let (left, right) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
 
             let value = match left {
                 ir::Literal::Void => false,
@@ -176,24 +183,32 @@ macro_rules! impl_op_cmp {
                 ir::Literal::Zeroed(_) => true,
             };
 
-            Value::Literal(ir::Literal::Boolean(value))
+            Value {
+                kind: ValueKind::Literal(ir::Literal::Boolean(value)),
+                tainted,
+            }
         }
     };
 }
 
 impl<'a, S: SyscallHandler> Interpreter<'a, S> {
-    fn eval_into_literal(&self, registers: &Registers<'a>, value: &ir::Value) -> ir::Literal {
-        self.eval(registers, value).unwrap_literal()
+    fn eval_into_literal(
+        &self,
+        registers: &Registers<'a>,
+        value: &ir::Value,
+    ) -> (ir::Literal, Option<Tainted>) {
+        let reg = self.eval(registers, value);
+        (reg.kind.unwrap_literal(), reg.tainted)
     }
 
     fn eval_binary_ops(
         &self,
         operands: &BinaryOperands,
         registers: &Registers<'a>,
-    ) -> (ir::Literal, ir::Literal) {
-        let left = self.eval_into_literal(registers, &operands.left);
-        let right = self.eval_into_literal(registers, &operands.right);
-        (left, right)
+    ) -> (ir::Literal, ir::Literal, Option<Tainted>) {
+        let (left, l_tainted) = self.eval_into_literal(registers, &operands.left);
+        let (right, r_tainted) = self.eval_into_literal(registers, &operands.right);
+        (left, right, l_tainted.or(r_tainted))
     }
 
     impl_op_basic!(add, wrapping_add, +, |);

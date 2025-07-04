@@ -158,9 +158,11 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
             }))
             .at(expr.source)
         }
-        ExprKind::SizeOf(ty) => ast::ExprKind::SizeOf(Box::new(ty.clone())).at(expr.source),
-        ExprKind::SizeOfValue(value) => {
-            ast::ExprKind::SizeOfValue(Box::new(translate_expr(ctx, value)?)).at(expr.source)
+        ExprKind::SizeOf(ty, mode) => {
+            ast::ExprKind::SizeOf(Box::new(ty.clone()), *mode).at(expr.source)
+        }
+        ExprKind::SizeOfValue(value, mode) => {
+            ast::ExprKind::SizeOfValue(Box::new(translate_expr(ctx, value)?), *mode).at(expr.source)
         }
         ExprKind::AlignOf(_) => todo!("translate_expr AlignOf"),
         ExprKind::IntegerPromote(value) => {

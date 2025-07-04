@@ -596,15 +596,19 @@ pub fn flatten_expr(
                 static_member_call.source,
             )
         }
-        ExprKind::SizeOf(ty) => {
-            builder.push_sequential(cursor, SequentialNodeKind::SizeOf(*ty), expr.source)
+        ExprKind::SizeOf(ty, mode) => {
+            builder.push_sequential(cursor, SequentialNodeKind::SizeOf(*ty, mode), expr.source)
         }
-        ExprKind::SizeOfValue(of_value) => {
+        ExprKind::SizeOfValue(of_value, mode) => {
             cursor = flatten_expr(builder, cursor, *of_value, IsValue::RequireValue);
             let Some(value) = cursor.value() else {
                 return cursor;
             };
-            builder.push_sequential(cursor, SequentialNodeKind::SizeOfValue(value), expr.source)
+            builder.push_sequential(
+                cursor,
+                SequentialNodeKind::SizeOfValue(value, mode),
+                expr.source,
+            )
         }
         ExprKind::InterpreterSyscall(syscall) => {
             let mut args = Vec::with_capacity(syscall.args.len());

@@ -51,7 +51,7 @@ impl HumanLabel for SequentialNodeKind {
             SequentialNodeKind::UnaryOperation(..) => "unary_op".into(),
             SequentialNodeKind::StaticMemberValue(..) => "static_member_value".into(),
             SequentialNodeKind::StaticMemberCall(..) => "static_member_call".into(),
-            SequentialNodeKind::SizeOf(_) => "sizeof".into(),
+            SequentialNodeKind::SizeOf(_, _) => "sizeof".into(),
             SequentialNodeKind::SizeOfValue(..) => "sizeof_value".into(),
             SequentialNodeKind::InterpreterSyscall(..) => "interpreter_syscall".into(),
             SequentialNodeKind::IntegerPromote(..) => "integer_promote".into(),

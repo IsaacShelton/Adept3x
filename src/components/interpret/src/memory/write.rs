@@ -2,7 +2,7 @@ use super::{
     super::{error::InterpreterError, size_of::size_of, value::Value},
     Memory,
 };
-use crate::value::StructLiteral;
+use crate::value::{StructLiteral, ValueKind};
 
 impl Memory {
     pub fn write(
@@ -15,10 +15,10 @@ impl Memory {
             return Err(InterpreterError::SegfaultWrite);
         }
 
-        match value {
-            Value::Undefined => Ok(()),
-            Value::Literal(literal) => self.write_literal(destination, literal, ir_module),
-            Value::StructLiteral(literal) => {
+        match value.kind {
+            ValueKind::Undefined => Ok(()),
+            ValueKind::Literal(literal) => self.write_literal(destination, literal, ir_module),
+            ValueKind::StructLiteral(literal) => {
                 self.write_struct_literal(destination, literal, ir_module)
             }
         }

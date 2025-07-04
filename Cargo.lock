@@ -285,6 +285,7 @@ name = "build_llvm_ir"
 version = "0.1.0"
 dependencies = [
  "append_only_vec",
+ "ast",
  "backend",
  "build_executable",
  "colored",
@@ -368,6 +369,7 @@ dependencies = [
  "line_column",
  "path-absolutize",
  "pp_ast",
+ "primitives",
  "source_files",
  "target",
  "text",
@@ -674,6 +676,7 @@ version = "0.1.0"
 name = "interpret"
 version = "0.1.0"
 dependencies = [
+ "ast",
  "compiler_version",
  "derive_more",
  "interpreter_api",
@@ -693,6 +696,7 @@ version = "0.1.0"
 dependencies = [
  "append_only_vec",
  "arena",
+ "ast",
  "attributes",
  "data_units",
  "derivative",

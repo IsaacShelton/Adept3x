@@ -476,7 +476,9 @@ pub fn lower_expr(builder: &mut FuncBuilder, expr: &asg::Expr) -> Result<ir::Val
         }
         ExprKind::ResolvedNamedExpression(resolved_expr) => builder.lower_expr(resolved_expr),
         ExprKind::Zeroed(ty) => Ok(ir::Value::Literal(Literal::Zeroed(builder.lower_type(ty)?))),
-        ExprKind::SizeOf(ty) => Ok(builder.push(ir::Instr::SizeOf(builder.lower_type(ty)?))),
+        ExprKind::SizeOf(ty, mode) => {
+            Ok(builder.push(ir::Instr::SizeOf(builder.lower_type(ty)?, *mode)))
+        }
         ExprKind::InterpreterSyscall(syscall, args) => {
             let mut values = Vec::with_capacity(args.len());
 
@@ -585,7 +587,7 @@ pub fn evaluate_const_integer_expr(
         | ExprKind::UnaryMathOperation(_) => todo!(),
         ExprKind::Dereference(_) | ExprKind::AddressOf(_) | ExprKind::Conditional(_) => todo!(),
         ExprKind::While(_) | ExprKind::ArrayAccess(_) | ExprKind::Zeroed(_) => todo!(),
-        ExprKind::SizeOf(_)
+        ExprKind::SizeOf(_, _)
         | ExprKind::InterpreterSyscall(_, _)
         | ExprKind::Break
         | ExprKind::Continue

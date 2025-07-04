@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ast = { version = "0.1.0", path = "../../representations/ast" }
 compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
 derive_more.workspace = true
 interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }

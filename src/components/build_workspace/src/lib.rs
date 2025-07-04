@@ -80,7 +80,7 @@ pub fn compile_workspace(
             return Err(());
         };
 
-        setup_build_system_interpreter_symbols(files.get_mut(&guaranteed_entry).unwrap());
+        setup_build_system_interpreter_symbols(files.get_mut(&guaranteed_entry).unwrap(), false);
     }
 
     // Compile ASTs into workspace and propagate module settings to each module's contained files
@@ -90,10 +90,13 @@ pub fn compile_workspace(
     #[allow(unreachable_code)]
     #[allow(unused_variables)]
     if compiler.options.new_compilation_system {
-        let executor = job::MainExecutor::new();
-        let build_asg_task = executor.spawn(&[], job::BuildAsg::new(&workspace));
-
         let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
+        let build_options = compiler.options.clone();
+
+        let executor = job::MainExecutor::new();
+        let build_workspace_task =
+            executor.spawn(&[], job::BuildWorkspace::new(&workspace, &build_options));
+
         let executed = executor.start(compiler.source_files, &mut allocator);
         let show_executor_stats = false;
 
@@ -124,13 +127,7 @@ pub fn compile_workspace(
             println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
         }
 
-        let asg = executed.truth.demand(build_asg_task);
-
-        // Lower code to high level intermediate representation
-        // NOTE: This will have to be converted into executor tasks
-        // before we can really do anything
-        let ir_module = unerror(lower(&compiler.options, &asg), source_files)?;
-        //let ir_module = todo!("need ir_module from executed tasks");
+        let ir_module = executed.truth.demand(build_workspace_task);
 
         // Export and link to create executable
         let export_details = export_and_link(compiler, project_folder, &ir_module)?;

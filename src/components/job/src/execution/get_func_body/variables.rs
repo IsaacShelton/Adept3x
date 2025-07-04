@@ -3,11 +3,11 @@ use crate::{
     repr::{Type, Variable, Variables},
 };
 
-// We store a sorted array of NodeRefs that reference
+// NOTE: We store a sorted array of NodeRefs that reference
 // each node that declares a variable.
-// Each element's index will be used to uniquely identify the variable,
-// as well as it's "slot".
-// The length of this array will also be the total number of unique variables.
+// Once type resolution is complete, unresolved variables will
+// be pruned, and we will be left with a slot assignment and
+// mapping for each variable.
 // LIMITATION: A node cannot declare more that one variable.
 #[derive(Debug, Clone, Default)]
 pub struct VariableTrackers<'env> {
@@ -63,6 +63,6 @@ impl<'env> VariableTrackers<'env> {
 #[derive(Debug, Clone)]
 pub struct VariableTracker<'env> {
     pub declared_at: NodeRef,
-    // Resolved during type resolution step
+    // Resolved during type resolution step.
     pub ty: Option<&'env Type<'env>>,
 }
