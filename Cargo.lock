@@ -677,6 +677,7 @@ name = "interpret"
 version = "0.1.0"
 dependencies = [
  "ast",
+ "bit-vec",
  "compiler_version",
  "derive_more",
  "interpreter_api",

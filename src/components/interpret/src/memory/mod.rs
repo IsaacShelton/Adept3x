@@ -3,11 +3,22 @@ mod write;
 
 use super::error::InterpreterError;
 use crate::ir;
+use bit_vec::BitVec;
 
 #[derive(Debug)]
 pub struct Memory {
     heap: Vec<u8>,
     stack: Vec<u8>,
+    // Track whether values are derived from the compilation host's sizeof.
+    // We do this to raise errors and make it difficult to
+    // unintentionally transfer values derived from the compilation host's sizeof
+    // to runtime code, as runtime code should never depend on implementation details
+    // of the virtual machine used to run compile-time code.
+    // The sizeof a value for the compilation host is not guaranteed to be
+    // the same as the target platform, which is why we prevent accidental leakage
+    // (even convoluted cases) through this tracking.
+    heap_tainted_by_comptime_sizeof: BitVec,
+    stack_tainted_by_comptime_sizeof: BitVec,
 }
 
 impl Memory {
@@ -19,6 +30,8 @@ impl Memory {
         Self {
             heap: Vec::with_capacity(1024),
             stack: Vec::with_capacity(1024),
+            heap_tainted_by_comptime_sizeof: BitVec::with_capacity(1024),
+            stack_tainted_by_comptime_sizeof: BitVec::with_capacity(1024),
         }
     }
 
@@ -28,8 +41,9 @@ impl Memory {
 
     pub fn alloc_permanent_raw(&mut self, bytes: u64) -> u64 {
         let address = Self::HEAP_OFFSET + u64::try_from(self.heap.len()).unwrap();
-        self.heap
-            .extend(std::iter::repeat(0).take(bytes.try_into().unwrap()));
+        let bytes = usize::try_from(bytes).unwrap();
+        self.heap.extend(std::iter::repeat(0).take(bytes));
+        self.heap_tainted_by_comptime_sizeof.grow(bytes, false);
         address
     }
 
@@ -54,9 +68,9 @@ impl Memory {
         }
 
         let address = ir::Literal::Unsigned64(raw_address);
-
-        self.stack
-            .extend(std::iter::repeat(0).take(bytes.try_into().unwrap()));
+        let bytes = usize::try_from(bytes).unwrap();
+        self.stack.extend(std::iter::repeat(0).take(bytes));
+        self.stack_tainted_by_comptime_sizeof.grow(bytes, false);
         Ok(address)
     }
 

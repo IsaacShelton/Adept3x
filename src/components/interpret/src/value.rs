@@ -1,7 +1,7 @@
 use crate::ir;
 use derive_more::{IsVariant, Unwrap};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Tainted {
     ByCompilationHostSizeof,
 }
@@ -13,7 +13,11 @@ pub struct Value<'a> {
 }
 
 impl<'a> Value<'a> {
-    pub fn new(kind: ValueKind<'a>, tainted: Tainted) -> Self {
+    pub fn new(kind: ValueKind<'a>, tainted: Option<Tainted>) -> Self {
+        Self { kind, tainted }
+    }
+
+    pub fn new_tainted(kind: ValueKind<'a>, tainted: Tainted) -> Self {
         Self {
             kind,
             tainted: Some(tainted),

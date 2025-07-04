@@ -2,8 +2,9 @@ use super::{
     super::{error::InterpreterError, size_of::size_of, value::Value},
     Memory,
 };
-use crate::value::{StructLiteral, ValueKind};
+use crate::value::{StructLiteral, Tainted, ValueKind};
 
+// TODO: Clean up and reduce redundancy
 impl Memory {
     pub fn write(
         &mut self,
@@ -17,7 +18,9 @@ impl Memory {
 
         match value.kind {
             ValueKind::Undefined => Ok(()),
-            ValueKind::Literal(literal) => self.write_literal(destination, literal, ir_module),
+            ValueKind::Literal(literal) => {
+                self.write_literal(destination, literal, value.tainted, ir_module)
+            }
             ValueKind::StructLiteral(literal) => {
                 self.write_struct_literal(destination, literal, ir_module)
             }
@@ -45,26 +48,28 @@ impl Memory {
         &mut self,
         destination: u64,
         literal: ir::Literal,
+        tainted: Option<Tainted>,
         ir_module: &ir::Module,
     ) -> Result<(), InterpreterError> {
         match literal {
             ir::Literal::Void => (),
-            ir::Literal::Boolean(x) => self.write_bytes(destination, &[x.into()]),
-            ir::Literal::Signed8(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Unsigned8(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Signed16(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Unsigned16(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Signed32(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Unsigned32(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Signed64(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Unsigned64(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Float32(x) => self.write_bytes(destination, &x.to_le_bytes()),
-            ir::Literal::Float64(x) => self.write_bytes(destination, &x.to_le_bytes()),
+            ir::Literal::Boolean(x) => self.write_bytes(destination, &[x.into()], tainted),
+            ir::Literal::Signed8(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Unsigned8(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Signed16(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Unsigned16(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Signed32(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Unsigned32(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Signed64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Unsigned64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Float32(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Float64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
             ir::Literal::NullTerminatedString(value) => {
+                // TODO: Cache the allocation
                 let string_bytes = value.as_bytes_with_nul();
                 let alloced = self.alloc_permanent_raw(string_bytes.len().try_into().unwrap());
-                self.write_bytes(alloced, string_bytes);
-                self.write_bytes(destination, &alloced.to_le_bytes());
+                self.write_bytes(alloced, string_bytes, tainted);
+                self.write_bytes(destination, &alloced.to_le_bytes(), tainted);
             }
             ir::Literal::Zeroed(ty) => {
                 let size = size_of(&ty, ir_module);
@@ -84,23 +89,47 @@ impl Memory {
         Ok(())
     }
 
-    fn write_bytes(&mut self, destination: u64, bytes: &[u8]) {
+    fn write_bytes(&mut self, destination: u64, bytes: &[u8], tainted: Option<Tainted>) {
         if self.is_heap_address(destination) {
-            self.write_bytes_heap(destination, bytes);
+            self.write_bytes_heap(destination, bytes, tainted);
         } else {
-            self.write_bytes_stack(destination, bytes);
+            self.write_bytes_stack(destination, bytes, tainted);
         }
     }
 
-    fn write_bytes_heap(&mut self, destination: u64, bytes: &[u8]) {
-        for (i, byte) in bytes.iter().enumerate() {
-            self.heap[destination as usize - Self::HEAP_OFFSET as usize + i] = *byte;
-        }
+    fn write_bytes_heap(&mut self, destination: u64, bytes: &[u8], tainted: Option<Tainted>) {
+        let start_index = destination as usize - Self::HEAP_OFFSET as usize;
+
+        self.heap
+            .iter_mut()
+            .skip(start_index)
+            .zip(bytes.iter().copied())
+            .for_each(|(memory, byte)| *memory = byte);
+
+        self.heap_tainted_by_comptime_sizeof
+            .iter_mut()
+            .skip(start_index)
+            .take(bytes.len())
+            .for_each(|mut x| {
+                *x = tainted == Some(Tainted::ByCompilationHostSizeof);
+            });
     }
 
-    fn write_bytes_stack(&mut self, destination: u64, bytes: &[u8]) {
-        for (i, byte) in bytes.iter().enumerate() {
-            self.stack[destination as usize - Self::STACK_OFFSET as usize + i] = *byte;
-        }
+    fn write_bytes_stack(&mut self, destination: u64, bytes: &[u8], tainted: Option<Tainted>) {
+        let start_index = destination as usize - Self::STACK_OFFSET as usize;
+
+        self.stack
+            .iter_mut()
+            .skip(start_index)
+            .zip(bytes.iter().copied())
+            .for_each(|(memory, byte)| *memory = byte);
+
+        self.stack_tainted_by_comptime_sizeof
+            .iter_mut()
+            .skip(start_index)
+            .take(bytes.len())
+            .for_each(|mut x| {
+                *x = tainted == Some(Tainted::ByCompilationHostSizeof);
+            });
     }
 }

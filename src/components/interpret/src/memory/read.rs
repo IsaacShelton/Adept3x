@@ -1,7 +1,7 @@
 use super::Memory;
 use crate::{
     error::InterpreterError,
-    value::{Value, ValueKind},
+    value::{Tainted, Value, ValueKind},
 };
 use ir::Literal;
 
@@ -41,98 +41,135 @@ impl Memory {
         })
     }
 
-    pub fn read_bytes(&self, from: u64, count: usize) -> &[u8] {
+    pub fn read_bytes(&self, from: u64, count: usize) -> (&[u8], Option<Tainted>) {
         if self.is_heap_address(from) {
             let start = (from - Self::HEAP_OFFSET) as usize;
-            &self.heap[start..start + count]
+
+            let tainted = self
+                .heap_tainted_by_comptime_sizeof
+                .iter()
+                .skip(start)
+                .take(count)
+                .any(|b| b)
+                .then_some(Tainted::ByCompilationHostSizeof);
+            (&self.heap[start..start + count], tainted)
         } else {
             let start = (from - Self::STACK_OFFSET) as usize;
-            &self.stack[start..start + count]
+
+            let tainted = self
+                .stack_tainted_by_comptime_sizeof
+                .iter()
+                .skip(start)
+                .take(count)
+                .any(|b| b)
+                .then_some(Tainted::ByCompilationHostSizeof);
+            (&self.stack[start..start + count], tainted)
         }
     }
 
     pub fn read_u1<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 1);
-        ValueKind::Literal(Literal::Boolean(bytes[0] != 0)).untainted()
+        let (bytes, tainted) = self.read_bytes(from, 1);
+        Value::new(ValueKind::Literal(Literal::Boolean(bytes[0] != 0)), tainted)
     }
 
     pub fn read_u8<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 1);
-        ValueKind::Literal(Literal::Unsigned8(u8::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 1);
+
+        Value::new(
+            ValueKind::Literal(Literal::Unsigned8(u8::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_u16<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 2);
-        ValueKind::Literal(Literal::Unsigned16(u16::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 2);
+        Value::new(
+            ValueKind::Literal(Literal::Unsigned16(u16::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_u32<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 4);
-        ValueKind::Literal(Literal::Unsigned32(u32::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 4);
+        Value::new(
+            ValueKind::Literal(Literal::Unsigned32(u32::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_u64<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 8);
-        ValueKind::Literal(Literal::Unsigned64(u64::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 8);
+        Value::new(
+            ValueKind::Literal(Literal::Unsigned64(u64::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_s8<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 1);
-        ValueKind::Literal(Literal::Signed8(i8::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 1);
+        Value::new(
+            ValueKind::Literal(Literal::Signed8(i8::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_s16<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 2);
-        ValueKind::Literal(Literal::Signed16(i16::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 2);
+        Value::new(
+            ValueKind::Literal(Literal::Signed16(i16::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_s32<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 4);
-        ValueKind::Literal(Literal::Signed32(i32::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 4);
+        Value::new(
+            ValueKind::Literal(Literal::Signed32(i32::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_s64<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 8);
-        ValueKind::Literal(Literal::Signed64(i64::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 8);
+        Value::new(
+            ValueKind::Literal(Literal::Signed64(i64::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_f32<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 4);
-        ValueKind::Literal(Literal::Float32(f32::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 4);
+        Value::new(
+            ValueKind::Literal(Literal::Float32(f32::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 
     pub fn read_f64<'a>(&self, from: u64) -> Value<'a> {
-        let bytes = self.read_bytes(from, 8);
-        ValueKind::Literal(Literal::Float64(f64::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
-        .untainted()
+        let (bytes, tainted) = self.read_bytes(from, 8);
+        Value::new(
+            ValueKind::Literal(Literal::Float64(f64::from_le_bytes(
+                bytes.try_into().unwrap(),
+            ))),
+            tainted,
+        )
     }
 }
