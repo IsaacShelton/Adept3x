@@ -151,17 +151,18 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                             let mut generics = generics.drain(..);
 
                             if let Some("sizeof") = name.as_plain_str() {
-                                let Some(arg) = generics.next() else {
+                                let Some(first_arg) = generics.next() else {
                                     return Err(ParseErrorKind::Other {
                                         message: "Expected type argument to sizeof macro".into(),
                                     }
                                     .at(source));
                                 };
 
-                                let (arg, mode) = if let Some(type_arg) = generics.next() {
-                                    (type_arg, Some(arg))
+                                // Decide meaning of arguments: `sizeof<"target", T>` vs `sizeof<T>`
+                                let (arg, mode) = if let Some(second_arg) = generics.next() {
+                                    (second_arg, Some(first_arg))
                                 } else {
-                                    (arg, None)
+                                    (first_arg, None)
                                 };
 
                                 let mode = match mode {
@@ -194,28 +195,26 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                                 } else if let TypeArg::Expr(value) = arg {
                                     ExprKind::SizeOfValue(Box::new(value), mode).at(source)
                                 } else {
-                                    return Err(ParseErrorKind::Other {
-                                        message:
-                                            "Cannot get size of compile-time value that isn't type or expression"
-                                                .into(),
-                                    }
-                                    .at(source));
+                                    return Err(ParseError::other(
+                                        "Cannot get size of compile-time value that isn't type or expression",
+                                        source,
+                                    ));
                                 };
 
                                 if generics.next().is_some() {
-                                    return Err(ParseErrorKind::Other {
-                                        message: "Too many arguments to sizeof macro".into(),
-                                    }
-                                    .at(source));
+                                    return Err(ParseError::other(
+                                        "Too many arguments to sizeof macro",
+                                        source,
+                                    ));
                                 };
 
                                 return Ok(expr);
                             }
 
-                            return Err(ParseErrorKind::Other {
-                                message: format!("Macro '{}' does not exist", name.to_string()),
-                            }
-                            .at(source));
+                            return Err(ParseError::other(
+                                format!("Macro '{}' does not exist", name.to_string()),
+                                source,
+                            ));
                         }
 
                         Ok(Expr::new(ExprKind::Variable(name), source))
