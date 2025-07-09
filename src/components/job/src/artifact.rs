@@ -4,6 +4,7 @@ use crate::repr::{
 };
 use ast_workspace::TypeDeclRef;
 use derive_more::From;
+use std::path::Path;
 
 #[derive(Debug, From)]
 pub enum Artifact<'env> {
@@ -21,6 +22,7 @@ pub enum Artifact<'env> {
     FuncHead(&'env FuncHead<'env>),
     FuncBody(&'env FuncBody<'env>),
     IrModule(ir::Module),
+    OptionPath(Option<&'env Path>),
 }
 
 impl_unwrap_from_artifact!(Void, ());
@@ -37,3 +39,4 @@ impl_unwrap_from_artifact!(TypeArg, &'env TypeArg<'env>);
 impl_unwrap_from_artifact!(FuncHead, &'env FuncHead<'env>);
 impl_unwrap_from_artifact!(FuncBody, &'env FuncBody<'env>);
 impl_unwrap_from_artifact!(IrModule, ir::Module);
+impl_unwrap_from_artifact!(OptionPath, Option<&'env Path>);

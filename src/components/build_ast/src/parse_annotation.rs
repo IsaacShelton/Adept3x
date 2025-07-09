@@ -45,6 +45,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                         ty: self.parse_type(NoneStr, "for context")?,
                     }
                 }),
+                "comptime" => AnnotationKind::Comptime,
                 _ => {
                     return Err(ParseErrorKind::UnrecognizedAnnotation {
                         name: annotation_name,

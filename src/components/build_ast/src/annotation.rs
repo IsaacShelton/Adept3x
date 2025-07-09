@@ -25,6 +25,7 @@ pub enum AnnotationKind {
     Private,
     Template,
     Using(Given),
+    Comptime,
 }
 
 impl AnnotationKind {
@@ -45,6 +46,7 @@ impl Display for AnnotationKind {
             Self::Private => "private",
             Self::Template => "template",
             Self::Using(_) => "using",
+            Self::Comptime => "comptime",
         })
     }
 }

@@ -9,6 +9,7 @@ mod get_func_body;
 mod get_func_head;
 mod get_type_body;
 mod get_type_head;
+mod main;
 mod print;
 mod resolve_type;
 mod resolve_type_arg;
@@ -26,6 +27,7 @@ pub use get_func_body::*;
 pub use get_func_head::*;
 pub use get_type_body::GetTypeBody;
 pub use get_type_head::GetTypeHead;
+pub use main::Main;
 pub use print::Print;
 pub use resolve_type::ResolveType;
 pub use resolve_type_arg::*;
@@ -68,7 +70,8 @@ where
 #[derive(Debug)]
 #[enum_dispatch(RawExecutable)]
 pub enum Execution<'env> {
-    BuildAsg(BuildWorkspace<'env>),
+    Main(Main<'env>),
+    BuildWorkspace(BuildWorkspace<'env>),
     Diverge(Diverge),
     Print(Print<'env>),
     EstimateDeclScope(EstimateDeclScope<'env>),

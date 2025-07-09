@@ -1,6 +1,6 @@
-use super::Executable;
+use super::{EstimateDeclScope, Executable, GetFuncBody};
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, Suspend, SuspendManyAssoc,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, Suspend, SuspendMany, SuspendManyAssoc,
     repr::{
         DeclScope, DeclScopeOrigin, FindTypeResult, FuncBody, FuncHead, TypeBody, TypeHead,
         TypeKind,
@@ -8,12 +8,11 @@ use crate::{
 };
 use arena::Arena;
 use ast_workspace::AstWorkspace;
-use attributes::Tag;
 use by_address::ByAddress;
 use compiler::BuildOptions;
 use derivative::Derivative;
 use derive_more::Debug;
-use diagnostics::ErrorDiagnostic;
+use itertools::Itertools;
 use primitives::{FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
 
@@ -58,6 +57,10 @@ pub struct BuildWorkspace<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(PartialEq = "ignore")]
     pub build_options: &'env BuildOptions,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    pub all_funcs: SuspendMany<'env, &'env FuncBody<'env>>,
 }
 
 impl<'env> BuildWorkspace<'env> {
@@ -73,6 +76,7 @@ impl<'env> BuildWorkspace<'env> {
             func_body: None,
             builtin_types: None,
             build_options,
+            all_funcs: None,
         }
     }
 }
@@ -108,172 +112,59 @@ impl<'env> Executable<'env> for BuildWorkspace<'env> {
 
         let builtin_types = self.builtin_types.as_ref().unwrap();
 
-        // We will want to spawn tasks to compute the
-        // function bodies for every function.
-
-        // We will also want to then spawn a task to compute the IR
-        // for the program,
-        // which itself depends on monomorphizing, globals, type layouts, etc.
-
-        /*
-        if let Some(func_body) = executor.demand(self.func_body) {
-            dbg!(func_body);
-            return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
-        }
-
-        if let Some(func_head) = executor.demand(self.func_head) {
-            // dbg!(func_head);
-
-            let func_ref = self
-                .workspace
-                .symbols
-                .all_funcs
-                .iter()
-                .filter(|(_, func)| func.head.name == "exampleFunction")
-                .map(|(func_ref, _)| func_ref)
-                .next()
-                .unwrap();
-
-            return suspend!(
-                self.func_body,
-                executor.request(GetFuncBody::new(
-                    workspace,
-                    func_ref,
-                    self.decl_scope.unwrap(),
-                    builtin_types,
-                )),
-                ctx
-            );
-        }
-
-        if let Some(type_body) = executor.demand(self.type_body) {
-            // dbg!(type_body);
-
-            let func_ref = self
-                .workspace
-                .symbols
-                .all_funcs
-                .iter()
-                .filter(|(_, func)| func.head.name == "exampleFunction")
-                .map(|(func_ref, _)| func_ref)
-                .next()
-                .unwrap();
-
-            return suspend!(
-                self.func_head,
-                executor.request(GetFuncHead::new(
-                    workspace,
-                    func_ref,
-                    self.decl_scope.unwrap()
-                )),
-                ctx
-            );
-        }
-
-        if let Some(found) = executor.demand(self.find_type) {
-            // dbg!(&found);
-
-            if let Ok(Some(type_decl_ref)) = found {
-                return suspend!(
-                    self.type_body,
-                    executor.request(GetTypeBody::new(
-                        workspace,
-                        self.decl_scope.unwrap(),
-                        type_decl_ref
-                    )),
-                    ctx
-                );
-            } else {
-                return Ok(ctx.alloc(asg::Asg::new(self.workspace.0)));
-            }
-        }
-
-        if let Some(_type_heads) = executor.demand_many_assoc(&self.estimate_type_heads) {
-            return suspend!(
-                self.find_type,
-                executor.request(FindType::new(
-                    workspace,
-                    self.decl_scope.unwrap(),
-                    "MyTrait",
-                    0
-                )),
-                ctx
-            );
-        }
-
-        if let Some(scopes) = executor.demand_many_assoc(&self.module_scopes) {
-            let first_module_ref = self.workspace.modules.keys().next().unwrap();
-            self.decl_scope = scopes
-                .iter()
-                .find(|scope| scope.0 == DeclScopeOrigin::Module(first_module_ref))
-                .map(|(_k, v)| &**v);
-
+        let Some(scopes) = executor.demand_many_assoc(&self.module_scopes) else {
             return suspend_many_assoc!(
-                self.estimate_type_heads,
-                scopes
-                    .iter()
-                    .map(|(origin, scope)| (
-                        *origin,
-                        executor.request(EstimateTypeHeads::new(workspace, scope, "Test"))
-                    ))
+                self.module_scopes,
+                workspace
+                    .modules
+                    .keys()
+                    .map(|module_ref| {
+                        let scope_origin = DeclScopeOrigin::Module(module_ref);
+
+                        (
+                            scope_origin,
+                            executor.request(EstimateDeclScope {
+                                workspace: self.workspace,
+                                scope_origin,
+                            }),
+                        )
+                    })
                     .collect(),
                 ctx
             );
-        }
-
-        suspend_many_assoc!(
-            self.module_scopes,
-            workspace
+        };
+        dbg!(&scopes);
+        dbg!(
+            self.workspace
                 .modules
-                .keys()
-                .map(|module_ref| {
-                    let scope_origin = DeclScopeOrigin::Module(module_ref);
-
-                    (
-                        scope_origin,
-                        executor.request(EstimateDeclScope {
-                            workspace: self.workspace,
-                            scope_origin,
-                        }),
+                .iter()
+                .flat_map(|(_, module)| module.files.iter())
+                .flat_map(
+                    |ast_file| self.workspace.symbols.all_conditional_name_scopes.get_span(
+                        self.workspace.symbols.all_name_scopes[ast_file.names]
+                            .conditonal_name_scopes
                     )
-                })
-                .collect(),
-            ctx
-        )
-        */
+                )
+                .collect_vec()
+        );
 
-        let mut main_modules = self
-            .workspace
-            .modules
-            .iter()
-            .filter(|(module_ref, module)| {
-                module
-                    .files
-                    .iter()
-                    .map(|file| &self.workspace.symbols.all_name_scopes[file.names])
-                    .any(|name_scope| {
-                        self.workspace
-                            .symbols
-                            .all_funcs
-                            .get_span(name_scope.funcs)
-                            .any(|f| f.head.tag == Some(Tag::Main))
-                    })
+        let Some(all_funcs) = executor.demand_many(&self.all_funcs) else {
+            let func_refs = scopes.iter().flat_map(|(decl_scope_origin, decl_scope)| {
+                decl_scope.iter_self().flat_map(|(_, decl_set)| {
+                    decl_set
+                        .func_decls()
+                        .map(|func_ref| (func_ref, *decl_scope))
+                })
             });
 
-        let Some((main_module_ref, main_module)) = main_modules.next() else {
-            return Err(ErrorDiagnostic::new("Missing 'main' function", Source::internal()).into());
+            let tasks = func_refs.map(|(func_ref, decl_scope)| {
+                GetFuncBody::new(&self.workspace, func_ref, decl_scope, builtin_types)
+            });
+
+            return suspend_many!(self.all_funcs, executor.request_many(tasks), ctx);
         };
 
-        if main_modules.next().is_some() {
-            return Err(
-                ErrorDiagnostic::new("Multiple main modules exist", Source::internal()).into(),
-            );
-        }
-
-        // Resolved Type -> Resolved Type w/ Layout -> IR Layout => IR
-
-        dbg!(&main_module);
-        //todo!("lower main module");
+        dbg!(all_funcs);
 
         let funcs = Arena::new();
 

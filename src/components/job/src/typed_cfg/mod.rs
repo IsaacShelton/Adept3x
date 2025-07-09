@@ -16,6 +16,7 @@ pub use value::*;
 #[derive(Clone, Debug)]
 pub struct Resolved<'env> {
     ty: Type<'env>,
+    #[allow(unused)]
     data: Option<ResolvedData>,
 }
 

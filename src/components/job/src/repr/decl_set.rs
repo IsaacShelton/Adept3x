@@ -17,4 +17,11 @@ impl<'env> DeclSet {
             _ => None,
         })
     }
+
+    pub fn func_decls(&self) -> impl Iterator<Item = ast_workspace::FuncRef> {
+        self.0.iter().filter_map(|decl| match decl {
+            Decl::Func(func_ref) => Some(*func_ref),
+            _ => None,
+        })
+    }
 }

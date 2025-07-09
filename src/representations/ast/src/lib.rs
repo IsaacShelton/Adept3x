@@ -1,4 +1,5 @@
 mod block;
+mod conditional_compilation;
 mod conforming;
 mod datatype;
 mod enumeration;
@@ -17,6 +18,7 @@ mod type_alias;
 mod type_params;
 
 pub use block::*;
+pub use conditional_compilation::*;
 pub use conforming::*;
 pub use datatype::*;
 pub use enumeration::*;

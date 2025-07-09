@@ -457,6 +457,7 @@ name = "compiler"
 version = "0.1.0"
 dependencies = [
  "compiler_version",
+ "derive_more",
  "diagnostics",
  "num_cpus",
  "once_map",

@@ -41,11 +41,74 @@ pub fn compile_single_file_only(
     compile_workspace(compiler, project_folder, Some(filepath.to_path_buf()))
 }
 
+// Work-in-Progress: New compilation system (full)
+pub fn compile(
+    compiler: &mut Compiler,
+    project_folder: &Path,
+    single_file: Option<PathBuf>,
+) -> Result<(), ()> {
+    let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
+    let build_options = compiler.options.clone();
+
+    let executor = job::MainExecutor::new();
+    let main_task = executor.spawn(
+        &[],
+        job::Main::new(
+            &build_options,
+            project_folder,
+            single_file.as_ref().map(|path_buf| path_buf.as_path()),
+        ),
+    );
+
+    let executed = executor.start(compiler.source_files, &mut allocator);
+    let show_executor_stats = false;
+
+    if executed.errors.len() > 0 {
+        for error in executed.errors.iter() {
+            error.eprintln(compiler.source_files);
+        }
+        return Err(());
+    } else if executed.num_scheduled != executed.num_completed {
+        let num_cyclic = executed.num_scheduled - executed.num_completed;
+
+        if num_cyclic == 1 {
+            println!("error: {} cyclic dependency found!", num_cyclic);
+        } else {
+            println!("error: {} cyclic dependencies found!", num_cyclic);
+        }
+
+        for task in executed.truth.tasks.values() {
+            if let TaskState::Suspended(_execution, _waiting_count) = &task.state {
+                println!(" Incomplete: {:?}", task);
+            }
+        }
+    } else if show_executor_stats {
+        println!(
+            "Tasks: {}/{}",
+            executed.num_completed, executed.num_scheduled,
+        );
+        println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
+    }
+
+    if let Some(executable_filepath) = executed.truth.demand(main_task) {
+        return compiler.execute_result(&executable_filepath);
+    } else {
+        Ok(())
+    }
+}
+
 pub fn compile_workspace(
     compiler: &mut Compiler,
     project_folder: &Path,
     single_file: Option<PathBuf>,
 ) -> Result<(), ()> {
+    // Work-in-Progress: New compilation system (full)
+    #[allow(unreachable_code)]
+    #[allow(unused_variables)]
+    if compiler.options.new_compilation_system.is_full() {
+        return compile(compiler, project_folder, single_file);
+    }
+
     let stats = CompilationStats::start();
 
     let fs = Fs::new();
@@ -86,10 +149,10 @@ pub fn compile_workspace(
     // Compile ASTs into workspace and propagate module settings to each module's contained files
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, module_folders);
 
-    // Work-in-Progress: New compilation system
+    // Work-in-Progress: New compilation system (middle-end only)
     #[allow(unreachable_code)]
     #[allow(unused_variables)]
-    if compiler.options.new_compilation_system {
+    if compiler.options.new_compilation_system.is_middle_end() {
         let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
         let build_options = compiler.options.clone();
 

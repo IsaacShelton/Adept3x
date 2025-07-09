@@ -1,5 +1,5 @@
 use super::BuildCommand;
-use compiler::BuildOptions;
+use compiler::{BuildOptions, NewCompilationSystem};
 use std::{path::PathBuf, str::FromStr};
 use target::{Target, TargetOs};
 
@@ -10,7 +10,12 @@ impl BuildCommand {
 
         while let Some(option) = args.next() {
             match option.as_str() {
-                "-x" => options.new_compilation_system = true,
+                // WIP: Opt-in flags for WIP new compilation system...
+                // These completely change how compilation works in
+                // very incompatible ways, and will be removed after
+                // the transition is complete.
+                "-xf" => options.new_compilation_system = NewCompilationSystem::Full,
+                "-xm" => options.new_compilation_system = NewCompilationSystem::MiddleEnd,
                 "-e" => options.execute_result = true,
                 "--emit-ir" => options.emit_ir = true,
                 "--emit-llvm-ir" => options.emit_llvm_ir = true,

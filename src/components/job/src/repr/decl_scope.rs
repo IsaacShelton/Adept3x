@@ -31,4 +31,8 @@ impl DeclScope {
     pub fn parent(&self) -> Option<DeclScopeRef> {
         self.parent
     }
+
+    pub fn iter_self(&self) -> impl Iterator<Item = (&str, &DeclSet)> {
+        self.names.iter().map(|x| (x.0.as_str(), x.1))
+    }
 }

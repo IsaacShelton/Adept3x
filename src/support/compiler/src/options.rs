@@ -1,3 +1,4 @@
+use derive_more::IsVariant;
 use std::{num::NonZero, path::PathBuf};
 use target::Target;
 
@@ -13,7 +14,19 @@ pub struct BuildOptions {
     pub target: Target,
     pub infrastructure: Option<PathBuf>,
     pub available_parallelism: NonZero<usize>,
-    pub new_compilation_system: bool,
+    pub new_compilation_system: NewCompilationSystem,
+}
+
+// Gradual adoption of new compilation system.
+// This will be removed once the transition is complete.
+#[derive(Copy, Clone, Debug, IsVariant)]
+pub enum NewCompilationSystem {
+    // Old compilation system (will be removed once transition is complete)
+    Legacy,
+    // Only use new compilation system for middle-end (useful for limited testing)
+    MiddleEnd,
+    // Fully use the new compilation system (this alters lexing/parsing as well)
+    Full,
 }
 
 impl Default for BuildOptions {
@@ -38,7 +51,7 @@ impl Default for BuildOptions {
             target: Target::HOST,
             infrastructure: Some(infrastructure),
             available_parallelism,
-            new_compilation_system: false,
+            new_compilation_system: NewCompilationSystem::Legacy,
         }
     }
 }

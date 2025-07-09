@@ -3,7 +3,7 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
 };
-use ast::NamespaceItems;
+use ast::{ConditionalCompilation, NamespaceItems};
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
@@ -15,6 +15,32 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             self.ignore_newlines();
         }
         Ok(items)
+    }
+
+    pub fn parse_top_level_block(
+        &mut self,
+        namespace_items: &mut NamespaceItems,
+        parent_annotations: Vec<Annotation>,
+    ) -> Result<(), ParseError> {
+        self.input
+            .expect(TokenKind::OpenCurly, "to open top level block")?;
+
+        self.ignore_newlines();
+
+        while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
+            self.parse_top_level(namespace_items, parent_annotations.clone())?;
+            self.ignore_newlines();
+        }
+
+        self.input
+            .expect(TokenKind::CloseCurly, "to close top level block")?;
+        Ok(())
+    }
+
+    pub fn parse_top_level_new_block(&mut self) -> Result<NamespaceItems, ParseError> {
+        let mut namespace_items = NamespaceItems::default();
+        self.parse_top_level_block(&mut namespace_items, vec![])?;
+        Ok(namespace_items)
     }
 
     pub fn parse_top_level(
@@ -43,17 +69,54 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         // Parse top-level construct
         match self.input.peek().kind {
-            TokenKind::OpenCurly => {
-                self.input.advance().kind.unwrap_open_curly();
-                self.ignore_newlines();
-
-                while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-                    self.parse_top_level(namespace_items, annotations.clone())?;
-                    self.ignore_newlines();
+            TokenKind::IfKeyword => {
+                for annotation in annotations {
+                    match annotation.kind {
+                        // NOTE: Comptime is implied
+                        AnnotationKind::Comptime => (),
+                        _ => {
+                            return Err(self.unexpected_annotation(
+                                &annotation,
+                                "for conditional compilation block",
+                            ));
+                        }
+                    }
                 }
 
-                self.input
-                    .expect(TokenKind::CloseCurly, "to close annotation group")?;
+                self.input.advance().kind.unwrap_if_keyword();
+                self.ignore_newlines();
+
+                let condition = self.parse_expr()?;
+                let inner_items = self.parse_top_level_new_block()?;
+                let mut conditions = vec![(condition, inner_items)];
+
+                while self.input.peek_is(TokenKind::ElifKeyword) {
+                    self.input.advance().kind.unwrap_elif_keyword();
+                    self.ignore_newlines();
+
+                    let condition = self.parse_expr()?;
+                    let inner_items = self.parse_top_level_new_block()?;
+                    conditions.push((condition, inner_items));
+                }
+
+                let otherwise = self
+                    .input
+                    .peek_is(TokenKind::ElseKeyword)
+                    .then(|| {
+                        self.input.advance().kind.unwrap_else_keyword();
+                        self.parse_top_level_new_block()
+                    })
+                    .transpose()?;
+
+                namespace_items
+                    .conditional_compilations
+                    .push(ConditionalCompilation {
+                        conditions,
+                        otherwise,
+                    });
+            }
+            TokenKind::OpenCurly => {
+                self.parse_top_level_block(namespace_items, annotations)?;
             }
             TokenKind::PragmaKeyword => {
                 return Err(ParseErrorKind::Other {

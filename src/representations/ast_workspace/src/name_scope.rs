@@ -1,6 +1,7 @@
 use crate::{
-    EnumId, ExprAliasId, FuncId, GlobalId, ImplId, NameScopeRef, Namespace, NamespaceId, StructId,
-    TraitId, TypeAliasId, TypeDeclRef,
+    ConditionalNameScopeId, EnumId, ExprAliasId, FuncId, GlobalId, ImplId, NameScopeRef, Namespace,
+    NamespaceId, StructId, TraitId, TypeAliasId, TypeDeclRef,
+    conditional_name_scope::ConditionalNameScope,
 };
 use arena::IdxSpan;
 use ast::{Enum, ExprAlias, Func, Global, Impl, Struct, Trait, TypeAlias};
@@ -16,6 +17,7 @@ pub struct NameScope {
     pub traits: IdxSpan<TraitId, Trait>,
     pub impls: IdxSpan<ImplId, Impl>,
     pub namespaces: IdxSpan<NamespaceId, Namespace>,
+    pub conditonal_name_scopes: IdxSpan<ConditionalNameScopeId, ConditionalNameScope>,
     pub parent: Option<NameScopeRef>,
 }
 

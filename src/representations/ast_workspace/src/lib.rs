@@ -1,5 +1,6 @@
 mod all_symbols;
 mod ast_file;
+mod conditional_name_scope;
 mod configure_job;
 mod module;
 mod name_scope;
@@ -11,6 +12,7 @@ use arena::{Arena, ArenaMap, Idx, new_id_with_niche};
 use ast::{Enum, ExprAlias, Func, Global, Impl, RawAstFile, Struct, Trait, TypeAlias};
 pub use ast_file::*;
 use ast_workspace_settings::{Settings, SettingsId, SettingsRef};
+use conditional_name_scope::ConditionalNameScope;
 use configure_job::ConfigureJob;
 use fs_tree::{Fs, FsNodeId};
 pub use module::*;
@@ -20,17 +22,18 @@ use source_files::SourceFiles;
 use std::collections::{HashMap, HashSet, VecDeque};
 pub use type_decl_ref::TypeDeclRef;
 
-new_id_with_niche!(FuncId, u64);
-new_id_with_niche!(StructId, u64);
-new_id_with_niche!(EnumId, u64);
-new_id_with_niche!(GlobalId, u64);
-new_id_with_niche!(TypeAliasId, u64);
-new_id_with_niche!(ExprAliasId, u64);
-new_id_with_niche!(TraitId, u64);
-new_id_with_niche!(ImplId, u64);
-new_id_with_niche!(NameScopeId, u64);
-new_id_with_niche!(ModuleId, u64);
-new_id_with_niche!(NamespaceId, u64);
+new_id_with_niche!(FuncId, u32);
+new_id_with_niche!(StructId, u32);
+new_id_with_niche!(EnumId, u32);
+new_id_with_niche!(GlobalId, u32);
+new_id_with_niche!(TypeAliasId, u32);
+new_id_with_niche!(ExprAliasId, u32);
+new_id_with_niche!(TraitId, u32);
+new_id_with_niche!(ImplId, u32);
+new_id_with_niche!(NameScopeId, u32);
+new_id_with_niche!(ModuleId, u32);
+new_id_with_niche!(NamespaceId, u32);
+new_id_with_niche!(ConditionalNameScopeId, u32);
 
 pub type FuncRef = Idx<FuncId, Func>;
 pub type StructRef = Idx<StructId, Struct>;
@@ -43,6 +46,7 @@ pub type ImplRef = Idx<ImplId, Impl>;
 pub type NameScopeRef = Idx<NameScopeId, NameScope>;
 pub type ModuleRef = Idx<ModuleId, Module>;
 pub type NamespaceRef = Idx<NamespaceId, Namespace>;
+pub type ConditonalNameScopeRef = Idx<ConditionalNameScopeId, ConditionalNameScope>;
 
 #[derive(Debug)]
 pub struct AstWorkspace<'source_files> {

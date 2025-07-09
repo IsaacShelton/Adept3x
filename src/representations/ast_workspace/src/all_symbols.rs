@@ -1,6 +1,7 @@
 use crate::{
-    EnumId, ExprAliasId, FuncId, GlobalId, ImplId, NameScope, NameScopeId, NameScopeRef, Namespace,
-    NamespaceId, StructId, TraitId, TypeAliasId,
+    ConditionalNameScopeId, EnumId, ExprAliasId, FuncId, GlobalId, ImplId, NameScope, NameScopeId,
+    NameScopeRef, Namespace, NamespaceId, StructId, TraitId, TypeAliasId,
+    conditional_name_scope::ConditionalNameScope,
 };
 use arena::{IdxSpan, LockFreeArena};
 use ast::{Enum, ExprAlias, Func, Global, Impl, NamespaceItems, Struct, Trait, TypeAlias};
@@ -18,6 +19,7 @@ pub struct AstWorkspaceSymbols {
     pub all_impls: LockFreeArena<ImplId, Impl>,
     pub all_namespaces: LockFreeArena<NamespaceId, Namespace>,
     pub all_name_scopes: LockFreeArena<NameScopeId, NameScope>,
+    pub all_conditional_name_scopes: LockFreeArena<ConditionalNameScopeId, ConditionalNameScope>,
 }
 
 impl AstWorkspaceSymbols {
@@ -55,6 +57,7 @@ impl AstWorkspaceSymbols {
             traits,
             impls,
             namespaces: IdxSpan::default(),
+            conditonal_name_scopes: IdxSpan::default(),
             parent,
         });
 
@@ -67,8 +70,34 @@ impl AstWorkspaceSymbols {
             });
         }
 
+        let mut conditional_name_scopes = Vec::with_capacity(items.conditional_compilations.len());
+        for conditional in items.conditional_compilations {
+            let conditions = conditional
+                .conditions
+                .into_iter()
+                .map(|(expr, items)| {
+                    (
+                        expr,
+                        self.new_name_scope(items, Some(new_name_scope), settings),
+                    )
+                })
+                .collect();
+
+            let otherwise = conditional
+                .otherwise
+                .map(|items| self.new_name_scope(items, Some(new_name_scope), settings));
+
+            conditional_name_scopes.push(ConditionalNameScope {
+                conditions,
+                otherwise,
+            });
+        }
+
         self.all_name_scopes[new_name_scope].namespaces =
             self.all_namespaces.alloc_many(namespaces.into_iter());
+        self.all_name_scopes[new_name_scope].conditonal_name_scopes = self
+            .all_conditional_name_scopes
+            .alloc_many(conditional_name_scopes.into_iter());
         new_name_scope
     }
 }
