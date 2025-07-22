@@ -1,7 +1,7 @@
 use crate::{
     ConditionalNameScopeId, EnumId, ExprAliasId, FuncId, GlobalId, ImplId, NameScope, NameScopeId,
-    NameScopeRef, Namespace, NamespaceId, StructId, TraitId, TypeAliasId,
-    conditional_name_scope::ConditionalNameScope,
+    NameScopeRef, Namespace, NamespaceId, StructId, TraitId, TypeAliasId, TypeDeclRef,
+    conditional_name_scope::ConditionalNameScope, type_decl_ref::TypeDecl,
 };
 use arena::{IdxSpan, LockFreeArena};
 use ast::{Enum, ExprAlias, Func, Global, Impl, NamespaceItems, Struct, Trait, TypeAlias};
@@ -25,6 +25,15 @@ pub struct AstWorkspaceSymbols {
 impl AstWorkspaceSymbols {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn get_type<'a>(&'a self, type_decl_ref: TypeDeclRef) -> TypeDecl<'a> {
+        match type_decl_ref {
+            TypeDeclRef::Struct(inner) => TypeDecl::Struct(&self.all_structs[inner]),
+            TypeDeclRef::Enum(inner) => TypeDecl::Enum(&self.all_enums[inner]),
+            TypeDeclRef::Alias(inner) => TypeDecl::Alias(&self.all_type_aliases[inner]),
+            TypeDeclRef::Trait(inner) => TypeDecl::Trait(&self.all_traits[inner]),
+        }
     }
 
     pub fn new_name_scope(

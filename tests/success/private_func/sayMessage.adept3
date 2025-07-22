@@ -1,6 +1,6 @@
 
 #[foreign]
-func printf(format ptr#char, ...) int
+func printf(format ptr'char, ...) int
 
 func sayMessage() {
     helloWorld()

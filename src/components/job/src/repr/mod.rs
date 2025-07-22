@@ -1,4 +1,5 @@
 mod decl;
+mod decl_head_set;
 mod decl_scope;
 mod decl_scope_origin;
 mod decl_scope_ref;
@@ -16,6 +17,7 @@ mod variables;
 
 use ast_workspace::TypeDeclRef;
 pub use decl::*;
+pub use decl_head_set::*;
 pub use decl_scope::*;
 pub use decl_scope_origin::*;
 pub use decl_scope_ref::*;

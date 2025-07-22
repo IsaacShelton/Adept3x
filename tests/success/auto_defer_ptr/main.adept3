@@ -2,13 +2,15 @@
 pragma => adept("3.0")
 
 #[foreign]
-func printf(format ptr#char, ...) int
+func printf(format ptr'char, ...) int
 
-struct Person (firstname ptr#char, lastname ptr#char)
+struct Person (firstname ptr'char, lastname ptr'char)
 
 func main {
     john := Person { firstname: c"John", lastname: c"Smith" }
+    value ptr'char = c"arstr"
     person := &john
 
     printf(c"%s %s\n", person.firstname, person.lastname)
 }
+

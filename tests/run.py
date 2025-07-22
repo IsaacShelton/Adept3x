@@ -28,14 +28,14 @@ def run_all_tests():
 
 def prepare(executable, dir, entry):
     folder = join(dir, entry.name)
-    is_mod = exists(join(folder, "_.adept"))
+    is_mod = exists(join(folder, "_.adept3"))
 
     cmd = [executable, "--infrastructure", "infrastructure"]
 
     if is_mod:
         cmd.append(folder)
     else:
-        cmd.append(join(folder, "main.adept"))
+        cmd.append(join(folder, "main.adept3"))
 
     return cmd
 

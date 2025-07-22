@@ -1,2 +1,0 @@
-
-int special_value;

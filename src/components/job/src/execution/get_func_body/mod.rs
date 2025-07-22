@@ -370,7 +370,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                                 unified_type
                             };
 
-                            Resolved::new(result_type, ResolvedData::BasicBinaryOperator(operator))
+                            Resolved::new(result_type, ResolvedData::BinaryImplicitCast(operator))
                         }
                     }
                     SequentialNodeKind::Boolean(value) => {

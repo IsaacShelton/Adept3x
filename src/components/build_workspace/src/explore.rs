@@ -78,7 +78,7 @@ pub fn explore(
             )
             .expect("you aren't living millions of years into the future");
 
-            if basename == "_.adept" {
+            if basename == "_.adept" || basename == "_.adept3" {
                 let fs_node_id = fs
                     .insert(entry.path(), Some(last_modified_ms))
                     .expect("inserted");
@@ -87,7 +87,7 @@ pub fn explore(
             }
 
             let kind = match entry.path().extension().and_then(OsStr::to_str) {
-                Some("adept") => NormalFileKind::Adept,
+                Some("adept" | "adept3") => NormalFileKind::Adept,
                 Some("c") => NormalFileKind::CSource,
                 Some("h") => NormalFileKind::CHeader,
                 _ => return WalkState::Continue,

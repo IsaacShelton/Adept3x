@@ -24,6 +24,10 @@ impl<'env> Type<'env> {
     pub fn numeric_mode(&self) -> Option<NumericMode> {
         self.kind.numeric_mode()
     }
+
+    pub fn contains_polymorph(&self) -> bool {
+        self.kind.contains_polymorph()
+    }
 }
 
 impl<'env> Display for Type<'env> {
@@ -36,6 +40,15 @@ impl<'env> Display for Type<'env> {
 pub enum TypeArg<'env> {
     Type(&'env Type<'env>),
     Integer(BigInt),
+}
+
+impl<'env> TypeArg<'env> {
+    pub fn contains_polymorph(&self) -> bool {
+        match self {
+            TypeArg::Type(ty) => ty.contains_polymorph(),
+            TypeArg::Integer(_) => false,
+        }
+    }
 }
 
 impl<'env> Display for TypeArg<'env> {
@@ -104,6 +117,28 @@ impl<'env> TypeKind<'env> {
             }),
             Self::Floating(_) => Some(NumericMode::Float),
             _ => None,
+        }
+    }
+
+    pub fn contains_polymorph(&self) -> bool {
+        match self {
+            TypeKind::Boolean
+            | TypeKind::BooleanLiteral(_)
+            | TypeKind::BitInteger(_, _)
+            | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
+            | TypeKind::IntegerLiteral(_)
+            | TypeKind::FloatLiteral(_)
+            | TypeKind::Floating(_) => false,
+            TypeKind::Ptr(inner) => inner.kind.contains_polymorph(),
+            TypeKind::Void | TypeKind::Never => false,
+            TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
+            TypeKind::Polymorph(_) => true,
+            TypeKind::UserDefined(user_defined_type) => user_defined_type
+                .args
+                .iter()
+                .any(|arg| arg.contains_polymorph()),
+            TypeKind::DirectLabel(_) => false,
         }
     }
 }

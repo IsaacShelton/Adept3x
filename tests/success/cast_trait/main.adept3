@@ -6,7 +6,7 @@ pragma => {
 }
 
 #[foreign]
-func printf(format ptr#char, ...) int
+func printf(format ptr'char, ...) int
 
 func main {
     castTest(1234)::(std/castI32ToDouble, std/castI32ToLongLong)
@@ -18,6 +18,6 @@ func castTest(x i32) {
     printf(c"With long form generics syntax:\n")
     printf(c"%d %f %lld\n", x, x.cast<double>(), x.cast<longlong>())
     printf(c"With shorthand generics syntax:\n")
-    printf(c"%d %f %lld\n", x, x.cast#double(), x.cast#longlong())
+    printf(c"%d %f %lld\n", x, x.cast'double(), x.cast'longlong())
 }
 

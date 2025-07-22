@@ -20,7 +20,7 @@ pub use name_scope::*;
 pub use namespace::*;
 use source_files::SourceFiles;
 use std::collections::{HashMap, HashSet, VecDeque};
-pub use type_decl_ref::TypeDeclRef;
+pub use type_decl_ref::{TypeDecl, TypeDeclRef};
 
 new_id_with_niche!(FuncId, u32);
 new_id_with_niche!(StructId, u32);
@@ -206,6 +206,10 @@ impl<'source_files> AstWorkspace<'source_files> {
                     .map(|child_fs_node_id| ConfigureJob::new(child_fs_node_id, settings)),
             );
         }
+    }
+
+    pub fn get_type<'a>(&'a self, type_decl_ref: TypeDeclRef) -> TypeDecl<'a> {
+        self.symbols.get_type(type_decl_ref)
     }
 }
 

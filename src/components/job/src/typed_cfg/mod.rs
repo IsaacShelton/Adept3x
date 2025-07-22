@@ -7,6 +7,7 @@
 mod value;
 
 use crate::repr::{Type, TypeKind};
+use derive_more::From;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
 use primitives::{FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate};
@@ -52,11 +53,16 @@ impl<'env> Resolved<'env> {
 }
 
 #[derive(Clone, Debug)]
-pub enum ResolvedData {
-    BasicBinaryOperator(BasicBinaryOperator),
+pub enum UnaryImplicitCast {
     SpecializeBoolean(bool),
     SpecializeInteger(BigInt),
     SpecializeFloat(Option<NotNan<f64>>),
+}
+
+#[derive(Clone, Debug, From)]
+pub enum ResolvedData {
+    UnaryImplicitCast(UnaryImplicitCast),
+    BinaryImplicitCast(BasicBinaryOperator),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

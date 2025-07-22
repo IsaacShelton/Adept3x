@@ -1,5 +1,5 @@
 use crate::{
-    BuiltinTypes, Resolved, ResolvedData,
+    BuiltinTypes, Resolved, UnaryImplicitCast,
     repr::{Type, TypeKind},
 };
 use data_units::BitUnits;
@@ -32,11 +32,11 @@ pub fn conform_to_default<'env>(
         .ok_or_else(|| ErrorDiagnostic::new("Failed to specialize integer literal", source))?,
         TypeKind::FloatLiteral(not_nan) => Resolved::new(
             TypeKind::Floating(FloatSize::Bits64).at(source),
-            ResolvedData::SpecializeFloat(not_nan.clone()),
+            UnaryImplicitCast::SpecializeFloat(not_nan.clone()).into(),
         ),
         TypeKind::BooleanLiteral(value) => Resolved::new(
             TypeKind::Boolean.at(source),
-            ResolvedData::SpecializeBoolean(*value),
+            UnaryImplicitCast::SpecializeBoolean(*value).into(),
         ),
         _ => Resolved::from_type(ty.clone()),
     })
@@ -52,7 +52,7 @@ fn from_integer_literal<'env>(
         TypeKind::Floating(float_size) => value.to_f64().map(|float| {
             Resolved::new(
                 TypeKind::Floating(*float_size).at(source),
-                ResolvedData::SpecializeFloat(NotNan::new(float).ok()),
+                UnaryImplicitCast::SpecializeFloat(NotNan::new(float).ok()).into(),
             )
         }),
         TypeKind::BitInteger(to_bits, to_sign) => {
@@ -70,7 +70,7 @@ fn from_integer_literal<'env>(
             does_fit.then(|| {
                 Resolved::new(
                     TypeKind::BitInteger(*to_bits, *to_sign).at(source),
-                    ResolvedData::SpecializeInteger(value.clone()),
+                    UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
                 )
             })
         }
@@ -81,7 +81,7 @@ fn from_integer_literal<'env>(
             (needs_bits <= to_c_integer.min_bits(assumptions).bits()).then(|| {
                 Resolved::new(
                     TypeKind::CInteger(*to_c_integer, *to_sign).at(source),
-                    ResolvedData::SpecializeInteger(value.clone()),
+                    UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
                 )
             })
         }
@@ -96,7 +96,7 @@ fn from_integer_literal<'env>(
             does_fit.then(|| {
                 Resolved::new(
                     TypeKind::SizeInteger(*to_sign).at(source),
-                    ResolvedData::SpecializeInteger(value.clone()),
+                    UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
                 )
             })
         }
