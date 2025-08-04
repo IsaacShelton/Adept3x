@@ -46,6 +46,7 @@ members = [
     "src/support/arena",
     "src/support/optional_string",
     "src/support/append_only_vec",
+    "src/support/threadpool",
 ]
 
 [workspace.dependencies]

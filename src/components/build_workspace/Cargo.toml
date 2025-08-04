@@ -42,4 +42,5 @@ source_files = { version = "0.1.0", path = "../../representations/source_files" 
 target = { version = "0.1.0", path = "../../support/target" }
 text = { version = "0.1.0", path = "../../support/text" }
 thousands.workspace = true
+threadpool = { version = "0.1.0", path = "../../support/threadpool" }
 token = { version = "0.1.0", path = "../../representations/token" }

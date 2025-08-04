@@ -35,6 +35,11 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         if !self.input.peek_nth(1).is_identifier() {
             let expr = self.parse_expr()?;
+            todo!(
+                "namespaces created by expression are not implemented yet - {:?}",
+                expr
+            );
+            #[allow(unreachable_code)]
             return Err(ParseErrorKind::CannotCallFunctionsAtGlobalScope.at(self.input.here()));
         }
 

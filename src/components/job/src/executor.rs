@@ -11,6 +11,7 @@
 use crate::{
     Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, SuspendMany,
     SuspendManyAssoc, Task, TaskId, TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
+    io::{IoRequest, IoRequestHandle, IoResponse},
 };
 use arena::Arena;
 use crossbeam_deque::Injector as InjectorQueue;
@@ -19,9 +20,11 @@ use std::{
     sync::{
         RwLock,
         atomic::{AtomicUsize, Ordering},
+        mpsc,
     },
 };
 use std_ext::BoxedSlice;
+use threadpool::ThreadPool;
 
 pub struct Executor<'env> {
     pub injector: InjectorQueue<TaskRef<'env>>,
@@ -30,11 +33,14 @@ pub struct Executor<'env> {
     pub num_scheduled: AtomicUsize,
     pub num_queued: AtomicUsize,
     pub num_cleared: AtomicUsize,
+    pub next_io_handle: AtomicUsize,
+    pub io_thread_pool: &'env ThreadPool,
+    pub io_tx: mpsc::Sender<IoResponse>,
 }
 
 impl<'env> Executor<'env> {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(io_thread_pool: &'env ThreadPool, io_tx: mpsc::Sender<IoResponse>) -> Self {
         Self {
             truth: RwLock::new(Truth::new()),
             injector: InjectorQueue::new(),
@@ -42,7 +48,29 @@ impl<'env> Executor<'env> {
             num_completed: AtomicUsize::new(0),
             num_queued: AtomicUsize::new(0),
             num_cleared: AtomicUsize::new(0),
+            next_io_handle: AtomicUsize::new(1),
+            io_thread_pool,
+            io_tx,
         }
+    }
+
+    #[must_use]
+    pub fn request_io(&self, io_request: IoRequest) -> IoRequestHandle {
+        let handle = IoRequestHandle(self.next_io_handle.fetch_add(1, Ordering::Relaxed));
+        let io_tx = self.io_tx.clone();
+
+        self.io_thread_pool.execute(move || match io_request {
+            IoRequest::ReadFile(path) => {
+                io_tx
+                    .send(IoResponse {
+                        handle,
+                        payload: std::fs::read_to_string(path).map_err(|e| e.to_string()),
+                    })
+                    .expect("failed to send io response");
+            }
+        });
+
+        handle
     }
 
     #[must_use]

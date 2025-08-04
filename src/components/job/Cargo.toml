@@ -36,3 +36,4 @@ smallvec = "1.15.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
 std_ext = { version = "0.1.0", path = "../../support/std_ext" }
 target = { version = "0.1.0", path = "../../support/target" }
+threadpool = { version = "0.1.0", path = "../../support/threadpool" }

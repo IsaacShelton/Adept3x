@@ -11,20 +11,29 @@
 use crate::{
     BumpAllocatorPool, Executable, Execution, Executor, Pending, TaskRef, TopN, Truth, Worker,
     WorkerRef,
+    io::{IoRequest, IoResponse},
 };
 use diagnostics::ErrorDiagnostic;
 use source_files::SourceFiles;
-use std::{sync::atomic::Ordering, thread};
+use std::{
+    sync::{atomic::Ordering, mpsc},
+    thread,
+};
+use threadpool::ThreadPool;
 
 pub struct MainExecutor<'env> {
     pub executor: Executor<'env>,
+    pub io_rx: mpsc::Receiver<IoResponse>,
 }
 
 impl<'env> MainExecutor<'env> {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(io_thread_pool: &'env ThreadPool) -> Self {
+        let (io_tx, io_rx) = mpsc::channel::<IoResponse>();
+
         Self {
-            executor: Executor::new(),
+            executor: Executor::new(io_thread_pool, io_tx),
+            io_rx,
         }
     }
 
@@ -67,6 +76,20 @@ impl<'env> MainExecutor<'env> {
                 |a, b| a.cmp_with(b, source_files),
             )
         });
+
+        // Using io thread pool for io requests
+        for _ in 0..1000 {
+            let _io_handle = self
+                .executor
+                .request_io(IoRequest::ReadFile("/Users/isaac/a.c".into()));
+        }
+
+        self.executor.io_thread_pool.join();
+
+        // Very simple handling of responses, without taking the io handles into account yet
+        while let Ok(response) = self.io_rx.try_recv() {
+            println!("{:?}", response);
+        }
 
         MainExecutorStats {
             num_completed: self.executor.num_completed.load(Ordering::Relaxed),

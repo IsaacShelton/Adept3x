@@ -68,6 +68,7 @@ mod continuation;
 mod execution;
 mod execution_ctx;
 mod executor;
+mod io;
 mod main_executor;
 mod module_graph;
 mod pending;

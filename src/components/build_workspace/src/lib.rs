@@ -32,6 +32,7 @@ use queue::LexParseInfo;
 use stats::CompilationStats;
 use std::path::{Path, PathBuf};
 use thousands::Separable;
+use threadpool::ThreadPool;
 
 pub fn compile_single_file_only(
     compiler: &mut Compiler,
@@ -50,7 +51,15 @@ pub fn compile(
     let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
     let build_options = compiler.options.clone();
 
-    let executor = job::MainExecutor::new();
+    // À la tokio, we keep a thread pool for blocking tasks.
+    // This 500 number is based off of what tokio does by default.
+    // The overhead for spawning these should be <5ms even in conservative scenarios.
+    // *HOWEVER*, we're keeping this low initially, as 500 is probably overkill.
+    const MIN_IO_THREADS: usize = 10;
+    const MAX_IO_THREADS: usize = 400;
+    let io_thread_pool = ThreadPool::new_growable(MIN_IO_THREADS, MAX_IO_THREADS);
+
+    let executor = job::MainExecutor::new(&io_thread_pool);
     let main_task = executor.spawn(
         &[],
         job::Main::new(
