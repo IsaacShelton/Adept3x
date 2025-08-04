@@ -1,9 +1,10 @@
 use crate::{
-    BuiltinTypes, ExecutionCtx, Executor, ResolveType, Suspend,
+    BuiltinTypes, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend,
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
     },
-    repr::{DeclScope, Type},
+    module_graph::ModuleView,
+    repr::Type,
     sub_task::SubTask,
 };
 use arena::ArenaMap;
@@ -16,7 +17,7 @@ pub struct ComputePreferredTypesUserData<'env, 'a> {
     pub cfg: &'env UntypedCfg,
     pub func_return_type: &'env ast::Type,
     pub workspace: &'env AstWorkspace<'env>,
-    pub decl_scope: &'env DeclScope,
+    pub view: ModuleView<'env>,
     pub builtin_types: &'env BuiltinTypes<'env>,
 }
 
@@ -64,10 +65,10 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                         return sub_task_suspend!(
                             self,
                             waiting_on_type,
-                            executor.request(ResolveType::new(
+                            executor.request(ResolveTypeKeepAliases::new(
                                 user_data.workspace,
                                 expected_var_ty,
-                                user_data.decl_scope,
+                                user_data.view,
                             )),
                             ctx
                         );
@@ -128,10 +129,10 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                         return sub_task_suspend!(
                             self,
                             waiting_on_type,
-                            executor.request(ResolveType::new(
+                            executor.request(ResolveTypeKeepAliases::new(
                                 user_data.workspace,
                                 user_data.func_return_type,
-                                user_data.decl_scope
+                                user_data.view,
                             )),
                             ctx
                         );

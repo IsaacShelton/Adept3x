@@ -9,6 +9,8 @@ use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_namespace_items(&mut self) -> Result<NamespaceItems, ParseError> {
+        self.ignore_newlines();
+
         let mut items = NamespaceItems::default();
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
             self.parse_top_level(&mut items, vec![])?;
@@ -134,6 +136,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     .globals
                     .push(self.parse_global(annotations)?);
             }
+
             TokenKind::StructKeyword => namespace_items
                 .structs
                 .push(self.parse_structure(annotations)?),

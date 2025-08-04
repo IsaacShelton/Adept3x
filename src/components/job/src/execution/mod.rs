@@ -1,10 +1,6 @@
-mod build_workspace;
 mod diverge;
-mod estimate_decl_scope;
-mod estimate_type_heads;
 mod find_type;
 mod find_type_in_decl_set;
-mod find_type_in_estimated;
 mod get_func_body;
 mod get_func_head;
 mod get_type_body;
@@ -13,16 +9,13 @@ mod main;
 mod print;
 mod resolve_type;
 mod resolve_type_arg;
+mod resolve_type_keep_aliases;
 
 use crate::{Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom};
-pub use build_workspace::BuildWorkspace;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
-pub use estimate_decl_scope::EstimateDeclScope;
-use estimate_type_heads::EstimateTypeHeads;
 pub use find_type::FindType;
 use find_type_in_decl_set::FindTypeInDeclSet;
-pub use find_type_in_estimated::FindTypeInEstimated;
 pub use get_func_body::*;
 pub use get_func_head::*;
 pub use get_type_body::GetTypeBody;
@@ -31,6 +24,7 @@ pub use main::Main;
 pub use print::Print;
 pub use resolve_type::ResolveType;
 pub use resolve_type_arg::*;
+pub use resolve_type_keep_aliases::*;
 
 #[enum_dispatch]
 pub trait RawExecutable<'env> {
@@ -71,17 +65,14 @@ where
 #[enum_dispatch(RawExecutable)]
 pub enum Execution<'env> {
     Main(Main<'env>),
-    BuildWorkspace(BuildWorkspace<'env>),
     Diverge(Diverge),
     Print(Print<'env>),
-    EstimateDeclScope(EstimateDeclScope<'env>),
     GetTypeHead(GetTypeHead<'env>),
-    EstimateTypeHeads(EstimateTypeHeads<'env>),
-    FindTypeInEstimated(FindTypeInEstimated<'env>),
     FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
     GetTypeBody(GetTypeBody<'env>),
     ResolveType(ResolveType<'env>),
+    ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
     ResolveTypeArg(ResolveTypeArg<'env>),
     GetFuncHead(GetFuncHead<'env>),
     GetFuncBody(GetFuncBody<'env>),
@@ -92,14 +83,12 @@ pub enum Execution<'env> {
 pub enum Request<'env> {
     Diverge(Diverge),
     Print(Print<'env>),
-    EstimateDeclScope(EstimateDeclScope<'env>),
     GetTypeHead(GetTypeHead<'env>),
-    EstimateTypeHeads(EstimateTypeHeads<'env>),
-    FindTypeInEstimated(FindTypeInEstimated<'env>),
     FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
     GetTypeBody(GetTypeBody<'env>),
     ResolveType(ResolveType<'env>),
+    ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
     ResolveTypeArg(ResolveTypeArg<'env>),
     GetFuncHead(GetFuncHead<'env>),
     GetFuncBody(GetFuncBody<'env>),

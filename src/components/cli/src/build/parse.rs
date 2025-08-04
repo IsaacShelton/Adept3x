@@ -14,8 +14,7 @@ impl BuildCommand {
                 // These completely change how compilation works in
                 // very incompatible ways, and will be removed after
                 // the transition is complete.
-                "-xf" => options.new_compilation_system = NewCompilationSystem::Full,
-                "-xm" => options.new_compilation_system = NewCompilationSystem::MiddleEnd,
+                "-x" => options.new_compilation_system = NewCompilationSystem::Full,
                 "-e" => options.execute_result = true,
                 "--emit-ir" => options.emit_ir = true,
                 "--emit-llvm-ir" => options.emit_llvm_ir = true,
@@ -46,7 +45,12 @@ impl BuildCommand {
                             .expect("invalid non-utf-8 infrastructure path"),
                     );
                 }
-                _ => {
+                bad_option => {
+                    if bad_option.starts_with("-") {
+                        eprintln!("error: Unrecognized option '{}'", bad_option);
+                        return Err(());
+                    }
+
                     if filename.replace(option).is_some() {
                         eprintln!("error: Multiple paths specified");
                         return Err(());

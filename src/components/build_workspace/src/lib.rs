@@ -149,55 +149,6 @@ pub fn compile_workspace(
     // Compile ASTs into workspace and propagate module settings to each module's contained files
     let workspace = AstWorkspace::new(fs, files, compiler.source_files, module_folders);
 
-    // Work-in-Progress: New compilation system (middle-end only)
-    #[allow(unreachable_code)]
-    #[allow(unused_variables)]
-    if compiler.options.new_compilation_system.is_middle_end() {
-        let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
-        let build_options = compiler.options.clone();
-
-        let executor = job::MainExecutor::new();
-        let build_workspace_task =
-            executor.spawn(&[], job::BuildWorkspace::new(&workspace, &build_options));
-
-        let executed = executor.start(compiler.source_files, &mut allocator);
-        let show_executor_stats = false;
-
-        if executed.errors.len() > 0 {
-            for error in executed.errors.iter() {
-                error.eprintln(source_files);
-            }
-            return Err(());
-        } else if executed.num_scheduled != executed.num_completed {
-            let num_cyclic = executed.num_scheduled - executed.num_completed;
-
-            if num_cyclic == 1 {
-                println!("error: {} cyclic dependency found!", num_cyclic);
-            } else {
-                println!("error: {} cyclic dependencies found!", num_cyclic);
-            }
-
-            for task in executed.truth.tasks.values() {
-                if let TaskState::Suspended(execution, waiting_count) = &task.state {
-                    println!(" Incomplete: {:?}", task);
-                }
-            }
-        } else if show_executor_stats {
-            println!(
-                "Tasks: {}/{}",
-                executed.num_completed, executed.num_scheduled,
-            );
-            println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
-        }
-
-        let ir_module = executed.truth.demand(build_workspace_task);
-
-        // Export and link to create executable
-        let export_details = export_and_link(compiler, project_folder, &ir_module)?;
-        print_summary(&stats);
-        return compiler.execute_result(&export_details.executable_filepath);
-    }
-
     // Resolve symbols and validate semantics for workspace
     let asg = unerror(resolve(&workspace, &compiler.options), source_files)?;
 

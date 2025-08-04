@@ -94,6 +94,7 @@ pub enum TokenKind {
     BreakKeyword,
     ContinueKeyword,
     NamespaceKeyword,
+    ModKeyword,
     GotoKeyword,
     Member,
     Add,
@@ -197,6 +198,7 @@ impl Display for TokenKind {
             TokenKind::BreakKeyword => f.write_str("'break' keyword"),
             TokenKind::ContinueKeyword => f.write_str("'continue' keyword"),
             TokenKind::NamespaceKeyword => f.write_str("'namespace' keyword"),
+            TokenKind::ModKeyword => f.write_str("'mod' keyword"),
             TokenKind::GotoKeyword => f.write_str("'goto' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
@@ -338,6 +340,7 @@ impl TokenKind {
             | TokenKind::BreakKeyword
             | TokenKind::ContinueKeyword
             | TokenKind::NamespaceKeyword
+            | TokenKind::ModKeyword
             | TokenKind::GotoKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma

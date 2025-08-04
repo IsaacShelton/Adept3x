@@ -1,6 +1,5 @@
 use crate::repr::{
-    AmbiguousType, DeclScope, Field, FindTypeResult, FuncBody, FuncHead, Type, TypeArg, TypeBody,
-    TypeHead,
+    AmbiguousType, Field, FindTypeResult, FuncBody, FuncHead, Type, TypeArg, TypeBody, TypeHead,
 };
 use ast_workspace::TypeDeclRef;
 use derive_more::From;
@@ -9,7 +8,6 @@ use std::path::Path;
 #[derive(Debug, From)]
 pub enum Artifact<'env> {
     Void(()),
-    DeclScope(&'env DeclScope),
     TypeHead(&'env TypeHead<'env>),
     TypeHeads(&'env [&'env TypeHead<'env>]),
     OptionTypeDeclRef(Option<TypeDeclRef>),
@@ -26,7 +24,6 @@ pub enum Artifact<'env> {
 }
 
 impl_unwrap_from_artifact!(Void, ());
-impl_unwrap_from_artifact!(DeclScope, &'env DeclScope);
 impl_unwrap_from_artifact!(TypeHead, &'env TypeHead<'env>);
 impl_unwrap_from_artifact!(TypeHeads, &'env [&'env TypeHead<'env>]);
 impl_unwrap_from_artifact!(OptionTypeDeclRef, Option<TypeDeclRef>);

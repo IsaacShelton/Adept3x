@@ -5,14 +5,15 @@ mod variables;
 
 use super::Executable;
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, ResolveType, Resolved, ResolvedData,
-    Suspend, SuspendMany, Value,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, ResolveTypeKeepAliases, Resolved,
+    ResolvedData, Suspend, SuspendMany, Value,
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, UntypedCfg,
         flatten_func_ignore_const_evals,
     },
     conform::conform_to_default,
-    repr::{DeclScope, FuncBody, Type, TypeKind},
+    module_graph::ModuleView,
+    repr::{FuncBody, Type, TypeKind},
     sub_task::SubTask,
     unify::unify_types,
 };
@@ -40,7 +41,7 @@ pub struct GetFuncBody<'env> {
     workspace: ByAddress<&'env AstWorkspace<'env>>,
 
     #[derivative(Hash = "ignore")]
-    decl_scope: ByAddress<&'env DeclScope>,
+    view: ModuleView<'env>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -92,13 +93,13 @@ impl<'env> GetFuncBody<'env> {
     pub fn new(
         workspace: &'env AstWorkspace<'env>,
         func_ref: FuncRef,
-        decl_scope: &'env DeclScope,
+        view: ModuleView<'env>,
         builtin_types: &'env BuiltinTypes<'env>,
     ) -> Self {
         Self {
             workspace: ByAddress(workspace),
             func_ref,
-            decl_scope: ByAddress(decl_scope),
+            view,
             inner_types: None,
             compute_preferred_types: ComputePreferredTypes::default(),
             resolved_nodes: ArenaMap::new(),
@@ -203,7 +204,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                 cfg,
                 func_return_type: &def.head.return_type,
                 workspace: &self.workspace,
-                decl_scope: &self.decl_scope,
+                view: self.view,
                 builtin_types: self.builtin_types,
             },
         ) {
@@ -302,10 +303,10 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         let Some(resolved_type) = executor.demand(self.resolved_type) else {
                             return suspend!(
                                 self.resolved_type,
-                                executor.request(ResolveType::new(
+                                executor.request(ResolveTypeKeepAliases::new(
                                     &self.workspace,
                                     ast_type,
-                                    &self.decl_scope
+                                    self.view,
                                 )),
                                 ctx
                             );

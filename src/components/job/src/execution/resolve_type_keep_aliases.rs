@@ -1,6 +1,6 @@
 use super::{Executable, FindType, ResolveTypeArg};
 use crate::{
-    Continuation, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend, SuspendMany,
+    Continuation, ExecutionCtx, Executor, Suspend, SuspendMany,
     module_graph::ModuleView,
     repr::{FindTypeResult, Type, TypeArg, TypeKind, UserDefinedType},
 };
@@ -10,14 +10,14 @@ use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct ResolveType<'env> {
+pub struct ResolveTypeKeepAliases<'env> {
     ast_type: ByAddress<&'env ast::Type>,
 
     #[derivative(Debug = "ignore")]
-    view: ModuleView<'env>,
+    workspace: ByAddress<&'env AstWorkspace<'env>>,
 
     #[derivative(Debug = "ignore")]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
+    view: ModuleView<'env>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -35,7 +35,7 @@ pub struct ResolveType<'env> {
     type_args: SuspendMany<'env, &'env TypeArg<'env>>,
 }
 
-impl<'env> ResolveType<'env> {
+impl<'env> ResolveTypeKeepAliases<'env> {
     pub fn new(
         workspace: &'env AstWorkspace<'env>,
         ast_type: &'env ast::Type,
@@ -52,7 +52,7 @@ impl<'env> ResolveType<'env> {
     }
 }
 
-impl<'env> Executable<'env> for ResolveType<'env> {
+impl<'env> Executable<'env> for ResolveTypeKeepAliases<'env> {
     type Output = &'env Type<'env>;
 
     fn execute(
@@ -72,7 +72,7 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                 let Some(inner) = executor.demand(self.inner_type) else {
                     return suspend!(
                         self.inner_type,
-                        executor.request(ResolveTypeKeepAliases::new(workspace, inner, self.view,)),
+                        executor.request(ResolveTypeKeepAliases::new(workspace, inner, self.view)),
                         ctx
                     );
                 };

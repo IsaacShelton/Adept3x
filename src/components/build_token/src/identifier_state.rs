@@ -48,6 +48,7 @@ impl IdentifierState {
             "break" => TokenKind::BreakKeyword,
             "continue" => TokenKind::ContinueKeyword,
             "namespace" => TokenKind::NamespaceKeyword,
+            "mod" => TokenKind::ModKeyword,
             "goto" => TokenKind::GotoKeyword,
             _ => TokenKind::Identifier(identifier),
         }

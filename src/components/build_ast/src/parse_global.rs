@@ -33,14 +33,15 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             }
         }
 
+        if !self.input.peek_nth(1).is_identifier() {
+            let expr = self.parse_expr()?;
+            eprintln!("{:?}", expr);
+            return Err(ParseErrorKind::CannotCallFunctionsAtGlobalScope.at(self.input.here()));
+        }
+
         let (name, source) = self
             .parse_identifier_keep_location(Some("for name of global variable"))?
             .tuple();
-
-        // Better error message for trying to call functions at global scope
-        if self.input.peek_is(TokenKind::OpenParen) {
-            return Err(ParseErrorKind::CannotCallFunctionsAtGlobalScope.at(source));
-        }
 
         let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
 

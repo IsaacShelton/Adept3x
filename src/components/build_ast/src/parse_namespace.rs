@@ -16,32 +16,47 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         let source = self.input.peek().source;
         self.input.advance().kind.unwrap_namespace_keyword();
 
-        let Some(name) = self.input.eat_identifier() else {
-            return Err(ParseError::other(
-                "Expected name of namepace after 'namespace' keyword",
-                source,
-            ));
+        let name = match self.input.eat_identifier() {
+            Some(name) => Some(name),
+            None => {
+                if self.input.eat(TokenKind::Multiply) {
+                    None
+                } else {
+                    return Err(ParseError::other(
+                        "Expected name of namepace or '*' after 'namespace' keyword",
+                        source,
+                    ));
+                }
+            }
         };
 
-        let mut privacy = Privacy::Protected;
+        let mut privacy = None;
 
         for annotation in annotations {
             match annotation.kind {
-                AnnotationKind::Public => privacy = Privacy::Public,
-                AnnotationKind::Private => privacy = Privacy::Private,
+                AnnotationKind::Public => privacy = Some(Privacy::Public),
+                AnnotationKind::Protected => privacy = Some(Privacy::Protected),
+                AnnotationKind::Private => privacy = Some(Privacy::Private),
                 _ => {
                     return Err(self.unexpected_annotation(&annotation, "for namespace"));
                 }
             }
         }
 
-        self.input
-            .expect(TokenKind::OpenCurly, "to begin namespace")?;
+        let items = if self.input.eat(TokenKind::Assign) {
+            self.parse_expr()?.into()
+        } else {
+            self.input
+                .expect(TokenKind::OpenCurly, "to begin namespace")?;
 
-        let items = self.parse_namespace_items()?;
+            let items = self.parse_namespace_items()?;
 
-        self.input
-            .expect(TokenKind::CloseCurly, "to end namespace")?;
+            self.ignore_newlines();
+
+            self.input
+                .expect(TokenKind::CloseCurly, "to end namespace")?;
+            items.into()
+        };
 
         Ok(Namespace {
             name,

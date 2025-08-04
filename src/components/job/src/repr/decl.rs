@@ -11,7 +11,7 @@ pub enum Decl {
 }
 
 /// A symbol declaration
-#[derive(Clone, Debug, From)]
+#[derive(Copy, Clone, Debug, From)]
 pub enum DeclHead<'env> {
     FuncLike(FuncRef, &'env FuncHead<'env>),
     TypeLike(TypeLikeRef, &'env TypeHead<'env>),
@@ -27,6 +27,7 @@ pub enum TypeLikeRef {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, From)]
 pub enum ValueLikeRef {
+    Dummy,
     Global(ast_workspace::GlobalRef),
     ExprAlias(ast_workspace::ExprAliasRef),
 }

@@ -111,6 +111,7 @@ dependencies = [
  "ast_workspace_settings",
  "attributes",
  "compiler_version",
+ "derive_more",
  "fs_tree",
  "indexmap",
  "source_files",

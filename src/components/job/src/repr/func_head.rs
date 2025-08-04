@@ -1,4 +1,5 @@
-use super::{Params, Type, TypeParams, UserDefinedType};
+use super::{Params, TypeParams};
+use crate::repr::{UnaliasedType, UnaliasedUserDefinedType};
 use attributes::{SymbolOwnership, Tag};
 use indexmap::IndexMap;
 use source_files::Source;
@@ -8,7 +9,7 @@ pub struct FuncHead<'env> {
     pub name: &'env str,
     pub type_params: TypeParams,
     pub params: Params<'env>,
-    pub return_type: &'env Type<'env>,
+    pub return_type: UnaliasedType<'env>,
     pub impl_params: ImplParams<'env>,
     pub source: Source,
     pub metadata: FuncMetadata,
@@ -29,5 +30,5 @@ pub enum TargetAbi {
 
 #[derive(Clone, Debug)]
 pub struct ImplParams<'env> {
-    pub params: IndexMap<&'env str, &'env UserDefinedType<'env>>,
+    pub params: IndexMap<&'env str, UnaliasedUserDefinedType<'env>>,
 }

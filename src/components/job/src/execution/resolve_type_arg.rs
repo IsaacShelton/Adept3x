@@ -1,7 +1,8 @@
-use super::{Executable, ResolveType};
+use super::{Executable, ResolveTypeKeepAliases};
 use crate::{
     Continuation, ExecutionCtx, Executor, Suspend,
-    repr::{DeclScope, Type, TypeArg},
+    module_graph::ModuleView,
+    repr::{Type, TypeArg},
 };
 use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
@@ -16,7 +17,7 @@ pub struct ResolveTypeArg<'env> {
     workspace: ByAddress<&'env AstWorkspace<'env>>,
 
     #[derivative(Debug = "ignore")]
-    decl_scope: ByAddress<&'env DeclScope>,
+    view: ModuleView<'env>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -28,12 +29,12 @@ impl<'env> ResolveTypeArg<'env> {
     pub fn new(
         workspace: &'env AstWorkspace<'env>,
         type_arg: &'env ast::TypeArg,
-        decl_scope: &'env DeclScope,
+        view: ModuleView<'env>,
     ) -> Self {
         Self {
             workspace: ByAddress(workspace),
             type_arg: ByAddress(type_arg),
-            decl_scope: ByAddress(decl_scope),
+            view,
             inner_type: None,
         }
     }
@@ -52,10 +53,10 @@ impl<'env> Executable<'env> for ResolveTypeArg<'env> {
                 let Some(inner_type) = executor.demand(self.inner_type) else {
                     return suspend!(
                         self.inner_type,
-                        executor.request(ResolveType::new(
+                        executor.request(ResolveTypeKeepAliases::new(
                             &self.workspace,
                             inner,
-                            &self.decl_scope
+                            self.view,
                         )),
                         ctx
                     );

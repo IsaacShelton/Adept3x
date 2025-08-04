@@ -10,6 +10,9 @@ use primitives::{
 use source_files::Source;
 use std::fmt::Display;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UnaliasedType<'env>(pub &'env Type<'env>);
+
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct Type<'env> {
@@ -27,6 +30,10 @@ impl<'env> Type<'env> {
 
     pub fn contains_polymorph(&self) -> bool {
         self.kind.contains_polymorph()
+    }
+
+    pub fn contains_type_alias(&self) -> bool {
+        self.kind.contains_type_alias()
     }
 }
 
@@ -46,6 +53,13 @@ impl<'env> TypeArg<'env> {
     pub fn contains_polymorph(&self) -> bool {
         match self {
             TypeArg::Type(ty) => ty.contains_polymorph(),
+            TypeArg::Integer(_) => false,
+        }
+    }
+
+    pub fn contains_type_alias(&self) -> bool {
+        match self {
+            TypeArg::Type(ty) => ty.contains_type_alias(),
             TypeArg::Integer(_) => false,
         }
     }
@@ -134,10 +148,26 @@ impl<'env> TypeKind<'env> {
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
             TypeKind::Polymorph(_) => true,
-            TypeKind::UserDefined(user_defined_type) => user_defined_type
-                .args
-                .iter()
-                .any(|arg| arg.contains_polymorph()),
+            TypeKind::UserDefined(user_defined_type) => user_defined_type.contains_polymorph(),
+            TypeKind::DirectLabel(_) => false,
+        }
+    }
+
+    pub fn contains_type_alias(&self) -> bool {
+        match self {
+            TypeKind::Boolean
+            | TypeKind::BooleanLiteral(_)
+            | TypeKind::BitInteger(_, _)
+            | TypeKind::CInteger(_, _)
+            | TypeKind::SizeInteger(_)
+            | TypeKind::IntegerLiteral(_)
+            | TypeKind::FloatLiteral(_)
+            | TypeKind::Floating(_) => false,
+            TypeKind::Ptr(inner) => inner.kind.contains_type_alias(),
+            TypeKind::Void | TypeKind::Never => false,
+            TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
+            TypeKind::Polymorph(_) => true,
+            TypeKind::UserDefined(user_defined_type) => user_defined_type.contains_type_alias(),
             TypeKind::DirectLabel(_) => false,
         }
     }
@@ -220,3 +250,16 @@ pub struct UserDefinedType<'env> {
     pub type_decl_ref: TypeDeclRef,
     pub args: &'env [TypeArg<'env>],
 }
+
+impl<'env> UserDefinedType<'env> {
+    pub fn contains_polymorph(&self) -> bool {
+        self.args.iter().any(|arg| arg.contains_polymorph())
+    }
+
+    pub fn contains_type_alias(&self) -> bool {
+        self.type_decl_ref.is_alias() || self.args.iter().any(|arg| arg.contains_type_alias())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UnaliasedUserDefinedType<'env>(pub &'env UserDefinedType<'env>);

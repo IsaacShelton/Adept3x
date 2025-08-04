@@ -4,8 +4,12 @@ use crate::{
     conditional_name_scope::ConditionalNameScope, type_decl_ref::TypeDecl,
 };
 use arena::{IdxSpan, LockFreeArena};
-use ast::{Enum, ExprAlias, Func, Global, Impl, NamespaceItems, Struct, Trait, TypeAlias};
+use ast::{
+    Enum, ExprAlias, Func, Global, Impl, NamespaceItems, NamespaceItemsSource, Struct, Trait,
+    TypeAlias,
+};
 use ast_workspace_settings::SettingsRef;
+use attributes::Privacy;
 
 #[derive(Debug, Default)]
 pub struct AstWorkspaceSymbols {
@@ -72,10 +76,24 @@ impl AstWorkspaceSymbols {
 
         let mut namespaces = Vec::with_capacity(items.namespaces.len());
         for namespace in items.namespaces {
+            let Some(name) = namespace.name else {
+                eprintln!(
+                    "warning: wildcard namespaces are not supported in legacy compilation, skipping..."
+                );
+                continue;
+            };
+
+            let NamespaceItemsSource::Items(items) = namespace.items else {
+                eprintln!(
+                    "warning: expression namespaces are not supported in legacy compilation, skipping..."
+                );
+                continue;
+            };
+
             namespaces.push(Namespace {
-                name: namespace.name,
-                names: self.new_name_scope(namespace.items, Some(new_name_scope), settings),
-                privacy: namespace.privacy,
+                name,
+                names: self.new_name_scope(items, Some(new_name_scope), settings),
+                privacy: namespace.privacy.unwrap_or(Privacy::Protected),
             });
         }
 

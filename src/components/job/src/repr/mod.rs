@@ -1,8 +1,5 @@
 mod decl;
 mod decl_head_set;
-mod decl_scope;
-mod decl_scope_origin;
-mod decl_scope_ref;
 mod decl_set;
 mod enum_body;
 mod func_body;
@@ -18,9 +15,6 @@ mod variables;
 use ast_workspace::TypeDeclRef;
 pub use decl::*;
 pub use decl_head_set::*;
-pub use decl_scope::*;
-pub use decl_scope_origin::*;
-pub use decl_scope_ref::*;
 pub use decl_set::*;
 pub use enum_body::*;
 pub use func_body::*;

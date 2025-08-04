@@ -1,9 +1,10 @@
 use derive_more::IsVariant;
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, IsVariant)]
+// NOTE: Privacy is ordered from least private to most private
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, IsVariant)]
 pub enum Privacy {
-    #[default]
     Public,
-    Private,
+    #[default]
     Protected,
+    Private,
 }

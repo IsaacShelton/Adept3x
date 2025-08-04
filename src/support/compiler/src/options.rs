@@ -23,8 +23,6 @@ pub struct BuildOptions {
 pub enum NewCompilationSystem {
     // Old compilation system (will be removed once transition is complete)
     Legacy,
-    // Only use new compilation system for middle-end (useful for limited testing)
-    MiddleEnd,
     // Fully use the new compilation system (this alters lexing/parsing as well)
     Full,
 }

@@ -1,7 +1,8 @@
 use crate::{
-    ConditionalCompilation, Enum, ExprAlias, Func, Global, Impl, Struct, Trait, TypeAlias,
+    ConditionalCompilation, Enum, Expr, ExprAlias, Func, Global, Impl, Struct, Trait, TypeAlias,
 };
 use attributes::Privacy;
+use derive_more::From;
 use source_files::Source;
 
 #[derive(Clone, Debug, Default)]
@@ -20,8 +21,14 @@ pub struct NamespaceItems {
 
 #[derive(Clone, Debug)]
 pub struct Namespace {
-    pub name: String,
-    pub items: NamespaceItems,
+    pub name: Option<String>,
+    pub items: NamespaceItemsSource,
     pub source: Source,
-    pub privacy: Privacy,
+    pub privacy: Option<Privacy>,
+}
+
+#[derive(Clone, Debug, From)]
+pub enum NamespaceItemsSource {
+    Items(NamespaceItems),
+    Expr(Expr),
 }

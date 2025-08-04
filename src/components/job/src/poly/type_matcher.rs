@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::PolyValue;
 use crate::repr::{Type, TypeArg, TypeKind, UserDefinedType};
 use ast_workspace::{TypeAliasRef, TypeDeclRef};

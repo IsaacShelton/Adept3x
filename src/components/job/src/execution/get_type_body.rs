@@ -1,9 +1,10 @@
 use super::Executable;
 use crate::{
-    Continuation, ExecutionCtx, Executor, ResolveType, Suspend, SuspendMany,
+    Continuation, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend, SuspendMany,
+    module_graph::ModuleView,
     repr::{
-        DeclScope, EnumBody, EnumVariant, Field, Param, Params, StructBody, TraitBody, TraitFunc,
-        Type, TypeAliasBody, TypeBody,
+        EnumBody, EnumVariant, Field, Param, Params, StructBody, TraitBody, TraitFunc, Type,
+        TypeAliasBody, TypeBody, UnaliasedType,
     },
 };
 use ast_workspace::{AstWorkspace, EnumRef, StructRef, TraitRef, TypeAliasRef, TypeDeclRef};
@@ -18,7 +19,7 @@ pub struct GetTypeBody<'env> {
     type_decl_ref: TypeDeclRef,
 
     #[derivative(Debug = "ignore")]
-    decl_scope: ByAddress<&'env DeclScope>,
+    view: ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     workspace: ByAddress<&'env AstWorkspace<'env>>,
@@ -37,12 +38,12 @@ pub struct GetTypeBody<'env> {
 impl<'env> GetTypeBody<'env> {
     pub fn new(
         workspace: &'env AstWorkspace<'env>,
-        decl_scope: &'env DeclScope,
+        view: ModuleView<'env>,
         type_decl_ref: TypeDeclRef,
     ) -> Self {
         Self {
             workspace: ByAddress(workspace),
-            decl_scope: ByAddress(decl_scope),
+            view,
             type_decl_ref,
             inner_types: None,
             backing_type: None,
@@ -81,11 +82,9 @@ impl<'env> GetTypeBody<'env> {
 
         suspend_many!(
             self.inner_types,
-            executor.request_many(def.fields.iter().map(|(_name, field)| ResolveType::new(
-                &self.workspace,
-                &field.ast_type,
-                &self.decl_scope
-            )),),
+            executor.request_many(def.fields.iter().map(|(_name, field)| {
+                ResolveTypeKeepAliases::new(&self.workspace, &field.ast_type, self.view)
+            }),),
             ctx
         )
     }
@@ -101,12 +100,12 @@ impl<'env> GetTypeBody<'env> {
         let Some(backing_type) = executor.demand(self.backing_type) else {
             return suspend!(
                 self.backing_type,
-                executor.request(ResolveType::new(
+                executor.request(ResolveTypeKeepAliases::new(
                     &self.workspace,
                     def.backing_type
                         .as_ref()
                         .unwrap_or_else(|| ctx.alloc(ast::TypeKind::u32().at(Source::internal()))),
-                    &self.decl_scope
+                    self.view
                 )),
                 ctx
             );
@@ -141,10 +140,10 @@ impl<'env> GetTypeBody<'env> {
         let Some(target) = executor.demand(self.backing_type) else {
             return suspend!(
                 self.backing_type,
-                executor.request(ResolveType::new(
+                executor.request(ResolveTypeKeepAliases::new(
                     &self.workspace,
                     &def.value,
-                    &self.decl_scope
+                    self.view
                 )),
                 ctx
             );
@@ -177,7 +176,7 @@ impl<'env> GetTypeBody<'env> {
                         .map(|param| &param.ast_type)
                         .chain(std::iter::once(&func.return_type))
                 })
-                .map(|ast_type| ResolveType::new(&self.workspace, ast_type, &self.decl_scope));
+                .map(|ast_type| ResolveTypeKeepAliases::new(&self.workspace, ast_type, self.view));
 
             return suspend_many!(
                 self.inner_types,
@@ -188,6 +187,14 @@ impl<'env> GetTypeBody<'env> {
 
         let mut inner_types = inner_types.iter();
 
+        let unalias = |ty: &'env Type<'env>| -> UnaliasedType<'env> {
+            if ty.contains_type_alias() {
+                todo!("unalias type in GetFuncBody")
+            } else {
+                UnaliasedType(ty)
+            }
+        };
+
         let funcs = IndexMap::from_iter(def.funcs.iter().map(|func| {
             (
                 func.name.as_str(),
@@ -196,7 +203,7 @@ impl<'env> GetTypeBody<'env> {
                         required: ctx.alloc_slice_fill_iter(func.params.required.iter().map(
                             |param| Param {
                                 name: param.name.as_ref().map(|name| name.as_str()),
-                                ty: inner_types.next().unwrap(),
+                                ty: unalias(inner_types.next().unwrap()),
                             },
                         )),
                         is_cstyle_vararg: func.params.is_cstyle_vararg,

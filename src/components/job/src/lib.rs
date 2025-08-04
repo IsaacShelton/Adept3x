@@ -69,6 +69,7 @@ mod execution;
 mod execution_ctx;
 mod executor;
 mod main_executor;
+mod module_graph;
 mod pending;
 mod poly;
 mod repr;

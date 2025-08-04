@@ -1,4 +1,4 @@
-use super::Type;
+use crate::repr::UnaliasedType;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Params<'env> {
@@ -9,5 +9,5 @@ pub struct Params<'env> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Param<'env> {
     pub name: Option<&'env str>,
-    pub ty: &'env Type<'env>,
+    pub ty: UnaliasedType<'env>,
 }
