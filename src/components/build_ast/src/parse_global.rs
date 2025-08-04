@@ -35,7 +35,6 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         if !self.input.peek_nth(1).is_identifier() {
             let expr = self.parse_expr()?;
-            eprintln!("{:?}", expr);
             return Err(ParseErrorKind::CannotCallFunctionsAtGlobalScope.at(self.input.here()));
         }
 

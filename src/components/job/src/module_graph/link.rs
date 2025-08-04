@@ -39,7 +39,10 @@ impl<'env> LookupConstraints<'env> {
         match self {
             LookupConstraints::TypeLike(constraints) => constraints.is_match(head),
             LookupConstraints::FuncLike(constraints) => constraints.is_match(head),
-            LookupConstraints::ValueLike => todo!(),
+            LookupConstraints::ValueLike => match head {
+                DeclHead::FuncLike(..) | DeclHead::TypeLike(..) => false,
+                DeclHead::ValueLike(value_like_ref) => true,
+            },
         }
     }
 }
