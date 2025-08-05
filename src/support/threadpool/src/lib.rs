@@ -475,6 +475,10 @@ impl ThreadPool {
         self.shared_data.queued_count.load(Ordering::Relaxed)
     }
 
+    pub fn queued_count_seq_cst(&self) -> usize {
+        self.shared_data.queued_count.load(Ordering::SeqCst)
+    }
+
     /// Returns the number of currently active threads.
     ///
     /// # Examples

@@ -14,4 +14,7 @@ pub enum SuspendCondition<'env> {
 
     /// Wait for any of these specified dependent tasks to complete before waking up
     Any(SmallVec<[TaskRef<'env>; 2]>),
+
+    /// Pending IO
+    PendingIo,
 }

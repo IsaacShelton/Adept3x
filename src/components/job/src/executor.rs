@@ -11,14 +11,15 @@
 use crate::{
     Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, SuspendMany,
     SuspendManyAssoc, Task, TaskId, TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
-    io::{IoRequest, IoRequestHandle, IoResponse},
+    io::{IoRequest, IoRequestHandle, IoRequestStatus, IoResponse},
 };
 use arena::Arena;
 use crossbeam_deque::Injector as InjectorQueue;
 use std::{
+    collections::HashMap,
     ops::DerefMut,
     sync::{
-        RwLock,
+        Mutex, RwLock,
         atomic::{AtomicUsize, Ordering},
         mpsc,
     },
@@ -29,13 +30,19 @@ use threadpool::ThreadPool;
 pub struct Executor<'env> {
     pub injector: InjectorQueue<TaskRef<'env>>,
     pub truth: RwLock<Truth<'env>>,
+
+    // Count for tasks
     pub num_completed: AtomicUsize,
     pub num_scheduled: AtomicUsize,
+
+    // Count for task executions (including suspend/resumes)
     pub num_queued: AtomicUsize,
     pub num_cleared: AtomicUsize,
+
     pub next_io_handle: AtomicUsize,
     pub io_thread_pool: &'env ThreadPool,
     pub io_tx: mpsc::Sender<IoResponse>,
+    pub completed_io: Mutex<HashMap<IoRequestHandle, IoRequestStatus<'env>>>,
 }
 
 impl<'env> Executor<'env> {
@@ -51,13 +58,21 @@ impl<'env> Executor<'env> {
             next_io_handle: AtomicUsize::new(1),
             io_thread_pool,
             io_tx,
+            completed_io: Mutex::default(),
         }
     }
 
     #[must_use]
-    pub fn request_io(&self, io_request: IoRequest) -> IoRequestHandle {
+    pub fn request_io(&self, io_request: IoRequest, then_wake: TaskRef<'env>) -> IoRequestHandle {
+        self.num_queued.fetch_add(1, Ordering::SeqCst);
+
         let handle = IoRequestHandle(self.next_io_handle.fetch_add(1, Ordering::Relaxed));
         let io_tx = self.io_tx.clone();
+
+        self.completed_io
+            .lock()
+            .unwrap()
+            .insert(handle, IoRequestStatus::PendingThen(then_wake));
 
         self.io_thread_pool.execute(move || match io_request {
             IoRequest::ReadFile(path) => {

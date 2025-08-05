@@ -42,6 +42,8 @@ impl<'env> Worker<'env> {
 
         loop {
             if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
+                ctx.set_self_task(task_ref);
+
                 let result = panic::catch_unwind(AssertUnwindSafe(|| {
                     execution.execute_raw(executor, &mut ctx)
                 }));
@@ -50,13 +52,20 @@ impl<'env> Worker<'env> {
                     Ok(Ok(artifact)) => {
                         executor.num_completed.fetch_add(1, Ordering::SeqCst);
                         self.complete(executor, task_ref, artifact);
+                        executor.num_cleared.fetch_add(1, Ordering::SeqCst);
                     }
                     Ok(Err(Continuation::Suspend(execution))) => {
                         self.suspend(executor, task_ref, ctx.waiting_on(), execution);
                         ctx.reset_waiting_on();
+                        executor.num_cleared.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Ok(Err(Continuation::PendingIo(execution))) => {
+                        executor.truth.write().unwrap().tasks[task_ref].state =
+                            TaskState::Suspended(execution, SuspendCondition::PendingIo);
                     }
                     Ok(Err(Continuation::Error(error))) => {
                         top_n_errors.push(error, |a, b| a.cmp_with(b, source_files));
+                        executor.num_cleared.fetch_add(1, Ordering::SeqCst);
                     }
                     Err(_) => {
                         top_n_errors.push(
@@ -66,10 +75,9 @@ impl<'env> Worker<'env> {
                             ),
                             |a, b| a.cmp_with(b, source_files),
                         );
+                        executor.num_cleared.fetch_add(1, Ordering::SeqCst);
                     }
                 }
-
-                executor.num_cleared.fetch_add(1, Ordering::SeqCst);
             } else if executor.num_cleared.load(Ordering::SeqCst)
                 == executor.num_queued.load(Ordering::SeqCst)
             {
@@ -138,6 +146,7 @@ impl<'env> Worker<'env> {
                             self.local_queue.push(dependent);
                         }
                     }
+                    SuspendCondition::PendingIo => (),
                 }
             }
         }

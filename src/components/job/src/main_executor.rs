@@ -11,13 +11,14 @@
 use crate::{
     BumpAllocatorPool, Executable, Execution, Executor, Pending, TaskRef, TopN, Truth, Worker,
     WorkerRef,
-    io::{IoRequest, IoResponse},
+    io::{IoRequestStatus, IoResponse},
 };
 use diagnostics::ErrorDiagnostic;
 use source_files::SourceFiles;
 use std::{
     sync::{atomic::Ordering, mpsc},
     thread,
+    time::Duration,
 };
 use threadpool::ThreadPool;
 
@@ -68,6 +69,35 @@ impl<'env> MainExecutor<'env> {
                 }));
             }
 
+            loop {
+                match self.io_rx.recv_timeout(Duration::from_millis(1)) {
+                    Ok(response) => {
+                        {
+                            let mut completed = self.executor.completed_io.lock().unwrap();
+
+                            if let Some(IoRequestStatus::PendingThen(task_ref)) =
+                                completed.get(&response.handle)
+                            {
+                                self.executor.injector.push(*task_ref);
+                            } else {
+                                panic!("completed io is missing a task to wake!");
+                            }
+
+                            completed.insert(response.handle, IoRequestStatus::Fulfilled(response));
+                        }
+
+                        self.executor.num_cleared.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Err(_timeout) => {
+                        if self.executor.num_cleared.load(Ordering::SeqCst)
+                            == self.executor.num_queued.load(Ordering::SeqCst)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
             TopN::from_iter(
                 max_top_errors,
                 top_n_trackers
@@ -77,19 +107,7 @@ impl<'env> MainExecutor<'env> {
             )
         });
 
-        // Using io thread pool for io requests
-        for _ in 0..1000 {
-            let _io_handle = self
-                .executor
-                .request_io(IoRequest::ReadFile("/Users/isaac/a.c".into()));
-        }
-
         self.executor.io_thread_pool.join();
-
-        // Very simple handling of responses, without taking the io handles into account yet
-        while let Ok(response) = self.io_rx.try_recv() {
-            println!("{:?}", response);
-        }
 
         MainExecutorStats {
             num_completed: self.executor.num_completed.load(Ordering::Relaxed),

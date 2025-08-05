@@ -8,14 +8,13 @@
 */
 
 use crate::Execution;
-use derive_more::From;
 use diagnostics::ErrorDiagnostic;
 
-#[derive(From)]
 pub enum Continuation<'env> {
     // NOTE: To delay waking back up, tasks must be waited on using `ctx.suspend_on` before
     // returning. Usually this is handled indirectly via macro.
     Suspend(Execution<'env>),
+    PendingIo(Execution<'env>),
     Error(ErrorDiagnostic),
 }
 
@@ -32,5 +31,17 @@ impl<'env> From<Result<Execution<'env>, ErrorDiagnostic>> for Continuation<'env>
             Ok(ok) => ok.into(),
             Err(err) => err.into(),
         }
+    }
+}
+
+impl<'env> From<Execution<'env>> for Continuation<'env> {
+    fn from(value: Execution<'env>) -> Self {
+        Self::Suspend(value)
+    }
+}
+
+impl<'env> From<ErrorDiagnostic> for Continuation<'env> {
+    fn from(value: ErrorDiagnostic) -> Self {
+        Self::Error(value)
     }
 }
