@@ -196,7 +196,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         });
 
         // 5) Determine what type each CFG node prefers to be.
-        let preferred_types = match self.compute_preferred_types.execute_sub_task(
+        let preferred_types = execute_sub_task!(
+            self,
+            self.compute_preferred_types,
             executor,
             ctx,
             ComputePreferredTypesUserData {
@@ -206,11 +208,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                 workspace: &self.workspace,
                 view: self.view,
                 builtin_types: self.builtin_types,
-            },
-        ) {
-            Ok(ok) => ok,
-            Err(e) => return Err(e.map(|_| self.into()).into()),
-        };
+            }
+        );
 
         // 6) Resolve types and linked data for each CFG node (may suspend)
         while self.num_resolved_nodes < post_order.len() {

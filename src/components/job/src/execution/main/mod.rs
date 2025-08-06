@@ -1,9 +1,12 @@
+mod read_file;
+
 use super::Executable;
 use crate::{
     Continuation, ExecutionCtx, Executor,
-    io::{IoRequest, IoRequestHandle},
+    execution::main::read_file::ReadFile,
     module_graph::ModuleGraph,
     repr::{DeclHead, ValueLikeRef},
+    sub_task::SubTask,
 };
 use attributes::Privacy;
 use compiler::BuildOptions;
@@ -24,7 +27,8 @@ pub struct Main<'env> {
     #[allow(unused)]
     module_graph: Option<&'env ModuleGraph<'env>>,
 
-    io_handle: Option<IoRequestHandle>,
+    read_file: Option<ReadFile>,
+    read_file2: Option<ReadFile>,
 }
 
 impl<'env> Main<'env> {
@@ -38,7 +42,8 @@ impl<'env> Main<'env> {
             project_folder,
             single_file,
             module_graph: None,
-            io_handle: None,
+            read_file: None,
+            read_file2: None,
         }
     }
 }
@@ -56,25 +61,24 @@ impl<'env> Executable<'env> for Main<'env> {
             return Err(ErrorDiagnostic::plain("Must specify root file").into());
         };
 
-        let Some(io_handle) = self.io_handle else {
-            println!("Root file is {:?}", single_file);
+        let result1 = execute_sub_task!(
+            self,
+            self.read_file
+                .get_or_insert_with(|| ReadFile::new(single_file.into())),
+            executor,
+            ctx
+        );
 
-            self.io_handle =
-                Some(executor.request_io(IoRequest::ReadFile(single_file.into()), ctx.self_task()));
+        let result2 = execute_sub_task!(
+            self,
+            self.read_file2
+                .get_or_insert_with(|| ReadFile::new("bacon.toml".into())),
+            executor,
+            ctx
+        );
 
-            return Err(Continuation::PendingIo(self.into()));
-        };
-
-        let io_response = executor
-            .completed_io
-            .lock()
-            .unwrap()
-            .get_mut(&io_handle)
-            .map(|fulfilled| std::mem::take(fulfilled))
-            .unwrap()
-            .unwrap_fulfilled();
-
-        println!("{:?}", io_response);
+        println!("{:?}", result1);
+        println!("{:?}", result2);
 
         let module_graph = *self
             .module_graph

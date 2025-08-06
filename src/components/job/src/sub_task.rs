@@ -1,4 +1,4 @@
-use crate::{ExecutionCtx, Executor};
+use crate::{Continuation, Execution, ExecutionCtx, Executor};
 use diagnostics::ErrorDiagnostic;
 
 // NOTE: Sub tasks are responsible for caching their own results
@@ -25,5 +25,8 @@ where
         executor: &'a Executor<'env>,
         ctx: &'ctx mut ExecutionCtx<'env>,
         user_data: Self::UserData<'a>,
-    ) -> Result<Self::SubArtifact<'a>, Result<(), ErrorDiagnostic>>;
+    ) -> Result<
+        Self::SubArtifact<'a>,
+        Result<impl Fn(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
+    >;
 }

@@ -50,13 +50,27 @@ macro_rules! suspend_many_assoc {
     }};
 }
 
-macro_rules! sub_task_suspend {
+macro_rules! suspend_from_subtask {
     ($self:ident, $field:ident, $task_ref:expr, $ctx:expr) => {{
         let pending = $task_ref;
 
         $ctx.suspend_on(::std::iter::once(pending.raw_task_ref()));
         $self.$field = Some(pending);
-        Err(Ok(()))
+        Err(Ok(Continuation::Suspend))
+    }};
+}
+
+macro_rules! execute_sub_task {
+    ($self:ident, $sub_task:expr, $executor:expr, $ctx:expr) => {
+        execute_sub_task!($self, $sub_task, $executor, $ctx, ())
+    };
+    ($self:ident, $sub_task:expr, $executor:expr, $ctx:expr, $user_data:expr) => {{
+        match $sub_task.execute_sub_task($executor, $ctx, $user_data) {
+            Ok(ok) => ok,
+            Err(e) => {
+                return Err(e.map(|into_continuation| into_continuation($self.into()))?);
+            }
+        }
     }};
 }
 

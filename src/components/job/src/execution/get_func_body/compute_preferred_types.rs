@@ -1,5 +1,5 @@
 use crate::{
-    BuiltinTypes, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend,
+    BuiltinTypes, Continuation, Execution, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend,
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
     },
@@ -10,6 +10,7 @@ use crate::{
 use arena::ArenaMap;
 use ast::{UnaryMathOperator, UnaryOperator};
 use ast_workspace::AstWorkspace;
+use diagnostics::ErrorDiagnostic;
 
 #[derive(Debug)]
 pub struct ComputePreferredTypesUserData<'env, 'a> {
@@ -44,7 +45,10 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
         executor: &'a Executor<'env>,
         ctx: &'ctx mut ExecutionCtx<'env>,
         user_data: Self::UserData<'a>,
-    ) -> Result<Self::SubArtifact<'a>, Result<(), diagnostics::ErrorDiagnostic>> {
+    ) -> Result<
+        Self::SubArtifact<'a>,
+        Result<impl Fn(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
+    > {
         let cfg = user_data.cfg;
         let post_order = user_data.post_order;
 
@@ -62,7 +66,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                     ..
                 }) => {
                     let Some(fulfilled) = self.waiting_on_type.take() else {
-                        return sub_task_suspend!(
+                        return suspend_from_subtask!(
                             self,
                             waiting_on_type,
                             executor.request(ResolveTypeKeepAliases::new(
@@ -126,7 +130,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                 NodeKind::Sequential(..) => (),
                 NodeKind::Terminating(TerminatingNode::Return(Some(value))) => {
                     let Some(fulfilled) = self.waiting_on_type.take() else {
-                        return sub_task_suspend!(
+                        return suspend_from_subtask!(
                             self,
                             waiting_on_type,
                             executor.request(ResolveTypeKeepAliases::new(
