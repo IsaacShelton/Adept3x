@@ -13,6 +13,8 @@ ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace
 attributes = { version = "0.1.0", path = "../../representations/attributes" }
 beef = "0.5.2"
 bit-vec = "0.8.0"
+build_ast = { version = "0.1.0", path = "../build_ast" }
+build_token = { version = "0.1.0", path = "../build_token" }
 bumpalo = "3.17.0"
 by_address.workspace = true
 compiler = { version = "0.1.0", path = "../../support/compiler" }
@@ -24,6 +26,7 @@ diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
 enum_dispatch.workspace = true
 fs_tree = { version = "0.1.0", path = "../../representations/fs_tree" }
 indexmap.workspace = true
+infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
 interpreter_api = { version = "0.1.0", path = "../../representations/interpreter_api" }
 ir = { version = "0.1.0", path = "../../representations/ir" }
 itertools.workspace = true
@@ -36,4 +39,5 @@ smallvec = "1.15.0"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
 std_ext = { version = "0.1.0", path = "../../support/std_ext" }
 target = { version = "0.1.0", path = "../../support/target" }
+text = { version = "0.1.0", path = "../../support/text" }
 threadpool = { version = "0.1.0", path = "../../support/threadpool" }

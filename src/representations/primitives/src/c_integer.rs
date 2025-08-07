@@ -88,13 +88,13 @@ pub fn fmt_c_integer(
     Ok(())
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub struct CIntegerAssumptions {
     pub int_at_least_32_bits: bool,
 }
 
-impl CIntegerAssumptions {
-    pub fn stable() -> Self {
+impl Default for CIntegerAssumptions {
+    fn default() -> Self {
         // Assumptions we can make for when we compile
         Self {
             int_at_least_32_bits: true,

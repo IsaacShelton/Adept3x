@@ -1,16 +1,11 @@
+mod load_file;
 mod read_file;
 
 use super::Executable;
-use crate::{
-    Continuation, ExecutionCtx, Executor,
-    execution::main::read_file::ReadFile,
-    module_graph::ModuleGraph,
-    repr::{DeclHead, ValueLikeRef},
-    sub_task::SubTask,
-};
-use attributes::Privacy;
+use crate::{Continuation, ExecutionCtx, Executor, module_graph::ModuleGraph};
 use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
+pub use load_file::LoadFile;
 use std::path::Path;
 
 #[derive(Clone, Debug)]
@@ -26,9 +21,6 @@ pub struct Main<'env> {
 
     #[allow(unused)]
     module_graph: Option<&'env ModuleGraph<'env>>,
-
-    read_file: Option<ReadFile>,
-    read_file2: Option<ReadFile>,
 }
 
 impl<'env> Main<'env> {
@@ -42,8 +34,6 @@ impl<'env> Main<'env> {
             project_folder,
             single_file,
             module_graph: None,
-            read_file: None,
-            read_file2: None,
         }
     }
 }
@@ -61,53 +51,17 @@ impl<'env> Executable<'env> for Main<'env> {
             return Err(ErrorDiagnostic::plain("Must specify root file").into());
         };
 
-        let result1 = execute_sub_task!(
-            self,
-            self.read_file
-                .get_or_insert_with(|| ReadFile::new(single_file.into())),
-            executor,
-            ctx
-        );
-
-        let result2 = execute_sub_task!(
-            self,
-            self.read_file2
-                .get_or_insert_with(|| ReadFile::new("bacon.toml".into())),
-            executor,
-            ctx
-        );
-
-        println!("{:?}", result1);
-        println!("{:?}", result2);
-
         let module_graph = *self
             .module_graph
             .get_or_insert_with(|| ctx.alloc(ModuleGraph::default()));
 
+        // * To incorporate files, we need to add a new handle and load the new file into it.
+        // * To import modules, we need to create a new module and (should) setup the module link
+        // before loading the first file into the initial handle for the new module.
+
         let handle = module_graph.add_module_with_initial_part();
 
-        module_graph.add_symbol(
-            Privacy::Public,
-            "test",
-            DeclHead::ValueLike(ValueLikeRef::Dummy),
-            handle,
-        );
-
-        module_graph.add_symbol(
-            Privacy::Private,
-            "test",
-            DeclHead::ValueLike(ValueLikeRef::Dummy),
-            handle,
-        );
-
-        let incorporated = module_graph.add_part(handle);
-
-        module_graph.add_symbol(
-            Privacy::Protected,
-            "hello",
-            DeclHead::ValueLike(ValueLikeRef::Dummy),
-            incorporated,
-        );
+        let _ = executor.request(LoadFile::new(single_file.into(), handle));
 
         Ok(None)
     }

@@ -61,7 +61,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         Self {
             input,
             treat_string_literals_as_cstring_literals: true,
-            conform_behavior: ConformBehavior::Adept(CIntegerAssumptions::stable()),
+            conform_behavior: ConformBehavior::Adept(CIntegerAssumptions::default()),
         }
     }
 

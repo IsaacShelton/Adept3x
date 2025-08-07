@@ -11,7 +11,9 @@ mod resolve_type;
 mod resolve_type_arg;
 mod resolve_type_keep_aliases;
 
-use crate::{Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom};
+use crate::{
+    Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom, execution::main::LoadFile,
+};
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use find_type::FindType;
@@ -76,6 +78,7 @@ pub enum Execution<'env> {
     ResolveTypeArg(ResolveTypeArg<'env>),
     GetFuncHead(GetFuncHead<'env>),
     GetFuncBody(GetFuncBody<'env>),
+    LoadFile(LoadFile<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -92,6 +95,7 @@ pub enum Request<'env> {
     ResolveTypeArg(ResolveTypeArg<'env>),
     GetFuncHead(GetFuncHead<'env>),
     GetFuncBody(GetFuncBody<'env>),
+    LoadFile(LoadFile<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

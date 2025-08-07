@@ -733,6 +733,8 @@ dependencies = [
  "attributes",
  "beef",
  "bit-vec",
+ "build_ast",
+ "build_token",
  "bumpalo",
  "by_address",
  "compiler",
@@ -744,6 +746,7 @@ dependencies = [
  "enum_dispatch",
  "fs_tree",
  "indexmap",
+ "infinite_iterator",
  "interpreter_api",
  "ir",
  "itertools",
@@ -756,6 +759,7 @@ dependencies = [
  "source_files",
  "std_ext",
  "target",
+ "text",
  "threadpool",
 ]
 
