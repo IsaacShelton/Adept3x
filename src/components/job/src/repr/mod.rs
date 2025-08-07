@@ -1,3 +1,4 @@
+mod compiler;
 mod decl;
 mod decl_head_set;
 mod decl_set;
@@ -13,6 +14,7 @@ mod type_head;
 mod variables;
 
 use ast_workspace::TypeDeclRef;
+pub use compiler::*;
 pub use decl::*;
 pub use decl_head_set::*;
 pub use decl_set::*;

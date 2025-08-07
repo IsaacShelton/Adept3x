@@ -1,4 +1,5 @@
 use crate::{Expr, Language, Type};
+use derive_more::IsVariant;
 
 #[derive(Clone, Debug)]
 pub struct StructLiteral {
@@ -14,7 +15,7 @@ pub struct FieldInitializer {
     pub value: Expr,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, IsVariant)]
 pub enum FillBehavior {
     Forbid,
     Zeroed,

@@ -1,14 +1,14 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, execution::main::read_file::ReadFile,
-    module_graph::ModulePartHandle, sub_task::SubTask,
+    module_graph::ModulePartHandle, repr::Compiler, sub_task::SubTask,
 };
 use build_ast::{Input, Parser};
 use build_token::Lexer;
+use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use infinite_iterator::InfiniteIteratorPeeker;
 use primitives::CIntegerAssumptions;
-use source_files::SourceFiles;
 use std::{fs::canonicalize, path::PathBuf};
 use text::{CharacterInfiniteIterator, CharacterPeeker};
 
@@ -16,6 +16,9 @@ use text::{CharacterInfiniteIterator, CharacterPeeker};
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LoadFile<'env> {
     canonical_filename: Result<PathBuf, PathBuf>,
+
+    #[derivative(Debug = "ignore")]
+    compiler: ByAddress<&'env Compiler<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -26,10 +29,14 @@ pub struct LoadFile<'env> {
 }
 
 impl<'env> LoadFile<'env> {
-    pub fn new(filename: PathBuf, module_part_handle: ModulePartHandle<'env>) -> Self {
+    pub fn new(
+        compiler: &'env Compiler,
+        filename: PathBuf,
+        module_part_handle: ModulePartHandle<'env>,
+    ) -> Self {
         Self {
-            // TODO: Better handle canonicalization
             canonical_filename: canonicalize(&filename).map_err(|_| filename.clone()),
+            compiler: ByAddress(compiler),
             read_file: ReadFile::new(filename),
             module_part_handle,
         }
@@ -37,7 +44,6 @@ impl<'env> LoadFile<'env> {
 }
 
 impl<'env> Executable<'env> for LoadFile<'env> {
-    // The filepath to execute when completed
     type Output = ();
 
     fn execute(
@@ -58,25 +64,22 @@ impl<'env> Executable<'env> for LoadFile<'env> {
             .map_err(ErrorDiagnostic::plain)?;
 
         // TODO: We will need to migrate `Compiler` data to keep things like `SourceFiles`
-        let source_files = &SourceFiles::new();
+        let source_files = &self.compiler.source_files;
         let key = source_files.add(canonical_filename.into(), content.into());
         let content = source_files.get(key).content();
 
-        println!("got content {:?}", content);
-
         let text = CharacterPeeker::new(CharacterInfiniteIterator::new(content.chars(), key));
         let lexer = InfiniteIteratorPeeker::new(Lexer::new(text));
-        let mut input = Input::new(lexer, source_files, key);
-        input.ignore_newlines();
+        let input = Input::new(lexer, source_files, key);
 
-        // TODO: Parse header here...
-        input.ignore_newlines();
-
-        let ast = Parser::new(
+        let mut parser = Parser::new(
             input,
             ast::ConformBehavior::Adept(CIntegerAssumptions::default()),
-        )
-        .parse();
+        );
+        let file_header = parser.parse_file_header()?;
+        println!("{:?}", file_header);
+
+        let ast = parser.parse().map_err(ErrorDiagnostic::from)?;
 
         println!("{:?}", ast);
         Ok(())

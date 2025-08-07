@@ -1,4 +1,4 @@
-use diagnostics::Show;
+use diagnostics::{ErrorDiagnostic, Show};
 use optional_string::OptionalString;
 use source_files::{Source, SourceFiles};
 use std::{borrow::Borrow, fmt::Display};
@@ -97,6 +97,12 @@ pub enum ParseErrorKind {
     Other {
         message: String,
     },
+}
+
+impl From<ParseError> for ErrorDiagnostic {
+    fn from(value: ParseError) -> Self {
+        Self::new(value.kind, value.source)
+    }
 }
 
 impl ParseErrorKind {

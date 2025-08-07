@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 ast = { version = "0.1.0", path = "../../representations/ast" }
 attributes = { version = "0.1.0", path = "../../representations/attributes" }
+compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
 derivative.workspace = true
 derive_more.workspace = true
 diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }

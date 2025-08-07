@@ -1,6 +1,7 @@
 use super::{ParseError, Parser};
 use ast::{Expr, ExprKind, FieldInitializer, FillBehavior, Language, Name, StructLiteral, Type};
 use infinite_iterator::InfinitePeekable;
+use source_files::Source;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -17,6 +18,23 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         //      ^
 
         let source = ast_type.source;
+        let (fields, fill_behavior) = self.parse_struct_literal_agnostic(source)?;
+
+        Ok(Expr::new(
+            ExprKind::StructLiteral(Box::new(StructLiteral {
+                ast_type,
+                fields,
+                fill_behavior,
+                language: Language::Adept,
+            })),
+            source,
+        ))
+    }
+
+    pub fn parse_struct_literal_agnostic(
+        &mut self,
+        source: Source,
+    ) -> Result<(Vec<FieldInitializer>, FillBehavior), ParseError> {
         self.input
             .expect(TokenKind::OpenCurly, "to begin struct literal")?;
         self.ignore_newlines();
@@ -62,15 +80,6 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         self.input
             .expect(TokenKind::CloseCurly, "to end struct literal")?;
-
-        Ok(Expr::new(
-            ExprKind::StructLiteral(Box::new(StructLiteral {
-                ast_type,
-                fields,
-                fill_behavior,
-                language: Language::Adept,
-            })),
-            source,
-        ))
+        Ok((fields, fill_behavior))
     }
 }

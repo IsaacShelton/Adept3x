@@ -2,6 +2,7 @@
 
 mod annotation;
 pub mod error;
+mod file_header;
 mod input;
 mod make_error;
 mod parse_annotation;

@@ -66,6 +66,7 @@ pub fn compile(
             &build_options,
             project_folder,
             single_file.as_ref().map(|path_buf| path_buf.as_path()),
+            compiler.source_files,
         ),
     );
 
