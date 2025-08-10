@@ -3,7 +3,10 @@ mod read_file;
 
 use super::Executable;
 pub use crate::repr::Compiler;
-use crate::{Continuation, ExecutionCtx, Executor, module_graph::ModuleGraph};
+use crate::{
+    Continuation, ExecutionCtx, Executor,
+    module_graph::{ModuleGraph, ModuleView},
+};
 use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
 pub use load_file::LoadFile;
@@ -71,7 +74,8 @@ impl<'env> Executable<'env> for Main<'env> {
 
         let handle = module_graph.add_module_with_initial_part();
 
-        let _ = executor.request(LoadFile::new(compiler, single_file.into(), handle));
+        let view = ModuleView::new(module_graph, handle);
+        let _ = executor.request(LoadFile::new(compiler, single_file.into(), view, None));
 
         Ok(None)
     }

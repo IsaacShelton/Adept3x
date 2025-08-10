@@ -150,8 +150,41 @@ pub enum LookupError {
     Ambiguous,
 }
 
+#[derive(Clone, Debug)]
+pub enum ModuleBreakOffMode {
+    Module,
+    Part,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ModuleView<'env> {
     pub module_graph: ByAddress<&'env ModuleGraph<'env>>,
     pub handle: ModulePartHandle<'env>,
+}
+
+impl<'env> ModuleView<'env> {
+    pub fn new(module_graph: &'env ModuleGraph<'env>, handle: ModulePartHandle<'env>) -> Self {
+        Self {
+            module_graph: ByAddress(module_graph),
+            handle,
+        }
+    }
+
+    pub fn break_off(&self, mode: ModuleBreakOffMode) -> Self {
+        match mode {
+            ModuleBreakOffMode::Module => self.break_off_into_module(),
+            ModuleBreakOffMode::Part => self.break_off_into_part(),
+        }
+    }
+
+    pub fn break_off_into_module(&self) -> Self {
+        Self::new(
+            &self.module_graph,
+            self.module_graph.add_module_with_initial_part(),
+        )
+    }
+
+    pub fn break_off_into_part(&self) -> Self {
+        Self::new(&self.module_graph, self.module_graph.add_part(self.handle))
+    }
 }

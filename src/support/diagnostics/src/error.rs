@@ -16,6 +16,13 @@ impl ErrorDiagnostic {
         }
     }
 
+    pub fn new_maybe_source(message: impl ToString, source: Option<Source>) -> Self {
+        Self {
+            message: message.to_string(),
+            source,
+        }
+    }
+
     pub fn plain(message: impl ToString) -> Self {
         Self {
             message: message.to_string(),

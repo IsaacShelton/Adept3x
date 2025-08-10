@@ -33,21 +33,11 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             }
         }
 
-        if !self.input.peek_nth(1).is_identifier() {
-            let expr = self.parse_expr()?;
-            todo!(
-                "namespaces created by expression are not implemented yet - {:?}",
-                expr
-            );
-            #[allow(unreachable_code)]
-            return Err(ParseErrorKind::CannotCallFunctionsAtGlobalScope.at(self.input.here()));
-        }
-
         let (name, source) = self
             .parse_identifier_keep_location(Some("for name of global variable"))?
             .tuple();
 
-        let ast_type = self.parse_type(None::<&str>, Some("for type of global variable"))?;
+        let ast_type = self.parse_type(None::<&str>, Some("for global variable"))?;
 
         if !self.input.peek_is(TokenKind::Newline) {
             return Err(ParseErrorKind::Expected {
