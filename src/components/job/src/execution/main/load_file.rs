@@ -13,16 +13,13 @@ use diagnostics::ErrorDiagnostic;
 use infinite_iterator::InfiniteIteratorPeeker;
 use primitives::CIntegerAssumptions;
 use source_files::Source;
-use std::{
-    fs::canonicalize,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LoadFile<'env> {
-    canonical_filename: Result<PathBuf, PathBuf>,
+    canonical_filename: PathBuf,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -43,18 +40,42 @@ pub struct LoadFile<'env> {
 impl<'env> LoadFile<'env> {
     pub fn new(
         compiler: &'env Compiler,
-        filename: PathBuf,
+        canonical_filename: PathBuf,
         view: ModuleView<'env>,
         source: Option<Source>,
     ) -> Self {
         Self {
-            canonical_filename: canonicalize(&filename).map_err(|_| filename.clone()),
             compiler: ByAddress(compiler),
-            read_file: ReadFile::new(filename),
+            read_file: ReadFile::new(canonical_filename.clone()),
             view,
             source,
+            canonical_filename,
         }
     }
+}
+
+pub fn canonicalize_or_error(
+    filename: &Path,
+    source: Option<Source>,
+) -> Result<PathBuf, ErrorDiagnostic> {
+    if let Ok(canonicalized) = std::fs::canonicalize(filename) {
+        return Ok(canonicalized);
+    }
+
+    Err(if let Ok(false) = std::fs::exists(filename) {
+        ErrorDiagnostic::new_maybe_source(
+            format!("File does not exist: {}", filename.to_string_lossy()),
+            source,
+        )
+    } else {
+        ErrorDiagnostic::new_maybe_source(
+            format!(
+                "Failed to canonicalize filename: {}",
+                filename.to_string_lossy()
+            ),
+            source,
+        )
+    })
 }
 
 impl<'env> Executable<'env> for LoadFile<'env> {
@@ -65,31 +86,13 @@ impl<'env> Executable<'env> for LoadFile<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        // Ensure filename was canonicalized
-        let canonical_filename = self.canonical_filename.as_ref().map_err(|filename| {
-            if let Ok(false) = std::fs::exists(filename) {
-                ErrorDiagnostic::new_maybe_source(
-                    format!("File does not exist: {}", filename.to_string_lossy()),
-                    self.source,
-                )
-            } else {
-                ErrorDiagnostic::new_maybe_source(
-                    format!(
-                        "Failed to canonicalize filename: {}",
-                        filename.to_string_lossy()
-                    ),
-                    self.source,
-                )
-            }
-        })?;
-
         // Read file content
         let content = execute_sub_task!(self, self.read_file, executor, ctx)
             .map_err(ErrorDiagnostic::plain)?;
 
         // TODO: We will need to migrate `Compiler` data to keep things like `SourceFiles`
         let source_files = &self.compiler.source_files;
-        let key = source_files.add(canonical_filename.into(), content.into());
+        let key = source_files.add(self.canonical_filename.clone(), content.into());
         let content = source_files.get(key).content();
 
         let text = CharacterPeeker::new(CharacterInfiniteIterator::new(content.chars(), key));
@@ -116,7 +119,12 @@ impl<'env> Executable<'env> for LoadFile<'env> {
         */
 
         let ast = parser.parse().map_err(ErrorDiagnostic::from)?;
-        println!("{:?}", canonical_filename);
+        println!(
+            "{}: {}: {:?}",
+            self.view.title(),
+            self.view.meta().target,
+            self.compiler.filename(&self.canonical_filename),
+        );
 
         for namespace in ast.namespaces {
             match namespace.items {
@@ -132,12 +140,18 @@ impl<'env> Executable<'env> for LoadFile<'env> {
                         .into());
                     };
 
-                    let new_filename = canonical_filename
-                        .parent()
-                        .expect("file is in folder")
-                        .join(Path::new(&load_target.relative_filename));
+                    let new_filename = canonicalize_or_error(
+                        &self
+                            .canonical_filename
+                            .parent()
+                            .expect("file is in folder")
+                            .join(Path::new(&load_target.relative_filename)),
+                        self.source,
+                    )?;
 
-                    let new_view = self.view.break_off(load_target.mode);
+                    let new_view =
+                        self.view
+                            .break_off(load_target.mode, &new_filename, &self.compiler);
                     let _ = executor.request(LoadFile::new(
                         &self.compiler,
                         new_filename,
@@ -166,8 +180,8 @@ fn fake_run_namespace_expr(expr: &ast::Expr) -> Option<LoadTarget> {
     };
 
     let mode = match call.name.as_plain_str() {
-        Some("incorporate") => ModuleBreakOffMode::Part,
-        Some("import") => ModuleBreakOffMode::Module,
+        Some("addFile") => ModuleBreakOffMode::Part,
+        Some("addModule") => ModuleBreakOffMode::Module,
         _ => return None,
     };
 

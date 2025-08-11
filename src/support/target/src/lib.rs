@@ -19,6 +19,7 @@ pub struct Target {
 
 impl Target {
     pub const HOST: Self = Self::new(TargetOs::HOST, TargetArch::HOST);
+    pub const SANDBOX: Self = Self::new(None, None);
 
     pub const fn new(os: Option<TargetOs>, arch: Option<TargetArch>) -> Self {
         Self { arch, os }
@@ -75,17 +76,17 @@ impl Target {
     }
 
     pub fn default_c_integer_sign(&self, integer: CInteger) -> IntegerSign {
-        // Non-`char` integer types are signed by default.
-        // On darwin, `char` is also always signed.
+        // Everything except `char` is always signed by default.
+        // On Darwin, `char` is also always signed by default.
         if integer != CInteger::Char || self.os.is_mac() {
             return IntegerSign::Signed;
         }
 
-        // Otherwise, the signness of `char` depends on the architecture
+        // Otherwise, it's architecture-dependent.
+        // What's the sign of `char` on this architecture?
         match &self.arch {
-            None => IntegerSign::Unsigned,
             Some(TargetArch::X86_64) => IntegerSign::Signed,
-            Some(TargetArch::Aarch64) => IntegerSign::Unsigned,
+            None | Some(TargetArch::Aarch64) => IntegerSign::Unsigned,
         }
     }
 
@@ -101,7 +102,7 @@ impl Target {
 
     pub fn is_little_endian(&self) -> bool {
         match &self.arch {
-            None | Some(TargetArch::X86_64) | Some(TargetArch::Aarch64) => true,
+            None | Some(TargetArch::X86_64 | TargetArch::Aarch64) => true,
         }
     }
 }
@@ -111,8 +112,8 @@ impl Display for Target {
         write!(
             f,
             "{} {}",
-            self.arch.map_or("unknown".into(), |arch| arch.to_string()),
-            self.os.map_or("unknown".into(), |os| os.to_string())
+            self.arch.map_or("bytecode".into(), |arch| arch.to_string()),
+            self.os.map_or("sandbox".into(), |os| os.to_string())
         )
     }
 }

@@ -10,6 +10,16 @@ pub struct WildcardImportsGraph<'env> {
     public: ArenaMap<ModuleId, Vec<Wildcard<'env>>>,
     protected: ArenaMap<ModuleId, Vec<Wildcard<'env>>>,
     private: HashMap<ModulePartHandle<'env>, Vec<Wildcard<'env>>>,
+
+    // These are "public", but not within this workspace (as the module part is hidden here)
+    // If the module part ever gets unhidden, then the wildcards for it will be merged
+    // into the normal "public".
+    hidden_public: HashMap<ModulePartHandle<'env>, Vec<Wildcard<'env>>>,
+
+    // These are "protected", but not within this workspace (as the module part is hidden here)
+    // If the module part ever gets unhidden, then the wildcards for it will be merged
+    // into the normal "protected".
+    hidden_protected: HashMap<ModulePartHandle<'env>, Vec<Wildcard<'env>>>,
 }
 
 impl<'env> WildcardImportsGraph<'env> {
@@ -50,7 +60,7 @@ impl<'env> WildcardImportsGraph<'env> {
     }
 }
 
-/// Corresponds to one `namespace * = import("...")`
+/// Corresponds to one wildcard import of a module
 #[derive(Debug)]
 pub struct Wildcard<'env> {
     module: ModuleRef<'env>,

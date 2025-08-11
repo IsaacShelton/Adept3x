@@ -43,11 +43,7 @@ pub fn compile_single_file_only(
 }
 
 // Work-in-Progress: New compilation system (full)
-pub fn compile(
-    compiler: &mut Compiler,
-    project_folder: &Path,
-    single_file: Option<PathBuf>,
-) -> Result<(), ()> {
+pub fn compile(compiler: &mut Compiler, single_file: Option<PathBuf>) -> Result<(), ()> {
     let mut allocator = BumpAllocatorPool::new(compiler.options.available_parallelism);
     let build_options = compiler.options.clone();
 
@@ -64,7 +60,6 @@ pub fn compile(
         &[],
         job::Main::new(
             &build_options,
-            project_folder,
             single_file.as_ref().map(|path_buf| path_buf.as_path()),
             compiler.source_files,
         ),
@@ -116,7 +111,7 @@ pub fn compile_workspace(
     #[allow(unreachable_code)]
     #[allow(unused_variables)]
     if compiler.options.new_compilation_system.is_full() {
-        return compile(compiler, project_folder, single_file);
+        return compile(compiler, single_file);
     }
 
     let stats = CompilationStats::start();

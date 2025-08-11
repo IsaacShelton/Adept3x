@@ -6,7 +6,7 @@ mod part;
 mod symbol_channel;
 mod wildcard;
 
-use crate::repr::{DeclHead, DeclHeadSet, DeclSet, Type};
+use crate::repr::{Compiler, DeclHead, DeclHeadSet, DeclSet, Type};
 use append_only_vec::AppendOnlyVec;
 use arena::{Arena, ArenaMap, Idx, LockFreeArena, new_id_with_niche};
 use attributes::Privacy;
@@ -17,23 +17,103 @@ use num_traits::bounds::LowerBounded;
 pub use part::*;
 use std::{
     collections::{HashMap, HashSet},
-    sync::Mutex,
+    path::Path,
+    sync::{Mutex, RwLock},
 };
 use std_ext::HashMapExt;
 pub use symbol_channel::*;
+use target::Target;
 pub use wildcard::*;
 
 new_id_with_niche!(ModuleId, u32);
 pub type ModuleRef<'env> = Idx<ModuleId, Module<'env>>;
 
+new_id_with_niche!(ModuleGraphId, u16);
+pub type ModuleGraphRef<'env> = Idx<ModuleGraphId, ModuleGraph<'env>>;
+
 #[derive(Debug, Default)]
+pub struct ModuleGraphWeb<'env> {
+    graphs: LockFreeArena<ModuleGraphId, ModuleGraph<'env>>,
+}
+
+impl<'env> ModuleGraphWeb<'env> {
+    pub fn add_module_graph(
+        &self,
+        comptime: Option<ModuleGraphRef<'env>>,
+        meta: ModuleGraphMeta,
+    ) -> ModuleGraphRef<'env> {
+        self.graphs.alloc(ModuleGraph::new(comptime, meta))
+    }
+
+    pub fn add_module_with_initial_part(
+        &'env self,
+        module_graph: ModuleGraphRef<'env>,
+    ) -> ModuleView<'env> {
+        let handle = { self.graphs[module_graph].add_module_with_initial_part() };
+
+        ModuleView {
+            module_graph_web: ByAddress(self),
+            module_graph,
+            handle,
+        }
+    }
+
+    pub fn meta(&self, module_graph: ModuleGraphRef<'env>) -> &ModuleGraphMeta {
+        &self.graphs[module_graph].meta
+    }
+
+    pub fn title(&self, module_graph: ModuleGraphRef<'env>) -> &'static str {
+        &self.graphs[module_graph].meta.title
+    }
+}
+
+#[derive(Debug)]
+pub struct ModuleGraphMeta {
+    // Human-readable title for this module graph.
+    pub title: &'static str,
+
+    // Whether this module graph is meant for compile-time code evaluation.
+    pub is_comptime: Option<ComptimeFlavor>,
+
+    // The target for this module graph
+    pub target: Target,
+}
+
+#[derive(Debug)]
+pub enum ComptimeFlavor {
+    Sandbox,
+}
+
+#[derive(Debug)]
 pub struct ModuleGraph<'env> {
+    // `None` means self-reference (the module graph is its own comptime).
+    // If `Some` the referenced module must self-reference.
+    comptime: Option<ModuleGraphRef<'env>>,
+
+    // Each of the modules within this module graph
     modules: Mutex<Arena<ModuleId, Module<'env>>>,
+
+    // Each of the wildcard imports within this module graph
     wildcard_imports: Mutex<WildcardImportsGraph<'env>>,
+
+    // Each of the links that must stay consistent when adding symbols
     consistency: AppendOnlyVec<Link<'env>>,
+
+    // Metadata about the purpose of this module graph
+    meta: ModuleGraphMeta,
 }
 
 impl<'env> ModuleGraph<'env> {
+    pub fn new(comptime: Option<ModuleGraphRef<'env>>, meta: ModuleGraphMeta) -> Self {
+        Self {
+            comptime: comptime,
+            modules: Default::default(),
+            wildcard_imports: Default::default(),
+            consistency: Default::default(),
+            meta,
+        }
+    }
+
     pub fn add_module_with_initial_part(&self) -> ModulePartHandle<'env> {
         let mut module = Module::default();
         let part_ref = module.add_part();
@@ -158,33 +238,96 @@ pub enum ModuleBreakOffMode {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ModuleView<'env> {
-    pub module_graph: ByAddress<&'env ModuleGraph<'env>>,
+    pub module_graph_web: ByAddress<&'env ModuleGraphWeb<'env>>,
+    pub module_graph: ModuleGraphRef<'env>,
     pub handle: ModulePartHandle<'env>,
 }
 
 impl<'env> ModuleView<'env> {
-    pub fn new(module_graph: &'env ModuleGraph<'env>, handle: ModulePartHandle<'env>) -> Self {
+    pub fn new(
+        module_graph_web: &'env ModuleGraphWeb<'env>,
+        module_graph: ModuleGraphRef<'env>,
+        handle: ModulePartHandle<'env>,
+    ) -> Self {
         Self {
-            module_graph: ByAddress(module_graph),
+            module_graph_web: ByAddress(module_graph_web),
+            module_graph,
             handle,
         }
     }
 
-    pub fn break_off(&self, mode: ModuleBreakOffMode) -> Self {
+    pub fn title(&self) -> &'static str {
+        self.module_graph_web.title(self.module_graph)
+    }
+
+    pub fn meta(&self) -> &ModuleGraphMeta {
+        self.module_graph_web.meta(self.module_graph)
+    }
+
+    pub fn graph(&self) -> &ModuleGraph<'env> {
+        &self.module_graph_web.graphs[self.module_graph]
+    }
+
+    pub fn comptime_graph(&self) -> Option<&ModuleGraph<'env>> {
+        let graphs = &self.module_graph_web.graphs;
+        graphs[self.module_graph].comptime.map(|idx| &graphs[idx])
+    }
+
+    pub fn break_off(
+        &self,
+        mode: ModuleBreakOffMode,
+        canonical_filename: &Path,
+        compiler: &Compiler,
+    ) -> Self {
         match mode {
-            ModuleBreakOffMode::Module => self.break_off_into_module(),
-            ModuleBreakOffMode::Part => self.break_off_into_part(),
+            ModuleBreakOffMode::Module => self.break_off_into_module(canonical_filename, compiler),
+            ModuleBreakOffMode::Part => self.break_off_into_part(canonical_filename, compiler),
         }
     }
 
-    pub fn break_off_into_module(&self) -> Self {
-        Self::new(
-            &self.module_graph,
-            self.module_graph.add_module_with_initial_part(),
+    pub fn break_off_into_module(&self, canonical_filename: &Path, compiler: &Compiler) -> Self {
+        todo!(
+            "break_off_into_module {:?}",
+            compiler.filename(canonical_filename)
         )
+
+        /*
+        Self::new(
+            &self.module_graph_web,
+            self.module_graph,
+            self.module_graph_web.add_module_with_initial_part(),
+        )
+        */
     }
 
-    pub fn break_off_into_part(&self) -> Self {
-        Self::new(&self.module_graph, self.module_graph.add_part(self.handle))
+    pub fn break_off_into_part(&self, canonical_filename: &Path, compiler: &Compiler) -> Self {
+        {
+            let graph = self.graph();
+
+            if let Some(comptime) = self.comptime_graph() {
+                // We are "runtime" relative to another module graph,
+                // we need to update our comptime module graph to
+                // include the new part.
+                // If the part does not exist in the comptime module,
+                // we need to make it hidden so it doesn't influence
+                // anything there.
+                todo!(
+                    "break_off_into_part (has comptime) {:?}",
+                    compiler.filename(canonical_filename),
+                )
+            } else {
+                // This module graph is its own "comptime". If the part we want
+                // already exists as a hidden part, we need to use
+                // that and update everyone (in this module graph)
+                // who may depend on the new symbols.
+                todo!(
+                    "break_off_into_part (is self comptime) {:?}",
+                    compiler.filename(canonical_filename),
+                )
+            }
+        }
+
+        todo!("break_off_into_part")
+        // Self::new(&self.module_graph, self.module_graph.add_part(self.handle))
     }
 }
