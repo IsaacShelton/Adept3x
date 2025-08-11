@@ -6,7 +6,7 @@ pub use crate::repr::Compiler;
 use crate::{
     Continuation, ExecutionCtx, Executor,
     execution::main::load_file::canonicalize_or_error,
-    module_graph::{ComptimeFlavor, ModuleGraphMeta, ModuleGraphWeb},
+    module_graph::{ComptimeKind, ModuleGraphMeta, ModuleGraphWeb},
 };
 use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
@@ -71,7 +71,7 @@ impl<'env> Executable<'env> for Main<'env> {
             None,
             ModuleGraphMeta {
                 title: "comptime",
-                is_comptime: Some(ComptimeFlavor::Sandbox),
+                is_comptime: Some(ComptimeKind::Sandbox),
                 target: Target::SANDBOX,
             },
         );

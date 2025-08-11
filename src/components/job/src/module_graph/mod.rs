@@ -52,18 +52,18 @@ impl<'env> ModuleGraphWeb<'env> {
         let handle = { self.graphs[module_graph].add_module_with_initial_part() };
 
         ModuleView {
-            module_graph_web: ByAddress(self),
-            module_graph,
+            web: ByAddress(self),
+            graph: module_graph,
             handle,
         }
     }
 
-    pub fn meta(&self, module_graph: ModuleGraphRef<'env>) -> &ModuleGraphMeta {
-        &self.graphs[module_graph].meta
+    pub fn graph(&self, module_graph: ModuleGraphRef<'env>) -> &ModuleGraph<'env> {
+        &self.graphs[module_graph]
     }
 
-    pub fn title(&self, module_graph: ModuleGraphRef<'env>) -> &'static str {
-        &self.graphs[module_graph].meta.title
+    pub fn meta(&self, module_graph: ModuleGraphRef<'env>) -> &ModuleGraphMeta {
+        &self.graphs[module_graph].meta
     }
 }
 
@@ -73,14 +73,14 @@ pub struct ModuleGraphMeta {
     pub title: &'static str,
 
     // Whether this module graph is meant for compile-time code evaluation.
-    pub is_comptime: Option<ComptimeFlavor>,
+    pub is_comptime: Option<ComptimeKind>,
 
     // The target for this module graph
     pub target: Target,
 }
 
 #[derive(Debug)]
-pub enum ComptimeFlavor {
+pub enum ComptimeKind {
     Sandbox,
 }
 
@@ -238,39 +238,37 @@ pub enum ModuleBreakOffMode {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ModuleView<'env> {
-    pub module_graph_web: ByAddress<&'env ModuleGraphWeb<'env>>,
-    pub module_graph: ModuleGraphRef<'env>,
+    pub web: ByAddress<&'env ModuleGraphWeb<'env>>,
+    pub graph: ModuleGraphRef<'env>,
     pub handle: ModulePartHandle<'env>,
 }
 
 impl<'env> ModuleView<'env> {
     pub fn new(
-        module_graph_web: &'env ModuleGraphWeb<'env>,
-        module_graph: ModuleGraphRef<'env>,
+        web: &'env ModuleGraphWeb<'env>,
+        graph: ModuleGraphRef<'env>,
         handle: ModulePartHandle<'env>,
     ) -> Self {
         Self {
-            module_graph_web: ByAddress(module_graph_web),
-            module_graph,
+            web: ByAddress(web),
+            graph,
             handle,
         }
     }
 
-    pub fn title(&self) -> &'static str {
-        self.module_graph_web.title(self.module_graph)
-    }
-
     pub fn meta(&self) -> &ModuleGraphMeta {
-        self.module_graph_web.meta(self.module_graph)
+        self.web.meta(self.graph)
     }
 
     pub fn graph(&self) -> &ModuleGraph<'env> {
-        &self.module_graph_web.graphs[self.module_graph]
+        self.web.graph(self.graph)
     }
 
     pub fn comptime_graph(&self) -> Option<&ModuleGraph<'env>> {
-        let graphs = &self.module_graph_web.graphs;
-        graphs[self.module_graph].comptime.map(|idx| &graphs[idx])
+        self.web
+            .graph(self.graph)
+            .comptime
+            .map(|comptime| self.web.graph(comptime))
     }
 
     pub fn break_off(

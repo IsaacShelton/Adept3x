@@ -21,12 +21,12 @@ impl<'env> ModulePart<'env> {
 }
 
 /// Hidden module parts are module parts that are exclusively
-/// referenced by other workspaces.
+/// referenced by other module graphs.
 /// For example,
 /// If we add a part to a module only for the runtime target,
 /// it still needs to reference the compile-time version of itself
-/// in the compile-time workspace, despite the (compile-time version) module part
-/// not being visible to other parts within the module (for the compile-time workspace).
+/// in the compile-time module graph, despite the (compile-time version) module part
+/// not being visible to other parts within the module (for the compile-time module graph).
 #[derive(Debug, Default)]
 pub struct HiddenModulePartSymbols<'env> {
     public: SymbolChannel<'env>,

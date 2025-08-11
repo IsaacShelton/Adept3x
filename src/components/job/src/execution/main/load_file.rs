@@ -121,7 +121,7 @@ impl<'env> Executable<'env> for LoadFile<'env> {
         let ast = parser.parse().map_err(ErrorDiagnostic::from)?;
         println!(
             "{}: {}: {:?}",
-            self.view.title(),
+            self.view.meta().title,
             self.view.meta().target,
             self.compiler.filename(&self.canonical_filename),
         );
@@ -134,7 +134,7 @@ impl<'env> Executable<'env> for LoadFile<'env> {
                 ast::NamespaceItemsSource::Expr(expr) => {
                     let Some(load_target) = fake_run_namespace_expr(&expr) else {
                         return Err(ErrorDiagnostic::new(
-                            "Expression must evaluate to a target to import or incorporate",
+                            "Expression must evaluate to a target to import or add",
                             expr.source,
                         )
                         .into());
@@ -146,7 +146,7 @@ impl<'env> Executable<'env> for LoadFile<'env> {
                             .parent()
                             .expect("file is in folder")
                             .join(Path::new(&load_target.relative_filename)),
-                        self.source,
+                        Some(expr.source),
                     )?;
 
                     let new_view =
