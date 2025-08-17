@@ -4,18 +4,18 @@ use crate::{
     sub_task::SubTask,
 };
 use diagnostics::ErrorDiagnostic;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Clone, Debug)]
-pub enum ReadFile {
-    NotStarted(Option<PathBuf>),
+pub enum ReadFile<'env> {
+    NotStarted(&'env Path),
     Pending(IoRequestHandle),
     Complete(Result<String, String>),
 }
 
-impl ReadFile {
-    pub fn new(filename: PathBuf) -> Self {
-        Self::NotStarted(Some(filename))
+impl<'env> ReadFile<'env> {
+    pub fn new(filename: &'env Path) -> Self {
+        Self::NotStarted(filename)
     }
 
     fn unwrap_complete(&self) -> Result<&str, &str> {
@@ -29,7 +29,7 @@ impl ReadFile {
     }
 }
 
-impl<'env> SubTask<'env> for ReadFile {
+impl<'env> SubTask<'env> for ReadFile<'env> {
     type SubArtifact<'a>
         = Result<&'a str, &'a str>
     where
@@ -52,11 +52,10 @@ impl<'env> SubTask<'env> for ReadFile {
         Result<impl Fn(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
     > {
         match self {
-            ReadFile::NotStarted(path_buf) => {
-                *self = Self::Pending(executor.request_io(
-                    IoRequest::ReadFile(path_buf.take().unwrap()),
-                    ctx.self_task(),
-                ));
+            ReadFile::NotStarted(path) => {
+                *self = Self::Pending(
+                    executor.request_io(IoRequest::ReadFile(path.to_path_buf()), ctx.self_task()),
+                );
 
                 return Err(Ok(Continuation::PendingIo));
             }

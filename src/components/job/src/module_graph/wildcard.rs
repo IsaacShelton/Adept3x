@@ -23,6 +23,30 @@ pub struct WildcardImportsGraph<'env> {
 }
 
 impl<'env> WildcardImportsGraph<'env> {
+    pub fn unhide(&mut self, handle: ModulePartHandle<'env>) -> bool {
+        let mut did = false;
+
+        if let Some(mut new_public) = self.hidden_public.remove(&handle) {
+            if let Some(existing_public) = self.public.get_mut(handle.module_ref) {
+                existing_public.append(&mut new_public);
+            } else {
+                self.public.insert(handle.module_ref, new_public);
+            }
+            did = true;
+        }
+
+        if let Some(mut new_protected) = self.hidden_protected.remove(&handle) {
+            if let Some(existing_protected) = self.protected.get_mut(handle.module_ref) {
+                existing_protected.append(&mut new_protected);
+            } else {
+                self.protected.insert(handle.module_ref, new_protected);
+            }
+            did = true;
+        }
+
+        did
+    }
+
     pub fn compute_wildcards(&self, start: ModulePartHandle<'env>) -> Vec<ModuleRef<'env>> {
         let mut seen = HashSet::new();
         let mut stack = Vec::with_capacity(8);

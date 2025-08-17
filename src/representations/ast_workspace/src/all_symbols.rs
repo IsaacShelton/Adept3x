@@ -97,8 +97,8 @@ impl AstWorkspaceSymbols {
             });
         }
 
-        let mut conditional_name_scopes = Vec::with_capacity(items.conditional_compilations.len());
-        for conditional in items.conditional_compilations {
+        let mut conditional_name_scopes = Vec::with_capacity(items.whens.len());
+        for conditional in items.whens {
             let conditions = conditional
                 .conditions
                 .into_iter()

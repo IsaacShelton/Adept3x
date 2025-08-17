@@ -50,6 +50,7 @@ impl IdentifierState {
             "namespace" => TokenKind::NamespaceKeyword,
             "mod" => TokenKind::ModKeyword,
             "goto" => TokenKind::GotoKeyword,
+            "when" => TokenKind::WhenKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)

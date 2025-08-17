@@ -1,5 +1,4 @@
 mod block;
-mod conditional_compilation;
 mod conforming;
 mod datatype;
 mod enumeration;
@@ -17,9 +16,9 @@ mod structs;
 mod traits;
 mod type_alias;
 mod type_params;
+mod when;
 
 pub use block::*;
-pub use conditional_compilation::*;
 pub use conforming::*;
 pub use datatype::*;
 pub use enumeration::*;
@@ -39,3 +38,5 @@ pub use token::Name;
 pub use traits::*;
 pub use type_alias::*;
 pub use type_params::*;
+pub use when::*;
+

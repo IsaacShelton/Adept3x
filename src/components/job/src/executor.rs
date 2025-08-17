@@ -89,6 +89,15 @@ impl<'env> Executor<'env> {
     }
 
     #[must_use]
+    pub fn spawn(&self, execution: impl Into<Execution<'env>>) -> TaskRef<'env> {
+        let execution = execution.into();
+        let mut truth_guard = self.truth.write().unwrap();
+        let truth = truth_guard.deref_mut();
+        let tasks = &mut truth.tasks;
+        self.push_unique_into_tasks(tasks, &[], execution)
+    }
+
+    #[must_use]
     pub fn request<R, T>(&self, request: R) -> Pending<'env, T>
     where
         R: Into<Request<'env>> + Executable<'env, Output = T>,

@@ -11,6 +11,7 @@ asg = { version = "0.1.0", path = "../../representations/asg" }
 ast = { version = "0.1.0", path = "../../representations/ast" }
 ast_workspace = { version = "0.1.0", path = "../../representations/ast_workspace" }
 attributes = { version = "0.1.0", path = "../../representations/attributes" }
+auto_enums = "0.8.7"
 beef = "0.5.2"
 bit-vec = "0.8.0"
 build_ast = { version = "0.1.0", path = "../build_ast" }

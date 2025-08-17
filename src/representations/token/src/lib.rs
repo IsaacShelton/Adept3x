@@ -96,6 +96,7 @@ pub enum TokenKind {
     NamespaceKeyword,
     ModKeyword,
     GotoKeyword,
+    WhenKeyword,
     Member,
     Add,
     Subtract,
@@ -200,6 +201,7 @@ impl Display for TokenKind {
             TokenKind::NamespaceKeyword => f.write_str("'namespace' keyword"),
             TokenKind::ModKeyword => f.write_str("'mod' keyword"),
             TokenKind::GotoKeyword => f.write_str("'goto' keyword"),
+            TokenKind::WhenKeyword => f.write_str("'when' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -342,6 +344,7 @@ impl TokenKind {
             | TokenKind::NamespaceKeyword
             | TokenKind::ModKeyword
             | TokenKind::GotoKeyword
+            | TokenKind::WhenKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

@@ -3,7 +3,7 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
 };
-use ast::{ConditionalCompilation, NamespaceItems};
+use ast::{NamespaceItems, When};
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
@@ -71,7 +71,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         // Parse top-level construct
         match self.input.peek().kind {
-            TokenKind::IfKeyword => {
+            TokenKind::WhenKeyword => {
                 for annotation in annotations {
                     match annotation.kind {
                         // NOTE: Comptime is implied
@@ -85,37 +85,32 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     }
                 }
 
-                self.input.advance().kind.unwrap_if_keyword();
+                self.input.advance().kind.unwrap_when_keyword();
                 self.ignore_newlines();
 
                 let condition = self.parse_expr()?;
                 let inner_items = self.parse_top_level_new_block()?;
                 let mut conditions = vec![(condition, inner_items)];
+                let mut otherwise = None;
 
-                while self.input.peek_is(TokenKind::ElifKeyword) {
-                    self.input.advance().kind.unwrap_elif_keyword();
+                while self.input.peek_is(TokenKind::ElseKeyword) {
+                    self.input.advance().kind.unwrap_else_keyword();
                     self.ignore_newlines();
 
-                    let condition = self.parse_expr()?;
-                    let inner_items = self.parse_top_level_new_block()?;
-                    conditions.push((condition, inner_items));
+                    if self.input.eat(TokenKind::WhenKeyword) {
+                        let condition = self.parse_expr()?;
+                        let inner_items = self.parse_top_level_new_block()?;
+                        conditions.push((condition, inner_items));
+                    } else {
+                        otherwise = Some(self.parse_top_level_new_block()?);
+                        break;
+                    }
                 }
 
-                let otherwise = self
-                    .input
-                    .peek_is(TokenKind::ElseKeyword)
-                    .then(|| {
-                        self.input.advance().kind.unwrap_else_keyword();
-                        self.parse_top_level_new_block()
-                    })
-                    .transpose()?;
-
-                namespace_items
-                    .conditional_compilations
-                    .push(ConditionalCompilation {
-                        conditions,
-                        otherwise,
-                    });
+                namespace_items.whens.push(When {
+                    conditions,
+                    otherwise,
+                });
             }
             TokenKind::OpenCurly => {
                 self.parse_top_level_block(namespace_items, annotations)?;

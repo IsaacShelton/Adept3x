@@ -37,3 +37,12 @@ impl<'env> DeclHeadSet<'env> {
         self.0.iter()
     }
 }
+
+impl<'env> IntoIterator for DeclHeadSet<'env> {
+    type Item = DeclHead<'env>;
+    type IntoIter = <SmallVec2<DeclHead<'env>> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}

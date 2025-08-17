@@ -28,7 +28,7 @@ impl<K: Id, V> LockFreeArena<K, V> {
     /// ```
     /// # use arena::LockFreeArena;
     /// let arena: LockFreeArena<u32, i32> = LockFreeArena::new();
-    /// assert_ne!(arena.len(), 0);
+    /// assert_eq!(arena.len(), 0);
     /// ```
     #[inline]
     pub const fn new() -> Self {

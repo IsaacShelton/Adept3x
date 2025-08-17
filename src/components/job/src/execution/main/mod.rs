@@ -2,11 +2,10 @@ mod load_file;
 mod read_file;
 
 use super::Executable;
-pub use crate::repr::Compiler;
 use crate::{
-    Continuation, ExecutionCtx, Executor,
-    execution::main::load_file::canonicalize_or_error,
-    module_graph::{ComptimeKind, ModuleGraphMeta, ModuleGraphWeb},
+    Continuation, ExecutionCtx, Executor, canonicalize_or_error,
+    module_graph::{ModuleGraphRef, ModuleGraphWeb},
+    repr::Compiler,
 };
 use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
@@ -21,7 +20,11 @@ pub struct Main<'env> {
     build_options: &'env BuildOptions,
     uncanonicalized_single_file: Option<&'env Path>,
     canonicalized_single_file: Option<&'env Path>,
+
+    #[allow(unused)]
     module_graph_web: Option<&'env ModuleGraphWeb<'env>>,
+
+    #[allow(unused)]
     source_files: &'env SourceFiles,
 }
 
@@ -65,49 +68,18 @@ impl<'env> Executable<'env> for Main<'env> {
 
         let web = *self
             .module_graph_web
-            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::default()));
-
-        let comptime = web.add_module_graph(
-            None,
-            ModuleGraphMeta {
-                title: "comptime",
-                is_comptime: Some(ComptimeKind::Sandbox),
-                target: Target::SANDBOX,
-            },
-        );
-        let runtime = web.add_module_graph(
-            Some(comptime),
-            ModuleGraphMeta {
-                title: "runtime",
-                is_comptime: None,
-                target: Target::HOST,
-            },
-        );
+            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST)));
 
         let compiler = ctx.alloc(Compiler {
             source_files: self.source_files,
             project_root,
         });
 
-        // * To incorporate files, we need to add a new handle and load the new file into it.
-        // * To import modules, we need to create a new module and (should) setup the module link
-        // before loading the first file into the initial handle for the new module.
+        let runtime = web
+            .find_or_create_module_with_initial_part(ModuleGraphRef::Runtime, single_file)
+            .out_of();
 
-        let comptime_view = web.add_module_with_initial_part(comptime);
-        let _ = executor.request(LoadFile::new(
-            compiler,
-            single_file.into(),
-            comptime_view,
-            None,
-        ));
-
-        let runtime_view = web.add_module_with_initial_part(runtime);
-        let _ = executor.request(LoadFile::new(
-            compiler,
-            single_file.into(),
-            runtime_view,
-            None,
-        ));
+        let _ = executor.request(LoadFile::new(compiler, single_file.into(), runtime, None));
 
         Ok(None)
     }

@@ -1,3 +1,4 @@
+mod canonicalize;
 mod diverge;
 mod find_type;
 mod find_type_in_decl_set;
@@ -10,10 +11,12 @@ mod print;
 mod resolve_type;
 mod resolve_type_arg;
 mod resolve_type_keep_aliases;
+mod semantic;
 
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom, execution::main::LoadFile,
 };
+pub use canonicalize::canonicalize_or_error;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use find_type::FindType;
@@ -27,6 +30,7 @@ pub use print::Print;
 pub use resolve_type::ResolveType;
 pub use resolve_type_arg::*;
 pub use resolve_type_keep_aliases::*;
+pub use semantic::*;
 
 #[enum_dispatch]
 pub trait RawExecutable<'env> {
@@ -79,6 +83,8 @@ pub enum Execution<'env> {
     GetFuncHead(GetFuncHead<'env>),
     GetFuncBody(GetFuncBody<'env>),
     LoadFile(LoadFile<'env>),
+    ResolveNamespaceItems(ResolveNamespaceItems<'env>),
+    ResolveNamespace(ResolveNamespace<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -96,6 +102,8 @@ pub enum Request<'env> {
     GetFuncHead(GetFuncHead<'env>),
     GetFuncBody(GetFuncBody<'env>),
     LoadFile(LoadFile<'env>),
+    ResolveNamespaceItems(ResolveNamespaceItems<'env>),
+    ResolveNamespace(ResolveNamespace<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

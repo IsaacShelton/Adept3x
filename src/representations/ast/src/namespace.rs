@@ -1,6 +1,4 @@
-use crate::{
-    ConditionalCompilation, Enum, Expr, ExprAlias, Func, Global, Impl, Struct, Trait, TypeAlias,
-};
+use crate::{Enum, Expr, ExprAlias, Func, Global, Impl, Struct, Trait, TypeAlias, When};
 use attributes::Privacy;
 use derive_more::From;
 use source_files::Source;
@@ -16,7 +14,7 @@ pub struct NamespaceItems {
     pub traits: Vec<Trait>,
     pub impls: Vec<Impl>,
     pub namespaces: Vec<Namespace>,
-    pub conditional_compilations: Vec<ConditionalCompilation>,
+    pub whens: Vec<When>,
 }
 
 #[derive(Clone, Debug)]

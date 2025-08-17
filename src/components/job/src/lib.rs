@@ -97,7 +97,6 @@ mod truth;
 mod typed_cfg;
 mod unify;
 mod unwrap_from;
-mod views;
 mod waiting_count;
 mod worker;
 
