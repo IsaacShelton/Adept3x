@@ -51,13 +51,13 @@ impl<'env> ModuleGraphWebInner<'env> {
         }
     }
 
-    pub fn graph_mut(&mut self, graph_ref: ModuleGraphRef) -> &ModuleGraph<'env> {
+    pub fn graph_mut(&mut self, graph_ref: ModuleGraphRef) -> &mut ModuleGraph<'env> {
         match graph_ref {
-            ModuleGraphRef::Runtime => &self.runtime,
+            ModuleGraphRef::Runtime => &mut self.runtime,
             ModuleGraphRef::Comptime(comptime_kind) => match comptime_kind {
-                ComptimeKind::Sandbox => &self.comptime_sandbox,
-                ComptimeKind::Target => &self.comptime_target,
-                ComptimeKind::Host => &self.comptime_host,
+                ComptimeKind::Sandbox => &mut self.comptime_sandbox,
+                ComptimeKind::Target => &mut self.comptime_target,
+                ComptimeKind::Host => &mut self.comptime_host,
             },
         }
     }
@@ -71,28 +71,12 @@ impl<'env> ModuleGraphWebInner<'env> {
 
         graph
             .modules
-            .lock()
+            .get_mut()
             .unwrap()
             .find_or_create_module_with_initial_part(
                 canonical_filename,
                 ModulePartVisibility::Visible,
             )
-            .if_found(|found| graph.unhide(found))
-    }
-
-    pub fn find_or_create_part(
-        &mut self,
-        graph_ref: ModuleGraphRef,
-        module_ref: ModuleRef<'env>,
-        canonical_filename: &Path,
-    ) -> ModulePartHandle<'env> {
-        let graph = self.graph_mut(graph_ref);
-
-        let part_ref = graph.modules.lock().unwrap().arena[module_ref]
-            .find_or_create_part(canonical_filename, ModulePartVisibility::Visible)
-            .if_found(|found| graph.unhide(ModulePartHandle::new(module_ref, found)))
-            .out_of();
-
-        ModulePartHandle::new(module_ref, part_ref)
+            .if_found(|found| graph.unhide_mut(found))
     }
 }

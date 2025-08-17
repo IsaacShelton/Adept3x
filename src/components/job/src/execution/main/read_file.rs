@@ -1,15 +1,11 @@
-use crate::{
-    Continuation, Execution, ExecutionCtx, Executor,
-    io::{IoRequest, IoRequestHandle},
-    sub_task::SubTask,
-};
+use crate::{Continuation, Execution, ExecutionCtx, Executor, io::IoRequest, sub_task::SubTask};
 use diagnostics::ErrorDiagnostic;
 use std::path::Path;
 
 #[derive(Clone, Debug)]
 pub enum ReadFile<'env> {
     NotStarted(&'env Path),
-    Pending(IoRequestHandle),
+    Pending,
     Complete(Result<String, String>),
 }
 
@@ -44,32 +40,23 @@ impl<'env> SubTask<'env> for ReadFile<'env> {
 
     fn execute_sub_task<'a, 'ctx>(
         &'a mut self,
-        executor: &'a Executor<'env>,
+        _executor: &'a Executor<'env>,
         ctx: &'ctx mut ExecutionCtx<'env>,
         _user_data: Self::UserData<'a>,
     ) -> Result<
         Self::SubArtifact<'a>,
-        Result<impl Fn(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
+        Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
     > {
         match self {
             ReadFile::NotStarted(path) => {
-                *self = Self::Pending(
-                    executor.request_io(IoRequest::ReadFile(path.to_path_buf()), ctx.self_task()),
-                );
-
-                return Err(Ok(Continuation::PendingIo));
+                let path_buf = path.to_path_buf();
+                *self = Self::Pending;
+                return Err(Ok(move |executable| {
+                    Continuation::RequestIo(executable, IoRequest::ReadFile(path_buf))
+                }));
             }
-            ReadFile::Pending(io_handle) => {
-                *self = Self::Complete(
-                    executor
-                        .completed_io
-                        .lock()
-                        .unwrap()
-                        .remove(&io_handle)
-                        .unwrap()
-                        .unwrap_fulfilled()
-                        .payload,
-                );
+            ReadFile::Pending => {
+                *self = Self::Complete(ctx.io_response().unwrap().payload);
                 return Ok(self.unwrap_complete());
             }
             ReadFile::Complete(_) => {

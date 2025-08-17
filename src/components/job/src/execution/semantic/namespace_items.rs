@@ -1,6 +1,6 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, ResolveNamespace, module_graph::ModuleView,
-    repr::Compiler,
+    Continuation, Executable, ExecutionCtx, Executor, ResolveNamespace, ResolveWhen,
+    module_graph::ModuleView, repr::Compiler,
 };
 use ast::NamespaceItems;
 use derivative::Derivative;
@@ -46,6 +46,13 @@ impl<'env> Executable<'env> for ResolveNamespaceItems<'env> {
         let Some(namespace_items) = self.namespace_items.take() else {
             return Ok(());
         };
+
+        ctx.suspend_on(
+            namespace_items
+                .whens
+                .into_iter()
+                .map(|when| executor.spawn(ResolveWhen::new(self.view, self.compiler, when))),
+        );
 
         ctx.suspend_on(namespace_items.namespaces.into_iter().map(|namespace| {
             executor.spawn(ResolveNamespace::new(self.view, self.compiler, namespace))

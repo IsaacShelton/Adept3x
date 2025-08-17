@@ -4,7 +4,7 @@
     ---------------------------------------------------------------------------
 */
 
-use crate::{TaskRef, WaitingCount};
+use crate::{TaskRef, WaitingCount, io::IoResponse};
 use smallvec::SmallVec;
 
 #[derive(Debug)]
@@ -17,4 +17,16 @@ pub enum SuspendCondition<'env> {
 
     /// Pending IO
     PendingIo,
+
+    /// Wake from IO
+    WakeFromIo(IoResponse),
+}
+
+impl<'env> SuspendCondition<'env> {
+    pub fn to_io_response(self) -> Option<IoResponse> {
+        match self {
+            SuspendCondition::WakeFromIo(io_response) => Some(io_response),
+            _ => None,
+        }
+    }
 }

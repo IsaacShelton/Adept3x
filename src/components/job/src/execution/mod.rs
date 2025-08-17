@@ -85,6 +85,8 @@ pub enum Execution<'env> {
     LoadFile(LoadFile<'env>),
     ResolveNamespaceItems(ResolveNamespaceItems<'env>),
     ResolveNamespace(ResolveNamespace<'env>),
+    ResolveWhen(ResolveWhen<'env>),
+    EvaluateComptime(EvaluateComptime<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -104,6 +106,8 @@ pub enum Request<'env> {
     LoadFile(LoadFile<'env>),
     ResolveNamespaceItems(ResolveNamespaceItems<'env>),
     ResolveNamespace(ResolveNamespace<'env>),
+    ResolveWhen(ResolveWhen<'env>),
+    EvaluateComptime(EvaluateComptime<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

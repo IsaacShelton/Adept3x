@@ -1,6 +1,7 @@
 use crate::{
     Artifact, BumpAllocator, Continuation, Execution, ExecutionCtx, Executor, RawExecutable,
     SuspendCondition, TaskRef, TaskState, TopN, WaitingCount,
+    io::{IoRequest, IoResponse},
 };
 use crossbeam_deque::{Stealer, Worker as WorkerQueue};
 use diagnostics::ErrorDiagnostic;
@@ -41,8 +42,8 @@ impl<'env> Worker<'env> {
         let mut top_n_errors = TopN::new(max_top_errors);
 
         loop {
-            if let Some((task_ref, execution)) = self.find_task(executor, stealers) {
-                ctx.set_self_task(task_ref);
+            if let Some((task_ref, execution, io_response)) = self.find_task(executor, stealers) {
+                ctx.prepare_for_task(task_ref, io_response);
 
                 let result = panic::catch_unwind(AssertUnwindSafe(|| {
                     execution.execute_raw(executor, &mut ctx)
@@ -59,9 +60,27 @@ impl<'env> Worker<'env> {
                         ctx.reset_waiting_on();
                         executor.num_cleared.fetch_add(1, Ordering::SeqCst);
                     }
-                    Ok(Err(Continuation::PendingIo(execution))) => {
+                    Ok(Err(Continuation::RequestIo(execution, io_request))) => {
                         executor.truth.write().unwrap().tasks[task_ref].state =
                             TaskState::Suspended(execution, SuspendCondition::PendingIo);
+
+                        executor.num_queued.fetch_add(1, Ordering::SeqCst);
+
+                        let task_id = task_ref.into_raw();
+                        let io_tx = executor.io_tx.clone();
+                        executor.io_thread_pool.execute(move || match io_request {
+                            IoRequest::ReadFile(path) => {
+                                io_tx
+                                    .send((
+                                        task_id,
+                                        IoResponse {
+                                            payload: std::fs::read_to_string(path)
+                                                .map_err(|e| e.to_string()),
+                                        },
+                                    ))
+                                    .expect("failed to send io response");
+                            }
+                        });
                     }
                     Ok(Err(Continuation::Error(error))) => {
                         top_n_errors.push(error, |a, b| a.cmp_with(b, source_files));
@@ -93,7 +112,7 @@ impl<'env> Worker<'env> {
         &self,
         executor: &Executor<'env>,
         stealers: &[Stealer<TaskRef<'env>>],
-    ) -> Option<(TaskRef<'env>, Execution<'env>)> {
+    ) -> Option<(TaskRef<'env>, Execution<'env>, Option<IoResponse>)> {
         // Try to find task (in the order of local queue, global queue, other worker queues)
         let task_ref = self.local_queue.pop().or_else(|| {
             iter::repeat_with(|| {
@@ -106,13 +125,18 @@ impl<'env> Worker<'env> {
             .and_then(|s| s.success())
         });
 
+        let mut truth = executor.truth.write().unwrap();
+
         // If found a task, extract it's execution that needs to be run
         task_ref.map(|task_ref| {
-            (
-                task_ref,
-                mem::take(&mut executor.truth.write().unwrap().tasks[task_ref].state)
-                    .unwrap_suspended_execution(),
-            )
+            let state = mem::take(&mut truth.tasks[task_ref].state);
+
+            match state {
+                TaskState::Suspended(execution, suspend_condition) => {
+                    (task_ref, execution, suspend_condition.to_io_response())
+                }
+                _ => panic!("Cannot run task that isn't suspended!"),
+            }
         })
     }
 
@@ -147,6 +171,7 @@ impl<'env> Worker<'env> {
                         }
                     }
                     SuspendCondition::PendingIo => (),
+                    SuspendCondition::WakeFromIo(..) => unreachable!(),
                 }
             }
         }

@@ -23,10 +23,10 @@ impl<'env> TaskState<'env> {
         }
     }
 
-    pub fn unwrap_suspended_execution(self) -> Execution<'env> {
+    pub fn get_suspended_execution(self) -> Result<Execution<'env>, Self> {
         match self {
-            TaskState::Suspended(execution, _condition) => execution,
-            _ => panic!("unwrap_suspended_execution failed!"),
+            TaskState::Suspended(execution, _condition) => Ok(execution),
+            _ => Err(self),
         }
     }
 }

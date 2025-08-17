@@ -92,8 +92,8 @@ pub enum FoundOrCreated<T> {
 impl<T: Copy> FoundOrCreated<T> {
     pub fn out_of(self) -> T {
         match self {
-            FoundOrCreated::Found(found) => found,
-            FoundOrCreated::Created(created) => created,
+            Self::Found(found) => found,
+            Self::Created(created) => created,
         }
     }
 
@@ -103,6 +103,21 @@ impl<T: Copy> FoundOrCreated<T> {
         }
 
         self
+    }
+}
+
+#[derive(IsVariant)]
+pub enum Upserted<T> {
+    Existing(T),
+    Created(T),
+}
+
+impl<T: Copy> Upserted<T> {
+    pub fn out_of(self) -> T {
+        match self {
+            Self::Existing(existing) => existing,
+            Self::Created(created) => created,
+        }
     }
 }
 
@@ -130,7 +145,7 @@ impl<'env> ModuleGraph<'env> {
         let created_module = modules.arena.alloc(Module::default());
         let created_part = modules.arena[created_module]
             .find_or_create_part(canonical_filename, preferred_creation_visibility)
-            .if_found(|found| self.unhide(ModulePartHandle::new(created_module, found)))
+            .if_found(|found| self.unhide_via_locks(ModulePartHandle::new(created_module, found)))
             .out_of();
 
         let created = ModulePartHandle::new(created_module, created_part);
@@ -150,25 +165,21 @@ impl<'env> ModuleGraph<'env> {
         module.add_symbol(handle.part_ref, privacy, name, decl_head);
     }
 
-    pub fn find_or_create_part(
-        &self,
-        canonical_filename: &Path,
-        module_ref: ModuleRef<'env>,
-        visibility: ModulePartVisibility,
-    ) -> ModulePartRef<'env> {
-        let found_or_created = {
-            self.modules.lock().unwrap().arena[module_ref]
-                .find_or_create_part(canonical_filename, visibility)
-        };
+    pub fn unhide_via_locks(&self, handle: ModulePartHandle<'env>) -> bool {
+        let mut modules = self.modules.lock().unwrap();
+        let module = &mut modules.arena[handle.module_ref];
 
-        // WARNING: Do not combine, because of lock!
-        found_or_created
-            .if_found(|found| self.unhide(ModulePartHandle::new(module_ref, found)))
-            .out_of()
+        if let Some(hidden) = module.get_mut(handle.part_ref).unhide() {
+            module.add_previously_hidden(hidden);
+            self.wildcard_imports.lock().unwrap().unhide(handle);
+            true
+        } else {
+            false
+        }
     }
 
-    pub fn unhide(&self, handle: ModulePartHandle<'env>) -> bool {
-        let mut modules = self.modules.lock().unwrap();
+    pub fn unhide_mut(&mut self, handle: ModulePartHandle<'env>) -> bool {
+        let mut modules = self.modules.get_mut().unwrap();
         let module = &mut modules.arena[handle.module_ref];
 
         if let Some(hidden) = module.get_mut(handle.part_ref).unhide() {

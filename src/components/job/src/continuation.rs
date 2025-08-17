@@ -7,17 +7,14 @@
     ---------------------------------------------------------------------------
 */
 
-use crate::Execution;
+use crate::{Execution, io::IoRequest};
 use diagnostics::ErrorDiagnostic;
 
 pub enum Continuation<'env> {
     // NOTE: To delay waking back up, tasks must be waited on using `ctx.suspend_on` before
     // returning. Usually this is handled indirectly via macro.
     Suspend(Execution<'env>),
-    // NOTE: To prevent immediately waking up when going to sleep with no dependencies,
-    // we can use this. Note that suspending on other tasks while pending IO is not supported.
-    // Instead, create a separate task to handle the IO and wait for it like any other task.
-    PendingIo(Execution<'env>),
+    RequestIo(Execution<'env>, IoRequest),
     Error(ErrorDiagnostic),
 }
 

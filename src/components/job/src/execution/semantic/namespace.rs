@@ -1,7 +1,7 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, canonicalize_or_error,
     execution::main::LoadFile,
-    module_graph::{ModuleBreakOffMode, ModuleView},
+    module_graph::{ModuleBreakOffMode, ModuleView, Upserted},
     repr::Compiler,
 };
 use ast::Namespace;
@@ -23,11 +23,6 @@ pub struct ResolveNamespace<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     namespace: Option<Namespace>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    did_spawn_children: bool,
 }
 
 impl<'env> ResolveNamespace<'env> {
@@ -40,7 +35,6 @@ impl<'env> ResolveNamespace<'env> {
             view,
             compiler,
             namespace: Some(namespace),
-            did_spawn_children: false,
         }
     }
 }
@@ -84,20 +78,23 @@ impl<'env> Executable<'env> for ResolveNamespace<'env> {
                     .view
                     .break_off(load_target.mode, new_filename, &self.compiler);
 
+                let Upserted::Created(created) = new_view else {
+                    return Ok(());
+                };
+
                 ctx.suspend_on(std::iter::once(
                     executor
                         .request(LoadFile::new(
                             &self.compiler,
                             new_filename,
-                            new_view,
+                            created,
                             Some(expr.source),
                         ))
                         .raw_task_ref(),
                 ));
+                return Err(Continuation::Suspend(self.into()));
             }
         }
-
-        Err(Continuation::Suspend(self.into()))
     }
 }
 

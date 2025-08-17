@@ -76,7 +76,7 @@ impl<'env> Executable<'env> for Main<'env> {
         });
 
         let runtime = web
-            .find_or_create_module_with_initial_part(ModuleGraphRef::Runtime, single_file)
+            .upsert_module_with_initial_part(ModuleGraphRef::Runtime, single_file)
             .out_of();
 
         let _ = executor.request(LoadFile::new(compiler, single_file.into(), runtime, None));

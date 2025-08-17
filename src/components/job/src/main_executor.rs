@@ -9,9 +9,8 @@
 */
 
 use crate::{
-    BumpAllocatorPool, Executable, Execution, Executor, Pending, TaskRef, TopN, Truth, Worker,
-    WorkerRef,
-    io::{IoRequestStatus, IoResponse},
+    BumpAllocatorPool, Executable, Execution, Executor, Pending, SuspendCondition, TaskId, TaskRef,
+    TaskState, TopN, Truth, Worker, WorkerRef, io::IoResponse,
 };
 use diagnostics::ErrorDiagnostic;
 use source_files::SourceFiles;
@@ -24,13 +23,13 @@ use threadpool::ThreadPool;
 
 pub struct MainExecutor<'env> {
     pub executor: Executor<'env>,
-    pub io_rx: mpsc::Receiver<IoResponse>,
+    pub io_rx: mpsc::Receiver<(TaskId, IoResponse)>,
 }
 
 impl<'env> MainExecutor<'env> {
     #[must_use]
     pub fn new(io_thread_pool: &'env ThreadPool) -> Self {
-        let (io_tx, io_rx) = mpsc::channel::<IoResponse>();
+        let (io_tx, io_rx) = mpsc::channel::<(TaskId, IoResponse)>();
 
         Self {
             executor: Executor::new(io_thread_pool, io_tx),
@@ -71,21 +70,19 @@ impl<'env> MainExecutor<'env> {
 
             loop {
                 match self.io_rx.recv_timeout(Duration::from_millis(1)) {
-                    Ok(response) => {
-                        {
-                            let mut completed = self.executor.completed_io.lock().unwrap();
+                    Ok((task_id, io_response)) => {
+                        let task_ref = unsafe { TaskRef::from_raw(task_id) };
 
-                            if let Some(IoRequestStatus::PendingThen(task_ref)) =
-                                completed.get(&response.handle)
-                            {
-                                self.executor.injector.push(*task_ref);
-                            } else {
-                                panic!("completed io is missing a task to wake!");
+                        match &mut self.executor.truth.write().unwrap().tasks[task_ref].state {
+                            TaskState::Suspended(_, condition @ SuspendCondition::PendingIo) => {
+                                *condition = SuspendCondition::WakeFromIo(io_response)
                             }
+                            _ => panic!(
+                                "Cannot receive completed IO for task that's not pending IO!"
+                            ),
+                        };
 
-                            completed.insert(response.handle, IoRequestStatus::Fulfilled(response));
-                        }
-
+                        self.executor.injector.push(task_ref);
                         self.executor.num_cleared.fetch_add(1, Ordering::SeqCst);
                     }
                     Err(_timeout) => {

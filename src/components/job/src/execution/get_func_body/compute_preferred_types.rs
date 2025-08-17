@@ -47,7 +47,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
         user_data: Self::UserData<'a>,
     ) -> Result<
         Self::SubArtifact<'a>,
-        Result<impl Fn(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
+        Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
     > {
         let cfg = user_data.cfg;
         let post_order = user_data.post_order;

@@ -8,6 +8,7 @@ use std::path::Path;
 #[derive(Debug, From)]
 pub enum Artifact<'env> {
     Void(()),
+    Bool(bool),
     TypeHead(&'env TypeHead<'env>),
     TypeHeads(&'env [&'env TypeHead<'env>]),
     OptionTypeDeclRef(Option<TypeDeclRef>),
@@ -24,6 +25,7 @@ pub enum Artifact<'env> {
 }
 
 impl_unwrap_from_artifact!(Void, ());
+impl_unwrap_from_artifact!(Bool, bool);
 impl_unwrap_from_artifact!(TypeHead, &'env TypeHead<'env>);
 impl_unwrap_from_artifact!(TypeHeads, &'env [&'env TypeHead<'env>]);
 impl_unwrap_from_artifact!(OptionTypeDeclRef, Option<TypeDeclRef>);

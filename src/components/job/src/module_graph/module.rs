@@ -31,7 +31,9 @@ impl<'env> Module<'env> {
             return FoundOrCreated::Found(*found);
         }
 
-        FoundOrCreated::Created(self.parts.alloc(ModulePart::new(visibility)))
+        let part = self.parts.alloc(ModulePart::new(visibility));
+        self.filenames.insert(canonical_filename.into(), part);
+        FoundOrCreated::Created(part)
     }
 
     pub fn get(&self, part_ref: ModulePartRef<'env>) -> &ModulePart<'env> {
