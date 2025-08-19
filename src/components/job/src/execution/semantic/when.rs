@@ -18,12 +18,12 @@ pub struct ResolveWhen<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    conditions_stack: Vec<(ast::Expr, NamespaceItems)>,
+    conditions_stack: Vec<(&'env ast::Expr, &'env NamespaceItems)>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    otherwise: Option<NamespaceItems>,
+    otherwise: Option<&'env NamespaceItems>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -33,7 +33,7 @@ pub struct ResolveWhen<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    then: Option<NamespaceItems>,
+    then: Option<&'env NamespaceItems>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -42,12 +42,12 @@ pub struct ResolveWhen<'env> {
 }
 
 impl<'env> ResolveWhen<'env> {
-    pub fn new(view: ModuleView<'env>, compiler: &'env Compiler<'env>, when: When) -> Self {
+    pub fn new(view: ModuleView<'env>, compiler: &'env Compiler<'env>, when: &'env When) -> Self {
         Self {
             view,
             compiler,
-            conditions_stack: when.conditions.into_iter().rev().collect(),
-            otherwise: when.otherwise,
+            conditions_stack: when.conditions.iter().rev().map(|(a, b)| (a, b)).collect(),
+            otherwise: when.otherwise.as_ref(),
             condition: None,
             then: None,
             did_spawn: false,
@@ -73,11 +73,9 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
             self.condition = None;
             if yes {
                 self.did_spawn = true;
-                ctx.suspend_on(std::iter::once(executor.spawn(ResolveNamespaceItems::new(
-                    self.view,
-                    self.compiler,
-                    self.then.take().unwrap(),
-                ))));
+                ctx.suspend_on(std::iter::once(executor.spawn_raw(
+                    ResolveNamespaceItems::new(self.view, self.compiler, self.then.unwrap()),
+                )));
                 return Err(Continuation::Suspend(self.into()));
             }
         }
@@ -87,7 +85,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
             self.then = Some(items);
             return suspend!(
                 self.condition,
-                executor.request(EvaluateComptime::new(self.view, self.compiler, condition)),
+                executor.spawn(EvaluateComptime::new(self.view, self.compiler, condition)),
                 ctx
             );
         }
@@ -95,11 +93,9 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
         // Suspend on "else" items if present and no condition was met
         if let Some(otherwise) = self.otherwise.take() {
             self.did_spawn = true;
-            ctx.suspend_on(std::iter::once(executor.spawn(ResolveNamespaceItems::new(
-                self.view,
-                self.compiler,
-                otherwise,
-            ))));
+            ctx.suspend_on(std::iter::once(executor.spawn_raw(
+                ResolveNamespaceItems::new(self.view, self.compiler, otherwise),
+            )));
             return Err(Continuation::Suspend(self.into()));
         }
 

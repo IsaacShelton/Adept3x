@@ -7,7 +7,8 @@
     ---------------------------------------------------------------------------
 */
 
-use crate::{Execution, io::IoRequest};
+use crate::{Execution, PendingSearchVersion, io::IoRequest, module_graph::ModuleGraphRef};
+use derive_more::From;
 use diagnostics::ErrorDiagnostic;
 
 pub enum Continuation<'env> {
@@ -15,6 +16,12 @@ pub enum Continuation<'env> {
     // returning. Usually this is handled indirectly via macro.
     Suspend(Execution<'env>),
     RequestIo(Execution<'env>, IoRequest),
+    PendingSearch(
+        Execution<'env>,
+        ModuleGraphRef,
+        PendingSearchVersion,
+        Search<'env>,
+    ),
     Error(ErrorDiagnostic),
 }
 
@@ -44,4 +51,22 @@ impl<'env> From<ErrorDiagnostic> for Continuation<'env> {
     fn from(value: ErrorDiagnostic) -> Self {
         Self::Error(value)
     }
+}
+
+#[derive(Clone, Debug, From)]
+pub enum Search<'env> {
+    Func(FuncSearch<'env>),
+}
+
+impl<'env> Search<'env> {
+    pub fn name(&self) -> &'env str {
+        match self {
+            Search::Func(func_search) => func_search.name,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FuncSearch<'env> {
+    pub name: &'env str,
 }

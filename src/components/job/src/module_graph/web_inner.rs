@@ -1,8 +1,12 @@
-use crate::module_graph::{
-    ComptimeKind, FoundOrCreated, ModuleGraph, ModuleGraphRef, ModulePartHandle,
-    ModulePartVisibility, ModuleRef, meta::ModuleGraphMeta,
+use crate::{
+    module_graph::{
+        ComptimeKind, FoundOrCreated, ModuleGraph, ModuleGraphRef, ModulePartHandle,
+        ModulePartVisibility, ModuleRef, meta::ModuleGraphMeta,
+    },
+    repr::DeclHead,
 };
 use arena::LockFreeArena;
+use attributes::Privacy;
 use std::path::Path;
 use target::Target;
 
@@ -78,5 +82,17 @@ impl<'env> ModuleGraphWebInner<'env> {
                 ModulePartVisibility::Visible,
             )
             .if_found(|found| graph.unhide_mut(found))
+    }
+
+    pub fn add_symbol(
+        &self,
+        graph_ref: ModuleGraphRef,
+        handle: ModulePartHandle<'env>,
+        privacy: Privacy,
+        name: &'env str,
+        decl_head: DeclHead<'env>,
+    ) {
+        self.graph(graph_ref)
+            .add_symbol(handle, privacy, name, decl_head);
     }
 }

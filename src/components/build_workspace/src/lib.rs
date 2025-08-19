@@ -20,13 +20,14 @@ mod stats;
 use ast_workspace::AstWorkspace;
 use build_asg::resolve;
 use build_ir::lower;
+use colored::Colorize;
 use compiler::Compiler;
 use diagnostics::{Show, unerror};
 use explore_within::{ExploreWithinResult, explore_within};
 use export_and_link::export_and_link;
 use fs_tree::Fs;
 use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
-use job::{BumpAllocatorPool, TaskState};
+use job::BumpAllocatorPool;
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
 use queue::LexParseInfo;
 use stats::CompilationStats;
@@ -68,25 +69,60 @@ pub fn compile(compiler: &mut Compiler, single_file: Option<PathBuf>) -> Result<
     let executed = executor.start(compiler.source_files, &mut allocator);
     let show_executor_stats = false;
 
+    let project_path = single_file
+        .as_ref()
+        .into_iter()
+        .flat_map(|path_buf| path_buf.as_path().parent())
+        .flat_map(|path| std::fs::canonicalize(path))
+        .next();
+
     if executed.errors.len() > 0 {
         for error in executed.errors.iter() {
-            error.eprintln(compiler.source_files);
+            error.eprintln(
+                compiler.source_files,
+                project_path.as_ref().map(|path| &**path),
+            );
         }
+
+        if executed.errors.len() == executed.errors.cap() {
+            eprintln!(
+                "{} The maximum number of errors to report has been reached, stopping...",
+                "stopping:".red().bold(),
+            );
+        }
+
         return Err(());
     } else if executed.num_scheduled != executed.num_completed {
         let num_cyclic = executed.num_scheduled - executed.num_completed;
 
-        if num_cyclic == 1 {
-            println!("error: {} cyclic dependency found!", num_cyclic);
+        if executed.num_unresolved_symbol_references > 0 {
+            eprintln!(
+                "{} {} symbol references remain unresolved!",
+                "error:".red().bold(),
+                executed.num_unresolved_symbol_references
+            );
+        } else if num_cyclic == 1 {
+            eprintln!(
+                "{} {} cyclic dependency found!",
+                "error:".red().bold(),
+                num_cyclic
+            );
         } else {
-            println!("error: {} cyclic dependencies found!", num_cyclic);
+            eprintln!(
+                "{} {} cyclic dependencies found!",
+                "error:".red().bold(),
+                num_cyclic
+            );
         }
 
+        // TODO: Provide more detail for scenarios like these:
+        /*
         for task in executed.truth.tasks.values() {
             if let TaskState::Suspended(_execution, _waiting_count) = &task.state {
                 println!(" Incomplete: {:?}", task);
             }
         }
+        */
     } else if show_executor_stats {
         println!(
             "Tasks: {}/{}",

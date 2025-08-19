@@ -22,14 +22,14 @@ pub struct ResolveNamespace<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    namespace: Option<Namespace>,
+    namespace: Option<&'env Namespace>,
 }
 
 impl<'env> ResolveNamespace<'env> {
     pub fn new(
         view: ModuleView<'env>,
         compiler: &'env Compiler<'env>,
-        namespace: Namespace,
+        namespace: &'env Namespace,
     ) -> Self {
         Self {
             view,
@@ -51,7 +51,7 @@ impl<'env> Executable<'env> for ResolveNamespace<'env> {
             return Ok(());
         };
 
-        match namespace.items {
+        match &namespace.items {
             ast::NamespaceItemsSource::Items(_namespace_items) => {
                 todo!("namespace items not supported yet")
             }
@@ -65,6 +65,7 @@ impl<'env> Executable<'env> for ResolveNamespace<'env> {
                 };
 
                 let new_filename = ctx.alloc(canonicalize_or_error(
+                    Some(self.compiler),
                     &self
                         .view
                         .canonical_filename
@@ -72,6 +73,7 @@ impl<'env> Executable<'env> for ResolveNamespace<'env> {
                         .expect("file is in folder")
                         .join(Path::new(&load_target.relative_filename)),
                     Some(expr.source),
+                    self.view.graph,
                 )?);
 
                 let new_view = self

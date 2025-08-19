@@ -1,5 +1,7 @@
-use crate::{Diagnostic, show::Show};
+use crate::{Diagnostic, minimal_filename, show::Show};
+use colored::Colorize;
 use source_files::{Source, SourceFiles};
+use std::path::Path;
 
 pub struct WarningDiagnostic {
     message: String,
@@ -23,18 +25,24 @@ impl WarningDiagnostic {
 }
 
 impl Show for WarningDiagnostic {
-    fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
+    fn show(
+        &self,
+        w: &mut dyn std::fmt::Write,
+        source_files: &SourceFiles,
+        project_root: Option<&Path>,
+    ) -> std::fmt::Result {
         if let Some(source) = self.source {
             write!(
                 w,
-                "{}:{}:{}: warning: {}",
-                source_files.get(source.key).filename(),
+                "{}:{}:{}: {} {}",
+                minimal_filename(source, source_files, project_root),
                 source.location.line,
                 source.location.column,
+                "warning:".yellow().bold(),
                 self.message,
             )
         } else {
-            write!(w, "warning: {}", self.message)
+            write!(w, "{} {}", "warning".yellow().bold(), self.message)
         }
     }
 }

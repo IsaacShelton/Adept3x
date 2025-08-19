@@ -49,4 +49,13 @@ impl ModuleGraphRef {
             },
         }
     }
+
+    pub fn postfix(&self) -> Option<&'static str> {
+        match self {
+            ModuleGraphRef::Runtime => None,
+            ModuleGraphRef::Comptime(ComptimeKind::Sandbox) => Some(" [for comptime (sandbox)]"),
+            ModuleGraphRef::Comptime(ComptimeKind::Target) => Some(" [for comptime]"),
+            ModuleGraphRef::Comptime(ComptimeKind::Host) => Some(" [for comptime (host)]"),
+        }
+    }
 }

@@ -1,8 +1,12 @@
-use crate::module_graph::{
-    FoundOrCreated, ModuleGraph, ModuleGraphRef, ModulePartHandle, ModuleRef, Upserted,
-    meta::ModuleGraphMeta, module_graph_ref::ComptimeKind, view::ModuleView,
-    web_inner::ModuleGraphWebInner,
+use crate::{
+    module_graph::{
+        FoundOrCreated, ModuleGraph, ModuleGraphRef, ModulePartHandle, ModuleRef, Upserted,
+        meta::ModuleGraphMeta, module_graph_ref::ComptimeKind, view::ModuleView,
+        web_inner::ModuleGraphWebInner,
+    },
+    repr::DeclHead,
 };
+use attributes::Privacy;
 use std::{path::Path, sync::RwLock};
 use target::Target;
 
@@ -59,5 +63,19 @@ impl<'env> ModuleGraphWeb<'env> {
         } else {
             Upserted::Created(view)
         }
+    }
+
+    pub fn add_symbol(
+        &self,
+        graph_ref: ModuleGraphRef,
+        handle: ModulePartHandle<'env>,
+        privacy: Privacy,
+        name: &'env str,
+        decl_head: DeclHead<'env>,
+    ) {
+        self.inner
+            .read()
+            .unwrap()
+            .add_symbol(graph_ref, handle, privacy, name, decl_head);
     }
 }

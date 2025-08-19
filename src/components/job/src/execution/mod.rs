@@ -87,6 +87,9 @@ pub enum Execution<'env> {
     ResolveNamespace(ResolveNamespace<'env>),
     ResolveWhen(ResolveWhen<'env>),
     EvaluateComptime(EvaluateComptime<'env>),
+    ResolveEvaluation(ResolveEvaluation<'env>),
+    ResolveFunction(ResolveFunction<'env>),
+    ResolveFunctionHead(ResolveFunctionHead<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -107,7 +110,11 @@ pub enum Request<'env> {
     ResolveNamespaceItems(ResolveNamespaceItems<'env>),
     ResolveNamespace(ResolveNamespace<'env>),
     ResolveWhen(ResolveWhen<'env>),
-    EvaluateComptime(EvaluateComptime<'env>),
+    // NOTE: AST expressions are not Hash + PartialEq
+    // EvaluateComptime(EvaluateComptime<'env>),
+    ResolveEvaluation(ResolveEvaluation<'env>),
+    ResolveFunction(ResolveFunction<'env>),
+    ResolveFunctionHead(ResolveFunctionHead<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

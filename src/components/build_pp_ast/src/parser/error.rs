@@ -1,7 +1,7 @@
-use diagnostics::Show;
+use diagnostics::{Show, minimal_filename};
 use pp_token::Punctuator;
 use source_files::{Source, SourceFiles};
-use std::fmt::Display;
+use std::{fmt::Display, path::Path};
 
 #[derive(Clone, Debug)]
 pub struct ParseError {
@@ -16,11 +16,16 @@ impl ParseError {
 }
 
 impl Show for ParseError {
-    fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
+    fn show(
+        &self,
+        w: &mut dyn std::fmt::Write,
+        source_files: &SourceFiles,
+        project_root: Option<&Path>,
+    ) -> std::fmt::Result {
         write!(
             w,
             "{}:{}:{}: error: {}",
-            source_files.get(self.source.key).filename(),
+            minimal_filename(self.source, source_files, project_root),
             self.source.location.line,
             self.source.location.column,
             self.kind

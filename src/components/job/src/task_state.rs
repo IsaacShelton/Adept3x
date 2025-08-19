@@ -22,11 +22,4 @@ impl<'env> TaskState<'env> {
             TaskState::Completed(artifact) => Some(artifact),
         }
     }
-
-    pub fn get_suspended_execution(self) -> Result<Execution<'env>, Self> {
-        match self {
-            TaskState::Suspended(execution, _condition) => Ok(execution),
-            _ => Err(self),
-        }
-    }
 }

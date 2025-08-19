@@ -20,6 +20,9 @@ pub enum SuspendCondition<'env> {
 
     /// Wake from IO
     WakeFromIo(IoResponse),
+
+    /// Pending symbol
+    PendingSymbol,
 }
 
 impl<'env> SuspendCondition<'env> {

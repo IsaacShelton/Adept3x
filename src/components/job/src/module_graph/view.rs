@@ -1,4 +1,5 @@
 use crate::{
+    Continuation, Execution, Executor, Search, execution,
     module_graph::{
         ModuleBreakOffMode, ModuleGraph, ModuleGraphMeta, ModuleGraphRef, ModuleGraphWeb,
         ModulePartHandle, ModulePartVisibility, Upserted,
@@ -8,6 +9,7 @@ use crate::{
 use attributes::Privacy;
 use by_address::ByAddress;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 use source_files::SourceFiles;
 use std::path::Path;
 
@@ -46,6 +48,7 @@ impl<'env> ModuleView<'env> {
         }
     }
 
+    #[must_use]
     pub fn upsert_part(&self, canonical_filename: &'env Path) -> Upserted<ModuleView<'env>> {
         let new_part_ref = self.web.graph_mut(self.graph, |graph| {
             graph.modules.get_mut().unwrap().arena[self.handle.module_ref]
@@ -75,6 +78,7 @@ impl<'env> ModuleView<'env> {
         self.web.graph(self.graph, f)
     }
 
+    #[must_use]
     pub fn break_off(
         &self,
         mode: ModuleBreakOffMode,
@@ -87,5 +91,33 @@ impl<'env> ModuleView<'env> {
                 .upsert_module_with_initial_part(self.graph, canonical_filename),
             ModuleBreakOffMode::Part => self.upsert_part(canonical_filename),
         }
+    }
+
+    pub fn add_symbol(&self, privacy: Privacy, name: &'env str, decl_head: DeclHead<'env>) {
+        self.web
+            .add_symbol(self.graph, self.handle, privacy, name, decl_head);
+    }
+
+    pub fn find_symbol<S>(
+        &self,
+        executor: &Executor<'env>,
+        search: S,
+    ) -> Result<DeclHead<'env>, impl FnOnce(Execution<'env>) -> Continuation<'env> + use<'env, S>>
+    where
+        S: Into<Search<'env>>,
+    {
+        let search = search.into();
+        let graph = self.graph;
+        let handle = self.handle;
+
+        let searched_version = executor.pending_searches.get_or_default(graph, |graph| {
+            graph.get_pending_search_version(search.name())
+        });
+
+        // TODO: ... Perform search ...
+
+        Err(move |execution| {
+            Continuation::PendingSearch(execution, graph, searched_version, search)
+        })
     }
 }

@@ -212,12 +212,6 @@ impl<'env> ModulePartHandle<'env> {
 }
 
 #[derive(Clone, Debug)]
-pub enum LookupError {
-    NotFound,
-    Ambiguous,
-}
-
-#[derive(Clone, Debug)]
 pub enum ModuleBreakOffMode {
     Module,
     Part,

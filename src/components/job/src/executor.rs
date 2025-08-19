@@ -9,9 +9,9 @@
 */
 
 use crate::{
-    Artifact, Executable, Execution, Pending, Request, Spawnable, SuspendCondition, SuspendMany,
-    SuspendManyAssoc, Task, TaskId, TaskRef, TaskState, Truth, UnwrapFrom, WaitingCount,
-    io::IoResponse,
+    Artifact, Executable, Execution, ModuleGraphPendingSearchMap, Pending, Request, Spawnable,
+    SuspendCondition, SuspendMany, SuspendManyAssoc, Task, TaskId, TaskRef, TaskState, Truth,
+    UnwrapFrom, WaitingCount, io::IoResponse, module_graph::ModuleGraphRef,
 };
 use arena::Arena;
 use crossbeam_deque::Injector as InjectorQueue;
@@ -27,7 +27,10 @@ use std_ext::BoxedSlice;
 use threadpool::ThreadPool;
 
 pub struct Executor<'env> {
+    // Global work-stealing queue injector
     pub injector: InjectorQueue<TaskRef<'env>>,
+
+    // Task Data
     pub truth: RwLock<Truth<'env>>,
 
     // Count for tasks
@@ -38,9 +41,12 @@ pub struct Executor<'env> {
     pub num_queued: AtomicUsize,
     pub num_cleared: AtomicUsize,
 
-    pub next_io_handle: AtomicUsize,
+    // IO Thread Pool
     pub io_thread_pool: &'env ThreadPool,
     pub io_tx: mpsc::Sender<(TaskId, IoResponse)>,
+
+    // Pending Searches
+    pub pending_searches: ModuleGraphPendingSearchMap<'env>,
 }
 
 impl<'env> Executor<'env> {
@@ -56,14 +62,25 @@ impl<'env> Executor<'env> {
             num_completed: AtomicUsize::new(0),
             num_queued: AtomicUsize::new(0),
             num_cleared: AtomicUsize::new(0),
-            next_io_handle: AtomicUsize::new(1),
             io_thread_pool,
             io_tx,
+            pending_searches: Default::default(),
         }
     }
 
     #[must_use]
-    pub fn spawn(&self, execution: impl Into<Execution<'env>>) -> TaskRef<'env> {
+    pub fn spawn<T>(
+        &self,
+        execution: impl Into<Execution<'env>> + Executable<'env, Output = T>,
+    ) -> Pending<'env, T>
+    where
+        T: UnwrapFrom<Artifact<'env>>,
+    {
+        Pending::new_unchecked(self.spawn_raw(execution))
+    }
+
+    #[must_use]
+    pub fn spawn_raw(&self, execution: impl Into<Execution<'env>>) -> TaskRef<'env> {
         let execution = execution.into();
         let mut truth_guard = self.truth.write().unwrap();
         let truth = truth_guard.deref_mut();
@@ -274,5 +291,20 @@ impl<'env> Executor<'env> {
                 .unwrap()
                 .demand_many_assoc(pending_list.into_iter().copied())
         })
+    }
+
+    pub fn wake_pending_search(&self, graph_ref: ModuleGraphRef, name: &'env str) {
+        let tasks_to_wake = self
+            .pending_searches
+            .get_or_default(graph_ref, |pending_search_map| {
+                pending_search_map.wake(name)
+            });
+
+        self.num_queued
+            .fetch_add(tasks_to_wake.len(), Ordering::SeqCst);
+
+        for task_ref in tasks_to_wake {
+            self.injector.push(task_ref);
+        }
     }
 }

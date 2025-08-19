@@ -55,7 +55,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
                             );
                         }
                         Err(failed_module_message) => {
-                            failed_module_message.eprintln(source_files);
+                            failed_module_message.eprintln(source_files, None);
                             stats.fail_module_file();
                         }
                     }
@@ -86,7 +86,7 @@ pub fn lex_and_parse_workspace_in_parallel<'a>(
                             stats.process_bytes(did_bytes);
                         }
                         Err(error_message) => {
-                            error_message.eprintln(source_files);
+                            error_message.eprintln(source_files, None);
                             stats.fail_file();
                         }
                     };
@@ -163,7 +163,7 @@ fn queue_dependencies<I: InfinitePeekable<Token>>(
                     format!("Dependency '{}' could not be found", &**folder),
                     Source::new(source_file, Location::new(0, 1)),
                 )
-                .eprintln(compiler.source_files);
+                .eprintln(compiler.source_files, None);
                 stats.fail_module_file();
                 return settings;
             };

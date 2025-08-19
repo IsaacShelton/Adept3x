@@ -367,6 +367,7 @@ dependencies = [
  "build_pp_ast",
  "build_token",
  "c_ast",
+ "colored",
  "compiler",
  "data_units",
  "derive_more",
@@ -582,6 +583,7 @@ name = "diagnostics"
 version = "0.1.0"
 dependencies = [
  "append_only_vec",
+ "colored",
  "source_files",
 ]
 

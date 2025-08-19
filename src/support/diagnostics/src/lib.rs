@@ -6,7 +6,7 @@ mod warning;
 use append_only_vec::AppendOnlyVec;
 use core::fmt::Debug;
 pub use error::ErrorDiagnostic;
-pub use show::{Show, into_show};
+pub use show::{Show, into_show, minimal_filename};
 use source_files::SourceFiles;
 pub use unerror::unerror;
 pub use warning::WarningDiagnostic;
@@ -73,7 +73,7 @@ impl<'a> Diagnostics<'a> {
         let mut message = String::new();
 
         diagnostic
-            .show(&mut message, self.source_files)
+            .show(&mut message, self.source_files, None)
             .expect("show error message");
 
         eprintln!("{message}");

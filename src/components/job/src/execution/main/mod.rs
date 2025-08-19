@@ -59,21 +59,24 @@ impl<'env> Executable<'env> for Main<'env> {
 
         // Rust does not have `try_get_or_insert`...
         if self.canonicalized_single_file.is_none() {
-            self.canonicalized_single_file =
-                Some(ctx.alloc(canonicalize_or_error(uncanonicalized_single_file, None)?));
+            self.canonicalized_single_file = Some(ctx.alloc(canonicalize_or_error(
+                None,
+                uncanonicalized_single_file,
+                None,
+                ModuleGraphRef::Runtime,
+            )?));
         }
         let single_file = self.canonicalized_single_file.unwrap();
-
         let project_root = single_file.parent();
-
-        let web = *self
-            .module_graph_web
-            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST)));
 
         let compiler = ctx.alloc(Compiler {
             source_files: self.source_files,
             project_root,
         });
+
+        let web = *self
+            .module_graph_web
+            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST)));
 
         let runtime = web
             .upsert_module_with_initial_part(ModuleGraphRef::Runtime, single_file)

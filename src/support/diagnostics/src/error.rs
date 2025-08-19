@@ -1,11 +1,13 @@
-use crate::Show;
+use crate::{Show, minimal_filename};
+use colored::Colorize;
 use source_files::{Source, SourceFiles};
-use std::cmp::Ordering;
+use std::{cmp::Ordering, path::Path};
 
 #[derive(Debug)]
 pub struct ErrorDiagnostic {
     message: String,
     source: Option<Source>,
+    postfix: Option<&'static str>,
 }
 
 impl ErrorDiagnostic {
@@ -13,6 +15,7 @@ impl ErrorDiagnostic {
         Self {
             message: message.to_string(),
             source: Some(source),
+            postfix: None,
         }
     }
 
@@ -20,6 +23,7 @@ impl ErrorDiagnostic {
         Self {
             message: message.to_string(),
             source,
+            postfix: None,
         }
     }
 
@@ -27,7 +31,13 @@ impl ErrorDiagnostic {
         Self {
             message: message.to_string(),
             source: None,
+            postfix: None,
         }
+    }
+
+    pub fn with_postfix(mut self, postfix: Option<&'static str>) -> Self {
+        self.postfix = postfix;
+        self
     }
 
     pub fn cmp_with(&self, other: &Self, source_files: &SourceFiles) -> Ordering {
@@ -52,24 +62,39 @@ impl ErrorDiagnostic {
                 .filename()
                 .cmp(source_files.get(b.key).filename());
 
-            filename_ordering.then_with(|| a.location.cmp(&b.location))
+            filename_ordering
+                .then_with(|| a.location.cmp(&b.location))
+                .then_with(|| self.postfix.cmp(&other.postfix))
         })
     }
 }
 
 impl Show for ErrorDiagnostic {
-    fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
+    fn show(
+        &self,
+        w: &mut dyn std::fmt::Write,
+        source_files: &SourceFiles,
+        project_root: Option<&Path>,
+    ) -> std::fmt::Result {
         if let Some(source) = self.source {
             write!(
                 w,
-                "{}:{}:{}: error: {}",
-                source_files.get(source.key).filename(),
+                "{}:{}:{}: {} {}{}",
+                minimal_filename(source, source_files, project_root),
                 source.location.line,
                 source.location.column,
+                "error:".red().bold(),
                 self.message,
+                self.postfix.unwrap_or(""),
             )
         } else {
-            write!(w, "error: {}", self.message)
+            write!(
+                w,
+                "{} {}{}",
+                "error:".red().bold(),
+                self.message,
+                self.postfix.unwrap_or("").red().bold(),
+            )
         }
     }
 }

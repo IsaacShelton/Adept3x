@@ -20,6 +20,7 @@ build_llvm_ir = { version = "0.1.0", path = "../build_llvm_ir" }
 build_pp_ast = { version = "0.1.0", path = "../build_pp_ast" }
 build_token = { version = "0.1.0", path = "../build_token" }
 c_ast = { version = "0.1.0", path = "../../representations/c_ast" }
+colored.workspace = true
 compiler = { version = "0.1.0", path = "../../support/compiler" }
 data_units = { version = "0.1.0", path = "../../support/data_units" }
 derive_more.workspace = true

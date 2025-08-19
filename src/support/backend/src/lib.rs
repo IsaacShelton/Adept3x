@@ -1,5 +1,6 @@
 use diagnostics::Show;
 use source_files::SourceFiles;
+use std::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct BackendError {
@@ -29,7 +30,12 @@ impl From<&str> for BackendError {
 }
 
 impl Show for BackendError {
-    fn show(&self, w: &mut dyn std::fmt::Write, _source_files: &SourceFiles) -> std::fmt::Result {
+    fn show(
+        &self,
+        w: &mut dyn std::fmt::Write,
+        _source_files: &SourceFiles,
+        _project_root: Option<&Path>,
+    ) -> std::fmt::Result {
         write!(w, "error: {}", self.message)
     }
 }

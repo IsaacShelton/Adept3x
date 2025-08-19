@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::VecDeque};
+use std::{cmp::Ordering, collections::VecDeque, fmt::Debug};
 
 #[derive(Clone, Debug)]
 pub struct TopN<T> {
@@ -19,6 +19,10 @@ impl<T> TopN<T> {
         self.items.len()
     }
 
+    pub fn cap(&self) -> usize {
+        self.capacity
+    }
+
     pub fn from_iter(
         capacity: usize,
         iter: impl IntoIterator<Item = T>,
@@ -27,7 +31,8 @@ impl<T> TopN<T> {
         Self {
             items: iter
                 .into_iter()
-                .k_smallest_by(capacity, |a, b| comparator(a, b))
+                .k_smallest_by(capacity, &comparator)
+                .sorted_by(&comparator)
                 .collect(),
             capacity,
         }

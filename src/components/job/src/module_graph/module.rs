@@ -1,7 +1,7 @@
 use crate::{
     module_graph::{
-        FoundOrCreated, HiddenModulePartSymbols, LookupError, ModulePart, ModulePartHandle,
-        ModulePartId, ModulePartVisibility, ShouldBeAtModuleLevel, part::ModulePartRef,
+        FoundOrCreated, HiddenModulePartSymbols, ModulePart, ModulePartHandle, ModulePartId,
+        ModulePartVisibility, ShouldBeAtModuleLevel, part::ModulePartRef,
         symbol_channel::SymbolChannel,
     },
     repr::{DeclHead, DeclHeadSet},

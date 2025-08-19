@@ -52,7 +52,7 @@ impl<'env> MainExecutor<'env> {
             .map(|worker| worker.local_queue.stealer())
             .collect::<Box<_>>();
 
-        let max_top_errors = 5;
+        let max_top_errors = 10;
 
         let errors = thread::scope(|scope| {
             let mut top_n_trackers = Vec::with_capacity(workers.len());
@@ -113,6 +113,10 @@ impl<'env> MainExecutor<'env> {
             num_queued: self.executor.num_queued.load(Ordering::Relaxed),
             truth: self.executor.truth.into_inner().unwrap(),
             errors,
+            num_unresolved_symbol_references: self
+                .executor
+                .pending_searches
+                .num_unresolved_symbol_references(),
         }
     }
 
@@ -137,4 +141,5 @@ pub struct MainExecutorStats<'env> {
     pub num_queued: usize,
     pub truth: Truth<'env>,
     pub errors: TopN<ErrorDiagnostic>,
+    pub num_unresolved_symbol_references: usize,
 }

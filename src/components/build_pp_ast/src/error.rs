@@ -1,7 +1,7 @@
 use super::parser::{ParseError, ParseErrorKind};
 use diagnostics::Show;
 use source_files::{Source, SourceFiles};
-use std::fmt::Display;
+use std::{fmt::Display, path::Path};
 
 #[derive(Clone, Debug)]
 pub struct PreprocessorError {
@@ -25,14 +25,26 @@ impl From<ParseError> for PreprocessorError {
 }
 
 impl Show for PreprocessorError {
-    fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
+    fn show(
+        &self,
+        w: &mut dyn std::fmt::Write,
+        source_files: &SourceFiles,
+        project_root: Option<&Path>,
+    ) -> std::fmt::Result {
+        let filename = source_files.get(self.source.key).filename();
+        let filename = project_root
+            .into_iter()
+            .flat_map(|root| Path::new(filename).strip_prefix(root).ok())
+            .next()
+            .into_iter()
+            .flat_map(|x| x.to_str())
+            .next()
+            .unwrap_or(filename);
+
         write!(
             w,
             "{}:{}:{}: error: {}",
-            source_files.get(self.source.key).filename(),
-            self.source.location.line,
-            self.source.location.column,
-            self.kind
+            filename, self.source.location.line, self.source.location.column, self.kind
         )
     }
 }

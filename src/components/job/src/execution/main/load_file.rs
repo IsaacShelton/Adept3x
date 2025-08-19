@@ -12,7 +12,7 @@ use diagnostics::ErrorDiagnostic;
 use infinite_iterator::InfiniteIteratorPeeker;
 use primitives::CIntegerAssumptions;
 use source_files::Source;
-use std::{io::Write, path::Path};
+use std::path::Path;
 use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 #[derive(Clone, Derivative)]
@@ -83,6 +83,8 @@ impl<'env> Executable<'env> for LoadFile<'env> {
         let _file_header = parser.parse_file_header()?;
 
         let ast = parser.parse().map_err(ErrorDiagnostic::from)?;
+
+        /*
         writeln!(
             &mut std::io::stdout(),
             "[{}]: {:?}",
@@ -90,8 +92,13 @@ impl<'env> Executable<'env> for LoadFile<'env> {
             self.compiler.filename(&self.canonical_filename),
         )
         .unwrap();
+        */
 
-        let _ = executor.spawn(ResolveNamespaceItems::new(self.view, &self.compiler, ast));
+        let _ = executor.spawn_raw(ResolveNamespaceItems::new(
+            self.view,
+            &self.compiler,
+            ctx.alloc(ast),
+        ));
 
         Ok(())
     }

@@ -60,6 +60,31 @@ impl<'env> Worker<'env> {
                         ctx.reset_waiting_on();
                         executor.num_cleared.fetch_add(1, Ordering::SeqCst);
                     }
+                    Ok(Err(Continuation::PendingSearch(
+                        execution,
+                        graph_ref,
+                        searched_version,
+                        search,
+                    ))) => {
+                        executor.truth.write().unwrap().tasks[task_ref].state =
+                            TaskState::Suspended(execution, SuspendCondition::PendingSymbol);
+
+                        if let Err(already_ready) = executor.pending_searches.get_or_default(
+                            graph_ref,
+                            |pending_search_map| {
+                                pending_search_map.suspend_on(
+                                    searched_version,
+                                    search.name(),
+                                    task_ref,
+                                )
+                            },
+                        ) {
+                            executor.num_queued.fetch_add(1, Ordering::SeqCst);
+                            self.local_queue.push(already_ready);
+                        }
+
+                        executor.num_cleared.fetch_add(1, Ordering::SeqCst);
+                    }
                     Ok(Err(Continuation::RequestIo(execution, io_request))) => {
                         executor.truth.write().unwrap().tasks[task_ref].state =
                             TaskState::Suspended(execution, SuspendCondition::PendingIo);
@@ -127,7 +152,7 @@ impl<'env> Worker<'env> {
 
         let mut truth = executor.truth.write().unwrap();
 
-        // If found a task, extract it's execution that needs to be run
+        // If found a task, extract its execution that needs to be run
         task_ref.map(|task_ref| {
             let state = mem::take(&mut truth.tasks[task_ref].state);
 
@@ -155,23 +180,28 @@ impl<'env> Worker<'env> {
         };
 
         for dependent in dependents {
-            if let TaskState::Suspended(_, condition) = &mut truth.tasks[dependent].state {
-                match condition {
-                    SuspendCondition::All(waiting_count) => {
-                        if waiting_count.decrement() {
-                            executor.num_queued.fetch_add(1, Ordering::SeqCst);
-                            self.local_queue.push(dependent);
-                        }
+            let TaskState::Suspended(_, condition) = &mut truth.tasks[dependent].state else {
+                continue;
+            };
+
+            match condition {
+                SuspendCondition::All(waiting_count) => {
+                    if waiting_count.decrement() {
+                        executor.num_queued.fetch_add(1, Ordering::SeqCst);
+                        self.local_queue.push(dependent);
                     }
-                    SuspendCondition::Any(of) => {
-                        if of.contains(&task_ref) {
-                            of.clear();
-                            executor.num_queued.fetch_add(1, Ordering::SeqCst);
-                            self.local_queue.push(dependent);
-                        }
+                }
+                SuspendCondition::Any(of) => {
+                    if of.contains(&task_ref) {
+                        of.clear();
+                        executor.num_queued.fetch_add(1, Ordering::SeqCst);
+                        self.local_queue.push(dependent);
                     }
-                    SuspendCondition::PendingIo => (),
-                    SuspendCondition::WakeFromIo(..) => unreachable!(),
+                }
+                SuspendCondition::PendingIo
+                | SuspendCondition::WakeFromIo(..)
+                | SuspendCondition::PendingSymbol => {
+                    unreachable!("cannot wake dependent task not in a dependent suspend condition")
                 }
             }
         }

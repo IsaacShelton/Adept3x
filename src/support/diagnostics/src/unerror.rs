@@ -7,7 +7,7 @@ pub fn unerror<T, E: Show>(result: Result<T, E>, source_files: &SourceFiles) -> 
         Err(err) => {
             let mut message = String::new();
 
-            err.show(&mut message, source_files)
+            err.show(&mut message, source_files, None)
                 .expect("show error message");
 
             eprintln!("{message}");

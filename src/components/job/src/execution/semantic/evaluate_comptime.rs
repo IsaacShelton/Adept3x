@@ -1,10 +1,11 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor,
+    Continuation, Executable, ExecutionCtx, Executor, ResolveEvaluation, Suspend,
     execution::main::LoadFile,
     module_graph::{ModuleView, Upserted},
-    repr::Compiler,
+    repr::{Compiler, Evaluated},
 };
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -19,15 +20,25 @@ pub struct EvaluateComptime<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    expr: ast::Expr,
+    expr: &'env ast::Expr,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    evaluated: Suspend<'env, &'env Evaluated>,
 }
 
 impl<'env> EvaluateComptime<'env> {
-    pub fn new(view: ModuleView<'env>, compiler: &'env Compiler<'env>, expr: ast::Expr) -> Self {
+    pub fn new(
+        view: ModuleView<'env>,
+        compiler: &'env Compiler<'env>,
+        expr: &'env ast::Expr,
+    ) -> Self {
         Self {
             view,
             compiler,
             expr,
+            evaluated: None,
         }
     }
 }
@@ -38,8 +49,19 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
     fn execute(
         self,
         executor: &Executor<'env>,
-        _ctx: &mut ExecutionCtx<'env>,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
+        if let Some(evaluated) = executor.demand(self.evaluated) {
+            match evaluated {
+                Evaluated::Bool(whether) => return Ok(*whether),
+                _ => {
+                    return Err(
+                        ErrorDiagnostic::plain("Expected bool from comptime evaluation").into(),
+                    );
+                }
+            }
+        }
+
         let comptime_graph = self
             .view
             .graph
@@ -52,7 +74,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             .upsert_module_with_initial_part(comptime_graph, self.view.canonical_module_filename);
 
         if let Upserted::Created(created) = comptime_module {
-            let _ = executor.spawn(LoadFile::new(
+            let _ = executor.spawn_raw(LoadFile::new(
                 self.compiler,
                 created.canonical_module_filename,
                 created,
@@ -61,9 +83,26 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
         }
 
         let comptime_module = comptime_module.out_of();
-        comptime_module.upsert_part(self.view.canonical_filename);
+        let comptime_part = comptime_module.upsert_part(self.view.canonical_filename);
 
-        //todo!("comptime evaluate expr {:?}", comptime_graph);
-        Ok(true)
+        if let Upserted::Created(created) = comptime_part {
+            let _ = executor.spawn_raw(LoadFile::new(
+                self.compiler,
+                created.canonical_filename,
+                created,
+                None,
+            ));
+        }
+        let comptime_part = comptime_part.out_of();
+
+        return suspend!(
+            self.evaluated,
+            executor.request(ResolveEvaluation::new(
+                comptime_part,
+                self.compiler,
+                self.expr
+            )),
+            ctx
+        );
     }
 }

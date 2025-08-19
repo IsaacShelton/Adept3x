@@ -1,7 +1,7 @@
-use diagnostics::{ErrorDiagnostic, Show};
+use diagnostics::{ErrorDiagnostic, Show, minimal_filename};
 use optional_string::OptionalString;
 use source_files::{Source, SourceFiles};
-use std::{borrow::Borrow, fmt::Display};
+use std::{borrow::Borrow, fmt::Display, path::Path};
 use token::{Token, TokenKind};
 
 #[derive(Clone, Debug)]
@@ -118,11 +118,16 @@ impl ParseErrorKind {
 }
 
 impl Show for ParseError {
-    fn show(&self, w: &mut dyn std::fmt::Write, source_files: &SourceFiles) -> std::fmt::Result {
+    fn show(
+        &self,
+        w: &mut dyn std::fmt::Write,
+        source_files: &SourceFiles,
+        project_root: Option<&Path>,
+    ) -> std::fmt::Result {
         write!(
             w,
             "{}:{}:{}: error: {}",
-            source_files.get(self.source.key).filename(),
+            minimal_filename(self.source, source_files, project_root),
             self.source.location.line,
             self.source.location.column,
             self.kind
