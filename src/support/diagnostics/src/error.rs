@@ -41,31 +41,30 @@ impl ErrorDiagnostic {
     }
 
     pub fn cmp_with(&self, other: &Self, source_files: &SourceFiles) -> Ordering {
-        self.message.cmp(&other.message).then_with(|| {
-            if self.source.is_none() && other.source.is_none() {
-                return Ordering::Equal;
-            }
+        if self.source.is_none() && other.source.is_none() {
+            return Ordering::Equal;
+        }
 
-            if self.source.is_none() && other.source.is_some() {
-                return Ordering::Less;
-            }
+        if self.source.is_none() && other.source.is_some() {
+            return Ordering::Less;
+        }
 
-            if self.source.is_some() && other.source.is_none() {
-                return Ordering::Greater;
-            }
+        if self.source.is_some() && other.source.is_none() {
+            return Ordering::Greater;
+        }
 
-            let a = self.source.unwrap();
-            let b = other.source.unwrap();
+        let a = self.source.unwrap();
+        let b = other.source.unwrap();
 
-            let filename_ordering = source_files
-                .get(a.key)
-                .filename()
-                .cmp(source_files.get(b.key).filename());
+        let filename_ordering = source_files
+            .get(a.key)
+            .filename()
+            .cmp(source_files.get(b.key).filename());
 
-            filename_ordering
-                .then_with(|| a.location.cmp(&b.location))
-                .then_with(|| self.postfix.cmp(&other.postfix))
-        })
+        filename_ordering
+            .then_with(|| a.location.cmp(&b.location))
+            .then_with(|| self.message.cmp(&other.message))
+            .then_with(|| self.postfix.cmp(&other.postfix))
     }
 }
 

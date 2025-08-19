@@ -3,6 +3,7 @@ use crate::{
     Suspend, module_graph::ModuleView, repr::Compiler,
 };
 use ast::{NamespaceItems, When};
+use by_address::ByAddress;
 use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
@@ -10,11 +11,13 @@ use derivative::Derivative;
 pub struct ResolveWhen<'env> {
     view: ModuleView<'env>,
 
-    #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    compiler: &'env Compiler<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
+    when: ByAddress<&'env When>,
+
+    // TODO: Remove this to iterate better now that we're no longer
+    // taking ownership
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
@@ -45,7 +48,8 @@ impl<'env> ResolveWhen<'env> {
     pub fn new(view: ModuleView<'env>, compiler: &'env Compiler<'env>, when: &'env When) -> Self {
         Self {
             view,
-            compiler,
+            compiler: ByAddress(compiler),
+            when: ByAddress(when),
             conditions_stack: when.conditions.iter().rev().map(|(a, b)| (a, b)).collect(),
             otherwise: when.otherwise.as_ref(),
             condition: None,
@@ -74,7 +78,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
             if yes {
                 self.did_spawn = true;
                 ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                    ResolveNamespaceItems::new(self.view, self.compiler, self.then.unwrap()),
+                    ResolveNamespaceItems::new(self.view, &self.compiler, self.then.unwrap()),
                 )));
                 return Err(Continuation::Suspend(self.into()));
             }
@@ -85,7 +89,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
             self.then = Some(items);
             return suspend!(
                 self.condition,
-                executor.spawn(EvaluateComptime::new(self.view, self.compiler, condition)),
+                executor.spawn(EvaluateComptime::new(self.view, &self.compiler, condition)),
                 ctx
             );
         }
@@ -94,7 +98,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
         if let Some(otherwise) = self.otherwise.take() {
             self.did_spawn = true;
             ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                ResolveNamespaceItems::new(self.view, self.compiler, otherwise),
+                ResolveNamespaceItems::new(self.view, &self.compiler, otherwise),
             )));
             return Err(Continuation::Suspend(self.into()));
         }

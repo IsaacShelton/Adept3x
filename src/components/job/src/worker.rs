@@ -72,11 +72,7 @@ impl<'env> Worker<'env> {
                         if let Err(already_ready) = executor.pending_searches.get_or_default(
                             graph_ref,
                             |pending_search_map| {
-                                pending_search_map.suspend_on(
-                                    searched_version,
-                                    search.name(),
-                                    task_ref,
-                                )
+                                pending_search_map.suspend_on(searched_version, search, task_ref)
                             },
                         ) {
                             executor.num_queued.fetch_add(1, Ordering::SeqCst);

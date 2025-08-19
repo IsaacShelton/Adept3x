@@ -54,7 +54,7 @@ impl<'env> MainExecutor<'env> {
 
         let max_top_errors = 10;
 
-        let errors = thread::scope(|scope| {
+        let mut errors = thread::scope(|scope| {
             let mut top_n_trackers = Vec::with_capacity(workers.len());
 
             for (worker, allocator) in workers
@@ -105,6 +105,9 @@ impl<'env> MainExecutor<'env> {
         });
 
         self.executor.io_thread_pool.join();
+        self.executor
+            .pending_searches
+            .report_errors(&mut errors, source_files);
 
         MainExecutorStats {
             num_completed: self.executor.num_completed.load(Ordering::Relaxed),

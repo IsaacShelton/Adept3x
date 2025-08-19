@@ -5,6 +5,7 @@ use crate::{
     repr::Compiler,
 };
 use ast::Namespace;
+use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use std::path::Path;
@@ -14,15 +15,10 @@ use std::path::Path;
 pub struct ResolveNamespace<'env> {
     view: ModuleView<'env>,
 
-    #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    compiler: &'env Compiler<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    namespace: Option<&'env Namespace>,
+    namespace: Option<ByAddress<&'env Namespace>>,
 }
 
 impl<'env> ResolveNamespace<'env> {
@@ -33,8 +29,8 @@ impl<'env> ResolveNamespace<'env> {
     ) -> Self {
         Self {
             view,
-            compiler,
-            namespace: Some(namespace),
+            compiler: ByAddress(compiler),
+            namespace: Some(ByAddress(namespace)),
         }
     }
 }
@@ -65,7 +61,7 @@ impl<'env> Executable<'env> for ResolveNamespace<'env> {
                 };
 
                 let new_filename = ctx.alloc(canonicalize_or_error(
-                    Some(self.compiler),
+                    Some(&self.compiler),
                     &self
                         .view
                         .canonical_filename

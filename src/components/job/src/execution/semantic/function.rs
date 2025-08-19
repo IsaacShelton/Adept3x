@@ -2,6 +2,7 @@ use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ResolveFunctionHead, Suspend,
     module_graph::ModuleView, repr::Compiler,
 };
+use by_address::ByAddress;
 use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
@@ -9,15 +10,10 @@ use derivative::Derivative;
 pub struct ResolveFunction<'env> {
     view: ModuleView<'env>,
 
-    #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    compiler: &'env Compiler<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    func: &'env ast::Func,
+    func: ByAddress<&'env ast::Func>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -33,8 +29,8 @@ impl<'env> ResolveFunction<'env> {
     ) -> Self {
         Self {
             view,
-            compiler,
-            func,
+            compiler: ByAddress(compiler),
+            func: ByAddress(func),
             resolved_head: None,
         }
     }
@@ -53,7 +49,7 @@ impl<'env> Executable<'env> for ResolveFunction<'env> {
                 self.resolved_head,
                 executor.request(ResolveFunctionHead::new(
                     self.view,
-                    self.compiler,
+                    &self.compiler,
                     &self.func.head,
                 )),
                 ctx

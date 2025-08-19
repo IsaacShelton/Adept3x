@@ -4,6 +4,7 @@ use crate::{
     module_graph::{ModuleView, Upserted},
     repr::{Compiler, Evaluated},
 };
+use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 
@@ -12,15 +13,10 @@ use diagnostics::ErrorDiagnostic;
 pub struct EvaluateComptime<'env> {
     view: ModuleView<'env>,
 
-    #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    compiler: &'env Compiler<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    expr: &'env ast::Expr,
+    expr: ByAddress<&'env ast::Expr>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -36,8 +32,8 @@ impl<'env> EvaluateComptime<'env> {
     ) -> Self {
         Self {
             view,
-            compiler,
-            expr,
+            compiler: ByAddress(compiler),
+            expr: ByAddress(expr),
             evaluated: None,
         }
     }
@@ -75,7 +71,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
 
         if let Upserted::Created(created) = comptime_module {
             let _ = executor.spawn_raw(LoadFile::new(
-                self.compiler,
+                &self.compiler,
                 created.canonical_module_filename,
                 created,
                 None,
@@ -87,7 +83,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
 
         if let Upserted::Created(created) = comptime_part {
             let _ = executor.spawn_raw(LoadFile::new(
-                self.compiler,
+                &self.compiler,
                 created.canonical_filename,
                 created,
                 None,
@@ -99,8 +95,8 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             self.evaluated,
             executor.request(ResolveEvaluation::new(
                 comptime_part,
-                self.compiler,
-                self.expr
+                &self.compiler,
+                &self.expr
             )),
             ctx
         );

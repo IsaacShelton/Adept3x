@@ -110,8 +110,6 @@ pub enum Request<'env> {
     ResolveNamespaceItems(ResolveNamespaceItems<'env>),
     ResolveNamespace(ResolveNamespace<'env>),
     ResolveWhen(ResolveWhen<'env>),
-    // NOTE: AST expressions are not Hash + PartialEq
-    // EvaluateComptime(EvaluateComptime<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
     ResolveFunction(ResolveFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),

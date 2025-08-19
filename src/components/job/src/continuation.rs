@@ -10,6 +10,7 @@
 use crate::{Execution, PendingSearchVersion, io::IoRequest, module_graph::ModuleGraphRef};
 use derive_more::From;
 use diagnostics::ErrorDiagnostic;
+use source_files::Source;
 
 pub enum Continuation<'env> {
     // NOTE: To delay waking back up, tasks must be waited on using `ctx.suspend_on` before
@@ -61,7 +62,19 @@ pub enum Search<'env> {
 impl<'env> Search<'env> {
     pub fn name(&self) -> &'env str {
         match self {
-            Search::Func(func_search) => func_search.name,
+            Self::Func(func_search) => func_search.name,
+        }
+    }
+
+    pub fn source(&self) -> Option<Source> {
+        match self {
+            Self::Func(func_search) => Some(func_search.source),
+        }
+    }
+
+    pub fn symbol_kind_name(&self) -> Option<&'static str> {
+        match self {
+            Self::Func(_) => Some("function"),
         }
     }
 }
@@ -69,4 +82,5 @@ impl<'env> Search<'env> {
 #[derive(Clone, Debug)]
 pub struct FuncSearch<'env> {
     pub name: &'env str,
+    pub source: Source,
 }

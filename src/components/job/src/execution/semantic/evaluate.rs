@@ -3,6 +3,7 @@ use crate::{
     module_graph::ModuleView,
     repr::{Compiler, Evaluated},
 };
+use by_address::ByAddress;
 use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
@@ -10,15 +11,10 @@ use derivative::Derivative;
 pub struct ResolveEvaluation<'env> {
     view: ModuleView<'env>,
 
-    #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    compiler: &'env Compiler<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    expr: &'env ast::Expr,
+    expr: ByAddress<&'env ast::Expr>,
 }
 
 impl<'env> ResolveEvaluation<'env> {
@@ -29,8 +25,8 @@ impl<'env> ResolveEvaluation<'env> {
     ) -> Self {
         Self {
             view,
-            compiler,
-            expr,
+            compiler: ByAddress(compiler),
+            expr: ByAddress(expr),
         }
     }
 }

@@ -4,6 +4,7 @@ use crate::{
     repr::{Compiler, DeclHead, ValueLikeRef},
 };
 use attributes::Privacy;
+use by_address::ByAddress;
 use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
@@ -11,15 +12,10 @@ use derivative::Derivative;
 pub struct ResolveFunctionHead<'env> {
     view: ModuleView<'env>,
 
-    #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    compiler: &'env Compiler<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    head: &'env ast::FuncHead,
+    head: ByAddress<&'env ast::FuncHead>,
 }
 
 impl<'env> ResolveFunctionHead<'env> {
@@ -30,8 +26,8 @@ impl<'env> ResolveFunctionHead<'env> {
     ) -> Self {
         Self {
             view,
-            compiler,
-            head,
+            compiler: ByAddress(compiler),
+            head: ByAddress(head),
         }
     }
 }
@@ -53,7 +49,8 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         let found = match self.view.find_symbol(
             executor,
             FuncSearch {
-                name: "my_testing_function",
+                name: _ctx.alloc(self.head.name.clone()),
+                source: self.head.source,
             },
         ) {
             Ok(found) => found,
