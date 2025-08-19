@@ -2,7 +2,7 @@ use crate::{
     Continuation, EvaluateComptime, Executable, ExecutionCtx, Executor, ResolveNamespaceItems,
     Suspend, module_graph::ModuleView, repr::Compiler,
 };
-use ast::{NamespaceItems, When};
+use ast::When;
 use by_address::ByAddress;
 use derivative::Derivative;
 
@@ -16,32 +16,18 @@ pub struct ResolveWhen<'env> {
 
     when: ByAddress<&'env When>,
 
-    // TODO: Remove this to iterate better now that we're no longer
-    // taking ownership
+    // The next condition/otherwise index to check, or None if
+    // waiting on a chosen conditional's "then" branch.
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    conditions_stack: Vec<(&'env ast::Expr, &'env NamespaceItems)>,
+    next_condition_index: Option<usize>,
 
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    otherwise: Option<&'env NamespaceItems>,
-
+    // The current comptime evaluation being suspended on
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     condition: Suspend<'env, bool>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    then: Option<&'env NamespaceItems>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    did_spawn: bool,
 }
 
 impl<'env> ResolveWhen<'env> {
@@ -50,11 +36,8 @@ impl<'env> ResolveWhen<'env> {
             view,
             compiler: ByAddress(compiler),
             when: ByAddress(when),
-            conditions_stack: when.conditions.iter().rev().map(|(a, b)| (a, b)).collect(),
-            otherwise: when.otherwise.as_ref(),
+            next_condition_index: Some(0),
             condition: None,
-            then: None,
-            did_spawn: false,
         }
     }
 }
@@ -68,7 +51,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         // Was waiting on items to complete
-        if self.did_spawn {
+        let Some(next_condition_index) = &mut self.next_condition_index else {
             return Ok(());
         };
 
@@ -76,17 +59,27 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
         if let Some(yes) = executor.demand(self.condition) {
             self.condition = None;
             if yes {
-                self.did_spawn = true;
+                let then = self
+                    .when
+                    .conditions
+                    .get(*next_condition_index)
+                    .map(|(_, then)| then)
+                    .unwrap_or_else(|| self.when.otherwise.as_ref().unwrap());
+
+                self.next_condition_index = None;
                 ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                    ResolveNamespaceItems::new(self.view, &self.compiler, self.then.unwrap()),
+                    ResolveNamespaceItems::new(self.view, &self.compiler, then),
                 )));
                 return Err(Continuation::Suspend(self.into()));
+            } else {
+                *next_condition_index += 1;
             }
         }
 
         // Suspend on next condition if there is one
-        if let Some((condition, items)) = self.conditions_stack.pop() {
-            self.then = Some(items);
+        if *next_condition_index < self.when.conditions.len() {
+            let (condition, _) = &self.when.conditions[*next_condition_index];
+
             return suspend!(
                 self.condition,
                 executor.spawn(EvaluateComptime::new(self.view, &self.compiler, condition)),
@@ -95,8 +88,8 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
         }
 
         // Suspend on "else" items if present and no condition was met
-        if let Some(otherwise) = self.otherwise.take() {
-            self.did_spawn = true;
+        if let Some(otherwise) = &self.when.otherwise {
+            self.next_condition_index = None;
             ctx.suspend_on(std::iter::once(executor.spawn_raw(
                 ResolveNamespaceItems::new(self.view, &self.compiler, otherwise),
             )));
