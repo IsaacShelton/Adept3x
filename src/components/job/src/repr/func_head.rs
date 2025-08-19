@@ -28,7 +28,7 @@ pub enum TargetAbi {
     C,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ImplParams<'env> {
     pub params: IndexMap<&'env str, UnaliasedUserDefinedType<'env>>,
 }

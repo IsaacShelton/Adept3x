@@ -1,36 +1,27 @@
 mod canonicalize;
 mod diverge;
 mod find_type;
-mod find_type_in_decl_set;
-mod get_func_body;
-mod get_func_head;
-mod get_type_body;
-mod get_type_head;
 mod main;
 mod print;
-mod resolve_type;
-mod resolve_type_arg;
-mod resolve_type_keep_aliases;
 mod semantic;
 
 use crate::{
-    Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom, execution::main::LoadFile,
+    Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
+    execution::{
+        main::LoadFile,
+        semantic::{
+            EvaluateComptime, ResolveEvaluation, ResolveFunction, ResolveFunctionBody,
+            ResolveFunctionHead, ResolveNamespace, ResolveNamespaceItems, ResolveType, ResolveWhen,
+        },
+    },
 };
 pub use canonicalize::canonicalize_or_error;
 pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use find_type::FindType;
-use find_type_in_decl_set::FindTypeInDeclSet;
-pub use get_func_body::*;
-pub use get_func_head::*;
-pub use get_type_body::GetTypeBody;
-pub use get_type_head::GetTypeHead;
 pub use main::Main;
 pub use print::Print;
-pub use resolve_type::ResolveType;
-pub use resolve_type_arg::*;
-pub use resolve_type_keep_aliases::*;
-pub use semantic::*;
+// pub use semantic::*;
 
 #[enum_dispatch]
 pub trait RawExecutable<'env> {
@@ -73,15 +64,14 @@ pub enum Execution<'env> {
     Main(Main<'env>),
     Diverge(Diverge),
     Print(Print<'env>),
-    GetTypeHead(GetTypeHead<'env>),
-    FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
-    GetTypeBody(GetTypeBody<'env>),
+    // GetTypeHead(GetTypeHead<'env>),
+    // GetTypeBody(GetTypeBody<'env>),
     ResolveType(ResolveType<'env>),
-    ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
-    ResolveTypeArg(ResolveTypeArg<'env>),
-    GetFuncHead(GetFuncHead<'env>),
-    GetFuncBody(GetFuncBody<'env>),
+    // ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
+    // ResolveTypeArg(ResolveTypeArg<'env>),
+    //GetFuncHead(GetFuncHead<'env>),
+    //GetFuncBody(GetFuncBody<'env>),
     LoadFile(LoadFile<'env>),
     ResolveNamespaceItems(ResolveNamespaceItems<'env>),
     ResolveNamespace(ResolveNamespace<'env>),
@@ -90,6 +80,7 @@ pub enum Execution<'env> {
     ResolveEvaluation(ResolveEvaluation<'env>),
     ResolveFunction(ResolveFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
+    ResolveFunctionBody(ResolveFunctionBody<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -97,15 +88,14 @@ pub enum Execution<'env> {
 pub enum Request<'env> {
     Diverge(Diverge),
     Print(Print<'env>),
-    GetTypeHead(GetTypeHead<'env>),
-    FindTypeInDeclSet(FindTypeInDeclSet<'env>),
     FindType(FindType<'env>),
-    GetTypeBody(GetTypeBody<'env>),
+    //GetTypeHead(GetTypeHead<'env>),
+    //GetTypeBody(GetTypeBody<'env>),
     ResolveType(ResolveType<'env>),
-    ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
-    ResolveTypeArg(ResolveTypeArg<'env>),
-    GetFuncHead(GetFuncHead<'env>),
-    GetFuncBody(GetFuncBody<'env>),
+    // ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
+    // ResolveTypeArg(ResolveTypeArg<'env>),
+    // GetFuncHead(GetFuncHead<'env>),
+    // GetFuncBody(GetFuncBody<'env>),
     LoadFile(LoadFile<'env>),
     ResolveNamespaceItems(ResolveNamespaceItems<'env>),
     ResolveNamespace(ResolveNamespace<'env>),
@@ -113,6 +103,7 @@ pub enum Request<'env> {
     ResolveEvaluation(ResolveEvaluation<'env>),
     ResolveFunction(ResolveFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
+    ResolveFunctionBody(ResolveFunctionBody<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

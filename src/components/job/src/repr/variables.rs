@@ -1,5 +1,4 @@
-use super::Type;
-use crate::cfg::NodeRef;
+use crate::{cfg::NodeRef, repr::UnaliasedType};
 
 #[derive(Debug, Clone)]
 pub struct Variables<'env> {
@@ -34,5 +33,5 @@ impl<'env> FromIterator<Variable<'env>> for Variables<'env> {
 #[derive(Debug, Clone)]
 pub struct Variable<'env> {
     pub declared_at: NodeRef,
-    pub ty: &'env Type<'env>,
+    pub ty: UnaliasedType<'env>,
 }

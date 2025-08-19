@@ -1,7 +1,7 @@
 use ast::IntegerKnown;
 use ast_workspace::TypeDeclRef;
 use derivative::Derivative;
-use derive_more::IsVariant;
+use derive_more::{Display, IsVariant};
 use num_bigint::BigInt;
 use ordered_float::NotNan;
 use primitives::{
@@ -10,7 +10,7 @@ use primitives::{
 use source_files::Source;
 use std::fmt::Display;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Display)]
 pub struct UnaliasedType<'env>(pub &'env Type<'env>);
 
 #[derive(Clone, Debug, Derivative)]

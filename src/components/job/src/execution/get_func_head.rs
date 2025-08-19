@@ -1,4 +1,4 @@
-use super::{Executable, ResolveTypeKeepAliases};
+use super::Executable;
 use crate::{
     Continuation, ExecutionCtx, Executor, SuspendMany,
     module_graph::ModuleView,

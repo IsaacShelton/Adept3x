@@ -1,10 +1,8 @@
-use super::{Executable, FindType, ResolveTypeArg};
 use crate::{
-    Continuation, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend, SuspendMany,
+    Continuation, Executable, ExecutionCtx, Executor, Suspend,
     module_graph::ModuleView,
-    repr::{FindTypeResult, Type, TypeArg, TypeKind, UserDefinedType},
+    repr::{Type, TypeKind, UnaliasedType},
 };
-use ast_workspace::AstWorkspace;
 use by_address::ByAddress;
 use derivative::Derivative;
 
@@ -16,14 +14,11 @@ pub struct ResolveType<'env> {
     #[derivative(Debug = "ignore")]
     view: ModuleView<'env>,
 
-    #[derivative(Debug = "ignore")]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
-
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    inner_type: Suspend<'env, &'env Type<'env>>,
-
+    inner_type: Suspend<'env, UnaliasedType<'env>>,
+    /*
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
@@ -33,35 +28,27 @@ pub struct ResolveType<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     type_args: SuspendMany<'env, &'env TypeArg<'env>>,
+    */
 }
 
 impl<'env> ResolveType<'env> {
-    pub fn new(
-        workspace: &'env AstWorkspace<'env>,
-        ast_type: &'env ast::Type,
-        view: ModuleView<'env>,
-    ) -> Self {
+    pub fn new(view: ModuleView<'env>, ast_type: &'env ast::Type) -> Self {
         Self {
             ast_type: ByAddress(ast_type),
             view,
-            workspace: ByAddress(workspace),
             inner_type: None,
-            inner_find_type: None,
-            type_args: None,
         }
     }
 }
 
 impl<'env> Executable<'env> for ResolveType<'env> {
-    type Output = &'env Type<'env>;
+    type Output = UnaliasedType<'env>;
 
     fn execute(
         self,
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let workspace = self.workspace.0;
-
         let kind = match &self.ast_type.kind {
             ast::TypeKind::Boolean => TypeKind::Boolean,
             ast::TypeKind::Integer(bits, sign) => TypeKind::BitInteger(*bits, *sign),
@@ -72,19 +59,26 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                 let Some(inner) = executor.demand(self.inner_type) else {
                     return suspend!(
                         self.inner_type,
-                        executor.request(ResolveTypeKeepAliases::new(workspace, inner, self.view,)),
+                        executor.request(ResolveType::new(self.view, inner)),
                         ctx
                     );
                 };
 
-                TypeKind::Ptr(inner)
+                TypeKind::Ptr(inner.0)
             }
             ast::TypeKind::FixedArray(_) => {
                 unimplemented!("we don't resolve fixed array types yet")
             }
             ast::TypeKind::Void => TypeKind::Void,
             ast::TypeKind::Never => TypeKind::Never,
-            ast::TypeKind::Named(name, type_args) => {
+            ast::TypeKind::Named(_name, _type_args) => {
+                todo!("named")
+
+                // NOTE: We will also need to unalias here,
+                // although perhaps we have a separate option
+                // for this to enable the preservation of type alises.
+
+                /*
                 let Some(name) = name.as_plain_str() else {
                     unimplemented!("we don't handle namespaced types yet");
                 };
@@ -109,11 +103,9 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                 let Some(type_args) = executor.demand_many(&self.type_args) else {
                     return suspend_many!(
                         self.type_args,
-                        executor.request_many(
-                            type_args.iter().map(|type_arg| ResolveTypeArg::new(
-                                workspace, type_arg, self.view
-                            ))
-                        ),
+                        executor.request_many(type_args.iter().map(|type_arg| {
+                            ResolveTypeArg::new(workspace, type_arg, self.view)
+                        })),
                         ctx
                     );
                 };
@@ -123,6 +115,7 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                     type_decl_ref: found,
                     args: ctx.alloc_slice_fill_iter(type_args.into_iter().cloned()),
                 })
+                */
             }
             ast::TypeKind::AnonymousStruct(_) => {
                 unimplemented!("we don't resolve anonymous structs yet")
@@ -139,9 +132,9 @@ impl<'env> Executable<'env> for ResolveType<'env> {
             ast::TypeKind::Polymorph(name) => TypeKind::Polymorph(name),
         };
 
-        Ok(ctx.alloc(Type {
+        Ok(UnaliasedType(ctx.alloc(Type {
             kind,
             source: self.ast_type.source,
-        }))
+        })))
     }
 }

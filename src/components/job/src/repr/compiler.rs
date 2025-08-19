@@ -1,3 +1,4 @@
+use crate::BuiltinTypes;
 use source_files::SourceFiles;
 use std::path::Path;
 
@@ -7,6 +8,7 @@ use std::path::Path;
 pub struct Compiler<'env> {
     pub source_files: &'env SourceFiles,
     pub project_root: Option<&'env Path>,
+    pub builtin_types: &'env BuiltinTypes<'env>,
 }
 
 impl<'env> Compiler<'env> {

@@ -6,49 +6,34 @@
 
 mod value;
 
-use crate::repr::{Type, TypeKind};
+use crate::repr::UnaliasedType;
 use derive_more::From;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
 use primitives::{FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate};
-use source_files::Source;
 pub use value::*;
 
 #[derive(Clone, Debug)]
 pub struct Resolved<'env> {
-    ty: Type<'env>,
+    ty: UnaliasedType<'env>,
     #[allow(unused)]
     data: Option<ResolvedData>,
 }
 
 impl<'env> Resolved<'env> {
-    pub fn new(ty: Type<'env>, data: ResolvedData) -> Self {
+    pub fn new(ty: UnaliasedType<'env>, data: ResolvedData) -> Self {
         Self {
             ty,
             data: Some(data),
         }
     }
 
-    pub fn from_type(ty: Type<'env>) -> Self {
+    pub fn from_type(ty: UnaliasedType<'env>) -> Self {
         Self { ty, data: None }
     }
 
-    pub fn void(source: Source) -> Self {
-        Self::from_type(Type {
-            kind: TypeKind::Void,
-            source,
-        })
-    }
-
-    pub fn never(source: Source) -> Self {
-        Self::from_type(Type {
-            kind: TypeKind::Never,
-            source,
-        })
-    }
-
-    pub fn ty(&self) -> &Type<'env> {
-        &self.ty
+    pub fn ty(&self) -> UnaliasedType<'env> {
+        self.ty
     }
 }
 

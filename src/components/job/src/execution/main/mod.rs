@@ -3,7 +3,7 @@ mod read_file;
 
 use super::Executable;
 use crate::{
-    Continuation, ExecutionCtx, Executor, canonicalize_or_error,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, canonicalize_or_error,
     module_graph::{ModuleGraphRef, ModuleGraphWeb},
     repr::Compiler,
 };
@@ -72,6 +72,7 @@ impl<'env> Executable<'env> for Main<'env> {
         let compiler = ctx.alloc(Compiler {
             source_files: self.source_files,
             project_root,
+            builtin_types: ctx.alloc(BuiltinTypes::default()),
         });
 
         let web = *self

@@ -1,6 +1,8 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, ResolveFunction, ResolveNamespace,
-    ResolveWhen, module_graph::ModuleView, repr::Compiler,
+    Continuation, Executable, ExecutionCtx, Executor,
+    execution::semantic::{ResolveFunction, ResolveNamespace, ResolveWhen},
+    module_graph::ModuleView,
+    repr::Compiler,
 };
 use ast::NamespaceItems;
 use by_address::ByAddress;

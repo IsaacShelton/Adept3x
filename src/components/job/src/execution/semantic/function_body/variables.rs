@@ -1,6 +1,6 @@
 use crate::{
     cfg::NodeRef,
-    repr::{Type, Variable, Variables},
+    repr::{UnaliasedType, Variable, Variables},
 };
 
 // NOTE: We store a sorted array of NodeRefs that reference
@@ -37,7 +37,7 @@ impl<'env> VariableTrackers<'env> {
             .map(|found| &mut self.storage[found])
     }
 
-    pub fn assign_resolved_type(&mut self, node_ref: NodeRef, ty: &'env Type<'env>) {
+    pub fn assign_resolved_type(&mut self, node_ref: NodeRef, ty: UnaliasedType<'env>) {
         assert!(
             self.get_mut(node_ref)
                 .expect("variable to be tracked")
@@ -64,5 +64,5 @@ impl<'env> VariableTrackers<'env> {
 pub struct VariableTracker<'env> {
     pub declared_at: NodeRef,
     // Resolved during type resolution step.
-    pub ty: Option<&'env Type<'env>>,
+    pub ty: Option<UnaliasedType<'env>>,
 }

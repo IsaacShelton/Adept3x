@@ -1,23 +1,24 @@
 use crate::{
-    BuiltinTypes, Resolved, UnaryImplicitCast,
-    repr::{Type, TypeKind},
+    BuiltinTypes, ExecutionCtx, Resolved, UnaryImplicitCast,
+    repr::{TypeKind, UnaliasedType},
 };
 use data_units::BitUnits;
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
 use num_traits::{ToPrimitive, Zero};
 use ordered_float::NotNan;
-use primitives::{CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign};
+use primitives::{CIntegerAssumptions, IntegerBits, IntegerSign};
 use source_files::Source;
 
 pub fn conform_to_default<'env>(
-    ty: &Type<'env>,
+    ctx: &mut ExecutionCtx<'env>,
+    ty: UnaliasedType<'env>,
     assumptions: CIntegerAssumptions,
     builtin_types: &'env BuiltinTypes<'env>,
 ) -> Result<Resolved<'env>, ErrorDiagnostic> {
-    let source = ty.source;
+    let source = ty.0.source;
 
-    Ok(match &ty.kind {
+    Ok(match &ty.0.kind {
         TypeKind::IntegerLiteral(big_int) => [
             &builtin_types.i32,
             &builtin_types.u32,
@@ -26,16 +27,23 @@ pub fn conform_to_default<'env>(
         ]
         .into_iter()
         .flat_map(|possible_type| {
-            from_integer_literal(big_int, assumptions, source, &possible_type.kind)
+            from_integer_literal(
+                ctx,
+                big_int,
+                assumptions,
+                source,
+                &possible_type.kind,
+                builtin_types,
+            )
         })
         .next()
         .ok_or_else(|| ErrorDiagnostic::new("Failed to specialize integer literal", source))?,
         TypeKind::FloatLiteral(not_nan) => Resolved::new(
-            TypeKind::Floating(FloatSize::Bits64).at(source),
+            builtin_types.f64(),
             UnaryImplicitCast::SpecializeFloat(not_nan.clone()).into(),
         ),
         TypeKind::BooleanLiteral(value) => Resolved::new(
-            TypeKind::Boolean.at(source),
+            builtin_types.bool(),
             UnaryImplicitCast::SpecializeBoolean(*value).into(),
         ),
         _ => Resolved::from_type(ty.clone()),
@@ -43,15 +51,17 @@ pub fn conform_to_default<'env>(
 }
 
 fn from_integer_literal<'env>(
+    ctx: &mut ExecutionCtx<'env>,
     value: &BigInt,
     assumptions: CIntegerAssumptions,
     source: Source,
     to_type_kind: &'env TypeKind<'env>,
+    builtin_types: &'env BuiltinTypes<'env>,
 ) -> Option<Resolved<'env>> {
     match &to_type_kind {
         TypeKind::Floating(float_size) => value.to_f64().map(|float| {
             Resolved::new(
-                TypeKind::Floating(*float_size).at(source),
+                builtin_types.floating(*float_size),
                 UnaryImplicitCast::SpecializeFloat(NotNan::new(float).ok()).into(),
             )
         }),
@@ -69,7 +79,7 @@ fn from_integer_literal<'env>(
 
             does_fit.then(|| {
                 Resolved::new(
-                    TypeKind::BitInteger(*to_bits, *to_sign).at(source),
+                    UnaliasedType(ctx.alloc(TypeKind::BitInteger(*to_bits, *to_sign).at(source))),
                     UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
                 )
             })
@@ -80,7 +90,9 @@ fn from_integer_literal<'env>(
 
             (needs_bits <= to_c_integer.min_bits(assumptions).bits()).then(|| {
                 Resolved::new(
-                    TypeKind::CInteger(*to_c_integer, *to_sign).at(source),
+                    UnaliasedType(
+                        ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
+                    ),
                     UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
                 )
             })
@@ -95,7 +107,7 @@ fn from_integer_literal<'env>(
 
             does_fit.then(|| {
                 Resolved::new(
-                    TypeKind::SizeInteger(*to_sign).at(source),
+                    UnaliasedType(ctx.alloc(TypeKind::SizeInteger(*to_sign).at(source))),
                     UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
                 )
             })

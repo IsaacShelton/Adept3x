@@ -1,6 +1,8 @@
 use crate::{
-    Continuation, EvaluateComptime, Executable, ExecutionCtx, Executor, ResolveNamespaceItems,
-    Suspend, module_graph::ModuleView, repr::Compiler,
+    Continuation, Executable, ExecutionCtx, Executor, Suspend,
+    execution::semantic::{EvaluateComptime, ResolveNamespaceItems},
+    module_graph::ModuleView,
+    repr::Compiler,
 };
 use ast::When;
 use by_address::ByAddress;

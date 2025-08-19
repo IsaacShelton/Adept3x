@@ -3,23 +3,22 @@ mod compute_preferred_types;
 mod dominators;
 mod variables;
 
-use super::Executable;
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, ResolveTypeKeepAliases, Resolved,
-    ResolvedData, Suspend, SuspendMany, Value,
+    Continuation, Executable, ExecutionCtx, Executor, Resolved, ResolvedData, Suspend, SuspendMany,
+    Value,
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, UntypedCfg,
         flatten_func_ignore_const_evals,
     },
     conform::conform_to_default,
+    execution::semantic::ResolveType,
     module_graph::ModuleView,
-    repr::{FuncBody, Type, TypeKind},
+    repr::{Compiler, FuncBody, Type, TypeKind, UnaliasedType},
     sub_task::SubTask,
     unify::unify_types,
 };
 use arena::ArenaMap;
 use ast::ConformBehavior;
-use ast_workspace::{AstWorkspace, FuncRef};
 use basic_bin_op::{
     resolve_basic_binary_operation_expr_on_literals, resolve_basic_binary_operator,
 };
@@ -29,29 +28,22 @@ use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
 use itertools::Itertools;
-use primitives::CInteger;
+use primitives::{CInteger, CIntegerAssumptions};
 use variables::{VariableTracker, VariableTrackers};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct GetFuncBody<'env> {
-    func_ref: FuncRef,
+pub struct ResolveFunctionBody<'env> {
+    view: ModuleView<'env>,
+    func: ByAddress<&'env ast::Func>,
 
     #[derivative(Debug = "ignore")]
-    workspace: ByAddress<&'env AstWorkspace<'env>>,
-
-    #[derivative(Hash = "ignore")]
-    view: ModuleView<'env>,
+    compiler: ByAddress<&'env Compiler<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     inner_types: SuspendMany<'env, &'env Type<'env>>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    builtin_types: &'env BuiltinTypes<'env>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -86,26 +78,24 @@ pub struct GetFuncBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    resolved_type: Suspend<'env, &'env Type<'env>>,
+    resolved_type: Suspend<'env, UnaliasedType<'env>>,
 }
 
-impl<'env> GetFuncBody<'env> {
+impl<'env> ResolveFunctionBody<'env> {
     pub fn new(
-        workspace: &'env AstWorkspace<'env>,
-        func_ref: FuncRef,
         view: ModuleView<'env>,
-        builtin_types: &'env BuiltinTypes<'env>,
+        compiler: &'env Compiler<'env>,
+        func: &'env ast::Func,
     ) -> Self {
         Self {
-            workspace: ByAddress(workspace),
-            func_ref,
             view,
+            func: ByAddress(func),
             inner_types: None,
             compute_preferred_types: ComputePreferredTypes::default(),
             resolved_nodes: ArenaMap::new(),
             num_resolved_nodes: 0,
             resolved_type: None,
-            builtin_types,
+            compiler: ByAddress(compiler),
             cfg: None,
             dominators_and_post_order: None,
             variables: None,
@@ -133,7 +123,7 @@ impl<'env> GetFuncBody<'env> {
        I think we also need to link them after macro resolution so that they will still work even if generated from macros.
 */
 
-impl<'env> Executable<'env> for GetFuncBody<'env> {
+impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
     type Output = &'env FuncBody<'env>;
 
     #[allow(unused_variables)]
@@ -143,7 +133,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let def = &self.workspace.symbols.all_funcs[self.func_ref];
+        let def = self.func;
+        let builtin_types = self.compiler.builtin_types;
 
         // 1) Compute control flow graph
         let cfg = match self.cfg {
@@ -166,9 +157,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             .get_or_insert_with(|| compute_idom_tree(&cfg));
 
         // 3) Acquire settings and configuration
-        let settings =
-            &self.workspace.settings[def.settings.expect("settings assigned for function")];
-        let c_integer_assumptions = settings.c_integer_assumptions();
+        //let settings = &self.settings[def.settings.expect("settings assigned for function")];
+        //let c_integer_assumptions = settings.c_integer_assumptions();
+        let c_integer_assumptions = CIntegerAssumptions::default();
 
         // 4) Allocate variable storage for each variable
         let variables = self.variables.get_or_insert_with(|| {
@@ -205,9 +196,8 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                 post_order,
                 cfg,
                 func_return_type: &def.head.return_type,
-                workspace: &self.workspace,
                 view: self.view,
-                builtin_types: self.builtin_types,
+                builtin_types,
             }
         );
 
@@ -223,7 +213,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
             };
 
             let resolved_node = match &node.kind {
-                NodeKind::Start(_) => Resolved::void(node.source),
+                NodeKind::Start(_) => Resolved::from_type(builtin_types.void()),
                 NodeKind::Sequential(sequential_node) => match &sequential_node.kind {
                     SequentialNodeKind::Join1(incoming) => get_typed(*incoming).clone(),
                     SequentialNodeKind::JoinN(items, Some(conform_behavior)) => {
@@ -233,11 +223,13 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             .collect_vec();
 
                         let Some(unified) = unify_types(
+                            ctx,
                             None,
                             edges
                                 .iter()
-                                .map(|value| value.ty(&self.resolved_nodes, self.builtin_types)),
+                                .map(|value| value.ty(&self.resolved_nodes, builtin_types)),
                             *conform_behavior,
+                            builtin_types,
                             node.source,
                         ) else {
                             // TODO: Improve error message
@@ -250,7 +242,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
 
                         Resolved::from_type(unified)
                     }
-                    SequentialNodeKind::JoinN(items, None) => Resolved::void(node.source),
+                    SequentialNodeKind::JoinN(items, None) => {
+                        Resolved::from_type(builtin_types.void())
+                    }
                     SequentialNodeKind::Const(_) => {
                         // For this case, we will have to suspend until the result
                         // of the calcuation is complete
@@ -302,11 +296,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         let Some(resolved_type) = executor.demand(self.resolved_type) else {
                             return suspend!(
                                 self.resolved_type,
-                                executor.request(ResolveTypeKeepAliases::new(
-                                    &self.workspace,
-                                    ast_type,
-                                    self.view,
-                                )),
+                                executor.request(ResolveType::new(self.view, ast_type,)),
                                 ctx
                             );
                         };
@@ -316,17 +306,18 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         // Reset suspend on type for next node that needs it
                         self.resolved_type = None;
 
-                        Resolved::void(node.source)
+                        Resolved::from_type(builtin_types.void())
                     }
-                    SequentialNodeKind::Assign(_, _) => Resolved::void(node.source),
+                    SequentialNodeKind::Assign(_, _) => Resolved::from_type(builtin_types.void()),
                     SequentialNodeKind::BinOp(left, bin_op, right, language) => {
                         let left_ty = get_typed(*left).ty();
                         let right_ty = get_typed(*right).ty();
 
                         if let (TypeKind::IntegerLiteral(left), TypeKind::IntegerLiteral(right)) =
-                            (&left_ty.kind, &right_ty.kind)
+                            (&left_ty.0.kind, &right_ty.0.kind)
                         {
                             resolve_basic_binary_operation_expr_on_literals(
+                                ctx,
                                 bin_op,
                                 &left,
                                 &right,
@@ -344,9 +335,11 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             let preferred_type = preferred_types.get(node_ref.into_raw()).copied();
 
                             let Some(unified_type) = unify_types(
+                                ctx,
                                 preferred_type,
                                 [left_ty, right_ty].into_iter(),
                                 conform_behavior,
+                                builtin_types,
                                 node.source,
                             ) else {
                                 return Err(ErrorDiagnostic::new(
@@ -360,12 +353,12 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             };
 
                             let operator =
-                                resolve_basic_binary_operator(bin_op, &unified_type, node.source)
+                                resolve_basic_binary_operator(bin_op, unified_type, node.source)
                                     .map_err(Continuation::Error)?;
 
                             dbg!(&preferred_type, &unified_type, &operator);
                             let result_type = if bin_op.returns_boolean() {
-                                self.builtin_types.bool.kind.clone().at(node.source)
+                                builtin_types.bool()
                             } else {
                                 unified_type
                             };
@@ -373,9 +366,9 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             Resolved::new(result_type, ResolvedData::BinaryImplicitCast(operator))
                         }
                     }
-                    SequentialNodeKind::Boolean(value) => {
-                        Resolved::from_type(TypeKind::BooleanLiteral(*value).at(node.source))
-                    }
+                    SequentialNodeKind::Boolean(value) => Resolved::from_type(UnaliasedType(
+                        ctx.alloc(TypeKind::BooleanLiteral(*value).at(node.source)),
+                    )),
                     SequentialNodeKind::Integer(integer) => {
                         let source = node.source;
 
@@ -386,7 +379,7 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                             }
                         };
 
-                        Resolved::from_type(ty)
+                        Resolved::from_type(UnaliasedType(ctx.alloc(ty)))
                     }
                     SequentialNodeKind::Float(_) => todo!("Float"),
                     SequentialNodeKind::AsciiChar(_) => todo!("AsciiChar"),
@@ -394,12 +387,14 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     SequentialNodeKind::String(_) => todo!("String"),
                     SequentialNodeKind::NullTerminatedString(cstring) => {
                         let char = TypeKind::CInteger(CInteger::Char, None).at(node.source);
-                        Resolved::from_type(TypeKind::Ptr(ctx.alloc(char)).at(node.source))
+                        Resolved::from_type(UnaliasedType(
+                            ctx.alloc(TypeKind::Ptr(ctx.alloc(char)).at(node.source)),
+                        ))
                     }
                     SequentialNodeKind::Null => todo!("Null"),
-                    SequentialNodeKind::Void => Resolved::void(node.source),
+                    SequentialNodeKind::Void => Resolved::from_type(builtin_types.void()),
                     SequentialNodeKind::Call(node_call) => {
-                        todo!("get_func_body Call")
+                        todo!("call expressions are not supported yet by ResolveFunctionBody")
                         // let found = find_or_suspend();
 
                         // let all_conformed = existing_conformed.conform_rest(rest).or_suspend();
@@ -408,11 +403,12 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     }
                     SequentialNodeKind::DeclareAssign(_name, value) => {
                         let declared = conform_to_default(
+                            ctx,
                             get_typed(*value).ty(),
                             c_integer_assumptions,
-                            self.builtin_types,
+                            builtin_types,
                         )?;
-                        variables.assign_resolved_type(node_ref, ctx.alloc(declared.ty().clone()));
+                        variables.assign_resolved_type(node_ref, declared.ty());
                         declared
                     }
                     SequentialNodeKind::Member(idx, _, privacy) => todo!("Member"),
@@ -438,13 +434,15 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                     SequentialNodeKind::StaticAssert(idx, _) => todo!("StaticAssert"),
                     SequentialNodeKind::ConformToBool(idx, language) => {
                         if let ast::Language::Adept = language {
-                            Resolved::from_type(self.builtin_types.bool.clone())
+                            Resolved::from_type(builtin_types.bool())
                         } else {
                             todo!("ConformToBool")
                         }
                     }
                     SequentialNodeKind::Is(idx, _) => unimplemented!("Is"),
-                    SequentialNodeKind::DirectGoto(label_value) => Resolved::never(node.source),
+                    SequentialNodeKind::DirectGoto(label_value) => {
+                        Resolved::from_type(builtin_types.never())
+                    }
                     SequentialNodeKind::LabelLiteral(name) => {
                         return Err(ErrorDiagnostic::new(
                             "Indirect goto labels are not supported yet",
@@ -453,14 +451,16 @@ impl<'env> Executable<'env> for GetFuncBody<'env> {
                         .into());
                     }
                 },
-                NodeKind::Branching(branch_node) => Resolved::void(node.source),
-                NodeKind::Terminating(terminating_node) => Resolved::never(node.source),
+                NodeKind::Branching(branch_node) => Resolved::from_type(builtin_types.void()),
+                NodeKind::Terminating(terminating_node) => {
+                    Resolved::from_type(builtin_types.never())
+                }
                 NodeKind::Scope(_) => {
                     // When joining control flow paths, consider the path immediately
                     // from this "begin scope" node to diverge since it's not a real branch.
                     // Since it's only used for scoping, so don't take it into account
                     // during type unifying from multiple code paths.
-                    Resolved::never(node.source)
+                    Resolved::from_type(builtin_types.never())
                 }
             };
 

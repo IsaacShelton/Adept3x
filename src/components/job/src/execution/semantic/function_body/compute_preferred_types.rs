@@ -1,15 +1,15 @@
 use crate::{
-    BuiltinTypes, Continuation, Execution, ExecutionCtx, Executor, ResolveTypeKeepAliases, Suspend,
+    BuiltinTypes, Continuation, Execution, ExecutionCtx, Executor, Suspend,
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
     },
+    execution::semantic::ResolveType,
     module_graph::ModuleView,
-    repr::Type,
+    repr::UnaliasedType,
     sub_task::SubTask,
 };
 use arena::ArenaMap;
 use ast::{UnaryMathOperator, UnaryOperator};
-use ast_workspace::AstWorkspace;
 use diagnostics::ErrorDiagnostic;
 
 #[derive(Debug)]
@@ -17,21 +17,20 @@ pub struct ComputePreferredTypesUserData<'env, 'a> {
     pub post_order: &'a [NodeRef],
     pub cfg: &'env UntypedCfg,
     pub func_return_type: &'env ast::Type,
-    pub workspace: &'env AstWorkspace<'env>,
     pub view: ModuleView<'env>,
     pub builtin_types: &'env BuiltinTypes<'env>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct ComputePreferredTypes<'env> {
-    preferred_types: Option<ArenaMap<NodeId, &'env Type<'env>>>,
+    preferred_types: Option<ArenaMap<NodeId, UnaliasedType<'env>>>,
     num_preferred_processed: usize,
-    waiting_on_type: Suspend<'env, &'env Type<'env>>,
+    waiting_on_type: Suspend<'env, UnaliasedType<'env>>,
 }
 
 impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
     type SubArtifact<'a>
-        = &'a ArenaMap<NodeId, &'env Type<'env>>
+        = &'a ArenaMap<NodeId, UnaliasedType<'env>>
     where
         Self: 'a;
 
@@ -69,11 +68,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                         return suspend_from_subtask!(
                             self,
                             waiting_on_type,
-                            executor.request(ResolveTypeKeepAliases::new(
-                                user_data.workspace,
-                                expected_var_ty,
-                                user_data.view,
-                            )),
+                            executor.request(ResolveType::new(user_data.view, expected_var_ty,)),
                             ctx
                         );
                     };
@@ -86,7 +81,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                     ..
                 }) => {
                     if let Some(preferred) = preferred_types.get(node_ref.into_raw()) {
-                        preferred_types.insert(value.into_raw(), preferred);
+                        preferred_types.insert(value.into_raw(), *preferred);
                     }
                 }
                 NodeKind::Sequential(SequentialNode {
@@ -133,10 +128,9 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                         return suspend_from_subtask!(
                             self,
                             waiting_on_type,
-                            executor.request(ResolveTypeKeepAliases::new(
-                                user_data.workspace,
-                                user_data.func_return_type,
+                            executor.request(ResolveType::new(
                                 user_data.view,
+                                user_data.func_return_type,
                             )),
                             ctx
                         );
@@ -147,7 +141,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                 }
                 NodeKind::Branching(branch) => {
                     preferred_types
-                        .insert(branch.condition.into_raw(), &user_data.builtin_types.bool);
+                        .insert(branch.condition.into_raw(), user_data.builtin_types.bool());
                 }
                 NodeKind::Start(_)
                 | NodeKind::Scope(_)
