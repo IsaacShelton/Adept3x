@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor,
-    execution::{main::read_file::ReadFile, semantic::ResolveNamespaceItems},
+    execution::{main::read_file::ReadFile, resolve::ResolveNamespaceItems},
     module_graph::ModuleView,
     repr::Compiler,
     sub_task::SubTask,

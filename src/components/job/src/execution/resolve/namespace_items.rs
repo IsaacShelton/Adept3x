@@ -1,6 +1,9 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor,
-    execution::semantic::{ResolveFunction, ResolveNamespace, ResolveWhen},
+    execution::{
+        lower::LowerFunction,
+        resolve::{ResolveNamespace, ResolveWhen},
+    },
     module_graph::ModuleView,
     repr::Compiler,
 };
@@ -56,9 +59,11 @@ impl<'env> Executable<'env> for ResolveNamespaceItems<'env> {
             executor.spawn_raw(ResolveNamespace::new(self.view, &self.compiler, namespace))
         }));
 
-        ctx.suspend_on(namespace_items.funcs.iter().map(|func| {
-            executor.spawn_raw(ResolveFunction::new(self.view, &self.compiler, &func))
-        }));
+        ctx.suspend_on(
+            namespace_items.funcs.iter().map(|func| {
+                executor.spawn_raw(LowerFunction::new(self.view, &self.compiler, &func))
+            }),
+        );
 
         Err(Continuation::Suspend(self.into()))
     }

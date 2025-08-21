@@ -3,7 +3,7 @@ use crate::{
     cfg::{
         NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
     },
-    execution::semantic::ResolveType,
+    execution::resolve::ResolveType,
     module_graph::ModuleView,
     repr::UnaliasedType,
     sub_task::SubTask,

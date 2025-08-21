@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
-    execution::semantic::{EvaluateComptime, ResolveNamespaceItems},
+    execution::resolve::{EvaluateComptime, ResolveNamespaceItems},
     module_graph::ModuleView,
     repr::Compiler,
 };

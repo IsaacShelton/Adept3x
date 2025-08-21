@@ -1,17 +1,19 @@
 mod canonicalize;
 mod diverge;
 mod find_type;
+mod lower;
 mod main;
 mod print;
-mod semantic;
+mod resolve;
 
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
     execution::{
+        lower::LowerFunction,
         main::LoadFile,
-        semantic::{
-            EvaluateComptime, ResolveEvaluation, ResolveFunction, ResolveFunctionBody,
-            ResolveFunctionHead, ResolveNamespace, ResolveNamespaceItems, ResolveType, ResolveWhen,
+        resolve::{
+            EvaluateComptime, ResolveEvaluation, ResolveFunctionBody, ResolveFunctionHead,
+            ResolveNamespace, ResolveNamespaceItems, ResolveType, ResolveWhen,
         },
     },
 };
@@ -21,7 +23,6 @@ use enum_dispatch::enum_dispatch;
 pub use find_type::FindType;
 pub use main::Main;
 pub use print::Print;
-// pub use semantic::*;
 
 #[enum_dispatch]
 pub trait RawExecutable<'env> {
@@ -78,7 +79,7 @@ pub enum Execution<'env> {
     ResolveWhen(ResolveWhen<'env>),
     EvaluateComptime(EvaluateComptime<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
-    ResolveFunction(ResolveFunction<'env>),
+    ResolveFunction(LowerFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
 }
@@ -101,7 +102,7 @@ pub enum Request<'env> {
     ResolveNamespace(ResolveNamespace<'env>),
     ResolveWhen(ResolveWhen<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
-    ResolveFunction(ResolveFunction<'env>),
+    ResolveFunction(LowerFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
 }

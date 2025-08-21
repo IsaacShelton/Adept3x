@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, SuspendMany,
-    execution::semantic::ResolveType,
+    execution::resolve::ResolveType,
     module_graph::ModuleView,
     repr::{
         Compiler, DeclHead, FuncHead, FuncMetadata, ImplParams, Param, Params, TargetAbi,

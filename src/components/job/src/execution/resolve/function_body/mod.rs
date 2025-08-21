@@ -11,7 +11,7 @@ use crate::{
         flatten_func_ignore_const_evals,
     },
     conform::conform_to_default,
-    execution::semantic::ResolveType,
+    execution::resolve::ResolveType,
     module_graph::ModuleView,
     repr::{Compiler, FuncBody, Type, TypeKind, UnaliasedType},
     sub_task::SubTask,
@@ -261,7 +261,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             match &dom.kind {
                                 NodeKind::Start(_) => {
                                     return Err(ErrorDiagnostic::new(
-                                        format!("Undefined variable '{}'", needle),
+                                        format!("Undeclared variable '{}'", needle),
                                         node.source,
                                     )
                                     .into());

@@ -11,7 +11,10 @@ mod web;
 mod web_inner;
 mod wildcard;
 
-use crate::repr::{Compiler, DeclHead, DeclHeadSet, DeclSet, Type};
+use crate::{
+    Ir,
+    repr::{Compiler, DeclHead, DeclHeadSet, DeclSet, Type},
+};
 use append_only_vec::AppendOnlyVec;
 use arena::{Arena, ArenaMap, Idx, LockFreeArena, new_id_with_niche};
 use attributes::Privacy;
@@ -81,6 +84,9 @@ pub struct ModuleGraph<'env> {
 
     // Metadata about the purpose of this module graph
     meta: ModuleGraphMeta,
+
+    // IR module
+    ir: Ir<'env>,
 }
 
 #[derive(IsVariant)]
@@ -128,6 +134,7 @@ impl<'env> ModuleGraph<'env> {
             wildcard_imports: Default::default(),
             consistency: Default::default(),
             meta,
+            ir: Ir::default(),
         }
     }
 

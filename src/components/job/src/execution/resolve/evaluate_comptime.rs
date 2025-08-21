@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
-    execution::{main::LoadFile, semantic::ResolveEvaluation},
+    execution::{main::LoadFile, resolve::ResolveEvaluation},
     module_graph::{ModuleView, Upserted},
     repr::{Compiler, Evaluated},
 };
