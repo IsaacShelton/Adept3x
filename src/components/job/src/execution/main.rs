@@ -2,7 +2,6 @@ use super::Executable;
 use crate::{
     BuiltinTypes, Continuation, ExecutionCtx, Executor, ProcessFile, Suspend,
     canonicalize_or_error,
-    execution::build_ir::BuildIr,
     module_graph::{ModuleGraphRef, ModuleGraphWeb},
     repr::Compiler,
 };
@@ -21,8 +20,7 @@ pub struct Main<'env> {
     canonicalized_single_file: Option<&'env Path>,
     module_graph_web: Option<&'env ModuleGraphWeb<'env>>,
     source_files: &'env SourceFiles,
-    all_symbols_resolved: Suspend<'env, ()>,
-    ir_done: Suspend<'env, ()>,
+    all_done: Suspend<'env, ()>,
 }
 
 impl<'env> Main<'env> {
@@ -37,8 +35,7 @@ impl<'env> Main<'env> {
             canonicalized_single_file: None,
             source_files,
             module_graph_web: None,
-            all_symbols_resolved: None,
-            ir_done: None,
+            all_done: None,
         }
     }
 }
@@ -90,23 +87,15 @@ impl<'env> Executable<'env> for Main<'env> {
             .into());
         }
 
-        let Some(_) = self.all_symbols_resolved else {
+        let Some(_) = self.all_done else {
             return suspend!(
-                self.all_symbols_resolved,
+                self.all_done,
                 executor.spawn(ProcessFile::new(
                     compiler,
                     single_file.into(),
                     runtime,
                     None
                 )),
-                ctx
-            );
-        };
-
-        let Some(_) = self.ir_done else {
-            return suspend!(
-                self.ir_done,
-                executor.request(BuildIr::new(compiler, runtime)),
                 ctx
             );
         };

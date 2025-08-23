@@ -9,7 +9,7 @@ mod util;
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
     execution::{
-        build_ir::{BuildIr, LowerFunctionHead},
+        build_ir::LowerFunctionHead,
         resolve::{
             EvaluateComptime, ResolveEvaluation, ResolveFunctionBody, ResolveFunctionHead,
             ResolveType,
@@ -18,7 +18,7 @@ use crate::{
 };
 use enum_dispatch::enum_dispatch;
 pub use find_type::FindType;
-pub use io::{canonicalize_or_error, *};
+pub use io::*;
 pub use main::Main;
 pub use process::*;
 pub use util::*;
@@ -77,7 +77,7 @@ pub enum Execution<'env> {
     //GetFuncBody(GetFuncBody<'env>),
 
     // Processing
-    LoadFile(ProcessFile<'env>),
+    ProcessFile(ProcessFile<'env>),
     ProcessNamespaceItems(ProcessNamespaceItems<'env>),
     ProcessNamespace(ProcessNamespace<'env>),
     ProcessWhen(ProcessWhen<'env>),
@@ -93,7 +93,6 @@ pub enum Execution<'env> {
     EvaluateComptime(EvaluateComptime<'env>),
 
     // Lowering
-    BuildIr(BuildIr<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
 }
 
@@ -114,7 +113,7 @@ pub enum Request<'env> {
     //GetFuncBody(GetFuncBody<'env>),
 
     // Processing
-    LoadFile(ProcessFile<'env>),
+    ProcessFile(ProcessFile<'env>),
     ProcessNamespaceItems(ProcessNamespaceItems<'env>),
     ProcessNamespace(ProcessNamespace<'env>),
     ProcessWhen(ProcessWhen<'env>),
@@ -130,7 +129,6 @@ pub enum Request<'env> {
     EvaluateComptime(EvaluateComptime<'env>),
 
     // Lowering
-    BuildIr(BuildIr<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
 }
 
