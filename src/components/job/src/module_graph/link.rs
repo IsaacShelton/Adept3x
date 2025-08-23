@@ -56,7 +56,7 @@ impl TypeLikeLookupConstraints {
     pub fn is_match<'env>(&self, head: &DeclHead<'env>) -> bool {
         match head {
             DeclHead::FuncLike(..) | DeclHead::ValueLike(..) => false,
-            DeclHead::TypeLike(_, type_head) => self.arity == type_head.arity,
+            DeclHead::TypeLike(type_head) => self.arity == type_head.arity,
         }
     }
 }
@@ -70,7 +70,7 @@ impl<'env> FuncLikeLookupConstraints<'env> {
     pub fn is_match(&self, head: &DeclHead<'env>) -> bool {
         match head {
             DeclHead::TypeLike(..) | DeclHead::ValueLike(..) => false,
-            DeclHead::FuncLike(_, func_head) => {
+            DeclHead::FuncLike(func_head) => {
                 // We will check that min arity matches, and types are compatible
                 // User-defined implicit conversions will probably not be allowed?
                 // They should use traits instead...

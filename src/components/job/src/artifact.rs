@@ -22,7 +22,6 @@ pub enum Artifact<'env> {
     TypeArg(&'env TypeArg<'env>),
     FuncHead(&'env FuncHead<'env>),
     FuncBody(&'env FuncBody<'env>),
-    IrModule(ir::Module),
     OptionPath(Option<&'env Path>),
     Evaluated(&'env Evaluated),
 }
@@ -41,6 +40,5 @@ impl_unwrap_from_artifact!(UnaliasedType, UnaliasedType<'env>);
 impl_unwrap_from_artifact!(TypeArg, &'env TypeArg<'env>);
 impl_unwrap_from_artifact!(FuncHead, &'env FuncHead<'env>);
 impl_unwrap_from_artifact!(FuncBody, &'env FuncBody<'env>);
-impl_unwrap_from_artifact!(IrModule, ir::Module);
 impl_unwrap_from_artifact!(OptionPath, Option<&'env Path>);
 impl_unwrap_from_artifact!(Evaluated, &'env Evaluated);

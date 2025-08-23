@@ -1,4 +1,5 @@
 use crate::{
+    ExecutionCtx,
     module_graph::{
         ComptimeKind, FoundOrCreated, ModuleGraph, ModuleGraphRef, ModulePartHandle,
         ModulePartVisibility, ModuleRef, meta::ModuleGraphMeta,
@@ -19,28 +20,40 @@ pub struct ModuleGraphWebInner<'env> {
 }
 
 impl<'env> ModuleGraphWebInner<'env> {
-    pub fn new(target: Target) -> Self {
+    pub fn new(target: Target, ctx: &mut ExecutionCtx<'env>) -> Self {
         Self {
-            runtime: ModuleGraph::new(ModuleGraphMeta {
-                title: "runtime",
-                self_ref: ModuleGraphRef::Runtime,
-                target,
-            }),
-            comptime_sandbox: ModuleGraph::new(ModuleGraphMeta {
-                title: "sandbox",
-                self_ref: ModuleGraphRef::Comptime(ComptimeKind::Sandbox),
-                target: Target::SANDBOX,
-            }),
-            comptime_target: ModuleGraph::new(ModuleGraphMeta {
-                title: "target",
-                self_ref: ModuleGraphRef::Comptime(ComptimeKind::Target),
-                target,
-            }),
-            comptime_host: ModuleGraph::new(ModuleGraphMeta {
-                title: "host",
-                self_ref: ModuleGraphRef::Comptime(ComptimeKind::Host),
-                target: Target::HOST,
-            }),
+            runtime: ModuleGraph::new(
+                ModuleGraphMeta {
+                    title: "runtime",
+                    self_ref: ModuleGraphRef::Runtime,
+                    target,
+                },
+                ctx,
+            ),
+            comptime_sandbox: ModuleGraph::new(
+                ModuleGraphMeta {
+                    title: "sandbox",
+                    self_ref: ModuleGraphRef::Comptime(ComptimeKind::Sandbox),
+                    target: Target::SANDBOX,
+                },
+                ctx,
+            ),
+            comptime_target: ModuleGraph::new(
+                ModuleGraphMeta {
+                    title: "target",
+                    self_ref: ModuleGraphRef::Comptime(ComptimeKind::Target),
+                    target,
+                },
+                ctx,
+            ),
+            comptime_host: ModuleGraph::new(
+                ModuleGraphMeta {
+                    title: "host",
+                    self_ref: ModuleGraphRef::Comptime(ComptimeKind::Host),
+                    target: Target::HOST,
+                },
+                ctx,
+            ),
         }
     }
 

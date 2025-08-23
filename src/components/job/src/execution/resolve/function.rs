@@ -1,6 +1,9 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
-    execution::resolve::{ResolveFunctionBody, ResolveFunctionHead},
+    execution::{
+        build_ir::LowerFunctionHead,
+        resolve::{ResolveFunctionBody, ResolveFunctionHead},
+    },
     module_graph::ModuleView,
     repr::{Compiler, FuncBody, FuncHead},
 };
@@ -9,7 +12,7 @@ use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct LowerFunction<'env> {
+pub struct ResolveFunction<'env> {
     view: ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
@@ -36,9 +39,14 @@ pub struct LowerFunction<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     resolved_body: Option<&'env FuncBody<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    lowering_head: Suspend<'env, ()>,
 }
 
-impl<'env> LowerFunction<'env> {
+impl<'env> ResolveFunction<'env> {
     pub fn new(
         view: ModuleView<'env>,
         compiler: &'env Compiler<'env>,
@@ -52,11 +60,12 @@ impl<'env> LowerFunction<'env> {
             resolved_body: None,
             resolving_head: None,
             resolving_body: None,
+            lowering_head: None,
         }
     }
 }
 
-impl<'env> Executable<'env> for LowerFunction<'env> {
+impl<'env> Executable<'env> for ResolveFunction<'env> {
     type Output = ();
 
     fn execute(
@@ -64,7 +73,8 @@ impl<'env> Executable<'env> for LowerFunction<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let _resolved_head = match self.resolved_head {
+        // NOTE: We have some extra caching here, although this should probably be standardized
+        let resolved_head = match self.resolved_head {
             Some(done) => done,
             None => {
                 let Some(resolved_head) = executor.demand(self.resolving_head) else {
@@ -83,6 +93,24 @@ impl<'env> Executable<'env> for LowerFunction<'env> {
             }
         };
 
+        if !self.view.graph.is_runtime() {
+            // If not for runtime, we lazily process function bodies...
+            return Ok(());
+        }
+
+        let Some(_lowered_head) = self.lowering_head else {
+            return suspend!(
+                self.lowering_head,
+                executor.request(LowerFunctionHead::new(
+                    self.view,
+                    &self.compiler,
+                    resolved_head
+                )),
+                ctx
+            );
+        };
+
+        // NOTE: We have some extra caching here, although this should probably be standardized
         let _resolved_body = match self.resolved_body {
             Some(done) => done,
             None => {

@@ -12,7 +12,7 @@ mod web_inner;
 mod wildcard;
 
 use crate::{
-    Ir,
+    ExecutionCtx, Ir,
     repr::{Compiler, DeclHead, DeclHeadSet, DeclSet, Type},
 };
 use append_only_vec::AppendOnlyVec;
@@ -86,7 +86,7 @@ pub struct ModuleGraph<'env> {
     meta: ModuleGraphMeta,
 
     // IR module
-    ir: Ir<'env>,
+    pub ir: &'env Ir<'env>,
 }
 
 #[derive(IsVariant)]
@@ -128,13 +128,13 @@ impl<T: Copy> Upserted<T> {
 }
 
 impl<'env> ModuleGraph<'env> {
-    pub fn new(meta: ModuleGraphMeta) -> Self {
+    pub fn new(meta: ModuleGraphMeta, ctx: &mut ExecutionCtx<'env>) -> Self {
         Self {
             modules: Default::default(),
             wildcard_imports: Default::default(),
             consistency: Default::default(),
             meta,
-            ir: Ir::default(),
+            ir: ctx.alloc(Ir::default()),
         }
     }
 

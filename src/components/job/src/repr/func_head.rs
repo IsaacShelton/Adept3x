@@ -1,6 +1,7 @@
 use super::{Params, TypeParams};
 use crate::repr::{UnaliasedType, UnaliasedUserDefinedType};
 use attributes::{SymbolOwnership, Tag};
+use derive_more::IsVariant;
 use indexmap::IndexMap;
 use source_files::Source;
 
@@ -22,7 +23,7 @@ pub struct FuncMetadata {
     pub tag: Option<Tag>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, IsVariant)]
 pub enum TargetAbi {
     Abstract,
     C,

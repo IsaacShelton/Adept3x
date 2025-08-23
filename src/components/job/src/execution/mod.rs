@@ -1,7 +1,7 @@
+mod build_ir;
 mod canonicalize;
 mod diverge;
 mod find_type;
-mod lower;
 mod main;
 mod print;
 mod resolve;
@@ -9,11 +9,11 @@ mod resolve;
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
     execution::{
-        lower::LowerFunction,
+        build_ir::{BuildIr, LowerFunctionHead},
         main::LoadFile,
         resolve::{
-            EvaluateComptime, ResolveEvaluation, ResolveFunctionBody, ResolveFunctionHead,
-            ResolveNamespace, ResolveNamespaceItems, ResolveType, ResolveWhen,
+            EvaluateComptime, ResolveEvaluation, ResolveFunction, ResolveFunctionBody,
+            ResolveFunctionHead, ResolveNamespace, ResolveNamespaceItems, ResolveType, ResolveWhen,
         },
     },
 };
@@ -79,9 +79,11 @@ pub enum Execution<'env> {
     ResolveWhen(ResolveWhen<'env>),
     EvaluateComptime(EvaluateComptime<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
-    ResolveFunction(LowerFunction<'env>),
+    ResolveFunction(ResolveFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
+    BuildIr(BuildIr<'env>),
+    LowerFunctionHead(LowerFunctionHead<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -102,9 +104,11 @@ pub enum Request<'env> {
     ResolveNamespace(ResolveNamespace<'env>),
     ResolveWhen(ResolveWhen<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
-    ResolveFunction(LowerFunction<'env>),
+    ResolveFunction(ResolveFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
+    BuildIr(BuildIr<'env>),
+    LowerFunctionHead(LowerFunctionHead<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

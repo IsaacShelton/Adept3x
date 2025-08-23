@@ -1,5 +1,4 @@
-use super::{DeclHead, FuncHead, TypeHead, TypeLikeRef, ValueLikeRef};
-use ast_workspace::FuncRef;
+use super::{DeclHead, FuncHead, TypeHead, ValueLikeRef};
 use std_ext::SmallVec2;
 
 /// A group of declarations under the same name
@@ -11,16 +10,16 @@ impl<'env> DeclHeadSet<'env> {
         self.0.push(decl_head);
     }
 
-    pub fn type_likes(&self) -> impl Iterator<Item = (TypeLikeRef, &'env TypeHead<'env>)> {
+    pub fn type_likes(&self) -> impl Iterator<Item = &'env TypeHead<'env>> {
         self.0.iter().filter_map(|decl_head| match decl_head {
-            DeclHead::TypeLike(type_like, type_head) => Some((*type_like, *type_head)),
+            DeclHead::TypeLike(type_head) => Some(*type_head),
             _ => None,
         })
     }
 
-    pub fn func_likes(&self) -> impl Iterator<Item = (FuncRef, &'env FuncHead<'env>)> {
+    pub fn func_likes(&self) -> impl Iterator<Item = &'env FuncHead<'env>> {
         self.0.iter().filter_map(|decl_head| match decl_head {
-            DeclHead::FuncLike(func_ref, func_head) => Some((*func_ref, *func_head)),
+            DeclHead::FuncLike(func_head) => Some(*func_head),
             _ => None,
         })
     }

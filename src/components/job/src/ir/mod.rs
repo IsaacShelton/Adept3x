@@ -43,8 +43,8 @@ pub struct Ir<'env> {
 pub struct Func<'env> {
     pub mangled_name: &'env str,
     pub params: &'env [Type<'env>],
-    pub return_type: &'env Type<'env>,
-    //pub basicblocks: BasicBlocks,
+    pub return_type: Type<'env>,
+    pub basicblocks: &'env [BasicBlock<'env>],
     pub is_cstyle_variadic: bool,
     pub ownership: SymbolOwnership,
     pub abide_abi: bool,

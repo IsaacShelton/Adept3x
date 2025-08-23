@@ -1,4 +1,5 @@
 use crate::{
+    ExecutionCtx,
     module_graph::{
         FoundOrCreated, ModuleGraph, ModuleGraphRef, ModulePartHandle, ModuleRef, Upserted,
         meta::ModuleGraphMeta, module_graph_ref::ComptimeKind, view::ModuleView,
@@ -16,9 +17,9 @@ pub struct ModuleGraphWeb<'env> {
 }
 
 impl<'env> ModuleGraphWeb<'env> {
-    pub fn new(target: Target) -> Self {
+    pub fn new(target: Target, ctx: &mut ExecutionCtx<'env>) -> Self {
         Self {
-            inner: RwLock::new(ModuleGraphWebInner::new(target)),
+            inner: RwLock::new(ModuleGraphWebInner::new(target, ctx)),
         }
     }
 

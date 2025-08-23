@@ -1,3 +1,5 @@
+use derive_more::IsVariant;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ComptimeKind {
     Sandbox,
@@ -5,7 +7,7 @@ pub enum ComptimeKind {
     Host,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
 pub enum ModuleGraphRef {
     Runtime,
     Comptime(ComptimeKind),

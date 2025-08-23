@@ -13,8 +13,8 @@ pub enum Decl {
 /// A symbol declaration
 #[derive(Copy, Clone, Debug, From)]
 pub enum DeclHead<'env> {
-    FuncLike(FuncRef, &'env FuncHead<'env>),
-    TypeLike(TypeLikeRef, &'env TypeHead<'env>),
+    FuncLike(&'env FuncHead<'env>),
+    TypeLike(&'env TypeHead<'env>),
     ValueLike(ValueLikeRef),
 }
 

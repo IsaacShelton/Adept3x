@@ -1,9 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor,
-    execution::{
-        lower::LowerFunction,
-        resolve::{ResolveNamespace, ResolveWhen},
-    },
+    execution::resolve::{ResolveFunction, ResolveFunctionHead, ResolveNamespace, ResolveWhen},
     module_graph::ModuleView,
     repr::Compiler,
 };
@@ -45,6 +42,7 @@ impl<'env> Executable<'env> for ResolveNamespaceItems<'env> {
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let Some(namespace_items) = self.namespace_items.take() else {
+            // All items resolved!
             return Ok(());
         };
 
@@ -61,7 +59,7 @@ impl<'env> Executable<'env> for ResolveNamespaceItems<'env> {
 
         ctx.suspend_on(
             namespace_items.funcs.iter().map(|func| {
-                executor.spawn_raw(LowerFunction::new(self.view, &self.compiler, &func))
+                executor.spawn_raw(ResolveFunction::new(self.view, &self.compiler, func))
             }),
         );
 

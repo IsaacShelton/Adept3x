@@ -50,12 +50,6 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        self.view.add_symbol(
-            Privacy::Public,
-            "my_testing_function",
-            DeclHead::ValueLike(ValueLikeRef::Dummy),
-        );
-
         let Some(inner_types) = executor.demand_many(&self.inner_types) else {
             let suspend_on_types = self
                 .head
@@ -125,7 +119,7 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         };
         */
 
-        Ok(ctx.alloc(FuncHead {
+        let func_head = ctx.alloc(FuncHead {
             name: self.head.name.as_str(),
             type_params: self.head.type_params.clone(),
             params,
@@ -141,6 +135,14 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
                 ownership: self.head.ownership,
                 tag: self.head.tag,
             },
-        }))
+        });
+
+        self.view.add_symbol(
+            self.head.privacy,
+            self.head.name.as_str(),
+            DeclHead::FuncLike(func_head),
+        );
+
+        Ok(func_head)
     }
 }

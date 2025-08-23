@@ -3,7 +3,8 @@ mod read_file;
 
 use super::Executable;
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, canonicalize_or_error,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, Suspend, canonicalize_or_error,
+    execution::build_ir::BuildIr,
     module_graph::{ModuleGraphRef, ModuleGraphWeb},
     repr::Compiler,
 };
@@ -20,12 +21,10 @@ pub struct Main<'env> {
     build_options: &'env BuildOptions,
     uncanonicalized_single_file: Option<&'env Path>,
     canonicalized_single_file: Option<&'env Path>,
-
-    #[allow(unused)]
     module_graph_web: Option<&'env ModuleGraphWeb<'env>>,
-
-    #[allow(unused)]
     source_files: &'env SourceFiles,
+    all_symbols_resolved: Suspend<'env, ()>,
+    ir_done: Suspend<'env, ()>,
 }
 
 impl<'env> Main<'env> {
@@ -40,6 +39,8 @@ impl<'env> Main<'env> {
             canonicalized_single_file: None,
             source_files,
             module_graph_web: None,
+            all_symbols_resolved: None,
+            ir_done: None,
         }
     }
 }
@@ -77,14 +78,31 @@ impl<'env> Executable<'env> for Main<'env> {
 
         let web = *self
             .module_graph_web
-            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST)));
+            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST, ctx)));
 
         let runtime = web
             .upsert_module_with_initial_part(ModuleGraphRef::Runtime, single_file)
             .out_of();
 
-        let _ = executor.request(LoadFile::new(compiler, single_file.into(), runtime, None));
+        let Some(_) = self.all_symbols_resolved else {
+            return suspend!(
+                self.all_symbols_resolved,
+                executor.spawn(LoadFile::new(compiler, single_file.into(), runtime, None)),
+                ctx
+            );
+        };
 
+        let Some(_) = self.ir_done else {
+            return suspend!(
+                self.ir_done,
+                executor.request(BuildIr::new(compiler, runtime)),
+                ctx
+            );
+        };
+
+        let ir = runtime.web.graph(runtime.graph, |graph| graph.ir);
+
+        println!("main done, send this to LLVM: {:?}", ir);
         Ok(None)
     }
 }

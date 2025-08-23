@@ -1,5 +1,5 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor,
+    Continuation, Executable, ExecutionCtx, Executor, Suspend,
     execution::{main::read_file::ReadFile, resolve::ResolveNamespaceItems},
     module_graph::ModuleView,
     repr::Compiler,
@@ -18,6 +18,7 @@ use text::{CharacterInfiniteIterator, CharacterPeeker};
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LoadFile<'env> {
+    view: ModuleView<'env>,
     canonical_filename: &'env Path,
 
     #[derivative(Hash = "ignore")]
@@ -35,7 +36,10 @@ pub struct LoadFile<'env> {
     #[derivative(PartialEq = "ignore")]
     source: Option<Source>,
 
-    view: ModuleView<'env>,
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    all_items_resolved: Suspend<'env, ()>,
 }
 
 impl<'env> LoadFile<'env> {
@@ -51,6 +55,7 @@ impl<'env> LoadFile<'env> {
             view,
             source,
             canonical_filename,
+            all_items_resolved: None,
         }
     }
 }
@@ -84,21 +89,17 @@ impl<'env> Executable<'env> for LoadFile<'env> {
 
         let ast = parser.parse().map_err(ErrorDiagnostic::from)?;
 
-        /*
-        writeln!(
-            &mut std::io::stdout(),
-            "[{}]: {:?}",
-            self.view.graph(|graph| graph.meta().title),
-            self.compiler.filename(&self.canonical_filename),
-        )
-        .unwrap();
-        */
-
-        let _ = executor.spawn_raw(ResolveNamespaceItems::new(
-            self.view,
-            &self.compiler,
-            ctx.alloc(ast),
-        ));
+        let Some(_) = self.all_items_resolved else {
+            return suspend!(
+                self.all_items_resolved,
+                executor.spawn(ResolveNamespaceItems::new(
+                    self.view,
+                    &self.compiler,
+                    ctx.alloc(ast),
+                )),
+                ctx
+            );
+        };
 
         Ok(())
     }
