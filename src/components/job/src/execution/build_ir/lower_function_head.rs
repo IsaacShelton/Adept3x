@@ -5,8 +5,6 @@ use crate::{
 };
 use by_address::ByAddress;
 use derivative::Derivative;
-use diagnostics::ErrorDiagnostic;
-use llvm_sys::core::LLVMIsMultithreaded;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -52,13 +50,6 @@ impl<'env> Executable<'env> for LowerFunctionHead<'env> {
             ownership: self.head.metadata.ownership,
             abide_abi: self.head.metadata.abi.is_c(),
         });
-
-        if unsafe { LLVMIsMultithreaded() } == 0 {
-            return Err(ErrorDiagnostic::plain(
-                "Your LLVM version does not support multi-threading! Please upgrade.",
-            )
-            .into());
-        }
 
         Ok(())
     }

@@ -13,7 +13,7 @@ mod wildcard;
 
 use crate::{
     ExecutionCtx, Ir,
-    repr::{Compiler, DeclHead, DeclHeadSet, DeclSet, Type},
+    repr::{Compiler, DeclHead, DeclHeadSet, Type},
 };
 use append_only_vec::AppendOnlyVec;
 use arena::{Arena, ArenaMap, Idx, LockFreeArena, new_id_with_niche};

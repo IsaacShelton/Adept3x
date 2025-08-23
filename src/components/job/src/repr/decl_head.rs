@@ -1,14 +1,6 @@
 use super::{FuncHead, TypeHead};
-use ast_workspace::{FuncRef, TypeDeclRef};
+use ast_workspace::TypeDeclRef;
 use derive_more::From;
-
-/// A symbol declaration
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, From)]
-pub enum Decl {
-    FuncLike(FuncRef),
-    TypeLike(TypeLikeRef),
-    ValueLike(ValueLikeRef),
-}
 
 /// A symbol declaration
 #[derive(Copy, Clone, Debug, From)]

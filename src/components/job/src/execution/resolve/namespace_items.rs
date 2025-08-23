@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor,
-    execution::resolve::{ResolveFunction, ResolveFunctionHead, ResolveNamespace, ResolveWhen},
+    execution::resolve::{ResolveFunction, ResolveNamespace, ResolveWhen},
     module_graph::ModuleView,
     repr::Compiler,
 };

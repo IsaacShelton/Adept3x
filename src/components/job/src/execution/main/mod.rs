@@ -10,6 +10,7 @@ use crate::{
 };
 use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
+use llvm_sys::core::LLVMIsMultithreaded;
 pub use load_file::LoadFile;
 use source_files::SourceFiles;
 use std::path::Path;
@@ -83,6 +84,14 @@ impl<'env> Executable<'env> for Main<'env> {
         let runtime = web
             .upsert_module_with_initial_part(ModuleGraphRef::Runtime, single_file)
             .out_of();
+
+        // Ensure multi-threading support is enabled for the version of LLVM being used
+        if unsafe { LLVMIsMultithreaded() } == 0 {
+            return Err(ErrorDiagnostic::plain(
+                "Your LLVM version does not support multi-threading! Please upgrade.",
+            )
+            .into());
+        }
 
         let Some(_) = self.all_symbols_resolved else {
             return suspend!(

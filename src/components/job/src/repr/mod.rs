@@ -1,7 +1,6 @@
 mod compiler;
-mod decl;
+mod decl_head;
 mod decl_head_set;
-mod decl_set;
 mod enum_body;
 mod evaluated;
 mod func_body;
@@ -16,9 +15,8 @@ mod variables;
 
 use ast_workspace::TypeDeclRef;
 pub use compiler::*;
-pub use decl::*;
+pub use decl_head::*;
 pub use decl_head_set::*;
-pub use decl_set::*;
 pub use enum_body::*;
 pub use evaluated::*;
 pub use func_body::*;

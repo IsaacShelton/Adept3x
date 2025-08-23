@@ -4,10 +4,9 @@ use crate::{
     module_graph::ModuleView,
     repr::{
         Compiler, DeclHead, FuncHead, FuncMetadata, ImplParams, Param, Params, TargetAbi,
-        UnaliasedType, ValueLikeRef,
+        UnaliasedType,
     },
 };
-use attributes::Privacy;
 use by_address::ByAddress;
 use derivative::Derivative;
 
