@@ -1,6 +1,5 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, canonicalize_or_error,
-    execution::main::LoadFile,
+    Continuation, Executable, ExecutionCtx, Executor, ProcessFile, canonicalize_or_error,
     module_graph::{ModuleBreakOffMode, ModuleView, Upserted},
     repr::Compiler,
 };
@@ -12,7 +11,7 @@ use std::path::Path;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct ResolveNamespace<'env> {
+pub struct ProcessNamespace<'env> {
     view: ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
@@ -21,7 +20,7 @@ pub struct ResolveNamespace<'env> {
     namespace: Option<ByAddress<&'env Namespace>>,
 }
 
-impl<'env> ResolveNamespace<'env> {
+impl<'env> ProcessNamespace<'env> {
     pub fn new(
         view: ModuleView<'env>,
         compiler: &'env Compiler<'env>,
@@ -35,7 +34,7 @@ impl<'env> ResolveNamespace<'env> {
     }
 }
 
-impl<'env> Executable<'env> for ResolveNamespace<'env> {
+impl<'env> Executable<'env> for ProcessNamespace<'env> {
     type Output = ();
 
     fn execute(
@@ -82,7 +81,7 @@ impl<'env> Executable<'env> for ResolveNamespace<'env> {
 
                 ctx.suspend_on(std::iter::once(
                     executor
-                        .request(LoadFile::new(
+                        .request(ProcessFile::new(
                             &self.compiler,
                             new_filename,
                             created,

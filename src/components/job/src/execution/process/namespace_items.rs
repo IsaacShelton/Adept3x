@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor,
-    execution::resolve::{ResolveFunction, ResolveNamespace, ResolveWhen},
+    execution::process::{ProcessFunction, ProcessNamespace, ProcessWhen},
     module_graph::ModuleView,
     repr::Compiler,
 };
@@ -10,7 +10,7 @@ use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct ResolveNamespaceItems<'env> {
+pub struct ProcessNamespaceItems<'env> {
     view: ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
@@ -19,7 +19,7 @@ pub struct ResolveNamespaceItems<'env> {
     namespace_items: Option<ByAddress<&'env NamespaceItems>>,
 }
 
-impl<'env> ResolveNamespaceItems<'env> {
+impl<'env> ProcessNamespaceItems<'env> {
     pub fn new(
         view: ModuleView<'env>,
         compiler: &'env Compiler<'env>,
@@ -33,7 +33,7 @@ impl<'env> ResolveNamespaceItems<'env> {
     }
 }
 
-impl<'env> Executable<'env> for ResolveNamespaceItems<'env> {
+impl<'env> Executable<'env> for ProcessNamespaceItems<'env> {
     type Output = ();
 
     fn execute(
@@ -50,16 +50,16 @@ impl<'env> Executable<'env> for ResolveNamespaceItems<'env> {
             namespace_items
                 .whens
                 .iter()
-                .map(|when| executor.spawn_raw(ResolveWhen::new(self.view, &self.compiler, when))),
+                .map(|when| executor.spawn_raw(ProcessWhen::new(self.view, &self.compiler, when))),
         );
 
         ctx.suspend_on(namespace_items.namespaces.iter().map(|namespace| {
-            executor.spawn_raw(ResolveNamespace::new(self.view, &self.compiler, namespace))
+            executor.spawn_raw(ProcessNamespace::new(self.view, &self.compiler, namespace))
         }));
 
         ctx.suspend_on(
             namespace_items.funcs.iter().map(|func| {
-                executor.spawn_raw(ResolveFunction::new(self.view, &self.compiler, func))
+                executor.spawn_raw(ProcessFunction::new(self.view, &self.compiler, func))
             }),
         );
 

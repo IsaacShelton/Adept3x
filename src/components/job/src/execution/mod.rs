@@ -1,28 +1,27 @@
 mod build_ir;
-mod canonicalize;
-mod diverge;
 mod find_type;
+mod io;
 mod main;
-mod print;
+mod process;
 mod resolve;
+mod util;
 
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
     execution::{
         build_ir::{BuildIr, LowerFunctionHead},
-        main::LoadFile,
         resolve::{
-            EvaluateComptime, ResolveEvaluation, ResolveFunction, ResolveFunctionBody,
-            ResolveFunctionHead, ResolveNamespace, ResolveNamespaceItems, ResolveType, ResolveWhen,
+            EvaluateComptime, ResolveEvaluation, ResolveFunctionBody, ResolveFunctionHead,
+            ResolveType,
         },
     },
 };
-pub use canonicalize::canonicalize_or_error;
-pub use diverge::Diverge;
 use enum_dispatch::enum_dispatch;
 pub use find_type::FindType;
+pub use io::{canonicalize_or_error, *};
 pub use main::Main;
-pub use print::Print;
+pub use process::*;
+pub use util::*;
 
 #[enum_dispatch]
 pub trait RawExecutable<'env> {
@@ -63,25 +62,37 @@ where
 #[enum_dispatch(RawExecutable)]
 pub enum Execution<'env> {
     Main(Main<'env>),
+
+    // Utility
     Diverge(Diverge),
     Print(Print<'env>),
-    FindType(FindType<'env>),
-    // GetTypeHead(GetTypeHead<'env>),
-    // GetTypeBody(GetTypeBody<'env>),
-    ResolveType(ResolveType<'env>),
-    // ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
-    // ResolveTypeArg(ResolveTypeArg<'env>),
+
+    // Prototypes
+    //FindType(FindType<'env>),
+    //GetTypeHead(GetTypeHead<'env>),
+    //GetTypeBody(GetTypeBody<'env>),
+    //ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
+    //ResolveTypeArg(ResolveTypeArg<'env>),
     //GetFuncHead(GetFuncHead<'env>),
     //GetFuncBody(GetFuncBody<'env>),
-    LoadFile(LoadFile<'env>),
-    ResolveNamespaceItems(ResolveNamespaceItems<'env>),
-    ResolveNamespace(ResolveNamespace<'env>),
-    ResolveWhen(ResolveWhen<'env>),
-    EvaluateComptime(EvaluateComptime<'env>),
+
+    // Processing
+    LoadFile(ProcessFile<'env>),
+    ProcessNamespaceItems(ProcessNamespaceItems<'env>),
+    ProcessNamespace(ProcessNamespace<'env>),
+    ProcessWhen(ProcessWhen<'env>),
+
+    // Resolution
+    ResolveType(ResolveType<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
-    ResolveFunction(ResolveFunction<'env>),
+    ResolveFunction(ProcessFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
+
+    // Comptime
+    EvaluateComptime(EvaluateComptime<'env>),
+
+    // Lowering
     BuildIr(BuildIr<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
 }
@@ -89,24 +100,36 @@ pub enum Execution<'env> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 #[enum_dispatch(Spawnable)]
 pub enum Request<'env> {
+    // Utility
     Diverge(Diverge),
     Print(Print<'env>),
-    FindType(FindType<'env>),
+
+    // Prototypes
+    //FindType(FindType<'env>),
     //GetTypeHead(GetTypeHead<'env>),
     //GetTypeBody(GetTypeBody<'env>),
+    //ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
+    //ResolveTypeArg(ResolveTypeArg<'env>),
+    //GetFuncHead(GetFuncHead<'env>),
+    //GetFuncBody(GetFuncBody<'env>),
+
+    // Processing
+    LoadFile(ProcessFile<'env>),
+    ProcessNamespaceItems(ProcessNamespaceItems<'env>),
+    ProcessNamespace(ProcessNamespace<'env>),
+    ProcessWhen(ProcessWhen<'env>),
+
+    // Resolution
     ResolveType(ResolveType<'env>),
-    // ResolveTypeKeepAliases(ResolveTypeKeepAliases<'env>),
-    // ResolveTypeArg(ResolveTypeArg<'env>),
-    // GetFuncHead(GetFuncHead<'env>),
-    // GetFuncBody(GetFuncBody<'env>),
-    LoadFile(LoadFile<'env>),
-    ResolveNamespaceItems(ResolveNamespaceItems<'env>),
-    ResolveNamespace(ResolveNamespace<'env>),
-    ResolveWhen(ResolveWhen<'env>),
     ResolveEvaluation(ResolveEvaluation<'env>),
-    ResolveFunction(ResolveFunction<'env>),
+    ResolveFunction(ProcessFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
+
+    // Comptime
+    EvaluateComptime(EvaluateComptime<'env>),
+
+    // Lowering
     BuildIr(BuildIr<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
 }

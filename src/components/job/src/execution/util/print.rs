@@ -1,5 +1,4 @@
-use super::Executable;
-use crate::{Continuation, ExecutionCtx, Executor};
+use crate::{Continuation, Executable, ExecutionCtx, Executor};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Print<'env>(pub &'env str);

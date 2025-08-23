@@ -1,9 +1,7 @@
-mod load_file;
-mod read_file;
-
 use super::Executable;
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, Suspend, canonicalize_or_error,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, ProcessFile, Suspend,
+    canonicalize_or_error,
     execution::build_ir::BuildIr,
     module_graph::{ModuleGraphRef, ModuleGraphWeb},
     repr::Compiler,
@@ -11,7 +9,6 @@ use crate::{
 use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::core::LLVMIsMultithreaded;
-pub use load_file::LoadFile;
 use source_files::SourceFiles;
 use std::path::Path;
 use target::Target;
@@ -96,7 +93,12 @@ impl<'env> Executable<'env> for Main<'env> {
         let Some(_) = self.all_symbols_resolved else {
             return suspend!(
                 self.all_symbols_resolved,
-                executor.spawn(LoadFile::new(compiler, single_file.into(), runtime, None)),
+                executor.spawn(ProcessFile::new(
+                    compiler,
+                    single_file.into(),
+                    runtime,
+                    None
+                )),
                 ctx
             );
         };

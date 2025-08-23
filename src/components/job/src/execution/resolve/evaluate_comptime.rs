@@ -1,6 +1,6 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, Suspend,
-    execution::{main::LoadFile, resolve::ResolveEvaluation},
+    Continuation, Executable, ExecutionCtx, Executor, ProcessFile, Suspend,
+    execution::resolve::ResolveEvaluation,
     module_graph::{ModuleView, Upserted},
     repr::{Compiler, Evaluated},
 };
@@ -70,7 +70,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             .upsert_module_with_initial_part(comptime_graph, self.view.canonical_module_filename);
 
         if let Upserted::Created(created) = comptime_module {
-            let _ = executor.spawn_raw(LoadFile::new(
+            let _ = executor.spawn_raw(ProcessFile::new(
                 &self.compiler,
                 created.canonical_module_filename,
                 created,
@@ -82,7 +82,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
         let comptime_part = comptime_module.upsert_part(self.view.canonical_filename);
 
         if let Upserted::Created(created) = comptime_part {
-            let _ = executor.spawn_raw(LoadFile::new(
+            let _ = executor.spawn_raw(ProcessFile::new(
                 &self.compiler,
                 created.canonical_filename,
                 created,

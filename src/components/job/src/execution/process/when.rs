@@ -1,8 +1,6 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, Suspend,
-    execution::resolve::{EvaluateComptime, ResolveNamespaceItems},
-    module_graph::ModuleView,
-    repr::Compiler,
+    Continuation, Executable, ExecutionCtx, Executor, ProcessNamespaceItems, Suspend,
+    execution::resolve::EvaluateComptime, module_graph::ModuleView, repr::Compiler,
 };
 use ast::When;
 use by_address::ByAddress;
@@ -10,7 +8,7 @@ use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct ResolveWhen<'env> {
+pub struct ProcessWhen<'env> {
     view: ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
@@ -32,7 +30,7 @@ pub struct ResolveWhen<'env> {
     condition: Suspend<'env, bool>,
 }
 
-impl<'env> ResolveWhen<'env> {
+impl<'env> ProcessWhen<'env> {
     pub fn new(view: ModuleView<'env>, compiler: &'env Compiler<'env>, when: &'env When) -> Self {
         Self {
             view,
@@ -44,7 +42,7 @@ impl<'env> ResolveWhen<'env> {
     }
 }
 
-impl<'env> Executable<'env> for ResolveWhen<'env> {
+impl<'env> Executable<'env> for ProcessWhen<'env> {
     type Output = ();
 
     fn execute(
@@ -70,7 +68,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
 
                 self.next_condition_index = None;
                 ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                    ResolveNamespaceItems::new(self.view, &self.compiler, then),
+                    ProcessNamespaceItems::new(self.view, &self.compiler, then),
                 )));
                 return Err(Continuation::Suspend(self.into()));
             } else {
@@ -93,7 +91,7 @@ impl<'env> Executable<'env> for ResolveWhen<'env> {
         if let Some(otherwise) = &self.when.otherwise {
             self.next_condition_index = None;
             ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                ResolveNamespaceItems::new(self.view, &self.compiler, otherwise),
+                ProcessNamespaceItems::new(self.view, &self.compiler, otherwise),
             )));
             return Err(Continuation::Suspend(self.into()));
         }

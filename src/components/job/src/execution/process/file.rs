@@ -1,8 +1,6 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, Suspend,
-    execution::{main::read_file::ReadFile, resolve::ResolveNamespaceItems},
-    module_graph::ModuleView,
-    repr::Compiler,
+    Continuation, Executable, ExecutionCtx, Executor, ReadFile, Suspend,
+    execution::process::ProcessNamespaceItems, module_graph::ModuleView, repr::Compiler,
     sub_task::SubTask,
 };
 use build_ast::{Input, Parser};
@@ -17,7 +15,7 @@ use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct LoadFile<'env> {
+pub struct ProcessFile<'env> {
     view: ModuleView<'env>,
     canonical_filename: &'env Path,
 
@@ -42,7 +40,7 @@ pub struct LoadFile<'env> {
     all_items_resolved: Suspend<'env, ()>,
 }
 
-impl<'env> LoadFile<'env> {
+impl<'env> ProcessFile<'env> {
     pub fn new(
         compiler: &'env Compiler,
         canonical_filename: &'env Path,
@@ -60,7 +58,7 @@ impl<'env> LoadFile<'env> {
     }
 }
 
-impl<'env> Executable<'env> for LoadFile<'env> {
+impl<'env> Executable<'env> for ProcessFile<'env> {
     type Output = ();
 
     fn execute(
@@ -92,7 +90,7 @@ impl<'env> Executable<'env> for LoadFile<'env> {
         let Some(_) = self.all_items_resolved else {
             return suspend!(
                 self.all_items_resolved,
-                executor.spawn(ResolveNamespaceItems::new(
+                executor.spawn(ProcessNamespaceItems::new(
                     self.view,
                     &self.compiler,
                     ctx.alloc(ast),

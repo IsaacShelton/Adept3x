@@ -12,7 +12,7 @@ use derivative::Derivative;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct ResolveFunction<'env> {
+pub struct ProcessFunction<'env> {
     view: ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
@@ -46,7 +46,7 @@ pub struct ResolveFunction<'env> {
     lowering_head: Suspend<'env, ()>,
 }
 
-impl<'env> ResolveFunction<'env> {
+impl<'env> ProcessFunction<'env> {
     pub fn new(
         view: ModuleView<'env>,
         compiler: &'env Compiler<'env>,
@@ -65,7 +65,7 @@ impl<'env> ResolveFunction<'env> {
     }
 }
 
-impl<'env> Executable<'env> for ResolveFunction<'env> {
+impl<'env> Executable<'env> for ProcessFunction<'env> {
     type Output = ();
 
     fn execute(
