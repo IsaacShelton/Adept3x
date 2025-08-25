@@ -69,6 +69,7 @@ impl<'env> Executable<'env> for Main<'env> {
             source_files: self.source_files,
             project_root,
             builtin_types: ctx.alloc(BuiltinTypes::default()),
+            runtime_target: self.build_options.target,
         });
 
         let web = *self

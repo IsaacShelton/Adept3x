@@ -7,6 +7,7 @@ use arena::{Idx, LockFreeArena, new_id_with_niche};
 use attributes::SymbolOwnership;
 use derive_more::IsVariant;
 use source_files::Source;
+use std::sync::OnceLock;
 
 new_id_with_niche!(FuncId, u32);
 new_id_with_niche!(StructId, u32);
@@ -44,10 +45,10 @@ pub struct Func<'env> {
     pub mangled_name: &'env str,
     pub params: &'env [Type<'env>],
     pub return_type: Type<'env>,
-    pub basicblocks: &'env [BasicBlock<'env>],
     pub is_cstyle_variadic: bool,
     pub ownership: SymbolOwnership,
     pub abide_abi: bool,
+    pub basicblocks: OnceLock<&'env [BasicBlock<'env>]>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, IsVariant, Hash)]

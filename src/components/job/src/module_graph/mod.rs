@@ -12,7 +12,8 @@ mod web_inner;
 mod wildcard;
 
 use crate::{
-    ExecutionCtx, Ir,
+    ExecutionCtx,
+    ir::Ir,
     repr::{Compiler, DeclHead, DeclHeadSet, Type},
 };
 use append_only_vec::AppendOnlyVec;

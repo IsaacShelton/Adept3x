@@ -787,6 +787,7 @@ dependencies = [
  "source_files",
  "std_ext",
  "target",
+ "target_layout",
  "text",
  "threadpool",
 ]

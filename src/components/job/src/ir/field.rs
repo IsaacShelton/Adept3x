@@ -1,4 +1,4 @@
-use crate::Type;
+use crate::ir::Type;
 use data_units::ByteUnits;
 use derivative::Derivative;
 use source_files::Source;

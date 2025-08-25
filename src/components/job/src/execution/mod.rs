@@ -1,6 +1,6 @@
-mod build_ir;
 mod find_type;
 mod io;
+mod lower;
 mod main;
 mod process;
 mod resolve;
@@ -9,7 +9,7 @@ mod util;
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
     execution::{
-        build_ir::LowerFunctionHead,
+        lower::{LowerFunctionBody, LowerFunctionHead, LowerType},
         resolve::{
             EvaluateComptime, ResolveEvaluation, ResolveFunctionBody, ResolveFunctionHead,
             ResolveType,
@@ -93,7 +93,9 @@ pub enum Execution<'env> {
     EvaluateComptime(EvaluateComptime<'env>),
 
     // Lowering
+    LowerType(LowerType<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
+    LowerFunctionBody(LowerFunctionBody<'env>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -129,7 +131,9 @@ pub enum Request<'env> {
     EvaluateComptime(EvaluateComptime<'env>),
 
     // Lowering
+    LowerType(LowerType<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
+    LowerFunctionBody(LowerFunctionBody<'env>),
 }
 
 impl<'env, E> RawExecutable<'env> for E

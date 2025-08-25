@@ -1,4 +1,4 @@
-use crate::{GlobalRef, Type, ir::value::Value};
+use crate::ir::{GlobalRef, Type, value::Value};
 use asg::FuncRef;
 use ast::SizeOfMode;
 use primitives::{FloatOrInteger, FloatOrSign, IntegerBits, IntegerSign};

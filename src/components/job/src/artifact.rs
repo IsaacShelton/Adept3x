@@ -1,6 +1,9 @@
-use crate::repr::{
-    AmbiguousType, Evaluated, Field, FindTypeResult, FuncBody, FuncHead, Type, TypeArg, TypeBody,
-    TypeHead, UnaliasedType,
+use crate::{
+    ir,
+    repr::{
+        AmbiguousType, Evaluated, Field, FindTypeResult, FuncBody, FuncHead, Type, TypeArg,
+        TypeBody, TypeHead, UnaliasedType,
+    },
 };
 use ast_workspace::TypeDeclRef;
 use derive_more::From;
@@ -24,6 +27,8 @@ pub enum Artifact<'env> {
     FuncBody(&'env FuncBody<'env>),
     OptionPath(Option<&'env Path>),
     Evaluated(&'env Evaluated),
+    IrType(ir::Type<'env>),
+    IrFuncRef(ir::FuncRef<'env>),
 }
 
 impl_unwrap_from_artifact!(Void, ());
@@ -42,3 +47,5 @@ impl_unwrap_from_artifact!(FuncHead, &'env FuncHead<'env>);
 impl_unwrap_from_artifact!(FuncBody, &'env FuncBody<'env>);
 impl_unwrap_from_artifact!(OptionPath, Option<&'env Path>);
 impl_unwrap_from_artifact!(Evaluated, &'env Evaluated);
+impl_unwrap_from_artifact!(IrType, ir::Type<'env>);
+impl_unwrap_from_artifact!(IrFuncRef, ir::FuncRef<'env>);

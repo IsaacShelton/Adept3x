@@ -1,9 +1,10 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
     execution::{
-        build_ir::LowerFunctionHead,
+        lower::{LowerFunctionBody, LowerFunctionHead},
         resolve::{ResolveFunctionBody, ResolveFunctionHead},
     },
+    ir,
     module_graph::ModuleView,
     repr::{Compiler, FuncBody, FuncHead},
 };
@@ -43,7 +44,12 @@ pub struct ProcessFunction<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    lowering_head: Suspend<'env, ()>,
+    lowering_head: Suspend<'env, ir::FuncRef<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    lowering_body: Suspend<'env, ()>,
 }
 
 impl<'env> ProcessFunction<'env> {
@@ -61,6 +67,7 @@ impl<'env> ProcessFunction<'env> {
             resolving_head: None,
             resolving_body: None,
             lowering_head: None,
+            lowering_body: None,
         }
     }
 }
@@ -98,20 +105,8 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
             return Ok(());
         }
 
-        let Some(_lowered_head) = self.lowering_head else {
-            return suspend!(
-                self.lowering_head,
-                executor.request(LowerFunctionHead::new(
-                    self.view,
-                    &self.compiler,
-                    resolved_head
-                )),
-                ctx
-            );
-        };
-
         // NOTE: We have some extra caching here, although this should probably be standardized
-        let _resolved_body = match self.resolved_body {
+        let resolved_body = match self.resolved_body {
             Some(done) => done,
             None => {
                 let Some(resolved_body) = executor.demand(self.resolving_body) else {
@@ -128,6 +123,37 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                 self.resolved_body = Some(resolved_body);
                 resolved_body
             }
+        };
+
+        // Don't lower generic functions unless specifically requested
+        if self.func.head.is_generic() {
+            return Ok(());
+        }
+
+        let Some(lowered_head) = executor.demand(self.lowering_head) else {
+            return suspend!(
+                self.lowering_head,
+                executor.request(LowerFunctionHead::new(
+                    self.view,
+                    &self.compiler,
+                    resolved_head
+                )),
+                ctx
+            );
+        };
+
+        let Some(_lowered_body) = self.lowering_body else {
+            return suspend!(
+                self.lowering_body,
+                executor.request(LowerFunctionBody::new(
+                    self.view,
+                    &self.compiler,
+                    lowered_head,
+                    resolved_head,
+                    resolved_body
+                )),
+                ctx
+            );
         };
 
         Ok(())

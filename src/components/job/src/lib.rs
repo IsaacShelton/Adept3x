@@ -108,7 +108,6 @@ pub use continuation::*;
 pub use execution::*;
 pub use execution_ctx::*;
 pub use executor::*;
-pub use ir::*;
 pub use main_executor::*;
 pub use pending::*;
 pub use pending_search::*;
