@@ -1,3 +1,4 @@
+/*
 use crate::{
     BuiltinTypes, ExecutionCtx, Resolved, UnaryImplicitCast,
     repr::{TypeKind, UnaliasedType},
@@ -115,3 +116,4 @@ fn from_integer_literal<'env>(
         _ => None,
     }
 }
+*/

@@ -1,4 +1,4 @@
-use crate::{cfg::NodeRef, repr::UnaliasedType};
+use crate::{InstrRef, repr::UnaliasedType};
 
 #[derive(Debug, Clone)]
 pub struct Variables<'env> {
@@ -10,9 +10,9 @@ impl<'env> Variables<'env> {
         self.storage.len()
     }
 
-    pub fn get(&self, node_ref: NodeRef) -> Option<&Variable<'env>> {
+    pub fn get(&self, instr_ref: InstrRef) -> Option<&Variable<'env>> {
         self.storage
-            .binary_search_by(|item| item.declared_at.cmp(&node_ref))
+            .binary_search_by(|item| item.declared_at.cmp(&instr_ref))
             .ok()
             .map(|found| &self.storage[found])
     }
@@ -32,6 +32,6 @@ impl<'env> FromIterator<Variable<'env>> for Variables<'env> {
 
 #[derive(Debug, Clone)]
 pub struct Variable<'env> {
-    pub declared_at: NodeRef,
+    pub declared_at: InstrRef,
     pub ty: UnaliasedType<'env>,
 }

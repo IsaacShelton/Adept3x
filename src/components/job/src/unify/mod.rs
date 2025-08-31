@@ -4,6 +4,7 @@
     ---------------------------------------------------------------------------
 */
 
+/*
 use crate::{
     BuiltinTypes, ExecutionCtx,
     repr::{Type, TypeKind, UnaliasedType},
@@ -327,3 +328,4 @@ fn integer_literals_all_fit<'env>(
         _ => false,
     })
 }
+*/

@@ -78,7 +78,7 @@ pub enum Type {
     Void,
     Union(()),
     Struct(StructRef),
-    AnonymousComposite(TypeComposite),
+    AnonymousComposite(Box<TypeComposite>),
     FuncPtr,
     FixedArray(Box<FixedArray>),
     Vector(Box<Vector>),

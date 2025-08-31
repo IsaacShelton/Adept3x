@@ -1,177 +1,481 @@
-use super::{
-    ConstEval, ConstEvalId, IsValue, Label, Node, NodeCall, NodeFieldInitializer,
-    NodeInterpreterSyscall, NodeKind, NodeRef, NodeStaticMemberCall, NodeStructLiteral,
-    NodeTypeArg, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
-    builder::Builder,
-    connect,
-    cursor::{Cursor, CursorPosition},
+use crate::{
+    Cfg, ExecutionCtx, InstrRef, Label,
+    cfg::{
+        IsValue,
+        builder::{Builder, Cursor},
+        instr::{
+            BreakContinue, CallInstr, EndInstrKind, FieldInitializer, InstrKind,
+            InterpreterSyscallInstr, StructLiteralInstr,
+        },
+    },
 };
-use arena::Arena;
-use ast::{
-    Call, ConformBehavior, Expr, ExprKind, Language, Params, ShortCircuitingBinaryOperator, Stmt,
-    StmtKind, TypeArg,
-};
-use smallvec::smallvec;
+use ast::{ConformBehavior, Language, Params, Stmt};
 use source_files::Source;
 
-pub fn flatten_func_ignore_const_evals(
-    params: &Params,
-    stmts: Vec<Stmt>,
+pub fn flatten_func<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    params: &'env Params,
+    stmts: &'env [Stmt],
     source: Source,
-) -> UntypedCfg {
-    let mut const_evals = Arena::new();
-    flatten_func(params, stmts, &mut const_evals, source)
-}
-
-pub fn flatten_func(
-    params: &Params,
-    stmts: Vec<Stmt>,
-    const_evals: &mut Arena<ConstEvalId, ConstEval>,
-    source: Source,
-) -> UntypedCfg {
-    let stmts = stmts.clone();
-
-    let (mut builder, mut cursor) = Builder::new(const_evals, source);
+) -> Cfg<'env> {
+    let (mut builder, mut cursor) = Builder::<'env>::new();
 
     for (index, param) in params.required.iter().enumerate() {
         let Some(name) = &param.name else {
             continue;
         };
 
-        cursor = builder.push_sequential(
-            cursor,
-            SequentialNodeKind::Parameter(name.clone(), param.ast_type.clone(), index),
-            source,
+        builder.push(
+            &mut cursor,
+            InstrKind::Parameter(
+                name,
+                &param.ast_type,
+                index.try_into().expect("reasonable number of parameters"),
+            )
+            .at(source),
         );
     }
 
-    cursor = flatten_stmts(&mut builder, cursor, stmts, IsValue::NeglectValue);
-    let _ = builder.push_terminating(cursor, TerminatingNode::Return(None), source);
-    builder.finish()
+    flatten_stmts(ctx, &mut builder, &mut cursor, stmts, IsValue::NeglectValue);
+
+    builder.push_end(&mut cursor, EndInstrKind::Return(None).at(source));
+    builder.finish(ctx)
 }
 
-#[must_use]
-pub fn flatten_stmts(
-    builder: &mut Builder,
-    mut cursor: Cursor,
-    stmts: Vec<Stmt>,
+fn flatten_stmts<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    cursor: &mut Cursor,
+    stmts: &'env [Stmt],
     is_value: IsValue,
-) -> Cursor {
+) -> Option<InstrRef> {
+    let mut value = None;
+
     let length = stmts.len();
-    for (i, stmt) in stmts.into_iter().enumerate() {
-        if i + 1 == length {
-            cursor = flatten_stmt(builder, cursor, stmt, is_value);
-        } else {
-            cursor = flatten_stmt(builder, cursor, stmt, IsValue::NeglectValue);
-        }
+    for (i, stmt) in stmts.iter().enumerate() {
+        value = flatten_stmt(
+            ctx,
+            builder,
+            cursor,
+            stmt,
+            if i + 1 == length {
+                is_value
+            } else {
+                IsValue::NeglectValue
+            },
+        );
     }
-    cursor
+
+    value
 }
 
-#[must_use]
-pub fn flatten_stmt(
-    builder: &mut Builder,
-    cursor: Cursor,
-    stmt: Stmt,
+fn flatten_stmt<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    cursor: &mut Cursor,
+    stmt: &'env Stmt,
     is_value: IsValue,
-) -> Cursor {
-    match stmt.kind {
-        StmtKind::Return(expr) => {
-            let cursor = if let Some(expr) = expr {
-                flatten_expr(builder, cursor, expr, IsValue::RequireValue)
-            } else {
-                cursor
-            };
-
-            let value = cursor.value();
-            builder.push_terminating(cursor, TerminatingNode::Return(value), stmt.source)
+) -> Option<InstrRef> {
+    match &stmt.kind {
+        ast::StmtKind::Return(expr) => {
+            let value = expr
+                .as_ref()
+                .map(|expr| flatten_expr(ctx, builder, cursor, expr, IsValue::RequireValue));
+            builder.push_end(cursor, EndInstrKind::Return(value).at(stmt.source));
+            None
         }
-        StmtKind::Expr(expr) => flatten_expr(builder, cursor, expr, is_value),
-        StmtKind::Declaration(declaration) => {
-            let cursor = if let Some(value) = declaration.initial_value {
-                flatten_expr(builder, cursor, value, IsValue::RequireValue)
-            } else {
-                cursor
-            };
+        ast::StmtKind::Expr(expr) => Some(flatten_expr(ctx, builder, cursor, expr, is_value)),
+        ast::StmtKind::Declaration(declaration) => {
+            let initial_value = declaration.initial_value.as_ref().map(|initial_value| {
+                flatten_expr(ctx, builder, cursor, initial_value, IsValue::RequireValue)
+            });
 
-            let value = cursor.value();
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::Declare(declaration.name, declaration.ast_type, value),
-                stmt.source,
+            Some(
+                builder.push(
+                    cursor,
+                    InstrKind::Declare(&declaration.name, &declaration.ast_type, initial_value)
+                        .at(stmt.source),
+                ),
             )
         }
-        StmtKind::Assignment(assignment) => {
-            let cursor = flatten_expr(builder, cursor, assignment.value, IsValue::RequireValue);
-            let left = cursor.value();
-
-            let cursor = flatten_expr(
+        ast::StmtKind::Assignment(assignment) => {
+            let left = flatten_expr(
+                ctx,
                 builder,
                 cursor,
-                assignment.destination,
+                &assignment.value,
                 IsValue::RequireValue,
             );
-            let right = cursor.value();
 
-            if let Some((left, right)) = left.zip(right) {
-                builder.push_sequential(
-                    cursor,
-                    SequentialNodeKind::Assign(left, right),
-                    stmt.source,
-                )
-            } else {
-                cursor
-            }
+            let right = flatten_expr(
+                ctx,
+                builder,
+                cursor,
+                &assignment.destination,
+                IsValue::RequireValue,
+            );
+
+            builder.push(cursor, InstrKind::Assign(left, right).at(stmt.source));
+            None
         }
-        StmtKind::Label(name) => {
-            let incoming = smallvec![];
+        ast::StmtKind::Label(name) => {
+            builder.push_jump_to_new_block(cursor, stmt.source);
 
-            let new_node_ref = builder.nodes.alloc(Node {
-                kind: NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::JoinN(incoming, None),
-                    next: None,
-                }),
-                source: stmt.source,
-            });
-
-            if let Some(position) = cursor.position {
-                connect(&mut builder.nodes, position, new_node_ref);
-            }
-
-            let position = CursorPosition::new(new_node_ref, 0);
-            builder.labels.push(Label {
+            builder.add_label(Label::new(
                 name,
-                node_ref: position.from,
-                source: stmt.source,
-            });
-            Cursor::from(position)
+                cursor.basicblock().into_raw(),
+                stmt.source,
+            ));
+            None
         }
-        StmtKind::Goto(label_name) => builder.push_sequential(
-            cursor,
-            SequentialNodeKind::DirectGoto(label_name),
-            stmt.source,
-        ),
+        ast::StmtKind::Goto(label_name) => {
+            builder.push_end(
+                cursor,
+                EndInstrKind::IncompleteGoto(label_name).at(stmt.source),
+            );
+            None
+        }
     }
 }
 
-#[must_use]
-pub fn flatten_condition(
-    builder: &mut Builder,
-    mut cursor: Cursor,
-    expr: Expr,
+fn flatten_expr<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    cursor: &mut Cursor,
+    expr: &'env ast::Expr,
+    is_value: IsValue,
+) -> InstrRef {
+    match &expr.kind {
+        ast::ExprKind::Variable(name) => {
+            let name = name
+                .as_plain_str()
+                .expect("only plain names can be used with new cfg");
+            builder.push(cursor, InstrKind::Name(name).at(expr.source))
+        }
+        ast::ExprKind::Boolean(value) => {
+            builder.push(cursor, InstrKind::BooleanLiteral(*value).at(expr.source))
+        }
+        ast::ExprKind::Integer(integer) => {
+            builder.push(cursor, InstrKind::IntegerLiteral(integer).at(expr.source))
+        }
+        ast::ExprKind::Float(float) => {
+            builder.push(cursor, InstrKind::FloatLiteral(*float).at(expr.source))
+        }
+        ast::ExprKind::Char(char) => {
+            builder.push(cursor, InstrKind::Utf8CharLiteral(char).at(expr.source))
+        }
+        ast::ExprKind::String(string) => {
+            builder.push(cursor, InstrKind::StringLiteral(string).at(expr.source))
+        }
+        ast::ExprKind::NullTerminatedString(cstring) => builder.push(
+            cursor,
+            InstrKind::NullTerminatedStringLiteral(cstring).at(expr.source),
+        ),
+        ast::ExprKind::CharLiteral(ascii_char) => builder.push(
+            cursor,
+            InstrKind::AsciiCharLiteral(*ascii_char).at(expr.source),
+        ),
+        ast::ExprKind::Null => builder.push(cursor, InstrKind::NullLiteral.at(expr.source)),
+        ast::ExprKind::Call(call) => {
+            let name = call
+                .name
+                .as_plain_str()
+                .expect("only plain names can be used for new cfg system");
+
+            let args = ctx.alloc_slice_fill_iter(
+                call.args
+                    .iter()
+                    .map(|arg| flatten_expr(ctx, builder, cursor, arg, IsValue::RequireValue)),
+            );
+
+            let generics = ctx.alloc_slice_fill_iter(call.generics.iter().map(|generic_arg| {
+                match generic_arg {
+                    ast::TypeArg::Type(ty) => ty,
+                    ast::TypeArg::Expr(_) => todo!("expressions not supported for generics for function calls in new system yet"),
+                }
+            }));
+
+            builder.push(
+                cursor,
+                InstrKind::Call(ctx.alloc(CallInstr {
+                    name,
+                    args,
+                    expected_to_return: call.expected_to_return.as_ref(),
+                    generics,
+                }))
+                .at(expr.source),
+            )
+        }
+        ast::ExprKind::DeclareAssign(declare_assign) => {
+            let value = flatten_expr(
+                ctx,
+                builder,
+                cursor,
+                &declare_assign.value,
+                IsValue::RequireValue,
+            );
+            builder.push(
+                cursor,
+                InstrKind::DeclareAssign(&declare_assign.name, value).at(expr.source),
+            )
+        }
+        ast::ExprKind::BasicBinaryOperation(bin_op) => {
+            let left = flatten_expr(ctx, builder, cursor, &bin_op.left, IsValue::RequireValue);
+            let right = flatten_expr(ctx, builder, cursor, &bin_op.right, IsValue::RequireValue);
+
+            builder.push(
+                cursor,
+                InstrKind::BinOp(left, bin_op.operator, right, bin_op.language).at(expr.source),
+            )
+        }
+        ast::ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
+            let right_source = bin_op.right.source;
+
+            let (mut when_true, mut when_false) = flatten_condition(
+                ctx,
+                builder,
+                cursor,
+                &bin_op.left,
+                bin_op.conform_behavior.language(),
+                Some(bin_op.conform_behavior),
+            );
+
+            let when_more_calc = match bin_op.operator {
+                ast::ShortCircuitingBinaryOperator::And => when_true.cursor(),
+                ast::ShortCircuitingBinaryOperator::Or => when_false.cursor(),
+            };
+
+            // NOTE: For C, the pre-conforming value should be the result, but we don't do that yet
+            let right_unconformed = flatten_expr(
+                ctx,
+                builder,
+                when_more_calc,
+                &bin_op.right,
+                IsValue::RequireValue,
+            );
+
+            builder.push(
+                when_more_calc,
+                InstrKind::ConformToBool(right_unconformed, bin_op.conform_behavior.language())
+                    .at(right_source),
+            );
+
+            new_basicblock_joining(
+                ctx,
+                builder,
+                [when_true, when_false].into_iter(),
+                Some(bin_op.conform_behavior),
+                expr.source,
+            )
+            .instr
+            .unwrap_or_else(|| builder.push(cursor, InstrKind::VoidLiteral.at(expr.source)))
+        }
+        ast::ExprKind::Member(subject, member, privacy) => {
+            let subject = flatten_expr(ctx, builder, cursor, subject, IsValue::RequireValue);
+
+            builder.push(
+                cursor,
+                InstrKind::Member(subject, member, *privacy).at(expr.source),
+            )
+        }
+        ast::ExprKind::ArrayAccess(array_access) => {
+            let subject = flatten_expr(
+                ctx,
+                builder,
+                cursor,
+                &array_access.subject,
+                IsValue::RequireValue,
+            );
+
+            let index = flatten_expr(
+                ctx,
+                builder,
+                cursor,
+                &array_access.index,
+                IsValue::RequireValue,
+            );
+
+            builder.push(
+                cursor,
+                InstrKind::ArrayAccess(subject, index).at(expr.source),
+            )
+        }
+        ast::ExprKind::StructLiteral(struct_literal) => {
+            let fields =
+                ctx.alloc_slice_fill_iter(struct_literal.fields.iter().map(|x| FieldInitializer {
+                    name: x.name.as_ref().map(|name| name.as_str()),
+                    value: flatten_expr(ctx, builder, cursor, &x.value, IsValue::RequireValue),
+                }));
+
+            let literal = ctx.alloc(StructLiteralInstr {
+                ast_type: &struct_literal.ast_type,
+                fields,
+                fill_behavior: struct_literal.fill_behavior,
+                language: struct_literal.language,
+            });
+
+            builder.push(cursor, InstrKind::StructLiteral(literal).at(expr.source))
+        }
+        ast::ExprKind::UnaryOperation(unary_op) => {
+            let inner = flatten_expr(ctx, builder, cursor, &unary_op.inner, IsValue::RequireValue);
+
+            builder.push(
+                cursor,
+                InstrKind::UnaryOperation(unary_op.operator, inner).at(expr.source),
+            )
+        }
+        ast::ExprKind::Conditional(conditional) => {
+            let (in_scope, close_scope) = builder.push_scope(cursor, expr.source);
+            *cursor = in_scope;
+
+            let mut incoming = vec![];
+
+            let no_result = match is_value {
+                IsValue::RequireValue => None,
+                IsValue::NeglectValue => {
+                    Some(builder.push(cursor, InstrKind::VoidLiteral.at(expr.source)))
+                }
+            };
+
+            for (condition, block) in conditional.conditions.iter() {
+                let (mut when_true, when_false) = flatten_condition(
+                    ctx,
+                    builder,
+                    cursor,
+                    condition,
+                    conditional.conform_behavior.language(),
+                    Some(conditional.conform_behavior),
+                );
+
+                let when_true_value =
+                    flatten_stmts(ctx, builder, when_true.cursor(), &block.stmts, is_value);
+                let value = no_result.or(when_true_value);
+
+                incoming.push(Joined::new(when_true.cursor, value));
+                *cursor = when_false.cursor;
+            }
+
+            if let Some(otherwise) = &conditional.otherwise {
+                let value = flatten_stmts(ctx, builder, cursor, &otherwise.stmts, is_value);
+                incoming.push(Joined::new(std::mem::replace(cursor, close_scope), value));
+            } else {
+                builder.push(cursor, InstrKind::VoidLiteral.at(expr.source));
+                incoming.push(Joined::new(
+                    std::mem::replace(cursor, close_scope),
+                    no_result,
+                ));
+            }
+
+            let phi = existing_basicblock_joining(
+                ctx,
+                builder,
+                cursor,
+                incoming.into_iter(),
+                Some(conditional.conform_behavior),
+                expr.source,
+            );
+            phi
+        }
+        ast::ExprKind::While(while_loop) => {
+            let void = builder.push(cursor, InstrKind::VoidLiteral.at(expr.source));
+
+            builder.push_jump_to_new_block(cursor, expr.source);
+
+            let condition_bb = cursor.basicblock().into_raw();
+            let condition = flatten_expr(
+                ctx,
+                builder,
+                cursor,
+                &while_loop.condition,
+                IsValue::RequireValue,
+            );
+
+            let (mut when_true, when_false) = builder.push_branch(
+                condition,
+                cursor,
+                Some(BreakContinue::positive()),
+                expr.source,
+            );
+
+            flatten_stmts(
+                ctx,
+                builder,
+                &mut when_true,
+                &while_loop.block.stmts,
+                IsValue::NeglectValue,
+            );
+
+            builder.push_end(
+                &mut when_true,
+                EndInstrKind::Jump(condition_bb).at(expr.source),
+            );
+
+            *cursor = when_false;
+            void
+        }
+        ast::ExprKind::StaticMemberValue(_) => todo!(),
+        ast::ExprKind::StaticMemberCall(_) => todo!(),
+        ast::ExprKind::SizeOf(ty, mode) => {
+            builder.push(cursor, InstrKind::SizeOf(ty, *mode).at(expr.source))
+        }
+        ast::ExprKind::SizeOfValue(of_value, mode) => {
+            let value = flatten_expr(ctx, builder, cursor, of_value, IsValue::RequireValue);
+            builder.push(cursor, InstrKind::SizeOfValue(value, *mode).at(expr.source))
+        }
+        ast::ExprKind::InterpreterSyscall(syscall) => {
+            let args = ctx.alloc_slice_fill_iter(syscall.args.iter().map(|(ty, arg)| {
+                (
+                    ty,
+                    flatten_expr(ctx, builder, cursor, arg, IsValue::RequireValue),
+                )
+            }));
+
+            builder.push(
+                cursor,
+                InstrKind::InterpreterSyscall(ctx.alloc(InterpreterSyscallInstr {
+                    kind: syscall.kind,
+                    args,
+                    result_type: &syscall.result_type,
+                }))
+                .at(expr.source),
+            )
+        }
+        ast::ExprKind::Break => {
+            builder.push_end(cursor, EndInstrKind::IncompleteBreak.at(expr.source))
+        }
+        ast::ExprKind::Continue => {
+            builder.push_end(cursor, EndInstrKind::IncompleteContinue.at(expr.source))
+        }
+        ast::ExprKind::IntegerPromote(value) => {
+            let value = flatten_expr(ctx, builder, cursor, value, IsValue::RequireValue);
+            builder.push(cursor, InstrKind::IntegerPromote(value).at(expr.source))
+        }
+        ast::ExprKind::StaticAssert(..) => todo!(),
+        ast::ExprKind::Is(value, variant) => {
+            let value = flatten_expr(ctx, builder, cursor, &value, IsValue::RequireValue);
+            builder.push(cursor, InstrKind::Is(value, &variant).at(expr.source))
+        }
+        ast::ExprKind::LabelLiteral(label_name) => {
+            builder.push(cursor, InstrKind::LabelLiteral(label_name).at(expr.source))
+        }
+    }
+}
+
+fn flatten_condition<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    cursor: &mut Cursor,
+    expr: &'env ast::Expr,
     language: Language,
     conform_behavior: Option<ConformBehavior>,
-) -> (Cursor, Cursor) {
+) -> (Joined, Joined) {
     let source = expr.source;
+    let void = builder.push(cursor, InstrKind::VoidLiteral.at(source));
+
     let mut when_true = vec![];
     let mut when_false = vec![];
-
-    cursor = builder.push_sequential(cursor, SequentialNodeKind::Void, source);
-    let Some(void) = cursor.value() else {
-        return (Cursor::terminated(), Cursor::terminated());
-    };
-
     flatten_condition_inner(
+        ctx,
         builder,
         cursor,
         expr,
@@ -181,527 +485,146 @@ pub fn flatten_condition(
         void,
     );
 
-    let when_true = builder.push_join_n(when_true, conform_behavior, source);
-    let when_false = builder.push_join_n(when_false, conform_behavior, source);
+    let when_true = new_basicblock_joining(
+        ctx,
+        builder,
+        when_true.into_iter(),
+        conform_behavior,
+        source,
+    );
+    let when_false = new_basicblock_joining(
+        ctx,
+        builder,
+        when_false.into_iter(),
+        conform_behavior,
+        source,
+    );
     (when_true, when_false)
 }
 
-pub fn flatten_condition_inner(
-    builder: &mut Builder,
-    mut cursor: Cursor,
-    expr: Expr,
+struct Joined {
+    cursor: Cursor,
+    instr: Option<InstrRef>,
+}
+
+impl Joined {
+    pub fn new(cursor: Cursor, instr: Option<InstrRef>) -> Self {
+        Self { cursor, instr }
+    }
+
+    pub fn cursor(&mut self) -> &mut Cursor {
+        &mut self.cursor
+    }
+}
+
+/// Creates a new basicblock that joins multiple basicblocks together using
+/// jumps and a PHI node.
+fn new_basicblock_joining<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    mut incoming: impl ExactSizeIterator<Item = Joined>,
+    conform_behavior: Option<ConformBehavior>,
+    source: Source,
+) -> Joined {
+    if incoming.len() == 1 {
+        return incoming.next().unwrap();
+    }
+
+    let mut joined_bb = builder.new_block();
+
+    Joined {
+        instr: Some(existing_basicblock_joining(
+            ctx,
+            builder,
+            &mut joined_bb,
+            incoming,
+            conform_behavior,
+            source,
+        )),
+        cursor: joined_bb,
+    }
+}
+
+fn existing_basicblock_joining<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    joined_bb: &mut Cursor,
+    incoming: impl IntoIterator<Item = Joined>,
+    conform_behavior: Option<ConformBehavior>,
+    source: Source,
+) -> InstrRef {
+    let mut values = Vec::new();
+
+    for mut joined in incoming {
+        if builder.has_end(&joined.cursor) {
+            continue;
+        }
+
+        values.push((joined.cursor().basicblock().into_raw(), joined.instr));
+        builder.push_end(
+            joined.cursor(),
+            EndInstrKind::Jump(joined_bb.basicblock().into_raw()).at(source),
+        );
+    }
+
+    let joined_value = builder.push(
+        joined_bb,
+        InstrKind::Phi(
+            ctx.alloc_slice_fill_iter(values.into_iter()),
+            conform_behavior,
+        )
+        .at(source),
+    );
+
+    joined_value
+}
+
+fn flatten_condition_inner<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    builder: &mut Builder<'env>,
+    cursor: &mut Cursor,
+    expr: &'env ast::Expr,
     language: Language,
-    join_when_true: &mut Vec<(Cursor, Option<NodeRef>)>,
-    join_when_false: &mut Vec<(Cursor, Option<NodeRef>)>,
-    void: NodeRef,
+    join_when_true: &mut Vec<Joined>,
+    join_when_false: &mut Vec<Joined>,
+    void: InstrRef,
 ) {
     let source = expr.source;
 
-    match expr.kind {
-        ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
+    match &expr.kind {
+        ast::ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
             let mut more_to_compute = Vec::new();
 
             match bin_op.operator {
-                ShortCircuitingBinaryOperator::And => flatten_condition_inner(
+                ast::ShortCircuitingBinaryOperator::And => flatten_condition_inner(
+                    ctx,
                     builder,
                     cursor,
-                    bin_op.left,
+                    &bin_op.left,
                     bin_op.conform_behavior.language(),
                     &mut more_to_compute,
                     join_when_false,
                     void,
                 ),
-                ShortCircuitingBinaryOperator::Or => flatten_condition_inner(
+                ast::ShortCircuitingBinaryOperator::Or => flatten_condition_inner(
+                    ctx,
                     builder,
                     cursor,
-                    bin_op.left,
+                    &bin_op.left,
                     bin_op.conform_behavior.language(),
                     join_when_true,
                     &mut more_to_compute,
                     void,
                 ),
-            };
-
-            cursor = builder.push_join_n(more_to_compute, Some(bin_op.conform_behavior), source);
-
-            flatten_condition_inner(
-                builder,
-                cursor,
-                bin_op.right,
-                bin_op.conform_behavior.language(),
-                join_when_true,
-                join_when_false,
-                void,
-            );
+            }
         }
         _ => {
-            cursor = flatten_expr(builder, cursor, expr, IsValue::RequireValue);
-
-            let Some(value) = cursor.value() else {
-                return;
-            };
-
-            cursor = builder.push_sequential(
-                cursor,
-                SequentialNodeKind::ConformToBool(value, language),
-                source,
-            );
-
-            let Some(value) = cursor.value() else {
-                return;
-            };
-
-            let (when_true, when_false) = builder.push_branch(cursor, value, source);
-            join_when_true.push((when_true, Some(void)));
-            join_when_false.push((when_false, Some(void)));
+            let value = flatten_expr(ctx, builder, cursor, expr, IsValue::RequireValue);
+            let condition =
+                builder.push(cursor, InstrKind::ConformToBool(value, language).at(source));
+            let (when_true, when_false) = builder.push_branch(condition, cursor, None, source);
+            join_when_true.push(Joined::new(when_true, Some(void.clone())));
+            join_when_false.push(Joined::new(when_false, Some(void)));
         }
     }
-}
-
-#[must_use]
-pub fn flatten_expr(
-    builder: &mut Builder,
-    mut cursor: Cursor,
-    expr: Expr,
-    is_value: IsValue,
-) -> Cursor {
-    match expr.kind {
-        ExprKind::Variable(name) => {
-            builder.push_sequential(cursor, SequentialNodeKind::Name(name), expr.source)
-        }
-        ExprKind::Boolean(value) => {
-            builder.push_sequential(cursor, SequentialNodeKind::Boolean(value), expr.source)
-        }
-        ExprKind::Integer(integer) => {
-            builder.push_sequential(cursor, SequentialNodeKind::Integer(integer), expr.source)
-        }
-        ExprKind::Float(float) => {
-            builder.push_sequential(cursor, SequentialNodeKind::Float(float), expr.source)
-        }
-        ExprKind::Char(char) => {
-            builder.push_sequential(cursor, SequentialNodeKind::Utf8Char(char), expr.source)
-        }
-        ExprKind::String(string) => {
-            builder.push_sequential(cursor, SequentialNodeKind::String(string), expr.source)
-        }
-        ExprKind::NullTerminatedString(cstring) => builder.push_sequential(
-            cursor,
-            SequentialNodeKind::NullTerminatedString(cstring),
-            expr.source,
-        ),
-        ExprKind::CharLiteral(ascii_char) => builder.push_sequential(
-            cursor,
-            SequentialNodeKind::AsciiChar(ascii_char),
-            expr.source,
-        ),
-        ExprKind::Null => builder.push_sequential(cursor, SequentialNodeKind::Null, expr.source),
-        ExprKind::Call(call) => {
-            let (cursor, call) = match flatten_call(builder, cursor, *call) {
-                Ok(values) => values,
-                Err(cursor) => return cursor,
-            };
-
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::Call(Box::new(call)),
-                expr.source,
-            )
-        }
-        ExprKind::DeclareAssign(declare_assign) => {
-            let cursor = flatten_expr(builder, cursor, declare_assign.value, IsValue::RequireValue);
-            if let Some(value) = cursor.value() {
-                builder.push_sequential(
-                    cursor,
-                    SequentialNodeKind::DeclareAssign(declare_assign.name, value),
-                    expr.source,
-                )
-            } else {
-                cursor
-            }
-        }
-        ExprKind::BasicBinaryOperation(bin_op) => {
-            cursor = flatten_expr(builder, cursor, bin_op.left, IsValue::RequireValue);
-            let left = cursor.value();
-            cursor = flatten_expr(builder, cursor, bin_op.right, IsValue::RequireValue);
-            let right = cursor.value();
-
-            if let Some((left, right)) = left.zip(right) {
-                builder.push_sequential(
-                    cursor,
-                    SequentialNodeKind::BinOp(left, bin_op.operator, right, bin_op.language),
-                    expr.source,
-                )
-            } else {
-                cursor
-            }
-        }
-        ExprKind::ShortCircuitingBinaryOperation(bin_op) => {
-            let right_source = bin_op.right.source;
-
-            let (mut when_true, mut when_false) = flatten_condition(
-                builder,
-                cursor,
-                bin_op.left,
-                bin_op.conform_behavior.language(),
-                Some(bin_op.conform_behavior),
-            );
-
-            let when_more_calc = match bin_op.operator {
-                ShortCircuitingBinaryOperator::And => &mut when_true,
-                ShortCircuitingBinaryOperator::Or => &mut when_false,
-            };
-
-            // NOTE: For C, the pre-conforming value should be the result, but we don't do that yet
-            *when_more_calc = flatten_expr(
-                builder,
-                *when_more_calc,
-                bin_op.right,
-                IsValue::RequireValue,
-            );
-
-            if let Some(inner) = when_more_calc.value() {
-                *when_more_calc = builder.push_sequential(
-                    *when_more_calc,
-                    SequentialNodeKind::ConformToBool(inner, bin_op.conform_behavior.language()),
-                    right_source,
-                );
-            }
-
-            builder.push_join(
-                when_true,
-                when_true.value(),
-                when_false,
-                when_false.value(),
-                Some(bin_op.conform_behavior),
-                expr.source,
-            )
-        }
-        ExprKind::Member(subject, member, privacy) => {
-            cursor = flatten_expr(builder, cursor, *subject, IsValue::RequireValue);
-            let subject = cursor.value();
-
-            if let Some(subject) = subject {
-                builder.push_sequential(
-                    cursor,
-                    SequentialNodeKind::Member(subject, member, privacy),
-                    expr.source,
-                )
-            } else {
-                cursor
-            }
-        }
-        ExprKind::ArrayAccess(array_access) => {
-            cursor = flatten_expr(builder, cursor, array_access.subject, IsValue::RequireValue);
-            let subject = cursor.value();
-
-            cursor = flatten_expr(builder, cursor, array_access.index, IsValue::RequireValue);
-            let index = cursor.value();
-
-            if let Some((subject, index)) = subject.zip(index) {
-                builder.push_sequential(
-                    cursor,
-                    SequentialNodeKind::ArrayAccess(subject, index),
-                    expr.source,
-                )
-            } else {
-                cursor
-            }
-        }
-        ExprKind::StructLiteral(struct_literal) => {
-            let mut fields = Vec::with_capacity(struct_literal.fields.len());
-
-            for field in struct_literal.fields {
-                cursor = flatten_expr(builder, cursor, field.value, IsValue::RequireValue);
-
-                let Some(value) = cursor.value() else {
-                    return Cursor::terminated();
-                };
-
-                fields.push(NodeFieldInitializer {
-                    name: field.name,
-                    value,
-                });
-            }
-
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::StructLiteral(Box::new(NodeStructLiteral {
-                    ast_type: struct_literal.ast_type,
-                    fields,
-                    fill_behavior: struct_literal.fill_behavior,
-                    language: struct_literal.language,
-                })),
-                expr.source,
-            )
-        }
-        ExprKind::UnaryOperation(unary_operation) => {
-            cursor = flatten_expr(
-                builder,
-                cursor,
-                unary_operation.inner,
-                IsValue::RequireValue,
-            );
-            let inner = cursor.value();
-
-            if let Some(inner) = inner {
-                builder.push_sequential(
-                    cursor,
-                    SequentialNodeKind::UnaryOperation(unary_operation.operator, inner),
-                    expr.source,
-                )
-            } else {
-                cursor
-            }
-        }
-        ExprKind::Conditional(conditional) => {
-            let mut incoming = vec![];
-
-            // Create a fake code path to enforce branch scoping.
-            // This greatly reduces the cognitive burden of finding where
-            // variables are declared.
-            // (as otherwise you have to be able to mentally calculate which branches diverge)
-            // See the below example:
-            // -----------------
-            // x := c"Hello"
-            // if random() { return } else { x := 10 }
-            // print(x)
-            // -----------------
-            // Without this artifical code path, `x` would be overridden to 10.
-            // This means that the type of x hinges on whether all other branches diverge,
-            // which can cause unexpected behavior when refactoring.
-            // In this case, we recommend moving the exclusive code path after the
-            // conditional to make this dependency clearer to the reader.
-            // See `&&` for a conditional which doesn't have this behavior.
-            let (mut cursor, close_cursor) = builder.push_scope(cursor, expr.source);
-            let Some(never) = close_cursor.value() else {
-                return cursor;
-            };
-            incoming.push((close_cursor, Some(never)));
-
-            let no_result = match is_value {
-                IsValue::RequireValue => None,
-                IsValue::NeglectValue => {
-                    cursor = builder.push_sequential(cursor, SequentialNodeKind::Void, expr.source);
-                    let Some(value) = cursor.value() else {
-                        return cursor;
-                    };
-                    Some(value)
-                }
-            };
-
-            for (condition, block) in conditional.conditions {
-                // Open scope before evaluating condition
-                let (mut when_true, when_false) = flatten_condition(
-                    builder,
-                    cursor,
-                    condition,
-                    conditional.conform_behavior.language(),
-                    Some(conditional.conform_behavior),
-                );
-
-                when_true = flatten_stmts(builder, when_true, block.stmts, is_value);
-                let value = no_result.or_else(|| when_true.value());
-
-                incoming.push((when_true.clone(), value));
-                cursor = when_false;
-            }
-
-            if let Some(otherwise) = conditional.otherwise {
-                cursor = flatten_stmts(builder, cursor, otherwise.stmts, is_value);
-                let value = no_result.or_else(|| cursor.value());
-                incoming.push((cursor, value));
-            } else {
-                let no_result = if let Some(no_result) = no_result {
-                    Some(no_result)
-                } else {
-                    cursor = builder.push_sequential(cursor, SequentialNodeKind::Void, expr.source);
-                    cursor.value()
-                };
-
-                incoming.push((cursor.clone(), no_result));
-            }
-
-            builder.push_join_n(incoming, Some(conditional.conform_behavior), expr.source)
-        }
-        ExprKind::While(while_loop) => {
-            cursor = builder.push_sequential(cursor, SequentialNodeKind::Void, expr.source);
-
-            let Some(void_result) = cursor.value() else {
-                return cursor;
-            };
-
-            let Some(start_position) = cursor.position else {
-                return cursor;
-            };
-
-            let repeat_node_ref = builder.nodes.alloc(Node {
-                kind: NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::JoinN(smallvec![(start_position, void_result)], None),
-                    next: None,
-                }),
-                source: expr.source,
-            });
-
-            connect(&mut builder.nodes, start_position, repeat_node_ref);
-            cursor = CursorPosition::new(repeat_node_ref, 0).into();
-
-            cursor = flatten_expr(builder, cursor, while_loop.condition, IsValue::RequireValue);
-            let Some(condition) = cursor.value() else {
-                return cursor;
-            };
-
-            let (mut when_true, when_false) = builder.push_branch(cursor, condition, expr.source);
-
-            when_true = flatten_stmts(
-                builder,
-                when_true,
-                while_loop.block.stmts,
-                IsValue::NeglectValue,
-            );
-
-            if let Some(end_position) = when_true.position {
-                connect(&mut builder.nodes, end_position, repeat_node_ref);
-                match &mut builder.nodes[repeat_node_ref].kind {
-                    NodeKind::Sequential(sequential_node) => match &mut sequential_node.kind {
-                        SequentialNodeKind::JoinN(items, _) => {
-                            items.push((end_position, void_result));
-                        }
-                        _ => unreachable!(),
-                    },
-                    _ => unreachable!(),
-                }
-            }
-
-            when_false
-        }
-        ExprKind::StaticMemberValue(static_member_value) => builder.push_sequential(
-            cursor,
-            SequentialNodeKind::StaticMemberValue(static_member_value),
-            expr.source,
-        ),
-        ExprKind::StaticMemberCall(static_member_call) => {
-            let (cursor, call) = match flatten_call(builder, cursor, static_member_call.call) {
-                Ok(values) => values,
-                Err(cursor) => return cursor,
-            };
-
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::StaticMemberCall(Box::new(NodeStaticMemberCall {
-                    subject: static_member_call.subject,
-                    call,
-                    call_source: static_member_call.call_source,
-                    source: static_member_call.source,
-                })),
-                static_member_call.source,
-            )
-        }
-        ExprKind::SizeOf(ty, mode) => {
-            builder.push_sequential(cursor, SequentialNodeKind::SizeOf(*ty, mode), expr.source)
-        }
-        ExprKind::SizeOfValue(of_value, mode) => {
-            cursor = flatten_expr(builder, cursor, *of_value, IsValue::RequireValue);
-            let Some(value) = cursor.value() else {
-                return cursor;
-            };
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::SizeOfValue(value, mode),
-                expr.source,
-            )
-        }
-        ExprKind::InterpreterSyscall(syscall) => {
-            let mut args = Vec::with_capacity(syscall.args.len());
-            for (arg_type, arg) in syscall.args {
-                cursor = flatten_expr(builder, cursor, arg, IsValue::RequireValue);
-
-                let Some(value) = cursor.value() else {
-                    return cursor;
-                };
-
-                args.push((arg_type, value));
-            }
-
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::InterpreterSyscall(NodeInterpreterSyscall {
-                    kind: syscall.kind,
-                    args,
-                    result_type: syscall.result_type,
-                }),
-                expr.source,
-            )
-        }
-        ExprKind::Break => builder.push_terminating(cursor, TerminatingNode::Break, expr.source),
-        ExprKind::Continue => {
-            builder.push_terminating(cursor, TerminatingNode::Continue, expr.source)
-        }
-        ExprKind::IntegerPromote(value) => {
-            cursor = flatten_expr(builder, cursor, *value, IsValue::RequireValue);
-            let Some(value) = cursor.value() else {
-                return cursor;
-            };
-
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::IntegerPromote(value),
-                expr.source,
-            )
-        }
-        ExprKind::StaticAssert(value, message) => {
-            let condition = builder.const_eval(*value);
-            builder.push_sequential(
-                cursor,
-                SequentialNodeKind::StaticAssert(condition, message),
-                expr.source,
-            )
-        }
-        ExprKind::Is(value, variant) => {
-            cursor = flatten_expr(builder, cursor, *value, IsValue::RequireValue);
-            let Some(value) = cursor.value() else {
-                return cursor;
-            };
-
-            builder.push_sequential(cursor, SequentialNodeKind::Is(value, variant), expr.source)
-        }
-        ExprKind::LabelLiteral(name) => {
-            builder.push_sequential(cursor, SequentialNodeKind::LabelLiteral(name), expr.source)
-        }
-    }
-}
-
-fn flatten_call(
-    builder: &mut Builder,
-    mut cursor: Cursor,
-    call: Call,
-) -> Result<(Cursor, NodeCall), Cursor> {
-    let mut args = Vec::with_capacity(call.args.len());
-    for arg in call.args {
-        cursor = flatten_expr(builder, cursor, arg, IsValue::RequireValue);
-
-        if let Some(value) = cursor.value() {
-            args.push(value);
-        } else {
-            return Err(cursor);
-        }
-    }
-
-    let mut generics = Vec::with_capacity(call.generics.len());
-    for type_arg in call.generics {
-        generics.push(match type_arg {
-            TypeArg::Type(ty) => NodeTypeArg::Type(ty),
-            TypeArg::Expr(expr) => NodeTypeArg::Expr(builder.const_eval(expr)),
-        });
-    }
-
-    Ok((
-        cursor,
-        NodeCall {
-            name: call.name,
-            args,
-            expected_to_return: call.expected_to_return,
-            generics,
-            using: call.using,
-        },
-    ))
 }

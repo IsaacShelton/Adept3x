@@ -1,44 +1,6 @@
-use super::Resolved;
-use crate::{
-    cfg::{NodeId, NodeRef},
-    repr::{Type, TypeKind, UnaliasedType},
-};
-use arena::ArenaMap;
+use crate::repr::{Type, TypeKind, UnaliasedType};
 use primitives::{FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
-
-#[derive(Clone, Debug)]
-pub struct Value<'env> {
-    pub node_ref: NodeRef,
-    pub cast_to: Cast<'env>,
-}
-
-impl<'env> Value<'env> {
-    pub fn new(node_ref: NodeRef) -> Self {
-        Self {
-            node_ref,
-            cast_to: Cast::Identity,
-        }
-    }
-
-    pub fn new_with(node_ref: NodeRef, cast_to: Cast<'env>) -> Self {
-        Self { node_ref, cast_to }
-    }
-
-    pub fn reinterpret(node_ref: NodeRef, to: UnaliasedType<'env>) -> Self {
-        Self {
-            node_ref,
-            cast_to: Cast::Reinterpret(to),
-        }
-    }
-
-    pub fn builtin_cast(node_ref: NodeRef, to: UnaliasedType<'env>) -> Self {
-        Self {
-            node_ref,
-            cast_to: Cast::BuiltinCast(to),
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct BuiltinTypes<'env> {
@@ -116,28 +78,4 @@ impl<'env> BuiltinTypes<'env> {
     pub fn never(&'env self) -> UnaliasedType<'env> {
         UnaliasedType(&self.never)
     }
-}
-
-impl<'env> Value<'env> {
-    pub fn ty(
-        &self,
-        types: &ArenaMap<NodeId, Resolved<'env>>,
-        builtin_types: &'env BuiltinTypes<'env>,
-    ) -> UnaliasedType<'env> {
-        match &self.cast_to {
-            Cast::Identity => types
-                .get(self.node_ref.into_raw())
-                .map(|x| x.ty)
-                .unwrap_or(builtin_types.never()),
-            Cast::Reinterpret(inner) => *inner,
-            Cast::BuiltinCast(inner) => *inner,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum Cast<'env> {
-    Identity,
-    Reinterpret(UnaliasedType<'env>),
-    BuiltinCast(UnaliasedType<'env>),
 }

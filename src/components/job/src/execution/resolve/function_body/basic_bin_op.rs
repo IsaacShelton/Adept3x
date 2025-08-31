@@ -1,3 +1,4 @@
+/*
 use crate::{
     BasicBinaryOperator, ExecutionCtx, Resolved,
     repr::{TypeKind, UnaliasedType},
@@ -215,3 +216,4 @@ fn float_or_integer_from_type<'env>(
         _ => None,
     }
 }
+*/

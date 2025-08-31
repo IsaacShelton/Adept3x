@@ -2,10 +2,11 @@ mod field;
 mod instr;
 mod value;
 
-use crate::ir::{field::Field, instr::Instr};
+use crate::ir::field::Field;
 use arena::{Idx, LockFreeArena, new_id_with_niche};
 use attributes::SymbolOwnership;
 use derive_more::IsVariant;
+pub use instr::*;
 use source_files::Source;
 use std::sync::OnceLock;
 

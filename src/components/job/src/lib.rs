@@ -37,6 +37,7 @@ macro_rules! suspend_many {
     }};
 }
 
+#[allow(unused)]
 macro_rules! suspend_many_assoc {
     ($self:ident.$field:ident, $task_refs:expr, $ctx:expr) => {{
         let pending: crate::PendingManyAssoc<'env, _, _> = $task_refs;
@@ -50,6 +51,7 @@ macro_rules! suspend_many_assoc {
     }};
 }
 
+#[allow(unused)]
 macro_rules! suspend_from_subtask {
     ($self:ident, $field:ident, $task_ref:expr, $ctx:expr) => {{
         let pending = $task_ref;
@@ -104,6 +106,7 @@ mod worker;
 
 pub use allocator::*;
 pub use artifact::*;
+pub use cfg::*;
 pub use continuation::*;
 pub use execution::*;
 pub use execution_ctx::*;

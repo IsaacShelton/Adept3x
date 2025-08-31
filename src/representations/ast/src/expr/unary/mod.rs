@@ -3,7 +3,7 @@ mod math;
 use crate::Expr;
 pub use math::*;
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum UnaryOperator {
     Math(UnaryMathOperator),
     AddressOf,

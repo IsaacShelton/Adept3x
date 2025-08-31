@@ -4,32 +4,20 @@ mod dominators;
 mod variables;
 
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, Resolved, ResolvedData, Suspend, SuspendMany,
-    Value,
-    cfg::{
-        NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, UntypedCfg,
-        flatten_func_ignore_const_evals,
-    },
-    conform::conform_to_default,
-    execution::resolve::ResolveType,
+    BasicBlockId, Cfg, Continuation, Executable, ExecutionCtx, Executor, InstrKind, Suspend,
+    SuspendMany,
+    execution::resolve::function_body::variables::VariableTracker,
+    flatten_func,
     module_graph::ModuleView,
-    repr::{Compiler, FuncBody, Type, TypeKind, UnaliasedType},
-    sub_task::SubTask,
-    unify::unify_types,
+    repr::{Compiler, FuncBody, Type, UnaliasedType},
 };
 use arena::ArenaMap;
-use ast::ConformBehavior;
-use basic_bin_op::{
-    resolve_basic_binary_operation_expr_on_literals, resolve_basic_binary_operator,
-};
 use by_address::ByAddress;
-use compute_preferred_types::{ComputePreferredTypes, ComputePreferredTypesUserData};
+use compute_preferred_types::ComputePreferredTypes;
 use derivative::Derivative;
-use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
-use itertools::Itertools;
-use primitives::{CInteger, CIntegerAssumptions};
-use variables::{VariableTracker, VariableTrackers};
+use primitives::CIntegerAssumptions;
+use variables::VariableTrackers;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -48,12 +36,12 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    cfg: Option<&'env UntypedCfg>,
+    cfg: Option<Cfg<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    dominators_and_post_order: Option<(ArenaMap<NodeId, NodeRef>, PostOrder)>,
+    dominators_and_post_order: Option<(ArenaMap<BasicBlockId, BasicBlockId>, PostOrder)>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -64,11 +52,6 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     compute_preferred_types: ComputePreferredTypes<'env>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    resolved_nodes: ArenaMap<NodeId, Resolved<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -92,7 +75,6 @@ impl<'env> ResolveFunctionBody<'env> {
             func: ByAddress(func),
             inner_types: None,
             compute_preferred_types: ComputePreferredTypes::default(),
-            resolved_nodes: ArenaMap::new(),
             num_resolved_nodes: 0,
             resolved_type: None,
             compiler: ByAddress(compiler),
@@ -136,6 +118,51 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         let def = self.func;
         let builtin_types = self.compiler.builtin_types;
 
+        // 0) Foreign functions do not have bodies
+        assert!(def.head.ownership.is_owned());
+
+        // 1) Compute control flow graph
+        let cfg = match &mut self.cfg {
+            Some(cfg) => cfg,
+            None => self.cfg.insert(
+                flatten_func(ctx, &def.head.params, &def.stmts, def.head.source)
+                    .finalize_gotos()?,
+            ),
+        };
+
+        // 2) Compute immediate dominators and post order traversal
+        let (dominators, post_order) = self
+            .dominators_and_post_order
+            .get_or_insert_with(|| compute_idom_tree(&cfg));
+
+        // 3) Acquire settings and configuration
+        //let settings = &self.settings[def.settings.expect("settings assigned for function")];
+        //let c_integer_assumptions = settings.c_integer_assumptions();
+        let c_integer_assumptions = CIntegerAssumptions::default();
+
+        // 4) Allocate variable storage for each variable
+        let variables = self.variables.get_or_insert_with(|| {
+            // NOTE: We include all nodes even if they aren't a part of the actual graph.
+            // We can prune these after type resolution by removing the variables who never
+            // had a type determined for them.
+            // The new indices for each variable after this filtering are then the "slot"
+            // each will occupy during IR generation.
+            cfg.iter_instrs_ordered()
+                .flat_map(|(instr_ref, instr)| match &instr.kind {
+                    InstrKind::Declare(..)
+                    | InstrKind::DeclareAssign(..)
+                    | InstrKind::Parameter(..) => Some(VariableTracker {
+                        declared_at: instr_ref,
+                        ty: None,
+                    }),
+                    _ => None,
+                })
+                .collect()
+        });
+
+        todo!("finish ResolveFunctionBody")
+
+        /*
         // 1) Compute control flow graph
         let cfg = match self.cfg {
             Some(value) => value,
@@ -470,8 +497,11 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         }
 
         Ok(ctx.alloc(FuncBody {
+            cfg,
+            post_order: std::mem::take(post_order),
             resolved: self.resolved_nodes,
             variables: std::mem::take(variables).prune(),
         }))
+        */
     }
 }

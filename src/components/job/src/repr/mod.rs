@@ -23,6 +23,7 @@ pub use func_body::*;
 pub use func_head::*;
 pub use params::*;
 pub use struct_body::*;
+#[allow(unused)]
 pub use trait_body::*;
 pub use ty::*;
 pub use type_alias_body::*;

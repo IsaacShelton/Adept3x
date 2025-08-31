@@ -105,6 +105,11 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
             return Ok(());
         }
 
+        // Don't process bodies for foreign functions
+        if self.func.head.ownership.is_reference() {
+            return Ok(());
+        }
+
         // NOTE: We have some extra caching here, although this should probably be standardized
         let resolved_body = match self.resolved_body {
             Some(done) => done,

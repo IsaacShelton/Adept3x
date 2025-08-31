@@ -1,65 +1,111 @@
 mod builder;
-mod const_eval;
-mod cursor;
 mod flatten;
-mod graphviz;
-mod human_label;
-mod node;
+mod instr;
 
 use arena::{Arena, Id, Idx, new_id_with_niche};
-pub use const_eval::*;
-pub use cursor::*;
+use builder::PartialBasicBlock;
 use diagnostics::ErrorDiagnostic;
 pub use flatten::*;
-pub use node::*;
+pub use instr::{EndInstr, EndInstrKind, Instr, InstrKind};
 use source_files::Source;
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Display};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+new_id_with_niche!(BasicBlockId, u32);
+
+#[derive(Copy, Clone, Debug)]
 pub enum IsValue {
     RequireValue,
     NeglectValue,
 }
 
-// If a single function has more than 4 billion nodes, we might have a problem.
-// This should never happen though, so we will take the 50% space bonus instead.
-new_id_with_niche!(NodeId, u32);
-pub type NodeRef = Idx<NodeId, Node>;
-
-#[derive(Clone, Debug)]
-pub struct Label {
-    pub name: String,
-    pub source: Source,
-    pub node_ref: NodeRef,
-}
-
-#[derive(Clone)]
-pub struct UntypedCfg {
-    pub nodes: Arena<NodeId, Node>,
-    pub labels: Vec<Label>,
-}
-
-impl Debug for UntypedCfg {
+impl Display for BasicBlockId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_map().entries(self.nodes.iter()).finish()
+        write!(f, "bb{}", self.0.get())
     }
 }
 
-impl UntypedCfg {
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct InstrRef {
+    pub basicblock: BasicBlockId,
+    pub instr_or_end: u32,
+}
+
+impl Display for InstrRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}", self.basicblock, self.instr_or_end)
+    }
+}
+
+impl InstrRef {
+    pub fn new(basicblock: BasicBlockId, instr_or_end: u32) -> Self {
+        Self {
+            basicblock,
+            instr_or_end,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Label<'env> {
+    pub name: &'env str,
+    pub target: BasicBlockId,
+    pub source: Source,
+}
+
+impl<'env> Label<'env> {
+    pub fn new(name: &'env str, target: BasicBlockId, source: Source) -> Self {
+        Self {
+            name,
+            target,
+            source,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Cfg<'env> {
+    pub basicblocks: Arena<BasicBlockId, BasicBlock<'env>>,
+    pub labels: &'env [Label<'env>],
+}
+
+impl<'env> Cfg<'env> {
+    pub fn new() -> Self {
+        Self {
+            basicblocks: Arena::new(),
+            labels: &[],
+        }
+    }
+
     #[inline]
-    pub fn start(&self) -> NodeRef {
-        assert_ne!(self.len(), 0);
-        unsafe { NodeRef::from_raw(NodeId::from_usize(0)) }
+    pub fn start(&self) -> BasicBlockId {
+        assert_ne!(self.basicblocks.len(), 0);
+        BasicBlockId::from_usize(0)
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.nodes.len()
+        self.basicblocks.len()
+    }
+
+    #[inline]
+    pub fn get_unsafe(&self, id: BasicBlockId) -> &BasicBlock<'env> {
+        &self.basicblocks[unsafe { Idx::from_raw(id) }]
+    }
+
+    pub fn iter_instrs_ordered(&self) -> impl Iterator<Item = (InstrRef, &Instr<'env>)> {
+        self.basicblocks.iter().flat_map(|(bb_id, bb)| {
+            bb.instrs.iter().enumerate().map(move |(i, instr)| {
+                (
+                    InstrRef::new(bb_id.into_raw(), i.try_into().unwrap()),
+                    instr,
+                )
+            })
+        })
     }
 
     pub fn finalize_gotos(mut self) -> Result<Self, ErrorDiagnostic> {
+        // Create map of labels to target basicblocks
         let mut labels = HashMap::with_capacity(self.labels.len());
-
         for label in std::mem::take(&mut self.labels).into_iter() {
             if labels.contains_key(&label.name) {
                 return Err(ErrorDiagnostic::new(
@@ -68,28 +114,65 @@ impl UntypedCfg {
                 ));
             }
 
-            assert_eq!(labels.insert(label.name, label.node_ref), None);
+            assert_eq!(labels.insert(label.name, label.target), None);
         }
 
-        for node in self.nodes.values_mut() {
-            match &mut node.kind {
-                NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::DirectGoto(label_name),
-                    next,
-                }) => {
-                    let Some(destination) = labels.get(label_name) else {
-                        return Err(ErrorDiagnostic::new(
-                            format!("Undefined label '@{}@'", label_name),
-                            node.source,
-                        ));
-                    };
+        // Replace incomplete gotos with direct jumps to the target basicblocks
+        for bb in self.basicblocks.values_mut() {
+            if let EndInstrKind::IncompleteGoto(label_name) = &mut bb.end.kind {
+                let Some(target) = labels.get(label_name) else {
+                    return Err(ErrorDiagnostic::new(
+                        format!("Undefined label '@{}@'", label_name),
+                        bb.end.source,
+                    ));
+                };
 
-                    *next = Some(*destination);
-                }
-                _ => (),
+                bb.end.kind = EndInstrKind::Jump(*target);
             }
         }
 
         Ok(self)
+    }
+}
+
+impl<'env> Display for Cfg<'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "CFG WITH {} BASICBLOCKS", self.len())?;
+
+        for (i, block) in &self.basicblocks {
+            let i = i.into_raw();
+            writeln!(f, "{}\n{}", i, block)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BasicBlock<'env> {
+    pub instrs: &'env [Instr<'env>],
+    pub end: EndInstr<'env>,
+}
+
+impl<'env> Display for BasicBlock<'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (index, instr) in self.instrs.iter().enumerate() {
+            write!(f, "  {:04} {}", index, instr)?;
+        }
+        write!(f, "  {:04} {}", self.instrs.len(), self.end)?;
+        Ok(())
+    }
+}
+
+impl<'env> Display for PartialBasicBlock<'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (index, instr) in self.instrs.iter().enumerate() {
+            write!(f, "  {:04} {}", index, instr)?;
+        }
+        if let Some(end) = &self.end {
+            write!(f, "  {:04} {}", self.instrs.len(), end)?;
+        } else {
+            writeln!(f, "  {:04} <missing>", self.instrs.len())?;
+        }
+        Ok(())
     }
 }

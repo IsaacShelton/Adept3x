@@ -1,21 +1,22 @@
+/*
 use crate::{
-    BuiltinTypes, Continuation, Execution, ExecutionCtx, Executor, Suspend,
-    cfg::{
-        NodeId, NodeKind, NodeRef, SequentialNode, SequentialNodeKind, TerminatingNode, UntypedCfg,
-    },
-    execution::resolve::ResolveType,
-    module_graph::ModuleView,
-    repr::UnaliasedType,
+    BasicBlockId, BuiltinTypes, Cfg, Continuation, Execution, ExecutionCtx, Executor, Suspend,
+    execution::resolve::ResolveType, module_graph::ModuleView, repr::UnaliasedType,
     sub_task::SubTask,
 };
 use arena::ArenaMap;
 use ast::{UnaryMathOperator, UnaryOperator};
 use diagnostics::ErrorDiagnostic;
+*/
 
+use crate::{BasicBlockId, BuiltinTypes, Cfg, module_graph::ModuleView};
+use std::marker::PhantomData;
+
+#[allow(unused)]
 #[derive(Debug)]
 pub struct ComputePreferredTypesUserData<'env, 'a> {
-    pub post_order: &'a [NodeRef],
-    pub cfg: &'env UntypedCfg,
+    pub post_order: &'a [BasicBlockId],
+    pub cfg: &'env Cfg<'env>,
     pub func_return_type: &'env ast::Type,
     pub view: ModuleView<'env>,
     pub builtin_types: &'env BuiltinTypes<'env>,
@@ -23,11 +24,15 @@ pub struct ComputePreferredTypesUserData<'env, 'a> {
 
 #[derive(Clone, Debug, Default)]
 pub struct ComputePreferredTypes<'env> {
+    phantom: PhantomData<&'env ()>,
+    /*
     preferred_types: Option<ArenaMap<NodeId, UnaliasedType<'env>>>,
     num_preferred_processed: usize,
     waiting_on_type: Suspend<'env, UnaliasedType<'env>>,
+    */
 }
 
+/*
 impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
     type SubArtifact<'a>
         = &'a ArenaMap<NodeId, UnaliasedType<'env>>
@@ -159,3 +164,4 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
         Ok(preferred_types)
     }
 }
+*/

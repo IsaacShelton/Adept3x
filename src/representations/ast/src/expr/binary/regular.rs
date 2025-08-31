@@ -10,7 +10,7 @@ pub struct BasicBinaryOperation {
     pub language: Language,
 }
 
-#[derive(Clone, Debug, IsVariant)]
+#[derive(Copy, Clone, Debug, IsVariant)]
 pub enum BasicBinaryOperator {
     Add,
     Subtract,

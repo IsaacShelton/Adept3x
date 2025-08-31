@@ -1,4 +1,4 @@
-use crate::cfg::{NodeId, NodeKind, NodeRef, UntypedCfg};
+use crate::{BasicBlockId, Cfg, EndInstrKind};
 use arena::{ArenaMap, Id};
 use bit_vec::BitVec;
 use std::{
@@ -6,43 +6,44 @@ use std::{
     collections::{HashSet, VecDeque},
 };
 
-pub type PostOrder = Box<[NodeRef]>;
+pub type PostOrder = Box<[BasicBlockId]>;
 
-pub fn compute_idom_tree(cfg: &UntypedCfg) -> (ArenaMap<NodeId, NodeRef>, PostOrder) {
+pub fn compute_idom_tree(cfg: &Cfg) -> (ArenaMap<BasicBlockId, BasicBlockId>, PostOrder) {
     let start = cfg.start();
     let (post_order, post_order_map, pred_sets) = depth_first_search(cfg);
 
     let mut dominators = Dominators::with_capacity(cfg.len());
 
-    let root = post_order.last().unwrap();
-    dominators.insert(root.into_raw(), *root);
+    let root = *post_order.last().unwrap();
+    dominators.insert(root, root);
 
     let mut changed = true;
     while changed {
         changed = false;
 
-        for node_ref in post_order.iter().rev().skip(1).copied() {
-            debug_assert!(node_ref != start);
+        for bb_id in post_order.iter().rev().skip(1).copied() {
+            debug_assert!(bb_id != start);
 
             let mut completed_predecessors = pred_sets
-                .get(node_ref.into_raw())
+                .get(bb_id)
                 .unwrap()
                 .iter()
-                .filter(|predecessor| dominators.get(predecessor.into_raw()).is_some());
+                .copied()
+                .filter(|predecessor| dominators.get(*predecessor).is_some());
 
-            let first_completed_predecessor = *completed_predecessors
+            let first_completed_predecessor = completed_predecessors
                 .next()
                 .expect("There must exist a predecessor that is also a dominator");
 
             let new_idom = completed_predecessors.fold(
                 first_completed_predecessor,
                 |new_idom, predecessor| {
-                    intersect(&dominators, &post_order_map, new_idom, *predecessor)
+                    intersect(&dominators, &post_order_map, new_idom, predecessor)
                 },
             );
 
-            if Some(new_idom) != dominators.get(node_ref.into_raw()).copied() {
-                dominators.insert(node_ref.into_raw(), new_idom);
+            if Some(new_idom) != dominators.get(bb_id).copied() {
+                dominators.insert(bb_id, new_idom);
                 changed = true;
             }
         }
@@ -54,33 +55,33 @@ pub fn compute_idom_tree(cfg: &UntypedCfg) -> (ArenaMap<NodeId, NodeRef>, PostOr
 fn intersect(
     dominators: &Dominators,
     post_order_map: &PostOrderIndexMap,
-    mut a: NodeRef,
-    mut b: NodeRef,
-) -> NodeRef {
-    let mut a_idx = *post_order_map.get(a.into_raw()).unwrap();
-    let mut b_idx = *post_order_map.get(b.into_raw()).unwrap();
+    mut a: BasicBlockId,
+    mut b: BasicBlockId,
+) -> BasicBlockId {
+    let mut a_idx = *post_order_map.get(a).unwrap();
+    let mut b_idx = *post_order_map.get(b).unwrap();
 
     loop {
         match a_idx.cmp(&b_idx) {
             Ordering::Less => {
-                a = *dominators.get(a.into_raw()).unwrap();
-                a_idx = *post_order_map.get(a.into_raw()).unwrap();
+                a = *dominators.get(a).unwrap();
+                a_idx = *post_order_map.get(a).unwrap();
             }
             Ordering::Equal => return a,
             Ordering::Greater => {
-                b = *dominators.get(b.into_raw()).unwrap();
-                b_idx = *post_order_map.get(b.into_raw()).unwrap();
+                b = *dominators.get(b).unwrap();
+                b_idx = *post_order_map.get(b).unwrap();
             }
         }
     }
 }
 
-type Dominators = ArenaMap<NodeId, NodeRef>;
-type PostOrderIndex = usize;
-type PostOrderIndexMap = ArenaMap<NodeId, PostOrderIndex>;
-type PredecessorSets = ArenaMap<NodeId, HashSet<NodeRef>>;
+type Dominators = ArenaMap<BasicBlockId, BasicBlockId>;
+type PostOrderIndex = u32;
+type PostOrderIndexMap = ArenaMap<BasicBlockId, PostOrderIndex>;
+type PredecessorSets = ArenaMap<BasicBlockId, HashSet<BasicBlockId>>;
 
-fn depth_first_search(cfg: &UntypedCfg) -> (Vec<NodeRef>, PostOrderIndexMap, PredecessorSets) {
+fn depth_first_search(cfg: &Cfg) -> (Vec<BasicBlockId>, PostOrderIndexMap, PredecessorSets) {
     let start = cfg.start();
 
     let mut post_order = Vec::with_capacity(cfg.len());
@@ -92,50 +93,55 @@ fn depth_first_search(cfg: &UntypedCfg) -> (Vec<NodeRef>, PostOrderIndexMap, Pre
     queue.push_back(start);
 
     loop {
-        let Some(node_ref) = queue.front().copied() else {
+        let Some(bb_id) = queue.front().copied() else {
             break;
         };
 
-        let node = &cfg.nodes[node_ref];
+        let bb = cfg.get_unsafe(bb_id);
 
-        let mut enqueue = |next: Option<NodeRef>| {
-            if let Some(next) = next {
-                let index = next.into_raw().into_usize();
+        let mut enqueue = |next: BasicBlockId| {
+            let index = next.into_usize();
 
-                // Track predecessors
-                {
-                    let next_id = next.into_raw();
-                    if predecessor_sets.get(next_id).is_none() {
-                        predecessor_sets.insert(next_id, HashSet::new());
-                    }
-                    predecessor_sets.get_mut(next_id).unwrap().insert(node_ref);
+            // Track predecessors
+            {
+                let next_id = next;
+                if predecessor_sets.get(next_id).is_none() {
+                    predecessor_sets.insert(next_id, HashSet::new());
                 }
+                predecessor_sets.get_mut(next_id).unwrap().insert(bb_id);
+            }
 
-                if !visited.get(index).unwrap() {
-                    queue.push_front(next);
-                    visited.set(index, true);
-                    true
-                } else {
-                    false
-                }
+            if !visited.get(index).unwrap() {
+                queue.push_front(next);
+                visited.set(index, true);
+                true
             } else {
                 false
             }
         };
 
-        let pending = match &node.kind {
-            NodeKind::Start(next) => enqueue(*next),
-            NodeKind::Sequential(seq) => enqueue(seq.next),
-            NodeKind::Branching(branch) => enqueue(branch.when_true) || enqueue(branch.when_false),
-            NodeKind::Terminating(_) => false,
-            NodeKind::Scope(scope) => enqueue(scope.inner) || enqueue(scope.closed_at),
+        let pending = match bb.end.kind {
+            EndInstrKind::IncompleteGoto(_) => panic!("cannot dfs basicblock with incomplete goto"),
+            EndInstrKind::IncompleteBreak => panic!("cannot dfs basicblock with incomplete break"),
+            EndInstrKind::IncompleteContinue => {
+                panic!("cannot dfs basicblock with incomplete continue")
+            }
+            EndInstrKind::Return(_) => false,
+            EndInstrKind::Jump(next) => enqueue(next),
+            EndInstrKind::Branch(_, when_true, when_false, _) => {
+                enqueue(when_true) || enqueue(when_false)
+            }
+            EndInstrKind::NewScope(in_scope, close_scope) => {
+                enqueue(in_scope) || enqueue(close_scope)
+            }
+            EndInstrKind::Unreachable => false,
         };
 
         if !pending {
             queue.pop_front();
-            let number = post_order.len();
-            post_order_map.insert(node_ref.into_raw(), number);
-            post_order.push(node_ref);
+            let number = post_order.len().try_into().unwrap();
+            post_order_map.insert(bb_id, number);
+            post_order.push(bb_id);
         }
     }
 
