@@ -1,8 +1,8 @@
 use super::post_order_iter::PostOrderIterWithEnds;
 use crate::{
     BasicBlockId, BuiltinTypes, CfgBuilder, Continuation, EndInstrKind, Execution, ExecutionCtx,
-    Executor, InstrKind, Suspend, execution::resolve::ResolveType, module_graph::ModuleView,
-    repr::UnaliasedType, sub_task::SubTask,
+    Executor, InstrKind, InstrRef, Suspend, execution::resolve::ResolveType,
+    module_graph::ModuleView, repr::UnaliasedType, sub_task::SubTask,
 };
 use arena::Idx;
 use ast::{UnaryMathOperator, UnaryOperator};
@@ -24,6 +24,7 @@ pub struct ComputePreferredTypes<'env> {
     phantom: PhantomData<&'env ()>,
     post_order_iter: PostOrderIterWithEnds,
     waiting_on_type: Suspend<'env, UnaliasedType<'env>>,
+    current: Option<InstrRef>,
 }
 
 impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
@@ -49,16 +50,17 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
         let cfg = user_data.cfg;
         let post_order = user_data.post_order;
 
-        while let Some(instr_ref) = self.post_order_iter.next(cfg, post_order) {
-            let bb = &cfg.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+        if self.current.is_none() {
+            self.current = self.post_order_iter.next(cfg, post_order);
+        }
 
+        while let Some(instr_ref) = self.current {
+            let bb = &cfg.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
             assert!(instr_ref.instr_or_end as usize <= bb.instrs.len());
 
             // If this is an end instruction, handle it differently...
             if instr_ref.instr_or_end as usize == bb.instrs.len() {
-                let end = bb.end.as_ref().unwrap();
-
-                match &end.kind {
+                match &bb.end.as_ref().unwrap().kind {
                     EndInstrKind::Return(Some(value)) => {
                         let Some(fulfilled) = self.waiting_on_type.take() else {
                             return suspend_from_subtask!(
@@ -88,6 +90,7 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                     | EndInstrKind::Unreachable => (),
                 }
 
+                self.current = self.post_order_iter.next(cfg, post_order);
                 continue;
             }
 
@@ -198,6 +201,8 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
                 | InstrKind::Is(_, _)
                 | InstrKind::LabelLiteral(_) => (),
             };
+
+            self.current = self.post_order_iter.next(cfg, post_order);
         }
 
         Ok(())

@@ -86,10 +86,16 @@ pub struct Instr<'env> {
 impl<'env> Display for Instr<'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(typed) = self.typed {
-            writeln!(f, "{}  ->  {}", self.kind, typed)
+            writeln!(f, "{}  ->  {}", self.kind, typed)?;
         } else {
-            writeln!(f, "{}", self.kind)
+            writeln!(f, "{}", self.kind)?;
         }
+
+        if let Some(preferred) = self.preferred_type {
+            writeln!(f, "   | prefers {}", preferred)?;
+        }
+
+        Ok(())
     }
 }
 

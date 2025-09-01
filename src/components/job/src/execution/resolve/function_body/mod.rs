@@ -179,6 +179,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
             }
         );
 
+        println!("{}", cfg);
+        let _final_cfg = self.cfg.take().unwrap().finish(ctx);
         todo!("finish ResolveFunctionBody")
 
         /*
