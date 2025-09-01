@@ -1,5 +1,9 @@
 pub use super::*;
-use crate::{ExecutionCtx, cfg::instr::BreakContinue, repr::UnaliasedType};
+use crate::{
+    ExecutionCtx,
+    cfg::instr::BreakContinue,
+    repr::{Type, UnaliasedType},
+};
 use arena::Idx;
 
 #[derive(Clone, Debug, Default)]
@@ -54,10 +58,16 @@ impl<'env> CfgBuilder<'env> {
         )
     }
 
-    pub fn set_preferred_type(&mut self, instr_ref: InstrRef, ty: UnaliasedType<'env>) {
+    pub fn set_typed(&mut self, instr_ref: InstrRef, ty: UnaliasedType<'env>) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
-        bb.instrs[instr_ref.instr_or_end as usize].preferred_type = Some(ty);
+        bb.instrs[instr_ref.instr_or_end as usize].typed = Some(ty);
+    }
+
+    pub fn get_typed(&self, instr_ref: InstrRef) -> UnaliasedType<'env> {
+        let bb = &self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+        assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
+        bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
     }
 
     #[inline]

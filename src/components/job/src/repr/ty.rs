@@ -77,9 +77,10 @@ impl<'env> Display for TypeArg<'env> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
 pub enum TypeKind<'env> {
     // Literals
-    IntegerLiteral(BigInt),
+    IntegerLiteral(&'env BigInt),
     FloatLiteral(Option<NotNan<f64>>),
     BooleanLiteral(bool),
+    NullLiteral,
     // Boolean
     Boolean,
     // Integer
@@ -137,6 +138,7 @@ impl<'env> TypeKind<'env> {
     pub fn contains_polymorph(&self) -> bool {
         match self {
             TypeKind::Boolean
+            | TypeKind::NullLiteral
             | TypeKind::BooleanLiteral(_)
             | TypeKind::BitInteger(_, _)
             | TypeKind::CInteger(_, _)
@@ -156,6 +158,7 @@ impl<'env> TypeKind<'env> {
     pub fn contains_type_alias(&self) -> bool {
         match self {
             TypeKind::Boolean
+            | TypeKind::NullLiteral
             | TypeKind::BooleanLiteral(_)
             | TypeKind::BitInteger(_, _)
             | TypeKind::CInteger(_, _)
@@ -190,6 +193,7 @@ impl<'env> Display for TypeKind<'env> {
             TypeKind::FloatLiteral(Some(float)) => write!(f, "float {}", float),
             TypeKind::FloatLiteral(None) => write!(f, "float NaN"),
             TypeKind::Boolean => write!(f, "bool"),
+            TypeKind::NullLiteral => write!(f, "null"),
             TypeKind::BooleanLiteral(value) => write!(f, "bool {}", value),
             TypeKind::BitInteger(bits, sign) => f.write_str(match (bits, sign) {
                 (IntegerBits::Bits8, IntegerSign::Signed) => "i8",

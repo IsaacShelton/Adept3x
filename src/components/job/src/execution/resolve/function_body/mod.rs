@@ -1,24 +1,26 @@
 mod basic_bin_op;
-mod compute_preferred_types;
 mod dominators;
-mod post_order_iter;
+mod rev_post_order_iter;
 mod variables;
 
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, Executable, ExecutionCtx, Executor, InstrKind, Suspend,
     SuspendMany,
-    execution::resolve::function_body::{
-        compute_preferred_types::ComputePreferredTypesUserData, variables::VariableTracker,
+    execution::resolve::{
+        ResolveType,
+        function_body::{
+            rev_post_order_iter::RevPostOrderIterWithoutEnds, variables::VariableTracker,
+        },
     },
     flatten_func,
     module_graph::ModuleView,
-    repr::{Compiler, FuncBody, Type, UnaliasedType},
-    sub_task::SubTask,
+    repr::{Compiler, FuncBody, Type, TypeKind, UnaliasedType},
 };
 use arena::ArenaMap;
+use ast::Integer;
 use by_address::ByAddress;
-use compute_preferred_types::ComputePreferredTypes;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
 use primitives::CIntegerAssumptions;
 use variables::VariableTrackers;
@@ -55,12 +57,7 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    compute_preferred_types: ComputePreferredTypes<'env>,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    num_resolved_nodes: usize,
+    rev_post_order: Option<RevPostOrderIterWithoutEnds>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -78,8 +75,7 @@ impl<'env> ResolveFunctionBody<'env> {
             view,
             func: ByAddress(func),
             inner_types: None,
-            compute_preferred_types: ComputePreferredTypes::default(),
-            num_resolved_nodes: 0,
+            rev_post_order: None,
             resolved_type: None,
             compiler: ByAddress(compiler),
             cfg: None,
@@ -164,92 +160,135 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 .collect()
         });
 
-        // 5) Determine what type each CFG node prefers to be.
-        execute_sub_task!(
-            self,
-            self.compute_preferred_types,
-            executor,
-            ctx,
-            ComputePreferredTypesUserData {
-                post_order,
-                cfg,
-                func_return_type: &def.head.return_type,
-                view: self.view,
-                builtin_types,
-            }
-        );
+        let rev_post_order = self
+            .rev_post_order
+            .get_or_insert_with(|| RevPostOrderIterWithoutEnds::new(cfg, post_order));
 
         println!("{}", cfg);
-        let _final_cfg = self.cfg.take().unwrap().finish(ctx);
-        todo!("finish ResolveFunctionBody")
+
+        // 5) Resolve types and linked data for each CFG node (may suspend)
+        while let Some(instr_ref) = rev_post_order.peek() {
+            let bb = cfg.get_unsafe(instr_ref.basicblock);
+            let instr = &bb.instrs[instr_ref.instr_or_end as usize];
+
+            match &instr.kind {
+                InstrKind::Phi(items, conform_behavior) => {
+                    // NOTE: For PHI nodes, we will want to find the best
+                    // combining type, and then conform each incoming value
+                    // to that type.
+                    // The one issue though, is that this information
+                    // will need to flow backwards.
+                    // So the basicblocks who jump here may need
+                    // a special kind of jump that allows for that,
+                    // where we can retroactively add the conforming
+                    // to each branch before they go here.
+                    // We could also modify `Jump` to allow for this purpose.
+
+                    let mut expected = None;
+                    for item in items.iter().filter_map(|(bb_id, x)| *x) {
+                        let item = cfg.get_typed(item);
+
+                        let Some(expected) = expected else {
+                            expected = Some(item);
+                            continue;
+                        };
+
+                        if todo!("are types unequal") {
+                            return Err(ErrorDiagnostic::new(
+                                "Cannot combine incompatible types",
+                                instr.source,
+                            )
+                            .into());
+                        }
+                    }
+
+                    cfg.set_typed(instr_ref, expected.unwrap_or(builtin_types.never()))
+                }
+                InstrKind::Name(_) => todo!(),
+                InstrKind::Parameter(_, ast_type, _) => {
+                    // Resolve variable type
+                    let Some(resolved_type) = executor.demand(self.resolved_type) else {
+                        return suspend!(
+                            self.resolved_type,
+                            executor.request(ResolveType::new(self.view, ast_type)),
+                            ctx
+                        );
+                    };
+
+                    variables.assign_resolved_type(instr_ref, resolved_type);
+
+                    // Reset suspend on type for next node that needs it
+                    self.resolved_type = None;
+
+                    cfg.set_typed(instr_ref, builtin_types.void())
+                }
+                InstrKind::Declare(_, _, instr_ref) => todo!(),
+                InstrKind::Assign(instr_ref, instr_ref1) => todo!(),
+                InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
+                    todo!()
+                }
+                InstrKind::BooleanLiteral(value) => {
+                    cfg.set_typed(
+                        instr_ref,
+                        UnaliasedType(ctx.alloc(TypeKind::BooleanLiteral(*value).at(instr.source))),
+                    );
+                }
+                InstrKind::IntegerLiteral(integer) => match integer {
+                    Integer::Known(known) => {
+                        todo!("conform known type integer literal to final type")
+                    }
+                    Integer::Generic(big_int) => {
+                        cfg.set_typed(
+                            instr_ref,
+                            UnaliasedType(
+                                ctx.alloc(TypeKind::IntegerLiteral(big_int).at(instr.source)),
+                            ),
+                        );
+                    }
+                },
+                InstrKind::FloatLiteral(floating) => {
+                    cfg.set_typed(
+                        instr_ref,
+                        UnaliasedType(ctx.alloc(
+                            TypeKind::FloatLiteral((*floating).try_into().ok()).at(instr.source),
+                        )),
+                    );
+                }
+                InstrKind::AsciiCharLiteral(_) => todo!(),
+                InstrKind::Utf8CharLiteral(_) => todo!(),
+                InstrKind::StringLiteral(_) => todo!(),
+                InstrKind::NullTerminatedStringLiteral(cstr) => todo!(),
+                InstrKind::NullLiteral => {
+                    cfg.set_typed(instr_ref, builtin_types.null());
+                }
+                InstrKind::VoidLiteral => {
+                    cfg.set_typed(instr_ref, builtin_types.void());
+                }
+                InstrKind::Call(call_instr) => todo!(),
+                InstrKind::DeclareAssign(_, instr_ref) => todo!(),
+                InstrKind::Member(instr_ref, _, privacy) => todo!(),
+                InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
+                InstrKind::StructLiteral(struct_literal_instr) => todo!(),
+                InstrKind::UnaryOperation(unary_operator, instr_ref) => todo!(),
+                InstrKind::SizeOf(_, size_of_mode) => todo!(),
+                InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!(),
+                InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
+                InstrKind::IntegerPromote(instr_ref) => todo!(),
+                InstrKind::ConformToBool(..) => {
+                    // TODO: Perform any conforming necessary
+                    cfg.set_typed(instr_ref, builtin_types.bool());
+                }
+                InstrKind::Is(instr_ref, _) => todo!(),
+                InstrKind::LabelLiteral(_) => todo!(),
+            }
+
+            let bb = cfg.get_unsafe(instr_ref.basicblock);
+            let instr = &bb.instrs[instr_ref.instr_or_end as usize];
+            print!("revolved to: {}", instr);
+            rev_post_order.next(cfg, post_order);
+        }
 
         /*
-        // 1) Compute control flow graph
-        let cfg = match self.cfg {
-            Some(value) => value,
-            None => self.cfg.insert(
-                ctx.alloc(
-                    flatten_func_ignore_const_evals(
-                        &def.head.params,
-                        def.stmts.clone(),
-                        def.head.source,
-                    )
-                    .finalize_gotos()?,
-                ),
-            ),
-        };
-
-        // 2) Compute immediate dominators and post order traversal
-        let (dominators, post_order) = self
-            .dominators_and_post_order
-            .get_or_insert_with(|| compute_idom_tree(&cfg));
-
-        // 3) Acquire settings and configuration
-        //let settings = &self.settings[def.settings.expect("settings assigned for function")];
-        //let c_integer_assumptions = settings.c_integer_assumptions();
-        let c_integer_assumptions = CIntegerAssumptions::default();
-
-        // 4) Allocate variable storage for each variable
-        let variables = self.variables.get_or_insert_with(|| {
-            // NOTE: We include all nodes even if they aren't a part of the actual graph.
-            // We can prune these after type resolution by removing the variables who never
-            // had a type determined for them.
-            // The new indices for each variable after this filtering are then the "slot"
-            // each will occupy during IR generation.
-            cfg.nodes
-                .iter()
-                .flat_map(|(node_ref, node)| match &node.kind {
-                    NodeKind::Sequential(SequentialNode {
-                        kind:
-                            SequentialNodeKind::Declare(..)
-                            | SequentialNodeKind::DeclareAssign(..)
-                            | SequentialNodeKind::Parameter(..),
-                        ..
-                    }) => Some(VariableTracker {
-                        declared_at: node_ref,
-                        ty: None,
-                    }),
-                    _ => None,
-                })
-                .collect()
-        });
-
-        // 5) Determine what type each CFG node prefers to be.
-        let preferred_types = execute_sub_task!(
-            self,
-            self.compute_preferred_types,
-            executor,
-            ctx,
-            ComputePreferredTypesUserData {
-                post_order,
-                cfg,
-                func_return_type: &def.head.return_type,
-                view: self.view,
-                builtin_types,
-            }
-        );
-
-        // 6) Resolve types and linked data for each CFG node (may suspend)
         while self.num_resolved_nodes < post_order.len() {
             // We must process nodes in reverse post-order to ensure proper ordering, lexical
             // ordering is not enough! Consider `goto` for example.
@@ -516,7 +555,13 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 .insert(node_ref.into_raw(), resolved_node);
             self.num_resolved_nodes += 1;
         }
+        */
 
+        println!("{}", cfg);
+        let _final_cfg = self.cfg.take().unwrap().finish(ctx);
+        todo!("finish ResolveFunctionBody")
+
+        /*
         Ok(ctx.alloc(FuncBody {
             cfg,
             post_order: std::mem::take(post_order),

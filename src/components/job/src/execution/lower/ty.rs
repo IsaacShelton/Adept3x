@@ -57,21 +57,28 @@ impl<'env> Executable<'env> for LowerType<'env> {
         return Ok(match &self.ty.kind {
             TypeKind::IntegerLiteral(_) => {
                 return Err(ErrorDiagnostic::new(
-                    "Cannot lower unspecialized integer type",
+                    "Cannot lower unspecialized integer literal",
                     self.ty.source,
                 )
                 .into());
             }
             TypeKind::FloatLiteral(_) => {
                 return Err(ErrorDiagnostic::new(
-                    "Cannot lower unspecialized float type",
+                    "Cannot lower unspecialized float literal",
+                    self.ty.source,
+                )
+                .into());
+            }
+            TypeKind::NullLiteral => {
+                return Err(ErrorDiagnostic::new(
+                    "Cannot lower unspecialized null literal",
                     self.ty.source,
                 )
                 .into());
             }
             TypeKind::BooleanLiteral(_) => {
                 return Err(ErrorDiagnostic::new(
-                    "Cannot lower unspecialized boolean type",
+                    "Cannot lower unspecialized boolean literal",
                     self.ty.source,
                 )
                 .into());

@@ -66,6 +66,7 @@ pub fn are_types_equal<'env>(
         } else {
             false
         }),
+        TypeKind::NullLiteral => Ok(matches!(b, TypeKind::NullLiteral)),
         TypeKind::BooleanLiteral(a_value) => Ok(if let TypeKind::BooleanLiteral(b_value) = b {
             a_value == b_value
         } else {

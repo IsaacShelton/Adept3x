@@ -78,7 +78,6 @@ impl<'env> EndInstrKind<'env> {
 #[derive(Clone, Debug)]
 pub struct Instr<'env> {
     pub kind: InstrKind<'env>,
-    pub preferred_type: Option<UnaliasedType<'env>>,
     pub typed: Option<UnaliasedType<'env>>,
     pub source: Source,
 }
@@ -89,10 +88,6 @@ impl<'env> Display for Instr<'env> {
             writeln!(f, "{}  ->  {}", self.kind, typed)?;
         } else {
             writeln!(f, "{}", self.kind)?;
-        }
-
-        if let Some(preferred) = self.preferred_type {
-            writeln!(f, "   | prefers {}", preferred)?;
         }
 
         Ok(())
@@ -272,7 +267,6 @@ impl<'env> InstrKind<'env> {
         Instr {
             kind: self,
             source,
-            preferred_type: None,
             typed: None,
         }
     }
