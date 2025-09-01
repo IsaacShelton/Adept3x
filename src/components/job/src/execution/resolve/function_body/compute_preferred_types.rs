@@ -1,22 +1,19 @@
-/*
+use super::post_order_iter::PostOrderIterWithEnds;
 use crate::{
-    BasicBlockId, BuiltinTypes, Cfg, Continuation, Execution, ExecutionCtx, Executor, Suspend,
-    execution::resolve::ResolveType, module_graph::ModuleView, repr::UnaliasedType,
-    sub_task::SubTask,
+    BasicBlockId, BuiltinTypes, CfgBuilder, Continuation, EndInstrKind, Execution, ExecutionCtx,
+    Executor, InstrKind, Suspend, execution::resolve::ResolveType, module_graph::ModuleView,
+    repr::UnaliasedType, sub_task::SubTask,
 };
-use arena::ArenaMap;
+use arena::Idx;
 use ast::{UnaryMathOperator, UnaryOperator};
 use diagnostics::ErrorDiagnostic;
-*/
-
-use crate::{BasicBlockId, BuiltinTypes, Cfg, module_graph::ModuleView};
 use std::marker::PhantomData;
 
 #[allow(unused)]
 #[derive(Debug)]
 pub struct ComputePreferredTypesUserData<'env, 'a> {
     pub post_order: &'a [BasicBlockId],
-    pub cfg: &'env Cfg<'env>,
+    pub cfg: &'a mut CfgBuilder<'env>,
     pub func_return_type: &'env ast::Type,
     pub view: ModuleView<'env>,
     pub builtin_types: &'env BuiltinTypes<'env>,
@@ -25,17 +22,13 @@ pub struct ComputePreferredTypesUserData<'env, 'a> {
 #[derive(Clone, Debug, Default)]
 pub struct ComputePreferredTypes<'env> {
     phantom: PhantomData<&'env ()>,
-    /*
-    preferred_types: Option<ArenaMap<NodeId, UnaliasedType<'env>>>,
-    num_preferred_processed: usize,
+    post_order_iter: PostOrderIterWithEnds,
     waiting_on_type: Suspend<'env, UnaliasedType<'env>>,
-    */
 }
 
-/*
 impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
     type SubArtifact<'a>
-        = &'a ArenaMap<NodeId, UnaliasedType<'env>>
+        = ()
     where
         Self: 'a;
 
@@ -56,112 +49,157 @@ impl<'env> SubTask<'env> for ComputePreferredTypes<'env> {
         let cfg = user_data.cfg;
         let post_order = user_data.post_order;
 
-        let preferred_types = self
-            .preferred_types
-            .get_or_insert_with(|| ArenaMap::with_capacity(cfg.nodes.len()));
+        while let Some(instr_ref) = self.post_order_iter.next(cfg, post_order) {
+            let bb = &cfg.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
 
-        while self.num_preferred_processed < post_order.len() {
-            let node_ref = post_order[self.num_preferred_processed];
-            let node = &cfg.nodes[node_ref];
+            assert!(instr_ref.instr_or_end as usize <= bb.instrs.len());
 
-            match &node.kind {
-                NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::Declare(_, expected_var_ty, Some(value)),
-                    ..
-                }) => {
+            // If this is an end instruction, handle it differently...
+            if instr_ref.instr_or_end as usize == bb.instrs.len() {
+                let end = bb.end.as_ref().unwrap();
+
+                match &end.kind {
+                    EndInstrKind::Return(Some(value)) => {
+                        let Some(fulfilled) = self.waiting_on_type.take() else {
+                            return suspend_from_subtask!(
+                                self,
+                                waiting_on_type,
+                                executor.request(ResolveType::new(
+                                    user_data.view,
+                                    user_data.func_return_type,
+                                )),
+                                ctx
+                            );
+                        };
+
+                        cfg.set_preferred_type(*value, executor.demand(Some(fulfilled)).unwrap());
+                    }
+                    EndInstrKind::Branch(condition, _, _, _) => {
+                        cfg.set_preferred_type(*condition, user_data.builtin_types.bool());
+                    }
+                    EndInstrKind::IncompleteGoto(_)
+                    | EndInstrKind::IncompleteBreak
+                    | EndInstrKind::IncompleteContinue
+                    | EndInstrKind::Return(None)
+                    // NOTE: PHI nodes handle the propagation of preferred types
+                    // for chosen values, not the branches/jumps themselves.
+                    | EndInstrKind::Jump(_)
+                    | EndInstrKind::NewScope(..)
+                    | EndInstrKind::Unreachable => (),
+                }
+
+                continue;
+            }
+
+            // Otherwise, this is a normal sequential instruction...
+            let instr = &bb.instrs[instr_ref.instr_or_end as usize];
+
+            match &instr.kind {
+                InstrKind::Declare(_, _, None) => (),
+                InstrKind::Declare(_, expected_var_ty, Some(value)) => {
                     let Some(fulfilled) = self.waiting_on_type.take() else {
                         return suspend_from_subtask!(
                             self,
                             waiting_on_type,
-                            executor.request(ResolveType::new(user_data.view, expected_var_ty,)),
+                            executor.request(ResolveType::new(user_data.view, expected_var_ty)),
                             ctx
                         );
                     };
 
-                    preferred_types
-                        .insert(value.into_raw(), executor.demand(Some(fulfilled)).unwrap());
+                    cfg.set_preferred_type(*value, executor.demand(Some(fulfilled)).unwrap());
                 }
-                NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::Join1(value),
-                    ..
-                }) => {
-                    if let Some(preferred) = preferred_types.get(node_ref.into_raw()) {
-                        preferred_types.insert(value.into_raw(), *preferred);
-                    }
-                }
-                NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::JoinN(values, _),
-                    ..
-                }) => {
-                    if let Some(preferred) = preferred_types.get(node_ref.into_raw()).copied() {
-                        for (_, value) in values {
-                            preferred_types.insert(value.into_raw(), preferred);
+                InstrKind::Phi(incoming, _) => {
+                    if let Some(preferred) = instr.preferred_type {
+                        for (_, value) in incoming.iter() {
+                            if let Some(value) = value {
+                                cfg.set_preferred_type(*value, preferred);
+                            }
                         }
                     }
                 }
-                NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::UnaryOperation(op, value),
-                    ..
-                }) => match op {
+                InstrKind::UnaryOperation(
                     UnaryOperator::Math(
                         UnaryMathOperator::Not
                         | UnaryMathOperator::BitComplement
                         | UnaryMathOperator::Negate,
-                    ) => {
-                        if let Some(preferred) = preferred_types.get(node_ref.into_raw()).copied() {
-                            preferred_types.insert(value.into_raw(), preferred);
-                        }
-                    }
-                    UnaryOperator::Math(UnaryMathOperator::IsNonZero) => (),
-                    UnaryOperator::AddressOf => todo!(),
-                    UnaryOperator::Dereference => todo!(),
-                },
-                NodeKind::Sequential(SequentialNode {
-                    kind: SequentialNodeKind::BinOp(left, op, right, _),
-                    ..
-                }) => {
-                    if !op.returns_boolean() {
-                        if let Some(preferred) = preferred_types.get(node_ref.into_raw()).copied() {
-                            preferred_types.insert(left.into_raw(), preferred);
-                            preferred_types.insert(right.into_raw(), preferred);
-                        }
+                    ),
+                    value,
+                ) => {
+                    if let Some(preferred) = instr.preferred_type {
+                        cfg.set_preferred_type(*value, preferred);
                     }
                 }
-                NodeKind::Sequential(..) => (),
-                NodeKind::Terminating(TerminatingNode::Return(Some(value))) => {
-                    let Some(fulfilled) = self.waiting_on_type.take() else {
-                        return suspend_from_subtask!(
-                            self,
-                            waiting_on_type,
-                            executor.request(ResolveType::new(
-                                user_data.view,
-                                user_data.func_return_type,
-                            )),
-                            ctx
-                        );
-                    };
-
-                    preferred_types
-                        .insert(value.into_raw(), executor.demand(Some(fulfilled)).unwrap());
-                }
-                NodeKind::Branching(branch) => {
-                    preferred_types
-                        .insert(branch.condition.into_raw(), user_data.builtin_types.bool());
-                }
-                NodeKind::Start(_)
-                | NodeKind::Scope(_)
-                | NodeKind::Terminating(
-                    TerminatingNode::Break
-                    | TerminatingNode::Continue
-                    | TerminatingNode::Computed(_)
-                    | TerminatingNode::Return(None),
+                InstrKind::UnaryOperation(
+                    UnaryOperator::Math(UnaryMathOperator::IsNonZero)
+                    | UnaryOperator::AddressOf
+                    | UnaryOperator::Dereference,
+                    _,
                 ) => (),
-            };
+                InstrKind::BinOp(a, op, b, _) => {
+                    if !op.returns_boolean() {
+                        if let Some(preferred) = instr.preferred_type {
+                            let a = *a;
+                            let b = *b;
+                            cfg.set_preferred_type(a, preferred);
+                            cfg.set_preferred_type(b, preferred);
+                        }
+                    }
+                }
+                InstrKind::Assign(_, _) => {
+                    // NOTE: We need to know type information for the
+                    // destination in order to set the preferred type...
 
-            self.num_preferred_processed += 1;
+                    // We need to figure what to do in situations like this:
+                    // `x = x := 1243`
+                    // where the type of the destination depends
+                    // on the evaluation of the source.
+                    // Maybe we just don't have a preferred type for situations like this
+                    // where the destination type depends on the source.
+                    // But it would also be easy to have incorrect preferred
+                    // types if not careful.
+
+                    // In order to properly support something like this,
+                    // we need to:
+                    // 1) Determine the type of the destination
+                    // without evaluating it.
+                    // 2) Set the preferred type of the source to the destination type.
+                    // 3) Evaluate the source.
+                    // 4) Evaluate the destination.
+
+                    // We also want to do it this way to avoid
+                    // code like this holding locks longer than necessary:
+                    // ```rust
+                    // *x.lock().uwrap() = 1234;
+                    // ```
+                }
+                InstrKind::StructLiteral(_) => {
+                    // NOTE: We should set the preferred types for each field here...
+                }
+                InstrKind::Name(_)
+                | InstrKind::Parameter(_, _, _)
+                | InstrKind::BooleanLiteral(_)
+                | InstrKind::IntegerLiteral(_)
+                | InstrKind::FloatLiteral(_)
+                | InstrKind::AsciiCharLiteral(_)
+                | InstrKind::Utf8CharLiteral(_)
+                | InstrKind::StringLiteral(_)
+                | InstrKind::NullTerminatedStringLiteral(_)
+                | InstrKind::NullLiteral
+                | InstrKind::VoidLiteral
+                | InstrKind::Call(_)
+                | InstrKind::DeclareAssign(_, _)
+                | InstrKind::Member(_, _, _)
+                | InstrKind::ArrayAccess(_, _)
+                | InstrKind::SizeOf(_, _)
+                | InstrKind::SizeOfValue(_, _)
+                | InstrKind::InterpreterSyscall(_)
+                | InstrKind::IntegerPromote(_)
+                | InstrKind::ConformToBool(_, _)
+                | InstrKind::Is(_, _)
+                | InstrKind::LabelLiteral(_) => (),
+            };
         }
 
-        Ok(preferred_types)
+        Ok(())
     }
 }
-*/

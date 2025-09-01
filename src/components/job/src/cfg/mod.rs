@@ -3,7 +3,7 @@ mod flatten;
 mod instr;
 
 use arena::{Arena, Id, Idx, new_id_with_niche};
-use builder::PartialBasicBlock;
+pub use builder::*;
 use diagnostics::ErrorDiagnostic;
 pub use flatten::*;
 pub use instr::{EndInstr, EndInstrKind, Instr, InstrKind};
@@ -24,7 +24,7 @@ impl Display for BasicBlockId {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InstrRef {
     pub basicblock: BasicBlockId,
     pub instr_or_end: u32,
@@ -62,7 +62,7 @@ impl<'env> Label<'env> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Cfg<'env> {
     pub basicblocks: Arena<BasicBlockId, BasicBlock<'env>>,
     pub labels: &'env [Label<'env>],
@@ -102,37 +102,6 @@ impl<'env> Cfg<'env> {
             })
         })
     }
-
-    pub fn finalize_gotos(mut self) -> Result<Self, ErrorDiagnostic> {
-        // Create map of labels to target basicblocks
-        let mut labels = HashMap::with_capacity(self.labels.len());
-        for label in std::mem::take(&mut self.labels).into_iter() {
-            if labels.contains_key(&label.name) {
-                return Err(ErrorDiagnostic::new(
-                    format!("Duplicate label '@{}@'", &label.name),
-                    label.source,
-                ));
-            }
-
-            assert_eq!(labels.insert(label.name, label.target), None);
-        }
-
-        // Replace incomplete gotos with direct jumps to the target basicblocks
-        for bb in self.basicblocks.values_mut() {
-            if let EndInstrKind::IncompleteGoto(label_name) = &mut bb.end.kind {
-                let Some(target) = labels.get(label_name) else {
-                    return Err(ErrorDiagnostic::new(
-                        format!("Undefined label '@{}@'", label_name),
-                        bb.end.source,
-                    ));
-                };
-
-                bb.end.kind = EndInstrKind::Jump(*target);
-            }
-        }
-
-        Ok(self)
-    }
 }
 
 impl<'env> Display for Cfg<'env> {
@@ -147,7 +116,7 @@ impl<'env> Display for Cfg<'env> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BasicBlock<'env> {
     pub instrs: &'env [Instr<'env>],
     pub end: EndInstr<'env>,

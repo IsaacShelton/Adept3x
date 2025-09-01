@@ -1,8 +1,8 @@
 pub use super::*;
-use crate::{ExecutionCtx, cfg::instr::BreakContinue};
+use crate::{ExecutionCtx, cfg::instr::BreakContinue, repr::UnaliasedType};
 use arena::Idx;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct PartialBasicBlock<'env> {
     pub instrs: Vec<Instr<'env>>,
     pub end: Option<EndInstr<'env>>,
@@ -34,24 +34,13 @@ impl<'env> Cursor {
     }
 }
 
-pub struct Builder<'env> {
-    basicblocks: Arena<BasicBlockId, PartialBasicBlock<'env>>,
-    labels: Vec<Label<'env>>,
+#[derive(Clone, Debug)]
+pub struct CfgBuilder<'env> {
+    pub basicblocks: Arena<BasicBlockId, PartialBasicBlock<'env>>,
+    pub labels: Vec<Label<'env>>,
 }
 
-impl<'env> Display for Builder<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "BUILDER WITH {} BASICBLOCKS", self.basicblocks.len())?;
-
-        for (i, block) in &self.basicblocks {
-            let i = i.into_raw();
-            writeln!(f, "{}\n{}", i, block)?;
-        }
-        Ok(())
-    }
-}
-
-impl<'env> Builder<'env> {
+impl<'env> CfgBuilder<'env> {
     pub fn new() -> (Self, Cursor) {
         let mut basicblocks = Arena::new();
         let cursor = Cursor::new(basicblocks.alloc(PartialBasicBlock::default()).into_raw());
@@ -63,6 +52,39 @@ impl<'env> Builder<'env> {
             },
             cursor,
         )
+    }
+
+    pub fn set_preferred_type(&mut self, instr_ref: InstrRef, ty: UnaliasedType<'env>) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+        assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
+        bb.instrs[instr_ref.instr_or_end as usize].preferred_type = Some(ty);
+    }
+
+    #[inline]
+    pub fn start(&self) -> BasicBlockId {
+        assert_ne!(self.basicblocks.len(), 0);
+        BasicBlockId::from_usize(0)
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.basicblocks.len()
+    }
+
+    #[inline]
+    pub fn get_unsafe(&self, id: BasicBlockId) -> &PartialBasicBlock<'env> {
+        &self.basicblocks[unsafe { Idx::from_raw(id) }]
+    }
+
+    pub fn iter_instrs_ordered(&self) -> impl Iterator<Item = (InstrRef, &Instr<'env>)> {
+        self.basicblocks.iter().flat_map(|(bb_id, bb)| {
+            bb.instrs.iter().enumerate().map(move |(i, instr)| {
+                (
+                    InstrRef::new(bb_id.into_raw(), i.try_into().unwrap()),
+                    instr,
+                )
+            })
+        })
     }
 
     pub fn add_label(&mut self, label: Label<'env>) {
@@ -197,5 +219,48 @@ impl<'env> Builder<'env> {
         );
 
         (in_scope, close_scope)
+    }
+
+    pub fn finalize_gotos(mut self) -> Result<Self, ErrorDiagnostic> {
+        // Create map of labels to target basicblocks
+        let mut labels = HashMap::with_capacity(self.labels.len());
+        for label in std::mem::take(&mut self.labels).into_iter() {
+            if labels.contains_key(&label.name) {
+                return Err(ErrorDiagnostic::new(
+                    format!("Duplicate label '@{}@'", &label.name),
+                    label.source,
+                ));
+            }
+
+            assert_eq!(labels.insert(label.name, label.target), None);
+        }
+
+        // Replace incomplete gotos with direct jumps to the target basicblocks
+        for bb in self.basicblocks.values_mut() {
+            if let EndInstrKind::IncompleteGoto(label_name) = &mut bb.end.as_mut().unwrap().kind {
+                let Some(target) = labels.get(label_name) else {
+                    return Err(ErrorDiagnostic::new(
+                        format!("Undefined label '@{}@'", label_name),
+                        bb.end.as_mut().unwrap().source,
+                    ));
+                };
+
+                bb.end.as_mut().unwrap().kind = EndInstrKind::Jump(*target);
+            }
+        }
+
+        Ok(self)
+    }
+}
+
+impl<'env> Display for CfgBuilder<'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "BUILDER WITH {} BASICBLOCKS", self.basicblocks.len())?;
+
+        for (i, block) in &self.basicblocks {
+            let i = i.into_raw();
+            writeln!(f, "{}\n{}", i, block)?;
+        }
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use crate::{BasicBlockId, Cfg, EndInstrKind};
+use crate::{BasicBlockId, CfgBuilder, EndInstrKind};
 use arena::{ArenaMap, Id};
 use bit_vec::BitVec;
 use std::{
@@ -8,7 +8,7 @@ use std::{
 
 pub type PostOrder = Box<[BasicBlockId]>;
 
-pub fn compute_idom_tree(cfg: &Cfg) -> (ArenaMap<BasicBlockId, BasicBlockId>, PostOrder) {
+pub fn compute_idom_tree(cfg: &CfgBuilder) -> (ArenaMap<BasicBlockId, BasicBlockId>, PostOrder) {
     let start = cfg.start();
     let (post_order, post_order_map, pred_sets) = depth_first_search(cfg);
 
@@ -81,7 +81,7 @@ type PostOrderIndex = u32;
 type PostOrderIndexMap = ArenaMap<BasicBlockId, PostOrderIndex>;
 type PredecessorSets = ArenaMap<BasicBlockId, HashSet<BasicBlockId>>;
 
-fn depth_first_search(cfg: &Cfg) -> (Vec<BasicBlockId>, PostOrderIndexMap, PredecessorSets) {
+fn depth_first_search(cfg: &CfgBuilder) -> (Vec<BasicBlockId>, PostOrderIndexMap, PredecessorSets) {
     let start = cfg.start();
 
     let mut post_order = Vec::with_capacity(cfg.len());
@@ -120,7 +120,7 @@ fn depth_first_search(cfg: &Cfg) -> (Vec<BasicBlockId>, PostOrderIndexMap, Prede
             }
         };
 
-        let pending = match bb.end.kind {
+        let pending = match bb.end.as_ref().unwrap().kind {
             EndInstrKind::IncompleteGoto(_) => panic!("cannot dfs basicblock with incomplete goto"),
             EndInstrKind::IncompleteBreak => panic!("cannot dfs basicblock with incomplete break"),
             EndInstrKind::IncompleteContinue => {

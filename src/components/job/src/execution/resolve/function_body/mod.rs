@@ -1,15 +1,19 @@
 mod basic_bin_op;
 mod compute_preferred_types;
 mod dominators;
+mod post_order_iter;
 mod variables;
 
 use crate::{
-    BasicBlockId, Cfg, Continuation, Executable, ExecutionCtx, Executor, InstrKind, Suspend,
+    BasicBlockId, CfgBuilder, Continuation, Executable, ExecutionCtx, Executor, InstrKind, Suspend,
     SuspendMany,
-    execution::resolve::function_body::variables::VariableTracker,
+    execution::resolve::function_body::{
+        compute_preferred_types::ComputePreferredTypesUserData, variables::VariableTracker,
+    },
     flatten_func,
     module_graph::ModuleView,
     repr::{Compiler, FuncBody, Type, UnaliasedType},
+    sub_task::SubTask,
 };
 use arena::ArenaMap;
 use by_address::ByAddress;
@@ -36,7 +40,7 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    cfg: Option<Cfg<'env>>,
+    cfg: Option<CfgBuilder<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -122,7 +126,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         assert!(def.head.ownership.is_owned());
 
         // 1) Compute control flow graph
-        let cfg = match &mut self.cfg {
+        let cfg = match self.cfg.as_mut() {
             Some(cfg) => cfg,
             None => self.cfg.insert(
                 flatten_func(ctx, &def.head.params, &def.stmts, def.head.source)
@@ -159,6 +163,21 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 })
                 .collect()
         });
+
+        // 5) Determine what type each CFG node prefers to be.
+        execute_sub_task!(
+            self,
+            self.compute_preferred_types,
+            executor,
+            ctx,
+            ComputePreferredTypesUserData {
+                post_order,
+                cfg,
+                func_return_type: &def.head.return_type,
+                view: self.view,
+                builtin_types,
+            }
+        );
 
         todo!("finish ResolveFunctionBody")
 

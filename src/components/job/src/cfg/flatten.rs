@@ -1,8 +1,8 @@
 use crate::{
-    Cfg, ExecutionCtx, InstrRef, Label,
+    ExecutionCtx, InstrRef, Label,
     cfg::{
         IsValue,
-        builder::{Builder, Cursor},
+        builder::{CfgBuilder, Cursor},
         instr::{
             BreakContinue, CallInstr, EndInstrKind, FieldInitializer, InstrKind,
             InterpreterSyscallInstr, StructLiteralInstr,
@@ -17,8 +17,8 @@ pub fn flatten_func<'env>(
     params: &'env Params,
     stmts: &'env [Stmt],
     source: Source,
-) -> Cfg<'env> {
-    let (mut builder, mut cursor) = Builder::<'env>::new();
+) -> CfgBuilder<'env> {
+    let (mut builder, mut cursor) = CfgBuilder::<'env>::new();
 
     for (index, param) in params.required.iter().enumerate() {
         let Some(name) = &param.name else {
@@ -39,12 +39,12 @@ pub fn flatten_func<'env>(
     flatten_stmts(ctx, &mut builder, &mut cursor, stmts, IsValue::NeglectValue);
 
     builder.push_end(&mut cursor, EndInstrKind::Return(None).at(source));
-    builder.finish(ctx)
+    builder
 }
 
 fn flatten_stmts<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     cursor: &mut Cursor,
     stmts: &'env [Stmt],
     is_value: IsValue,
@@ -71,7 +71,7 @@ fn flatten_stmts<'env>(
 
 fn flatten_stmt<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     cursor: &mut Cursor,
     stmt: &'env Stmt,
     is_value: IsValue,
@@ -140,7 +140,7 @@ fn flatten_stmt<'env>(
 
 fn flatten_expr<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     cursor: &mut Cursor,
     expr: &'env ast::Expr,
     is_value: IsValue,
@@ -366,15 +366,14 @@ fn flatten_expr<'env>(
                 ));
             }
 
-            let phi = existing_basicblock_joining(
+            existing_basicblock_joining(
                 ctx,
                 builder,
                 cursor,
                 incoming.into_iter(),
                 Some(conditional.conform_behavior),
                 expr.source,
-            );
-            phi
+            )
         }
         ast::ExprKind::While(while_loop) => {
             let void = builder.push(cursor, InstrKind::VoidLiteral.at(expr.source));
@@ -463,7 +462,7 @@ fn flatten_expr<'env>(
 
 fn flatten_condition<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     cursor: &mut Cursor,
     expr: &'env ast::Expr,
     language: Language,
@@ -521,7 +520,7 @@ impl Joined {
 /// jumps and a PHI node.
 fn new_basicblock_joining<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     mut incoming: impl ExactSizeIterator<Item = Joined>,
     conform_behavior: Option<ConformBehavior>,
     source: Source,
@@ -547,7 +546,7 @@ fn new_basicblock_joining<'env>(
 
 fn existing_basicblock_joining<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     joined_bb: &mut Cursor,
     incoming: impl IntoIterator<Item = Joined>,
     conform_behavior: Option<ConformBehavior>,
@@ -581,7 +580,7 @@ fn existing_basicblock_joining<'env>(
 
 fn flatten_condition_inner<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    builder: &mut Builder<'env>,
+    builder: &mut CfgBuilder<'env>,
     cursor: &mut Cursor,
     expr: &'env ast::Expr,
     language: Language,

@@ -75,9 +75,10 @@ impl<'env> EndInstrKind<'env> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Instr<'env> {
     pub kind: InstrKind<'env>,
+    pub preferred_type: Option<UnaliasedType<'env>>,
     pub typed: Option<UnaliasedType<'env>>,
     pub source: Source,
 }
@@ -225,7 +226,7 @@ impl<'env> Display for InstrKind<'env> {
 const _: () = assert!(std::mem::size_of::<InstrKind>() <= 40);
 const _: () = assert!(std::mem::align_of::<InstrKind>() <= 8);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum InstrKind<'env> {
     Phi(
         &'env [(BasicBlockId, Option<InstrRef>)],
@@ -265,6 +266,7 @@ impl<'env> InstrKind<'env> {
         Instr {
             kind: self,
             source,
+            preferred_type: None,
             typed: None,
         }
     }
