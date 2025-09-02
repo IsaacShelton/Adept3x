@@ -62,6 +62,13 @@ impl<'env> Executable<'env> for LowerType<'env> {
                 )
                 .into());
             }
+            TypeKind::IntegerLiteralInRange(..) => {
+                return Err(ErrorDiagnostic::new(
+                    "Cannot lower unspecialized integer literal in range",
+                    self.ty.source,
+                )
+                .into());
+            }
             TypeKind::FloatLiteral(_) => {
                 return Err(ErrorDiagnostic::new(
                     "Cannot lower unspecialized float literal",

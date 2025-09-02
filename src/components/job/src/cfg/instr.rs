@@ -1,4 +1,4 @@
-use crate::{BasicBlockId, InstrRef, repr::UnaliasedType};
+use crate::{BasicBlockId, InstrRef, conform::UnaryImplicitCast, repr::UnaliasedType};
 use ast::{ConformBehavior, FillBehavior, Integer, Language, SizeOfMode, UnaryOperator};
 use attributes::Privacy;
 use source_files::Source;
@@ -22,14 +22,25 @@ impl<'env> Display for EndInstrKind<'env> {
             EndInstrKind::IncompleteGoto(name) => writeln!(f, "incomplete goto {}", name),
             EndInstrKind::IncompleteBreak => writeln!(f, "incomplete break"),
             EndInstrKind::IncompleteContinue => writeln!(f, "incomplete continue"),
-            EndInstrKind::Return(instr_ref) => {
+            EndInstrKind::Return(instr_ref, cast) => {
                 if let Some(instr_ref) = instr_ref {
-                    writeln!(f, "return {}", instr_ref)
+                    write!(f, "return {}", instr_ref)?;
                 } else {
-                    writeln!(f, "return")
+                    write!(f, "return")?;
+                }
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
+                }
+                writeln!(f, "")
+            }
+            EndInstrKind::Jump(bb_id, pre_jump_conform) => {
+                if let Some(pre_jump_conform) = pre_jump_conform {
+                    writeln!(f, "jump {} as {}", bb_id, pre_jump_conform)
+                } else {
+                    writeln!(f, "jump {}", bb_id)
                 }
             }
-            EndInstrKind::Jump(bb_id) => writeln!(f, "jump {}", bb_id),
             EndInstrKind::Branch(instr_ref, a, b, break_continue) => {
                 writeln!(f, "branch {} {} {} {:?}", instr_ref, a, b, break_continue)
             }
@@ -62,8 +73,8 @@ pub enum EndInstrKind<'env> {
     IncompleteGoto(&'env str),
     IncompleteBreak,
     IncompleteContinue,
-    Return(Option<InstrRef>),
-    Jump(BasicBlockId),
+    Return(Option<InstrRef>, Option<UnaryImplicitCast<'env>>),
+    Jump(BasicBlockId, Option<UnaliasedType<'env>>),
     Branch(InstrRef, BasicBlockId, BasicBlockId, Option<BreakContinue>),
     NewScope(BasicBlockId, BasicBlockId),
     Unreachable,
@@ -163,8 +174,12 @@ impl<'env> Display for InstrKind<'env> {
 
                 write!(f, ") {:?} {:?}", call.generics, call.expected_to_return)?;
             }
-            InstrKind::DeclareAssign(name, instr_ref) => {
+            InstrKind::DeclareAssign(name, instr_ref, cast) => {
                 write!(f, "declare_assign {} {}", name, instr_ref)?;
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
+                }
             }
             InstrKind::Member(subject, name, privacy) => {
                 write!(f, "member {} {} {}", subject, name, privacy)?;
@@ -209,8 +224,12 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::IntegerPromote(instr_ref) => {
                 write!(f, "integer_promote {}", instr_ref)?;
             }
-            InstrKind::ConformToBool(instr_ref, language) => {
+            InstrKind::ConformToBool(instr_ref, language, cast) => {
                 write!(f, "conform_to_bool {} {:?}", instr_ref, language)?;
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
+                }
             }
             InstrKind::Is(instr_ref, variant) => {
                 write!(f, "is {} {}", instr_ref, variant)?;
@@ -248,7 +267,7 @@ pub enum InstrKind<'env> {
     NullLiteral,
     VoidLiteral,
     Call(&'env CallInstr<'env>),
-    DeclareAssign(&'env str, InstrRef),
+    DeclareAssign(&'env str, InstrRef, Option<UnaryImplicitCast<'env>>),
     Member(InstrRef, &'env str, Privacy),
     ArrayAccess(InstrRef, InstrRef),
     StructLiteral(&'env StructLiteralInstr<'env>),
@@ -257,7 +276,7 @@ pub enum InstrKind<'env> {
     SizeOfValue(InstrRef, Option<SizeOfMode>),
     InterpreterSyscall(&'env InterpreterSyscallInstr<'env>),
     IntegerPromote(InstrRef),
-    ConformToBool(InstrRef, Language),
+    ConformToBool(InstrRef, Language, Option<UnaryImplicitCast<'env>>),
     Is(InstrRef, &'env str),
     LabelLiteral(&'env str),
 }

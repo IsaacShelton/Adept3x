@@ -38,7 +38,7 @@ pub fn flatten_func<'env>(
 
     flatten_stmts(ctx, &mut builder, &mut cursor, stmts, IsValue::NeglectValue);
 
-    builder.push_end(&mut cursor, EndInstrKind::Return(None).at(source));
+    builder.push_end(&mut cursor, EndInstrKind::Return(None, None).at(source));
     builder
 }
 
@@ -81,7 +81,7 @@ fn flatten_stmt<'env>(
             let value = expr
                 .as_ref()
                 .map(|expr| flatten_expr(ctx, builder, cursor, expr, IsValue::RequireValue));
-            builder.push_end(cursor, EndInstrKind::Return(value).at(stmt.source));
+            builder.push_end(cursor, EndInstrKind::Return(value, None).at(stmt.source));
             None
         }
         ast::StmtKind::Expr(expr) => Some(flatten_expr(ctx, builder, cursor, expr, is_value)),
@@ -216,7 +216,7 @@ fn flatten_expr<'env>(
             );
             builder.push(
                 cursor,
-                InstrKind::DeclareAssign(&declare_assign.name, value).at(expr.source),
+                InstrKind::DeclareAssign(&declare_assign.name, value, None).at(expr.source),
             )
         }
         ast::ExprKind::BasicBinaryOperation(bin_op) => {
@@ -256,8 +256,12 @@ fn flatten_expr<'env>(
 
             builder.push(
                 when_more_calc,
-                InstrKind::ConformToBool(right_unconformed, bin_op.conform_behavior.language())
-                    .at(right_source),
+                InstrKind::ConformToBool(
+                    right_unconformed,
+                    bin_op.conform_behavior.language(),
+                    None,
+                )
+                .at(right_source),
             );
 
             new_basicblock_joining(
@@ -406,7 +410,7 @@ fn flatten_expr<'env>(
 
             builder.push_end(
                 &mut when_true,
-                EndInstrKind::Jump(condition_bb).at(expr.source),
+                EndInstrKind::Jump(condition_bb, None).at(expr.source),
             );
 
             *cursor = when_false;
@@ -562,7 +566,7 @@ fn existing_basicblock_joining<'env>(
         values.push((joined.cursor().basicblock().into_raw(), joined.instr));
         builder.push_end(
             joined.cursor(),
-            EndInstrKind::Jump(joined_bb.basicblock().into_raw()).at(source),
+            EndInstrKind::Jump(joined_bb.basicblock().into_raw(), None).at(source),
         );
     }
 
@@ -619,8 +623,10 @@ fn flatten_condition_inner<'env>(
         }
         _ => {
             let value = flatten_expr(ctx, builder, cursor, expr, IsValue::RequireValue);
-            let condition =
-                builder.push(cursor, InstrKind::ConformToBool(value, language).at(source));
+            let condition = builder.push(
+                cursor,
+                InstrKind::ConformToBool(value, language, None).at(source),
+            );
             let (when_true, when_false) = builder.push_branch(condition, cursor, None, source);
             join_when_true.push(Joined::new(when_true, Some(void.clone())));
             join_when_false.push(Joined::new(when_false, Some(void)));

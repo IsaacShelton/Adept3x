@@ -4,17 +4,19 @@ mod rev_post_order_iter;
 mod variables;
 
 use crate::{
-    BasicBlockId, CfgBuilder, Continuation, Executable, ExecutionCtx, Executor, InstrKind, Suspend,
-    SuspendMany,
+    BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
+    InstrKind, Suspend, SuspendMany, are_types_equal,
+    conform::conform_to_default,
     execution::resolve::{
         ResolveType,
         function_body::{
-            rev_post_order_iter::RevPostOrderIterWithoutEnds, variables::VariableTracker,
+            rev_post_order_iter::RevPostOrderIterWithEnds, variables::VariableTracker,
         },
     },
     flatten_func,
     module_graph::ModuleView,
-    repr::{Compiler, FuncBody, Type, TypeKind, UnaliasedType},
+    repr::{Compiler, FuncBody, FuncHead, Type, TypeKind, UnaliasedType},
+    unify::unify_types,
 };
 use arena::ArenaMap;
 use ast::Integer;
@@ -30,6 +32,7 @@ use variables::VariableTrackers;
 pub struct ResolveFunctionBody<'env> {
     view: ModuleView<'env>,
     func: ByAddress<&'env ast::Func>,
+    resolved_head: ByAddress<&'env FuncHead<'env>>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -57,7 +60,7 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    rev_post_order: Option<RevPostOrderIterWithoutEnds>,
+    rev_post_order: Option<RevPostOrderIterWithEnds>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -70,10 +73,12 @@ impl<'env> ResolveFunctionBody<'env> {
         view: ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         func: &'env ast::Func,
+        resolved_head: &'env FuncHead<'env>,
     ) -> Self {
         Self {
             view,
             func: ByAddress(func),
+            resolved_head: ByAddress(resolved_head),
             inner_types: None,
             rev_post_order: None,
             resolved_type: None,
@@ -162,17 +167,75 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
         let rev_post_order = self
             .rev_post_order
-            .get_or_insert_with(|| RevPostOrderIterWithoutEnds::new(cfg, post_order));
-
-        println!("{}", cfg);
+            .get_or_insert_with(|| RevPostOrderIterWithEnds::new(cfg, post_order));
 
         // 5) Resolve types and linked data for each CFG node (may suspend)
         while let Some(instr_ref) = rev_post_order.peek() {
             let bb = cfg.get_unsafe(instr_ref.basicblock);
+
+            if instr_ref.instr_or_end >= bb.inner_len() {
+                let instr = &bb.end.as_ref().unwrap();
+
+                match &instr.kind {
+                    EndInstrKind::IncompleteGoto(_)
+                    | EndInstrKind::IncompleteBreak
+                    | EndInstrKind::IncompleteContinue => unreachable!(),
+                    EndInstrKind::Return(value, _) => {
+                        if let Some(value) = value {
+                            let conformed = conform_to_default(
+                                ctx,
+                                cfg.get_typed(*value),
+                                c_integer_assumptions,
+                                builtin_types,
+                            )?;
+
+                            if !are_types_equal(
+                                self.resolved_head.return_type,
+                                conformed.ty,
+                                |_, _| todo!("handle polymorphs"),
+                            ) {
+                                return Err(ErrorDiagnostic::new(
+                                    format!("Cannot return value of type '{}'", conformed.ty.0),
+                                    instr.source,
+                                )
+                                .into());
+                            }
+
+                            cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
+                        }
+                    }
+                    EndInstrKind::Jump(..)
+                    | EndInstrKind::Branch(..)
+                    | EndInstrKind::NewScope(..)
+                    | EndInstrKind::Unreachable => (),
+                }
+
+                let bb = cfg.get_unsafe(instr_ref.basicblock);
+                let instr = &bb.end.as_ref().unwrap();
+                print!("revolved end instr to: {}", instr);
+                rev_post_order.next(cfg, post_order);
+                continue;
+            }
+
             let instr = &bb.instrs[instr_ref.instr_or_end as usize];
 
             match &instr.kind {
+                InstrKind::Phi(items, conform_behavior) if items.len() <= 1 => {
+                    // 0] We don't need to do anything fancy if there's not more
+                    //    than one incoming value.
+                    cfg.set_typed(
+                        instr_ref,
+                        items
+                            .first()
+                            .unwrap()
+                            .1
+                            .map(|instr_ref| cfg.get_typed(instr_ref))
+                            .unwrap_or(builtin_types.never()),
+                    )
+                }
                 InstrKind::Phi(items, conform_behavior) => {
+                    // NOTE: We already handled case for when `items.len() <= 1` above.
+
                     // NOTE: For PHI nodes, we will want to find the best
                     // combining type, and then conform each incoming value
                     // to that type.
@@ -184,25 +247,31 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // to each branch before they go here.
                     // We could also modify `Jump` to allow for this purpose.
 
-                    let mut expected = None;
-                    for item in items.iter().filter_map(|(bb_id, x)| *x) {
-                        let item = cfg.get_typed(item);
+                    // 0] Determine types
+                    let types_iter = items
+                        .iter()
+                        .flat_map(|(bb, value)| value.map(|value| cfg.get_typed(value)));
 
-                        let Some(expected) = expected else {
-                            expected = Some(item);
-                            continue;
-                        };
+                    // 1] Determine unifying type
+                    let unified = unify_types(
+                        ctx,
+                        types_iter,
+                        conform_behavior.expect("conform behavior for >2 incoming phi"),
+                        builtin_types,
+                        instr.source,
+                    );
 
-                        if todo!("are types unequal") {
-                            return Err(ErrorDiagnostic::new(
-                                "Cannot combine incompatible types",
-                                instr.source,
-                            )
-                            .into());
+                    // 2] Set incoming jumps to conform to the unifying type
+                    if let Some(unified) = unified {
+                        for (bb, value) in items.iter() {
+                            if value.is_some() {
+                                cfg.set_jump_pre_conform(*bb, unified);
+                            }
                         }
                     }
 
-                    cfg.set_typed(instr_ref, expected.unwrap_or(builtin_types.never()))
+                    // 3] Result type is the unified type
+                    cfg.set_typed(instr_ref, unified.unwrap_or(builtin_types.never()))
                 }
                 InstrKind::Name(_) => todo!(),
                 InstrKind::Parameter(_, ast_type, _) => {
@@ -222,8 +291,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     cfg.set_typed(instr_ref, builtin_types.void())
                 }
-                InstrKind::Declare(_, _, instr_ref) => todo!(),
-                InstrKind::Assign(instr_ref, instr_ref1) => todo!(),
+                InstrKind::Declare(_, _, instr_ref) => todo!("declare"),
+                InstrKind::Assign(instr_ref, instr_ref1) => todo!("assign"),
                 InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
                     todo!()
                 }
@@ -254,9 +323,9 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         )),
                     );
                 }
-                InstrKind::AsciiCharLiteral(_) => todo!(),
-                InstrKind::Utf8CharLiteral(_) => todo!(),
-                InstrKind::StringLiteral(_) => todo!(),
+                InstrKind::AsciiCharLiteral(_) => todo!("ascii char literal"),
+                InstrKind::Utf8CharLiteral(_) => todo!("utf-8 char literal"),
+                InstrKind::StringLiteral(_) => todo!("string literal"),
                 InstrKind::NullTerminatedStringLiteral(cstr) => todo!(),
                 InstrKind::NullLiteral => {
                     cfg.set_typed(instr_ref, builtin_types.null());
@@ -264,27 +333,53 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::VoidLiteral => {
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
-                InstrKind::Call(call_instr) => todo!(),
-                InstrKind::DeclareAssign(_, instr_ref) => todo!(),
-                InstrKind::Member(instr_ref, _, privacy) => todo!(),
-                InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
-                InstrKind::StructLiteral(struct_literal_instr) => todo!(),
-                InstrKind::UnaryOperation(unary_operator, instr_ref) => todo!(),
-                InstrKind::SizeOf(_, size_of_mode) => todo!(),
-                InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!(),
-                InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
-                InstrKind::IntegerPromote(instr_ref) => todo!(),
-                InstrKind::ConformToBool(..) => {
-                    // TODO: Perform any conforming necessary
-                    cfg.set_typed(instr_ref, builtin_types.bool());
+                InstrKind::Call(call_instr) => todo!("call"),
+                InstrKind::DeclareAssign(_, value, _) => {
+                    let conformed = conform_to_default(
+                        ctx,
+                        cfg.get_typed(*value),
+                        c_integer_assumptions,
+                        builtin_types,
+                    )?;
+
+                    variables.assign_resolved_type(instr_ref, conformed.ty);
+                    cfg.set_typed(instr_ref, conformed.ty);
+                    cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
                 }
-                InstrKind::Is(instr_ref, _) => todo!(),
-                InstrKind::LabelLiteral(_) => todo!(),
+                InstrKind::Member(instr_ref, _, privacy) => todo!("member"),
+                InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!("array access"),
+                InstrKind::StructLiteral(struct_literal_instr) => todo!("struct litereal"),
+                InstrKind::UnaryOperation(unary_operator, instr_ref) => todo!("unary operation"),
+                InstrKind::SizeOf(_, size_of_mode) => todo!("sizeof"),
+                InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!("sizeof value"),
+                InstrKind::InterpreterSyscall(interpreter_syscall_instr) => {
+                    todo!("interpreter syscall")
+                }
+                InstrKind::IntegerPromote(instr_ref) => todo!("integer promote"),
+                InstrKind::ConformToBool(value, language, _) => {
+                    let conformed = conform_to_default(
+                        ctx,
+                        cfg.get_typed(*value),
+                        c_integer_assumptions,
+                        builtin_types,
+                    )?;
+
+                    if !conformed.ty.0.kind.is_boolean() {
+                        return Err(
+                            ErrorDiagnostic::new("Expected 'bool' value", instr.source).into()
+                        );
+                    }
+
+                    cfg.set_typed(instr_ref, conformed.ty);
+                    cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
+                }
+                InstrKind::Is(instr_ref, _) => todo!("is"),
+                InstrKind::LabelLiteral(_) => todo!("label literal"),
             }
 
             let bb = cfg.get_unsafe(instr_ref.basicblock);
             let instr = &bb.instrs[instr_ref.instr_or_end as usize];
-            print!("revolved to: {}", instr);
+            print!("revolved normal instr to: {}", instr);
             rev_post_order.next(cfg, post_order);
         }
 

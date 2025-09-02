@@ -1,8 +1,6 @@
 pub use super::*;
 use crate::{
-    ExecutionCtx,
-    cfg::instr::BreakContinue,
-    repr::{Type, UnaliasedType},
+    ExecutionCtx, cfg::instr::BreakContinue, conform::UnaryImplicitCast, repr::UnaliasedType,
 };
 use arena::Idx;
 
@@ -58,6 +56,16 @@ impl<'env> CfgBuilder<'env> {
         )
     }
 
+    pub fn set_jump_pre_conform(&mut self, bb_id: BasicBlockId, ty: UnaliasedType<'env>) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(bb_id) }];
+        match &mut bb.end.as_mut().unwrap().kind {
+            EndInstrKind::Jump(_, pre_jump_conform) => {
+                *pre_jump_conform = Some(ty);
+            }
+            _ => panic!("cannot set_jump_pre_conform for non-jump"),
+        }
+    }
+
     pub fn set_typed(&mut self, instr_ref: InstrRef, ty: UnaliasedType<'env>) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
@@ -68,6 +76,30 @@ impl<'env> CfgBuilder<'env> {
         let bb = &self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
         bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
+    }
+
+    pub fn set_primary_unary_implicit_cast(
+        &mut self,
+        instr_ref: InstrRef,
+        cast: Option<UnaryImplicitCast<'env>>,
+    ) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+
+        // End Instruction
+        if instr_ref.instr_or_end as usize >= bb.instrs.len() {
+            match &mut bb.end.as_mut().unwrap().kind {
+                EndInstrKind::Return(_, unary_implicit_cast) => *unary_implicit_cast = cast,
+                _ => unreachable!(),
+            }
+            return;
+        }
+
+        // Sequential Instruction
+        match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
+            InstrKind::DeclareAssign(_, _, unary_implicit_cast)
+            | InstrKind::ConformToBool(_, _, unary_implicit_cast) => *unary_implicit_cast = cast,
+            _ => unreachable!(),
+        }
     }
 
     #[inline]
@@ -114,7 +146,7 @@ impl<'env> CfgBuilder<'env> {
 
         self.push_end(
             cursor,
-            EndInstrKind::Jump(new_block.basicblock().into_raw()).at(source),
+            EndInstrKind::Jump(new_block.basicblock().into_raw(), None).at(source),
         );
 
         *cursor = new_block;
@@ -255,7 +287,7 @@ impl<'env> CfgBuilder<'env> {
                     ));
                 };
 
-                bb.end.as_mut().unwrap().kind = EndInstrKind::Jump(*target);
+                bb.end.as_mut().unwrap().kind = EndInstrKind::Jump(*target, None);
             }
         }
 

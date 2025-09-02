@@ -78,6 +78,7 @@ impl<'env> Display for TypeArg<'env> {
 pub enum TypeKind<'env> {
     // Literals
     IntegerLiteral(&'env BigInt),
+    IntegerLiteralInRange(&'env BigInt, &'env BigInt),
     FloatLiteral(Option<NotNan<f64>>),
     BooleanLiteral(bool),
     NullLiteral,
@@ -144,6 +145,7 @@ impl<'env> TypeKind<'env> {
             | TypeKind::CInteger(_, _)
             | TypeKind::SizeInteger(_)
             | TypeKind::IntegerLiteral(_)
+            | TypeKind::IntegerLiteralInRange(..)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => false,
             TypeKind::Ptr(inner) => inner.kind.contains_polymorph(),
@@ -164,6 +166,7 @@ impl<'env> TypeKind<'env> {
             | TypeKind::CInteger(_, _)
             | TypeKind::SizeInteger(_)
             | TypeKind::IntegerLiteral(_)
+            | TypeKind::IntegerLiteralInRange(..)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_) => false,
             TypeKind::Ptr(inner) => inner.kind.contains_type_alias(),
@@ -190,6 +193,9 @@ impl<'env> Display for TypeKind<'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TypeKind::IntegerLiteral(integer) => write!(f, "integer {}", integer),
+            TypeKind::IntegerLiteralInRange(min, max) => {
+                write!(f, "integer {}..={}", min, max)
+            }
             TypeKind::FloatLiteral(Some(float)) => write!(f, "float {}", float),
             TypeKind::FloatLiteral(None) => write!(f, "float NaN"),
             TypeKind::Boolean => write!(f, "bool"),

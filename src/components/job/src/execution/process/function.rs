@@ -121,6 +121,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                             self.view,
                             &self.compiler,
                             &self.func,
+                            resolved_head
                         )),
                         ctx
                     );

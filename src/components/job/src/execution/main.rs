@@ -68,7 +68,7 @@ impl<'env> Executable<'env> for Main<'env> {
         let compiler = ctx.alloc(Compiler {
             source_files: self.source_files,
             project_root,
-            builtin_types: ctx.alloc(BuiltinTypes::default()),
+            builtin_types: ctx.alloc(BuiltinTypes::new(ctx)),
             runtime_target: self.build_options.target,
         });
 

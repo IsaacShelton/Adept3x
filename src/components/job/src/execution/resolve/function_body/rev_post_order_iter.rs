@@ -1,12 +1,12 @@
 use crate::{BasicBlockId, CfgBuilder, InstrRef};
 
 #[derive(Clone, Debug)]
-pub struct RevPostOrderIterWithoutEnds {
+pub struct RevPostOrderIterWithEnds {
     current: Option<InstrRef>,
     post_order_index: u32,
 }
 
-impl RevPostOrderIterWithoutEnds {
+impl RevPostOrderIterWithEnds {
     pub fn new(cfg: &CfgBuilder, post_order: &[BasicBlockId]) -> Self {
         if post_order.len() == 0 {
             return Self {
@@ -46,7 +46,8 @@ impl RevPostOrderIterWithoutEnds {
         let current = self.current?;
         let bb = cfg.get_unsafe(current.basicblock);
 
-        if current.instr_or_end + 1 < bb.inner_len() {
+        // NOTE: We don't subtract one, since we want to include the end instruction.
+        if current.instr_or_end <= bb.inner_len() {
             self.current = Some(InstrRef::new(current.basicblock, current.instr_or_end + 1));
             return self.current;
         }

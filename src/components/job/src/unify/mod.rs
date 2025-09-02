@@ -4,7 +4,6 @@
     ---------------------------------------------------------------------------
 */
 
-/*
 use crate::{
     BuiltinTypes, ExecutionCtx,
     repr::{Type, TypeKind, UnaliasedType},
@@ -18,7 +17,6 @@ use source_files::Source;
 
 pub fn unify_types<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    preferred_type: Option<UnaliasedType<'env>>,
     types_iter: impl Iterator<Item = UnaliasedType<'env>> + Clone,
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
@@ -43,14 +41,64 @@ pub fn unify_types<'env>(
 
     // If all the values are integer literals, the unifying type is either
     // the preferred type or the default integer type
-    if types_iter.clone().all(|ty| ty.0.kind.is_integer_literal()) {
-        // If the preferred type is an integer type that can fit them, use the preferred type
-        if integer_literals_all_fit(preferred_type, types_iter) {
-            return Some(preferred_type.unwrap().clone());
+    if types_iter
+        .clone()
+        .all(|ty| ty.0.kind.is_integer_literal() || ty.0.kind.is_integer_literal_in_range())
+    {
+        let mut min = Option::<&'env BigInt>::None;
+        let mut max = Option::<&'env BigInt>::None;
+
+        for ty in types_iter {
+            match &ty.0.kind {
+                TypeKind::IntegerLiteral(big_int) => {
+                    if let Some(current_min) = min {
+                        if *big_int < current_min {
+                            min = Some(*big_int);
+                        }
+                    } else {
+                        min = Some(big_int);
+                    }
+                    if let Some(current_max) = max {
+                        if *big_int > current_max {
+                            max = Some(*big_int);
+                        }
+                    } else {
+                        max = Some(big_int);
+                    }
+                }
+                TypeKind::IntegerLiteralInRange(range_min, range_max) => {
+                    if let Some(current_min) = min {
+                        if *range_min < current_min {
+                            min = Some(*range_min);
+                        }
+                    } else {
+                        min = Some(range_min);
+                    }
+                    if let Some(current_max) = max {
+                        if *range_max > current_max {
+                            max = Some(*range_max);
+                        }
+                    } else {
+                        max = Some(range_max);
+                    }
+                }
+                _ => unreachable!(),
+            }
         }
 
-        // Otherwise, use the default integer type
-        return Some(builtin_types.i32());
+        // We're guarenteed to have these, because of the check for "never" done earlier
+        let (min, max) = min.zip(max).unwrap();
+
+        return Some(UnaliasedType(
+            ctx.alloc(
+                if min == max {
+                    TypeKind::IntegerLiteral(min)
+                } else {
+                    TypeKind::IntegerLiteralInRange(min, max)
+                }
+                .at(source),
+            ),
+        ));
     }
 
     // If all the values are float literals, the unifying type is f64
@@ -65,13 +113,7 @@ pub fn unify_types<'env>(
             TypeKind::IntegerLiteral(..) | TypeKind::FloatLiteral(..)
         )
     }) {
-        if let Some(TypeKind::Floating(FloatSize::Bits32)) =
-            preferred_type.as_ref().map(|ty| &ty.0.kind)
-        {
-            return Some(builtin_types.f32());
-        } else {
-            return Some(builtin_types.f64());
-        }
+        return Some(builtin_types.f64());
     }
 
     // If all values are integers and integer literals
@@ -168,7 +210,7 @@ impl IntegerProperties {
             TypeKind::IntegerLiteral(value) => {
                 let unsigned_bits = value.bits();
 
-                let sign = (*value < BigInt::ZERO).then_some(IntegerSign::Signed);
+                let sign = (**value < BigInt::ZERO).then_some(IntegerSign::Signed);
 
                 let bits = BitUnits::of(if sign == Some(IntegerSign::Signed) {
                     unsigned_bits + 1
@@ -315,7 +357,7 @@ fn integer_literals_all_fit<'env>(
 
     types.all(|ty| match &ty.0.kind {
         TypeKind::IntegerLiteral(value) => {
-            let literal_sign = IntegerSign::from(value);
+            let literal_sign = IntegerSign::from(*value);
 
             let literal_bits = BitUnits::of(match literal_sign {
                 IntegerSign::Unsigned => value.bits(),
@@ -328,4 +370,3 @@ fn integer_literals_all_fit<'env>(
         _ => false,
     })
 }
-*/

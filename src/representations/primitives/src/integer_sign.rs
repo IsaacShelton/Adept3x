@@ -8,6 +8,14 @@ pub enum IntegerSign {
 }
 
 impl IntegerSign {
+    pub fn new(is_signed: bool) -> Self {
+        if is_signed {
+            Self::Signed
+        } else {
+            Self::Unsigned
+        }
+    }
+
     pub fn stronger(a: Self, b: Self) -> Self {
         (a.is_signed() || b.is_signed())
             .then_some(Self::Signed)

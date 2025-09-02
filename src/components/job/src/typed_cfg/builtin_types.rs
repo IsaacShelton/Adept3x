@@ -1,10 +1,14 @@
-use crate::repr::{Type, TypeKind, UnaliasedType};
+use crate::{
+    ExecutionCtx,
+    repr::{Type, TypeKind, UnaliasedType},
+};
 use primitives::{FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
 
 #[derive(Clone, Debug)]
 pub struct BuiltinTypes<'env> {
     pub void: Type<'env>,
+    pub ptr_void: Type<'env>,
     pub null: Type<'env>,
     pub bool: Type<'env>,
     pub i32: Type<'env>,
@@ -16,10 +20,12 @@ pub struct BuiltinTypes<'env> {
     pub never: Type<'env>,
 }
 
-impl<'env> Default for BuiltinTypes<'env> {
-    fn default() -> Self {
+impl<'env> BuiltinTypes<'env> {
+    pub fn new(ctx: &mut ExecutionCtx<'env>) -> Self {
         Self {
             void: TypeKind::Void.at(Source::internal()),
+            ptr_void: TypeKind::Ptr(ctx.alloc(TypeKind::Void.at(Source::internal())))
+                .at(Source::internal()),
             null: TypeKind::NullLiteral.at(Source::internal()),
             bool: TypeKind::Boolean.at(Source::internal()),
             i32: TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Signed)
@@ -40,6 +46,10 @@ impl<'env> Default for BuiltinTypes<'env> {
 impl<'env> BuiltinTypes<'env> {
     pub fn void(&'env self) -> UnaliasedType<'env> {
         UnaliasedType(&self.void)
+    }
+
+    pub fn ptr_void(&'env self) -> UnaliasedType<'env> {
+        UnaliasedType(&self.ptr_void)
     }
 
     pub fn null(&'env self) -> UnaliasedType<'env> {

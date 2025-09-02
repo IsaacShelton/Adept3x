@@ -1,8 +1,9 @@
-/*
 use crate::{
-    BuiltinTypes, ExecutionCtx, Resolved, UnaryImplicitCast,
+    BuiltinTypes, ExecutionCtx,
+    conform::UnaryImplicitCast,
     repr::{TypeKind, UnaliasedType},
 };
+use ast::Integer;
 use data_units::BitUnits;
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
@@ -11,59 +12,117 @@ use ordered_float::NotNan;
 use primitives::{CIntegerAssumptions, IntegerBits, IntegerSign};
 use source_files::Source;
 
+pub struct Conform<'env> {
+    pub ty: UnaliasedType<'env>,
+    pub cast: Option<UnaryImplicitCast<'env>>,
+}
+
+impl<'env> Conform<'env> {
+    pub fn new(ty: UnaliasedType<'env>, cast: UnaryImplicitCast<'env>) -> Self {
+        Self {
+            ty,
+            cast: Some(cast),
+        }
+    }
+
+    pub fn from_type(ty: UnaliasedType<'env>) -> Self {
+        Self { ty, cast: None }
+    }
+}
+
 pub fn conform_to_default<'env>(
     ctx: &mut ExecutionCtx<'env>,
     ty: UnaliasedType<'env>,
     assumptions: CIntegerAssumptions,
     builtin_types: &'env BuiltinTypes<'env>,
-) -> Result<Resolved<'env>, ErrorDiagnostic> {
+) -> Result<Conform<'env>, ErrorDiagnostic> {
     let source = ty.0.source;
 
+    let default_integer_types = [
+        &builtin_types.i32,
+        &builtin_types.u32,
+        &builtin_types.i64,
+        &builtin_types.u64,
+    ];
+
     Ok(match &ty.0.kind {
-        TypeKind::IntegerLiteral(big_int) => [
-            &builtin_types.i32,
-            &builtin_types.u32,
-            &builtin_types.i64,
-            &builtin_types.u64,
-        ]
-        .into_iter()
-        .flat_map(|possible_type| {
-            from_integer_literal(
-                ctx,
-                big_int,
-                assumptions,
-                source,
-                &possible_type.kind,
-                builtin_types,
-            )
-        })
-        .next()
-        .ok_or_else(|| ErrorDiagnostic::new("Failed to specialize integer literal", source))?,
-        TypeKind::FloatLiteral(not_nan) => Resolved::new(
+        TypeKind::IntegerLiteral(big_int) => default_integer_types
+            .into_iter()
+            .flat_map(|possible_type| {
+                from_integer_literal(
+                    ctx,
+                    big_int,
+                    assumptions,
+                    source,
+                    &possible_type.kind,
+                    builtin_types,
+                )
+            })
+            .next()
+            .ok_or_else(|| {
+                ErrorDiagnostic::new(
+                    "Integer is too large to represent without concrete type",
+                    source,
+                )
+            })?,
+        TypeKind::FloatLiteral(not_nan) => Conform::new(
             builtin_types.f64(),
-            UnaryImplicitCast::SpecializeFloat(not_nan.clone()).into(),
+            UnaryImplicitCast::SpecializeFloat(not_nan.clone()),
         ),
-        TypeKind::BooleanLiteral(value) => Resolved::new(
+        TypeKind::BooleanLiteral(value) => Conform::new(
             builtin_types.bool(),
-            UnaryImplicitCast::SpecializeBoolean(*value).into(),
+            UnaryImplicitCast::SpecializeBoolean(*value),
         ),
-        _ => Resolved::from_type(ty.clone()),
+        TypeKind::IntegerLiteralInRange(min, max) => default_integer_types
+            .into_iter()
+            .flat_map(|possible_type| {
+                from_integer_literal(
+                    ctx,
+                    max,
+                    assumptions,
+                    source,
+                    &possible_type.kind,
+                    builtin_types,
+                )
+                .and_then(|_| {
+                    from_integer_literal(
+                        ctx,
+                        min,
+                        assumptions,
+                        source,
+                        &possible_type.kind,
+                        builtin_types,
+                    )
+                })
+            })
+            .next()
+            .ok_or_else(|| {
+                ErrorDiagnostic::new(
+                    "Possible integers are too large to represent without concrete type",
+                    source,
+                )
+            })?,
+        TypeKind::NullLiteral => Conform::new(
+            builtin_types.ptr_void(),
+            UnaryImplicitCast::SpecializePointerOuter(builtin_types.ptr_void()),
+        ),
+        _ => Conform::from_type(ty.clone()),
     })
 }
 
 fn from_integer_literal<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    value: &BigInt,
+    value: &'env BigInt,
     assumptions: CIntegerAssumptions,
     source: Source,
     to_type_kind: &'env TypeKind<'env>,
     builtin_types: &'env BuiltinTypes<'env>,
-) -> Option<Resolved<'env>> {
+) -> Option<Conform<'env>> {
     match &to_type_kind {
         TypeKind::Floating(float_size) => value.to_f64().map(|float| {
-            Resolved::new(
+            Conform::new(
                 builtin_types.floating(*float_size),
-                UnaryImplicitCast::SpecializeFloat(NotNan::new(float).ok()).into(),
+                UnaryImplicitCast::SpecializeFloat(NotNan::new(float).ok()),
             )
         }),
         TypeKind::BitInteger(to_bits, to_sign) => {
@@ -79,9 +138,9 @@ fn from_integer_literal<'env>(
             };
 
             does_fit.then(|| {
-                Resolved::new(
+                Conform::new(
                     UnaliasedType(ctx.alloc(TypeKind::BitInteger(*to_bits, *to_sign).at(source))),
-                    UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
+                    UnaryImplicitCast::SpecializeInteger(value).into(),
                 )
             })
         }
@@ -90,11 +149,11 @@ fn from_integer_literal<'env>(
                 BitUnits::of(value.bits() + (*value < BigInt::zero()).then_some(1).unwrap_or(0));
 
             (needs_bits <= to_c_integer.min_bits(assumptions).bits()).then(|| {
-                Resolved::new(
+                Conform::new(
                     UnaliasedType(
                         ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
                     ),
-                    UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
+                    UnaryImplicitCast::SpecializeInteger(value),
                 )
             })
         }
@@ -107,13 +166,12 @@ fn from_integer_literal<'env>(
             };
 
             does_fit.then(|| {
-                Resolved::new(
+                Conform::new(
                     UnaliasedType(ctx.alloc(TypeKind::SizeInteger(*to_sign).at(source))),
-                    UnaryImplicitCast::SpecializeInteger(value.clone()).into(),
+                    UnaryImplicitCast::SpecializeInteger(value).into(),
                 )
             })
         }
         _ => None,
     }
 }
-*/
