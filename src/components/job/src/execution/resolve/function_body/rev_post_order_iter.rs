@@ -47,7 +47,7 @@ impl RevPostOrderIterWithEnds {
         let bb = cfg.get_unsafe(current.basicblock);
 
         // NOTE: We don't subtract one, since we want to include the end instruction.
-        if current.instr_or_end <= bb.inner_len() {
+        if current.instr_or_end < bb.inner_len() {
             self.current = Some(InstrRef::new(current.basicblock, current.instr_or_end + 1));
             return self.current;
         }

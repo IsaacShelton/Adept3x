@@ -5,7 +5,7 @@ mod variables;
 
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
-    InstrKind, Suspend, SuspendMany, are_types_equal,
+    InstrKind, InstrRef, Suspend, SuspendMany, are_types_equal,
     conform::conform_to_default,
     execution::resolve::{
         ResolveType,
@@ -173,6 +173,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         while let Some(instr_ref) = rev_post_order.peek() {
             let bb = cfg.get_unsafe(instr_ref.basicblock);
 
+            // If we're processing an end instruction, we need to handle it separately
             if instr_ref.instr_or_end >= bb.inner_len() {
                 let instr = &bb.end.as_ref().unwrap();
 
@@ -180,43 +181,41 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     EndInstrKind::IncompleteGoto(_)
                     | EndInstrKind::IncompleteBreak
                     | EndInstrKind::IncompleteContinue => unreachable!(),
-                    EndInstrKind::Return(value, _) => {
-                        if let Some(value) = value {
-                            let conformed = conform_to_default(
-                                ctx,
-                                cfg.get_typed(*value),
-                                c_integer_assumptions,
-                                builtin_types,
-                            )?;
+                    EndInstrKind::Return(Some(value), _) => {
+                        // 1] Conform the value to its default type
+                        let conformed = conform_to_default(
+                            ctx,
+                            cfg.get_typed(*value),
+                            c_integer_assumptions,
+                            builtin_types,
+                        )?;
 
-                            if !are_types_equal(
-                                self.resolved_head.return_type,
-                                conformed.ty,
-                                |_, _| todo!("handle polymorphs"),
-                            ) {
-                                return Err(ErrorDiagnostic::new(
-                                    format!("Cannot return value of type '{}'", conformed.ty.0),
-                                    instr.source,
-                                )
-                                .into());
-                            }
-
-                            cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
+                        // 2] Ensure the type of the value matches the return type
+                        if !are_types_equal(self.resolved_head.return_type, conformed.ty, |_, _| {
+                            todo!("handle polymorphs")
+                        }) {
+                            return Err(ErrorDiagnostic::new(
+                                format!("Cannot return value of type '{}'", conformed.ty.0),
+                                instr.source,
+                            )
+                            .into());
                         }
+
+                        // 3] Track any casts that were necessary
+                        cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
                     }
-                    EndInstrKind::Jump(..)
+                    EndInstrKind::Return(None, _)
+                    | EndInstrKind::Jump(..)
                     | EndInstrKind::Branch(..)
                     | EndInstrKind::NewScope(..)
                     | EndInstrKind::Unreachable => (),
                 }
 
-                let bb = cfg.get_unsafe(instr_ref.basicblock);
-                let instr = &bb.end.as_ref().unwrap();
-                print!("revolved end instr to: {}", instr);
                 rev_post_order.next(cfg, post_order);
                 continue;
             }
 
+            // Otherwise, we're processing a normal instruction
             let instr = &bb.instrs[instr_ref.instr_or_end as usize];
 
             match &instr.kind {
@@ -234,18 +233,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     )
                 }
                 InstrKind::Phi(items, conform_behavior) => {
-                    // NOTE: We already handled case for when `items.len() <= 1` above.
-
-                    // NOTE: For PHI nodes, we will want to find the best
-                    // combining type, and then conform each incoming value
-                    // to that type.
-                    // The one issue though, is that this information
-                    // will need to flow backwards.
-                    // So the basicblocks who jump here may need
-                    // a special kind of jump that allows for that,
-                    // where we can retroactively add the conforming
-                    // to each branch before they go here.
-                    // We could also modify `Jump` to allow for this purpose.
+                    // NOTE: We already handled the case for when `items.len() <= 1` above.
 
                     // 0] Determine types
                     let types_iter = items
@@ -273,9 +261,65 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 3] Result type is the unified type
                     cfg.set_typed(instr_ref, unified.unwrap_or(builtin_types.never()))
                 }
-                InstrKind::Name(_) => todo!(),
+                InstrKind::Name(needle) => {
+                    // 1] Start by checking within current basicblock
+                    let mut dom_ref = instr_ref.basicblock;
+                    let mut num_take = instr_ref.instr_or_end as usize;
+
+                    // 2] Go up through the immediate dominators, checking
+                    //    in reverse instruction order to find the associated
+                    //    declaration.
+                    //    We may want to accelerate this later on using an
+                    //    auxiliary data structure, especially for larger blocks.
+                    let found = 'outer: loop {
+                        let dom = &cfg.get_unsafe(dom_ref);
+
+                        // Loop the instructions in reverse order to find declaration
+                        for (instr_index, instr) in
+                            dom.instrs.iter().take(num_take).enumerate().rev()
+                        {
+                            if match &instr.kind {
+                                InstrKind::Parameter(name, _, _)
+                                | InstrKind::Declare(name, _, _, _)
+                                | InstrKind::DeclareAssign(name, _, _) => name == needle,
+                                _ => false,
+                            } {
+                                // Declaration was found!
+                                break 'outer InstrRef::new(
+                                    dom_ref,
+                                    instr_index.try_into().unwrap(),
+                                );
+                            }
+                        }
+
+                        // Otherwise, we have to look in the next immediate dominator.
+                        let next_dom_ref = *dominators.get(dom_ref).unwrap();
+
+                        // If we dominator ourselves, then there is nowhere left to look
+                        // within the function.
+                        if dom_ref == next_dom_ref {
+                            return Err(ErrorDiagnostic::new(
+                                format!("Undeclared variable '{}'", needle),
+                                instr.source,
+                            )
+                            .into());
+                        }
+
+                        // Advance up the immediate dominator tree.
+                        dom_ref = next_dom_ref;
+                        num_take = usize::MAX;
+                    };
+
+                    // 3] Extract the type of the found variable.
+                    let var_ty = variables
+                        .get(found)
+                        .expect("variable to be tracked")
+                        .ty
+                        .expect("variable to have had type resolved");
+                    cfg.set_typed(instr_ref, var_ty)
+                }
                 InstrKind::Parameter(_, ast_type, _) => {
-                    // Resolve variable type
+                    // 0] Resolve variable type
                     let Some(resolved_type) = executor.demand(self.resolved_type) else {
                         return suspend!(
                             self.resolved_type,
@@ -284,14 +328,63 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         );
                     };
 
+                    // 1] Assign the variable the resolved type
                     variables.assign_resolved_type(instr_ref, resolved_type);
 
-                    // Reset suspend on type for next node that needs it
+                    // 2] Reset the "suspend on type" for the next time we need it
                     self.resolved_type = None;
 
+                    // 3] Finish typing the paramater declaration, which itself is void
                     cfg.set_typed(instr_ref, builtin_types.void())
                 }
-                InstrKind::Declare(_, _, instr_ref) => todo!("declare"),
+                InstrKind::Declare(name, ast_type, value, _) => {
+                    // 1] Resolve variable type
+                    let Some(resolved_type) = executor.demand(self.resolved_type) else {
+                        return suspend!(
+                            self.resolved_type,
+                            executor.request(ResolveType::new(self.view, ast_type)),
+                            ctx
+                        );
+                    };
+
+                    // 2] Ensure variable has initial value
+                    let Some(value) = value else {
+                        return Err(ErrorDiagnostic::new(
+                            format!("Variable '{}' must have an initial value", name),
+                            instr.source,
+                        )
+                        .into());
+                    };
+
+                    // 3] Conform the variable's initial value to its default concrete type
+                    let conformed = conform_to_default(
+                        ctx,
+                        cfg.get_typed(*value),
+                        c_integer_assumptions,
+                        builtin_types,
+                    )?;
+
+                    // 4] Ensure the value type matches the variable type
+                    if !are_types_equal(conformed.ty, resolved_type, |_, _| todo!("on polymorph")) {
+                        return Err(ErrorDiagnostic::new(
+                            format!(
+                                "Incompatible types '{}' and '{}'",
+                                conformed.ty, resolved_type
+                            ),
+                            instr.source,
+                        )
+                        .into());
+                    }
+
+                    // 5] Assign the variable the resolved type, and
+                    //    track the final type along with any necessary casts.
+                    variables.assign_resolved_type(instr_ref, resolved_type);
+                    cfg.set_typed(instr_ref, builtin_types.void());
+                    cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
+
+                    // 6] Reset the "suspend on type" for the next time we need it
+                    self.resolved_type = None;
+                }
                 InstrKind::Assign(instr_ref, instr_ref1) => todo!("assign"),
                 InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
                     todo!()
@@ -335,6 +428,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 }
                 InstrKind::Call(call_instr) => todo!("call"),
                 InstrKind::DeclareAssign(_, value, _) => {
+                    // 1] Conform the value to its default concrete type
                     let conformed = conform_to_default(
                         ctx,
                         cfg.get_typed(*value),
@@ -342,6 +436,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         builtin_types,
                     )?;
 
+                    // 2] Assign the variable the resolved type, and
+                    //    track the final type along with any necessary casts.
                     variables.assign_resolved_type(instr_ref, conformed.ty);
                     cfg.set_typed(instr_ref, conformed.ty);
                     cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
@@ -377,9 +473,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
             }
 
-            let bb = cfg.get_unsafe(instr_ref.basicblock);
-            let instr = &bb.instrs[instr_ref.instr_or_end as usize];
-            print!("revolved normal instr to: {}", instr);
             rev_post_order.next(cfg, post_order);
         }
 

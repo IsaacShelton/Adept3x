@@ -125,11 +125,15 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::Parameter(name, ty, index) => {
                 write!(f, "param {} {} {}", name, ty, index)?;
             }
-            InstrKind::Declare(name, ty, instr_ref) => {
+            InstrKind::Declare(name, ty, instr_ref, cast) => {
                 if let Some(instr_ref) = instr_ref {
                     write!(f, "declare {} {} {}", name, ty, instr_ref)?;
                 } else {
                     write!(f, "declare {} {}", name, ty)?;
+                }
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
                 }
             }
             InstrKind::Assign(dest, src) => {
@@ -243,7 +247,7 @@ impl<'env> Display for InstrKind<'env> {
 }
 
 // Getting this down to 32 is going to take some extreme manual layout optimization
-const _: () = assert!(std::mem::size_of::<InstrKind>() <= 40);
+const _: () = assert!(std::mem::size_of::<InstrKind>() <= 48);
 const _: () = assert!(std::mem::align_of::<InstrKind>() <= 8);
 
 #[derive(Clone, Debug)]
@@ -254,7 +258,12 @@ pub enum InstrKind<'env> {
     ),
     Name(&'env str),
     Parameter(&'env str, &'env ast::Type, u32),
-    Declare(&'env str, &'env ast::Type, Option<InstrRef>),
+    Declare(
+        &'env str,
+        &'env ast::Type,
+        Option<InstrRef>,
+        Option<UnaryImplicitCast<'env>>,
+    ),
     Assign(InstrRef, InstrRef),
     BinOp(InstrRef, ast::BasicBinaryOperator, InstrRef, Language),
     BooleanLiteral(bool),

@@ -93,8 +93,13 @@ fn flatten_stmt<'env>(
             Some(
                 builder.push(
                     cursor,
-                    InstrKind::Declare(&declaration.name, &declaration.ast_type, initial_value)
-                        .at(stmt.source),
+                    InstrKind::Declare(
+                        &declaration.name,
+                        &declaration.ast_type,
+                        initial_value,
+                        None,
+                    )
+                    .at(stmt.source),
                 ),
             )
         }

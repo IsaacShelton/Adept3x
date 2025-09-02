@@ -97,6 +97,7 @@ impl<'env> CfgBuilder<'env> {
         // Sequential Instruction
         match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
             InstrKind::DeclareAssign(_, _, unary_implicit_cast)
+            | InstrKind::Declare(_, _, _, unary_implicit_cast)
             | InstrKind::ConformToBool(_, _, unary_implicit_cast) => *unary_implicit_cast = cast,
             _ => unreachable!(),
         }
