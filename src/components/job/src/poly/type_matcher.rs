@@ -68,6 +68,13 @@ pub fn are_types_equal<'env>(
                 false
             }
         }
+        TypeKind::AsciiCharLiteral(a_value) => {
+            if let TypeKind::AsciiCharLiteral(b_value) = b {
+                a_value == b_value
+            } else {
+                false
+            }
+        }
         TypeKind::Boolean => matches!(b, TypeKind::Boolean),
         TypeKind::BitInteger(a_bits, a_sign) => {
             if let TypeKind::BitInteger(b_bits, b_sign) = b {

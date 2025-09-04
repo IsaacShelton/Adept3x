@@ -116,6 +116,22 @@ impl<'env> ModuleView<'env> {
 
         // TODO: ... Perform search ...
 
+        match &search {
+            Search::Func(func_search) => {
+                let found = self.web.graph(graph, |graph| {
+                    let module = graph.modules.lock().unwrap();
+
+                    module.arena[handle.module_ref]
+                        .iter_symbols(func_search.name, handle.part_ref)
+                        .next()
+                });
+
+                if let Some(found) = found {
+                    return Ok(found);
+                }
+            }
+        }
+
         Err(move |execution| {
             Continuation::PendingSearch(execution, graph, searched_version, search)
         })

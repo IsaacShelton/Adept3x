@@ -32,8 +32,8 @@ impl<'env> DeclHeadSet<'env> {
         })
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &DeclHead<'env>> {
-        self.0.iter()
+    pub fn iter(&self) -> impl Iterator<Item = DeclHead<'env>> {
+        self.0.iter().copied()
     }
 }
 

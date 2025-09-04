@@ -82,6 +82,7 @@ pub enum TypeKind<'env> {
     FloatLiteral(Option<NotNan<f64>>),
     BooleanLiteral(bool),
     NullLiteral,
+    AsciiCharLiteral(u8),
     // Boolean
     Boolean,
     // Integer
@@ -147,7 +148,8 @@ impl<'env> TypeKind<'env> {
             | TypeKind::IntegerLiteral(_)
             | TypeKind::IntegerLiteralInRange(..)
             | TypeKind::FloatLiteral(_)
-            | TypeKind::Floating(_) => false,
+            | TypeKind::Floating(_)
+            | TypeKind::AsciiCharLiteral(_) => false,
             TypeKind::Ptr(inner) => inner.kind.contains_polymorph(),
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
@@ -168,7 +170,8 @@ impl<'env> TypeKind<'env> {
             | TypeKind::IntegerLiteral(_)
             | TypeKind::IntegerLiteralInRange(..)
             | TypeKind::FloatLiteral(_)
-            | TypeKind::Floating(_) => false,
+            | TypeKind::Floating(_)
+            | TypeKind::AsciiCharLiteral(_) => false,
             TypeKind::Ptr(inner) => inner.kind.contains_type_alias(),
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
@@ -200,6 +203,23 @@ impl<'env> Display for TypeKind<'env> {
             TypeKind::FloatLiteral(None) => write!(f, "float NaN"),
             TypeKind::Boolean => write!(f, "bool"),
             TypeKind::NullLiteral => write!(f, "null"),
+            TypeKind::AsciiCharLiteral(c) => {
+                if c.is_ascii_graphic() || *c == b' ' {
+                    write!(f, "'{}'", *c)
+                } else if *c == b'\n' {
+                    write!(f, "'\\n'")
+                } else if *c == b'\t' {
+                    write!(f, "'\\t'")
+                } else if *c == b'\r' {
+                    write!(f, "'\\r'")
+                } else if *c == 0x1B {
+                    write!(f, "'\\e'")
+                } else if *c == b'\0' {
+                    write!(f, "'\\0'")
+                } else {
+                    write!(f, "'\\x{:02X}'", *c as i32)
+                }
+            }
             TypeKind::BooleanLiteral(value) => write!(f, "bool {}", value),
             TypeKind::BitInteger(bits, sign) => f.write_str(match (bits, sign) {
                 (IntegerBits::Bits8, IntegerSign::Signed) => "i8",

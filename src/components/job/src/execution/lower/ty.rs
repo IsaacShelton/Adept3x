@@ -90,6 +90,13 @@ impl<'env> Executable<'env> for LowerType<'env> {
                 )
                 .into());
             }
+            TypeKind::AsciiCharLiteral(_) => {
+                return Err(ErrorDiagnostic::new(
+                    "Cannot lower unspecialized ASCII character literal",
+                    self.ty.source,
+                )
+                .into());
+            }
             TypeKind::Boolean => ir::Type::Bool,
             TypeKind::BitInteger(bits, sign) => match (bits, sign) {
                 (Bits::Bits8, Sign::Signed) => ir::Type::S8,

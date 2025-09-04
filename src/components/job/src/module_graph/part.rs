@@ -60,10 +60,10 @@ impl<'env> ModulePart<'env> {
     }
 
     #[auto_enum(Iterator)]
-    pub fn iter_symbols<'a>(
+    pub fn iter_inner_symbols<'a>(
         &'a self,
         name: &'env str,
-    ) -> impl Iterator<Item = &'a DeclHead<'env>> + use<'a, 'env> {
+    ) -> impl Iterator<Item = DeclHead<'env>> {
         match &self.hidden {
             Some(hidden) => hidden
                 .public

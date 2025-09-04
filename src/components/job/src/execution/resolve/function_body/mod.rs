@@ -5,7 +5,7 @@ mod variables;
 
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
-    InstrKind, InstrRef, Suspend, SuspendMany, are_types_equal,
+    FuncSearch, InstrKind, InstrRef, Suspend, SuspendMany, are_types_equal,
     conform::conform_to_default,
     execution::resolve::{
         ResolveType,
@@ -274,7 +274,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     let found = 'outer: loop {
                         let dom = &cfg.get_unsafe(dom_ref);
 
-                        // Loop the instructions in reverse order to find declaration
+                        // Loop through the instructions in reverse order to find declaration
                         for (instr_index, instr) in
                             dom.instrs.iter().take(num_take).enumerate().rev()
                         {
@@ -295,7 +295,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         // Otherwise, we have to look in the next immediate dominator.
                         let next_dom_ref = *dominators.get(dom_ref).unwrap();
 
-                        // If we dominator ourselves, then there is nowhere left to look
+                        // If we dominate ourselves, then there's nowhere left to look
                         // within the function.
                         if dom_ref == next_dom_ref {
                             return Err(ErrorDiagnostic::new(
@@ -416,7 +416,12 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         )),
                     );
                 }
-                InstrKind::AsciiCharLiteral(_) => todo!("ascii char literal"),
+                InstrKind::AsciiCharLiteral(c) => {
+                    cfg.set_typed(
+                        instr_ref,
+                        UnaliasedType(ctx.alloc(TypeKind::AsciiCharLiteral(*c).at(instr.source))),
+                    );
+                }
                 InstrKind::Utf8CharLiteral(_) => todo!("utf-8 char literal"),
                 InstrKind::StringLiteral(_) => todo!("string literal"),
                 InstrKind::NullTerminatedStringLiteral(cstr) => todo!(),
@@ -426,7 +431,20 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::VoidLiteral => {
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
-                InstrKind::Call(call_instr) => todo!("call"),
+                InstrKind::Call(call_instr) => {
+                    let symbol = self
+                        .view
+                        .find_symbol(
+                            executor,
+                            FuncSearch {
+                                name: call_instr.name,
+                                source: instr.source,
+                            },
+                        )
+                        .map_err(|into_continuation| into_continuation(self.into()))?;
+
+                    todo!("resolve call to {:?}", symbol)
+                }
                 InstrKind::DeclareAssign(_, value, _) => {
                     // 1] Conform the value to its default concrete type
                     let conformed = conform_to_default(
@@ -745,17 +763,12 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         }
         */
 
-        println!("{}", cfg);
-        let _final_cfg = self.cfg.take().unwrap().finish(ctx);
-        todo!("finish ResolveFunctionBody")
+        let final_cfg = ctx.alloc(self.cfg.take().unwrap().finish(ctx));
 
-        /*
         Ok(ctx.alloc(FuncBody {
-            cfg,
-            post_order: std::mem::take(post_order),
-            resolved: self.resolved_nodes,
+            cfg: final_cfg,
+            post_order: ctx.alloc_slice_fill_iter(std::mem::take(post_order).iter().copied()),
             variables: std::mem::take(variables).prune(),
         }))
-        */
     }
 }

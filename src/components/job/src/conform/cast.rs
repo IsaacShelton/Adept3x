@@ -9,6 +9,7 @@ pub enum UnaryImplicitCast<'env> {
     SpecializeInteger(&'env BigInt),
     SpecializeFloat(Option<NotNan<f64>>),
     SpecializePointerOuter(UnaliasedType<'env>),
+    SpecializeAsciiChar(u8),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

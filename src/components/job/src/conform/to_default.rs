@@ -3,7 +3,6 @@ use crate::{
     conform::UnaryImplicitCast,
     repr::{TypeKind, UnaliasedType},
 };
-use ast::Integer;
 use data_units::BitUnits;
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
@@ -105,6 +104,10 @@ pub fn conform_to_default<'env>(
         TypeKind::NullLiteral => Conform::new(
             builtin_types.ptr_void(),
             UnaryImplicitCast::SpecializePointerOuter(builtin_types.ptr_void()),
+        ),
+        TypeKind::AsciiCharLiteral(value) => Conform::new(
+            builtin_types.bool(),
+            UnaryImplicitCast::SpecializeAsciiChar(*value),
         ),
         _ => Conform::from_type(ty.clone()),
     })

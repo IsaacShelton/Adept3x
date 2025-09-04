@@ -72,17 +72,17 @@ impl<'env> Module<'env> {
         &self,
         name: &'env str,
         part_ref: ModulePartRef<'env>,
-    ) -> impl Iterator<Item = &DeclHead<'env>> {
+    ) -> impl Iterator<Item = DeclHead<'env>> {
         let public = &self.public;
         let protected = &self.protected;
 
         self.parts[part_ref]
-            .iter_symbols(name)
+            .iter_inner_symbols(name)
             .chain(public.iter_symbols(name))
             .chain(protected.iter_symbols(name))
     }
 
-    pub fn iter_public_symbols(&self, name: &'env str) -> impl Iterator<Item = &DeclHead<'env>> {
+    pub fn iter_public_symbols(&self, name: &'env str) -> impl Iterator<Item = DeclHead<'env>> {
         self.public.iter_symbols(name)
     }
 

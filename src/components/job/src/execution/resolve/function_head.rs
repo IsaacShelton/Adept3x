@@ -9,6 +9,7 @@ use crate::{
 };
 use by_address::ByAddress;
 use derivative::Derivative;
+use std::time::Duration;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -66,19 +67,6 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
                 ctx
             );
         };
-
-        /*
-        let found = match self.view.find_symbol(
-            executor,
-            FuncSearch {
-                name: _ctx.alloc(self.head.name.clone()),
-                source: self.head.source,
-            },
-        ) {
-            Ok(found) => found,
-            Err(into_continuation) => return Err(into_continuation(self.into())),
-        };
-        */
 
         let mut inner_types = inner_types.into_iter();
 
@@ -142,6 +130,7 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
             DeclHead::FuncLike(func_head),
         );
 
+        executor.wake_pending_search(self.view.graph, &self.head.name);
         Ok(func_head)
     }
 }

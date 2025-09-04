@@ -21,7 +21,7 @@ impl<'env> SymbolChannel<'env> {
         }
     }
 
-    pub fn iter_symbols(&self, name: &'env str) -> impl Iterator<Item = &DeclHead<'env>> {
+    pub fn iter_symbols(&self, name: &'env str) -> impl Iterator<Item = DeclHead<'env>> {
         self.symbols
             .get(name)
             .into_iter()
