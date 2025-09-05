@@ -10,7 +10,6 @@ use crate::{
 };
 use by_address::ByAddress;
 use derivative::Derivative;
-use std::time::Duration;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
