@@ -83,6 +83,11 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
         // TODO: Here is where we will do monomorphization (but only for the function body)...
 
+        let ir_func_ref = self.func;
+
+        let ir_func = &ir.funcs[ir_func_ref];
+        ir_func.basicblocks.set(basicblocks).unwrap();
+
         todo!(
             "lower function body {:?} {:?} {:?}",
             func,
