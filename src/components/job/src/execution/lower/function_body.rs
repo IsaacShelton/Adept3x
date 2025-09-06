@@ -85,6 +85,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
         let ir_func_ref = self.func;
 
+        let basicblocks = todo!();
+
         let ir_func = &ir.funcs[ir_func_ref];
         ir_func.basicblocks.set(basicblocks).unwrap();
 
