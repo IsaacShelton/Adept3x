@@ -16,7 +16,7 @@ derive_more.workspace = true
 diagnostics = { version = "0.1.0", path = "../../support/diagnostics" }
 ir = { version = "0.1.0", path = "../../representations/ir" }
 itertools.workspace = true
-llvm-sys = { package = "llvm-sys", version = "201" }
+llvm-sys = { package = "llvm-sys", version = "181" }
 memo-map.workspace = true
 once_map.workspace = true
 primitives = { version = "0.1.0", path = "../../representations/primitives" }

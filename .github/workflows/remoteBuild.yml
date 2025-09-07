@@ -61,19 +61,18 @@ jobs:
       - name: Install LLVM and dependencies (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          rm C:\msys64\mingw64\lib\libpthread.dll.a
-          curl --output mingw-w64-x86_64-llvm-20.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-20.1.8-2-any.pkg.tar.zst"
-          curl --output mingw-w64-x86_64-llvm-libs-20.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-libs-20.1.8-2-any.pkg.tar.zst"
+          curl --output mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst"
+          curl --output mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst"
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-gcc --noconfirm
-          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-libs-20.1.8-2-any.pkg.tar.zst --noconfirm
-          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-20.1.8-2-any.pkg.tar.zst --noconfirm
+          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-libs-18.1.8-2-any.pkg.tar.zst --noconfirm
+          C:\msys64\usr\bin\pacman -U mingw-w64-x86_64-llvm-18.1.8-2-any.pkg.tar.zst --noconfirm
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-zlib --noconfirm
           C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-zstd --noconfirm
       - name: Install LLVM and dependencies (macOS)
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
           brew install llvm # For clang
-          brew install llvm@20
+          brew install llvm@18
           brew install zstd
       - name: Install LLVM and dependencies (Ubuntu)
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -81,7 +80,7 @@ jobs:
           sudo apt-get update
           sudo apt-get remove -y llvm
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install llvm@20
+          brew install llvm@18
           brew install zstd
       - name: Build (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
@@ -90,7 +89,7 @@ jobs:
         env:
           CFLAGS: -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
           CXXFLAGS: -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
-          LLVM_SYS_201_PREFIX: C:\msys64\mingw64
+          LLVM_SYS_181_PREFIX: C:\msys64\mingw64
           zstd_DIR: C:\msys64\mingw64
           zstd_LIBRARY: C:\msys64\mingw64\lib\libzstd.a
           ZLIB_INCLUDE_DIR: C:\msys64\mingw64\include
@@ -101,7 +100,7 @@ jobs:
           cargo build --release
         env:
           CC: /opt/homebrew/opt/llvm/bin/clang
-          LLVM_SYS_201_PREFIX: /opt/homebrew/opt/llvm@20
+          LLVM_SYS_181_PREFIX: /opt/homebrew/opt/llvm@18
           zstd_DIR: /usr/local/opt/zstd
           CFLAGS: -static-libstdc++
           CXXFLAGS: -static-libstdc++
@@ -111,7 +110,7 @@ jobs:
         run: |
           cargo build --release
         env:
-          LLVM_SYS_201_PREFIX: /home/linuxbrew/.linuxbrew/opt/llvm@20
+          LLVM_SYS_181_PREFIX: /home/linuxbrew/.linuxbrew/opt/llvm@18
           zstd_DIR: /home/linuxbrew/.linuxbrew/opt/zstd
       - name: Archive Build Result (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
