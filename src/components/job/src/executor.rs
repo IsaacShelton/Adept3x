@@ -15,6 +15,7 @@ use crate::{
 };
 use arena::Arena;
 use crossbeam_deque::Injector as InjectorQueue;
+use diagnostics::Diagnostics;
 use std::{
     ops::DerefMut,
     sync::{
@@ -47,6 +48,8 @@ pub struct Executor<'env> {
 
     // Pending Searches
     pub pending_searches: ModuleGraphPendingSearchMap<'env>,
+
+    pub diagnostics: &'env Diagnostics<'env>,
 }
 
 impl<'env> Executor<'env> {
@@ -54,6 +57,7 @@ impl<'env> Executor<'env> {
     pub fn new(
         io_thread_pool: &'env ThreadPool,
         io_tx: mpsc::Sender<(TaskId, IoResponse)>,
+        diagnostics: &'env Diagnostics<'env>,
     ) -> Self {
         Self {
             truth: RwLock::new(Truth::new()),
@@ -65,6 +69,7 @@ impl<'env> Executor<'env> {
             io_thread_pool,
             io_tx,
             pending_searches: Default::default(),
+            diagnostics,
         }
     }
 

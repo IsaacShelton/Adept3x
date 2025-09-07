@@ -59,7 +59,7 @@ impl<'env> CfgBuilder<'env> {
     pub fn set_jump_pre_conform(&mut self, bb_id: BasicBlockId, ty: UnaliasedType<'env>) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(bb_id) }];
         match &mut bb.end.as_mut().unwrap().kind {
-            EndInstrKind::Jump(_, pre_jump_conform) => {
+            EndInstrKind::Jump(_, _, pre_jump_conform) => {
                 *pre_jump_conform = Some(ty);
             }
             _ => panic!("cannot set_jump_pre_conform for non-jump"),
@@ -147,7 +147,7 @@ impl<'env> CfgBuilder<'env> {
 
         self.push_end(
             cursor,
-            EndInstrKind::Jump(new_block.basicblock().into_raw(), None).at(source),
+            EndInstrKind::Jump(new_block.basicblock().into_raw(), None, None).at(source),
         );
 
         *cursor = new_block;
@@ -288,7 +288,7 @@ impl<'env> CfgBuilder<'env> {
                     ));
                 };
 
-                bb.end.as_mut().unwrap().kind = EndInstrKind::Jump(*target, None);
+                bb.end.as_mut().unwrap().kind = EndInstrKind::Jump(*target, None, None);
             }
         }
 

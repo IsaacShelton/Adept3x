@@ -6,7 +6,7 @@ use source_files::Source;
 #[derive(Derivative, Clone, Debug)]
 #[derivative(Hash, PartialEq, Eq)]
 pub struct Field<'env> {
-    pub ir_type: Type<'env>,
+    pub ir_type: &'env Type<'env>,
     pub properties: FieldProperties,
 
     #[derivative(PartialEq = "ignore")]
@@ -15,7 +15,7 @@ pub struct Field<'env> {
 }
 
 impl<'env> Field<'env> {
-    pub fn basic(ir_type: Type<'env>, source: Source) -> Self {
+    pub fn basic(ir_type: &'env Type<'env>, source: Source) -> Self {
         Self {
             ir_type,
             properties: FieldProperties::default(),

@@ -56,7 +56,7 @@ pub fn compile(compiler: &mut Compiler, single_file: Option<PathBuf>) -> Result<
     const MAX_IO_THREADS: usize = 400;
     let io_thread_pool = ThreadPool::new_growable(MIN_IO_THREADS, MAX_IO_THREADS);
 
-    let executor = job::MainExecutor::new(&io_thread_pool);
+    let executor = job::MainExecutor::new(&io_thread_pool, compiler.diagnostics);
     let main_task = executor.spawn(
         &[],
         job::Main::new(
@@ -75,6 +75,8 @@ pub fn compile(compiler: &mut Compiler, single_file: Option<PathBuf>) -> Result<
         .flat_map(|path_buf| path_buf.as_path().parent())
         .flat_map(|path| std::fs::canonicalize(path))
         .next();
+
+    compiler.diagnostics.print_all();
 
     if executed.errors.len() > 0 {
         for error in executed.errors.iter() {

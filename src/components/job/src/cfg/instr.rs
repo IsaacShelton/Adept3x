@@ -34,7 +34,7 @@ impl<'env> Display for EndInstrKind<'env> {
                 }
                 writeln!(f, "")
             }
-            EndInstrKind::Jump(bb_id, pre_jump_conform) => {
+            EndInstrKind::Jump(bb_id, _value, pre_jump_conform) => {
                 if let Some(pre_jump_conform) = pre_jump_conform {
                     writeln!(f, "jump {} as {}", bb_id, pre_jump_conform)
                 } else {
@@ -74,7 +74,7 @@ pub enum EndInstrKind<'env> {
     IncompleteBreak,
     IncompleteContinue,
     Return(Option<InstrRef>, Option<UnaryImplicitCast<'env>>),
-    Jump(BasicBlockId, Option<UnaliasedType<'env>>),
+    Jump(BasicBlockId, Option<InstrRef>, Option<UnaliasedType<'env>>),
     Branch(InstrRef, BasicBlockId, BasicBlockId, Option<BreakContinue>),
     NewScope(BasicBlockId, BasicBlockId),
     Unreachable,

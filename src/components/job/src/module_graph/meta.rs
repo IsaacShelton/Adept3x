@@ -1,7 +1,7 @@
 use crate::module_graph::ModuleGraphRef;
 use target::Target;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ModuleGraphMeta {
     // Human-readable title for this module graph.
     pub title: &'static str,

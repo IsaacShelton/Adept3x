@@ -2,13 +2,13 @@ use super::Type;
 use derive_more::{From, IsVariant, Unwrap};
 use std::ffi::CStr;
 
-#[derive(Clone, Debug, From)]
+#[derive(Copy, Clone, Debug, From)]
 pub enum Value<'env> {
     Literal(Literal<'env>),
     Reference(ValueReference),
 }
 
-#[derive(Clone, Debug, Unwrap, IsVariant)]
+#[derive(Copy, Clone, Debug, Unwrap, IsVariant)]
 pub enum Literal<'env> {
     Void,
     Boolean(bool),
@@ -26,7 +26,7 @@ pub enum Literal<'env> {
     Zeroed(&'env Type<'env>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct ValueReference {
     pub basicblock_id: usize,
     pub instruction_id: usize,

@@ -127,7 +127,7 @@ fn depth_first_search(cfg: &CfgBuilder) -> (Vec<BasicBlockId>, PostOrderIndexMap
                 panic!("cannot dfs basicblock with incomplete continue")
             }
             EndInstrKind::Return(_, _) => false,
-            EndInstrKind::Jump(next, _) => enqueue(next),
+            EndInstrKind::Jump(next, _, _) => enqueue(next),
             EndInstrKind::Branch(_, when_true, when_false, _) => {
                 enqueue(when_true) || enqueue(when_false)
             }

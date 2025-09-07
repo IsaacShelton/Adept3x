@@ -2,6 +2,7 @@ use crate::{
     BuiltinTypes,
     module_graph::{ComptimeKind, ModuleGraphRef},
 };
+use once_map::OnceMap;
 use source_files::SourceFiles;
 use std::path::Path;
 use target::Target;
@@ -11,9 +12,11 @@ use target::Target;
 // `compiler::Compiler` in favor of this...
 pub struct Compiler<'env> {
     pub source_files: &'env SourceFiles,
-    pub project_root: Option<&'env Path>,
+    pub project_root: &'env Path,
     pub builtin_types: &'env BuiltinTypes<'env>,
     pub runtime_target: Target,
+    pub link_filenames: OnceMap<String, ()>,
+    pub link_frameworks: OnceMap<String, ()>,
 }
 
 impl<'env> Compiler<'env> {

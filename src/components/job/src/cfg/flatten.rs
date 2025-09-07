@@ -415,7 +415,7 @@ fn flatten_expr<'env>(
 
             builder.push_end(
                 &mut when_true,
-                EndInstrKind::Jump(condition_bb, None).at(expr.source),
+                EndInstrKind::Jump(condition_bb, None, None).at(expr.source),
             );
 
             *cursor = when_false;
@@ -568,10 +568,12 @@ fn existing_basicblock_joining<'env>(
             continue;
         }
 
-        values.push((joined.cursor().basicblock().into_raw(), joined.instr));
+        let value = joined.instr;
+
+        values.push((joined.cursor().basicblock().into_raw(), value));
         builder.push_end(
             joined.cursor(),
-            EndInstrKind::Jump(joined_bb.basicblock().into_raw(), None).at(source),
+            EndInstrKind::Jump(joined_bb.basicblock().into_raw(), value, None).at(source),
         );
     }
 

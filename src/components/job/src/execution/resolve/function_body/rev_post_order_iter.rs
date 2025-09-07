@@ -7,7 +7,7 @@ pub struct RevPostOrderIterWithEnds {
 }
 
 impl RevPostOrderIterWithEnds {
-    pub fn new(cfg: &CfgBuilder, post_order: &[BasicBlockId]) -> Self {
+    pub fn new(post_order: &[BasicBlockId]) -> Self {
         if post_order.len() == 0 {
             return Self {
                 current: None,
@@ -15,27 +15,12 @@ impl RevPostOrderIterWithEnds {
             };
         }
 
-        let mut post_order_index = post_order.len() - 1;
+        let bb_id = post_order[post_order.len() - 1];
 
-        loop {
-            let bb_id = post_order[post_order_index];
-
-            if cfg.get_unsafe(bb_id).inner_len() != 0 {
-                return Self {
-                    current: Some(InstrRef::new(bb_id, 0)),
-                    post_order_index: post_order_index.try_into().unwrap(),
-                };
-            }
-
-            if post_order_index == 0 {
-                return Self {
-                    current: None,
-                    post_order_index: 0,
-                };
-            }
-
-            post_order_index -= 1;
-        }
+        return Self {
+            current: Some(InstrRef::new(bb_id, 0)),
+            post_order_index: 0,
+        };
     }
 
     pub fn peek(&self) -> Option<InstrRef> {

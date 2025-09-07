@@ -42,4 +42,6 @@ target = { version = "0.1.0", path = "../../support/target" }
 text = { version = "0.1.0", path = "../../support/text" }
 threadpool = { version = "0.1.0", path = "../../support/threadpool" }
 llvm-sys = { package = "llvm-sys", version = "201" }
-target_layout = { version = "0.1.0", path = "../../support/target_layout" }
+colored.workspace = true
+once_map.workspace = true
+memo-map.workspace = true

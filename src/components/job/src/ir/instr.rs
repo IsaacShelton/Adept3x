@@ -1,5 +1,4 @@
-use crate::ir::{GlobalRef, Type, value::Value};
-use asg::FuncRef;
+use crate::ir::{FuncRef, GlobalRef, Type, value::Value};
 use ast::SizeOfMode;
 use primitives::{FloatOrInteger, FloatOrSign, IntegerBits, IntegerSign};
 
@@ -118,7 +117,7 @@ impl<'env> BinaryOperands<'env> {
 
 #[derive(Clone, Debug)]
 pub struct Call<'env> {
-    pub func: FuncRef,
+    pub func: FuncRef<'env>,
     pub args: &'env [Value<'env>],
     pub unpromoted_variadic_arg_types: &'env [Type<'env>],
 }

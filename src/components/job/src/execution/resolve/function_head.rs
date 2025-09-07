@@ -7,6 +7,7 @@ use crate::{
         UnaliasedType,
     },
 };
+use attributes::{Exposure, SymbolOwnership, Tag};
 use by_address::ByAddress;
 use derivative::Derivative;
 
@@ -105,6 +106,10 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         };
         */
 
+        let ownership = (self.head.tag == Some(Tag::Main))
+            .then_some(SymbolOwnership::Owned(Exposure::Exposed))
+            .unwrap_or(self.head.ownership);
+
         let func_head = ctx.alloc(FuncHead {
             name: self.head.name.as_str(),
             type_params: self.head.type_params.clone(),
@@ -118,7 +123,7 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
                     .abide_abi
                     .then_some(TargetAbi::C)
                     .unwrap_or(TargetAbi::Abstract),
-                ownership: self.head.ownership,
+                ownership,
                 tag: self.head.tag,
             },
         });

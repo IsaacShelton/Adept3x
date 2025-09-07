@@ -2,6 +2,7 @@ use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend, ir,
     module_graph::ModuleView,
     repr::{Compiler, Type, TypeKind},
+    target_layout::{TargetLayout, TypeLayout},
 };
 use by_address::ByAddress;
 use data_units::ByteUnits;
@@ -9,7 +10,6 @@ use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use primitives::{CInteger, FloatSize, IntegerSign};
 use target::{Target, TargetOsExt};
-use target_layout::{TargetLayout, TypeLayout};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]

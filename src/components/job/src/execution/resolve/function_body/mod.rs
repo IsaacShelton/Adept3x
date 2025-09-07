@@ -167,7 +167,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
         let rev_post_order = self
             .rev_post_order
-            .get_or_insert_with(|| RevPostOrderIterWithEnds::new(cfg, post_order));
+            .get_or_insert_with(|| RevPostOrderIterWithEnds::new(post_order));
 
         // 5) Resolve types and linked data for each CFG node (may suspend)
         while let Some(instr_ref) = rev_post_order.peek() {
@@ -204,8 +204,19 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         // 3] Track any casts that were necessary
                         cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
                     }
-                    EndInstrKind::Return(None, _)
-                    | EndInstrKind::Jump(..)
+                    EndInstrKind::Return(None, _) => {
+                        if !self.resolved_head.return_type.0.kind.is_void() {
+                            return Err(ErrorDiagnostic::new(
+                                format!(
+                                    "Must return a value of type '{}' before exiting function '{}'",
+                                    self.resolved_head.return_type, self.resolved_head.name
+                                ),
+                                instr.source,
+                            )
+                            .into());
+                        }
+                    }
+                    EndInstrKind::Jump(..)
                     | EndInstrKind::Branch(..)
                     | EndInstrKind::NewScope(..)
                     | EndInstrKind::Unreachable => (),

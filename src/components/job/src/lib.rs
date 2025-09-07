@@ -78,6 +78,8 @@ macro_rules! execute_sub_task {
 
 mod allocator;
 mod artifact;
+mod build_executable;
+mod build_llvm_ir;
 mod cfg;
 mod conform;
 mod continuation;
@@ -94,6 +96,7 @@ mod poly;
 mod repr;
 mod sub_task;
 mod suspend_condition;
+mod target_layout;
 mod task;
 mod task_state;
 mod top_n;

@@ -12,7 +12,7 @@ use crate::{
     BumpAllocatorPool, Executable, Execution, Executor, Pending, SuspendCondition, TaskId, TaskRef,
     TaskState, TopN, Truth, Worker, WorkerRef, io::IoResponse,
 };
-use diagnostics::ErrorDiagnostic;
+use diagnostics::{Diagnostics, ErrorDiagnostic};
 use source_files::SourceFiles;
 use std::{
     sync::{atomic::Ordering, mpsc},
@@ -28,11 +28,11 @@ pub struct MainExecutor<'env> {
 
 impl<'env> MainExecutor<'env> {
     #[must_use]
-    pub fn new(io_thread_pool: &'env ThreadPool) -> Self {
+    pub fn new(io_thread_pool: &'env ThreadPool, diagnostics: &'env Diagnostics<'env>) -> Self {
         let (io_tx, io_rx) = mpsc::channel::<(TaskId, IoResponse)>();
 
         Self {
-            executor: Executor::new(io_thread_pool, io_tx),
+            executor: Executor::new(io_thread_pool, io_tx, diagnostics),
             io_rx,
         }
     }

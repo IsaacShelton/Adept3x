@@ -1,10 +1,14 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, ir,
+    Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind, InstrRef,
+    ir::{self, Literal},
     module_graph::ModuleView,
-    repr::{Compiler, FuncBody, FuncHead},
+    repr::{Compiler, FuncBody, FuncHead, TypeKind},
 };
+use arena::Id;
 use by_address::ByAddress;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
+use primitives::{IntegerBits, IntegerSign};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -61,7 +65,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
     fn execute(
         self,
         _executor: &Executor<'env>,
-        _ctx: &mut ExecutionCtx<'env>,
+        ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let ir = self.view.web.graph(self.view.graph, |graph| graph.ir);
         let func = &ir.funcs[self.func];
@@ -83,18 +87,214 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
         // TODO: Here is where we will do monomorphization (but only for the function body)...
 
-        let ir_func_ref = self.func;
+        let mut builder = IrBuilder::new(&self.body);
 
-        let basicblocks = todo!();
+        for bb_id in self.body.post_order.iter().copied() {
+            let bb_index = bb_id.into_usize();
+            let bb = &self.body.cfg.get_unsafe(bb_id);
+            builder.set_position(bb_index);
 
-        let ir_func = &ir.funcs[ir_func_ref];
+            for instr in bb.instrs.iter() {
+                let result = match &instr.kind {
+                    InstrKind::Phi(items, conform_behavior) => todo!("lower phi"),
+                    InstrKind::Name(_) => todo!(),
+                    InstrKind::Parameter(_, _, index) => builder.push(ir::Instr::Parameter(*index)),
+                    InstrKind::Declare(_, _, instr_ref, unary_implicit_cast) => todo!(),
+                    InstrKind::Assign(left, right) => builder.push(ir::Instr::Store(ir::Store {
+                        new_value: builder.get_output(*right),
+                        destination: builder.get_output(*left),
+                    })),
+                    InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
+                        todo!()
+                    }
+                    InstrKind::BooleanLiteral(value) => ir::Literal::Boolean(*value).into(),
+                    InstrKind::IntegerLiteral(integer) => {
+                        let value = integer.value();
+                        let cfg_ty = instr.typed.unwrap().0;
+
+                        let result_value = match &cfg_ty.kind {
+                            TypeKind::IntegerLiteral(value) =>
+                            // Temporary
+                            {
+                                Ok((*value)
+                                    .try_into()
+                                    .map(Literal::Signed32)
+                                    .map_err(|_| "i32")
+                                    .unwrap()
+                                    .into())
+                            }
+                            TypeKind::IntegerLiteralInRange(min, max) => {
+                                todo!("assign type for range")
+                            }
+                            TypeKind::BitInteger(bits, sign) => match (bits, sign) {
+                                (IntegerBits::Bits8, IntegerSign::Signed) => {
+                                    value.try_into().map(Literal::Signed8).map_err(|_| "i8")
+                                }
+                                (IntegerBits::Bits8, IntegerSign::Unsigned) => {
+                                    value.try_into().map(Literal::Unsigned8).map_err(|_| "u8")
+                                }
+                                (IntegerBits::Bits16, IntegerSign::Signed) => {
+                                    value.try_into().map(Literal::Signed16).map_err(|_| "i16")
+                                }
+                                (IntegerBits::Bits16, IntegerSign::Unsigned) => {
+                                    value.try_into().map(Literal::Unsigned16).map_err(|_| "u16")
+                                }
+                                (IntegerBits::Bits32, IntegerSign::Signed) => {
+                                    value.try_into().map(Literal::Signed32).map_err(|_| "i32")
+                                }
+                                (IntegerBits::Bits32, IntegerSign::Unsigned) => {
+                                    value.try_into().map(Literal::Unsigned32).map_err(|_| "u32")
+                                }
+                                (IntegerBits::Bits64, IntegerSign::Signed) => {
+                                    value.try_into().map(Literal::Signed64).map_err(|_| "i64")
+                                }
+                                (IntegerBits::Bits64, IntegerSign::Unsigned) => {
+                                    value.try_into().map(Literal::Unsigned64).map_err(|_| "u64")
+                                }
+                            }
+                            .map(|literal| ir::Value::Literal(literal))
+                            .map_err(|expected_type| {
+                                ErrorDiagnostic::new(
+                                    format!("Cannot fit value {} in '{}'", value, expected_type),
+                                    instr.source,
+                                )
+                            }),
+                            _ => unreachable!(),
+                        }?;
+
+                        result_value
+                    }
+                    InstrKind::FloatLiteral(_) => todo!(),
+                    InstrKind::AsciiCharLiteral(_) => todo!(),
+                    InstrKind::Utf8CharLiteral(_) => todo!(),
+                    InstrKind::StringLiteral(_) => todo!(),
+                    InstrKind::NullTerminatedStringLiteral(cstr) => {
+                        ir::Literal::NullTerminatedString(cstr).into()
+                    }
+                    InstrKind::NullLiteral => todo!(),
+                    InstrKind::VoidLiteral => todo!(),
+                    InstrKind::Call(call_instr) => todo!(),
+                    InstrKind::DeclareAssign(_, instr_ref, unary_implicit_cast) => todo!(),
+                    InstrKind::Member(instr_ref, _, privacy) => todo!(),
+                    InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
+                    InstrKind::StructLiteral(struct_literal_instr) => todo!(),
+                    InstrKind::UnaryOperation(unary_operator, instr_ref) => todo!(),
+                    InstrKind::SizeOf(_, size_of_mode) => todo!(),
+                    InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!(),
+                    InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
+                    InstrKind::IntegerPromote(instr_ref) => todo!(),
+                    InstrKind::ConformToBool(instr_ref, language, unary_implicit_cast) => todo!(),
+                    InstrKind::Is(instr_ref, _) => todo!(),
+                    InstrKind::LabelLiteral(_) => todo!(),
+                };
+
+                builder.push_output(result);
+            }
+
+            let instr_end = &bb.end;
+
+            let result = match &instr_end.kind {
+                EndInstrKind::IncompleteGoto(_) => todo!(),
+                EndInstrKind::IncompleteBreak => todo!(),
+                EndInstrKind::IncompleteContinue => todo!(),
+                EndInstrKind::Return(value, unary_implicit_cast) => {
+                    let value = value.map(|value| builder.get_output(value));
+
+                    // TODO: Perform conform before returning
+                    eprintln!("warning: casts for returns are not performed yet");
+
+                    builder.push(ir::Instr::Return(value));
+                    ir::Literal::Void.into()
+                }
+                EndInstrKind::Jump(basic_block_id, value, unaliased_type) => {
+                    let value = value.map(|value| builder.get_output(value));
+
+                    // TODO: Perform conform before assigning value
+                    eprintln!("warning: casts for jumps are not performed yet");
+
+                    builder.push(ir::Instr::Break(ir::Break {
+                        basicblock_id: basic_block_id.into_usize(),
+                    }));
+
+                    value.unwrap_or(ir::Literal::Void.into())
+                }
+                EndInstrKind::Branch(
+                    instr_ref,
+                    basic_block_id,
+                    basic_block_id1,
+                    break_continue,
+                ) => todo!(),
+                EndInstrKind::NewScope(basic_block_id, basic_block_id1) => todo!(),
+                EndInstrKind::Unreachable => todo!(),
+            };
+
+            builder.push_output(result);
+        }
+
+        let basicblocks =
+            &*ctx.alloc_slice_fill_iter(builder.basicblocks.into_iter().map(|instrs| {
+                ir::BasicBlock {
+                    instructions: &*ctx.alloc_slice_fill_iter(instrs.into_iter()),
+                }
+            }));
+
+        let ir_func = &ir.funcs[self.func];
         ir_func.basicblocks.set(basicblocks).unwrap();
+        Ok(())
+    }
+}
 
-        todo!(
-            "lower function body {:?} {:?} {:?}",
-            func,
-            self.head,
-            self.body
-        )
+#[derive(Debug)]
+struct IrBuilder<'env> {
+    basicblocks: Vec<Vec<ir::Instr<'env>>>,
+    outputs: Vec<Vec<Option<ir::Value<'env>>>>,
+    current_bb_index: Option<usize>,
+    current_cfg_instr_index: usize,
+}
+
+impl<'env> IrBuilder<'env> {
+    pub fn new(body: &FuncBody<'env>) -> Self {
+        let outputs = Vec::from_iter(
+            body.cfg
+                .basicblocks
+                .values()
+                .map(|bb| Vec::from_iter(std::iter::repeat_n(None, bb.instrs.len() + 1))),
+        );
+
+        let basicblocks = Vec::from_iter(body.cfg.basicblocks.values().map(|_| Vec::new()));
+
+        Self {
+            basicblocks,
+            outputs,
+            current_bb_index: None,
+            current_cfg_instr_index: 0,
+        }
+    }
+
+    pub fn set_position(&mut self, new_bb_index: usize) {
+        self.current_bb_index = Some(new_bb_index);
+        self.current_cfg_instr_index = 0;
+    }
+
+    pub fn push(&mut self, instr: ir::Instr<'env>) -> ir::Value<'env> {
+        let current_bb_index = self.current_bb_index.unwrap();
+        let current_block = &mut self.basicblocks[current_bb_index];
+        current_block.push(instr);
+
+        ir::Value::Reference(ir::ValueReference {
+            basicblock_id: current_bb_index,
+            instruction_id: current_block.len() - 1,
+        })
+    }
+
+    pub fn push_output(&mut self, value: ir::Value<'env>) {
+        self.outputs[self.current_bb_index.unwrap()][self.current_cfg_instr_index] = Some(value);
+        self.current_cfg_instr_index += 1;
+    }
+
+    pub fn get_output(&self, instr_ref: InstrRef) -> ir::Value<'env> {
+        *self.outputs[instr_ref.basicblock.into_usize()][instr_ref.instr_or_end as usize]
+            .as_ref()
+            .unwrap()
     }
 }

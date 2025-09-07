@@ -1,6 +1,7 @@
 use super::Executable;
 use crate::{
     BuiltinTypes, Continuation, ExecutionCtx, Executor, ProcessFile, Suspend,
+    build_llvm_ir::llvm_backend,
     canonicalize_or_error,
     module_graph::{ModuleGraphRef, ModuleGraphWeb},
     repr::Compiler,
@@ -9,7 +10,7 @@ use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::core::LLVMIsMultithreaded;
 use source_files::SourceFiles;
-use std::path::Path;
+use std::{ffi::OsString, fs::create_dir_all, path::Path};
 use target::Target;
 
 #[derive(Clone, Debug)]
@@ -63,13 +64,15 @@ impl<'env> Executable<'env> for Main<'env> {
             )?));
         }
         let single_file = self.canonicalized_single_file.unwrap();
-        let project_root = single_file.parent();
+        let project_root = single_file.parent().expect("root file to have parent");
 
         let compiler = ctx.alloc(Compiler {
             source_files: self.source_files,
             project_root,
             builtin_types: ctx.alloc(BuiltinTypes::new(ctx)),
             runtime_target: self.build_options.target,
+            link_filenames: Default::default(),
+            link_frameworks: Default::default(),
         });
 
         let web = *self
@@ -102,8 +105,49 @@ impl<'env> Executable<'env> for Main<'env> {
         };
 
         let ir = runtime.web.graph(runtime.graph, |graph| graph.ir);
+        let meta = runtime
+            .web
+            .graph(runtime.graph, |graph| graph.meta().clone());
 
-        println!("main done, send this to LLVM: {:?}", ir);
+        let binary_artifacts_folder = compiler.project_root.join("bin");
+        let object_files_folder = compiler.project_root.join("obj");
+        create_dir_all(&binary_artifacts_folder).expect("failed to create bin folder");
+        create_dir_all(&object_files_folder).expect("failed to create obj folder");
+        let target = &meta.target;
+        let project_name = project_name(compiler.project_root);
+
+        let object_file_filepath =
+            object_files_folder.join(target.default_object_file_name(&project_name));
+
+        let executable_filepath =
+            binary_artifacts_folder.join(target.default_executable_name(&project_name));
+
+        let linking_duration = unsafe {
+            llvm_backend(
+                ctx,
+                compiler,
+                self.build_options,
+                ir,
+                &meta,
+                &object_file_filepath,
+                &executable_filepath,
+                executor.diagnostics,
+            )?
+        };
+
+        println!("Linked in {}ms", linking_duration.as_millis());
         Ok(None)
     }
+}
+
+fn project_name(project_folder: &Path) -> OsString {
+    project_folder
+        .file_name()
+        .map(OsString::from)
+        .or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .and_then(|dir| dir.file_name().map(OsString::from))
+        })
+        .unwrap_or_else(|| OsString::from("main"))
 }
