@@ -1,14 +1,21 @@
 use crate::{
     Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind, InstrRef,
+    conform::UnaryImplicitCast,
     ir::{self, Literal},
     module_graph::ModuleView,
+    repr,
     repr::{Compiler, FuncBody, FuncHead, TypeKind},
 };
 use arena::Id;
 use by_address::ByAddress;
+use core::f64;
+use data_units::BitUnits;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
-use primitives::{IntegerBits, IntegerSign};
+use num_bigint::BigInt;
+use num_traits::{ConstZero, ToPrimitive};
+use primitives::{FloatSize, IntegerBits, IntegerSign};
+use source_files::Source;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -113,54 +120,23 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let cfg_ty = instr.typed.unwrap().0;
 
                         let result_value = match &cfg_ty.kind {
-                            TypeKind::IntegerLiteral(value) =>
-                            // Temporary
-                            {
-                                Ok((*value)
-                                    .try_into()
-                                    .map(Literal::Signed32)
-                                    .map_err(|_| "i32")
-                                    .unwrap()
-                                    .into())
-                            }
+                            TypeKind::IntegerLiteral(_) => ir::Literal::Void.into(),
                             TypeKind::IntegerLiteralInRange(min, max) => {
-                                todo!("assign type for range")
+                                let (bits, sign) =
+                                    bits_and_sign_for_invisible_integer_in_range(min, max)
+                                        .map_err(|_| {
+                                            ErrorDiagnostic::new(
+                                                "Integer range too large to represent",
+                                                instr.source,
+                                            )
+                                        })?;
+                                value_for_bit_integer(value, bits, sign, instr.source)?
                             }
-                            TypeKind::BitInteger(bits, sign) => match (bits, sign) {
-                                (IntegerBits::Bits8, IntegerSign::Signed) => {
-                                    value.try_into().map(Literal::Signed8).map_err(|_| "i8")
-                                }
-                                (IntegerBits::Bits8, IntegerSign::Unsigned) => {
-                                    value.try_into().map(Literal::Unsigned8).map_err(|_| "u8")
-                                }
-                                (IntegerBits::Bits16, IntegerSign::Signed) => {
-                                    value.try_into().map(Literal::Signed16).map_err(|_| "i16")
-                                }
-                                (IntegerBits::Bits16, IntegerSign::Unsigned) => {
-                                    value.try_into().map(Literal::Unsigned16).map_err(|_| "u16")
-                                }
-                                (IntegerBits::Bits32, IntegerSign::Signed) => {
-                                    value.try_into().map(Literal::Signed32).map_err(|_| "i32")
-                                }
-                                (IntegerBits::Bits32, IntegerSign::Unsigned) => {
-                                    value.try_into().map(Literal::Unsigned32).map_err(|_| "u32")
-                                }
-                                (IntegerBits::Bits64, IntegerSign::Signed) => {
-                                    value.try_into().map(Literal::Signed64).map_err(|_| "i64")
-                                }
-                                (IntegerBits::Bits64, IntegerSign::Unsigned) => {
-                                    value.try_into().map(Literal::Unsigned64).map_err(|_| "u64")
-                                }
+                            TypeKind::BitInteger(bits, sign) => {
+                                value_for_bit_integer(value, *bits, *sign, instr.source)?
                             }
-                            .map(|literal| ir::Value::Literal(literal))
-                            .map_err(|expected_type| {
-                                ErrorDiagnostic::new(
-                                    format!("Cannot fit value {} in '{}'", value, expected_type),
-                                    instr.source,
-                                )
-                            }),
                             _ => unreachable!(),
-                        }?;
+                        };
 
                         result_value
                     }
@@ -198,10 +174,20 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 EndInstrKind::IncompleteBreak => todo!(),
                 EndInstrKind::IncompleteContinue => todo!(),
                 EndInstrKind::Return(value, unary_implicit_cast) => {
-                    let value = value.map(|value| builder.get_output(value));
+                    let value: Option<ir::Value<'env>> = value
+                        .map(|value| {
+                            let cfg_ty = self.head.return_type.0;
+                            let value = builder.get_output(value);
 
-                    // TODO: Perform conform before returning
-                    eprintln!("warning: casts for returns are not performed yet");
+                            to_ir_type(ctx, cfg_ty).map(|ir_ty| {
+                                perform_unary_implicit_cast(
+                                    value,
+                                    &ir_ty,
+                                    unary_implicit_cast.as_ref(),
+                                )
+                            })
+                        })
+                        .transpose()?;
 
                     builder.push(ir::Instr::Return(value));
                     ir::Literal::Void.into()
@@ -296,5 +282,152 @@ impl<'env> IrBuilder<'env> {
         *self.outputs[instr_ref.basicblock.into_usize()][instr_ref.instr_or_end as usize]
             .as_ref()
             .unwrap()
+    }
+}
+
+fn value_for_bit_integer(
+    value: &BigInt,
+    bits: IntegerBits,
+    sign: IntegerSign,
+    source: Source,
+) -> Result<ir::Value, ErrorDiagnostic> {
+    match (bits, sign) {
+        (IntegerBits::Bits8, IntegerSign::Signed) => {
+            value.try_into().map(Literal::Signed8).map_err(|_| "i8")
+        }
+        (IntegerBits::Bits8, IntegerSign::Unsigned) => {
+            value.try_into().map(Literal::Unsigned8).map_err(|_| "u8")
+        }
+        (IntegerBits::Bits16, IntegerSign::Signed) => {
+            value.try_into().map(Literal::Signed16).map_err(|_| "i16")
+        }
+        (IntegerBits::Bits16, IntegerSign::Unsigned) => {
+            value.try_into().map(Literal::Unsigned16).map_err(|_| "u16")
+        }
+        (IntegerBits::Bits32, IntegerSign::Signed) => {
+            value.try_into().map(Literal::Signed32).map_err(|_| "i32")
+        }
+        (IntegerBits::Bits32, IntegerSign::Unsigned) => {
+            value.try_into().map(Literal::Unsigned32).map_err(|_| "u32")
+        }
+        (IntegerBits::Bits64, IntegerSign::Signed) => {
+            value.try_into().map(Literal::Signed64).map_err(|_| "i64")
+        }
+        (IntegerBits::Bits64, IntegerSign::Unsigned) => {
+            value.try_into().map(Literal::Unsigned64).map_err(|_| "u64")
+        }
+    }
+    .map(|literal| ir::Value::Literal(literal))
+    .map_err(|expected_type| {
+        ErrorDiagnostic::new(
+            format!("Cannot fit value {} in '{}'", value, expected_type),
+            source,
+        )
+    })
+}
+
+fn bits_and_sign_for_invisible_integer(value: &BigInt) -> Result<(IntegerBits, IntegerSign), ()> {
+    bits_and_sign_for_invisible_integer_in_range(value, value)
+}
+
+fn bits_and_sign_for_invisible_integer_in_range(
+    min: &BigInt,
+    max: &BigInt,
+) -> Result<(IntegerBits, IntegerSign), ()> {
+    let signed = *min < BigInt::ZERO || *max < BigInt::ZERO;
+    let bits = IntegerBits::new(BitUnits::of(min.bits().max(max.bits()) + signed as u64));
+    bits.map(|bits| (bits, IntegerSign::new(signed))).ok_or(())
+}
+
+fn perform_unary_implicit_cast<'env>(
+    value: ir::Value<'env>,
+    ty: &ir::Type<'env>,
+    cast: Option<&UnaryImplicitCast>,
+) -> ir::Value<'env> {
+    let Some(cast) = cast else {
+        return value;
+    };
+
+    match *cast {
+        UnaryImplicitCast::SpecializeBoolean(_) => todo!(),
+        UnaryImplicitCast::SpecializeInteger(value) => match ty {
+            ir::Type::Bool => ir::Literal::Boolean(*value != BigInt::ZERO).into(),
+            ir::Type::S8 => ir::Literal::Signed8(value.try_into().unwrap()).into(),
+            ir::Type::S16 => ir::Literal::Signed16(value.try_into().unwrap()).into(),
+            ir::Type::S32 => ir::Literal::Signed32(value.try_into().unwrap()).into(),
+            ir::Type::S64 => ir::Literal::Signed64(value.try_into().unwrap()).into(),
+            ir::Type::U8 => ir::Literal::Unsigned8(value.try_into().unwrap()).into(),
+            ir::Type::U16 => ir::Literal::Unsigned16(value.try_into().unwrap()).into(),
+            ir::Type::U32 => ir::Literal::Unsigned32(value.try_into().unwrap()).into(),
+            ir::Type::U64 => ir::Literal::Unsigned64(value.try_into().unwrap()).into(),
+            ir::Type::F32 => ir::Literal::Float32(value.to_f32().unwrap_or_else(|| {
+                if *value < BigInt::ZERO {
+                    f32::NEG_INFINITY
+                } else {
+                    f32::INFINITY
+                }
+            }))
+            .into(),
+            ir::Type::F64 => ir::Literal::Float64(value.to_f64().unwrap_or_else(|| {
+                if *value < BigInt::ZERO {
+                    f64::NEG_INFINITY
+                } else {
+                    f64::INFINITY
+                }
+            }))
+            .into(),
+            _ => panic!("Cannot specialize integer for type {:?}", ty),
+        },
+        UnaryImplicitCast::SpecializeFloat(not_nan) => todo!("specialize float"),
+        UnaryImplicitCast::SpecializePointerOuter(unaliased_type) => {
+            todo!("specialize pointer outer")
+        }
+        UnaryImplicitCast::SpecializeAsciiChar(_) => todo!("specialize ascii char"),
+    }
+}
+
+fn to_ir_type<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    ty: &repr::Type,
+) -> Result<ir::Type<'env>, ErrorDiagnostic> {
+    Ok(match &ty.kind {
+        TypeKind::IntegerLiteral(_) => ir::Type::Void,
+        TypeKind::IntegerLiteralInRange(min, max) => {
+            let (bits, sign) =
+                bits_and_sign_for_invisible_integer_in_range(min, max).map_err(|_| {
+                    ErrorDiagnostic::new("Integer range too large to represent", ty.source)
+                })?;
+            to_ir_int(bits, sign)
+        }
+        TypeKind::FloatLiteral(_) => ir::Type::Void,
+        TypeKind::BooleanLiteral(_) => ir::Type::Void,
+        TypeKind::NullLiteral => ir::Type::Void,
+        TypeKind::AsciiCharLiteral(_) => ir::Type::Void,
+        TypeKind::Boolean => ir::Type::Bool,
+        TypeKind::BitInteger(bits, sign) => to_ir_int(*bits, *sign),
+        TypeKind::CInteger(cinteger, integer_sign) => todo!(),
+        TypeKind::SizeInteger(integer_sign) => todo!(),
+        TypeKind::Floating(FloatSize::Bits32) => ir::Type::F32,
+        TypeKind::Floating(FloatSize::Bits64) => ir::Type::F64,
+        TypeKind::Ptr(_) => todo!(),
+        TypeKind::Void => ir::Type::Void,
+        TypeKind::Never => ir::Type::Void,
+        TypeKind::FixedArray(_, _) => todo!(),
+        TypeKind::UserDefined(user_defined_type) => todo!(),
+        TypeKind::Polymorph(_) => panic!("Cannot convert unspecialized polymorph to IR type!"),
+        TypeKind::DirectLabel(_) => ir::Type::Void,
+    })
+}
+
+fn to_ir_int<'env>(bits: IntegerBits, sign: IntegerSign) -> ir::Type<'env> {
+    match (bits, sign) {
+        (IntegerBits::Bits8, IntegerSign::Signed) => ir::Type::S8,
+        (IntegerBits::Bits8, IntegerSign::Unsigned) => ir::Type::U8,
+        (IntegerBits::Bits16, IntegerSign::Signed) => ir::Type::S16,
+        (IntegerBits::Bits16, IntegerSign::Unsigned) => ir::Type::U16,
+        (IntegerBits::Bits32, IntegerSign::Signed) => ir::Type::S32,
+        (IntegerBits::Bits32, IntegerSign::Unsigned) => ir::Type::U32,
+        (IntegerBits::Bits64, IntegerSign::Signed) => ir::Type::S64,
+        (IntegerBits::Bits64, IntegerSign::Unsigned) => ir::Type::U64,
     }
 }

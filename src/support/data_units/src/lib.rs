@@ -28,6 +28,10 @@ impl ByteUnits {
     pub fn to_bits(self) -> BitUnits {
         BitUnits::from(self)
     }
+
+    pub fn next_power_of_two(self) -> Self {
+        Self::of(self.units.next_power_of_two())
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
