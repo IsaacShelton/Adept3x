@@ -22,6 +22,7 @@ use llvm_sys::{
     },
     prelude::LLVMTypeRef,
 };
+use primitives::{FloatSize, IntegerBits};
 use std::{borrow::Borrow, ptr::null_mut};
 
 pub unsafe fn to_backend_type<'a, 'env: 'a>(
@@ -33,12 +34,12 @@ pub unsafe fn to_backend_type<'a, 'env: 'a>(
     Ok(match ir_type {
         ir::Type::Void => LLVMVoidType(),
         ir::Type::Bool => LLVMInt1Type(),
-        ir::Type::S8 | ir::Type::U8 => LLVMInt8Type(),
-        ir::Type::S16 | ir::Type::U16 => LLVMInt16Type(),
-        ir::Type::S32 | ir::Type::U32 => LLVMInt32Type(),
-        ir::Type::S64 | ir::Type::U64 => LLVMInt64Type(),
-        ir::Type::F32 => LLVMFloatType(),
-        ir::Type::F64 => LLVMDoubleType(),
+        ir::Type::I(IntegerBits::Bits8, _) => LLVMInt8Type(),
+        ir::Type::I(IntegerBits::Bits16, _) => LLVMInt16Type(),
+        ir::Type::I(IntegerBits::Bits32, _) => LLVMInt32Type(),
+        ir::Type::I(IntegerBits::Bits64, _) => LLVMInt64Type(),
+        ir::Type::F(FloatSize::Bits32) => LLVMFloatType(),
+        ir::Type::F(FloatSize::Bits64) => LLVMDoubleType(),
         ir::Type::Ptr(to) => LLVMPointerType(to_backend_type(ctx, to)?, 0),
         ir::Type::Union(_) => todo!("to_backend_type for ir::Type::Union"),
         ir::Type::AnonymousComposite(composite) => {

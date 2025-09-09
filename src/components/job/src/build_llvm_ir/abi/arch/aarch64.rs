@@ -323,7 +323,7 @@ impl<'env> HomoDecider<'env> for Aarch64HomoDecider {
         }
 
         match ir_type {
-            ir::Type::F32 | ir::Type::F64 => true,
+            ir::Type::F(..) => true,
             ir::Type::Vector(_) => matches!(type_layout_cache.get(ir_type).width.bytes(), 8 | 16),
             _ => false,
         }

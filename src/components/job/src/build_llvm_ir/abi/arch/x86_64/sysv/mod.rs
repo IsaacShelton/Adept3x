@@ -498,18 +498,10 @@ impl SysV {
         // or C++ member pointers
 
         match ty {
-            ir::Type::Ptr(_)
-            | ir::Type::FuncPtr
-            | ir::Type::Bool
-            | ir::Type::S8
-            | ir::Type::S16
-            | ir::Type::S32
-            | ir::Type::S64
-            | ir::Type::U8
-            | ir::Type::U16
-            | ir::Type::U32
-            | ir::Type::U64 => *current = RegClass::Integer,
-            ir::Type::F32 | ir::Type::F64 => *current = RegClass::Sse,
+            ir::Type::Ptr(_) | ir::Type::FuncPtr | ir::Type::Bool | ir::Type::I(..) => {
+                *current = RegClass::Integer
+            }
+            ir::Type::F(..) => *current = RegClass::Sse,
             ir::Type::Void => *current = RegClass::NoClass,
             ir::Type::Struct(_) | ir::Type::AnonymousComposite(_) | ir::Type::Union(_) => {
                 pair = self.classify_record(ctx, abi, ty, offset_base, is_required, pair)
@@ -871,7 +863,7 @@ impl SysV {
         }
 
         match ir_type {
-            ir::Type::Struct(_) /*| ir::Type::Union(_) | ir::Type::AnonymousComposite(_)*/ => {
+            ir::Type::Struct(_) | ir::Type::Union(_) | ir::Type::AnonymousComposite(_) => {
                 Self::bits_contain_no_user_data_in_record(
                     ctx,
                     start_bit,

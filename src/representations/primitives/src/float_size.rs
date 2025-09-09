@@ -1,3 +1,5 @@
+use data_units::ByteUnits;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub enum FloatSize {
     Bits32,
@@ -5,10 +7,10 @@ pub enum FloatSize {
 }
 
 impl FloatSize {
-    pub fn bits(self) -> u8 {
+    pub fn bytes(self) -> ByteUnits {
         match self {
-            Self::Bits32 => 32,
-            Self::Bits64 => 64,
+            Self::Bits32 => ByteUnits::of(4),
+            Self::Bits64 => ByteUnits::of(8),
         }
     }
 }

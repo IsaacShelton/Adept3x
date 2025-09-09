@@ -55,7 +55,6 @@ pub fn is_homo_aggregate<'env>(
                 type_layout_cache,
             )
         }
-        /*
         ir::Type::AnonymousComposite(anonymous_composite) => is_homo_aggregate_record(
             decider,
             ir_type,
@@ -64,7 +63,6 @@ pub fn is_homo_aggregate<'env>(
             existing_base,
             type_layout_cache,
         ),
-        */
         _ => {
             let (ir_type, num_members) = if let ir::Type::Complex(complex) = ir_type {
                 (complex.element_type, 2)

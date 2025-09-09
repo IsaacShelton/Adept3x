@@ -349,34 +349,49 @@ fn perform_unary_implicit_cast<'env>(
         return value;
     };
 
+    use IntegerBits::*;
+    use IntegerSign::*;
+
     match *cast {
         UnaryImplicitCast::SpecializeBoolean(_) => todo!(),
         UnaryImplicitCast::SpecializeInteger(value) => match ty {
             ir::Type::Bool => ir::Literal::Boolean(*value != BigInt::ZERO).into(),
-            ir::Type::S8 => ir::Literal::Signed8(value.try_into().unwrap()).into(),
-            ir::Type::S16 => ir::Literal::Signed16(value.try_into().unwrap()).into(),
-            ir::Type::S32 => ir::Literal::Signed32(value.try_into().unwrap()).into(),
-            ir::Type::S64 => ir::Literal::Signed64(value.try_into().unwrap()).into(),
-            ir::Type::U8 => ir::Literal::Unsigned8(value.try_into().unwrap()).into(),
-            ir::Type::U16 => ir::Literal::Unsigned16(value.try_into().unwrap()).into(),
-            ir::Type::U32 => ir::Literal::Unsigned32(value.try_into().unwrap()).into(),
-            ir::Type::U64 => ir::Literal::Unsigned64(value.try_into().unwrap()).into(),
-            ir::Type::F32 => ir::Literal::Float32(value.to_f32().unwrap_or_else(|| {
-                if *value < BigInt::ZERO {
-                    f32::NEG_INFINITY
-                } else {
-                    f32::INFINITY
-                }
-            }))
-            .into(),
-            ir::Type::F64 => ir::Literal::Float64(value.to_f64().unwrap_or_else(|| {
-                if *value < BigInt::ZERO {
-                    f64::NEG_INFINITY
-                } else {
-                    f64::INFINITY
-                }
-            }))
-            .into(),
+            ir::Type::I(Bits8, Signed) => ir::Literal::Signed8(value.try_into().unwrap()).into(),
+            ir::Type::I(Bits16, Signed) => ir::Literal::Signed16(value.try_into().unwrap()).into(),
+            ir::Type::I(Bits32, Signed) => ir::Literal::Signed32(value.try_into().unwrap()).into(),
+            ir::Type::I(Bits64, Signed) => ir::Literal::Signed64(value.try_into().unwrap()).into(),
+            ir::Type::I(Bits8, Unsigned) => {
+                ir::Literal::Unsigned8(value.try_into().unwrap()).into()
+            }
+            ir::Type::I(Bits16, Unsigned) => {
+                ir::Literal::Unsigned16(value.try_into().unwrap()).into()
+            }
+            ir::Type::I(Bits32, Unsigned) => {
+                ir::Literal::Unsigned32(value.try_into().unwrap()).into()
+            }
+            ir::Type::I(Bits64, Unsigned) => {
+                ir::Literal::Unsigned64(value.try_into().unwrap()).into()
+            }
+            ir::Type::F(FloatSize::Bits32) => {
+                ir::Literal::Float32(value.to_f32().unwrap_or_else(|| {
+                    if *value < BigInt::ZERO {
+                        f32::NEG_INFINITY
+                    } else {
+                        f32::INFINITY
+                    }
+                }))
+                .into()
+            }
+            ir::Type::F(FloatSize::Bits64) => {
+                ir::Literal::Float64(value.to_f64().unwrap_or_else(|| {
+                    if *value < BigInt::ZERO {
+                        f64::NEG_INFINITY
+                    } else {
+                        f64::INFINITY
+                    }
+                }))
+                .into()
+            }
             _ => panic!("Cannot specialize integer for type {:?}", ty),
         },
         UnaryImplicitCast::SpecializeFloat(not_nan) => todo!("specialize float"),
@@ -399,14 +414,15 @@ fn to_ir_type<'env>(
                 bits_and_sign_for_invisible_integer_in_range(min, max).map_err(|_| {
                     ErrorDiagnostic::new("Integer range too large to represent", ty.source)
                 })?;
-            to_ir_int(bits, sign)
+
+            ir::Type::I(bits, sign)
         }
         TypeKind::FloatLiteral(_) => ir::Type::Void,
         TypeKind::BooleanLiteral(_) => ir::Type::Void,
         TypeKind::NullLiteral => ir::Type::Void,
         TypeKind::AsciiCharLiteral(_) => ir::Type::Void,
         TypeKind::Boolean => ir::Type::Bool,
-        TypeKind::BitInteger(bits, sign) => to_ir_int(*bits, *sign),
+        TypeKind::BitInteger(bits, sign) => ir::Type::I(*bits, *sign),
         TypeKind::CInteger(c_integer, sign) => {
             let bytes = target.c_integer_bytes(*c_integer);
             let Some(bits) = IntegerBits::new(bytes.to_bits()) else {
@@ -415,14 +431,14 @@ fn to_ir_type<'env>(
                     ty.source,
                 ));
             };
-            to_ir_int(
+
+            ir::Type::I(
                 bits,
                 sign.unwrap_or_else(|| target.default_c_integer_sign(*c_integer)),
             )
         }
         TypeKind::SizeInteger(integer_sign) => todo!(),
-        TypeKind::Floating(FloatSize::Bits32) => ir::Type::F32,
-        TypeKind::Floating(FloatSize::Bits64) => ir::Type::F64,
+        TypeKind::Floating(float_size) => ir::Type::F(*float_size),
         TypeKind::Ptr(_) => todo!(),
         TypeKind::Void => ir::Type::Void,
         TypeKind::Never => ir::Type::Void,
@@ -431,17 +447,4 @@ fn to_ir_type<'env>(
         TypeKind::Polymorph(_) => panic!("Cannot convert unspecialized polymorph to IR type!"),
         TypeKind::DirectLabel(_) => ir::Type::Void,
     })
-}
-
-fn to_ir_int<'env>(bits: IntegerBits, sign: IntegerSign) -> ir::Type<'env> {
-    match (bits, sign) {
-        (IntegerBits::Bits8, IntegerSign::Signed) => ir::Type::S8,
-        (IntegerBits::Bits8, IntegerSign::Unsigned) => ir::Type::U8,
-        (IntegerBits::Bits16, IntegerSign::Signed) => ir::Type::S16,
-        (IntegerBits::Bits16, IntegerSign::Unsigned) => ir::Type::U16,
-        (IntegerBits::Bits32, IntegerSign::Signed) => ir::Type::S32,
-        (IntegerBits::Bits32, IntegerSign::Unsigned) => ir::Type::U32,
-        (IntegerBits::Bits64, IntegerSign::Signed) => ir::Type::S64,
-        (IntegerBits::Bits64, IntegerSign::Unsigned) => ir::Type::U64,
-    }
 }

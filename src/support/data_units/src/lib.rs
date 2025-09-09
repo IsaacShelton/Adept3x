@@ -29,6 +29,16 @@ impl ByteUnits {
         BitUnits::from(self)
     }
 
+    pub fn from_bits(bits: BitUnits) -> ByteUnits {
+        let bits = bits.bits();
+
+        if bits % 8 == 0 {
+            ByteUnits::of(bits / 8)
+        } else {
+            ByteUnits::of(bits / 8 + 1)
+        }
+    }
+
     pub fn next_power_of_two(self) -> Self {
         Self::of(self.units.next_power_of_two())
     }

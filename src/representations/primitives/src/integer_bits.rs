@@ -34,12 +34,7 @@ impl IntegerBits {
     }
 
     pub fn bits(self) -> BitUnits {
-        match self {
-            IntegerBits::Bits8 => BitUnits::of(8),
-            IntegerBits::Bits16 => BitUnits::of(16),
-            IntegerBits::Bits32 => BitUnits::of(32),
-            IntegerBits::Bits64 => BitUnits::of(64),
-        }
+        self.bytes().to_bits()
     }
 
     pub fn bytes(self) -> ByteUnits {

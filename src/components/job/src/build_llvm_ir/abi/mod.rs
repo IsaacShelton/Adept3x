@@ -6,21 +6,14 @@ pub mod empty;
 mod homo_aggregate;
 
 use crate::ir;
+use primitives::IntegerBits;
 
 pub fn has_scalar_evaluation_kind(ty: &ir::Type) -> bool {
     match ty {
         ir::Type::Ptr(_)
         | ir::Type::Bool
-        | ir::Type::S8
-        | ir::Type::S16
-        | ir::Type::S32
-        | ir::Type::S64
-        | ir::Type::U8
-        | ir::Type::U16
-        | ir::Type::U32
-        | ir::Type::U64
-        | ir::Type::F32
-        | ir::Type::F64
+        | ir::Type::I(..)
+        | ir::Type::F(..)
         | ir::Type::Vector(_) => true,
         ir::Type::Atomic(inner) => has_scalar_evaluation_kind(inner),
         ir::Type::Complex(_)
@@ -42,13 +35,9 @@ pub fn is_promotable_integer_type_for_abi(ty: &ir::Type) -> bool {
     // NOTE: Arbitrarily sized integers and `char32` should be, but we don't support those yet
 
     match ty {
-        ir::Type::Bool | ir::Type::S8 | ir::Type::S16 | ir::Type::U8 | ir::Type::U16 => true,
-        ir::Type::S32
-        | ir::Type::S64
-        | ir::Type::U32
-        | ir::Type::U64
-        | ir::Type::F32
-        | ir::Type::F64
+        ir::Type::Bool | ir::Type::I(IntegerBits::Bits8 | IntegerBits::Bits16, _) => true,
+        ir::Type::I(IntegerBits::Bits32 | IntegerBits::Bits64, _)
+        | ir::Type::F(..)
         | ir::Type::Ptr(_)
         | ir::Type::Void
         | ir::Type::Union(_)

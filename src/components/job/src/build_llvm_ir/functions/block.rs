@@ -12,7 +12,7 @@ use crate::{
                 ABITypeKind, CoerceAndExpand, is_padding_for_coerce_expand,
                 kinds::{TypeExpansion, get_type_expansion},
             },
-            has_scalar_evaluation_kind,
+            has_scalar_evaluation_kind, is_promotable_integer_type_for_abi,
         },
         address::Address,
         backend_type::{get_abi_function_type, get_unabi_function_type, to_backend_type},
@@ -30,8 +30,7 @@ use crate::{
         value_catalog::ValueCatalog,
         values::build_value,
     },
-    ir,
-    ir::{Call, Instr},
+    ir::{self, Call, Instr},
     target_layout::TargetLayout,
 };
 use ast::SizeOfMode;
@@ -44,7 +43,7 @@ use llvm_sys::{
     core::*,
     prelude::{LLVMTypeRef, LLVMValueRef},
 };
-use primitives::{FloatOrInteger, FloatOrSign, IntegerSign};
+use primitives::{FloatOrInteger, FloatOrSign, FloatSize, IntegerBits, IntegerSign};
 use std::{borrow::Cow, ptr::null_mut, sync::atomic};
 use target::Target;
 
@@ -740,13 +739,15 @@ fn promote_variadic_argument_type<'env>(
         "we're assuming sizeof C int is 32 bits for now"
     );
 
-    match ir_type {
-        // Promote integers to 32-bit
-        ir::Type::Bool | ir::Type::S8 | ir::Type::S16 => ctx.alloc.alloc(ir::Type::S32),
-        ir::Type::U8 | ir::Type::U16 | ir::Type::U32 => ctx.alloc.alloc(ir::Type::U32),
+    if is_promotable_integer_type_for_abi(ir_type) {
+        return ctx
+            .alloc
+            .alloc(ir::Type::I(IntegerBits::Bits32, IntegerSign::Signed));
+    }
 
+    match ir_type {
         // Promote floats to 64-bit
-        ir::Type::F32 => ctx.alloc.alloc(ir::Type::F64),
+        ir::Type::F(FloatSize::Bits32) => ctx.alloc.alloc(ir::Type::F(FloatSize::Bits64)),
 
         // Promote atomics based on what's inside
         ir::Type::Atomic(inner_type) => {

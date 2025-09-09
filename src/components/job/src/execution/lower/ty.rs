@@ -8,8 +8,8 @@ use by_address::ByAddress;
 use data_units::ByteUnits;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
-use primitives::{CInteger, FloatSize, IntegerSign};
-use target::{Target, TargetOsExt};
+use primitives::{CInteger, IntegerBits, IntegerSign};
+use target::Target;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -50,8 +50,6 @@ impl<'env> Executable<'env> for LowerType<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        use primitives::{IntegerBits as Bits, IntegerSign as Sign};
-
         let target = self.compiler.target(self.view.graph);
 
         return Ok(match &self.ty.kind {
@@ -98,30 +96,14 @@ impl<'env> Executable<'env> for LowerType<'env> {
                 .into());
             }
             TypeKind::Boolean => ir::Type::Bool,
-            TypeKind::BitInteger(bits, sign) => match (bits, sign) {
-                (Bits::Bits8, Sign::Signed) => ir::Type::S8,
-                (Bits::Bits8, Sign::Unsigned) => ir::Type::U8,
-                (Bits::Bits16, Sign::Signed) => ir::Type::S16,
-                (Bits::Bits16, Sign::Unsigned) => ir::Type::U16,
-                (Bits::Bits32, Sign::Signed) => ir::Type::S32,
-                (Bits::Bits32, Sign::Unsigned) => ir::Type::U32,
-                (Bits::Bits64, Sign::Signed) => ir::Type::S64,
-                (Bits::Bits64, Sign::Unsigned) => ir::Type::U64,
-            },
+            TypeKind::BitInteger(bits, sign) => ir::Type::I(*bits, *sign),
             TypeKind::CInteger(integer, sign) => lower_c_integer(&target, *integer, *sign),
             TypeKind::SizeInteger(sign) => {
                 let layout = target.size_layout();
                 assert_eq!(layout, TypeLayout::basic(ByteUnits::of(8)));
-
-                match sign {
-                    Sign::Signed => ir::Type::S64,
-                    Sign::Unsigned => ir::Type::U64,
-                }
+                ir::Type::I(IntegerBits::Bits64, *sign)
             }
-            TypeKind::Floating(size) => match size {
-                FloatSize::Bits32 => ir::Type::F32,
-                FloatSize::Bits64 => ir::Type::F64,
-            },
+            TypeKind::Floating(size) => ir::Type::F(*size),
             TypeKind::Ptr(inner) => {
                 let Some(lowered_inner) = executor.demand(self.inner_type) else {
                     return suspend!(
@@ -150,33 +132,12 @@ impl<'env> Executable<'env> for LowerType<'env> {
 
 fn lower_c_integer<'env>(
     target: &Target,
-    integer: CInteger,
+    c_integer: CInteger,
     sign: Option<IntegerSign>,
 ) -> ir::Type<'env> {
-    let sign = sign.unwrap_or_else(|| target.default_c_integer_sign(integer));
+    let sign = sign.unwrap_or_else(|| target.default_c_integer_sign(c_integer));
+    let bits = IntegerBits::new(target.c_integer_bytes(c_integer).to_bits())
+        .expect("c integer to be representable with primitive integers");
 
-    match (integer, sign) {
-        (CInteger::Char, IntegerSign::Signed) => ir::Type::S8,
-        (CInteger::Char, IntegerSign::Unsigned) => ir::Type::U8,
-        (CInteger::Short, IntegerSign::Signed) => ir::Type::S16,
-        (CInteger::Short, IntegerSign::Unsigned) => ir::Type::U16,
-        (CInteger::Int, IntegerSign::Signed) => ir::Type::S32,
-        (CInteger::Int, IntegerSign::Unsigned) => ir::Type::U32,
-        (CInteger::Long, IntegerSign::Signed) => {
-            if target.os().is_windows() {
-                ir::Type::S32
-            } else {
-                ir::Type::S64
-            }
-        }
-        (CInteger::Long, IntegerSign::Unsigned) => {
-            if target.os().is_windows() {
-                ir::Type::U32
-            } else {
-                ir::Type::U64
-            }
-        }
-        (CInteger::LongLong, IntegerSign::Signed) => ir::Type::S64,
-        (CInteger::LongLong, IntegerSign::Unsigned) => ir::Type::U64,
-    }
+    ir::Type::I(bits, sign)
 }

@@ -28,14 +28,14 @@ fn from_float_to_float<O: Objective>(
     type_source: Source,
 ) -> ObjectiveResult<O> {
     let target_type = TypeKind::Floating(to_size).at(type_source);
-    let from_bits = from_size.bits();
-    let to_bits = to_size.bits();
+    let from_bytes = from_size.bytes();
+    let to_bytes = to_size.bytes();
 
-    if from_bits == to_bits {
+    if from_bytes == to_bytes {
         return O::success(|| TypedExpr::new(target_type, expr.clone()));
     }
 
-    if from_bits < to_bits {
+    if from_bytes < to_bytes {
         return O::success(|| {
             TypedExpr::new(
                 target_type.clone(),

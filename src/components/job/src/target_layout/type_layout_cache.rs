@@ -43,12 +43,8 @@ impl<'env> TypeLayoutCache<'env> {
         match ir_type {
             ir::Type::Ptr(_) | ir::Type::FuncPtr => self.target.pointer_layout(),
             ir::Type::Bool => self.target.bool_layout(),
-            ir::Type::S8 | ir::Type::U8 => TypeLayout::basic(ByteUnits::of(1)),
-            ir::Type::S16 | ir::Type::U16 => TypeLayout::basic(ByteUnits::of(2)),
-            ir::Type::S32 | ir::Type::U32 => TypeLayout::basic(ByteUnits::of(4)),
-            ir::Type::S64 | ir::Type::U64 => TypeLayout::basic(ByteUnits::of(8)),
-            ir::Type::F32 => TypeLayout::basic(ByteUnits::of(4)),
-            ir::Type::F64 => TypeLayout::basic(ByteUnits::of(8)),
+            ir::Type::I(integer_size, _) => TypeLayout::basic(integer_size.bytes()),
+            ir::Type::F(float_size) => TypeLayout::basic(float_size.bytes()),
             ir::Type::Void => TypeLayout {
                 width: ByteUnits::of(0),
                 alignment: ByteUnits::of(0),

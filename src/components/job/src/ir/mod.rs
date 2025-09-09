@@ -8,6 +8,7 @@ use attributes::SymbolOwnership;
 use derivative::Derivative;
 use derive_more::IsVariant;
 pub use instr::*;
+use primitives::{FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
 use std::sync::OnceLock;
 pub use value::*;
@@ -58,16 +59,8 @@ pub struct Func<'env> {
 pub enum Type<'env> {
     Ptr(&'env Type<'env>),
     Bool,
-    S8,
-    S16,
-    S32,
-    S64,
-    U8,
-    U16,
-    U32,
-    U64,
-    F32,
-    F64,
+    I(IntegerBits, IntegerSign),
+    F(FloatSize),
     Void,
     FuncPtr,
     Struct(StructRef<'env>),
@@ -97,40 +90,19 @@ impl<'env> Type<'env> {
 
     pub fn is_signed(&self) -> Option<bool> {
         match self {
-            Type::S8 | Type::S16 | Type::S32 | Type::S64 => Some(true),
-            Type::Bool | Type::U8 | Type::U16 | Type::U32 | Type::U64 => Some(false),
+            Type::I(_, sign) => Some(sign.is_signed()),
+            Type::Bool => Some(false),
             _ => None,
         }
     }
 
     pub fn is_integer_like(&self) -> bool {
-        matches!(
-            self,
-            Type::Bool
-                | Type::S8
-                | Type::S16
-                | Type::S32
-                | Type::S64
-                | Type::U8
-                | Type::U16
-                | Type::U32
-                | Type::U64
-        )
+        matches!(self, Type::Bool | Type::I(..))
     }
 
     pub fn is_builtin_data(&self) -> bool {
         match self {
-            Type::Bool
-            | Type::S8
-            | Type::S16
-            | Type::S32
-            | Type::S64
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::F32
-            | Type::F64 => true,
+            Type::Bool | Type::I(..) | Type::F(..) => true,
             Type::Ptr(_)
             | Type::Void
             | Type::Struct(_)
@@ -148,7 +120,7 @@ impl<'env> Type<'env> {
     pub fn struct_fields(&self, ir_module: &'env Ir<'env>) -> Option<&'env [&'env Field<'env>]> {
         match self {
             Type::Struct(struct_ref) => Some(&ir_module.structs[*struct_ref].fields[..]),
-            /*Type::AnonymousComposite(composite) => Some(&composite.fields[..]),*/
+            Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
             _ => None,
         }
     }

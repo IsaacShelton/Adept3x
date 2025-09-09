@@ -288,9 +288,7 @@ impl<'env> HomoDecider<'env> for Win64HomoDecider {
     ) -> bool {
         // NOTE: We don't support long doubles here
         match ir_type {
-            ir::Type::F32 | ir::Type::F64 => {
-                return true;
-            }
+            ir::Type::F(..) => true,
             ir::Type::Vector(_) => {
                 matches!(type_layout_cache.get(ir_type).width.bytes(), 16 | 32 | 64)
             }
