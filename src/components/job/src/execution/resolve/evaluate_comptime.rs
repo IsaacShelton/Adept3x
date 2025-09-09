@@ -64,10 +64,13 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             .default_comptime()
             .unwrap_or(self.view.graph);
 
-        let comptime_module = self
-            .view
-            .web
-            .upsert_module_with_initial_part(comptime_graph, self.view.canonical_module_filename);
+        let comptime_meta = self.view.web.graph(comptime_graph, |graph| graph.meta());
+
+        let comptime_module = self.view.web.upsert_module_with_initial_part(
+            comptime_graph,
+            comptime_meta,
+            self.view.canonical_module_filename,
+        );
 
         if let Upserted::Created(created) = comptime_module {
             let _ = executor.spawn_raw(ProcessFile::new(

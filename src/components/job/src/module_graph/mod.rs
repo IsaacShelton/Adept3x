@@ -84,7 +84,7 @@ pub struct ModuleGraph<'env> {
     consistency: AppendOnlyVec<Link<'env>>,
 
     // Metadata about the purpose of this module graph
-    meta: ModuleGraphMeta,
+    meta: &'env ModuleGraphMeta,
 
     // IR module
     pub ir: &'env Ir<'env>,
@@ -134,7 +134,7 @@ impl<'env> ModuleGraph<'env> {
             modules: Default::default(),
             wildcard_imports: Default::default(),
             consistency: Default::default(),
-            meta,
+            meta: ctx.alloc(meta),
             ir: ctx.alloc(Ir::default()),
         }
     }
@@ -199,8 +199,8 @@ impl<'env> ModuleGraph<'env> {
         }
     }
 
-    pub fn meta(&self) -> &ModuleGraphMeta {
-        &self.meta
+    pub fn meta(&self) -> &'env ModuleGraphMeta {
+        self.meta
     }
 }
 

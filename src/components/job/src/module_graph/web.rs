@@ -42,6 +42,7 @@ impl<'env> ModuleGraphWeb<'env> {
     pub fn upsert_module_with_initial_part(
         &'env self,
         graph_ref: ModuleGraphRef,
+        meta: &'env ModuleGraphMeta,
         canonical_filename: &'env Path,
     ) -> Upserted<ModuleView<'env>> {
         let handle = self
@@ -57,6 +58,7 @@ impl<'env> ModuleGraphWeb<'env> {
             handle.out_of(),
             canonical_filename,
             canonical_filename,
+            meta,
         );
 
         if is_found {

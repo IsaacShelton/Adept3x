@@ -3,8 +3,8 @@ use crate::{
     conform::UnaryImplicitCast,
     ir::{self, Literal},
     module_graph::ModuleView,
-    repr,
-    repr::{Compiler, FuncBody, FuncHead, TypeKind},
+    repr::{self, Compiler, FuncBody, FuncHead, TypeKind},
+    target_layout::TargetLayout,
 };
 use arena::Id;
 use by_address::ByAddress;
@@ -16,6 +16,7 @@ use num_bigint::BigInt;
 use num_traits::{ConstZero, ToPrimitive};
 use primitives::{FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
+use target::Target;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -179,7 +180,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             let cfg_ty = self.head.return_type.0;
                             let value = builder.get_output(value);
 
-                            to_ir_type(ctx, cfg_ty).map(|ir_ty| {
+                            to_ir_type(ctx, self.view.target(), cfg_ty).map(|ir_ty| {
                                 perform_unary_implicit_cast(
                                     value,
                                     &ir_ty,
@@ -388,6 +389,7 @@ fn perform_unary_implicit_cast<'env>(
 
 fn to_ir_type<'env>(
     ctx: &mut ExecutionCtx<'env>,
+    target: &Target,
     ty: &repr::Type,
 ) -> Result<ir::Type<'env>, ErrorDiagnostic> {
     Ok(match &ty.kind {
@@ -405,7 +407,19 @@ fn to_ir_type<'env>(
         TypeKind::AsciiCharLiteral(_) => ir::Type::Void,
         TypeKind::Boolean => ir::Type::Bool,
         TypeKind::BitInteger(bits, sign) => to_ir_int(*bits, *sign),
-        TypeKind::CInteger(cinteger, integer_sign) => todo!(),
+        TypeKind::CInteger(c_integer, sign) => {
+            let bytes = target.c_integer_bytes(*c_integer);
+            let Some(bits) = IntegerBits::new(bytes.to_bits()) else {
+                return Err(ErrorDiagnostic::new(
+                    "C integer is larger that supported",
+                    ty.source,
+                ));
+            };
+            to_ir_int(
+                bits,
+                sign.unwrap_or_else(|| target.default_c_integer_sign(*c_integer)),
+            )
+        }
         TypeKind::SizeInteger(integer_sign) => todo!(),
         TypeKind::Floating(FloatSize::Bits32) => ir::Type::F32,
         TypeKind::Floating(FloatSize::Bits64) => ir::Type::F64,

@@ -30,10 +30,13 @@ pub struct WaitingOnTypeAlias {
     type_alias_ref: TypeAliasRef,
 }
 
+pub trait OnPolymorph<'env>: FnMut(&str, UnaliasedType<'env>) -> bool {}
+impl<'env, F> OnPolymorph<'env> for F where F: FnMut(&str, UnaliasedType<'env>) -> bool {}
+
 pub fn are_types_equal<'env>(
     a_ty: UnaliasedType<'env>,
     b_ty: UnaliasedType<'env>,
-    mut on_polymorph: impl FnMut(&str, UnaliasedType<'env>) -> bool,
+    mut on_polymorph: impl OnPolymorph<'env>,
 ) -> bool {
     let a = &a_ty.0.kind;
     let b = &b_ty.0.kind;

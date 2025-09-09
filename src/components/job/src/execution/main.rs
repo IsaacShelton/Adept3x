@@ -79,8 +79,10 @@ impl<'env> Executable<'env> for Main<'env> {
             .module_graph_web
             .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST, ctx)));
 
+        let meta = web.graph(ModuleGraphRef::Runtime, |graph| graph.meta());
+
         let runtime = web
-            .upsert_module_with_initial_part(ModuleGraphRef::Runtime, single_file)
+            .upsert_module_with_initial_part(ModuleGraphRef::Runtime, meta, single_file)
             .out_of();
 
         // Ensure multi-threading support is enabled for the version of LLVM being used

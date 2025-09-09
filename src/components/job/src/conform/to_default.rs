@@ -1,15 +1,15 @@
 use crate::{
     BuiltinTypes, ExecutionCtx,
-    conform::UnaryImplicitCast,
+    conform::{UnaryImplicitCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
     repr::{TypeKind, UnaliasedType},
 };
-use data_units::BitUnits;
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::ToPrimitive;
 use ordered_float::NotNan;
-use primitives::{CIntegerAssumptions, IntegerBits, IntegerSign};
+use primitives::{CIntegerAssumptions, IntegerSign};
 use source_files::Source;
+use target::Target;
 
 pub struct Conform<'env> {
     pub ty: UnaliasedType<'env>,
@@ -24,7 +24,7 @@ impl<'env> Conform<'env> {
         }
     }
 
-    pub fn from_type(ty: UnaliasedType<'env>) -> Self {
+    pub fn identity(ty: UnaliasedType<'env>) -> Self {
         Self { ty, cast: None }
     }
 }
@@ -34,6 +34,7 @@ pub fn conform_to_default<'env>(
     ty: UnaliasedType<'env>,
     assumptions: CIntegerAssumptions,
     builtin_types: &'env BuiltinTypes<'env>,
+    target: &Target,
 ) -> Result<Conform<'env>, ErrorDiagnostic> {
     let source = ty.0.source;
 
@@ -48,13 +49,14 @@ pub fn conform_to_default<'env>(
         TypeKind::IntegerLiteral(big_int) => default_integer_types
             .into_iter()
             .flat_map(|possible_type| {
-                from_integer_literal(
+                default_from_integer_literal(
                     ctx,
                     big_int,
                     assumptions,
                     source,
                     &possible_type.kind,
                     builtin_types,
+                    target,
                 )
             })
             .next()
@@ -75,22 +77,24 @@ pub fn conform_to_default<'env>(
         TypeKind::IntegerLiteralInRange(min, max) => default_integer_types
             .into_iter()
             .flat_map(|possible_type| {
-                from_integer_literal(
+                default_from_integer_literal(
                     ctx,
                     max,
                     assumptions,
                     source,
                     &possible_type.kind,
                     builtin_types,
+                    target,
                 )
                 .and_then(|_| {
-                    from_integer_literal(
+                    default_from_integer_literal(
                         ctx,
                         min,
                         assumptions,
                         source,
                         &possible_type.kind,
                         builtin_types,
+                        target,
                     )
                 })
             })
@@ -109,17 +113,18 @@ pub fn conform_to_default<'env>(
             builtin_types.bool(),
             UnaryImplicitCast::SpecializeAsciiChar(*value),
         ),
-        _ => Conform::from_type(ty.clone()),
+        _ => Conform::identity(ty),
     })
 }
 
-fn from_integer_literal<'env>(
+fn default_from_integer_literal<'env>(
     ctx: &mut ExecutionCtx<'env>,
     value: &'env BigInt,
     assumptions: CIntegerAssumptions,
     source: Source,
     to_type_kind: &'env TypeKind<'env>,
     builtin_types: &'env BuiltinTypes<'env>,
+    target: &Target,
 ) -> Option<Conform<'env>> {
     match &to_type_kind {
         TypeKind::Floating(float_size) => value.to_f64().map(|float| {
@@ -129,18 +134,7 @@ fn from_integer_literal<'env>(
             )
         }),
         TypeKind::BitInteger(to_bits, to_sign) => {
-            let does_fit = match (to_bits, to_sign) {
-                (IntegerBits::Bits8, IntegerSign::Signed) => i8::try_from(value).is_ok(),
-                (IntegerBits::Bits8, IntegerSign::Unsigned) => u8::try_from(value).is_ok(),
-                (IntegerBits::Bits16, IntegerSign::Signed) => i16::try_from(value).is_ok(),
-                (IntegerBits::Bits16, IntegerSign::Unsigned) => u16::try_from(value).is_ok(),
-                (IntegerBits::Bits32, IntegerSign::Signed) => i32::try_from(value).is_ok(),
-                (IntegerBits::Bits32, IntegerSign::Unsigned) => u32::try_from(value).is_ok(),
-                (IntegerBits::Bits64, IntegerSign::Signed) => i64::try_from(value).is_ok(),
-                (IntegerBits::Bits64, IntegerSign::Unsigned) => u64::try_from(value).is_ok(),
-            };
-
-            does_fit.then(|| {
+            does_integer_literal_fit(value, *to_bits, *to_sign).then(|| {
                 Conform::new(
                     UnaliasedType(ctx.alloc(TypeKind::BitInteger(*to_bits, *to_sign).at(source))),
                     UnaryImplicitCast::SpecializeInteger(value).into(),
@@ -148,17 +142,16 @@ fn from_integer_literal<'env>(
             })
         }
         TypeKind::CInteger(to_c_integer, to_sign) => {
-            let needs_bits =
-                BitUnits::of(value.bits() + (*value < BigInt::zero()).then_some(1).unwrap_or(0));
-
-            (needs_bits <= to_c_integer.min_bits(assumptions).bits()).then(|| {
-                Conform::new(
-                    UnaliasedType(
-                        ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
-                    ),
-                    UnaryImplicitCast::SpecializeInteger(value),
-                )
-            })
+            does_integer_literal_fit_in_c(value, *to_c_integer, *to_sign, assumptions, target).then(
+                || {
+                    Conform::new(
+                        UnaliasedType(
+                            ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
+                        ),
+                        UnaryImplicitCast::SpecializeInteger(value),
+                    )
+                },
+            )
         }
         TypeKind::SizeInteger(to_sign) => {
             // Size types (i.e. size_t, ssize_t, usize, isize) are guananteed to be at least 16 bits

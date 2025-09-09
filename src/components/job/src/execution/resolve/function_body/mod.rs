@@ -6,7 +6,7 @@ mod variables;
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
     FuncSearch, InstrKind, InstrRef, Suspend, SuspendMany, are_types_equal,
-    conform::conform_to_default,
+    conform::{ConformMode, conform_to, conform_to_default},
     execution::resolve::{
         ResolveType,
         function_body::{
@@ -24,7 +24,7 @@ use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
-use primitives::CIntegerAssumptions;
+use primitives::{CInteger, CIntegerAssumptions};
 use variables::VariableTrackers;
 
 #[derive(Clone, Derivative)]
@@ -183,23 +183,29 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     | EndInstrKind::IncompleteContinue => unreachable!(),
                     EndInstrKind::Return(Some(value), _) => {
                         // 1] Conform the value to its default type
-                        let conformed = conform_to_default(
+                        let conformed = conform_to(
                             ctx,
                             cfg.get_typed(*value),
+                            self.resolved_head.return_type,
                             c_integer_assumptions,
+                            self.view.target(),
                             builtin_types,
-                        )?;
+                            ConformMode::Normal,
+                            |_, _| todo!("handle polymorphs"),
+                            instr.source,
+                        );
 
                         // 2] Ensure the type of the value matches the return type
-                        if !are_types_equal(self.resolved_head.return_type, conformed.ty, |_, _| {
-                            todo!("handle polymorphs")
-                        }) {
+                        let Some(conformed) = conformed else {
                             return Err(ErrorDiagnostic::new(
-                                format!("Cannot return value of type '{}'", conformed.ty.0),
+                                format!(
+                                    "Cannot return value of type '{}'",
+                                    self.resolved_head.return_type.0
+                                ),
                                 instr.source,
                             )
                             .into());
-                        }
+                        };
 
                         // 3] Track any casts that were necessary
                         cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
@@ -373,6 +379,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         cfg.get_typed(*value),
                         c_integer_assumptions,
                         builtin_types,
+                        self.view.target(),
                     )?;
 
                     // 4] Ensure the value type matches the variable type
@@ -435,7 +442,19 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 }
                 InstrKind::Utf8CharLiteral(_) => todo!("utf-8 char literal"),
                 InstrKind::StringLiteral(_) => todo!("string literal"),
-                InstrKind::NullTerminatedStringLiteral(cstr) => todo!(),
+                InstrKind::NullTerminatedStringLiteral(cstr) => {
+                    cfg.set_typed(
+                        instr_ref,
+                        UnaliasedType(
+                            ctx.alloc(
+                                TypeKind::Ptr(ctx.alloc(
+                                    TypeKind::CInteger(CInteger::Char, None).at(instr.source),
+                                ))
+                                .at(instr.source),
+                            ),
+                        ),
+                    )
+                }
                 InstrKind::NullLiteral => {
                     cfg.set_typed(instr_ref, builtin_types.null());
                 }
@@ -463,6 +482,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         cfg.get_typed(*value),
                         c_integer_assumptions,
                         builtin_types,
+                        self.view.target(),
                     )?;
 
                     // 2] Assign the variable the resolved type, and
@@ -487,6 +507,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         cfg.get_typed(*value),
                         c_integer_assumptions,
                         builtin_types,
+                        self.view.target(),
                     )?;
 
                     if !conformed.ty.0.kind.is_boolean() {

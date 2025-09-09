@@ -12,6 +12,7 @@ use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use source_files::SourceFiles;
 use std::path::Path;
+use target::Target;
 
 #[derive(Copy, Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -19,6 +20,11 @@ pub struct ModuleView<'env> {
     pub web: ByAddress<&'env ModuleGraphWeb<'env>>,
     pub graph: ModuleGraphRef,
     pub handle: ModulePartHandle<'env>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    pub meta: &'env ModuleGraphMeta,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -38,6 +44,7 @@ impl<'env> ModuleView<'env> {
         handle: ModulePartHandle<'env>,
         canonical_filename: &'env Path,
         canonical_module_filename: &'env Path,
+        meta: &'env ModuleGraphMeta,
     ) -> Self {
         Self {
             web: ByAddress(web),
@@ -45,7 +52,12 @@ impl<'env> ModuleView<'env> {
             handle,
             canonical_filename,
             canonical_module_filename,
+            meta,
         }
+    }
+
+    pub fn target(&self) -> &'env Target {
+        &self.meta.target
     }
 
     #[must_use]
@@ -65,6 +77,7 @@ impl<'env> ModuleView<'env> {
             ModulePartHandle::new(self.handle.module_ref, new_part_ref.out_of()),
             canonical_filename,
             self.canonical_module_filename,
+            self.meta,
         );
 
         if is_found {
@@ -86,9 +99,10 @@ impl<'env> ModuleView<'env> {
         compiler: &Compiler,
     ) -> Upserted<Self> {
         match mode {
-            ModuleBreakOffMode::Module => self
-                .web
-                .upsert_module_with_initial_part(self.graph, canonical_filename),
+            ModuleBreakOffMode::Module => {
+                self.web
+                    .upsert_module_with_initial_part(self.graph, self.meta, canonical_filename)
+            }
             ModuleBreakOffMode::Part => self.upsert_part(canonical_filename),
         }
     }
