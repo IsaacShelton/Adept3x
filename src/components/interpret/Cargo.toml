@@ -13,3 +13,4 @@ ir = { version = "0.1.0", path = "../../representations/ir" }
 num.workspace = true
 num-derive.workspace = true
 num-traits.workspace = true
+primitives = { version = "0.1.0", path = "../../representations/primitives" }

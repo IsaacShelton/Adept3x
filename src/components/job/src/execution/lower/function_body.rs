@@ -13,7 +13,7 @@ use data_units::BitUnits;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
-use num_traits::{ConstZero, ToPrimitive};
+use num_traits::ToPrimitive;
 use primitives::{FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
 use target::Target;
@@ -180,11 +180,12 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             let cfg_ty = self.head.return_type.0;
                             let value = builder.get_output(value);
 
-                            to_ir_type(ctx, self.view.target(), cfg_ty).map(|ir_ty| {
+                            to_ir_type(ctx, self.view.target(), cfg_ty).and_then(|ir_ty| {
                                 perform_unary_implicit_cast(
                                     value,
                                     &ir_ty,
                                     unary_implicit_cast.as_ref(),
+                                    instr_end.source,
                                 )
                             })
                         })
@@ -344,33 +345,49 @@ fn perform_unary_implicit_cast<'env>(
     value: ir::Value<'env>,
     ty: &ir::Type<'env>,
     cast: Option<&UnaryImplicitCast>,
-) -> ir::Value<'env> {
+    source: Source,
+) -> Result<ir::Value<'env>, ErrorDiagnostic> {
     let Some(cast) = cast else {
-        return value;
+        return Ok(value);
     };
 
     use IntegerBits::*;
     use IntegerSign::*;
 
-    match *cast {
+    let cast_failed = |_| {
+        ErrorDiagnostic::new(
+            format!("Internal Error: Failed to perform cast to {:?}", ty),
+            source,
+        )
+    };
+
+    Ok(match *cast {
         UnaryImplicitCast::SpecializeBoolean(_) => todo!(),
         UnaryImplicitCast::SpecializeInteger(value) => match ty {
             ir::Type::Bool => ir::Literal::Boolean(*value != BigInt::ZERO).into(),
-            ir::Type::I(Bits8, Signed) => ir::Literal::Signed8(value.try_into().unwrap()).into(),
-            ir::Type::I(Bits16, Signed) => ir::Literal::Signed16(value.try_into().unwrap()).into(),
-            ir::Type::I(Bits32, Signed) => ir::Literal::Signed32(value.try_into().unwrap()).into(),
-            ir::Type::I(Bits64, Signed) => ir::Literal::Signed64(value.try_into().unwrap()).into(),
+            ir::Type::I(Bits8, Signed) => {
+                ir::Literal::Signed8(value.try_into().map_err(cast_failed)?).into()
+            }
+            ir::Type::I(Bits16, Signed) => {
+                ir::Literal::Signed16(value.try_into().map_err(cast_failed)?).into()
+            }
+            ir::Type::I(Bits32, Signed) => {
+                ir::Literal::Signed32(value.try_into().map_err(cast_failed)?).into()
+            }
+            ir::Type::I(Bits64, Signed) => {
+                ir::Literal::Signed64(value.try_into().map_err(cast_failed)?).into()
+            }
             ir::Type::I(Bits8, Unsigned) => {
-                ir::Literal::Unsigned8(value.try_into().unwrap()).into()
+                ir::Literal::Unsigned8(value.try_into().map_err(cast_failed)?).into()
             }
             ir::Type::I(Bits16, Unsigned) => {
-                ir::Literal::Unsigned16(value.try_into().unwrap()).into()
+                ir::Literal::Unsigned16(value.try_into().map_err(cast_failed)?).into()
             }
             ir::Type::I(Bits32, Unsigned) => {
-                ir::Literal::Unsigned32(value.try_into().unwrap()).into()
+                ir::Literal::Unsigned32(value.try_into().map_err(cast_failed)?).into()
             }
             ir::Type::I(Bits64, Unsigned) => {
-                ir::Literal::Unsigned64(value.try_into().unwrap()).into()
+                ir::Literal::Unsigned64(value.try_into().map_err(cast_failed)?).into()
             }
             ir::Type::F(FloatSize::Bits32) => {
                 ir::Literal::Float32(value.to_f32().unwrap_or_else(|| {
@@ -399,7 +416,7 @@ fn perform_unary_implicit_cast<'env>(
             todo!("specialize pointer outer")
         }
         UnaryImplicitCast::SpecializeAsciiChar(_) => todo!("specialize ascii char"),
-    }
+    })
 }
 
 fn to_ir_type<'env>(

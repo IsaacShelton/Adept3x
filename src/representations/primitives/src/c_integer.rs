@@ -90,14 +90,22 @@ pub fn fmt_c_integer(
 
 #[derive(Copy, Clone, Debug)]
 pub struct CIntegerAssumptions {
+    /// Whether C's `int` can be assumed to be
+    /// at least 32 bits across targeted systems.
+    /// e.g. Can an `i32` be converted to an `int`?
     pub int_at_least_32_bits: bool,
+
+    /// Whether the target-dependent sign of an integer
+    /// should influnece implicit conversions.
+    /// e.g. Should -1 be allowed to convert to `char`?
+    pub allow_target_implicit_sign_converion: bool,
 }
 
 impl Default for CIntegerAssumptions {
     fn default() -> Self {
-        // Assumptions we can make for when we compile
         Self {
             int_at_least_32_bits: true,
+            allow_target_implicit_sign_converion: false,
         }
     }
 }

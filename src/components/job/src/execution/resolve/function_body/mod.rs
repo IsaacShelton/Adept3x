@@ -199,7 +199,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         let Some(conformed) = conformed else {
                             return Err(ErrorDiagnostic::new(
                                 format!(
-                                    "Cannot return value of type '{}'",
+                                    "Cannot return value of type '{}', expected '{}'",
+                                    cfg.get_typed(*value).0,
                                     self.resolved_head.return_type.0
                                 ),
                                 instr.source,

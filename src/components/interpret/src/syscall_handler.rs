@@ -4,6 +4,7 @@ use compiler_version::AdeptVersion;
 use interpreter_api::Syscall;
 use num::FromPrimitive;
 use num_derive::FromPrimitive;
+use primitives::CIntegerAssumptions;
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
@@ -38,7 +39,7 @@ pub struct BuildSystemSyscallHandler {
     pub link_frameworks: HashSet<String>,
     pub debug_skip_merging_helper_exprs: bool,
     pub imported_namespaces: Vec<Box<str>>,
-    pub assume_int_at_least_32_bits: bool,
+    pub c_integer_assumptions: CIntegerAssumptions,
     pub namespace_to_dependency: HashMap<String, Vec<String>>,
 }
 
@@ -51,7 +52,7 @@ impl Default for BuildSystemSyscallHandler {
             link_frameworks: HashSet::new(),
             debug_skip_merging_helper_exprs: false,
             imported_namespaces: vec![],
-            assume_int_at_least_32_bits: true,
+            c_integer_assumptions: CIntegerAssumptions::default(),
             namespace_to_dependency: HashMap::new(),
         }
     }
@@ -145,7 +146,7 @@ impl SyscallHandler for BuildSystemSyscallHandler {
             }
             Syscall::DontAssumeIntAtLeast32Bits => {
                 assert_eq!(args.len(), 0);
-                self.assume_int_at_least_32_bits = false;
+                self.c_integer_assumptions.int_at_least_32_bits = false;
                 ValueKind::Literal(ir::Literal::Void).untainted()
             }
             Syscall::UseDependency => {

@@ -3,7 +3,6 @@ mod to;
 mod to_default;
 
 pub use cast::*;
-use data_units::BitUnits;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use primitives::{CInteger, CIntegerAssumptions, IntegerBits, IntegerSign};
@@ -37,14 +36,25 @@ pub fn does_integer_literal_fit_in_c(
     assumptions: CIntegerAssumptions,
     target: &Target,
 ) -> bool {
-    let value_is_signed = *value < BigInt::zero();
-    let needs_bits = BitUnits::of(value.bits() + value_is_signed.then_some(1).unwrap_or(0));
+    let from_is_signed = *value < BigInt::zero();
 
-    needs_bits <= to_c_integer.min_bits(assumptions).bits()
-        && implies!(
-            value_is_signed,
-            to_sign
-                .unwrap_or_else(|| target.default_c_integer_sign(to_c_integer))
-                .is_signed()
-        )
+    if to_sign.is_none() && from_is_signed && !assumptions.allow_target_implicit_sign_converion {
+        return false;
+    }
+
+    let to_is_maybe_signed = if assumptions.allow_target_implicit_sign_converion {
+        to_sign
+            .unwrap_or_else(|| target.default_c_integer_sign(to_c_integer))
+            .is_signed()
+    } else {
+        matches!(to_sign, None | Some(IntegerSign::Signed))
+    };
+
+    let min_c_int_bits = value.bits()
+        + (to_is_maybe_signed && !from_is_signed)
+            .then_some(1)
+            .unwrap_or(0);
+
+    implies!(from_is_signed, to_is_maybe_signed)
+        && min_c_int_bits <= to_c_integer.min_bits(assumptions).bits().bits()
 }

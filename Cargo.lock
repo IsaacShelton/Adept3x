@@ -715,6 +715,7 @@ dependencies = [
  "num",
  "num-derive",
  "num-traits",
+ "primitives",
 ]
 
 [[package]]
