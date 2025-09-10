@@ -98,14 +98,14 @@ pub struct CIntegerAssumptions {
     /// Whether the target-dependent sign of an integer
     /// should influnece implicit conversions.
     /// e.g. Should -1 be allowed to convert to `char`?
-    pub allow_target_implicit_sign_converion: bool,
+    pub allow_target_implicit_sign_conversion: bool,
 }
 
 impl Default for CIntegerAssumptions {
     fn default() -> Self {
         Self {
             int_at_least_32_bits: true,
-            allow_target_implicit_sign_converion: false,
+            allow_target_implicit_sign_conversion: false,
         }
     }
 }

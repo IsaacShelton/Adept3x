@@ -38,11 +38,11 @@ pub fn does_integer_literal_fit_in_c(
 ) -> bool {
     let from_is_signed = *value < BigInt::zero();
 
-    if to_sign.is_none() && from_is_signed && !assumptions.allow_target_implicit_sign_converion {
+    if to_sign.is_none() && from_is_signed && !assumptions.allow_target_implicit_sign_conversion {
         return false;
     }
 
-    let to_is_maybe_signed = if assumptions.allow_target_implicit_sign_converion {
+    let to_is_maybe_signed = if assumptions.allow_target_implicit_sign_conversion {
         to_sign
             .unwrap_or_else(|| target.default_c_integer_sign(to_c_integer))
             .is_signed()
