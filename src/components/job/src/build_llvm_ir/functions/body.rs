@@ -37,7 +37,15 @@ pub unsafe fn create_function_bodies<'env>(
 ) -> Result<(), ErrorDiagnostic> {
     for (ir_func_ref, skeleton) in ctx.func_skeletons.iter() {
         let ir_function = &ctx.ir_module.funcs[*ir_func_ref];
-        let ir_function_basicblocks = *ir_function.basicblocks.get().unwrap();
+
+        if !ir_function.ownership.is_owned() {
+            continue;
+        }
+
+        let ir_function_basicblocks = *ir_function
+            .basicblocks
+            .get()
+            .expect("owned function to have implementation");
 
         let mut builder = Builder::new();
         let mut value_catalog = ValueCatalog::new(ir_function_basicblocks.len());

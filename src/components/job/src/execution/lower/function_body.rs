@@ -1,9 +1,11 @@
 use crate::{
-    Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind, InstrRef,
+    BasicBlockId, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
+    InstrRef, RevPostOrderIterWithEnds, Suspend,
     conform::UnaryImplicitCast,
+    execution::lower::LowerFunctionHead,
     ir::{self, Literal},
     module_graph::ModuleView,
-    repr::{self, Compiler, FuncBody, FuncHead, TypeKind},
+    repr::{self, Compiler, FuncBody, FuncHead, TypeKind, UnaliasedType},
     target_layout::TargetLayout,
 };
 use arena::Id;
@@ -33,17 +35,17 @@ pub struct LowerFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    current_basicblock: usize,
+    builder: Option<IrBuilder<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    current_node_index: usize,
+    rev_post_order: Option<RevPostOrderIterWithEnds>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    basicblocks: Vec<Vec<ir::Instr<'env>>>,
+    suspend_on_func: Suspend<'env, ir::FuncRef<'env>>,
 }
 
 impl<'env> LowerFunctionBody<'env> {
@@ -60,9 +62,9 @@ impl<'env> LowerFunctionBody<'env> {
             func,
             head: ByAddress(head),
             body: ByAddress(body),
-            current_basicblock: 0,
-            current_node_index: 0,
-            basicblocks: vec![vec![]],
+            builder: None,
+            rev_post_order: None,
+            suspend_on_func: None,
         }
     }
 }
@@ -71,13 +73,10 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
     type Output = ();
 
     fn execute(
-        self,
-        _executor: &Executor<'env>,
+        mut self,
+        executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let ir = self.view.web.graph(self.view.graph, |graph| graph.ir);
-        let func = &ir.funcs[self.func];
-
         // This may be easier if the CFG representation is already in basicblocks...
         // Otherwise, we have to convert it to basicblocks here anyway...
 
@@ -95,14 +94,24 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
         // TODO: Here is where we will do monomorphization (but only for the function body)...
 
-        let mut builder = IrBuilder::new(&self.body);
+        let cfg = self.body.cfg;
+        let builder = self
+            .builder
+            .get_or_insert_with(|| IrBuilder::new(&self.body));
 
-        for bb_id in self.body.post_order.iter().copied() {
+        let rev_post_order = self
+            .rev_post_order
+            .get_or_insert_with(|| RevPostOrderIterWithEnds::new(self.body.post_order));
+
+        while let Some(instr_ref) = rev_post_order.peek() {
+            let bb_id = instr_ref.basicblock;
             let bb_index = bb_id.into_usize();
             let bb = &self.body.cfg.get_unsafe(bb_id);
             builder.set_position(bb_index);
 
-            for instr in bb.instrs.iter() {
+            if (instr_ref.instr_or_end as usize) < bb.instrs.len() {
+                let instr = &bb.instrs[instr_ref.instr_or_end as usize];
+
                 let result = match &instr.kind {
                     InstrKind::Phi(items, conform_behavior) => todo!("lower phi"),
                     InstrKind::Name(_) => todo!(),
@@ -150,7 +159,80 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     }
                     InstrKind::NullLiteral => todo!(),
                     InstrKind::VoidLiteral => todo!(),
-                    InstrKind::Call(call_instr) => todo!(),
+                    InstrKind::Call(call, target) => {
+                        let target = target
+                            .as_ref()
+                            .expect("call without target cannot be lowered");
+
+                        let Some(ir_func_ref) = executor.demand(self.suspend_on_func) else {
+                            return suspend!(
+                                self.suspend_on_func,
+                                executor.request(LowerFunctionHead::new(
+                                    self.view,
+                                    &self.compiler,
+                                    target.callee,
+                                )),
+                                ctx
+                            );
+                        };
+
+                        let mut args = vec![];
+                        for ((arg_instr, unary_cast), param) in call
+                            .args
+                            .iter()
+                            .copied()
+                            .zip(target.arg_casts.iter())
+                            .zip(target.callee.params.required.iter())
+                        {
+                            let value = builder.get_output(arg_instr);
+                            let param_ir_ty = to_ir_type(ctx, self.view.target(), param.ty.0)?;
+
+                            let value = perform_unary_implicit_cast(
+                                value,
+                                &param_ir_ty,
+                                unary_cast.as_ref(),
+                                instr.source,
+                            )?;
+
+                            args.push(value);
+                        }
+
+                        // Add variadic arguments after conformed arguments
+                        args.extend(
+                            call.args
+                                .iter()
+                                .skip(target.callee.params.required.len())
+                                .map(|var_arg| builder.get_output(*var_arg)),
+                        );
+
+                        let args = ctx.alloc_slice_fill_iter(args.into_iter());
+
+                        let mut unpromoted_variadic_arg_types = vec![];
+                        for var_arg_ty in call
+                            .args
+                            .iter()
+                            .skip(target.callee.params.required.len())
+                            .map(|var_arg| cfg.get_typed(*var_arg))
+                        {
+                            unpromoted_variadic_arg_types.push(to_ir_type(
+                                ctx,
+                                self.view.target(),
+                                var_arg_ty.0,
+                            )?);
+                        }
+
+                        let unpromoted_variadic_arg_types =
+                            ctx.alloc_slice_fill_iter(unpromoted_variadic_arg_types.into_iter());
+
+                        // Reset ability to suspend on IR function head
+                        self.suspend_on_func = None;
+
+                        builder.push(ir::Instr::Call(ir::Call {
+                            func: ir_func_ref,
+                            args,
+                            unpromoted_variadic_arg_types,
+                        }))
+                    }
                     InstrKind::DeclareAssign(_, instr_ref, unary_implicit_cast) => todo!(),
                     InstrKind::Member(instr_ref, _, privacy) => todo!(),
                     InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
@@ -166,6 +248,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 };
 
                 builder.push_output(result);
+                rev_post_order.next(cfg, self.body.post_order);
+                continue;
             }
 
             let instr_end = &bb.end;
@@ -174,24 +258,22 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 EndInstrKind::IncompleteGoto(_) => todo!(),
                 EndInstrKind::IncompleteBreak => todo!(),
                 EndInstrKind::IncompleteContinue => todo!(),
-                EndInstrKind::Return(value, unary_implicit_cast) => {
-                    let value: Option<ir::Value<'env>> = value
-                        .map(|value| {
-                            let cfg_ty = self.head.return_type.0;
-                            let value = builder.get_output(value);
-
-                            to_ir_type(ctx, self.view.target(), cfg_ty).and_then(|ir_ty| {
-                                perform_unary_implicit_cast(
-                                    value,
-                                    &ir_ty,
-                                    unary_implicit_cast.as_ref(),
-                                    instr_end.source,
-                                )
+                EndInstrKind::Return(return_value, unary_implicit_cast) => {
+                    builder.push(ir::Instr::Return(
+                        return_value
+                            .map(|return_value| {
+                                to_ir_type(ctx, self.view.target(), self.head.return_type.0)
+                                    .and_then(|ir_return_ty| {
+                                        perform_unary_implicit_cast(
+                                            builder.get_output(return_value),
+                                            &ir_return_ty,
+                                            unary_implicit_cast.as_ref(),
+                                            instr_end.source,
+                                        )
+                                    })
                             })
-                        })
-                        .transpose()?;
-
-                    builder.push(ir::Instr::Return(value));
+                            .transpose()?,
+                    ));
                     ir::Literal::Void.into()
                 }
                 EndInstrKind::Jump(basic_block_id, value, unaliased_type) => {
@@ -217,22 +299,26 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
             };
 
             builder.push_output(result);
+            rev_post_order.next(cfg, self.body.post_order);
         }
 
+        // Collect lowered instructions into IR basicblocks
         let basicblocks =
-            &*ctx.alloc_slice_fill_iter(builder.basicblocks.into_iter().map(|instrs| {
-                ir::BasicBlock {
+            &*ctx.alloc_slice_fill_iter(std::mem::take(&mut builder.basicblocks).into_iter().map(
+                |instrs| ir::BasicBlock {
                     instructions: &*ctx.alloc_slice_fill_iter(instrs.into_iter()),
-                }
-            }));
+                },
+            ));
 
+        // Attach body to function
+        let ir = self.view.web.graph(self.view.graph, |graph| graph.ir);
         let ir_func = &ir.funcs[self.func];
         ir_func.basicblocks.set(basicblocks).unwrap();
         Ok(())
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct IrBuilder<'env> {
     basicblocks: Vec<Vec<ir::Instr<'env>>>,
     outputs: Vec<Vec<Option<ir::Value<'env>>>>,
@@ -260,8 +346,10 @@ impl<'env> IrBuilder<'env> {
     }
 
     pub fn set_position(&mut self, new_bb_index: usize) {
-        self.current_bb_index = Some(new_bb_index);
-        self.current_cfg_instr_index = 0;
+        if self.current_bb_index != Some(new_bb_index) {
+            self.current_bb_index = Some(new_bb_index);
+            self.current_cfg_instr_index = 0;
+        }
     }
 
     pub fn push(&mut self, instr: ir::Instr<'env>) -> ir::Value<'env> {
@@ -422,7 +510,7 @@ fn perform_unary_implicit_cast<'env>(
 fn to_ir_type<'env>(
     ctx: &mut ExecutionCtx<'env>,
     target: &Target,
-    ty: &repr::Type,
+    ty: &repr::Type<'env>,
 ) -> Result<ir::Type<'env>, ErrorDiagnostic> {
     Ok(match &ty.kind {
         TypeKind::IntegerLiteral(_) => ir::Type::Void,
@@ -456,7 +544,7 @@ fn to_ir_type<'env>(
         }
         TypeKind::SizeInteger(integer_sign) => todo!(),
         TypeKind::Floating(float_size) => ir::Type::F(*float_size),
-        TypeKind::Ptr(_) => todo!(),
+        TypeKind::Ptr(inner_ty) => ir::Type::Ptr(ctx.alloc(to_ir_type(ctx, target, inner_ty)?)),
         TypeKind::Void => ir::Type::Void,
         TypeKind::Never => ir::Type::Void,
         TypeKind::FixedArray(_, _) => todo!(),

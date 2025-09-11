@@ -1,21 +1,16 @@
 mod basic_bin_op;
 mod dominators;
-mod rev_post_order_iter;
 mod variables;
 
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
-    FuncSearch, InstrKind, InstrRef, Suspend, SuspendMany, are_types_equal,
+    FuncSearch, InstrKind, InstrRef, RevPostOrderIterWithEnds, Suspend, SuspendMany,
+    are_types_equal,
     conform::{ConformMode, conform_to, conform_to_default},
-    execution::resolve::{
-        ResolveType,
-        function_body::{
-            rev_post_order_iter::RevPostOrderIterWithEnds, variables::VariableTracker,
-        },
-    },
+    execution::resolve::{ResolveType, function_body::variables::VariableTracker},
     flatten_func,
     module_graph::ModuleView,
-    repr::{Compiler, FuncBody, FuncHead, Type, TypeKind, UnaliasedType},
+    repr::{Compiler, DeclHead, FuncBody, FuncHead, Type, TypeKind, UnaliasedType},
     unify::unify_types,
 };
 use arena::ArenaMap;
@@ -229,7 +224,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     | EndInstrKind::Unreachable => (),
                 }
 
-                rev_post_order.next(cfg, post_order);
+                rev_post_order.next_partial_block(cfg, post_order);
                 continue;
             }
 
@@ -462,19 +457,31 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::VoidLiteral => {
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
-                InstrKind::Call(call_instr) => {
-                    let symbol = self
-                        .view
-                        .find_symbol(
-                            executor,
-                            FuncSearch {
-                                name: call_instr.name,
-                                source: instr.source,
-                            },
-                        )
-                        .map_err(|into_continuation| into_continuation(self.into()))?;
+                InstrKind::Call(call, _) => {
+                    let symbol = match self.view.find_symbol(
+                        executor,
+                        FuncSearch {
+                            name: call.name,
+                            source: instr.source,
+                        },
+                    ) {
+                        Ok(symbol) => symbol,
+                        Err(into_continuation) => return Err(into_continuation(self.into())),
+                    };
 
-                    todo!("resolve call to {:?}", symbol)
+                    let DeclHead::FuncLike(func_head) = symbol else {
+                        return Err(
+                            ErrorDiagnostic::new("Cannot call non-function", instr.source).into(),
+                        );
+                    };
+
+                    let arg_casts = ctx.alloc_slice_fill_iter(std::iter::repeat_n(
+                        None,
+                        func_head.params.required.len(),
+                    ));
+                    eprintln!("warning: call argument casts not computed yet");
+
+                    cfg.set_typed_and_callee(instr_ref, func_head, arg_casts);
                 }
                 InstrKind::DeclareAssign(_, value, _) => {
                     // 1] Conform the value to its default concrete type
@@ -524,7 +531,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
             }
 
-            rev_post_order.next(cfg, post_order);
+            rev_post_order.next_partial_block(cfg, post_order);
         }
 
         /*

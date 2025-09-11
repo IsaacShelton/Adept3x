@@ -1,4 +1,4 @@
-use crate::{BasicBlockId, CfgBuilder, InstrRef};
+use crate::{BasicBlockId, Cfg, CfgBuilder, InstrRef};
 
 #[derive(Clone, Debug)]
 pub struct RevPostOrderIterWithEnds {
@@ -27,7 +27,11 @@ impl RevPostOrderIterWithEnds {
         self.current
     }
 
-    pub fn next(&mut self, cfg: &CfgBuilder, post_order: &[BasicBlockId]) -> Option<InstrRef> {
+    pub fn next_partial_block(
+        &mut self,
+        cfg: &CfgBuilder,
+        post_order: &[BasicBlockId],
+    ) -> Option<InstrRef> {
         let current = self.current?;
         let bb = cfg.get_unsafe(current.basicblock);
 
@@ -42,6 +46,30 @@ impl RevPostOrderIterWithEnds {
             let bb_id = post_order[self.post_order_index as usize];
 
             if cfg.get_unsafe(bb_id).inner_len() != 0 {
+                self.current = Some(InstrRef::new(bb_id, 0));
+                return self.current;
+            }
+        }
+
+        self.current = None;
+        return None;
+    }
+
+    pub fn next(&mut self, cfg: &Cfg, post_order: &[BasicBlockId]) -> Option<InstrRef> {
+        let current = self.current?;
+        let bb = cfg.get_unsafe(current.basicblock);
+
+        // NOTE: We don't subtract one, since we want to include the end instruction.
+        if (current.instr_or_end as usize) < bb.instrs.len() {
+            self.current = Some(InstrRef::new(current.basicblock, current.instr_or_end + 1));
+            return self.current;
+        }
+
+        while self.post_order_index > 0 {
+            self.post_order_index -= 1;
+            let bb_id = post_order[self.post_order_index as usize];
+
+            if cfg.get_unsafe(bb_id).instrs.len() != 0 {
                 self.current = Some(InstrRef::new(bb_id, 0));
                 return self.current;
             }

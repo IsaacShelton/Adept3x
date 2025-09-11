@@ -83,7 +83,7 @@ pub fn conform_to<'env>(
         TypeKind::BitInteger(from_bits, from_sign) => todo!(),
         TypeKind::FloatLiteral(from) => todo!(),
         TypeKind::Floating(from_size) => todo!(),
-        TypeKind::Ptr(from_inner) => todo!(),
+        TypeKind::Ptr(_) => None,
         TypeKind::CInteger(from_size, from_sign) => todo!(),
         TypeKind::SizeInteger(from_sign) => todo!(),
         _ => None,

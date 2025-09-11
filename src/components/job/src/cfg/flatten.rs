@@ -202,12 +202,15 @@ fn flatten_expr<'env>(
 
             builder.push(
                 cursor,
-                InstrKind::Call(ctx.alloc(CallInstr {
-                    name,
-                    args,
-                    expected_to_return: call.expected_to_return.as_ref(),
-                    generics,
-                }))
+                InstrKind::Call(
+                    ctx.alloc(CallInstr {
+                        name,
+                        args,
+                        expected_to_return: call.expected_to_return.as_ref(),
+                        generics,
+                    }),
+                    None,
+                )
                 .at(expr.source),
             )
         }

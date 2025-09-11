@@ -1,6 +1,9 @@
 pub use super::*;
 use crate::{
-    ExecutionCtx, cfg::instr::BreakContinue, conform::UnaryImplicitCast, repr::UnaliasedType,
+    ExecutionCtx,
+    cfg::instr::{BreakContinue, CallTarget},
+    conform::UnaryImplicitCast,
+    repr::{FuncHead, UnaliasedType},
 };
 use arena::Idx;
 
@@ -70,6 +73,26 @@ impl<'env> CfgBuilder<'env> {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
         bb.instrs[instr_ref.instr_or_end as usize].typed = Some(ty);
+    }
+
+    pub fn set_typed_and_callee(
+        &mut self,
+        instr_ref: InstrRef,
+        callee: &'env FuncHead<'env>,
+        arg_casts: &'env [Option<UnaryImplicitCast<'env>>],
+    ) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+        assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
+        let instr = &mut bb.instrs[instr_ref.instr_or_end as usize];
+
+        match &mut instr.kind {
+            InstrKind::Call(_, target) => {
+                *target = Some(CallTarget { callee, arg_casts });
+            }
+            _ => panic!("cannot set_typed_and_callee for non-call"),
+        }
+
+        instr.typed = Some(callee.return_type);
     }
 
     pub fn get_typed(&self, instr_ref: InstrRef) -> UnaliasedType<'env> {

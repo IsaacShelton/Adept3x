@@ -1,4 +1,8 @@
-use crate::{BasicBlockId, InstrRef, conform::UnaryImplicitCast, repr::UnaliasedType};
+use crate::{
+    BasicBlockId, InstrRef,
+    conform::UnaryImplicitCast,
+    repr::{FuncHead, UnaliasedType},
+};
 use ast::{ConformBehavior, FillBehavior, Integer, Language, SizeOfMode, UnaryOperator};
 use attributes::Privacy;
 use source_files::Source;
@@ -165,7 +169,7 @@ impl<'env> Display for InstrKind<'env> {
             }
             InstrKind::NullLiteral => write!(f, "null_lit")?,
             InstrKind::VoidLiteral => write!(f, "void_lit")?,
-            InstrKind::Call(call) => {
+            InstrKind::Call(call, _) => {
                 write!(f, "call {} (", call.name)?;
 
                 for (i, instr_ref) in call.args.iter().enumerate() {
@@ -275,7 +279,7 @@ pub enum InstrKind<'env> {
     NullTerminatedStringLiteral(&'env CStr),
     NullLiteral,
     VoidLiteral,
-    Call(&'env CallInstr<'env>),
+    Call(&'env CallInstr<'env>, Option<CallTarget<'env>>),
     DeclareAssign(&'env str, InstrRef, Option<UnaryImplicitCast<'env>>),
     Member(InstrRef, &'env str, Privacy),
     ArrayAccess(InstrRef, InstrRef),
@@ -306,6 +310,12 @@ pub struct CallInstr<'env> {
     pub args: &'env [InstrRef],
     pub expected_to_return: Option<&'env ast::Type>,
     pub generics: &'env [&'env ast::Type],
+}
+
+#[derive(Clone, Debug)]
+pub struct CallTarget<'env> {
+    pub callee: &'env FuncHead<'env>,
+    pub arg_casts: &'env [Option<UnaryImplicitCast<'env>>],
 }
 
 #[derive(Debug)]
