@@ -1,8 +1,12 @@
-use crate::{InstrRef, repr::UnaliasedType};
+use crate::repr::UnaliasedType;
+use arena::{Arena, Idx, new_id_with_niche};
 
-#[derive(Debug, Clone)]
+new_id_with_niche!(VariableId, u32);
+pub type VariableRef<'env> = Idx<VariableId, Variable<'env>>;
+
+#[derive(Clone, Debug, Default)]
 pub struct Variables<'env> {
-    storage: Box<[Variable<'env>]>,
+    storage: Arena<VariableId, Variable<'env>>,
 }
 
 impl<'env> Variables<'env> {
@@ -10,28 +14,26 @@ impl<'env> Variables<'env> {
         self.storage.len()
     }
 
-    pub fn get(&self, instr_ref: InstrRef) -> Option<&Variable<'env>> {
-        self.storage
-            .binary_search_by(|item| item.declared_at.cmp(&instr_ref))
-            .ok()
-            .map(|found| &self.storage[found])
+    pub fn iter(&self) -> impl Iterator<Item = &Variable<'env>> {
+        self.storage.values()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &Variable<'env>)> {
-        self.storage.iter().enumerate()
+    pub fn get(&self, variable_ref: VariableRef<'env>) -> &Variable<'env> {
+        &self.storage[variable_ref]
     }
-}
 
-impl<'env> FromIterator<Variable<'env>> for Variables<'env> {
-    fn from_iter<T: IntoIterator<Item = Variable<'env>>>(iter: T) -> Self {
-        Self {
-            storage: iter.into_iter().collect(),
-        }
+    pub fn push(&mut self, variable: Variable<'env>) -> VariableRef<'env> {
+        self.storage.alloc(variable)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Variable<'env> {
-    pub declared_at: InstrRef,
     pub ty: UnaliasedType<'env>,
+}
+
+impl<'env> Variable<'env> {
+    pub fn new(ty: UnaliasedType<'env>) -> Self {
+        Self { ty }
+    }
 }

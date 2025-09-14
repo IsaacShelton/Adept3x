@@ -354,15 +354,6 @@ impl<'a, S: SyscallHandler> Interpreter<'a, S> {
             });
         };
 
-        if let Some(tainted) = return_value
-            .as_ref()
-            .map(|value| self.eval(&registers, value))
-            .unwrap_or(ValueKind::Literal(ir::Literal::Void).untainted())
-            .tainted
-        {
-            dbg!(tainted);
-        }
-
         self.memory.stack_restore(fp);
         Ok(return_value
             .as_ref()

@@ -1,7 +1,7 @@
 use crate::{
     BasicBlockId, InstrRef,
-    conform::UnaryImplicitCast,
-    repr::{FuncHead, UnaliasedType},
+    conform::UnaryCast,
+    repr::{FuncHead, UnaliasedType, VariableRef},
 };
 use ast::{ConformBehavior, FillBehavior, Integer, Language, SizeOfMode, UnaryOperator};
 use attributes::Privacy;
@@ -38,9 +38,9 @@ impl<'env> Display for EndInstrKind<'env> {
                 }
                 writeln!(f, "")
             }
-            EndInstrKind::Jump(bb_id, _value, pre_jump_conform) => {
-                if let Some(pre_jump_conform) = pre_jump_conform {
-                    writeln!(f, "jump {} as {}", bb_id, pre_jump_conform)
+            EndInstrKind::Jump(bb_id, _value, typed_unary_cat) => {
+                if let Some(typed_unary_cast) = typed_unary_cat {
+                    writeln!(f, "jump {} as {:?}", bb_id, typed_unary_cast)
                 } else {
                     writeln!(f, "jump {}", bb_id)
                 }
@@ -77,8 +77,8 @@ pub enum EndInstrKind<'env> {
     IncompleteGoto(&'env str),
     IncompleteBreak,
     IncompleteContinue,
-    Return(Option<InstrRef>, Option<UnaryImplicitCast<'env>>),
-    Jump(BasicBlockId, Option<InstrRef>, Option<UnaliasedType<'env>>),
+    Return(Option<InstrRef>, Option<UnaryCast<'env>>),
+    Jump(BasicBlockId, Option<InstrRef>, Option<UnaryCast<'env>>),
     Branch(InstrRef, BasicBlockId, BasicBlockId, Option<BreakContinue>),
     NewScope(BasicBlockId, BasicBlockId),
     Unreachable,
@@ -99,8 +99,8 @@ pub struct Instr<'env> {
 
 impl<'env> Display for Instr<'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(typed) = self.typed {
-            writeln!(f, "{}  ->  {}", self.kind, typed)?;
+        if let Some(typed) = &self.typed {
+            writeln!(f, "{}  ->  {}", self.kind, typed.0)?;
         } else {
             writeln!(f, "{}", self.kind)?;
         }
@@ -125,11 +125,11 @@ impl<'env> Display for InstrKind<'env> {
 
                 write!(f, "{:?}", conform_behavior)?;
             }
-            InstrKind::Name(name) => write!(f, "name {}", name)?,
-            InstrKind::Parameter(name, ty, index) => {
+            InstrKind::Name(name, _) => write!(f, "name {}", name)?,
+            InstrKind::Parameter(name, ty, index, _) => {
                 write!(f, "param {} {} {}", name, ty, index)?;
             }
-            InstrKind::Declare(name, ty, instr_ref, cast) => {
+            InstrKind::Declare(name, ty, instr_ref, cast, _) => {
                 if let Some(instr_ref) = instr_ref {
                     write!(f, "declare {} {} {}", name, ty, instr_ref)?;
                 } else {
@@ -182,7 +182,7 @@ impl<'env> Display for InstrKind<'env> {
 
                 write!(f, ") {:?} {:?}", call.generics, call.expected_to_return)?;
             }
-            InstrKind::DeclareAssign(name, instr_ref, cast) => {
+            InstrKind::DeclareAssign(name, instr_ref, cast, _) => {
                 write!(f, "declare_assign {} {}", name, instr_ref)?;
 
                 if let Some(cast) = cast {
@@ -251,7 +251,7 @@ impl<'env> Display for InstrKind<'env> {
 }
 
 // Getting this down to 32 is going to take some extreme manual layout optimization
-const _: () = assert!(std::mem::size_of::<InstrKind>() <= 48);
+const _: () = assert!(std::mem::size_of::<InstrKind>() <= 64);
 const _: () = assert!(std::mem::align_of::<InstrKind>() <= 8);
 
 #[derive(Clone, Debug)]
@@ -260,13 +260,14 @@ pub enum InstrKind<'env> {
         &'env [(BasicBlockId, Option<InstrRef>)],
         Option<ConformBehavior>,
     ),
-    Name(&'env str),
-    Parameter(&'env str, &'env ast::Type, u32),
+    Name(&'env str, Option<VariableRef<'env>>),
+    Parameter(&'env str, &'env ast::Type, u32, Option<VariableRef<'env>>),
     Declare(
         &'env str,
         &'env ast::Type,
         Option<InstrRef>,
-        Option<UnaryImplicitCast<'env>>,
+        Option<UnaryCast<'env>>,
+        Option<VariableRef<'env>>,
     ),
     Assign(InstrRef, InstrRef),
     BinOp(InstrRef, ast::BasicBinaryOperator, InstrRef, Language),
@@ -280,7 +281,12 @@ pub enum InstrKind<'env> {
     NullLiteral,
     VoidLiteral,
     Call(&'env CallInstr<'env>, Option<CallTarget<'env>>),
-    DeclareAssign(&'env str, InstrRef, Option<UnaryImplicitCast<'env>>),
+    DeclareAssign(
+        &'env str,
+        InstrRef,
+        Option<UnaryCast<'env>>,
+        Option<VariableRef<'env>>,
+    ),
     Member(InstrRef, &'env str, Privacy),
     ArrayAccess(InstrRef, InstrRef),
     StructLiteral(&'env StructLiteralInstr<'env>),
@@ -289,7 +295,7 @@ pub enum InstrKind<'env> {
     SizeOfValue(InstrRef, Option<SizeOfMode>),
     InterpreterSyscall(&'env InterpreterSyscallInstr<'env>),
     IntegerPromote(InstrRef),
-    ConformToBool(InstrRef, Language, Option<UnaryImplicitCast<'env>>),
+    ConformToBool(InstrRef, Language, Option<UnaryCast<'env>>),
     Is(InstrRef, &'env str),
     LabelLiteral(&'env str),
 }
@@ -315,7 +321,8 @@ pub struct CallInstr<'env> {
 #[derive(Clone, Debug)]
 pub struct CallTarget<'env> {
     pub callee: &'env FuncHead<'env>,
-    pub arg_casts: &'env [Option<UnaryImplicitCast<'env>>],
+    pub arg_casts: &'env [Option<UnaryCast<'env>>],
+    pub variadic_arg_types: &'env [UnaliasedType<'env>],
 }
 
 #[derive(Debug)]

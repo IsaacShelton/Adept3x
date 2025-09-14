@@ -2,8 +2,8 @@ pub use super::*;
 use crate::{
     ExecutionCtx,
     cfg::instr::{BreakContinue, CallTarget},
-    conform::UnaryImplicitCast,
-    repr::{FuncHead, UnaliasedType},
+    conform::UnaryCast,
+    repr::{FuncHead, VariableRef},
 };
 use arena::Idx;
 
@@ -59,27 +59,33 @@ impl<'env> CfgBuilder<'env> {
         )
     }
 
-    pub fn set_jump_pre_conform(&mut self, bb_id: BasicBlockId, ty: UnaliasedType<'env>) {
+    pub fn set_pre_jump_typed_unary_cast(
+        &mut self,
+        bb_id: BasicBlockId,
+        cast: Option<UnaryCast<'env>>,
+    ) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(bb_id) }];
         match &mut bb.end.as_mut().unwrap().kind {
-            EndInstrKind::Jump(_, _, pre_jump_conform) => {
-                *pre_jump_conform = Some(ty);
+            EndInstrKind::Jump(_, _, typed_unary_cast) => {
+                *typed_unary_cast = cast;
             }
             _ => panic!("cannot set_jump_pre_conform for non-jump"),
         }
     }
 
-    pub fn set_typed(&mut self, instr_ref: InstrRef, ty: UnaliasedType<'env>) {
+    pub fn set_typed(&mut self, instr_ref: InstrRef, typed: UnaliasedType<'env>) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
-        bb.instrs[instr_ref.instr_or_end as usize].typed = Some(ty);
+        let instr = &mut bb.instrs[instr_ref.instr_or_end as usize];
+        instr.typed = Some(typed);
     }
 
     pub fn set_typed_and_callee(
         &mut self,
         instr_ref: InstrRef,
         callee: &'env FuncHead<'env>,
-        arg_casts: &'env [Option<UnaryImplicitCast<'env>>],
+        arg_casts: &'env [Option<UnaryCast<'env>>],
+        variadic_arg_types: &'env [UnaliasedType<'env>],
     ) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
@@ -87,7 +93,11 @@ impl<'env> CfgBuilder<'env> {
 
         match &mut instr.kind {
             InstrKind::Call(_, target) => {
-                *target = Some(CallTarget { callee, arg_casts });
+                *target = Some(CallTarget {
+                    callee,
+                    arg_casts,
+                    variadic_arg_types,
+                });
             }
             _ => panic!("cannot set_typed_and_callee for non-call"),
         }
@@ -101,17 +111,13 @@ impl<'env> CfgBuilder<'env> {
         bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
     }
 
-    pub fn set_primary_unary_implicit_cast(
-        &mut self,
-        instr_ref: InstrRef,
-        cast: Option<UnaryImplicitCast<'env>>,
-    ) {
+    pub fn set_primary_unary_cast(&mut self, instr_ref: InstrRef, cast: Option<UnaryCast<'env>>) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
 
         // End Instruction
         if instr_ref.instr_or_end as usize >= bb.instrs.len() {
             match &mut bb.end.as_mut().unwrap().kind {
-                EndInstrKind::Return(_, unary_implicit_cast) => *unary_implicit_cast = cast,
+                EndInstrKind::Return(_, unary_cast) => *unary_cast = cast,
                 _ => unreachable!(),
             }
             return;
@@ -119,9 +125,22 @@ impl<'env> CfgBuilder<'env> {
 
         // Sequential Instruction
         match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
-            InstrKind::DeclareAssign(_, _, unary_implicit_cast)
-            | InstrKind::Declare(_, _, _, unary_implicit_cast)
-            | InstrKind::ConformToBool(_, _, unary_implicit_cast) => *unary_implicit_cast = cast,
+            InstrKind::DeclareAssign(_, _, unary_cast, _)
+            | InstrKind::Declare(_, _, _, unary_cast, _)
+            | InstrKind::ConformToBool(_, _, unary_cast) => *unary_cast = cast,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn set_variable_ref(&mut self, instr_ref: InstrRef, new_variable_ref: VariableRef<'env>) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+
+        // Sequential Instruction
+        match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
+            InstrKind::DeclareAssign(_, _, _, variable_ref)
+            | InstrKind::Declare(_, _, _, _, variable_ref)
+            | InstrKind::Name(_, variable_ref)
+            | InstrKind::Parameter(_, _, _, variable_ref) => *variable_ref = Some(new_variable_ref),
             _ => unreachable!(),
         }
     }

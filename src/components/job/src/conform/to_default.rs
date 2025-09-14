@@ -1,6 +1,6 @@
 use crate::{
     BuiltinTypes, ExecutionCtx,
-    conform::{UnaryImplicitCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
+    conform::{UnaryCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
     repr::{TypeKind, UnaliasedType},
 };
 use diagnostics::ErrorDiagnostic;
@@ -11,13 +11,14 @@ use primitives::{CIntegerAssumptions, IntegerSign};
 use source_files::Source;
 use target::Target;
 
+#[derive(Debug)]
 pub struct Conform<'env> {
     pub ty: UnaliasedType<'env>,
-    pub cast: Option<UnaryImplicitCast<'env>>,
+    pub cast: Option<UnaryCast<'env>>,
 }
 
 impl<'env> Conform<'env> {
-    pub fn new(ty: UnaliasedType<'env>, cast: UnaryImplicitCast<'env>) -> Self {
+    pub fn new(ty: UnaliasedType<'env>, cast: UnaryCast<'env>) -> Self {
         Self {
             ty,
             cast: Some(cast),
@@ -27,16 +28,28 @@ impl<'env> Conform<'env> {
     pub fn identity(ty: UnaliasedType<'env>) -> Self {
         Self { ty, cast: None }
     }
+
+    pub fn after_dereference(self, ctx: &mut ExecutionCtx<'env>) -> Self {
+        let cast = self.cast.map(|cast| ctx.alloc(cast));
+
+        Self {
+            ty: self.ty,
+            cast: Some(UnaryCast::Dereference {
+                then: cast.map(|v| &*v),
+                after_deref: self.ty,
+            }),
+        }
+    }
 }
 
 pub fn conform_to_default<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    ty: UnaliasedType<'env>,
+    original_from_ty: UnaliasedType<'env>,
     assumptions: CIntegerAssumptions,
     builtin_types: &'env BuiltinTypes<'env>,
     target: &Target,
 ) -> Result<Conform<'env>, ErrorDiagnostic> {
-    let source = ty.0.source;
+    let source = original_from_ty.0.source;
 
     let default_integer_types = [
         &builtin_types.i32,
@@ -45,7 +58,12 @@ pub fn conform_to_default<'env>(
         &builtin_types.u64,
     ];
 
-    Ok(match &ty.0.kind {
+    let (ty, needs_dereference) = match &original_from_ty.0.kind {
+        TypeKind::Deref(inner_type, _) => (UnaliasedType(inner_type), true),
+        _ => (original_from_ty, false),
+    };
+
+    let inner_conform = match &ty.0.kind {
         TypeKind::IntegerLiteral(big_int) => default_integer_types
             .into_iter()
             .flat_map(|possible_type| {
@@ -68,12 +86,11 @@ pub fn conform_to_default<'env>(
             })?,
         TypeKind::FloatLiteral(not_nan) => Conform::new(
             builtin_types.f64(),
-            UnaryImplicitCast::SpecializeFloat(not_nan.clone()),
+            UnaryCast::SpecializeFloat(not_nan.clone()),
         ),
-        TypeKind::BooleanLiteral(value) => Conform::new(
-            builtin_types.bool(),
-            UnaryImplicitCast::SpecializeBoolean(*value),
-        ),
+        TypeKind::BooleanLiteral(value) => {
+            Conform::new(builtin_types.bool(), UnaryCast::SpecializeBoolean(*value))
+        }
         TypeKind::IntegerLiteralInRange(min, max) => default_integer_types
             .into_iter()
             .flat_map(|possible_type| {
@@ -107,14 +124,19 @@ pub fn conform_to_default<'env>(
             })?,
         TypeKind::NullLiteral => Conform::new(
             builtin_types.ptr_void(),
-            UnaryImplicitCast::SpecializePointerOuter(builtin_types.ptr_void()),
+            UnaryCast::SpecializePointerOuter(builtin_types.ptr_void()),
         ),
-        TypeKind::AsciiCharLiteral(value) => Conform::new(
-            builtin_types.bool(),
-            UnaryImplicitCast::SpecializeAsciiChar(*value),
-        ),
+        TypeKind::AsciiCharLiteral(value) => {
+            Conform::new(builtin_types.bool(), UnaryCast::SpecializeAsciiChar(*value))
+        }
         _ => Conform::identity(ty),
-    })
+    };
+
+    if needs_dereference {
+        Ok(inner_conform.after_dereference(ctx))
+    } else {
+        Ok(inner_conform)
+    }
 }
 
 fn default_from_integer_literal<'env>(
@@ -130,14 +152,14 @@ fn default_from_integer_literal<'env>(
         TypeKind::Floating(float_size) => value.to_f64().map(|float| {
             Conform::new(
                 builtin_types.floating(*float_size),
-                UnaryImplicitCast::SpecializeFloat(NotNan::new(float).ok()),
+                UnaryCast::SpecializeFloat(NotNan::new(float).ok()),
             )
         }),
         TypeKind::BitInteger(to_bits, to_sign) => {
             does_integer_literal_fit(value, *to_bits, *to_sign).then(|| {
                 Conform::new(
                     UnaliasedType(ctx.alloc(TypeKind::BitInteger(*to_bits, *to_sign).at(source))),
-                    UnaryImplicitCast::SpecializeInteger(value).into(),
+                    UnaryCast::SpecializeInteger(value).into(),
                 )
             })
         }
@@ -148,7 +170,7 @@ fn default_from_integer_literal<'env>(
                         UnaliasedType(
                             ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
                         ),
-                        UnaryImplicitCast::SpecializeInteger(value),
+                        UnaryCast::SpecializeInteger(value),
                     )
                 },
             )
@@ -164,7 +186,7 @@ fn default_from_integer_literal<'env>(
             does_fit.then(|| {
                 Conform::new(
                     UnaliasedType(ctx.alloc(TypeKind::SizeInteger(*to_sign).at(source))),
-                    UnaryImplicitCast::SpecializeInteger(value).into(),
+                    UnaryCast::SpecializeInteger(value).into(),
                 )
             })
         }

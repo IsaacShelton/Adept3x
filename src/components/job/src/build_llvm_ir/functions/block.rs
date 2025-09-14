@@ -153,9 +153,12 @@ pub unsafe fn create_function_block<'env>(
                 LLVMBuildStore(builder.get(), source, destination);
                 None
             }
-            Instr::Load((value, ir_type)) => {
-                let pointer = build_value(ctx, value_catalog, builder, value)?;
-                let llvm_type = to_backend_type(ctx.for_making_type(), ir_type)?;
+            Instr::Load {
+                pointer,
+                pointee: pointee_ir_type,
+            } => {
+                let pointer = build_value(ctx, value_catalog, builder, pointer)?;
+                let llvm_type = to_backend_type(ctx.for_making_type(), pointee_ir_type)?;
                 Some(LLVMBuildLoad2(
                     builder.get(),
                     llvm_type,

@@ -1,7 +1,7 @@
 use ast::IntegerKnown;
 use ast_workspace::TypeDeclRef;
 use derivative::Derivative;
-use derive_more::{Display, IsVariant};
+use derive_more::IsVariant;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
 use primitives::{
@@ -10,8 +10,14 @@ use primitives::{
 use source_files::Source;
 use std::fmt::Display;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UnaliasedType<'env>(pub &'env Type<'env>);
+
+impl<'env> Display for UnaliasedType<'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
@@ -75,7 +81,15 @@ impl<'env> Display for TypeArg<'env> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
+pub enum Mutability {
+    Immutable,
+    Mutable,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
 pub enum TypeKind<'env> {
+    // Mutable
+    Deref(&'env Type<'env>, Mutability),
     // Literals
     IntegerLiteral(&'env BigInt),
     IntegerLiteralInRange(&'env BigInt, &'env BigInt),
@@ -150,7 +164,7 @@ impl<'env> TypeKind<'env> {
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_)
             | TypeKind::AsciiCharLiteral(_) => false,
-            TypeKind::Ptr(inner) => inner.kind.contains_polymorph(),
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner, _) => inner.kind.contains_polymorph(),
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
             TypeKind::Polymorph(_) => true,
@@ -172,7 +186,7 @@ impl<'env> TypeKind<'env> {
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_)
             | TypeKind::AsciiCharLiteral(_) => false,
-            TypeKind::Ptr(inner) => inner.kind.contains_type_alias(),
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner, _) => inner.kind.contains_type_alias(),
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
             TypeKind::Polymorph(_) => true,
@@ -243,6 +257,9 @@ impl<'env> Display for TypeKind<'env> {
             }),
             TypeKind::Ptr(inner) => {
                 write!(f, "ptr<{}>", inner)
+            }
+            TypeKind::Deref(inner, _) => {
+                write!(f, "deref<{}>", inner)
             }
             TypeKind::Void => write!(f, "void"),
             TypeKind::Never => write!(f, "never"),

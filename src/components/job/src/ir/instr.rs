@@ -8,7 +8,10 @@ pub enum Instr<'env> {
     Call(Call<'env>),
     Alloca(Type<'env>),
     Store(Store<'env>),
-    Load((Value<'env>, Type<'env>)),
+    Load {
+        pointer: Value<'env>,
+        pointee: Type<'env>,
+    },
     Malloc(Type<'env>),
     MallocArray(Type<'env>, Value<'env>),
     Free(Value<'env>),

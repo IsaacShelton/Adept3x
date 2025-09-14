@@ -7,7 +7,7 @@ use arena::{Arena, Id, Idx, new_id_with_niche};
 pub use builder::*;
 use diagnostics::ErrorDiagnostic;
 pub use flatten::*;
-pub use instr::{EndInstr, EndInstrKind, Instr, InstrKind};
+pub use instr::*;
 use source_files::Source;
 use std::{collections::HashMap, fmt::Display};
 

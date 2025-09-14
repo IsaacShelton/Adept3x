@@ -31,6 +31,7 @@ pub fn flatten_func<'env>(
                 name,
                 &param.ast_type,
                 index.try_into().expect("reasonable number of parameters"),
+                None,
             )
             .at(source),
         );
@@ -98,6 +99,7 @@ fn flatten_stmt<'env>(
                         &declaration.ast_type,
                         initial_value,
                         None,
+                        None,
                     )
                     .at(stmt.source),
                 ),
@@ -155,7 +157,7 @@ fn flatten_expr<'env>(
             let name = name
                 .as_plain_str()
                 .expect("only plain names can be used with new cfg");
-            builder.push(cursor, InstrKind::Name(name).at(expr.source))
+            builder.push(cursor, InstrKind::Name(name, None).at(expr.source))
         }
         ast::ExprKind::Boolean(value) => {
             builder.push(cursor, InstrKind::BooleanLiteral(*value).at(expr.source))
@@ -224,7 +226,7 @@ fn flatten_expr<'env>(
             );
             builder.push(
                 cursor,
-                InstrKind::DeclareAssign(&declare_assign.name, value, None).at(expr.source),
+                InstrKind::DeclareAssign(&declare_assign.name, value, None, None).at(expr.source),
             )
         }
         ast::ExprKind::BasicBinaryOperation(bin_op) => {

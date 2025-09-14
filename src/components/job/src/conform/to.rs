@@ -1,8 +1,6 @@
 use crate::{
     BuiltinTypes, ExecutionCtx, OnPolymorph, are_types_equal,
-    conform::{
-        Conform, UnaryImplicitCast, does_integer_literal_fit, does_integer_literal_fit_in_c,
-    },
+    conform::{Conform, UnaryCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
     repr::{TypeKind, UnaliasedType},
 };
 use derive_more::IsVariant;
@@ -21,7 +19,7 @@ pub enum ConformMode {
 
 pub fn conform_to<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    from_ty: UnaliasedType<'env>,
+    original_from_ty: UnaliasedType<'env>,
     to_ty: UnaliasedType<'env>,
     assumptions: CIntegerAssumptions,
     target: &Target,
@@ -30,11 +28,22 @@ pub fn conform_to<'env>(
     on_polymorph: impl OnPolymorph<'env>,
     source: Source,
 ) -> Option<Conform<'env>> {
+    let (from_ty, needs_dereference) = match &original_from_ty.0.kind {
+        TypeKind::Deref(inner_type, _) => (UnaliasedType(inner_type), true),
+        _ => (original_from_ty, false),
+    };
+
     if are_types_equal(from_ty, to_ty, on_polymorph) {
-        return Some(Conform::identity(to_ty));
+        let inner_conform = Conform::identity(to_ty);
+
+        return Some(if needs_dereference {
+            inner_conform.after_dereference(ctx)
+        } else {
+            inner_conform
+        });
     }
 
-    match &from_ty.0.kind {
+    let inner_conform = match &from_ty.0.kind {
         TypeKind::IntegerLiteral(from) => match &to_ty.0.kind {
             TypeKind::IntegerLiteralInRange(min, max) => {
                 if from >= min && from <= max {
@@ -61,7 +70,7 @@ pub fn conform_to<'env>(
                         UnaliasedType(
                             ctx.alloc(TypeKind::BitInteger(*to_bits, *to_sign).at(source)),
                         ),
-                        UnaryImplicitCast::SpecializeInteger(from).into(),
+                        UnaryCast::SpecializeInteger(from).into(),
                     )
                 })
             }
@@ -72,7 +81,7 @@ pub fn conform_to<'env>(
                             UnaliasedType(
                                 ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
                             ),
-                            UnaryImplicitCast::SpecializeInteger(from),
+                            UnaryCast::SpecializeInteger(from),
                         )
                     })
             }
@@ -87,6 +96,12 @@ pub fn conform_to<'env>(
         TypeKind::CInteger(from_size, from_sign) => todo!(),
         TypeKind::SizeInteger(from_sign) => todo!(),
         _ => None,
+    }?;
+
+    if needs_dereference {
+        Some(inner_conform.after_dereference(ctx))
+    } else {
+        Some(inner_conform)
     }
 }
 

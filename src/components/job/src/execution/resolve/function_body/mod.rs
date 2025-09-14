@@ -1,16 +1,17 @@
 mod basic_bin_op;
 mod dominators;
-mod variables;
 
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
-    FuncSearch, InstrKind, InstrRef, RevPostOrderIterWithEnds, Suspend, SuspendMany,
-    are_types_equal,
+    FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany, are_types_equal,
     conform::{ConformMode, conform_to, conform_to_default},
-    execution::resolve::{ResolveType, function_body::variables::VariableTracker},
+    execution::resolve::ResolveType,
     flatten_func,
     module_graph::ModuleView,
-    repr::{Compiler, DeclHead, FuncBody, FuncHead, Type, TypeKind, UnaliasedType},
+    repr::{
+        Compiler, DeclHead, FuncBody, FuncHead, Mutability, Type, TypeKind, UnaliasedType,
+        Variable, Variables,
+    },
     unify::unify_types,
 };
 use arena::ArenaMap;
@@ -20,7 +21,6 @@ use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
 use primitives::{CInteger, CIntegerAssumptions};
-use variables::VariableTrackers;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -50,7 +50,7 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    variables: Option<VariableTrackers<'env>>,
+    variables: Option<Variables<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -140,25 +140,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         //let c_integer_assumptions = settings.c_integer_assumptions();
         let c_integer_assumptions = CIntegerAssumptions::default();
 
-        // 4) Allocate variable storage for each variable
-        let variables = self.variables.get_or_insert_with(|| {
-            // NOTE: We include all nodes even if they aren't a part of the actual graph.
-            // We can prune these after type resolution by removing the variables who never
-            // had a type determined for them.
-            // The new indices for each variable after this filtering are then the "slot"
-            // each will occupy during IR generation.
-            cfg.iter_instrs_ordered()
-                .flat_map(|(instr_ref, instr)| match &instr.kind {
-                    InstrKind::Declare(..)
-                    | InstrKind::DeclareAssign(..)
-                    | InstrKind::Parameter(..) => Some(VariableTracker {
-                        declared_at: instr_ref,
-                        ty: None,
-                    }),
-                    _ => None,
-                })
-                .collect()
-        });
+        let variables = self.variables.get_or_insert_default();
 
         let rev_post_order = self
             .rev_post_order
@@ -177,7 +159,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     | EndInstrKind::IncompleteBreak
                     | EndInstrKind::IncompleteContinue => unreachable!(),
                     EndInstrKind::Return(Some(value), _) => {
-                        // 1] Conform the value to its default type
+                        // 1] Conform the value to return type
                         let conformed = conform_to(
                             ctx,
                             cfg.get_typed(*value),
@@ -204,7 +186,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         };
 
                         // 3] Track any casts that were necessary
-                        cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
+                        cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     }
                     EndInstrKind::Return(None, _) => {
                         if !self.resolved_head.return_type.0.kind.is_void() {
@@ -235,15 +217,13 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::Phi(items, conform_behavior) if items.len() <= 1 => {
                     // 0] We don't need to do anything fancy if there's not more
                     //    than one incoming value.
-                    cfg.set_typed(
-                        instr_ref,
-                        items
-                            .first()
-                            .unwrap()
-                            .1
-                            .map(|instr_ref| cfg.get_typed(instr_ref))
-                            .unwrap_or(builtin_types.never()),
-                    )
+                    let instr = items.first().unwrap().1;
+
+                    let typed = instr
+                        .map(|instr_ref| cfg.get_typed(instr_ref))
+                        .unwrap_or(builtin_types.never());
+
+                    cfg.set_typed(instr_ref, typed)
                 }
                 InstrKind::Phi(items, conform_behavior) => {
                     // NOTE: We already handled the case for when `items.len() <= 1` above.
@@ -266,7 +246,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     if let Some(unified) = unified {
                         for (bb, value) in items.iter() {
                             if value.is_some() {
-                                cfg.set_jump_pre_conform(*bb, unified);
+                                cfg.set_pre_jump_typed_unary_cast(
+                                    *bb,
+                                    todo!("optional unary casts for incoming edges for CFG phi"),
+                                );
                             }
                         }
                     }
@@ -274,7 +257,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 3] Result type is the unified type
                     cfg.set_typed(instr_ref, unified.unwrap_or(builtin_types.never()))
                 }
-                InstrKind::Name(needle) => {
+                InstrKind::Name(needle, _) => {
                     // 1] Start by checking within current basicblock
                     let mut dom_ref = instr_ref.basicblock;
                     let mut num_take = instr_ref.instr_or_end as usize;
@@ -291,17 +274,17 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         for (instr_index, instr) in
                             dom.instrs.iter().take(num_take).enumerate().rev()
                         {
-                            if match &instr.kind {
-                                InstrKind::Parameter(name, _, _)
-                                | InstrKind::Declare(name, _, _, _)
-                                | InstrKind::DeclareAssign(name, _, _) => name == needle,
-                                _ => false,
+                            if let Some(found) = match &instr.kind {
+                                InstrKind::Parameter(name, _, _, variable_ref)
+                                | InstrKind::Declare(name, _, _, _, variable_ref)
+                                | InstrKind::DeclareAssign(name, _, _, variable_ref)
+                                    if name == needle =>
+                                {
+                                    *variable_ref
+                                }
+                                _ => None,
                             } {
-                                // Declaration was found!
-                                break 'outer InstrRef::new(
-                                    dom_ref,
-                                    instr_index.try_into().unwrap(),
-                                );
+                                break 'outer found;
                             }
                         }
 
@@ -323,15 +306,17 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         num_take = usize::MAX;
                     };
 
-                    // 3] Extract the type of the found variable.
-                    let var_ty = variables
-                        .get(found)
-                        .expect("variable to be tracked")
-                        .ty
-                        .expect("variable to have had type resolved");
-                    cfg.set_typed(instr_ref, var_ty)
+                    // 3] Extract the type of the found variable and create deref'T
+                    let variable_type = variables.get(found).ty;
+                    let deref_variable_type = UnaliasedType(ctx.alloc(
+                        TypeKind::Deref(variable_type.0, Mutability::Mutable).at(instr.source),
+                    ));
+
+                    // 4] Set result
+                    cfg.set_typed(instr_ref, deref_variable_type);
+                    cfg.set_variable_ref(instr_ref, found);
                 }
-                InstrKind::Parameter(_, ast_type, _) => {
+                InstrKind::Parameter(_, ast_type, _, _) => {
                     // 0] Resolve variable type
                     let Some(resolved_type) = executor.demand(self.resolved_type) else {
                         return suspend!(
@@ -342,7 +327,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     };
 
                     // 1] Assign the variable the resolved type
-                    variables.assign_resolved_type(instr_ref, resolved_type);
+                    let variable_ref = variables.push(Variable::new(resolved_type));
+                    cfg.set_variable_ref(instr_ref, variable_ref);
 
                     // 2] Reset the "suspend on type" for the next time we need it
                     self.resolved_type = None;
@@ -350,7 +336,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 3] Finish typing the paramater declaration, which itself is void
                     cfg.set_typed(instr_ref, builtin_types.void())
                 }
-                InstrKind::Declare(name, ast_type, value, _) => {
+                InstrKind::Declare(name, ast_type, value, _, _) => {
                     // 1] Resolve variable type
                     let Some(resolved_type) = executor.demand(self.resolved_type) else {
                         return suspend!(
@@ -392,9 +378,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     // 5] Assign the variable the resolved type, and
                     //    track the final type along with any necessary casts.
-                    variables.assign_resolved_type(instr_ref, resolved_type);
+                    let variable_ref = variables.push(Variable { ty: resolved_type });
+                    cfg.set_variable_ref(instr_ref, variable_ref);
+                    cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
-                    cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
 
                     // 6] Reset the "suspend on type" for the next time we need it
                     self.resolved_type = None;
@@ -475,15 +462,73 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         );
                     };
 
-                    let arg_casts = ctx.alloc_slice_fill_iter(std::iter::repeat_n(
-                        None,
-                        func_head.params.required.len(),
-                    ));
-                    eprintln!("warning: call argument casts not computed yet");
+                    let mut arg_casts = vec![];
+                    let mut variadic_arg_types = vec![];
 
-                    cfg.set_typed_and_callee(instr_ref, func_head, arg_casts);
+                    // WARNING: This part assumes we don't suspend
+                    for (i, arg) in call.args.iter().enumerate() {
+                        let got_type = cfg.get_typed(*arg);
+
+                        let conformed = if let Some(param) = func_head.params.required.get(i) {
+                            let expected_type = param.ty;
+
+                            // Conform the value to parameter type if present
+                            // WARNING: This part assumes we don't suspend
+                            let Some(conformed) = conform_to(
+                                ctx,
+                                got_type,
+                                expected_type,
+                                c_integer_assumptions,
+                                self.view.target(),
+                                builtin_types,
+                                ConformMode::ParameterPassing,
+                                |_, _| todo!("handle polymorphs"),
+                                instr.source,
+                            ) else {
+                                return Err(ErrorDiagnostic::new(
+                                    format!(
+                                        "Expected '{}' for argument #{}, but got '{}'",
+                                        expected_type,
+                                        i + 1,
+                                        got_type
+                                    ),
+                                    instr.source,
+                                )
+                                .into());
+                            };
+
+                            conformed
+                        } else {
+                            // Conform variadic arguments to their default types
+                            // WARNING: This part assumes we don't suspend
+                            let conformed = conform_to_default(
+                                ctx,
+                                got_type,
+                                c_integer_assumptions,
+                                builtin_types,
+                                self.view.target(),
+                            )?;
+
+                            variadic_arg_types.push(conformed.ty);
+                            conformed
+                        };
+
+                        arg_casts.push(conformed.cast);
+                    }
+
+                    let arg_casts = ctx.alloc_slice_fill_iter(arg_casts.into_iter());
+                    let variadic_arg_types =
+                        ctx.alloc_slice_fill_iter(variadic_arg_types.into_iter());
+
+                    assert_eq!(arg_casts.len(), call.args.len());
+                    assert_eq!(
+                        variadic_arg_types.len(),
+                        call.args.len() - func_head.params.required.len()
+                    );
+
+                    cfg.set_typed_and_callee(instr_ref, func_head, arg_casts, variadic_arg_types);
                 }
-                InstrKind::DeclareAssign(_, value, _) => {
+                InstrKind::DeclareAssign(_, value, _, _) => {
                     // 1] Conform the value to its default concrete type
                     let conformed = conform_to_default(
                         ctx,
@@ -495,9 +540,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     // 2] Assign the variable the resolved type, and
                     //    track the final type along with any necessary casts.
-                    variables.assign_resolved_type(instr_ref, conformed.ty);
+                    let variable_ref = variables.push(Variable::new(conformed.ty));
+                    cfg.set_variable_ref(instr_ref, variable_ref);
+                    cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, conformed.ty);
-                    cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
                 }
                 InstrKind::Member(instr_ref, _, privacy) => todo!("member"),
                 InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!("array access"),
@@ -525,7 +571,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     }
 
                     cfg.set_typed(instr_ref, conformed.ty);
-                    cfg.set_primary_unary_implicit_cast(instr_ref, conformed.cast);
+                    cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                 }
                 InstrKind::Is(instr_ref, _) => todo!("is"),
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
@@ -808,7 +854,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         Ok(ctx.alloc(FuncBody {
             cfg: final_cfg,
             post_order: ctx.alloc_slice_fill_iter(std::mem::take(post_order).iter().copied()),
-            variables: std::mem::take(variables).prune(),
+            variables: std::mem::take(variables),
         }))
     }
 }

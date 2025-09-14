@@ -4,12 +4,16 @@ use ordered_float::NotNan;
 use primitives::{FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate};
 
 #[derive(Clone, Debug)]
-pub enum UnaryImplicitCast<'env> {
+pub enum UnaryCast<'env> {
     SpecializeBoolean(bool),
     SpecializeInteger(&'env BigInt),
     SpecializeFloat(Option<NotNan<f64>>),
     SpecializePointerOuter(UnaliasedType<'env>),
     SpecializeAsciiChar(u8),
+    Dereference {
+        after_deref: UnaliasedType<'env>,
+        then: Option<&'env UnaryCast<'env>>,
+    },
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

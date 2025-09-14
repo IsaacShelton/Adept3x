@@ -10,7 +10,14 @@ use compiler::BuildOptions;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::core::LLVMIsMultithreaded;
 use source_files::SourceFiles;
-use std::{ffi::OsString, fs::create_dir_all, path::Path};
+use std::{
+    borrow::Cow,
+    ffi::OsString,
+    fs::create_dir_all,
+    path::{Path, absolute},
+    process::Command,
+    time::Duration,
+};
 use target::Target;
 
 #[derive(Clone, Debug)]
@@ -138,6 +145,11 @@ impl<'env> Executable<'env> for Main<'env> {
         };
 
         println!("Linked in {}ms", linking_duration.as_millis());
+
+        if self.build_options.execute_result {
+            execute_result(&executable_filepath)?;
+        }
+
         Ok(None)
     }
 }
@@ -152,4 +164,48 @@ fn project_name(project_folder: &Path) -> OsString {
                 .and_then(|dir| dir.file_name().map(OsString::from))
         })
         .unwrap_or_else(|| OsString::from("main"))
+}
+
+pub fn execute_result(output_binary_filepath: &Path) -> Result<(), ErrorDiagnostic> {
+    println!("    ==== executing result ====");
+
+    // Avoid using a relative filename to invoke the resulting executable
+    let output_binary_filepath = if output_binary_filepath.is_relative() {
+        let Ok(absolute_filename) = absolute(&output_binary_filepath) else {
+            return Err(ErrorDiagnostic::plain(format!(
+                "Failed to get absolute filename of resulting executable '{}'",
+                output_binary_filepath.to_string_lossy().as_ref(),
+            )));
+        };
+
+        Cow::Owned(absolute_filename)
+    } else {
+        Cow::Borrowed(output_binary_filepath)
+    };
+
+    let mut last_error = None;
+
+    for retry_duration in [10, 10, 10, 50, 100, 250].map(Duration::from_millis) {
+        match Command::new(output_binary_filepath.as_os_str())
+            .args([] as [&str; 0])
+            .spawn()
+        {
+            Ok(mut process) => {
+                let _ = process.wait();
+                return Ok(());
+            }
+            Err(e) => {
+                last_error = Some(e);
+
+                // Try again in few milliseconds
+                std::thread::sleep(retry_duration);
+            }
+        }
+    }
+
+    Err(ErrorDiagnostic::plain(format!(
+        "Failed to run resulting executable '{}' - {}",
+        output_binary_filepath.to_string_lossy().as_ref(),
+        last_error.unwrap()
+    )))
 }
