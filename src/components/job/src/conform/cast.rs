@@ -1,7 +1,7 @@
 use crate::repr::UnaliasedType;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
-use primitives::{FloatOrInteger, FloatOrSignLax, NumericMode, SignOrIndeterminate};
+use primitives::{FloatOrInteger, FloatOrSignLax, IntegerSign, NumericMode, SignOrIndeterminate};
 
 #[derive(Clone, Debug)]
 pub enum UnaryCast<'env> {
@@ -14,8 +14,7 @@ pub enum UnaryCast<'env> {
         after_deref: UnaliasedType<'env>,
         then: Option<&'env UnaryCast<'env>>,
     },
-    ZeroExtend,
-    SignExtend,
+    Extend(IntegerSign),
     Truncate,
 }
 

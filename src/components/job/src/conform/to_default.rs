@@ -1,7 +1,7 @@
 use crate::{
     BuiltinTypes, ExecutionCtx,
     conform::{UnaryCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
-    repr::{Mutability, TypeKind, UnaliasedType},
+    repr::{TypeKind, UnaliasedType},
 };
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;

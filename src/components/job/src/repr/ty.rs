@@ -81,12 +81,6 @@ impl<'env> Display for TypeArg<'env> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
-pub enum Mutability {
-    Immutable,
-    Mutable,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
 pub enum TypeKind<'env> {
     // Mutable
     Deref(&'env Type<'env>),

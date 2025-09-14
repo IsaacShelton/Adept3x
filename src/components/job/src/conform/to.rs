@@ -87,9 +87,8 @@ pub fn conform_to<'env>(
                 does_integer_literal_fit(from, bits, *sign)
                     .then(|| Conform::new(to_ty, UnaryCast::SpecializeInteger(from)))
             }
-            TypeKind::Floating(_) =>
-            /* NOTE: to_f64 should be infallible despite signature, as overridden by BigInt */
-            {
+            TypeKind::Floating(_) => {
+                // NOTE: to_f64 should be infallible despite signature, as overridden by BigInt
                 from.to_f64().and_then(|from| {
                     Some(Conform::new(
                         to_ty,
@@ -102,16 +101,7 @@ pub fn conform_to<'env>(
         TypeKind::BitInteger(from_bits, from_sign) => match &to_ty.0.kind {
             TypeKind::BitInteger(to_bits, to_sign) => (from_bits <= to_bits
                 && implies!(from_sign.is_signed(), to_sign.is_signed()))
-            .then(|| {
-                Conform::new(
-                    to_ty,
-                    if from_sign.is_signed() {
-                        UnaryCast::SignExtend
-                    } else {
-                        UnaryCast::ZeroExtend
-                    },
-                )
-            }),
+            .then(|| Conform::new(to_ty, UnaryCast::Extend(*from_sign))),
             TypeKind::CInteger(to_c_integer, to_sign) => does_bit_integer_fit_in_c(
                 *from_bits,
                 *from_sign,
@@ -120,31 +110,13 @@ pub fn conform_to<'env>(
                 assumptions,
                 target,
             )
-            .then(|| {
-                Conform::new(
-                    to_ty,
-                    if from_sign.is_signed() {
-                        UnaryCast::SignExtend
-                    } else {
-                        UnaryCast::ZeroExtend
-                    },
-                )
-            }),
+            .then(|| Conform::new(to_ty, UnaryCast::Extend(*from_sign))),
             TypeKind::SizeInteger(to_sign) => {
                 let to_bits = IntegerBits::new(target.size_layout().width.to_bits())
                     .expect("size type to be representable with common bit integers");
 
                 (*from_bits <= to_bits && implies!(from_sign.is_signed(), to_sign.is_signed()))
-                    .then(|| {
-                        Conform::new(
-                            to_ty,
-                            if from_sign.is_signed() {
-                                UnaryCast::SignExtend
-                            } else {
-                                UnaryCast::ZeroExtend
-                            },
-                        )
-                    })
+                    .then(|| Conform::new(to_ty, UnaryCast::Extend(*from_sign)))
             }
             TypeKind::Floating(float_size) => todo!(),
             _ => None,

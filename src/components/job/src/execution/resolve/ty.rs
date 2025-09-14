@@ -1,7 +1,7 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
     module_graph::ModuleView,
-    repr::{Mutability, Type, TypeKind, UnaliasedType},
+    repr::{Type, TypeKind, UnaliasedType},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
