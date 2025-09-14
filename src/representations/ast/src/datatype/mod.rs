@@ -39,7 +39,7 @@ impl Type {
             | TypeKind::CInteger(_, _)
             | TypeKind::SizeInteger(_)
             | TypeKind::Floating(_) => None,
-            TypeKind::Ptr(inner) => inner.contains_polymorph(),
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner) => inner.contains_polymorph(),
             TypeKind::FixedArray(fixed_array) => fixed_array.ast_type.contains_polymorph(),
             TypeKind::Void | TypeKind::Never => None,
             TypeKind::Named(_, args) => args

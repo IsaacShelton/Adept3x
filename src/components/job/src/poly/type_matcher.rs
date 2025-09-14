@@ -114,10 +114,9 @@ pub fn are_types_equal<'env>(
                 false
             }
         }
-        TypeKind::Deref(a_inner, a_mutability) => {
-            if let TypeKind::Deref(b_inner, b_mutability) = b {
-                a_mutability == b_mutability
-                    && are_types_equal(UnaliasedType(a_inner), UnaliasedType(b_inner), on_polymorph)
+        TypeKind::Deref(a_inner) => {
+            if let TypeKind::Deref(b_inner) = b {
+                are_types_equal(UnaliasedType(a_inner), UnaliasedType(b_inner), on_polymorph)
             } else {
                 false
             }

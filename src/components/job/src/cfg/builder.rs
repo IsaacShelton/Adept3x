@@ -127,7 +127,12 @@ impl<'env> CfgBuilder<'env> {
         match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
             InstrKind::DeclareAssign(_, _, unary_cast, _)
             | InstrKind::Declare(_, _, _, unary_cast, _)
-            | InstrKind::ConformToBool(_, _, unary_cast) => *unary_cast = cast,
+            | InstrKind::ConformToBool(_, _, unary_cast)
+            | InstrKind::Assign {
+                dest: _,
+                src: _,
+                src_cast: unary_cast,
+            } => *unary_cast = cast,
             _ => unreachable!(),
         }
     }

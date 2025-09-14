@@ -3,14 +3,13 @@ mod dominators;
 
 use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
-    FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany, are_types_equal,
+    FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
     conform::{ConformMode, conform_to, conform_to_default},
     execution::resolve::ResolveType,
     flatten_func,
     module_graph::ModuleView,
     repr::{
-        Compiler, DeclHead, FuncBody, FuncHead, Mutability, Type, TypeKind, UnaliasedType,
-        Variable, Variables,
+        Compiler, DeclHead, FuncBody, FuncHead, Type, TypeKind, UnaliasedType, Variable, Variables,
     },
     unify::unify_types,
 };
@@ -308,9 +307,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     // 3] Extract the type of the found variable and create deref'T
                     let variable_type = variables.get(found).ty;
-                    let deref_variable_type = UnaliasedType(ctx.alloc(
-                        TypeKind::Deref(variable_type.0, Mutability::Mutable).at(instr.source),
-                    ));
+                    let deref_variable_type =
+                        UnaliasedType(ctx.alloc(TypeKind::Deref(variable_type.0).at(instr.source)));
 
                     // 4] Set result
                     cfg.set_typed(instr_ref, deref_variable_type);
@@ -388,7 +386,55 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 5] Reset the "suspend on type" for the next time we need it
                     self.resolved_type = None;
                 }
-                InstrKind::Assign(instr_ref, instr_ref1) => todo!("assign"),
+                InstrKind::Assign {
+                    dest,
+                    src,
+                    src_cast: _,
+                } => {
+                    let dest_ty = cfg.get_typed(*dest);
+
+                    let TypeKind::Deref(mut dest_ty) = cfg.get_typed(*dest).0.kind else {
+                        return Err(ErrorDiagnostic::new(
+                            format!("Left side of assignment is not mutable"),
+                            instr.source,
+                        )
+                        .into());
+                    };
+
+                    while let TypeKind::Deref(inner_dest_ty) = &dest_ty.kind {
+                        dest_ty = inner_dest_ty;
+                    }
+
+                    let dest_ty = UnaliasedType(dest_ty);
+
+                    let Some(conformed) = conform_to(
+                        ctx,
+                        cfg.get_typed(*src),
+                        dest_ty,
+                        c_integer_assumptions,
+                        builtin_types,
+                        self.view.target(),
+                        ConformMode::Normal,
+                        |_, _| todo!("handle polymorphs"),
+                        instr.source,
+                    ) else {
+                        return Err(ErrorDiagnostic::new(
+                            format!(
+                                "Incompatible types '{}' and '{}'",
+                                cfg.get_typed(*src),
+                                dest_ty
+                            ),
+                            instr.source,
+                        )
+                        .into());
+                    };
+
+                    cfg.set_primary_unary_cast(instr_ref, conformed.cast);
+                    cfg.set_typed(instr_ref, builtin_types.void());
+
+                    // 5] Reset the "suspend on type" for the next time we need it
+                    self.resolved_type = None;
+                }
                 InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
                     todo!()
                 }

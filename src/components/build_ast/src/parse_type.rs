@@ -129,6 +129,30 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     })
                 }
             }
+            Some("deref") => {
+                if generics.len() == 1 {
+                    if let TypeArg::Type(inner) = generics.into_iter().next().unwrap() {
+                        Ok(TypeKind::Deref(Box::new(inner)))
+                    } else {
+                        Err(ParseError {
+                            kind: ParseErrorKind::ExpectedTypeParameterToBeAType {
+                                name: name.to_string(),
+                                word_for_nth: "first".into(),
+                            },
+                            source,
+                        })
+                    }
+                } else {
+                    Err(ParseError {
+                        kind: ParseErrorKind::IncorrectNumberOfTypeParametersFor {
+                            name: name.to_string(),
+                            expected: 1,
+                            got: generics.len(),
+                        },
+                        source,
+                    })
+                }
+            }
             Some("array") => {
                 // TODO: Update fixed array type to use compile time arguments
                 todo!("array<$N, $T> not updated yet to use compile time arguments");

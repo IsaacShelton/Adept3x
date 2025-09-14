@@ -3,18 +3,13 @@ mod to;
 mod to_default;
 
 pub use cast::*;
+use data_units::implies;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use primitives::{CInteger, CIntegerAssumptions, IntegerBits, IntegerSign};
 use target::Target;
 pub use to::*;
 pub use to_default::*;
-
-macro_rules! implies {
-    ($x:expr, $y:expr) => {
-        !($x) || ($y)
-    };
-}
 
 pub fn does_integer_literal_fit(value: &BigInt, bits: IntegerBits, sign: IntegerSign) -> bool {
     match (bits, sign) {
@@ -56,5 +51,37 @@ pub fn does_integer_literal_fit_in_c(
             .unwrap_or(0);
 
     implies!(from_is_signed, to_is_maybe_signed)
+        && min_c_int_bits <= to_c_integer.min_bits(assumptions).bits().bits()
+}
+
+pub fn does_bit_integer_fit_in_c(
+    from_bits: IntegerBits,
+    from_sign: IntegerSign,
+    to_c_integer: CInteger,
+    to_sign: Option<IntegerSign>,
+    assumptions: CIntegerAssumptions,
+    target: &Target,
+) -> bool {
+    if to_sign.is_none()
+        && from_sign.is_signed()
+        && !assumptions.allow_target_implicit_sign_conversion
+    {
+        return false;
+    }
+
+    let to_is_maybe_signed = if assumptions.allow_target_implicit_sign_conversion {
+        to_sign
+            .unwrap_or_else(|| target.default_c_integer_sign(to_c_integer))
+            .is_signed()
+    } else {
+        matches!(to_sign, None | Some(IntegerSign::Signed))
+    };
+
+    let min_c_int_bits = from_bits.bits().bits()
+        + (to_is_maybe_signed && !from_sign.is_signed())
+            .then_some(1)
+            .unwrap_or(0);
+
+    implies!(from_sign.is_signed(), to_is_maybe_signed)
         && min_c_int_bits <= to_c_integer.min_bits(assumptions).bits().bits()
 }

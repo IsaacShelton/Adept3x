@@ -164,10 +164,51 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                         ir::Literal::Void.into()
                     }
-                    InstrKind::Assign(left, right) => builder.push(ir::Instr::Store(ir::Store {
-                        new_value: builder.get_output(*right),
-                        destination: builder.get_output(*left),
-                    })),
+                    InstrKind::Assign {
+                        dest,
+                        src,
+                        src_cast: cast,
+                    } => {
+                        let new_value = builder.get_output(*src);
+
+                        let TypeKind::Deref(mut to_ty) = cfg.get_typed(*dest).0.kind else {
+                            return Err(ErrorDiagnostic::new(
+                                "Could not assign value, left hand side is not mutable",
+                                instr.source,
+                            )
+                            .into());
+                        };
+
+                        let mut dest = builder.get_output(*dest);
+
+                        while let TypeKind::Deref(inner_to_ty) = &to_ty.kind {
+                            dest = builder.push(ir::Instr::Load {
+                                pointer: dest,
+                                // Warning: Since we want to keep the outer `deref` layer , we pretend
+                                // that the pointee type is the type itself. As the pointee type should
+                                // be `Deref(inner_to_ty)` which is the same as `to_ty`.
+                                pointee: to_ir_type(ctx, self.view.target(), to_ty)?,
+                            });
+                            to_ty = inner_to_ty;
+                        }
+
+                        let to_ir_ty = to_ir_type(ctx, self.view.target(), to_ty)?;
+
+                        let new_value = perform_unary_cast_to(
+                            ctx,
+                            builder,
+                            new_value,
+                            &to_ir_ty,
+                            cast.as_ref(),
+                            self.view.target(),
+                            instr.source,
+                        )?;
+
+                        builder.push(ir::Instr::Store(ir::Store {
+                            new_value,
+                            destination: dest,
+                        }))
+                    }
                     InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
                         todo!()
                     }
@@ -490,6 +531,18 @@ fn perform_unary_cast_to<'env>(
                     pointee: after_deref,
                 })
             }
+            UnaryCast::ZeroExtend => {
+                assert!(to_ty.is_i());
+                builder.push(ir::Instr::ZeroExtend(value, *to_ty))
+            }
+            UnaryCast::SignExtend => {
+                assert!(to_ty.is_i());
+                builder.push(ir::Instr::SignExtend(value, *to_ty))
+            }
+            UnaryCast::Truncate => {
+                assert!(to_ty.is_i());
+                builder.push(ir::Instr::Truncate(value, *to_ty))
+            }
         };
     }
 }
@@ -534,7 +587,7 @@ fn to_ir_type<'env>(
         }
         TypeKind::SizeInteger(integer_sign) => todo!(),
         TypeKind::Floating(float_size) => ir::Type::F(*float_size),
-        TypeKind::Ptr(inner_ty) | TypeKind::Deref(inner_ty, _) => {
+        TypeKind::Ptr(inner_ty) | TypeKind::Deref(inner_ty) => {
             ir::Type::Ptr(ctx.alloc(to_ir_type(ctx, target, inner_ty)?))
         }
         TypeKind::Void => ir::Type::Void,

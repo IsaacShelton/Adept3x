@@ -89,7 +89,7 @@ pub enum Mutability {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
 pub enum TypeKind<'env> {
     // Mutable
-    Deref(&'env Type<'env>, Mutability),
+    Deref(&'env Type<'env>),
     // Literals
     IntegerLiteral(&'env BigInt),
     IntegerLiteralInRange(&'env BigInt, &'env BigInt),
@@ -164,7 +164,7 @@ impl<'env> TypeKind<'env> {
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_)
             | TypeKind::AsciiCharLiteral(_) => false,
-            TypeKind::Ptr(inner) | TypeKind::Deref(inner, _) => inner.kind.contains_polymorph(),
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner) => inner.kind.contains_polymorph(),
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
             TypeKind::Polymorph(_) => true,
@@ -186,7 +186,7 @@ impl<'env> TypeKind<'env> {
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_)
             | TypeKind::AsciiCharLiteral(_) => false,
-            TypeKind::Ptr(inner) | TypeKind::Deref(inner, _) => inner.kind.contains_type_alias(),
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner) => inner.kind.contains_type_alias(),
             TypeKind::Void | TypeKind::Never => false,
             TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
             TypeKind::Polymorph(_) => true,
@@ -256,10 +256,10 @@ impl<'env> Display for TypeKind<'env> {
                 FloatSize::Bits64 => "f64",
             }),
             TypeKind::Ptr(inner) => {
-                write!(f, "ptr<{}>", inner)
+                write!(f, "ptr'{}", inner)
             }
-            TypeKind::Deref(inner, _) => {
-                write!(f, "deref<{}>", inner)
+            TypeKind::Deref(inner) => {
+                write!(f, "deref'{}", inner)
             }
             TypeKind::Void => write!(f, "void"),
             TypeKind::Never => write!(f, "never"),

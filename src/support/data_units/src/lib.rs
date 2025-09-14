@@ -3,6 +3,13 @@ use std::{
     sync::atomic::{self, AtomicU64},
 };
 
+#[macro_export]
+macro_rules! implies {
+    ($x:expr, $y:expr) => {
+        !($x) || ($y)
+    };
+}
+
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ByteUnits {
     units: u64,

@@ -14,6 +14,7 @@ pub enum TypeKind {
     SizeInteger(IntegerSign),
     Floating(FloatSize),
     Ptr(Box<Type>),
+    Deref(Box<Type>),
     FixedArray(Box<FixedArray>),
     Void,
     Never,

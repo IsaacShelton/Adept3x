@@ -140,8 +140,16 @@ impl<'env> Display for InstrKind<'env> {
                     write!(f, "\n        | casts to: {:?}", cast)?;
                 }
             }
-            InstrKind::Assign(dest, src) => {
+            InstrKind::Assign {
+                dest,
+                src,
+                src_cast: cast,
+            } => {
                 write!(f, "assign {} {}", dest, src)?;
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
+                }
             }
             InstrKind::BinOp(a, op, b, language) => {
                 write!(f, "bin_op {} {} {} {:?}", a, op, b, language)?;
@@ -269,7 +277,11 @@ pub enum InstrKind<'env> {
         Option<UnaryCast<'env>>,
         Option<VariableRef<'env>>,
     ),
-    Assign(InstrRef, InstrRef),
+    Assign {
+        dest: InstrRef,
+        src: InstrRef,
+        src_cast: Option<UnaryCast<'env>>,
+    },
     BinOp(InstrRef, ast::BasicBinaryOperator, InstrRef, Language),
     BooleanLiteral(bool),
     IntegerLiteral(&'env Integer),

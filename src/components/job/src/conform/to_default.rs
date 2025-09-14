@@ -1,7 +1,7 @@
 use crate::{
     BuiltinTypes, ExecutionCtx,
     conform::{UnaryCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
-    repr::{TypeKind, UnaliasedType},
+    repr::{Mutability, TypeKind, UnaliasedType},
 };
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
@@ -32,13 +32,29 @@ impl<'env> Conform<'env> {
     pub fn after_dereference(self, ctx: &mut ExecutionCtx<'env>) -> Self {
         let cast = self.cast.map(|cast| ctx.alloc(cast));
 
+        let is_nested_dereference = cast.as_ref().map_or(false, |cast| cast.is_dereference());
+
         Self {
             ty: self.ty,
             cast: Some(UnaryCast::Dereference {
                 then: cast.map(|v| &*v),
-                after_deref: self.ty,
+                after_deref: if is_nested_dereference {
+                    UnaliasedType(ctx.alloc(TypeKind::Deref(self.ty.0).at(Source::internal())))
+                } else {
+                    self.ty
+                },
             }),
         }
+    }
+
+    pub fn after_dereferences(self, ctx: &mut ExecutionCtx<'env>, count: usize) -> Self {
+        let mut result = self;
+
+        for _ in 0..count {
+            result = result.after_dereference(ctx);
+        }
+
+        result
     }
 }
 
@@ -58,10 +74,18 @@ pub fn conform_to_default<'env>(
         &builtin_types.u64,
     ];
 
-    let (ty, needs_dereference) = match &original_from_ty.0.kind {
-        TypeKind::Deref(inner_type, _) => (UnaliasedType(inner_type), true),
-        _ => (original_from_ty, false),
-    };
+    let mut ty = original_from_ty;
+    let mut dereferences = 0;
+
+    loop {
+        match &ty.0.kind {
+            TypeKind::Deref(inner_type) => {
+                ty = UnaliasedType(inner_type);
+                dereferences += 1;
+            }
+            _ => break,
+        }
+    }
 
     let inner_conform = match &ty.0.kind {
         TypeKind::IntegerLiteral(big_int) => default_integer_types
@@ -132,11 +156,13 @@ pub fn conform_to_default<'env>(
         _ => Conform::identity(ty),
     };
 
-    if needs_dereference {
-        Ok(inner_conform.after_dereference(ctx))
-    } else {
-        Ok(inner_conform)
+    let mut result = inner_conform;
+
+    for _ in 0..dereferences {
+        result = result.after_dereference(ctx);
     }
+
+    Ok(result)
 }
 
 fn default_from_integer_literal<'env>(

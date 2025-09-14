@@ -27,7 +27,10 @@ impl Display for &TypeKind {
                 IntegerSign::Unsigned => "usize",
             })?,
             TypeKind::Ptr(inner) => {
-                write!(f, "ptr<{inner}>")?;
+                write!(f, "ptr'{inner}")?;
+            }
+            TypeKind::Deref(inner) => {
+                write!(f, "deref'{inner}")?;
             }
             TypeKind::Void => {
                 write!(f, "void")?;

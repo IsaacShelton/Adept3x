@@ -1,11 +1,17 @@
 use crate::{
     BuiltinTypes, ExecutionCtx, OnPolymorph, are_types_equal,
-    conform::{Conform, UnaryCast, does_integer_literal_fit, does_integer_literal_fit_in_c},
+    conform::{
+        Conform, UnaryCast, does_bit_integer_fit_in_c, does_integer_literal_fit,
+        does_integer_literal_fit_in_c,
+    },
     repr::{TypeKind, UnaliasedType},
+    target_layout::TargetLayout,
 };
+use data_units::implies;
 use derive_more::IsVariant;
+use num_traits::ToPrimitive;
 use ordered_float::NotNan;
-use primitives::CIntegerAssumptions;
+use primitives::{CIntegerAssumptions, IntegerBits};
 use source_files::Source;
 use target::Target;
 
@@ -26,21 +32,23 @@ pub fn conform_to<'env>(
     target: &Target,
     _mode: ConformMode,
     on_polymorph: impl OnPolymorph<'env>,
-    source: Source,
+    _source: Source,
 ) -> Option<Conform<'env>> {
-    let (from_ty, needs_dereference) = match &original_from_ty.0.kind {
-        TypeKind::Deref(inner_type, _) => (UnaliasedType(inner_type), true),
-        _ => (original_from_ty, false),
-    };
+    let mut from_ty = original_from_ty;
+    let mut dereferences = 0;
+
+    while !to_ty.0.kind.is_deref() {
+        match &from_ty.0.kind {
+            TypeKind::Deref(inner_type) => {
+                from_ty = UnaliasedType(inner_type);
+                dereferences += 1;
+            }
+            _ => break,
+        }
+    }
 
     if are_types_equal(from_ty, to_ty, on_polymorph) {
-        let inner_conform = Conform::identity(to_ty);
-
-        return Some(if needs_dereference {
-            inner_conform.after_dereference(ctx)
-        } else {
-            inner_conform
-        });
+        return Some(Conform::identity(to_ty).after_dereferences(ctx, dereferences));
     }
 
     let inner_conform = match &from_ty.0.kind {
@@ -65,31 +73,82 @@ pub fn conform_to<'env>(
                 }
             }
             TypeKind::BitInteger(to_bits, to_sign) => {
-                does_integer_literal_fit(from, *to_bits, *to_sign).then(|| {
-                    Conform::new(
-                        UnaliasedType(
-                            ctx.alloc(TypeKind::BitInteger(*to_bits, *to_sign).at(source)),
-                        ),
-                        UnaryCast::SpecializeInteger(from).into(),
-                    )
-                })
+                does_integer_literal_fit(from, *to_bits, *to_sign)
+                    .then(|| Conform::new(to_ty, UnaryCast::SpecializeInteger(from).into()))
             }
             TypeKind::CInteger(to_c_integer, to_sign) => {
                 does_integer_literal_fit_in_c(from, *to_c_integer, *to_sign, assumptions, target)
+                    .then(|| Conform::new(to_ty, UnaryCast::SpecializeInteger(from)))
+            }
+            TypeKind::SizeInteger(sign) => {
+                let bits = IntegerBits::new(target.size_layout().width.to_bits())
+                    .expect("size type to be representable with common bit integers");
+
+                does_integer_literal_fit(from, bits, *sign)
+                    .then(|| Conform::new(to_ty, UnaryCast::SpecializeInteger(from)))
+            }
+            TypeKind::Floating(_) =>
+            /* NOTE: to_f64 should be infallible despite signature, as overridden by BigInt */
+            {
+                from.to_f64().and_then(|from| {
+                    Some(Conform::new(
+                        to_ty,
+                        UnaryCast::SpecializeFloat(NotNan::new(from).ok()),
+                    ))
+                })
+            }
+            _ => None,
+        },
+        TypeKind::BitInteger(from_bits, from_sign) => match &to_ty.0.kind {
+            TypeKind::BitInteger(to_bits, to_sign) => (from_bits <= to_bits
+                && implies!(from_sign.is_signed(), to_sign.is_signed()))
+            .then(|| {
+                Conform::new(
+                    to_ty,
+                    if from_sign.is_signed() {
+                        UnaryCast::SignExtend
+                    } else {
+                        UnaryCast::ZeroExtend
+                    },
+                )
+            }),
+            TypeKind::CInteger(to_c_integer, to_sign) => does_bit_integer_fit_in_c(
+                *from_bits,
+                *from_sign,
+                *to_c_integer,
+                *to_sign,
+                assumptions,
+                target,
+            )
+            .then(|| {
+                Conform::new(
+                    to_ty,
+                    if from_sign.is_signed() {
+                        UnaryCast::SignExtend
+                    } else {
+                        UnaryCast::ZeroExtend
+                    },
+                )
+            }),
+            TypeKind::SizeInteger(to_sign) => {
+                let to_bits = IntegerBits::new(target.size_layout().width.to_bits())
+                    .expect("size type to be representable with common bit integers");
+
+                (*from_bits <= to_bits && implies!(from_sign.is_signed(), to_sign.is_signed()))
                     .then(|| {
                         Conform::new(
-                            UnaliasedType(
-                                ctx.alloc(TypeKind::CInteger(*to_c_integer, *to_sign).at(source)),
-                            ),
-                            UnaryCast::SpecializeInteger(from),
+                            to_ty,
+                            if from_sign.is_signed() {
+                                UnaryCast::SignExtend
+                            } else {
+                                UnaryCast::ZeroExtend
+                            },
                         )
                     })
             }
-            TypeKind::SizeInteger(integer_sign) => todo!(),
             TypeKind::Floating(float_size) => todo!(),
             _ => None,
         },
-        TypeKind::BitInteger(from_bits, from_sign) => todo!(),
         TypeKind::FloatLiteral(from) => todo!(),
         TypeKind::Floating(from_size) => todo!(),
         TypeKind::Ptr(_) => None,
@@ -98,11 +157,7 @@ pub fn conform_to<'env>(
         _ => None,
     }?;
 
-    if needs_dereference {
-        Some(inner_conform.after_dereference(ctx))
-    } else {
-        Some(inner_conform)
-    }
+    Some(inner_conform.after_dereferences(ctx, dereferences))
 }
 
 /*

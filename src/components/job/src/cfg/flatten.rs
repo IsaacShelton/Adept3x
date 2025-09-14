@@ -106,15 +106,7 @@ fn flatten_stmt<'env>(
             )
         }
         ast::StmtKind::Assignment(assignment) => {
-            let left = flatten_expr(
-                ctx,
-                builder,
-                cursor,
-                &assignment.value,
-                IsValue::RequireValue,
-            );
-
-            let right = flatten_expr(
+            let dest = flatten_expr(
                 ctx,
                 builder,
                 cursor,
@@ -122,7 +114,23 @@ fn flatten_stmt<'env>(
                 IsValue::RequireValue,
             );
 
-            builder.push(cursor, InstrKind::Assign(left, right).at(stmt.source));
+            let src = flatten_expr(
+                ctx,
+                builder,
+                cursor,
+                &assignment.value,
+                IsValue::RequireValue,
+            );
+
+            builder.push(
+                cursor,
+                InstrKind::Assign {
+                    dest,
+                    src,
+                    src_cast: None,
+                }
+                .at(stmt.source),
+            );
             None
         }
         ast::StmtKind::Label(name) => {

@@ -14,6 +14,15 @@ pub enum UnaryCast<'env> {
         after_deref: UnaliasedType<'env>,
         then: Option<&'env UnaryCast<'env>>,
     },
+    ZeroExtend,
+    SignExtend,
+    Truncate,
+}
+
+impl<'env> UnaryCast<'env> {
+    pub fn is_dereference(&self) -> bool {
+        matches!(self, Self::Dereference { .. })
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

@@ -58,6 +58,9 @@ impl<'a> ResolveTypeCtx<'a> {
                 let inner = self.resolve_or_undeclared(inner, options)?;
                 Ok(asg::TypeKind::Ptr(Box::new(inner)))
             }
+            ast::TypeKind::Deref(_) => {
+                unimplemented!("deref'T is not supported for old compilation system")
+            }
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
             ast::TypeKind::Never => Ok(asg::TypeKind::Never),
             ast::TypeKind::Named(name, arguments) => {

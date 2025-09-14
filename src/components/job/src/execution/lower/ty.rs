@@ -104,7 +104,7 @@ impl<'env> Executable<'env> for LowerType<'env> {
                 ir::Type::I(IntegerBits::Bits64, *sign)
             }
             TypeKind::Floating(size) => ir::Type::F(*size),
-            TypeKind::Ptr(inner) | TypeKind::Deref(inner, _) => {
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner) => {
                 let Some(lowered_inner) = executor.demand(self.inner_type) else {
                     return suspend!(
                         self.inner_type,

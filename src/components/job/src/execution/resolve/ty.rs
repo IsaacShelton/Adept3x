@@ -1,7 +1,7 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
     module_graph::ModuleView,
-    repr::{Type, TypeKind, UnaliasedType},
+    repr::{Mutability, Type, TypeKind, UnaliasedType},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -66,13 +66,24 @@ impl<'env> Executable<'env> for ResolveType<'env> {
 
                 TypeKind::Ptr(inner.0)
             }
+            ast::TypeKind::Deref(inner) => {
+                let Some(inner) = executor.demand(self.inner_type) else {
+                    return suspend!(
+                        self.inner_type,
+                        executor.request(ResolveType::new(self.view, inner)),
+                        ctx
+                    );
+                };
+
+                TypeKind::Deref(inner.0)
+            }
             ast::TypeKind::FixedArray(_) => {
                 unimplemented!("we don't resolve fixed array types yet")
             }
             ast::TypeKind::Void => TypeKind::Void,
             ast::TypeKind::Never => TypeKind::Never,
             ast::TypeKind::Named(_name, _type_args) => {
-                todo!("named")
+                todo!("resolve named type")
 
                 // NOTE: We will also need to unalias here,
                 // although perhaps we have a separate option
