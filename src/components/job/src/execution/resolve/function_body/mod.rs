@@ -165,8 +165,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             cfg.get_typed(*value),
                             self.resolved_head.return_type,
                             c_integer_assumptions,
-                            self.view.target(),
                             builtin_types,
+                            self.view.target(),
                             ConformMode::Normal,
                             |_, _| todo!("handle polymorphs"),
                             instr.source,
@@ -356,34 +356,36 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     };
 
                     // 3] Conform the variable's initial value to its default concrete type
-                    let conformed = conform_to_default(
+                    let Some(conformed) = conform_to(
                         ctx,
                         cfg.get_typed(*value),
+                        resolved_type,
                         c_integer_assumptions,
                         builtin_types,
                         self.view.target(),
-                    )?;
-
-                    // 4] Ensure the value type matches the variable type
-                    if !are_types_equal(conformed.ty, resolved_type, |_, _| todo!("on polymorph")) {
+                        ConformMode::Normal,
+                        |_, _| todo!("handle polymorphs"),
+                        instr.source,
+                    ) else {
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types '{}' and '{}'",
-                                conformed.ty, resolved_type
+                                cfg.get_typed(*value),
+                                resolved_type
                             ),
                             instr.source,
                         )
                         .into());
-                    }
+                    };
 
-                    // 5] Assign the variable the resolved type, and
+                    // 4] Assign the variable the resolved type, and
                     //    track the final type along with any necessary casts.
                     let variable_ref = variables.push(Variable { ty: resolved_type });
                     cfg.set_variable_ref(instr_ref, variable_ref);
                     cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
 
-                    // 6] Reset the "suspend on type" for the next time we need it
+                    // 5] Reset the "suspend on type" for the next time we need it
                     self.resolved_type = None;
                 }
                 InstrKind::Assign(instr_ref, instr_ref1) => todo!("assign"),
@@ -479,8 +481,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 got_type,
                                 expected_type,
                                 c_integer_assumptions,
-                                self.view.target(),
                                 builtin_types,
+                                self.view.target(),
                                 ConformMode::ParameterPassing,
                                 |_, _| todo!("handle polymorphs"),
                                 instr.source,

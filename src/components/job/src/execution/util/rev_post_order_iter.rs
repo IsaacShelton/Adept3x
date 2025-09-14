@@ -15,11 +15,12 @@ impl RevPostOrderIterWithEnds {
             };
         }
 
-        let bb_id = post_order[post_order.len() - 1];
+        let post_order_index = post_order.len() - 1;
+        let bb_id = post_order[post_order_index];
 
         return Self {
             current: Some(InstrRef::new(bb_id, 0)),
-            post_order_index: 0,
+            post_order_index: post_order_index as u32,
         };
     }
 
@@ -41,14 +42,11 @@ impl RevPostOrderIterWithEnds {
             return self.current;
         }
 
-        while self.post_order_index > 0 {
+        if self.post_order_index > 0 {
             self.post_order_index -= 1;
             let bb_id = post_order[self.post_order_index as usize];
-
-            if cfg.get_unsafe(bb_id).inner_len() != 0 {
-                self.current = Some(InstrRef::new(bb_id, 0));
-                return self.current;
-            }
+            self.current = Some(InstrRef::new(bb_id, 0));
+            return self.current;
         }
 
         self.current = None;
@@ -65,14 +63,11 @@ impl RevPostOrderIterWithEnds {
             return self.current;
         }
 
-        while self.post_order_index > 0 {
+        if self.post_order_index > 0 {
             self.post_order_index -= 1;
             let bb_id = post_order[self.post_order_index as usize];
-
-            if cfg.get_unsafe(bb_id).instrs.len() != 0 {
-                self.current = Some(InstrRef::new(bb_id, 0));
-                return self.current;
-            }
+            self.current = Some(InstrRef::new(bb_id, 0));
+            return self.current;
         }
 
         self.current = None;

@@ -370,7 +370,13 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     basic_block_id1,
                     break_continue,
                 ) => todo!(),
-                EndInstrKind::NewScope(basic_block_id, basic_block_id1) => todo!(),
+                EndInstrKind::NewScope(in_scope, _close_scope) => {
+                    builder.push(ir::Instr::Break(ir::Break {
+                        basicblock_id: in_scope.into_usize(),
+                    }));
+
+                    ir::Literal::Void.into()
+                }
                 EndInstrKind::Unreachable => todo!(),
             };
 
