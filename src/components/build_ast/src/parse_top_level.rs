@@ -127,11 +127,14 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 namespace_items.funcs.push(self.parse_func(annotations)?);
             }
             TokenKind::Identifier(_) => {
-                namespace_items
-                    .globals
-                    .push(self.parse_global(annotations)?);
+                if self.input.peek_nth(1).is_open_paren() {
+                    namespace_items.pragmas.push(self.parse_expr_primary()?);
+                } else {
+                    namespace_items
+                        .globals
+                        .push(self.parse_global(annotations)?);
+                }
             }
-
             TokenKind::StructKeyword => namespace_items
                 .structs
                 .push(self.parse_structure(annotations)?),

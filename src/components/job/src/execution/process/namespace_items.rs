@@ -1,5 +1,5 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor,
+    Continuation, Executable, ExecutionCtx, Executor, ProcessPragma,
     execution::process::{ProcessFunction, ProcessNamespace, ProcessWhen},
     module_graph::ModuleView,
     repr::Compiler,
@@ -55,6 +55,10 @@ impl<'env> Executable<'env> for ProcessNamespaceItems<'env> {
 
         ctx.suspend_on(namespace_items.namespaces.iter().map(|namespace| {
             executor.spawn_raw(ProcessNamespace::new(self.view, &self.compiler, namespace))
+        }));
+
+        ctx.suspend_on(namespace_items.pragmas.iter().map(|pragma| {
+            executor.spawn_raw(ProcessPragma::new(self.view, &self.compiler, pragma))
         }));
 
         ctx.suspend_on(

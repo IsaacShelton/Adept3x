@@ -531,9 +531,9 @@ fn perform_unary_cast_to<'env>(
                     pointee: after_deref,
                 })
             }
-            UnaryCast::Extend(sign) => {
+            UnaryCast::Extend(from_sign) => {
                 assert!(to_ty.is_i());
-                builder.push(ir::Instr::Extend(value, sign, *to_ty))
+                builder.push(ir::Instr::Extend(value, from_sign, *to_ty))
             }
             UnaryCast::Truncate => {
                 assert!(to_ty.is_i());

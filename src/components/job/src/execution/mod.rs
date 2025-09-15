@@ -81,6 +81,7 @@ pub enum Execution<'env> {
     ProcessNamespaceItems(ProcessNamespaceItems<'env>),
     ProcessNamespace(ProcessNamespace<'env>),
     ProcessWhen(ProcessWhen<'env>),
+    ProcessPragma(ProcessPragma<'env>),
 
     // Resolution
     ResolveType(ResolveType<'env>),
@@ -119,6 +120,7 @@ pub enum Request<'env> {
     ProcessNamespaceItems(ProcessNamespaceItems<'env>),
     ProcessNamespace(ProcessNamespace<'env>),
     ProcessWhen(ProcessWhen<'env>),
+    ProcessPragma(ProcessPragma<'env>),
 
     // Resolution
     ResolveType(ResolveType<'env>),

@@ -437,11 +437,11 @@ pub unsafe fn create_function_block<'env>(
                 let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
                 Some(builder.bitcast(value, backend_type))
             }
-            Instr::Extend(value, sign, ir_type) => {
+            Instr::Extend(value, from_sign, ir_type) => {
                 let value = build_value(ctx, value_catalog, builder, value)?;
                 let backend_type = to_backend_type(ctx.for_making_type(), ir_type)?;
 
-                Some(match sign {
+                Some(match from_sign {
                     IntegerSign::Signed => {
                         LLVMBuildSExt(builder.get(), value, backend_type, c"".as_ptr())
                     }

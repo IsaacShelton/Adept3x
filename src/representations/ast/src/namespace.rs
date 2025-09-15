@@ -15,6 +15,7 @@ pub struct NamespaceItems {
     pub impls: Vec<Impl>,
     pub namespaces: Vec<Namespace>,
     pub whens: Vec<When>,
+    pub pragmas: Vec<Expr>,
 }
 
 #[derive(Clone, Debug)]
