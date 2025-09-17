@@ -76,7 +76,6 @@ where
                         ['<', '=', ..] => (TokenKind::LeftShiftAssign, 2),
                         ['<', ..] => (TokenKind::LeftShift, 1),
                         ['=', ..] => (TokenKind::LessThanEq, 1),
-
                         [':', ..] => {
                             return FeedResult::Has(
                                 TokenKind::Error(
@@ -93,6 +92,11 @@ where
                 }
 
                 return Has(token_kind.at(source));
+            }
+
+            // Special case for ' :: ' operator
+            if let Ok(source) = self.characters.eat_remember(":: ") {
+                return Has(TokenKind::BindNamespace.at(source));
             }
         }
 
