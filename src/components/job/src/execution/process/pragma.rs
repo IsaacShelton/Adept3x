@@ -6,7 +6,6 @@ use crate::{
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
-use source_files::Source;
 use std::path::Path;
 
 #[derive(Clone, Derivative)]
@@ -27,11 +26,6 @@ pub struct ProcessPragma<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    expr_source: Source,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
     spawned_children: bool,
 }
 
@@ -46,7 +40,6 @@ impl<'env> ProcessPragma<'env> {
             compiler: ByAddress(compiler),
             pragma: ByAddress(pragma),
             load_target: None,
-            expr_source: pragma.expr.source,
             spawned_children: false,
         }
     }
@@ -67,7 +60,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
         let Some(load_target) = fake_run_namespace_expr(&self.pragma.expr) else {
             return Err(ErrorDiagnostic::new(
                 "Expression must evaluate to a target to import or add",
-                self.expr_source,
+                self.pragma.expr.source,
             )
             .into());
         };
@@ -80,7 +73,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                 .parent()
                 .expect("file is in folder")
                 .join(Path::new(&load_target.relative_filename)),
-            Some(self.expr_source),
+            Some(self.pragma.expr.source),
             self.view.graph,
         )?);
 
@@ -104,7 +97,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                     &self.compiler,
                     new_filename,
                     ctx.alloc(created),
-                    Some(self.expr_source),
+                    Some(self.pragma.expr.source),
                 ))
                 .raw_task_ref(),
         ));
