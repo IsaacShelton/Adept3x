@@ -7,12 +7,15 @@ use crate::{
 };
 use by_address::ByAddress;
 use derivative::Derivative;
-use std::sync::OnceLock;
+use std::{
+    hash::{DefaultHasher, Hasher},
+    sync::OnceLock,
+};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerFunctionHead<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -27,7 +30,7 @@ pub struct LowerFunctionHead<'env> {
 
 impl<'env> LowerFunctionHead<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         head: &'env FuncHead<'env>,
     ) -> Self {

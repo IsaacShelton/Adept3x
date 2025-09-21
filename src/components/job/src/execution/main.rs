@@ -106,7 +106,7 @@ impl<'env> Executable<'env> for Main<'env> {
                 executor.spawn(ProcessFile::new(
                     compiler,
                     single_file.into(),
-                    runtime,
+                    ctx.alloc(runtime),
                     None
                 )),
                 ctx

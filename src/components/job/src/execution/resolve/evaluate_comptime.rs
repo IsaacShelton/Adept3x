@@ -11,7 +11,7 @@ use diagnostics::ErrorDiagnostic;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct EvaluateComptime<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -26,7 +26,7 @@ pub struct EvaluateComptime<'env> {
 
 impl<'env> EvaluateComptime<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         expr: &'env ast::Expr,
     ) -> Self {
@@ -58,6 +58,10 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             }
         }
 
+        eprintln!(
+            "warning: EvaluateComptime is not fully implemented yet, and will not wait for children"
+        );
+
         let comptime_graph = self
             .view
             .graph
@@ -76,7 +80,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             let _ = executor.spawn_raw(ProcessFile::new(
                 &self.compiler,
                 created.canonical_module_filename,
-                created,
+                ctx.alloc(created),
                 None,
             ));
         }
@@ -88,7 +92,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             let _ = executor.spawn_raw(ProcessFile::new(
                 &self.compiler,
                 created.canonical_filename,
-                created,
+                ctx.alloc(created),
                 None,
             ));
         }

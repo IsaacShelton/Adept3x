@@ -11,7 +11,7 @@ use derivative::Derivative;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessNamespaceItems<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -21,7 +21,7 @@ pub struct ProcessNamespaceItems<'env> {
 
 impl<'env> ProcessNamespaceItems<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         namespace_items: &'env NamespaceItems,
     ) -> Self {
@@ -50,20 +50,22 @@ impl<'env> Executable<'env> for ProcessNamespaceItems<'env> {
             namespace_items
                 .whens
                 .iter()
-                .map(|when| executor.spawn_raw(ProcessWhen::new(self.view, &self.compiler, when))),
+                .map(|when| executor.request(ProcessWhen::new(self.view, &self.compiler, when))),
         );
 
         ctx.suspend_on(namespace_items.namespaces.iter().map(|namespace| {
-            executor.spawn_raw(ProcessNamespace::new(self.view, &self.compiler, namespace))
-        }));
-
-        ctx.suspend_on(namespace_items.pragmas.iter().map(|pragma| {
-            executor.spawn_raw(ProcessPragma::new(self.view, &self.compiler, pragma))
+            executor.request(ProcessNamespace::new(self.view, &self.compiler, namespace))
         }));
 
         ctx.suspend_on(
+            namespace_items.pragmas.iter().map(|pragma| {
+                executor.request(ProcessPragma::new(self.view, &self.compiler, pragma))
+            }),
+        );
+
+        ctx.suspend_on(
             namespace_items.funcs.iter().map(|func| {
-                executor.spawn_raw(ProcessFunction::new(self.view, &self.compiler, func))
+                executor.request(ProcessFunction::new(self.view, &self.compiler, func))
             }),
         );
 

@@ -26,7 +26,7 @@ use target::Target;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerFunctionBody<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -58,7 +58,7 @@ pub struct LowerFunctionBody<'env> {
 
 impl<'env> LowerFunctionBody<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         func: ir::FuncRef<'env>,
         head: &'env FuncHead<'env>,
@@ -261,7 +261,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             return suspend!(
                                 self.suspend_on_func,
                                 executor.request(LowerFunctionHead::new(
-                                    self.view,
+                                    target.view,
                                     &self.compiler,
                                     target.callee,
                                 )),

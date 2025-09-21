@@ -24,7 +24,7 @@ use primitives::{CInteger, CIntegerAssumptions};
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ResolveFunctionBody<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
     func: ByAddress<&'env ast::Func>,
     resolved_head: ByAddress<&'env FuncHead<'env>>,
 
@@ -64,7 +64,7 @@ pub struct ResolveFunctionBody<'env> {
 
 impl<'env> ResolveFunctionBody<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         func: &'env ast::Func,
         resolved_head: &'env FuncHead<'env>,
@@ -574,7 +574,13 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         call.args.len() - func_head.params.required.len()
                     );
 
-                    cfg.set_typed_and_callee(instr_ref, func_head, arg_casts, variadic_arg_types);
+                    cfg.set_typed_and_callee(
+                        instr_ref,
+                        func_head,
+                        arg_casts,
+                        variadic_arg_types,
+                        func_head.view,
+                    );
                 }
                 InstrKind::DeclareAssign(_, value, _, _) => {
                     // 1] Conform the value to its default concrete type

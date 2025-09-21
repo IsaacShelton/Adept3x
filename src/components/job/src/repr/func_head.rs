@@ -1,5 +1,8 @@
 use super::{Params, TypeParams};
-use crate::repr::{UnaliasedType, UnaliasedUserDefinedType};
+use crate::{
+    module_graph::ModuleView,
+    repr::{UnaliasedType, UnaliasedUserDefinedType},
+};
 use attributes::{SymbolOwnership, Tag};
 use derive_more::IsVariant;
 use indexmap::IndexMap;
@@ -14,6 +17,7 @@ pub struct FuncHead<'env> {
     pub impl_params: ImplParams<'env>,
     pub source: Source,
     pub metadata: FuncMetadata,
+    pub view: &'env ModuleView<'env>,
 }
 
 #[derive(Clone, Debug)]

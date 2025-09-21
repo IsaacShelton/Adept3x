@@ -14,7 +14,7 @@ use derivative::Derivative;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessFunction<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -54,7 +54,7 @@ pub struct ProcessFunction<'env> {
 
 impl<'env> ProcessFunction<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         func: &'env ast::Func,
     ) -> Self {

@@ -9,7 +9,7 @@ use derivative::Derivative;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessWhen<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -31,7 +31,11 @@ pub struct ProcessWhen<'env> {
 }
 
 impl<'env> ProcessWhen<'env> {
-    pub fn new(view: ModuleView<'env>, compiler: &'env Compiler<'env>, when: &'env When) -> Self {
+    pub fn new(
+        view: &'env ModuleView<'env>,
+        compiler: &'env Compiler<'env>,
+        when: &'env When,
+    ) -> Self {
         Self {
             view,
             compiler: ByAddress(compiler),

@@ -1,6 +1,7 @@
 use crate::{
     BasicBlockId, InstrRef,
     conform::UnaryCast,
+    module_graph::ModuleView,
     repr::{FuncHead, UnaliasedType, VariableRef},
 };
 use ast::{ConformBehavior, FillBehavior, Integer, Language, SizeOfMode, UnaryOperator};
@@ -335,6 +336,7 @@ pub struct CallTarget<'env> {
     pub callee: &'env FuncHead<'env>,
     pub arg_casts: &'env [Option<UnaryCast<'env>>],
     pub variadic_arg_types: &'env [UnaliasedType<'env>],
+    pub view: &'env ModuleView<'env>,
 }
 
 #[derive(Debug)]

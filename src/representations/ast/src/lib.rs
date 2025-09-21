@@ -16,6 +16,7 @@ mod structs;
 mod traits;
 mod type_alias;
 mod type_params;
+mod use_namespace;
 mod when;
 
 pub use block::*;
@@ -38,5 +39,5 @@ pub use token::Name;
 pub use traits::*;
 pub use type_alias::*;
 pub use type_params::*;
+pub use use_namespace::*;
 pub use when::*;
-

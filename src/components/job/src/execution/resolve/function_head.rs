@@ -14,7 +14,7 @@ use derivative::Derivative;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ResolveFunctionHead<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -29,7 +29,7 @@ pub struct ResolveFunctionHead<'env> {
 
 impl<'env> ResolveFunctionHead<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         head: &'env ast::FuncHead,
     ) -> Self {
@@ -126,6 +126,7 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
                 ownership,
                 tag: self.head.tag,
             },
+            view: self.view,
         });
 
         self.view.add_symbol(

@@ -17,7 +17,9 @@ use target::Target;
 #[derive(Copy, Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ModuleView<'env> {
+    #[derivative(Debug = "ignore")]
     pub web: ByAddress<&'env ModuleGraphWeb<'env>>,
+
     pub graph: ModuleGraphRef,
     pub handle: ModulePartHandle<'env>,
 

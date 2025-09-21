@@ -6,22 +6,38 @@ use crate::{
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
+use source_files::Source;
 use std::path::Path;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessPragma<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
 
     expr: Option<ByAddress<&'env ast::Expr>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    load_target: Option<LoadTarget>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    expr_source: Source,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    spawned_children: bool,
 }
 
 impl<'env> ProcessPragma<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         expr: &'env ast::Expr,
     ) -> Self {
@@ -29,6 +45,9 @@ impl<'env> ProcessPragma<'env> {
             view,
             compiler: ByAddress(compiler),
             expr: Some(ByAddress(expr)),
+            load_target: None,
+            expr_source: expr.source,
+            spawned_children: false,
         }
     }
 }
@@ -41,14 +60,18 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let Some(expr) = self.expr.take() else {
+        if self.spawned_children {
             return Ok(());
-        };
+        }
 
-        let Some(load_target) = fake_run_namespace_expr(&expr) else {
+        if let Some(expr) = self.expr.take() {
+            self.load_target = fake_run_namespace_expr(&expr);
+        }
+
+        let Some(load_target) = self.load_target.as_ref() else {
             return Err(ErrorDiagnostic::new(
                 "Expression must evaluate to a target to import or add",
-                expr.source,
+                self.expr_source,
             )
             .into());
         };
@@ -61,13 +84,15 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                 .parent()
                 .expect("file is in folder")
                 .join(Path::new(&load_target.relative_filename)),
-            Some(expr.source),
+            Some(self.expr_source),
             self.view.graph,
         )?);
 
         let new_view = self
             .view
             .break_off(load_target.mode, new_filename, &self.compiler);
+
+        self.spawned_children = true;
 
         let Upserted::Created(created) = new_view else {
             return Ok(());
@@ -78,8 +103,8 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                 .request(ProcessFile::new(
                     &self.compiler,
                     new_filename,
-                    created,
-                    Some(expr.source),
+                    ctx.alloc(created),
+                    Some(self.expr_source),
                 ))
                 .raw_task_ref(),
         ));

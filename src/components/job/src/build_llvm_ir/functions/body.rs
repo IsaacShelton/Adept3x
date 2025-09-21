@@ -42,10 +42,12 @@ pub unsafe fn create_function_bodies<'env>(
             continue;
         }
 
-        let ir_function_basicblocks = *ir_function
-            .basicblocks
-            .get()
-            .expect("owned function to have implementation");
+        let Some(ir_function_basicblocks) = ir_function.basicblocks.get().copied() else {
+            return Err(ErrorDiagnostic::plain(format!(
+                "Internal Error: Expected owned IR function {:?} '{}' to have implementation",
+                *ir_func_ref, ir_function.mangled_name
+            )));
+        };
 
         let mut builder = Builder::new();
         let mut value_catalog = ValueCatalog::new(ir_function_basicblocks.len());

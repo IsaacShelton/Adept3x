@@ -3,7 +3,7 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
 };
-use ast::{NamespaceItems, When};
+use ast::{NamespaceItems, UseNamespace, When};
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
@@ -126,9 +126,34 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             TokenKind::FuncKeyword => {
                 namespace_items.funcs.push(self.parse_func(annotations)?);
             }
+            TokenKind::Multiply => {
+                self.input.eat(TokenKind::Multiply);
+
+                if !self.input.eat(TokenKind::BindNamespace) {
+                    return Err(
+                        ParseErrorKind::other("Expected ' :: ' after '*' at top level")
+                            .at(self.input.peek().source),
+                    );
+                }
+
+                let expr = self.parse_expr()?;
+
+                namespace_items
+                    .use_namespaces
+                    .push(UseNamespace { name: None, expr });
+            }
             TokenKind::Identifier(_) => {
                 if self.input.peek_nth(1).is_open_paren() {
                     namespace_items.pragmas.push(self.parse_expr_primary()?);
+                } else if self.input.peek_nth(1).is_bind_namespace() {
+                    let name = self.input.eat_identifier().unwrap();
+                    self.input.eat(TokenKind::BindNamespace);
+                    let expr = self.parse_expr()?;
+
+                    namespace_items.use_namespaces.push(UseNamespace {
+                        name: Some(name),
+                        expr,
+                    });
                 } else {
                     namespace_items
                         .globals

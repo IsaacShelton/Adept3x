@@ -16,7 +16,7 @@ use text::{CharacterInfiniteIterator, CharacterPeeker};
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessFile<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
     canonical_filename: &'env Path,
 
     #[derivative(Hash = "ignore")]
@@ -44,7 +44,7 @@ impl<'env> ProcessFile<'env> {
     pub fn new(
         compiler: &'env Compiler,
         canonical_filename: &'env Path,
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         source: Option<Source>,
     ) -> Self {
         Self {

@@ -12,7 +12,7 @@ pub struct ResolveType<'env> {
     ast_type: ByAddress<&'env ast::Type>,
 
     #[derivative(Debug = "ignore")]
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -32,7 +32,7 @@ pub struct ResolveType<'env> {
 }
 
 impl<'env> ResolveType<'env> {
-    pub fn new(view: ModuleView<'env>, ast_type: &'env ast::Type) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, ast_type: &'env ast::Type) -> Self {
         Self {
             ast_type: ByAddress(ast_type),
             view,

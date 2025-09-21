@@ -14,7 +14,7 @@ use target::Target;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerType<'env> {
-    view: ModuleView<'env>,
+    view: &'env ModuleView<'env>,
 
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
@@ -29,7 +29,7 @@ pub struct LowerType<'env> {
 
 impl<'env> LowerType<'env> {
     pub fn new(
-        view: ModuleView<'env>,
+        view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
         ty: &'env Type<'env>,
     ) -> Self {

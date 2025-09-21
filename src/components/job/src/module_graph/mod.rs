@@ -219,7 +219,7 @@ impl<'env> ModulePartHandle<'env> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum ModuleBreakOffMode {
     Module,
     Part,

@@ -3,6 +3,7 @@ use crate::{
     ExecutionCtx,
     cfg::instr::{BreakContinue, CallTarget},
     conform::UnaryCast,
+    module_graph::ModuleView,
     repr::{FuncHead, VariableRef},
 };
 use arena::Idx;
@@ -86,6 +87,7 @@ impl<'env> CfgBuilder<'env> {
         callee: &'env FuncHead<'env>,
         arg_casts: &'env [Option<UnaryCast<'env>>],
         variadic_arg_types: &'env [UnaliasedType<'env>],
+        view: &'env ModuleView<'env>,
     ) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
@@ -97,6 +99,7 @@ impl<'env> CfgBuilder<'env> {
                     callee,
                     arg_casts,
                     variadic_arg_types,
+                    view,
                 });
             }
             _ => panic!("cannot set_typed_and_callee for non-call"),
