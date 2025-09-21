@@ -461,9 +461,9 @@ fn perform_unary_cast_to<'env>(
         use IntegerSign::*;
 
         let cast_failed = |_| {
-            ErrorDiagnostic::new(
-                format!("Internal Error: Failed to perform cast to {:?}", to_ty),
-                source,
+            ErrorDiagnostic::ice(
+                format!("Failed to perform cast to {:?}", to_ty),
+                Some(source),
             )
         };
 

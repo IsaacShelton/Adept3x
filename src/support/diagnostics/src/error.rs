@@ -11,6 +11,14 @@ pub struct ErrorDiagnostic {
 }
 
 impl ErrorDiagnostic {
+    pub fn ice(message: impl ToString, source: Option<Source>) -> Self {
+        Self {
+            message: format!("internal compiler error => {}", message.to_string()),
+            source: source,
+            postfix: None,
+        }
+    }
+
     pub fn new(message: impl ToString, source: Source) -> Self {
         Self {
             message: message.to_string(),

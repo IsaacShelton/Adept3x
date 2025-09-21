@@ -3,7 +3,7 @@ use super::{
     annotation::{Annotation, AnnotationKind},
     error::{ParseError, ParseErrorKind},
 };
-use ast::{NamespaceItems, UseNamespace, When};
+use ast::{NamespaceItems, Pragma, UseBinding, When};
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
@@ -138,20 +138,24 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
                 let expr = self.parse_expr()?;
 
-                namespace_items
-                    .use_namespaces
-                    .push(UseNamespace { name: None, expr });
+                namespace_items.pragmas.push(Pragma {
+                    name: Some(UseBinding::Wildcard),
+                    expr,
+                });
             }
             TokenKind::Identifier(_) => {
                 if self.input.peek_nth(1).is_open_paren() {
-                    namespace_items.pragmas.push(self.parse_expr_primary()?);
+                    namespace_items.pragmas.push(Pragma {
+                        name: None,
+                        expr: self.parse_expr_primary()?,
+                    });
                 } else if self.input.peek_nth(1).is_bind_namespace() {
                     let name = self.input.eat_identifier().unwrap();
                     self.input.eat(TokenKind::BindNamespace);
                     let expr = self.parse_expr()?;
 
-                    namespace_items.use_namespaces.push(UseNamespace {
-                        name: Some(name),
+                    namespace_items.pragmas.push(Pragma {
+                        name: Some(UseBinding::Name(name)),
                         expr,
                     });
                 } else {

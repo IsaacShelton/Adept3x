@@ -7,10 +7,7 @@ use crate::{
 };
 use by_address::ByAddress;
 use derivative::Derivative;
-use std::{
-    hash::{DefaultHasher, Hasher},
-    sync::OnceLock,
-};
+use std::sync::OnceLock;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]

@@ -109,10 +109,7 @@ impl<'env> Worker<'env> {
                     }
                     Err(_) => {
                         top_n_errors.push(
-                            ErrorDiagnostic::new(
-                                format!("Internal Compiler Error! Task paniced during execution!"),
-                                Source::internal(),
-                            ),
+                            ErrorDiagnostic::ice("Task paniced during execution!", None),
                             |a, b| a.cmp_with(b, source_files),
                         );
                         executor.num_cleared.fetch_add(1, Ordering::SeqCst);

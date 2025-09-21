@@ -43,10 +43,13 @@ pub unsafe fn create_function_bodies<'env>(
         }
 
         let Some(ir_function_basicblocks) = ir_function.basicblocks.get().copied() else {
-            return Err(ErrorDiagnostic::plain(format!(
-                "Internal Error: Expected owned IR function {:?} '{}' to have implementation",
-                *ir_func_ref, ir_function.mangled_name
-            )));
+            return Err(ErrorDiagnostic::ice(
+                format!(
+                    "Expected owned IR function {:?} '{}' to have implementation",
+                    *ir_func_ref, ir_function.mangled_name
+                ),
+                None,
+            ));
         };
 
         let mut builder = Builder::new();

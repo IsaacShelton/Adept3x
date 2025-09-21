@@ -11,12 +11,12 @@ mod given;
 mod global_variable;
 mod implementation;
 mod namespace;
+mod pragma;
 mod stmt;
 mod structs;
 mod traits;
 mod type_alias;
 mod type_params;
-mod use_namespace;
 mod when;
 
 pub use block::*;
@@ -32,6 +32,7 @@ pub use given::*;
 pub use global_variable::*;
 pub use implementation::*;
 pub use namespace::*;
+pub use pragma::*;
 #[allow(unused_imports)]
 pub use stmt::*;
 pub use structs::*;
@@ -39,5 +40,4 @@ pub use token::Name;
 pub use traits::*;
 pub use type_alias::*;
 pub use type_params::*;
-pub use use_namespace::*;
 pub use when::*;

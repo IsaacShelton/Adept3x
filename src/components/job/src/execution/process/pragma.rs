@@ -17,7 +17,7 @@ pub struct ProcessPragma<'env> {
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
 
-    expr: Option<ByAddress<&'env ast::Expr>>,
+    pragma: ByAddress<&'env ast::Pragma>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -39,14 +39,14 @@ impl<'env> ProcessPragma<'env> {
     pub fn new(
         view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
-        expr: &'env ast::Expr,
+        pragma: &'env ast::Pragma,
     ) -> Self {
         Self {
             view,
             compiler: ByAddress(compiler),
-            expr: Some(ByAddress(expr)),
+            pragma: ByAddress(pragma),
             load_target: None,
-            expr_source: expr.source,
+            expr_source: pragma.expr.source,
             spawned_children: false,
         }
     }
@@ -64,11 +64,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
             return Ok(());
         }
 
-        if let Some(expr) = self.expr.take() {
-            self.load_target = fake_run_namespace_expr(&expr);
-        }
-
-        let Some(load_target) = self.load_target.as_ref() else {
+        let Some(load_target) = fake_run_namespace_expr(&self.pragma.expr) else {
             return Err(ErrorDiagnostic::new(
                 "Expression must evaluate to a target to import or add",
                 self.expr_source,
@@ -97,6 +93,10 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
         let Upserted::Created(created) = new_view else {
             return Ok(());
         };
+
+        if let Some(_use_binding) = &self.pragma.name {
+            todo!("use binding is not implemented yet!");
+        }
 
         ctx.suspend_on(std::iter::once(
             executor
