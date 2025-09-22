@@ -56,7 +56,7 @@ impl TypeLikeLookupConstraints {
     pub fn is_match<'env>(&self, head: &DeclHead<'env>) -> bool {
         match head {
             DeclHead::FuncLike(..) | DeclHead::ValueLike(..) => false,
-            DeclHead::TypeLike(type_head) => self.arity == type_head.arity,
+            DeclHead::TypeLike(type_head) => self.arity == type_head.arity(),
         }
     }
 }

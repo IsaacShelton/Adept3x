@@ -1,7 +1,7 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ProcessFile, canonicalize_or_error,
     module_graph::{ModuleBreakOffMode, ModuleView, Upserted},
-    repr::Compiler,
+    repr::{Compiler, DeclHead, DeclHeadTypeLike},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -87,8 +87,20 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
             return Ok(());
         };
 
-        if let Some(_use_binding) = &self.pragma.name {
-            todo!("use binding is not implemented yet!");
+        if let Some(use_binding) = &self.pragma.name {
+            match use_binding {
+                ast::UseBinding::Name(name) => {
+                    self.view.add_symbol(
+                        self.pragma.0.privacy,
+                        name,
+                        DeclHead::TypeLike(DeclHeadTypeLike::Namespace(
+                            name,
+                            created.handle.module_ref,
+                        )),
+                    );
+                }
+                ast::UseBinding::Wildcard => todo!("use binding wildcard not implemented yet!"),
+            }
         }
 
         ctx.suspend_on(std::iter::once(

@@ -3,9 +3,9 @@ use crate::{
     SuspendCondition, TaskRef, TaskState, TopN, WaitingCount,
     io::{IoRequest, IoResponse},
 };
-use crossbeam_deque::{Stealer, Worker as WorkerQueue};
+use crossbeam_deque::{Stealer, Worker as LocalQueue};
 use diagnostics::ErrorDiagnostic;
-use source_files::{Source, SourceFiles};
+use source_files::SourceFiles;
 use std::{
     iter::{self},
     mem,
@@ -18,7 +18,7 @@ pub struct WorkerRef(pub usize);
 
 pub struct Worker<'env> {
     pub worker_ref: WorkerRef,
-    pub local_queue: WorkerQueue<TaskRef<'env>>,
+    pub local_queue: LocalQueue<TaskRef<'env>>,
 }
 
 impl<'env> Worker<'env> {
@@ -26,7 +26,7 @@ impl<'env> Worker<'env> {
     pub fn new(worker_ref: WorkerRef) -> Self {
         Worker {
             worker_ref,
-            local_queue: WorkerQueue::new_lifo(),
+            local_queue: LocalQueue::new_lifo(),
         }
     }
 

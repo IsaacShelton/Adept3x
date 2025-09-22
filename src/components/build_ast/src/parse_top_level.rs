@@ -4,6 +4,7 @@ use super::{
     error::{ParseError, ParseErrorKind},
 };
 use ast::{NamespaceItems, Pragma, UseBinding, When};
+use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
 use token::{Token, TokenKind};
 
@@ -115,18 +116,24 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             TokenKind::OpenCurly => {
                 self.parse_top_level_block(namespace_items, annotations)?;
             }
-            TokenKind::PragmaKeyword => {
-                return Err(ParseErrorKind::Other {
-                    message:
-                        "Cannot use 'pragma' keyword here, did you mean to compile as single file?"
-                            .into(),
-                }
-                .at(self.input.peek().source));
-            }
             TokenKind::FuncKeyword => {
                 namespace_items.funcs.push(self.parse_func(annotations)?);
             }
             TokenKind::Multiply => {
+                let mut privacy = Privacy::Protected;
+                for annotation in annotations {
+                    match annotation.kind {
+                        AnnotationKind::Public => privacy = Privacy::Public,
+                        AnnotationKind::Protected => privacy = Privacy::Protected,
+                        AnnotationKind::Private => privacy = Privacy::Private,
+                        _ => {
+                            return Err(
+                                self.unexpected_annotation(&annotation, "for wildcard import")
+                            );
+                        }
+                    }
+                }
+
                 self.input.eat(TokenKind::Multiply);
 
                 if !self.input.eat(TokenKind::BindNamespace) {
@@ -141,6 +148,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 namespace_items.pragmas.push(Pragma {
                     name: Some(UseBinding::Wildcard),
                     expr,
+                    privacy,
                 });
             }
             TokenKind::Identifier(_) => {
@@ -148,8 +156,23 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     namespace_items.pragmas.push(Pragma {
                         name: None,
                         expr: self.parse_expr_primary()?,
+                        privacy: Privacy::Protected,
                     });
                 } else if self.input.peek_nth(1).is_bind_namespace() {
+                    let mut privacy = Privacy::Protected;
+                    for annotation in annotations {
+                        match annotation.kind {
+                            AnnotationKind::Public => privacy = Privacy::Public,
+                            AnnotationKind::Protected => privacy = Privacy::Protected,
+                            AnnotationKind::Private => privacy = Privacy::Private,
+                            _ => {
+                                return Err(
+                                    self.unexpected_annotation(&annotation, "for named import")
+                                );
+                            }
+                        }
+                    }
+
                     let name = self.input.eat_identifier().unwrap();
                     self.input.eat(TokenKind::BindNamespace);
                     let expr = self.parse_expr()?;
@@ -157,6 +180,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     namespace_items.pragmas.push(Pragma {
                         name: Some(UseBinding::Name(name)),
                         expr,
+                        privacy,
                     });
                 } else {
                     namespace_items

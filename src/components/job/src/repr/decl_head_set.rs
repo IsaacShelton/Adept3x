@@ -1,4 +1,5 @@
-use super::{DeclHead, FuncHead, TypeHead, ValueLikeRef};
+use super::{DeclHead, FuncHead, ValueLikeRef};
+use crate::repr::DeclHeadTypeLike;
 use std_ext::SmallVec2;
 
 /// A group of declarations under the same name
@@ -10,11 +11,14 @@ impl<'env> DeclHeadSet<'env> {
         self.0.push(decl_head);
     }
 
-    pub fn type_likes(&self) -> impl Iterator<Item = &'env TypeHead<'env>> {
-        self.0.iter().filter_map(|decl_head| match decl_head {
-            DeclHead::TypeLike(type_head) => Some(*type_head),
-            _ => None,
-        })
+    pub fn type_likes(&self) -> impl Iterator<Item = DeclHeadTypeLike<'env>> {
+        self.0
+            .iter()
+            .copied()
+            .filter_map(|decl_head| match decl_head {
+                DeclHead::TypeLike(type_head) => Some(type_head),
+                _ => None,
+            })
     }
 
     pub fn func_likes(&self) -> impl Iterator<Item = &'env FuncHead<'env>> {
