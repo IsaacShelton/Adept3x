@@ -4,18 +4,18 @@ use crate::{
     initialized::Initialized,
 };
 use asg::{GlobalDecl, TypedExpr};
-use ast::Name;
+use ast::NamePath;
 use source_files::Source;
 
 pub fn resolve_variable_expr(
     ctx: &mut ResolveExprCtx,
-    name: &Name,
+    name_path: &NamePath,
     preferred_type: Option<PreferredType>,
     initialized: Initialized,
     mode: ResolveExprMode,
     source: Source,
 ) -> Result<TypedExpr, ResolveError> {
-    if let Some(variable) = name
+    if let Some(variable) = name_path
         .as_plain_str()
         .and_then(|name| ctx.variable_haystack.find(name))
     {
@@ -33,7 +33,7 @@ pub fn resolve_variable_expr(
         }
     }
 
-    if let Some(basename) = name.as_plain_str() {
+    if let Some(basename) = name_path.as_plain_str() {
         let maybe_global = ctx
             .globals_in_modules
             .get(&ctx.physical_fs_node_id)
@@ -61,12 +61,17 @@ pub fn resolve_variable_expr(
         }
     }
 
-    if !name.namespace.is_empty() {
-        let Name {
+    if name_path.has_namespace() {
+        eprintln!(
+            "warning: namespaced globals/helper-exprs/etc. are not supported during transition to new system"
+        );
+
+        /*
+        let NamePath {
             namespace,
             basename,
             ..
-        } = name;
+        } = name_path;
 
         let modules = ctx
             .settings
@@ -106,7 +111,7 @@ pub fn resolve_variable_expr(
         if let Some(found) = maybe_global {
             if global_var_matches.next().is_some() {
                 return Err(ResolveErrorKind::AmbiguousGlobal {
-                    name: name.to_string(),
+                    name: name_path.to_string(),
                 }
                 .at(source));
             }
@@ -117,17 +122,18 @@ pub fn resolve_variable_expr(
         if let Some(found) = maybe_helper_expr {
             if helper_expr_matches.next().is_some() {
                 return Err(ResolveErrorKind::AmbiguousHelperExpr {
-                    name: name.to_string(),
+                    name: name_path.to_string(),
                 }
                 .at(source));
             }
 
             return resolve_expr(ctx, &found.value, preferred_type, initialized, mode);
         }
+        */
     }
 
     Err(ResolveErrorKind::UndeclaredVariable {
-        name: name.to_string(),
+        name: name_path.to_string(),
     }
     .at(source))
 }

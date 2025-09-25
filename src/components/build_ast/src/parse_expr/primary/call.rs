@@ -1,6 +1,6 @@
 use super::Parser;
 use crate::error::ParseError;
-use ast::{Call, Expr, ExprKind, Name, TypeArg, Using};
+use ast::{Call, Expr, ExprKind, NamePath, TypeArg, Using};
 use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
@@ -8,36 +8,36 @@ use token::{Token, TokenKind};
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_call(
         &mut self,
-        name: Name,
+        name_path: NamePath,
         generics: Vec<TypeArg>,
         source: Source,
     ) -> Result<Expr, ParseError> {
-        self.parse_call_raw_with(name, generics, vec![])
+        self.parse_call_raw_with(name_path, generics, vec![])
             .map(|call| ExprKind::Call(Box::new(call)).at(source))
     }
 
     pub fn parse_call_with(
         &mut self,
-        name: Name,
+        name_path: NamePath,
         generics: Vec<TypeArg>,
         prefix_args: Vec<Expr>,
         source: Source,
     ) -> Result<Expr, ParseError> {
-        self.parse_call_raw_with(name, generics, prefix_args)
+        self.parse_call_raw_with(name_path, generics, prefix_args)
             .map(|call| ExprKind::Call(Box::new(call)).at(source))
     }
 
     pub fn parse_call_raw(
         &mut self,
-        name: Name,
+        name_path: NamePath,
         generics: Vec<TypeArg>,
     ) -> Result<Call, ParseError> {
-        self.parse_call_raw_with(name, generics, vec![])
+        self.parse_call_raw_with(name_path, generics, vec![])
     }
 
     pub fn parse_call_raw_with(
         &mut self,
-        name: Name,
+        name_path: NamePath,
         generics: Vec<TypeArg>,
         prefix_args: Vec<Expr>,
     ) -> Result<Call, ParseError> {
@@ -99,7 +99,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         }
 
         Ok(Call {
-            name,
+            name_path,
             args,
             expected_to_return: None,
             generics,

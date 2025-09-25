@@ -47,4 +47,4 @@ impl Expr {
 }
 
 // Make sure ExprKind doesn't accidentally become huge
-const _: () = assert!(std::mem::size_of::<ExprKind>() <= 48);
+const _: () = assert!(std::mem::size_of::<ExprKind>() <= 64);

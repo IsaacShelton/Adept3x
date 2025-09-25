@@ -130,7 +130,7 @@ fn fake_run_namespace_expr(expr: &ast::Expr) -> Option<LoadTarget> {
         return None;
     };
 
-    let mode = match call.name.as_plain_str() {
+    let mode = match call.name_path.as_plain_str() {
         Some("include") => ModuleBreakOffMode::Part,
         Some("import") => ModuleBreakOffMode::Module,
         _ => return None,

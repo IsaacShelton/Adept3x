@@ -7,7 +7,7 @@ use super::{
     type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
 };
 use asg::{Asg, FuncRef, GenericTraitRef, ImplParams, ResolvedName, VariableStorage};
-use ast::{FuncHead, Name};
+use ast::{FuncHead, NamePath};
 use ast_workspace::AstWorkspace;
 use attributes::{Exposure, SymbolOwnership, Tag};
 use compiler::BuildOptions;
@@ -42,9 +42,15 @@ pub fn create_func_heads<'a>(
             let func = &ast_workspace.symbols.all_funcs[func_id];
 
             let name = if func.head.privacy.is_private() {
-                ResolvedName::new(physical_file_id, &Name::plain(&func.head.name))
+                ResolvedName::new(
+                    physical_file_id,
+                    &NamePath::new_plain(func.head.name.clone()),
+                )
             } else {
-                ResolvedName::new(module_folder_id, &Name::plain(&func.head.name))
+                ResolvedName::new(
+                    module_folder_id,
+                    &NamePath::new_plain(func.head.name.clone()),
+                )
             };
 
             let func_ref = create_func_head(

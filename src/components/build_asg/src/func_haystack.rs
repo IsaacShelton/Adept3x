@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{PolyCatalogExt, conform::Perform, unalias};
 use asg::{Callee, PolyCatalog, PolyValue, ResolvedName, TypeKind, TypedExpr};
-use ast::Name;
+use ast::NamePath;
 use fs_tree::FsNodeId;
 use itertools::Itertools;
 use source_files::Source;
@@ -41,18 +41,18 @@ impl FuncHaystack {
     pub fn find(
         &self,
         ctx: &ResolveExprCtx,
-        name: &Name,
+        name_path: &NamePath,
         generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Result<Callee, FindFunctionError> {
-        self.find_local(ctx, name, generics, arguments, source)
-            .or_else(|| self.find_remote(ctx, name, generics, arguments, source))
-            .or_else(|| self.find_imported(ctx, name, generics, arguments, source))
+        self.find_local(ctx, name_path, generics, arguments, source)
+            .or_else(|| self.find_remote(ctx, name_path, generics, arguments, source))
+            .or_else(|| self.find_imported(ctx, name_path, generics, arguments, source))
             .unwrap_or(Err(FindFunctionError::NotDefined))
     }
 
-    pub fn find_near_matches(&self, ctx: &ResolveExprCtx, name: &Name) -> Vec<String> {
+    pub fn find_near_matches(&self, ctx: &ResolveExprCtx, name: &NamePath) -> Vec<String> {
         // TODO: Clean up this function
 
         let isolate_from_module = ctx
@@ -83,6 +83,12 @@ impl FuncHaystack {
             )
             .flatten();
 
+        let remote_matches = std::iter::empty();
+        eprintln!(
+            "warning: remote function matches are not supported during transition to new system"
+        );
+
+        /*
         let remote_matches = (!name.namespace.is_empty())
             .then(|| {
                 ctx.settings
@@ -101,6 +107,7 @@ impl FuncHaystack {
                     .into_iter()
             })
             .flatten();
+        */
 
         local_matches
             .chain(remote_matches)
@@ -210,7 +217,7 @@ impl FuncHaystack {
     fn find_local(
         &self,
         ctx: &ResolveExprCtx,
-        name: &Name,
+        name: &NamePath,
         generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
@@ -255,12 +262,18 @@ impl FuncHaystack {
 
     fn find_remote(
         &self,
-        ctx: &ResolveExprCtx,
-        name: &Name,
-        generics: &[PolyValue],
-        arguments: &[TypedExpr],
-        source: Source,
+        _ctx: &ResolveExprCtx,
+        _name: &NamePath,
+        _generics: &[PolyValue],
+        __arguments: &[TypedExpr],
+        _source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
+        let mut remote_matches = std::iter::empty();
+        eprintln!(
+            "warning: remote function matches are not supported during transition to new system"
+        );
+
+        /*
         let mut remote_matches = (!name.namespace.is_empty())
             .then(|| {
                 ctx.settings
@@ -280,6 +293,7 @@ impl FuncHaystack {
             })
             .flatten()
             .flat_map(|f| Self::fits(ctx, *f, generics, arguments, None, source));
+        */
 
         remote_matches.next().map(|found| {
             if remote_matches.next().is_some() {
@@ -293,12 +307,12 @@ impl FuncHaystack {
     fn find_imported(
         &self,
         ctx: &ResolveExprCtx,
-        name: &Name,
+        name: &NamePath,
         generics: &[PolyValue],
         arguments: &[TypedExpr],
         source: Source,
     ) -> Option<Result<Callee, FindFunctionError>> {
-        if !name.namespace.is_empty() {
+        if name.has_namespace() {
             return None;
         }
 
@@ -336,7 +350,7 @@ impl FuncHaystack {
             .flat_map(|module_fs_node_id| {
                 ctx.public_funcs
                     .get(&module_fs_node_id)
-                    .and_then(|public| public.get(name.basename.as_ref()))
+                    .and_then(|public| public.get(name.basename()))
                     .into_iter()
                     .flatten()
             })

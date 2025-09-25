@@ -3,14 +3,14 @@ use super::{
     InterpreterSyscall, ShortCircuitingBinaryOperation, StaticMemberCall, StaticMemberValue,
     StructLiteral, UnaryOperation, While,
 };
-use crate::{Name, Type};
+use crate::{NamePath, Type};
 use attributes::Privacy;
 use source_files::Source;
 use std::ffi::CString;
 
 #[derive(Clone, Debug)]
 pub enum ExprKind {
-    Variable(Name),
+    Variable(NamePath),
     Boolean(bool),
     Integer(Integer),
     Float(f64),
@@ -23,7 +23,7 @@ pub enum ExprKind {
     DeclareAssign(Box<DeclareAssign>),
     BasicBinaryOperation(Box<BasicBinaryOperation>),
     ShortCircuitingBinaryOperation(Box<ShortCircuitingBinaryOperation>),
-    Member(Box<Expr>, String, Privacy),
+    Member(Box<Expr>, Box<str>, Privacy),
     ArrayAccess(Box<ArrayAccess>),
     StructLiteral(Box<StructLiteral>),
     UnaryOperation(Box<UnaryOperation>),

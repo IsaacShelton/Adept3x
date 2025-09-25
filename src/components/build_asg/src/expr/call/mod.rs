@@ -43,16 +43,16 @@ pub fn resolve_call_expr(
 
     let callee = ctx
         .func_haystack
-        .find(ctx, &call.name, &generics, &args[..], source)
+        .find(ctx, &call.name_path, &generics, &args[..], source)
         .map_err(|reason| {
             ResolveErrorKind::FailedToFindFunction {
                 signature: format!(
                     "{}({})",
-                    call.name,
+                    call.name_path,
                     args.iter().map(|arg| arg.ty.to_string()).join(", ")
                 ),
                 reason,
-                almost_matches: ctx.func_haystack.find_near_matches(ctx, &call.name),
+                almost_matches: ctx.func_haystack.find_near_matches(ctx, &call.name_path),
             }
             .at(source)
         })?;

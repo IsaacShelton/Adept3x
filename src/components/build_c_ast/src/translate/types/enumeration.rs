@@ -2,12 +2,13 @@ use crate::{
     parse::{ParseError, error::ParseErrorKind},
     translate::eval::evaluate_to_const_integer,
 };
-use ast::Name;
+use ast::NamePath;
 use attributes::Privacy;
 use c_ast::Enumeration;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::Zero;
+use smallvec::smallvec;
 
 pub fn make_anonymous_enum(
     ast_file: &mut ast::RawAstFile,
@@ -54,7 +55,9 @@ pub fn make_anonymous_enum(
                     let aka_value =
                         ast::ExprKind::StaticMemberValue(Box::new(ast::StaticMemberValue {
                             subject: ast::TypeKind::Named(
-                                Name::plain(format!("enum<{}>", definition_name)),
+                                NamePath::new(smallvec![
+                                    format!("enum<{}>", definition_name).into()
+                                ]),
                                 vec![],
                             )
                             .at(enumerator.source),
@@ -92,7 +95,7 @@ pub fn make_anonymous_enum(
             }
 
             Ok(ast::TypeKind::Named(
-                Name::plain(format!("enum<{}>", named.name)),
+                NamePath::new(smallvec![format!("enum<{}>", named.name).into()]),
                 vec![],
             ))
         }

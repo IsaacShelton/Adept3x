@@ -77,7 +77,7 @@ impl PragmaSection {
                 let has_adept_first = stmts.first().map_or(false, |stmt| {
                     if let StmtKind::Expr(e) = &stmt.kind {
                         if let ExprKind::Call(c) = &e.kind {
-                            c.name.as_plain_str() == Some("adept")
+                            c.name_path.as_plain_str() == Some("adept")
                         } else {
                             false
                         }

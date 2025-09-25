@@ -2,7 +2,7 @@ use super::{
     Parser,
     error::{ParseError, ParseErrorKind},
 };
-use ast::{Name, Type, TypeArg, TypeKind};
+use ast::{NamePath, Type, TypeArg, TypeKind};
 use infinite_iterator::InfinitePeekable;
 use optional_string::{NoneStr, OptionalString};
 use source_files::Source;
@@ -17,7 +17,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         let source = self.input.peek().source;
         let token = self.input.peek().clone();
 
-        let Ok(name) = self.parse_name(None::<&str>) else {
+        let Ok(name_path) = self.parse_name_path(None::<&str>) else {
             if token.kind.is_polymorph() {
                 return Ok(TypeKind::Polymorph(token.kind.unwrap_polymorph()).at(source));
             }
@@ -31,7 +31,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         };
 
         let generics = self.parse_type_args()?;
-        self.parse_type_from_parts(name, generics, source)
+        self.parse_type_from_parts(name_path, generics, source)
     }
 
     pub fn parse_type_args(&mut self) -> Result<Vec<TypeArg>, ParseError> {
@@ -74,11 +74,11 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
     pub fn parse_type_from_parts(
         &mut self,
-        name: Name,
+        name_path: NamePath,
         generics: Vec<TypeArg>,
         source: Source,
     ) -> Result<Type, ParseError> {
-        let type_kind = match name.as_plain_str() {
+        let type_kind = match name_path.as_plain_str() {
             Some("bool") => Ok(TypeKind::Boolean),
             Some("char") => Ok(TypeKind::char()),
             Some("schar") => Ok(TypeKind::schar()),
@@ -112,7 +112,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     } else {
                         Err(ParseError {
                             kind: ParseErrorKind::ExpectedTypeParameterToBeAType {
-                                name: name.to_string(),
+                                name: name_path.to_string(),
                                 word_for_nth: "first".into(),
                             },
                             source,
@@ -121,7 +121,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 } else {
                     Err(ParseError {
                         kind: ParseErrorKind::IncorrectNumberOfTypeParametersFor {
-                            name: name.to_string(),
+                            name: name_path.to_string(),
                             expected: 1,
                             got: generics.len(),
                         },
@@ -136,7 +136,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     } else {
                         Err(ParseError {
                             kind: ParseErrorKind::ExpectedTypeParameterToBeAType {
-                                name: name.to_string(),
+                                name: name_path.to_string(),
                                 word_for_nth: "first".into(),
                             },
                             source,
@@ -145,7 +145,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 } else {
                     Err(ParseError {
                         kind: ParseErrorKind::IncorrectNumberOfTypeParametersFor {
-                            name: name.to_string(),
+                            name: name_path.to_string(),
                             expected: 1,
                             got: generics.len(),
                         },
@@ -162,7 +162,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 //     count,
                 // })))
             }
-            _ => Ok(TypeKind::Named(name, generics)),
+            _ => Ok(TypeKind::Named(name_path, generics)),
         }?;
 
         Ok(Type::new(type_kind, source))

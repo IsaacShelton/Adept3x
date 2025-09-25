@@ -107,20 +107,23 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 let subject = TypeKind::Polymorph(polymorph).at(source);
                 self.parse_static_member_with_type(subject, source)
             }
-            TokenKind::Identifier(_) | TokenKind::NamespacedIdentifier(_) => {
+            TokenKind::Identifier(_) | TokenKind::OldNamespacedIdentifier(_) => {
                 // TODO: CLEANUP: This should be cleaned up once we have proper
                 // namespaces and generic parsing that applies to all cases
 
-                let name = self.parse_name(None::<&str>).unwrap();
+                let name_path = self.parse_name_path(None::<&str>).unwrap();
                 let generics = self.parse_type_args()?;
 
                 match self.input.peek().kind {
-                    TokenKind::StaticMember => self.parse_static_member(name, generics, source),
+                    TokenKind::StaticMember => {
+                        self.parse_static_member(name_path, generics, source)
+                    }
                     TokenKind::OpenCurly => {
                         let peek = &self.input.peek_nth(1).kind;
 
                         if peek.is_extend() || peek.is_colon() {
-                            let ast_type = self.parse_type_from_parts(name, generics, source)?;
+                            let ast_type =
+                                self.parse_type_from_parts(name_path, generics, source)?;
                             self.parse_struct_literal_with(ast_type)
                         } else {
                             let last_two =
@@ -130,27 +133,27 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                                 [TokenKind::Colon, ..]
                                 | [TokenKind::Identifier(_), TokenKind::Colon, ..] => {
                                     let ast_type =
-                                        self.parse_type_from_parts(name, generics, source)?;
+                                        self.parse_type_from_parts(name_path, generics, source)?;
                                     self.parse_struct_literal_with(ast_type)
                                 }
-                                _ => Ok(Expr::new(ExprKind::Variable(name), source)),
+                                _ => Ok(Expr::new(ExprKind::Variable(name_path), source)),
                             }
                         }
                     }
-                    TokenKind::OpenParen => self.parse_call(name, generics, source),
+                    TokenKind::OpenParen => self.parse_call(name_path, generics, source),
                     TokenKind::DeclareAssign => {
                         if !generics.is_empty() {
                             return Err(ParseErrorKind::GenericsNotSupportedHere.at(source));
                         }
 
-                        self.parse_declare_assign(into_plain_name(name, source)?, source)
+                        self.parse_declare_assign(into_plain_name(name_path, source)?, source)
                     }
                     _ => {
                         if !generics.is_empty() {
                             let mut generics = generics;
                             let mut generics = generics.drain(..);
 
-                            if let Some("sizeof") = name.as_plain_str() {
+                            if let Some("sizeof") = name_path.as_plain_str() {
                                 let Some(first_arg) = generics.next() else {
                                     return Err(ParseErrorKind::Other {
                                         message: "Expected type argument to sizeof macro".into(),
@@ -212,12 +215,12 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                             }
 
                             return Err(ParseError::other(
-                                format!("Macro '{}' does not exist", name.to_string()),
+                                format!("Macro '{}' does not exist", name_path.to_string()),
                                 source,
                             ));
                         }
 
-                        Ok(Expr::new(ExprKind::Variable(name), source))
+                        Ok(Expr::new(ExprKind::Variable(name_path), source))
                     }
                 }
             }

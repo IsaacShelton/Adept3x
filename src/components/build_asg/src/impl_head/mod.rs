@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{error::ResolveErrorKind, type_ctx::ResolveTypeCtx};
 use asg::{Asg, Func, GenericTraitRef, ImplDecl, ImplRef, ResolvedName, TraitFunc, Type};
-use ast::Name;
+use ast::NamePath;
 use ast_workspace::NameScope;
 use attributes::Privacy;
 use compiler::BuildOptions;
@@ -28,7 +28,10 @@ pub fn create_impl_heads(
         let impl_ref = create_impl_head(ctx, asg, module_folder_id, physical_file_id, ast_impl)?;
 
         for (func_i, func) in ast_impl.body.iter().enumerate() {
-            let name = ResolvedName::new(module_folder_id, &Name::plain(&func.head.name));
+            let name = ResolvedName::new(
+                module_folder_id,
+                &NamePath::new_plain(func.head.name.clone()),
+            );
 
             let func_ref = create_func_head(
                 ctx,

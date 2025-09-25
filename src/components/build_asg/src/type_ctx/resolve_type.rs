@@ -63,8 +63,8 @@ impl<'a> ResolveTypeCtx<'a> {
             }
             ast::TypeKind::Void => Ok(asg::TypeKind::Void),
             ast::TypeKind::Never => Ok(asg::TypeKind::Never),
-            ast::TypeKind::Named(name, arguments) => {
-                match self.find(name, arguments, ast_type.source) {
+            ast::TypeKind::Named(name_path, arguments) => {
+                match self.find(name_path, arguments, ast_type.source) {
                     Ok(found) => {
                         if let asg::TypeKind::Structure(_, struct_ref, arguments) = found.borrow() {
                             let structure = &self.asg.structs[*struct_ref];
@@ -73,7 +73,7 @@ impl<'a> ResolveTypeCtx<'a> {
 
                         Ok(found.into_owned())
                     }
-                    Err(err) => Err(err.into_resolve_error(name, ast_type.source)),
+                    Err(err) => Err(err.into_resolve_error(name_path, ast_type.source)),
                 }
             }
             ast::TypeKind::Floating(size) => Ok(asg::TypeKind::Floating(*size)),

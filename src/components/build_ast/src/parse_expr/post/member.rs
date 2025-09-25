@@ -15,7 +15,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         self.input
             .expect(TokenKind::Member, "for member expression")?;
 
-        let member_name = self.parse_name("for member name")?;
+        let member_name = self.parse_name_path("for member name")?;
 
         let generics = self.parse_type_args()?;
 

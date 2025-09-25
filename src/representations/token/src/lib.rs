@@ -59,7 +59,7 @@ pub enum TokenKind {
     Newline,
     Identifier(String),
     Polymorph(String),
-    NamespacedIdentifier(Name),
+    OldNamespacedIdentifier(Name),
     OpenCurly,
     CloseCurly,
     OpenParen,
@@ -161,7 +161,7 @@ impl Display for TokenKind {
             TokenKind::Newline => f.write_str("'newline'"),
             TokenKind::Identifier(name) => write!(f, "(identifier) '{}'", name),
             TokenKind::Polymorph(name) => write!(f, "'${}'", name),
-            TokenKind::NamespacedIdentifier(name) => write!(
+            TokenKind::OldNamespacedIdentifier(name) => write!(
                 f,
                 "(namespaced identifier) '{}{}'",
                 name.namespace, name.basename,
@@ -311,7 +311,7 @@ impl TokenKind {
             | TokenKind::Newline
             | TokenKind::Identifier(_)
             | TokenKind::Polymorph(_)
-            | TokenKind::NamespacedIdentifier(_)
+            | TokenKind::OldNamespacedIdentifier(_)
             | TokenKind::CloseCurly
             | TokenKind::OpenParen
             | TokenKind::CloseParen

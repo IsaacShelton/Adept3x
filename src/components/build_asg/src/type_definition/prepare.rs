@@ -4,7 +4,7 @@ use crate::{
     job::TypeJob,
 };
 use asg::{Asg, EnumRef, HumanName, ResolvedName, StructRef, TraitRef, TypeAliasRef, TypeDecl};
-use ast::Name;
+use ast::NamePath;
 use ast_workspace::AstWorkspace;
 use attributes::Privacy;
 use fs_tree::FsNodeId;
@@ -86,7 +86,10 @@ fn prepare_structure(
     structure: &ast::Struct,
 ) -> Result<StructRef, ResolveError> {
     let struct_ref = asg.structs.alloc(asg::Struct {
-        name: ResolvedName::new(module_fs_node_id, &Name::plain(&structure.name)),
+        name: ResolvedName::new(
+            module_fs_node_id,
+            &NamePath::new_plain(structure.name.clone()),
+        ),
         fields: IndexMap::new(),
         is_packed: structure.is_packed,
         params: structure.params.clone(),
@@ -124,7 +127,10 @@ fn prepare_enum(
     definition: &ast::Enum,
 ) -> Result<EnumRef, ResolveError> {
     let enum_ref = asg.enums.alloc(asg::Enum {
-        name: ResolvedName::new(module_fs_node_id, &Name::plain(&definition.name)),
+        name: ResolvedName::new(
+            module_fs_node_id,
+            &NamePath::new_plain(definition.name.clone()),
+        ),
         ty: asg::TypeKind::Unresolved.at(definition.source),
         source: definition.source,
         members: definition.members.clone(),

@@ -17,12 +17,12 @@ pub fn find_builtin_cast_func(
     args: Vec<TypedExpr>,
     source: Source,
 ) -> Result<Result<TypedExpr, Vec<TypedExpr>>, ResolveError> {
-    if !call.name.namespace.is_empty() || args.len() != 1 || !call.generics.is_empty() {
+    if !call.name_path.has_namespace() || args.len() != 1 || !call.generics.is_empty() {
         // No match
         return Ok(Err(args));
     }
 
-    let name = &call.name.basename;
+    let name = &call.name_path.basename();
 
     let target_type_kind = match name.as_ref() {
         "deref" => match args.into_iter().exactly_one() {

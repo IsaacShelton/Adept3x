@@ -49,6 +49,8 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         Ok(())
     }
 
+    /// NOTE: This is different from type arguments.
+    /// Type parameters are like: `<$T, $E, $F>` in `func my_function<$T, $E, $F>() { ... }`
     pub fn parse_type_params(&mut self) -> Result<TypeParams, ParseError> {
         let mut params = IndexSet::new();
 

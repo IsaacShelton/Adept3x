@@ -1,6 +1,6 @@
 use crate::error::{ResolveError, ResolveErrorKind};
 use asg::ResolvedName;
-use ast::Name;
+use ast::NamePath;
 use source_files::Source;
 
 #[derive(Clone, Debug)]
@@ -14,8 +14,12 @@ pub enum FindTypeError {
 }
 
 impl FindTypeError {
-    pub fn into_resolve_error(self: FindTypeError, name: &Name, source: Source) -> ResolveError {
-        let name = name.to_string();
+    pub fn into_resolve_error(
+        self: FindTypeError,
+        name_path: &NamePath,
+        source: Source,
+    ) -> ResolveError {
+        let name = name_path.to_string();
 
         match self {
             FindTypeError::NotDefined => ResolveErrorKind::UndeclaredType {

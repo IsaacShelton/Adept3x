@@ -1,14 +1,14 @@
 use super::{ResolveTypeCtx, ResolveTypeOptions, find_error::FindTypeError};
 use crate::error::ResolveError;
 use asg::{TypeParam, TypeParamError};
-use ast::{Name, TypeArg};
+use ast::{NamePath, TypeArg};
 use source_files::Source;
 use std::borrow::Cow;
 
 impl<'a> ResolveTypeCtx<'a> {
     pub fn find(
         &self,
-        name: &Name,
+        name_path: &NamePath,
         type_args: &[TypeArg],
         source: Source,
     ) -> Result<Cow<'a, asg::TypeKind>, FindTypeError> {
@@ -20,7 +20,7 @@ impl<'a> ResolveTypeCtx<'a> {
             .unwrap()
             .settings];
 
-        let decl = name
+        let decl = name_path
             .as_plain_str()
             .and_then(|name| {
                 self.types_in_modules
@@ -34,15 +34,19 @@ impl<'a> ResolveTypeCtx<'a> {
             .filter(|local| local.num_parameters(self.asg) == type_args.len())
             .map(Ok)
             .unwrap_or_else(|| {
-                if name.namespace.is_empty() {
+                eprintln!("legacy namespace system is no longer supported");
+                return Err(FindTypeError::NotDefined);
+
+                /*
+                if name_path.namespace.is_empty() {
                     return Err(FindTypeError::NotDefined);
                 }
 
-                let Name {
+                let NamePath {
                     namespace,
                     basename,
                     ..
-                } = name;
+                } = name_path;
 
                 let mut matches = settings
                     .namespace_to_dependency
@@ -64,6 +68,7 @@ impl<'a> ResolveTypeCtx<'a> {
                 } else {
                     Err(FindTypeError::NotDefined)
                 }
+                */
             })?;
 
         let mut type_args = type_args.into_iter().enumerate();

@@ -11,6 +11,7 @@ use super::TranslateCtx;
 use crate::parse::ParseError;
 use ast::Language;
 use c_ast::{BinaryOperator, Expr, ExprKind};
+use smallvec::smallvec;
 
 pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, ParseError> {
     Ok(match &expr.kind {
@@ -93,7 +94,10 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
         ExprKind::PostIncrement(_) => todo!(),
         ExprKind::PostDecrement(_) => todo!(),
         ExprKind::Identifier(name) => {
-            return Ok(ast::ExprKind::Variable(ast::Name::plain(name)).at(expr.source));
+            return Ok(ast::ExprKind::Variable(ast::NamePath::new(smallvec![
+                name.clone().into_boxed_str()
+            ]))
+            .at(expr.source));
         }
         ExprKind::EnumConstant(_, _) => todo!(),
         ExprKind::CompoundLiteral(compound_literal) => {
@@ -150,7 +154,7 @@ pub fn translate_expr(ctx: &mut TranslateCtx, expr: &Expr) -> Result<ast::Expr, 
                 .collect::<Result<Vec<ast::Expr>, ParseError>>()?;
 
             ast::ExprKind::Call(Box::new(ast::Call {
-                name: ast::Name::plain(target),
+                name_path: ast::NamePath::new(smallvec![target.clone().into_boxed_str()]),
                 args,
                 expected_to_return: None,
                 generics: vec![],

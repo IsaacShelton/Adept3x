@@ -1,21 +1,22 @@
 use super::Parser;
 use crate::error::{ParseError, ParseErrorKind};
-use ast::{Expr, ExprKind, Name, StaticMemberCall, StaticMemberValue, Type, TypeArg};
+use ast::{Expr, ExprKind, NamePath, StaticMemberCall, StaticMemberValue, Type, TypeArg};
 use infinite_iterator::InfinitePeekable;
+use smallvec::smallvec;
 use source_files::Source;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_static_member(
         &mut self,
-        type_name: Name,
+        name_path: NamePath,
         generics: Vec<TypeArg>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // EnumName::EnumVariant
         //         ^
 
-        let subject = self.parse_type_from_parts(type_name, generics, source)?;
+        let subject = self.parse_type_from_parts(name_path, generics, source)?;
         self.parse_static_member_with_type(subject, source)
     }
 
@@ -39,7 +40,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         Ok(
             if self.input.peek_is(TokenKind::OpenParen) || self.input.peek_is(TokenKind::OpenAngle)
             {
-                let name = Name::plain(action_name);
+                let name = NamePath::new(smallvec![action_name.into()]);
                 let generics = self.parse_type_args()?;
 
                 ExprKind::StaticMemberCall(Box::new(StaticMemberCall {

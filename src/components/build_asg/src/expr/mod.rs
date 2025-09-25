@@ -133,8 +133,8 @@ pub fn resolve_expr(
     let source = ast_expr.source;
 
     let resolved_expr = match &ast_expr.kind {
-        ast::ExprKind::Variable(name) => {
-            resolve_variable_expr(ctx, name, preferred_type, initialized, mode, source)
+        ast::ExprKind::Variable(name_path) => {
+            resolve_variable_expr(ctx, name_path, preferred_type, initialized, mode, source)
         }
         ast::ExprKind::Char(content) => {
             if content.len() == 1 {

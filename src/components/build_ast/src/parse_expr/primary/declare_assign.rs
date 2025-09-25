@@ -8,7 +8,7 @@ use token::{Token, TokenKind};
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_declare_assign(
         &mut self,
-        name: String,
+        name: Box<str>,
         source: Source,
     ) -> Result<Expr, ParseError> {
         // variable_name := value

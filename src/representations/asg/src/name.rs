@@ -1,4 +1,4 @@
-use ast::Name;
+use ast::NamePath;
 use fs_tree::{Fs, FsNodeId};
 use std::fmt::Display;
 
@@ -9,10 +9,10 @@ pub struct ResolvedName {
 }
 
 impl ResolvedName {
-    pub fn new(fs_node_id: FsNodeId, name: &Name) -> Self {
+    pub fn new(fs_node_id: FsNodeId, name_path: &NamePath) -> Self {
         Self {
             fs_node_id,
-            name: name.fullname().into_boxed_str(),
+            name: name_path.fullname().into_boxed_str(),
         }
     }
 

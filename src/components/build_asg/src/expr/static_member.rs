@@ -11,7 +11,7 @@ use asg::{
     HumanName, ImplRef, IntoPolyRecipeResolver, PolyCall, PolyCallee, PolyCatalog, PolyRecipe,
     TypeKind, TypedExpr,
 };
-use ast::{Name, StaticMemberCall, StaticMemberValue, TypeArg};
+use ast::{NamePath, StaticMemberCall, StaticMemberValue, TypeArg};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use source_files::Source;
@@ -105,7 +105,7 @@ pub fn resolve_impl_mention_from_type<'a>(
 
 pub fn resolve_impl_mention(
     ctx: &mut ResolveExprCtx,
-    impl_name: &Name,
+    impl_name: &NamePath,
     impl_args: &[TypeArg],
     source: Source,
 ) -> Result<(ImplRef, PolyCatalog), ResolveError> {
@@ -116,7 +116,11 @@ pub fn resolve_impl_mention(
     });
 
     let impl_decl = impl_decl.ok_or(()).or_else(|_| {
-        let mut matches = (!impl_name.namespace.is_empty())
+        let mut matches = std::iter::empty();
+        eprintln!("warning: old impl resolution system is no longer supported during transition");
+
+        /*
+        (!impl_name.namespace.is_empty())
             .then(|| {
                 ctx.settings
                     .namespace_to_dependency
@@ -134,6 +138,7 @@ pub fn resolve_impl_mention(
                     .filter(|imp| imp.privacy.is_public())
                     .into_iter()
             });
+        */
 
         let Some(imp) = matches.next() else {
             return Err(ResolveError::other(
@@ -188,7 +193,7 @@ pub fn resolve_impl_mention(
 pub fn resolve_static_member_call_named(
     ctx: &mut ResolveExprCtx,
     static_member_call: &StaticMemberCall,
-    impl_name: &Name,
+    impl_name: &NamePath,
     impl_args: &[TypeArg],
 ) -> Result<TypedExpr, ResolveError> {
     let StaticMemberCall {
@@ -212,7 +217,7 @@ pub fn resolve_static_member_call_named(
     let (impl_ref, catalog) =
         resolve_impl_mention(ctx, impl_name, impl_args, static_member_call.source)?;
 
-    let Some(callee_name) = call.name.as_plain_str() else {
+    let Some(callee_name) = call.name_path.as_plain_str() else {
         return Err(ResolveError::other(
             "Implementation does not have namespaced functions",
             *call_source,
@@ -244,7 +249,7 @@ pub fn resolve_static_member_call_named(
             signature: format!(
                 "{}::{}({})",
                 impl_name,
-                call.name,
+                call.name_path,
                 args.iter().map(|arg| arg.ty.to_string()).join(", ")
             ),
             reason: FindFunctionError::NotDefined,
@@ -298,7 +303,7 @@ pub fn resolve_static_member_call_polymorph(
     let trait_decl = &ctx.asg.traits[generic_trait_ref.trait_ref];
 
     let member = call
-        .name
+        .name_path
         .as_plain_str()
         .ok_or_else(|| {
             ResolveError::other(

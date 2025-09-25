@@ -21,4 +21,5 @@ source_files = { version = "0.1.0", path = "../source_files" }
 std_ext = { version = "0.1.0", path = "../../support/std_ext" }
 token = { version = "0.1.0", path = "../token" }
 compiler_version = { version = "0.1.0", path = "../../support/compiler_version" }
+itertools.workspace = true
 

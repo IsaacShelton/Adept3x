@@ -1,5 +1,7 @@
 use super::{ParseError, Parser};
-use ast::{Expr, ExprKind, FieldInitializer, FillBehavior, Language, Name, StructLiteral, Type};
+use ast::{
+    Expr, ExprKind, FieldInitializer, FillBehavior, Language, NamePath, StructLiteral, Type,
+};
 use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
@@ -54,7 +56,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 self.ignore_newlines();
 
                 let field_value = if dupe {
-                    ExprKind::Variable(Name::plain(field_name.clone())).at(source)
+                    ExprKind::Variable(NamePath::new_plain(field_name.clone())).at(source)
                 } else {
                     self.input
                         .expect(TokenKind::Colon, "after field name in struct literal")?;

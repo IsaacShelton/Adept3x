@@ -2,7 +2,7 @@ mod common;
 mod display;
 
 use super::{AnonymousEnum, AnonymousStruct, AnonymousUnion, FixedArray, FuncPtr, Type, TypeArg};
-use crate::Name;
+use crate::NamePath;
 use primitives::{CInteger, FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
 
@@ -18,7 +18,7 @@ pub enum TypeKind {
     FixedArray(Box<FixedArray>),
     Void,
     Never,
-    Named(Name, Vec<TypeArg>),
+    Named(NamePath, Vec<TypeArg>),
     AnonymousStruct(AnonymousStruct),
     AnonymousUnion(AnonymousUnion),
     AnonymousEnum(AnonymousEnum),
@@ -33,7 +33,7 @@ impl TypeKind {
 
     pub fn allow_indirect_undefined(&self) -> bool {
         if let TypeKind::Named(name, arguments) = self {
-            let basename = &name.basename;
+            let basename = name.basename();
             if arguments.len() == 0
                 && (basename.starts_with("struct<")
                     || basename.starts_with("union<")

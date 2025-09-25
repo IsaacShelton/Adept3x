@@ -4,7 +4,7 @@ use super::{
     type_ctx::{ResolveTypeCtx, ResolveTypeOptions},
 };
 use asg::{Asg, GlobalDecl, ResolvedName};
-use ast::Name;
+use ast::NamePath;
 use ast_workspace::AstWorkspace;
 
 pub fn resolve_global_variables(
@@ -24,7 +24,8 @@ pub fn resolve_global_variables(
             );
 
             let ty = type_ctx.resolve(&global.ast_type, ResolveTypeOptions::Unalias)?;
-            let resolved_name = ResolvedName::new(module_folder_id, &Name::plain(&global.name));
+            let resolved_name =
+                ResolvedName::new(module_folder_id, &NamePath::new_plain(global.name.clone()));
 
             let global_ref = asg.globals.alloc(asg::Global {
                 name: resolved_name,

@@ -19,7 +19,7 @@ impl IdentifierState {
 
             let namespace = identifier;
 
-            return TokenKind::NamespacedIdentifier(Name::new(Some(namespace), basename))
+            return TokenKind::OldNamespacedIdentifier(Name::new(Some(namespace), basename))
                 .at(self.start_source);
         }
 

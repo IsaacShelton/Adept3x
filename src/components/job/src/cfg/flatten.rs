@@ -193,7 +193,7 @@ fn flatten_expr<'env>(
         ast::ExprKind::Null => builder.push(cursor, InstrKind::NullLiteral.at(expr.source)),
         ast::ExprKind::Call(call) => {
             let name = call
-                .name
+                .name_path
                 .as_plain_str()
                 .expect("only plain names can be used for new cfg system");
 
