@@ -45,7 +45,7 @@ impl<'env> SubTask<'env> for ReadFile<'env> {
         _user_data: Self::UserData<'a>,
     ) -> Result<
         Self::SubArtifact<'a>,
-        Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
+        Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'env, ErrorDiagnostic>,
     > {
         match self {
             ReadFile::NotStarted(path) => {

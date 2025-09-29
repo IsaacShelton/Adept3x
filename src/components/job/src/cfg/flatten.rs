@@ -192,11 +192,6 @@ fn flatten_expr<'env>(
         ),
         ast::ExprKind::Null => builder.push(cursor, InstrKind::NullLiteral.at(expr.source)),
         ast::ExprKind::Call(call) => {
-            let name = call
-                .name_path
-                .as_plain_str()
-                .expect("only plain names can be used for new cfg system");
-
             let args = ctx.alloc_slice_fill_iter(
                 call.args
                     .iter()
@@ -214,7 +209,7 @@ fn flatten_expr<'env>(
                 cursor,
                 InstrKind::Call(
                     ctx.alloc(CallInstr {
-                        name,
+                        name_path: &call.name_path,
                         args,
                         expected_to_return: call.expected_to_return.as_ref(),
                         generics,

@@ -136,9 +136,9 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
                 self.input.eat(TokenKind::Multiply);
 
-                if !self.input.eat(TokenKind::BindNamespace) {
+                if !self.input.eat(TokenKind::BindSymbol) {
                     return Err(
-                        ParseErrorKind::other("Expected ' :: ' after '*' at top level")
+                        ParseErrorKind::other("Expected ':<' after '*' at top level")
                             .at(self.input.peek().source),
                     );
                 }
@@ -158,7 +158,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                         expr: self.parse_expr_primary()?,
                         privacy: Privacy::Protected,
                     });
-                } else if self.input.peek_nth(1).is_bind_namespace() {
+                } else if self.input.peek_nth(1).is_bind_symbol() {
                     let mut privacy = Privacy::Protected;
                     for annotation in annotations {
                         match annotation.kind {
@@ -174,7 +174,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     }
 
                     let name = self.input.eat_identifier().unwrap();
-                    self.input.eat(TokenKind::BindNamespace);
+                    assert!(self.input.eat(TokenKind::BindSymbol));
                     let expr = self.parse_expr()?;
 
                     namespace_items.pragmas.push(Pragma {

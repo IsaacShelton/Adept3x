@@ -114,9 +114,9 @@ impl<'env> ModuleView<'env> {
             .add_symbol(self.graph, self.handle, privacy, name, decl_head);
     }
 
-    pub fn find_symbol<S>(
+    pub fn find_symbol<'a, S>(
         &self,
-        executor: &Executor<'env>,
+        executor: &'a Executor<'env>,
         search: S,
     ) -> Result<DeclHead<'env>, impl FnOnce(Execution<'env>) -> Continuation<'env> + use<'env, S>>
     where
@@ -139,6 +139,19 @@ impl<'env> ModuleView<'env> {
 
                     module.arena[handle.module_ref]
                         .iter_symbols(func_search.name, handle.part_ref)
+                        .next()
+                });
+
+                if let Some(found) = found {
+                    return Ok(found);
+                }
+            }
+            Search::Namespace(namespace_search) => {
+                let found = self.web.graph(graph, |graph| {
+                    let module = graph.modules.lock().unwrap();
+
+                    module.arena[handle.module_ref]
+                        .iter_symbols(namespace_search.name, handle.part_ref)
                         .next()
                 });
 

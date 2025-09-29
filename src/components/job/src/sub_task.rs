@@ -27,6 +27,6 @@ where
         user_data: Self::UserData<'a>,
     ) -> Result<
         Self::SubArtifact<'a>,
-        Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'static, ErrorDiagnostic>,
+        Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'env, ErrorDiagnostic>,
     >;
 }

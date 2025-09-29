@@ -4,7 +4,7 @@ use crate::{
     module_graph::ModuleView,
     repr::{FuncHead, UnaliasedType, VariableRef},
 };
-use ast::{ConformBehavior, FillBehavior, Integer, Language, SizeOfMode, UnaryOperator};
+use ast::{ConformBehavior, FillBehavior, Integer, Language, NamePath, SizeOfMode, UnaryOperator};
 use attributes::Privacy;
 use source_files::Source;
 use std::{ffi::CStr, fmt::Display};
@@ -179,7 +179,7 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::NullLiteral => write!(f, "null_lit")?,
             InstrKind::VoidLiteral => write!(f, "void_lit")?,
             InstrKind::Call(call, _) => {
-                write!(f, "call {} (", call.name)?;
+                write!(f, "call {} (", call.name_path)?;
 
                 for (i, instr_ref) in call.args.iter().enumerate() {
                     if i + 1 == call.args.len() {
@@ -325,7 +325,7 @@ impl<'env> InstrKind<'env> {
 
 #[derive(Debug)]
 pub struct CallInstr<'env> {
-    pub name: &'env str,
+    pub name_path: &'env NamePath,
     pub args: &'env [InstrRef],
     pub expected_to_return: Option<&'env ast::Type>,
     pub generics: &'env [&'env ast::Type],

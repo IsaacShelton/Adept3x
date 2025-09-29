@@ -1,12 +1,12 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ProcessFile, canonicalize_or_error,
     module_graph::{ModuleBreakOffMode, ModuleView, Upserted},
-    repr::{Compiler, DeclHead, DeclHeadTypeLike},
+    repr::{Compiler, DeclHead, ValueLikeRef},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -93,10 +93,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                     self.view.add_symbol(
                         self.pragma.0.privacy,
                         name,
-                        DeclHead::TypeLike(DeclHeadTypeLike::Namespace(
-                            name,
-                            created.handle.module_ref,
-                        )),
+                        DeclHead::ValueLike(ValueLikeRef::Namespace(created.handle.module_ref)),
                     );
                 }
                 ast::UseBinding::Wildcard => todo!("use binding wildcard not implemented yet!"),
@@ -144,8 +141,14 @@ fn fake_run_namespace_expr(expr: &ast::Expr) -> Option<LoadTarget> {
         return None;
     };
 
+    let filename = if mode.is_module() && !filename.ends_with(".adept") {
+        Cow::Owned(format!("{}/_.adept", filename))
+    } else {
+        Cow::Borrowed(filename)
+    };
+
     Some(LoadTarget {
         mode,
-        relative_filename: filename.into(),
+        relative_filename: filename.into_owned(),
     })
 }

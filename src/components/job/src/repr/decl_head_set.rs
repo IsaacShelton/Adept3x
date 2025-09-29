@@ -29,11 +29,14 @@ impl<'env> DeclHeadSet<'env> {
     }
 
     #[allow(unused)]
-    pub fn value_likes(&self) -> impl Iterator<Item = ValueLikeRef> {
-        self.0.iter().filter_map(|decl_head| match decl_head {
-            DeclHead::ValueLike(value_like) => Some(*value_like),
-            _ => None,
-        })
+    pub fn value_likes(&self) -> impl Iterator<Item = ValueLikeRef<'env>> {
+        self.0
+            .iter()
+            .copied()
+            .filter_map(move |decl_head| match decl_head {
+                DeclHead::ValueLike(value_like) => Some(value_like),
+                _ => None,
+            })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = DeclHead<'env>> {

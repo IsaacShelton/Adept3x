@@ -42,6 +42,11 @@ impl NamePath {
     pub fn fullname(&self) -> String {
         Itertools::intersperse(self.segments.iter().map(|x| &**x), "::").collect()
     }
+
+    pub fn namespaces(&self) -> &[Box<str>] {
+        debug_assert!(self.segments.len() > 0);
+        &self.segments[..self.segments.len() - 1]
+    }
 }
 
 impl Display for NamePath {

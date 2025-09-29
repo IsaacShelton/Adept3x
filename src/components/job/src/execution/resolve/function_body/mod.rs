@@ -5,12 +5,13 @@ use crate::{
     BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
     FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
     conform::{ConformMode, conform_to, conform_to_default},
-    execution::resolve::ResolveType,
+    execution::resolve::{ResolveNamespace, ResolveType},
     flatten_func,
     module_graph::ModuleView,
     repr::{
         Compiler, DeclHead, FuncBody, FuncHead, Type, TypeKind, UnaliasedType, Variable, Variables,
     },
+    sub_task::SubTask,
     unify::unify_types,
 };
 use arena::ArenaMap;
@@ -60,6 +61,11 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     resolved_type: Suspend<'env, UnaliasedType<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    resolved_namespace: Option<ResolveNamespace<'env>>,
 }
 
 impl<'env> ResolveFunctionBody<'env> {
@@ -80,6 +86,7 @@ impl<'env> ResolveFunctionBody<'env> {
             cfg: None,
             dominators_and_post_order: None,
             variables: None,
+            resolved_namespace: None,
         }
     }
 }
@@ -493,10 +500,30 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
                 InstrKind::Call(call, _) => {
-                    let symbol = match self.view.find_symbol(
+                    let name_path = call.name_path;
+                    let basename = name_path.basename();
+
+                    let view = if name_path.has_namespace() {
+                        let resolved_namespace = self
+                            .resolved_namespace
+                            .get_or_insert_with(|| ResolveNamespace::new(self.view, instr.source));
+
+                        execute_sub_task!(
+                            self,
+                            resolved_namespace,
+                            executor,
+                            ctx,
+                            name_path.namespaces()
+                        )
+                        .expect("infallible")
+                    } else {
+                        *self.view
+                    };
+
+                    let symbol = match view.find_symbol(
                         executor,
                         FuncSearch {
-                            name: call.name,
+                            name: basename,
                             source: instr.source,
                         },
                     ) {

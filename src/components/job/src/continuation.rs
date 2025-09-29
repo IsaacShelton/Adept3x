@@ -57,30 +57,40 @@ impl<'env> From<ErrorDiagnostic> for Continuation<'env> {
 #[derive(Clone, Debug, From)]
 pub enum Search<'env> {
     Func(FuncSearch<'env>),
+    Namespace(NamespaceSearch<'env>),
 }
 
 impl<'env> Search<'env> {
     pub fn name(&self) -> &'env str {
         match self {
             Self::Func(func_search) => func_search.name,
+            Self::Namespace(namespace_search) => namespace_search.name,
         }
     }
 
     pub fn source(&self) -> Option<Source> {
         match self {
             Self::Func(func_search) => Some(func_search.source),
+            Self::Namespace(namespace_search) => Some(namespace_search.source),
         }
     }
 
     pub fn symbol_kind_name(&self) -> Option<&'static str> {
         match self {
             Self::Func(_) => Some("function"),
+            Self::Namespace(_) => Some("namespace"),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct FuncSearch<'env> {
+    pub name: &'env str,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct NamespaceSearch<'env> {
     pub name: &'env str,
     pub source: Source,
 }
