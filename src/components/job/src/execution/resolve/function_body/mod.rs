@@ -212,7 +212,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     | EndInstrKind::Unreachable => (),
                 }
 
-                rev_post_order.next_partial_block(cfg, post_order);
+                rev_post_order.next_in_builder(cfg, post_order);
                 continue;
             }
 
@@ -335,9 +335,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     let variable_ref = variables.push(Variable::new(resolved_type));
                     cfg.set_variable_ref(instr_ref, variable_ref);
 
-                    // 2] Reset the "suspend on type" for the next time we need it
-                    self.resolved_type = None;
-
                     // 3] Finish typing the paramater declaration, which itself is void
                     cfg.set_typed(instr_ref, builtin_types.void())
                 }
@@ -389,9 +386,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_variable_ref(instr_ref, variable_ref);
                     cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
-
-                    // 5] Reset the "suspend on type" for the next time we need it
-                    self.resolved_type = None;
                 }
                 InstrKind::Assign {
                     dest,
@@ -438,9 +432,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
-
-                    // 5] Reset the "suspend on type" for the next time we need it
-                    self.resolved_type = None;
                 }
                 InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
                     todo!()
@@ -658,7 +649,11 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
             }
 
-            rev_post_order.next_partial_block(cfg, post_order);
+            // Reset suspension states for next instruction to use
+            self.resolved_type = None;
+            self.resolved_namespace = None;
+
+            rev_post_order.next_in_builder(cfg, post_order);
         }
 
         /*

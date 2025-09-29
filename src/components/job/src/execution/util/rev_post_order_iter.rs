@@ -28,7 +28,7 @@ impl RevPostOrderIterWithEnds {
         self.current
     }
 
-    pub fn next_partial_block(
+    pub fn next_in_builder(
         &mut self,
         cfg: &CfgBuilder,
         post_order: &[BasicBlockId],
