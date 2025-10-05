@@ -621,15 +621,19 @@ pub unsafe fn create_function_block<'env>(
                 ))
             }
             Instr::Phi(phi) => {
-                let backend_type = to_backend_type(ctx.for_making_type(), &phi.ir_type)?;
-                let phi_node = LLVMBuildPhi(builder.get(), backend_type, c"".as_ptr());
+                if phi.ir_type.is_void() {
+                    None
+                } else {
+                    let backend_type = to_backend_type(ctx.for_making_type(), &phi.ir_type)?;
+                    let phi_node = LLVMBuildPhi(builder.get(), backend_type, c"".as_ptr());
 
-                builder.add_phi_relocation(PhiRelocation {
-                    phi_node,
-                    incoming: phi.incoming,
-                });
+                    builder.add_phi_relocation(PhiRelocation {
+                        phi_node,
+                        incoming: phi.incoming,
+                    });
 
-                Some(phi_node)
+                    Some(phi_node)
+                }
             }
             Instr::InterpreterSyscall(..) => {
                 return Err(ErrorDiagnostic::plain(

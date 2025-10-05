@@ -13,7 +13,7 @@ use crate::{
 use data_units::AtomicByteUnits;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::{
-    core::{LLVMAddIncoming, LLVMAppendBasicBlock, LLVMGetUndef, LLVMInt32Type},
+    core::{LLVMAddIncoming, LLVMAppendBasicBlock, LLVMDumpValue, LLVMGetUndef, LLVMInt32Type},
     prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
 use std::cell::OnceCell;
