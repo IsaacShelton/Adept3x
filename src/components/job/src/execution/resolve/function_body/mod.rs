@@ -251,11 +251,11 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 2] Set incoming jumps to conform to the unifying type
                     if let Some(unified) = unified {
                         for (bb, value) in items.iter() {
+                            eprintln!(
+                                "warning: optional unary casts for incoming edges for CFG phi is not implemented!"
+                            );
                             if value.is_some() {
-                                cfg.set_pre_jump_typed_unary_cast(
-                                    *bb,
-                                    todo!("optional unary casts for incoming edges for CFG phi"),
-                                );
+                                cfg.set_pre_jump_typed_unary_cast(*bb, None);
                             }
                         }
                     }

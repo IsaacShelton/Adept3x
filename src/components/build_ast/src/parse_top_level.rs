@@ -216,6 +216,11 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                     .namespaces
                     .push(self.parse_namespace(annotations)?);
             }
+            TokenKind::LinksetKeyword => {
+                namespace_items
+                    .linksets
+                    .push(self.parse_linkset(annotations)?);
+            }
             TokenKind::EndOfFile => {
                 // End-of-file is only okay if no preceeding annotations
                 if !annotations.is_empty() {

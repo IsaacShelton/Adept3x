@@ -97,6 +97,7 @@ pub enum TokenKind {
     ModKeyword,
     GotoKeyword,
     WhenKeyword,
+    LinksetKeyword,
     Member,
     Add,
     Subtract,
@@ -203,6 +204,7 @@ impl Display for TokenKind {
             TokenKind::ModKeyword => f.write_str("'mod' keyword"),
             TokenKind::GotoKeyword => f.write_str("'goto' keyword"),
             TokenKind::WhenKeyword => f.write_str("'when' keyword"),
+            TokenKind::LinksetKeyword => f.write_str("'linkset' keyword"),
             TokenKind::Member => f.write_str("'.'"),
             TokenKind::Add => f.write_str("'+'"),
             TokenKind::Subtract => f.write_str("'-'"),
@@ -347,6 +349,7 @@ impl TokenKind {
             | TokenKind::ModKeyword
             | TokenKind::GotoKeyword
             | TokenKind::WhenKeyword
+            | TokenKind::LinksetKeyword
             | TokenKind::OpenAngle
             | TokenKind::Comma
             | TokenKind::Colon

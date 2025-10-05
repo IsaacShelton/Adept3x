@@ -1,4 +1,6 @@
-use crate::{Enum, Expr, ExprAlias, Func, Global, Impl, Pragma, Struct, Trait, TypeAlias, When};
+use crate::{
+    Enum, Expr, ExprAlias, Func, Global, Impl, Linkset, Pragma, Struct, Trait, TypeAlias, When,
+};
 use attributes::Privacy;
 use derive_more::From;
 use source_files::Source;
@@ -16,6 +18,7 @@ pub struct NamespaceItems {
     pub namespaces: Vec<Namespace>,
     pub whens: Vec<When>,
     pub pragmas: Vec<Pragma>,
+    pub linksets: Vec<Linkset>,
 }
 
 #[derive(Clone, Debug)]

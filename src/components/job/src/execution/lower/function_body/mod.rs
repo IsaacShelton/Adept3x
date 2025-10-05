@@ -17,6 +17,7 @@ use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use integer::*;
 use ir_builder::*;
+use itertools::Itertools;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use primitives::{FloatSize, IntegerBits, IntegerSign};
@@ -129,7 +130,25 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 let instr = &bb.instrs[instr_ref.instr_or_end as usize];
 
                 let result = match &instr.kind {
-                    InstrKind::Phi(items, conform_behavior) => todo!("lower phi"),
+                    InstrKind::Phi(items, _conform_behavior) => {
+                        let unified_type = instr.typed.as_ref().unwrap();
+                        let ir_type = to_ir_type(ctx, self.view.target(), unified_type.0)?;
+
+                        let incoming = items
+                            .iter()
+                            .flat_map(|(bb, value)| {
+                                value.map(|value| ir::PhiIncoming {
+                                    basicblock_id: bb.into_usize(),
+                                    value: builder.get_output(value),
+                                })
+                            })
+                            .collect_vec();
+
+                        builder.push(ir::Instr::Phi(ir::Phi {
+                            ir_type,
+                            incoming: ctx.alloc_slice_fill_iter(incoming.into_iter()),
+                        }))
+                    }
                     InstrKind::Name(_, variable_ref) => get_variable_alloca(variable_ref.unwrap()),
                     InstrKind::Parameter(_, _, index, _) => {
                         builder.push(ir::Instr::Parameter(*index))
@@ -251,7 +270,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         ir::Literal::NullTerminatedString(cstr).into()
                     }
                     InstrKind::NullLiteral => todo!(),
-                    InstrKind::VoidLiteral => todo!(),
+                    InstrKind::VoidLiteral => ir::Value::Literal(ir::Literal::Void),
                     InstrKind::Call(call, target) => {
                         let target = target
                             .as_ref()
@@ -354,7 +373,10 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!(),
                     InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
                     InstrKind::IntegerPromote(instr_ref) => todo!(),
-                    InstrKind::ConformToBool(instr_ref, language, unary_cast) => todo!(),
+                    InstrKind::ConformToBool(value, language, unary_cast) => {
+                        eprintln!("warning: lowering conform to bool is not implemented yet!");
+                        builder.get_output(*value)
+                    }
                     InstrKind::Is(instr_ref, _) => todo!(),
                     InstrKind::LabelLiteral(_) => todo!(),
                 };
@@ -405,12 +427,17 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                     value.unwrap_or(ir::Literal::Void.into())
                 }
-                EndInstrKind::Branch(
-                    instr_ref,
-                    basic_block_id,
-                    basic_block_id1,
-                    break_continue,
-                ) => todo!(),
+                EndInstrKind::Branch(condition, when_true, when_false, break_continue) => {
+                    let condition = builder.get_output(*condition);
+
+                    builder.push(ir::Instr::ConditionalBreak(
+                        condition,
+                        ir::ConditionalBreak {
+                            true_basicblock_id: when_true.into_usize(),
+                            false_basicblock_id: when_false.into_usize(),
+                        },
+                    ))
+                }
                 EndInstrKind::NewScope(in_scope, _close_scope) => {
                     builder.push(ir::Instr::Break(ir::Break {
                         basicblock_id: in_scope.into_usize(),

@@ -7,6 +7,7 @@ use crate::{
     repr::Compiler,
 };
 use compiler::BuildOptions;
+use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::core::LLVMIsMultithreaded;
 use source_files::SourceFiles;
@@ -20,7 +21,8 @@ use std::{
 };
 use target::Target;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct Main<'env> {
     #[allow(unused)]
     build_options: &'env BuildOptions,
@@ -29,6 +31,9 @@ pub struct Main<'env> {
     module_graph_web: Option<&'env ModuleGraphWeb<'env>>,
     source_files: &'env SourceFiles,
     all_done: Suspend<'env, ()>,
+
+    #[derivative(Debug = "ignore")]
+    compiler: Option<&'env Compiler<'env>>,
 }
 
 impl<'env> Main<'env> {
@@ -44,6 +49,7 @@ impl<'env> Main<'env> {
             source_files,
             module_graph_web: None,
             all_done: None,
+            compiler: None,
         }
     }
 }
@@ -73,13 +79,15 @@ impl<'env> Executable<'env> for Main<'env> {
         let single_file = self.canonicalized_single_file.unwrap();
         let project_root = single_file.parent().expect("root file to have parent");
 
-        let compiler = ctx.alloc(Compiler {
-            source_files: self.source_files,
-            project_root,
-            builtin_types: ctx.alloc(BuiltinTypes::new(ctx)),
-            runtime_target: self.build_options.target,
-            link_filenames: Default::default(),
-            link_frameworks: Default::default(),
+        let compiler = *self.compiler.get_or_insert_with(|| {
+            ctx.alloc(Compiler {
+                source_files: self.source_files,
+                project_root,
+                builtin_types: ctx.alloc(BuiltinTypes::new(ctx)),
+                runtime_target: self.build_options.target,
+                link_filenames: Default::default(),
+                link_frameworks: Default::default(),
+            })
         });
 
         let web = *self
@@ -106,6 +114,7 @@ impl<'env> Executable<'env> for Main<'env> {
                 executor.spawn(ProcessFile::new(
                     compiler,
                     single_file.into(),
+                    true,
                     ctx.alloc(runtime),
                     None
                 )),

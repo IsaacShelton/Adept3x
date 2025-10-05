@@ -57,12 +57,16 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
             return Ok(());
         }
 
-        let Some(load_target) = fake_run_namespace_expr(&self.pragma.expr) else {
+        let Some(fake_run_result) = fake_run_namespace_expr(&self.pragma.expr) else {
             return Err(ErrorDiagnostic::new(
-                "Expression must evaluate to a target to import or add",
+                "Top-level expression must be one of: `include(...)`, `import(...)`, etc.",
                 self.pragma.expr.source,
             )
             .into());
+        };
+
+        let load_target = match fake_run_result {
+            FakeRunResult::LoadTarget(load_target) => load_target,
         };
 
         let new_filename = ctx.alloc(canonicalize_or_error(
@@ -105,6 +109,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                 .request(ProcessFile::new(
                     &self.compiler,
                     new_filename,
+                    false,
                     ctx.alloc(created),
                     Some(self.pragma.expr.source),
                 ))
@@ -120,9 +125,13 @@ pub struct LoadTarget {
     relative_filename: String,
 }
 
+pub enum FakeRunResult {
+    LoadTarget(LoadTarget),
+}
+
 // Eventually, we'll hook this up to the comptime VM for a more powerful version.
 // We'll keep it simple for now though.
-fn fake_run_namespace_expr(expr: &ast::Expr) -> Option<LoadTarget> {
+fn fake_run_namespace_expr(expr: &ast::Expr) -> Option<FakeRunResult> {
     let ast::ExprKind::Call(call) = &expr.kind else {
         return None;
     };
@@ -147,8 +156,8 @@ fn fake_run_namespace_expr(expr: &ast::Expr) -> Option<LoadTarget> {
         Cow::Borrowed(filename)
     };
 
-    Some(LoadTarget {
+    Some(FakeRunResult::LoadTarget(LoadTarget {
         mode,
         relative_filename: filename.into_owned(),
-    })
+    }))
 }

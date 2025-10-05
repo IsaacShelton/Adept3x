@@ -57,7 +57,7 @@ use target::TargetOs;
 
 pub unsafe fn llvm_backend<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    compiler: &mut Compiler<'env>,
+    compiler: &Compiler<'env>,
     options: &BuildOptions,
     ir_module: &'env ir::Ir<'env>,
     meta: &ModuleGraphMeta,

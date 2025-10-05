@@ -14,6 +14,7 @@ mod parse_func_params;
 mod parse_global;
 mod parse_helper_expr;
 mod parse_impl;
+mod parse_linkset;
 mod parse_namespace;
 mod parse_stmt;
 mod parse_structure;

@@ -11,7 +11,7 @@ use std::{
 use target::{Target, TargetArch, TargetArchExt, TargetOs, TargetOsExt};
 
 pub fn link_result<'env>(
-    compiler: &mut Compiler<'env>,
+    compiler: &Compiler<'env>,
     options: &BuildOptions,
     target: &Target,
     diagnostics: &Diagnostics,
@@ -39,7 +39,8 @@ pub fn link_result<'env>(
     args.push(output_object_filepath.as_os_str().into());
 
     // Add arguments to link against requested filenames
-    for (filename, _) in compiler.link_filenames.iter_mut() {
+    for (filename, _) in compiler.link_filenames.read_only_view().iter() {
+        eprintln!("linking {}", filename);
         if is_flag_like(filename) {
             eprintln!("warning: ignoring incorrect link filename '{}'", filename);
         } else {
@@ -50,14 +51,15 @@ pub fn link_result<'env>(
     // Ensure that not trying to link against frameworks when not targeting macOS
     if !target.os().is_mac() {
         if let Some((framework, _)) = compiler.link_frameworks.read_only_view().iter().next() {
-            return Err(ErrorDiagnostic::plain(
-                "Cannot link against framework '{framework}' when not targeting macOS",
-            ));
+            return Err(ErrorDiagnostic::plain(format!(
+                "Cannot link against framework '{framework}' when not targeting macOS"
+            )));
         }
     }
 
     // Add arguments to link against requested frameworks
-    for (framework, _) in compiler.link_frameworks.iter_mut() {
+    for (framework, _) in compiler.link_frameworks.read_only_view().iter() {
+        eprintln!("linking framework {}", framework);
         args.push(OsString::from("-framework"));
         args.push(OsString::from(framework));
     }

@@ -51,6 +51,7 @@ impl IdentifierState {
             "mod" => TokenKind::ModKeyword,
             "goto" => TokenKind::GotoKeyword,
             "when" => TokenKind::WhenKeyword,
+            "linkset" => TokenKind::LinksetKeyword,
             _ => TokenKind::Identifier(identifier),
         }
         .at(self.start_source)

@@ -43,7 +43,12 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             if !fields.is_empty() {
                 self.input
                     .expect(TokenKind::Comma, "to separate struct fields")?;
+
                 self.ignore_newlines();
+
+                if self.input.peek_is_or_eof(TokenKind::CloseParen) {
+                    break;
+                }
             }
 
             let source = self.input.here();

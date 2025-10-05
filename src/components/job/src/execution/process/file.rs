@@ -22,6 +22,11 @@ pub struct ProcessFile<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
+    require_metadata: bool,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
     compiler: &'env Compiler<'env>,
 
     #[derivative(Hash = "ignore")]
@@ -44,11 +49,13 @@ impl<'env> ProcessFile<'env> {
     pub fn new(
         compiler: &'env Compiler,
         canonical_filename: &'env Path,
+        require_metadata: bool,
         view: &'env ModuleView<'env>,
         source: Option<Source>,
     ) -> Self {
         Self {
             compiler,
+            require_metadata,
             read_file: ReadFile::new(canonical_filename),
             view,
             source,
@@ -83,7 +90,15 @@ impl<'env> Executable<'env> for ProcessFile<'env> {
             input,
             ast::ConformBehavior::Adept(CIntegerAssumptions::default()),
         );
-        let _file_header = parser.parse_file_header()?;
+        let file_header = parser.parse_file_header()?;
+
+        if file_header.is_none() && self.require_metadata {
+            return Err(ErrorDiagnostic::new(
+                "Expected metadata at top of file, for example: { adept: \"3.0\" }",
+                parser.input.here(),
+            )
+            .into());
+        }
 
         let ast = parser.parse().map_err(ErrorDiagnostic::from)?;
 

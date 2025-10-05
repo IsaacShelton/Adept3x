@@ -80,6 +80,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             let _ = executor.spawn_raw(ProcessFile::new(
                 &self.compiler,
                 created.canonical_module_filename,
+                false,
                 ctx.alloc(created),
                 None,
             ));
@@ -92,6 +93,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             let _ = executor.spawn_raw(ProcessFile::new(
                 &self.compiler,
                 created.canonical_filename,
+                false,
                 ctx.alloc(created),
                 None,
             ));
