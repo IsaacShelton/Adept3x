@@ -29,6 +29,7 @@ use num_traits::bounds::LowerBounded;
 pub use part::*;
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     path::{Path, PathBuf},
     sync::{Mutex, RwLock},
 };
@@ -88,6 +89,26 @@ pub struct ModuleGraph<'env> {
 
     // IR module
     pub ir: &'env Ir<'env>,
+
+    // Finalized linksets
+    pub linksets: &'env AppendOnlyVec<Vec<ResolvedLinksetEntry<'env>>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ResolvedLinksetEntry<'env> {
+    File(&'env Path),
+    Library(&'env str),
+    Framework(&'env str),
+}
+
+impl<'env> Display for ResolvedLinksetEntry<'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResolvedLinksetEntry::File(file) => write!(f, "file: {}", file.to_string_lossy()),
+            ResolvedLinksetEntry::Library(library) => write!(f, "library: {}", library),
+            ResolvedLinksetEntry::Framework(framework) => write!(f, "framework: {}", framework),
+        }
+    }
 }
 
 #[derive(IsVariant)]
@@ -136,6 +157,7 @@ impl<'env> ModuleGraph<'env> {
             consistency: Default::default(),
             meta: ctx.alloc(meta),
             ir: ctx.alloc(Ir::default()),
+            linksets: ctx.alloc(AppendOnlyVec::new()),
         }
     }
 

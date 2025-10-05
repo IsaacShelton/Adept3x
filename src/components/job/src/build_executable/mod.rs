@@ -1,7 +1,10 @@
-use crate::repr::Compiler;
+use crate::module_graph::ResolvedLinksetEntry;
+use append_only_vec::AppendOnlyVec;
 use compiler::BuildOptions;
 use diagnostics::{Diagnostics, ErrorDiagnostic, WarningDiagnostic};
+use itertools::Itertools;
 use std::{
+    collections::{HashMap, HashSet, VecDeque},
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     process::Command,
@@ -11,7 +14,7 @@ use std::{
 use target::{Target, TargetArch, TargetArchExt, TargetOs, TargetOsExt};
 
 pub fn link_result<'env>(
-    compiler: &Compiler<'env>,
+    linksets: &'env AppendOnlyVec<Vec<ResolvedLinksetEntry<'env>>>,
     options: &BuildOptions,
     target: &Target,
     diagnostics: &Diagnostics,
@@ -37,32 +40,7 @@ pub fn link_result<'env>(
     }
 
     args.push(output_object_filepath.as_os_str().into());
-
-    // Add arguments to link against requested filenames
-    for (filename, _) in compiler.link_filenames.read_only_view().iter() {
-        eprintln!("linking {}", filename);
-        if is_flag_like(filename) {
-            eprintln!("warning: ignoring incorrect link filename '{}'", filename);
-        } else {
-            args.push(OsString::from(filename));
-        }
-    }
-
-    // Ensure that not trying to link against frameworks when not targeting macOS
-    if !target.os().is_mac() {
-        if let Some((framework, _)) = compiler.link_frameworks.read_only_view().iter().next() {
-            return Err(ErrorDiagnostic::plain(format!(
-                "Cannot link against framework '{framework}' when not targeting macOS"
-            )));
-        }
-    }
-
-    // Add arguments to link against requested frameworks
-    for (framework, _) in compiler.link_frameworks.read_only_view().iter() {
-        eprintln!("linking framework {}", framework);
-        args.push(OsString::from("-framework"));
-        args.push(OsString::from(framework));
-    }
+    flatten_linksets(&mut args, linksets, target)?;
 
     if target.os().is_windows() {
         let to_windows = infrastructure.join("to_windows");
@@ -154,6 +132,76 @@ fn please_manually_link(args: Vec<OsString>, diagnostics: &Diagnostics) -> Error
     ErrorDiagnostic::plain("Success, but requires manual linking, exiting with 1")
 }
 
-fn is_flag_like(string: &str) -> bool {
-    string.chars().skip_while(|c| c.is_whitespace()).next() == Some('-')
+fn flatten_linksets(
+    args: &mut Vec<OsString>,
+    linksets: &AppendOnlyVec<Vec<ResolvedLinksetEntry<'_>>>,
+    target: &Target,
+) -> Result<(), ErrorDiagnostic> {
+    #[derive(Default)]
+    struct Data<'env> {
+        children: HashSet<&'env ResolvedLinksetEntry<'env>>,
+    }
+
+    let mut map = HashMap::<&ResolvedLinksetEntry, Data>::new();
+
+    for linkset in linksets.iter() {
+        if linkset.len() == 1 {
+            let entry = linkset.iter().next().unwrap();
+            map.entry(entry).or_insert_with(|| Default::default());
+            continue;
+        }
+
+        for window in linkset.windows(2) {
+            let entry_a = &window[0];
+            let entry_b = &window[1];
+            let _a = map.entry(entry_a).or_insert_with(|| Default::default());
+            let _b = map
+                .entry(entry_b)
+                .or_insert_with(|| Default::default())
+                .children
+                .insert(entry_a);
+        }
+    }
+
+    let mut queue = Vec::new();
+
+    for (entry, data) in map.iter() {
+        if data.children.len() == 0 {
+            queue.push(*entry);
+        }
+    }
+
+    while let Some(entry) = queue.pop() {
+        match entry {
+            ResolvedLinksetEntry::File(filepath) => {
+                args.push(filepath.into());
+            }
+            ResolvedLinksetEntry::Library(library) => {
+                args.push(format!("-l{}", library).into());
+            }
+            ResolvedLinksetEntry::Framework(framework) => {
+                if target.os().is_mac() {
+                    args.push(OsString::from("-framework"));
+                    args.push(OsString::from(framework));
+                }
+            }
+        }
+
+        for (other_entry, other_data) in map.iter_mut() {
+            if other_data.children.remove(&entry) && other_data.children.len() == 0 {
+                queue.push(*other_entry);
+            }
+        }
+
+        map.remove(&entry);
+    }
+
+    if map.is_empty() {
+        Ok(())
+    } else {
+        Err(ErrorDiagnostic::plain(format!(
+            "Circular linkage dependencies, remaining: {}",
+            map.keys().map(|entry| format!("`{}`", entry)).join(", ")
+        )))
+    }
 }

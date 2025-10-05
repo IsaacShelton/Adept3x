@@ -122,7 +122,10 @@ impl<'env> Executable<'env> for Main<'env> {
             );
         };
 
-        let ir = runtime.web.graph(runtime.graph, |graph| graph.ir);
+        let (ir, linksets) = runtime
+            .web
+            .graph(runtime.graph, |graph| (graph.ir, graph.linksets));
+
         let meta = runtime
             .web
             .graph(runtime.graph, |graph| graph.meta().clone());
@@ -146,6 +149,7 @@ impl<'env> Executable<'env> for Main<'env> {
                 compiler,
                 self.build_options,
                 ir,
+                linksets,
                 &meta,
                 &object_file_filepath,
                 &executable_filepath,

@@ -30,8 +30,13 @@ use self::{
     target_triple::{get_triple, make_llvm_target},
 };
 use crate::{
-    ExecutionCtx, build_executable::link_result, ir, module_graph::ModuleGraphMeta, repr::Compiler,
+    ExecutionCtx,
+    build_executable::link_result,
+    ir,
+    module_graph::{ModuleGraphMeta, ResolvedLinksetEntry},
+    repr::Compiler,
 };
+use append_only_vec::AppendOnlyVec;
 use colored::Colorize;
 use compiler::BuildOptions;
 use diagnostics::{Diagnostics, ErrorDiagnostic};
@@ -60,6 +65,7 @@ pub unsafe fn llvm_backend<'env>(
     compiler: &Compiler<'env>,
     options: &BuildOptions,
     ir_module: &'env ir::Ir<'env>,
+    linksets: &'env AppendOnlyVec<Vec<ResolvedLinksetEntry<'env>>>,
     meta: &ModuleGraphMeta,
     output_object_filepath: &Path,
     output_binary_filepath: &Path,
@@ -148,7 +154,7 @@ pub unsafe fn llvm_backend<'env>(
     }
 
     link_result(
-        compiler,
+        linksets,
         options,
         &meta.target,
         diagnostics,

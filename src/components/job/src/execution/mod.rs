@@ -82,6 +82,7 @@ pub enum Execution<'env> {
     ProcessNamespace(ProcessNamespace<'env>),
     ProcessWhen(ProcessWhen<'env>),
     ProcessPragma(ProcessPragma<'env>),
+    ProcessLinkset(ProcessLinkset<'env>),
 
     // Resolution
     ResolveType(ResolveType<'env>),
@@ -121,6 +122,7 @@ pub enum Request<'env> {
     ProcessNamespace(ProcessNamespace<'env>),
     ProcessWhen(ProcessWhen<'env>),
     ProcessPragma(ProcessPragma<'env>),
+    ProcessLinkset(ProcessLinkset<'env>),
 
     // Resolution
     ResolveType(ResolveType<'env>),
