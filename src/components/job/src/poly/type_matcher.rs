@@ -161,7 +161,13 @@ pub fn are_types_equal<'env>(
                 false
             }
         }
-        TypeKind::Polymorph(name) => on_polymorph(name, b_ty),
+        TypeKind::Polymorph(a_name) => {
+            if let TypeKind::Polymorph(b_name) = b {
+                a_name == b_name || on_polymorph(a_name, b_ty)
+            } else {
+                on_polymorph(a_name, b_ty)
+            }
+        }
         TypeKind::DirectLabel(a_label) => {
             if let TypeKind::DirectLabel(b_label) = b {
                 a_label == b_label

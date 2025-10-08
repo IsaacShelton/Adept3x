@@ -30,7 +30,7 @@ pub fn unify_types<'env>(
     builtin_types: &'env BuiltinTypes<'env>,
     target: &Target,
     source: Source,
-) -> Option<UnifySolution<'env>> {
+) -> Result<UnifySolution<'env>, ()> {
     let to_ty = unify_types_trivial(
         ctx,
         types_iter.clone().map(|(_bb, ty)| ty),
@@ -59,14 +59,14 @@ pub fn unify_types<'env>(
             |_, _| false,
             source,
         )
-        .expect("failed to conform value to unified type");
+        .expect("failed to conform value to calculated unifying type");
 
         if let Some(cast) = conformed.cast {
             casts.push((bb_id, cast));
         }
     }
 
-    Some(UnifySolution {
+    Ok(UnifySolution {
         unified: to_ty,
         unary_casts: casts,
     })
@@ -78,22 +78,20 @@ pub fn unify_types_trivial<'env>(
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
     source: Source,
-) -> Option<UnaliasedType<'env>> {
+) -> Result<UnaliasedType<'env>, ()> {
     let incoming = types_iter.filter(|ty| !ty.0.kind.is_never());
 
     // If unreachable, the unifying type is the never type
     if incoming.clone().next().is_none() {
-        return Some(builtin_types.never());
+        return Ok(builtin_types.never());
     }
 
     // If all the values have the same type, the unifying type is that type
     if incoming.clone().all_equal() {
-        return Some(
-            incoming
-                .clone()
-                .next()
-                .unwrap_or_else(|| builtin_types.void()),
-        );
+        return Ok(incoming
+            .clone()
+            .next()
+            .unwrap_or_else(|| builtin_types.void()));
     }
 
     // If all the values are integer literals, the unifying type is either
@@ -146,7 +144,7 @@ pub fn unify_types_trivial<'env>(
         // We're guarenteed to have these, because of the check for "never" done earlier
         let (min, max) = min.zip(max).unwrap();
 
-        return Some(UnaliasedType(
+        return Ok(UnaliasedType(
             ctx.alloc(
                 if min == max {
                     TypeKind::IntegerLiteral(min)
@@ -160,7 +158,7 @@ pub fn unify_types_trivial<'env>(
 
     // If all the values are float literals, the unifying type is f64
     if incoming.clone().all(|ty| ty.0.kind.is_integer_literal()) {
-        return Some(builtin_types.f64());
+        return Ok(builtin_types.f64());
     }
 
     // If all values are integer and floating literals, use the default floating-point type
@@ -170,7 +168,7 @@ pub fn unify_types_trivial<'env>(
             TypeKind::IntegerLiteral(..) | TypeKind::FloatLiteral(..)
         )
     }) {
-        return Some(builtin_types.f64());
+        return Ok(builtin_types.f64());
     }
 
     // If all values are integers and integer literals
@@ -185,7 +183,7 @@ pub fn unify_types_trivial<'env>(
             TypeKind::Floating(FloatSize::Bits32) | TypeKind::FloatLiteral(_)
         )
     }) {
-        return Some(builtin_types.f32());
+        return Ok(builtin_types.f32());
     }
 
     // Otherwise if all values floating points / integer literals, the result should be f64
@@ -195,10 +193,10 @@ pub fn unify_types_trivial<'env>(
             TypeKind::Floating(_) | TypeKind::FloatLiteral(_) | TypeKind::IntegerLiteral(_)
         )
     }) {
-        return Some(builtin_types.f64());
+        return Ok(builtin_types.f64());
     }
 
-    None
+    Err(())
 }
 
 fn compute_unifying_integer_type<'env>(
@@ -206,13 +204,13 @@ fn compute_unifying_integer_type<'env>(
     types_iter: impl Iterator<Item = UnaliasedType<'env>>,
     behavior: ConformBehavior,
     source: Source,
-) -> Option<UnaliasedType<'env>> {
+) -> Result<UnaliasedType<'env>, ()> {
     let IntegerProperties {
         largest_loose_used,
         required_bits,
         required_sign,
         ..
-    } = IntegerProperties::compute(types_iter, behavior.c_integer_assumptions())?;
+    } = IntegerProperties::compute(types_iter, behavior.c_integer_assumptions()).ok_or(())?;
 
     let required_sign = required_sign.unwrap_or(IntegerSign::Signed);
     let assumptions = behavior.c_integer_assumptions();
@@ -222,14 +220,14 @@ fn compute_unifying_integer_type<'env>(
             CInteger::smallest_that_fits(c_integer, required_bits.unwrap(), assumptions)
                 .unwrap_or(CInteger::LongLong);
 
-        return Some(UnaliasedType(ctx.alloc(
+        return Ok(UnaliasedType(ctx.alloc(
             TypeKind::CInteger(c_integer, Some(required_sign)).at(source),
         )));
     }
 
     let required_bits = required_bits.unwrap_or(IntegerBits::Bits32);
 
-    return Some(UnaliasedType(ctx.alloc(
+    return Ok(UnaliasedType(ctx.alloc(
         TypeKind::BitInteger(required_bits, required_sign).at(source),
     )));
 }

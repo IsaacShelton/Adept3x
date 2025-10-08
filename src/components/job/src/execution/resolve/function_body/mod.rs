@@ -237,30 +237,32 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         .map(|(bb_id, value)| (*bb_id, cfg.get_typed(*value, builtin_types)));
 
                     // 1] Determine unifying type
-                    let unified = unify_types(
+                    let Ok(unified) = unify_types(
                         ctx,
                         types_iter,
                         conform_behavior.expect("conform behavior for >2 incoming phi"),
                         builtin_types,
                         self.view.target(),
                         instr.source,
-                    );
+                    ) else {
+                        return Err(ErrorDiagnostic::new(
+                            "Cannot unify incompatible values from branches",
+                            instr.source,
+                        )
+                        .into());
+                    };
 
                     // 2] Set incoming jumps to conform to the unifying type
-                    if let Some(unified) = unified {
-                        for (bb, _value) in possible_incoming.iter() {
-                            cfg.set_pre_jump_typed_unary_cast(*bb, None, unified.unified);
-                        }
-
-                        for (bb, cast) in unified.unary_casts {
-                            cfg.set_pre_jump_typed_unary_cast(bb, Some(cast), unified.unified);
-                        }
-
-                        // 3] Result type is the unified type
-                        cfg.set_typed(instr_ref, unified.unified);
-                    } else {
-                        cfg.set_typed(instr_ref, builtin_types.never());
+                    for (bb, _value) in possible_incoming.iter() {
+                        cfg.set_pre_jump_typed_unary_cast(*bb, None, unified.unified);
                     }
+
+                    for (bb, cast) in unified.unary_casts {
+                        cfg.set_pre_jump_typed_unary_cast(bb, Some(cast), unified.unified);
+                    }
+
+                    // 3] Result type is the unified type
+                    cfg.set_typed(instr_ref, unified.unified);
                 }
                 InstrKind::Name(needle, _) => {
                     // 1] Start by checking within current basicblock
