@@ -2,8 +2,8 @@ mod basic_bin_op;
 mod dominators;
 
 use crate::{
-    BasicBlockId, CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor,
-    FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
+    BasicBlockId, CfgBuilder, CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx,
+    Executor, FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
     conform::{ConformMode, conform_to, conform_to_default},
     execution::resolve::{ResolveNamespace, ResolveType},
     flatten_func,
@@ -164,11 +164,11 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     EndInstrKind::IncompleteGoto(_)
                     | EndInstrKind::IncompleteBreak
                     | EndInstrKind::IncompleteContinue => unreachable!(),
-                    EndInstrKind::Return(Some(value), _) => {
+                    EndInstrKind::Return(value, _) => {
                         // 1] Conform the value to return type
                         let conformed = conform_to(
                             ctx,
-                            cfg.get_typed(*value),
+                            cfg.get_typed(*value, builtin_types),
                             self.resolved_head.return_type,
                             c_integer_assumptions,
                             builtin_types,
@@ -181,11 +181,18 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         // 2] Ensure the type of the value matches the return type
                         let Some(conformed) = conformed else {
                             return Err(ErrorDiagnostic::new(
-                                format!(
-                                    "Cannot return value of type '{}', expected '{}'",
-                                    cfg.get_typed(*value).0,
-                                    self.resolved_head.return_type.0
-                                ),
+                                if matches!(value, CfgValue::Void) && !self.resolved_head.return_type.0.kind.is_void() {
+                                    format!(
+                                        "Must return a value of type '{}' before exiting function '{}'",
+                                        self.resolved_head.return_type, self.resolved_head.name
+                                    )
+                                } else {
+                                    format!(
+                                        "Cannot return value of type '{}', expected '{}'",
+                                        cfg.get_typed((*value).into(), builtin_types).0,
+                                        self.resolved_head.return_type.0
+                                    )
+                                },
                                 instr.source,
                             )
                             .into());
@@ -193,18 +200,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                         // 3] Track any casts that were necessary
                         cfg.set_primary_unary_cast(instr_ref, conformed.cast);
-                    }
-                    EndInstrKind::Return(None, _) => {
-                        if !self.resolved_head.return_type.0.kind.is_void() {
-                            return Err(ErrorDiagnostic::new(
-                                format!(
-                                    "Must return a value of type '{}' before exiting function '{}'",
-                                    self.resolved_head.return_type, self.resolved_head.name
-                                ),
-                                instr.source,
-                            )
-                            .into());
-                        }
                     }
                     EndInstrKind::Jump(..)
                     | EndInstrKind::Branch(..)
@@ -220,24 +215,26 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
             let instr = &bb.instrs[instr_ref.instr_or_end as usize];
 
             match &instr.kind {
-                InstrKind::Phi(items, conform_behavior) if items.len() <= 1 => {
+                InstrKind::Phi {
+                    possible_incoming,
+                    conform_behavior: _,
+                } if possible_incoming.len() <= 1 => {
                     // 0] We don't need to do anything fancy if there's not more
                     //    than one incoming value.
-                    let instr = items.first().unwrap().1;
-
-                    let typed = instr
-                        .map(|instr_ref| cfg.get_typed(instr_ref))
-                        .unwrap_or(builtin_types.never());
-
+                    let incoming_value = possible_incoming.first().unwrap().1;
+                    let typed = cfg.get_typed(incoming_value, builtin_types);
                     cfg.set_typed(instr_ref, typed)
                 }
-                InstrKind::Phi(items, conform_behavior) => {
+                InstrKind::Phi {
+                    possible_incoming,
+                    conform_behavior,
+                } => {
                     // NOTE: We already handled the case for when `items.len() <= 1` above.
 
                     // 0] Determine types
-                    let types_iter = items
+                    let types_iter = possible_incoming
                         .iter()
-                        .flat_map(|(bb, value)| value.map(|value| cfg.get_typed(value)));
+                        .map(|(bb_id, value)| (*bb_id, cfg.get_typed(*value, builtin_types)));
 
                     // 1] Determine unifying type
                     let unified = unify_types(
@@ -245,23 +242,25 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         types_iter,
                         conform_behavior.expect("conform behavior for >2 incoming phi"),
                         builtin_types,
+                        self.view.target(),
                         instr.source,
                     );
 
                     // 2] Set incoming jumps to conform to the unifying type
                     if let Some(unified) = unified {
-                        for (bb, value) in items.iter() {
-                            eprintln!(
-                                "warning: optional unary casts for incoming edges for CFG phi is not implemented!"
-                            );
-                            if value.is_some() {
-                                cfg.set_pre_jump_typed_unary_cast(*bb, None);
-                            }
+                        for (bb, _value) in possible_incoming.iter() {
+                            cfg.set_pre_jump_typed_unary_cast(*bb, None, unified.unified);
                         }
-                    }
 
-                    // 3] Result type is the unified type
-                    cfg.set_typed(instr_ref, unified.unwrap_or(builtin_types.never()))
+                        for (bb, cast) in unified.unary_casts {
+                            cfg.set_pre_jump_typed_unary_cast(bb, Some(cast), unified.unified);
+                        }
+
+                        // 3] Result type is the unified type
+                        cfg.set_typed(instr_ref, unified.unified);
+                    } else {
+                        cfg.set_typed(instr_ref, builtin_types.never());
+                    }
                 }
                 InstrKind::Name(needle, _) => {
                     // 1] Start by checking within current basicblock
@@ -360,7 +359,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 3] Conform the variable's initial value to its default concrete type
                     let Some(conformed) = conform_to(
                         ctx,
-                        cfg.get_typed(*value),
+                        cfg.get_typed(*value, builtin_types),
                         resolved_type,
                         c_integer_assumptions,
                         builtin_types,
@@ -372,7 +371,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types '{}' and '{}'",
-                                cfg.get_typed(*value),
+                                cfg.get_typed(*value, builtin_types),
                                 resolved_type
                             ),
                             instr.source,
@@ -392,9 +391,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     src,
                     src_cast: _,
                 } => {
-                    let dest_ty = cfg.get_typed(*dest);
+                    let dest_ty = cfg.get_typed(*dest, builtin_types);
 
-                    let TypeKind::Deref(mut dest_ty) = cfg.get_typed(*dest).0.kind else {
+                    let TypeKind::Deref(mut dest_ty) = cfg.get_typed(*dest, builtin_types).0.kind
+                    else {
                         return Err(ErrorDiagnostic::new(
                             format!("Left side of assignment is not mutable"),
                             instr.source,
@@ -410,7 +410,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     let Some(conformed) = conform_to(
                         ctx,
-                        cfg.get_typed(*src),
+                        cfg.get_typed(*src, builtin_types),
                         dest_ty,
                         c_integer_assumptions,
                         builtin_types,
@@ -422,7 +422,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types '{}' and '{}'",
-                                cfg.get_typed(*src),
+                                cfg.get_typed(*src, builtin_types),
                                 dest_ty
                             ),
                             instr.source,
@@ -533,7 +533,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     // WARNING: This part assumes we don't suspend
                     for (i, arg) in call.args.iter().enumerate() {
-                        let got_type = cfg.get_typed(*arg);
+                        let got_type = cfg.get_typed(*arg, builtin_types);
 
                         let conformed = if let Some(param) = func_head.params.required.get(i) {
                             let expected_type = param.ty;
@@ -604,7 +604,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 1] Conform the value to its default concrete type
                     let conformed = conform_to_default(
                         ctx,
-                        cfg.get_typed(*value),
+                        cfg.get_typed(*value, builtin_types),
                         c_integer_assumptions,
                         builtin_types,
                         self.view.target(),
@@ -630,7 +630,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::ConformToBool(value, language, _) => {
                     let conformed = conform_to_default(
                         ctx,
-                        cfg.get_typed(*value),
+                        cfg.get_typed(*value, builtin_types),
                         c_integer_assumptions,
                         builtin_types,
                         self.view.target(),

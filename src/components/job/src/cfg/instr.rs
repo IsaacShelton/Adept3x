@@ -1,5 +1,5 @@
 use crate::{
-    BasicBlockId, InstrRef,
+    BasicBlockId, CfgValue, InstrRef,
     conform::UnaryCast,
     module_graph::ModuleView,
     repr::{FuncHead, UnaliasedType, VariableRef},
@@ -27,20 +27,16 @@ impl<'env> Display for EndInstrKind<'env> {
             EndInstrKind::IncompleteGoto(name) => writeln!(f, "incomplete goto {}", name),
             EndInstrKind::IncompleteBreak => writeln!(f, "incomplete break"),
             EndInstrKind::IncompleteContinue => writeln!(f, "incomplete continue"),
-            EndInstrKind::Return(instr_ref, cast) => {
-                if let Some(instr_ref) = instr_ref {
-                    write!(f, "return {}", instr_ref)?;
-                } else {
-                    write!(f, "return")?;
-                }
+            EndInstrKind::Return(value, cast) => {
+                write!(f, "return {}", value)?;
 
                 if let Some(cast) = cast {
                     write!(f, "\n        | casts to: {:?}", cast)?;
                 }
                 writeln!(f, "")
             }
-            EndInstrKind::Jump(bb_id, _value, typed_unary_cat) => {
-                if let Some(typed_unary_cast) = typed_unary_cat {
+            EndInstrKind::Jump(bb_id, _value, typed_unary_cast, _to_ty) => {
+                if let Some(typed_unary_cast) = typed_unary_cast {
                     writeln!(f, "jump {} as {:?}", bb_id, typed_unary_cast)
                 } else {
                     writeln!(f, "jump {}", bb_id)
@@ -78,9 +74,14 @@ pub enum EndInstrKind<'env> {
     IncompleteGoto(&'env str),
     IncompleteBreak,
     IncompleteContinue,
-    Return(Option<InstrRef>, Option<UnaryCast<'env>>),
-    Jump(BasicBlockId, Option<InstrRef>, Option<UnaryCast<'env>>),
-    Branch(InstrRef, BasicBlockId, BasicBlockId, Option<BreakContinue>),
+    Return(CfgValue, Option<UnaryCast<'env>>),
+    Jump(
+        BasicBlockId,
+        CfgValue,
+        Option<UnaryCast<'env>>,
+        Option<UnaliasedType<'env>>,
+    ),
+    Branch(CfgValue, BasicBlockId, BasicBlockId, Option<BreakContinue>),
     NewScope(BasicBlockId, BasicBlockId),
     Unreachable,
 }
@@ -113,15 +114,14 @@ impl<'env> Display for Instr<'env> {
 impl<'env> Display for InstrKind<'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InstrKind::Phi(items, conform_behavior) => {
+            InstrKind::Phi {
+                possible_incoming,
+                conform_behavior,
+            } => {
                 write!(f, "phi ")?;
 
-                for (bb_id, instr_ref) in items.iter() {
-                    if let Some(instr_ref) = instr_ref {
-                        write!(f, "[{} {}] ", bb_id, instr_ref)?;
-                    } else {
-                        write!(f, "[{} None] ", bb_id)?;
-                    }
+                for (bb_id, cfg_value) in possible_incoming.iter() {
+                    write!(f, "[{} {}] ", bb_id, cfg_value)?;
                 }
 
                 write!(f, "{:?}", conform_behavior)?;
@@ -130,9 +130,9 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::Parameter(name, ty, index, _) => {
                 write!(f, "param {} {} {}", name, ty, index)?;
             }
-            InstrKind::Declare(name, ty, instr_ref, cast, _) => {
-                if let Some(instr_ref) = instr_ref {
-                    write!(f, "declare {} {} {}", name, ty, instr_ref)?;
+            InstrKind::Declare(name, ty, cfg_value, cast, _) => {
+                if let Some(cfg_value) = cfg_value {
+                    write!(f, "declare {} {} {}", name, ty, cfg_value)?;
                 } else {
                     write!(f, "declare {} {}", name, ty)?;
                 }
@@ -181,18 +181,18 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::Call(call, _) => {
                 write!(f, "call {} (", call.name_path)?;
 
-                for (i, instr_ref) in call.args.iter().enumerate() {
+                for (i, cfg_value) in call.args.iter().enumerate() {
                     if i + 1 == call.args.len() {
-                        write!(f, "{}", instr_ref)?;
+                        write!(f, "{}", cfg_value)?;
                     } else {
-                        write!(f, "{}, ", instr_ref)?;
+                        write!(f, "{}, ", cfg_value)?;
                     }
                 }
 
                 write!(f, ") {:?} {:?}", call.generics, call.expected_to_return)?;
             }
-            InstrKind::DeclareAssign(name, instr_ref, cast, _) => {
-                write!(f, "declare_assign {} {}", name, instr_ref)?;
+            InstrKind::DeclareAssign(name, cfg_value, cast, _) => {
+                write!(f, "declare_assign {} {}", name, cfg_value)?;
 
                 if let Some(cast) = cast {
                     write!(f, "\n        | casts to: {:?}", cast)?;
@@ -226,30 +226,30 @@ impl<'env> Display for InstrKind<'env> {
                     struct_lit.fill_behavior, struct_lit.language
                 )?;
             }
-            InstrKind::UnaryOperation(op, instr_ref) => {
-                write!(f, "unary_op {:?} {}", op, instr_ref)?;
+            InstrKind::UnaryOperation(op, cfg_value) => {
+                write!(f, "unary_op {:?} {}", op, cfg_value)?;
             }
             InstrKind::SizeOf(ty, mode) => {
                 write!(f, "sizeof {} {:?}", ty, mode)?;
             }
-            InstrKind::SizeOfValue(instr_ref, mode) => {
-                write!(f, "sizeof_value {} {:?}", instr_ref, mode)?;
+            InstrKind::SizeOfValue(cfg_value, mode) => {
+                write!(f, "sizeof_value {} {:?}", cfg_value, mode)?;
             }
             InstrKind::InterpreterSyscall(syscall) => {
                 write!(f, "interp_systcall {:?}", syscall)?;
             }
-            InstrKind::IntegerPromote(instr_ref) => {
-                write!(f, "integer_promote {}", instr_ref)?;
+            InstrKind::IntegerPromote(cfg_value) => {
+                write!(f, "integer_promote {}", cfg_value)?;
             }
-            InstrKind::ConformToBool(instr_ref, language, cast) => {
-                write!(f, "conform_to_bool {} {:?}", instr_ref, language)?;
+            InstrKind::ConformToBool(cfg_value, language, cast) => {
+                write!(f, "conform_to_bool {} {:?}", cfg_value, language)?;
 
                 if let Some(cast) = cast {
                     write!(f, "\n        | casts to: {:?}", cast)?;
                 }
             }
-            InstrKind::Is(instr_ref, variant) => {
-                write!(f, "is {} {}", instr_ref, variant)?;
+            InstrKind::Is(cfg_value, variant) => {
+                write!(f, "is {} {}", cfg_value, variant)?;
             }
             InstrKind::LabelLiteral(label) => {
                 write!(f, "label_lit {}", label)?;
@@ -260,30 +260,30 @@ impl<'env> Display for InstrKind<'env> {
 }
 
 // Getting this down to 32 is going to take some extreme manual layout optimization
-const _: () = assert!(std::mem::size_of::<InstrKind>() <= 64);
+const _: () = assert!(std::mem::size_of::<InstrKind>() <= 72);
 const _: () = assert!(std::mem::align_of::<InstrKind>() <= 8);
 
 #[derive(Clone, Debug)]
 pub enum InstrKind<'env> {
-    Phi(
-        &'env [(BasicBlockId, Option<InstrRef>)],
-        Option<ConformBehavior>,
-    ),
+    Phi {
+        possible_incoming: &'env [(BasicBlockId, CfgValue)],
+        conform_behavior: Option<ConformBehavior>,
+    },
     Name(&'env str, Option<VariableRef<'env>>),
     Parameter(&'env str, &'env ast::Type, u32, Option<VariableRef<'env>>),
     Declare(
         &'env str,
         &'env ast::Type,
-        Option<InstrRef>,
+        Option<CfgValue>,
         Option<UnaryCast<'env>>,
         Option<VariableRef<'env>>,
     ),
     Assign {
-        dest: InstrRef,
-        src: InstrRef,
+        dest: CfgValue,
+        src: CfgValue,
         src_cast: Option<UnaryCast<'env>>,
     },
-    BinOp(InstrRef, ast::BasicBinaryOperator, InstrRef, Language),
+    BinOp(CfgValue, ast::BasicBinaryOperator, CfgValue, Language),
     BooleanLiteral(bool),
     IntegerLiteral(&'env Integer),
     FloatLiteral(f64),
@@ -296,20 +296,20 @@ pub enum InstrKind<'env> {
     Call(&'env CallInstr<'env>, Option<CallTarget<'env>>),
     DeclareAssign(
         &'env str,
-        InstrRef,
+        CfgValue,
         Option<UnaryCast<'env>>,
         Option<VariableRef<'env>>,
     ),
-    Member(InstrRef, &'env str, Privacy),
-    ArrayAccess(InstrRef, InstrRef),
+    Member(CfgValue, &'env str, Privacy),
+    ArrayAccess(CfgValue, CfgValue),
     StructLiteral(&'env StructLiteralInstr<'env>),
-    UnaryOperation(UnaryOperator, InstrRef),
+    UnaryOperation(UnaryOperator, CfgValue),
     SizeOf(&'env ast::Type, Option<SizeOfMode>),
-    SizeOfValue(InstrRef, Option<SizeOfMode>),
+    SizeOfValue(CfgValue, Option<SizeOfMode>),
     InterpreterSyscall(&'env InterpreterSyscallInstr<'env>),
-    IntegerPromote(InstrRef),
-    ConformToBool(InstrRef, Language, Option<UnaryCast<'env>>),
-    Is(InstrRef, &'env str),
+    IntegerPromote(CfgValue),
+    ConformToBool(CfgValue, Language, Option<UnaryCast<'env>>),
+    Is(CfgValue, &'env str),
     LabelLiteral(&'env str),
 }
 
@@ -326,7 +326,7 @@ impl<'env> InstrKind<'env> {
 #[derive(Debug)]
 pub struct CallInstr<'env> {
     pub name_path: &'env NamePath,
-    pub args: &'env [InstrRef],
+    pub args: &'env [CfgValue],
     pub expected_to_return: Option<&'env ast::Type>,
     pub generics: &'env [&'env ast::Type],
 }
@@ -350,12 +350,12 @@ pub struct StructLiteralInstr<'env> {
 #[derive(Debug)]
 pub struct FieldInitializer<'env> {
     pub name: Option<&'env str>,
-    pub value: InstrRef,
+    pub value: CfgValue,
 }
 
 #[derive(Debug)]
 pub struct InterpreterSyscallInstr<'env> {
     pub kind: interpreter_api::Syscall,
-    pub args: &'env [(&'env ast::Type, InstrRef)],
+    pub args: &'env [(&'env ast::Type, CfgValue)],
     pub result_type: &'env ast::Type,
 }

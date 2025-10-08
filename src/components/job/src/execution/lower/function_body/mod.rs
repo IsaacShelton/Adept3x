@@ -1,7 +1,7 @@
 mod integer;
 mod ir_builder;
 use crate::{
-    Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
+    CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
     RevPostOrderIterWithEnds, Suspend,
     conform::UnaryCast,
     execution::lower::LowerFunctionHead,
@@ -120,6 +120,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
             .rev_post_order
             .get_or_insert_with(|| RevPostOrderIterWithEnds::new(self.body.post_order));
 
+        let builtin_types = self.compiler.builtin_types;
+
         while let Some(instr_ref) = rev_post_order.peek() {
             let bb_id = instr_ref.basicblock;
             let bb_index = bb_id.into_usize();
@@ -130,17 +132,18 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 let instr = &bb.instrs[instr_ref.instr_or_end as usize];
 
                 let result = match &instr.kind {
-                    InstrKind::Phi(items, _conform_behavior) => {
+                    InstrKind::Phi {
+                        possible_incoming,
+                        conform_behavior: _,
+                    } => {
                         let unified_type = instr.typed.as_ref().unwrap();
                         let ir_type = to_ir_type(ctx, self.view.target(), unified_type.0)?;
 
-                        let incoming = items
+                        let incoming = possible_incoming
                             .iter()
-                            .flat_map(|(bb, value)| {
-                                value.map(|value| ir::PhiIncoming {
-                                    basicblock_id: bb.into_usize(),
-                                    value: builder.get_output(value),
-                                })
+                            .map(|(bb, value)| ir::PhiIncoming {
+                                basicblock_id: bb.into_usize(),
+                                value: builder.get_output(*value),
                             })
                             .collect_vec();
 
@@ -190,7 +193,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     } => {
                         let new_value = builder.get_output(*src);
 
-                        let TypeKind::Deref(mut to_ty) = cfg.get_typed(*dest).0.kind else {
+                        let TypeKind::Deref(mut to_ty) = cfg.get_typed(*dest, builtin_types).0.kind
+                        else {
                             return Err(ErrorDiagnostic::new(
                                 "Could not assign value, left hand side is not mutable",
                                 instr.source,
@@ -373,9 +377,18 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!(),
                     InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
                     InstrKind::IntegerPromote(instr_ref) => todo!(),
-                    InstrKind::ConformToBool(value, language, unary_cast) => {
-                        eprintln!("warning: lowering conform to bool is not implemented yet!");
-                        builder.get_output(*value)
+                    InstrKind::ConformToBool(value, _language, unary_cast) => {
+                        let to_ty = to_ir_type(ctx, self.view.target(), instr.typed.unwrap().0)?;
+
+                        perform_unary_cast_to(
+                            ctx,
+                            builder,
+                            builder.get_output(*value),
+                            &to_ty,
+                            unary_cast.as_ref(),
+                            self.view.target(),
+                            instr.source,
+                        )?
                     }
                     InstrKind::Is(instr_ref, _) => todo!(),
                     InstrKind::LabelLiteral(_) => todo!(),
@@ -386,46 +399,57 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 continue;
             }
 
-            let instr_end = &bb.end;
+            let end_instr = &bb.end;
 
-            let result = match &instr_end.kind {
+            let result = match &end_instr.kind {
                 EndInstrKind::IncompleteGoto(_) => todo!(),
                 EndInstrKind::IncompleteBreak => todo!(),
                 EndInstrKind::IncompleteContinue => todo!(),
                 EndInstrKind::Return(return_value, unary_cast) => {
-                    let return_instr = ir::Instr::Return(
-                        return_value
-                            .map(|return_value| {
-                                to_ir_type(ctx, self.view.target(), self.head.return_type.0)
-                                    .and_then(|ir_return_ty| {
-                                        perform_unary_cast_to(
-                                            ctx,
-                                            builder,
-                                            builder.get_output(return_value),
-                                            &ir_return_ty,
-                                            unary_cast.as_ref(),
-                                            self.view.target(),
-                                            instr_end.source,
-                                        )
-                                    })
-                            })
-                            .transpose()?,
-                    );
+                    let return_instr = ir::Instr::Return(if let CfgValue::Void = return_value {
+                        None
+                    } else {
+                        // TODO: Technically, this should be expanded to handle the case
+                        // where we return void as a value.
+                        Some(
+                            to_ir_type(ctx, self.view.target(), self.head.return_type.0).and_then(
+                                |ir_return_ty| {
+                                    perform_unary_cast_to(
+                                        ctx,
+                                        builder,
+                                        builder.get_output(*return_value),
+                                        &ir_return_ty,
+                                        unary_cast.as_ref(),
+                                        self.view.target(),
+                                        end_instr.source,
+                                    )
+                                },
+                            )?,
+                        )
+                    });
 
                     builder.push(return_instr);
                     ir::Literal::Void.into()
                 }
-                EndInstrKind::Jump(basic_block_id, value, unaliased_type) => {
-                    let value = value.map(|value| builder.get_output(value));
-
-                    // TODO: Perform conform before assigning value
-                    eprintln!("warning: casts for jumps are not performed yet");
+                EndInstrKind::Jump(basic_block_id, value, cast, to_ty) => {
+                    let value = builder.get_output(*value);
+                    let to_ty = to_ty.unwrap();
+                    let to_ty = to_ir_type(ctx, self.view.target(), &to_ty.0)?;
+                    let value = perform_unary_cast_to(
+                        ctx,
+                        builder,
+                        value,
+                        &to_ty,
+                        cast.as_ref(),
+                        self.view.target(),
+                        end_instr.source,
+                    )?;
 
                     builder.push(ir::Instr::Break(ir::Break {
                         basicblock_id: basic_block_id.into_usize(),
                     }));
 
-                    value.unwrap_or(ir::Literal::Void.into())
+                    value
                 }
                 EndInstrKind::Branch(condition, when_true, when_false, break_continue) => {
                     let condition = builder.get_output(*condition);
@@ -495,7 +519,7 @@ fn perform_unary_cast_to<'env>(
         };
 
         value = match *cast {
-            UnaryCast::SpecializeBoolean(_) => todo!(),
+            UnaryCast::SpecializeBoolean(value) => ir::Literal::Boolean(value).into(),
             UnaryCast::SpecializeInteger(value) => match to_ty {
                 ir::Type::Bool => ir::Literal::Boolean(*value != BigInt::ZERO).into(),
                 ir::Type::I(Bits8, Signed) => {

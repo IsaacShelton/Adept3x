@@ -1,8 +1,9 @@
 mod builder;
 mod flatten;
 mod instr;
+mod value;
 
-use crate::repr::UnaliasedType;
+use crate::{BuiltinTypes, repr::UnaliasedType};
 use arena::{Arena, Id, Idx, new_id_with_niche};
 pub use builder::*;
 use diagnostics::ErrorDiagnostic;
@@ -10,6 +11,7 @@ pub use flatten::*;
 pub use instr::*;
 use source_files::Source;
 use std::{collections::HashMap, fmt::Display};
+pub use value::*;
 
 new_id_with_niche!(BasicBlockId, u32);
 
@@ -104,7 +106,15 @@ impl<'env> Cfg<'env> {
         })
     }
 
-    pub fn get_typed(&self, instr_ref: InstrRef) -> UnaliasedType<'env> {
+    pub fn get_typed(
+        &self,
+        cfg_value: CfgValue,
+        builtin_types: &'env BuiltinTypes<'env>,
+    ) -> UnaliasedType<'env> {
+        let CfgValue::Instr(instr_ref) = cfg_value else {
+            return builtin_types.void();
+        };
+
         let bb = &self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
         bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()

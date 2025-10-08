@@ -1,6 +1,6 @@
 pub use super::*;
 use crate::{
-    ExecutionCtx,
+    BuiltinTypes, ExecutionCtx,
     cfg::instr::{BreakContinue, CallTarget},
     conform::UnaryCast,
     module_graph::ModuleView,
@@ -60,15 +60,30 @@ impl<'env> CfgBuilder<'env> {
         )
     }
 
+    pub fn never_or_void(&self, cursor: &Cursor) -> CfgValue {
+        let bb = &self.basicblocks[cursor.basicblock()];
+
+        if bb.end.is_some() {
+            CfgValue::Instr(InstrRef::new(
+                cursor.basicblock().into_raw(),
+                bb.instrs.len().try_into().unwrap(),
+            ))
+        } else {
+            CfgValue::Void
+        }
+    }
+
     pub fn set_pre_jump_typed_unary_cast(
         &mut self,
         bb_id: BasicBlockId,
         cast: Option<UnaryCast<'env>>,
+        to_ty: UnaliasedType<'env>,
     ) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(bb_id) }];
         match &mut bb.end.as_mut().unwrap().kind {
-            EndInstrKind::Jump(_, _, typed_unary_cast) => {
-                *typed_unary_cast = cast;
+            EndInstrKind::Jump(_, _, unary_cast, ty) => {
+                *unary_cast = cast;
+                *ty = Some(to_ty);
             }
             _ => panic!("cannot set_jump_pre_conform for non-jump"),
         }
@@ -108,7 +123,15 @@ impl<'env> CfgBuilder<'env> {
         instr.typed = Some(callee.return_type);
     }
 
-    pub fn get_typed(&self, instr_ref: InstrRef) -> UnaliasedType<'env> {
+    pub fn get_typed(
+        &self,
+        cfg_value: CfgValue,
+        builtin_types: &'env BuiltinTypes<'env>,
+    ) -> UnaliasedType<'env> {
+        let CfgValue::Instr(instr_ref) = cfg_value else {
+            return builtin_types.void();
+        };
+
         let bb = &self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
         bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
@@ -195,9 +218,15 @@ impl<'env> CfgBuilder<'env> {
     pub fn push_jump_to_new_block(&mut self, cursor: &mut Cursor, source: Source) {
         let new_block = self.new_block();
 
-        self.push_end(
+        self.try_push_end(
+            EndInstrKind::Jump(
+                new_block.basicblock().into_raw(),
+                self.never_or_void(cursor),
+                None,
+                None,
+            )
+            .at(source),
             cursor,
-            EndInstrKind::Jump(new_block.basicblock().into_raw(), None, None).at(source),
         );
 
         *cursor = new_block;
@@ -227,7 +256,7 @@ impl<'env> CfgBuilder<'env> {
         self.basicblocks[cursor.basicblock()].end.is_some()
     }
 
-    pub fn push(&mut self, cursor: &mut Cursor, instr: Instr<'env>) -> InstrRef {
+    pub fn try_push(&mut self, cursor: &mut Cursor, instr: Instr<'env>) -> InstrRef {
         let bb = &mut self.basicblocks[cursor.basicblock()];
         let new_instr = InstrRef::new(cursor.basicblock, bb.inner_len());
 
@@ -238,15 +267,15 @@ impl<'env> CfgBuilder<'env> {
         new_instr
     }
 
-    pub fn push_end(&mut self, cursor: &mut Cursor, end_instr: EndInstr<'env>) -> InstrRef {
+    pub fn try_push_end(&mut self, end_instr: EndInstr<'env>, cursor: &mut Cursor) -> InstrRef {
         let bb = &mut self.basicblocks[cursor.basicblock()];
         bb.end.get_or_insert(end_instr);
         InstrRef::new(cursor.basicblock, bb.inner_len())
     }
 
-    pub fn push_branch(
+    pub fn try_push_branch(
         &mut self,
-        condition: InstrRef,
+        condition: CfgValue,
         cursor: &mut Cursor,
         break_continue: Option<BreakContinue>,
         source: Source,
@@ -271,8 +300,7 @@ impl<'env> CfgBuilder<'env> {
                 .into_raw(),
         );
 
-        self.push_end(
-            cursor,
+        self.try_push_end(
             EndInstrKind::Branch(
                 condition,
                 when_true.basicblock,
@@ -280,6 +308,7 @@ impl<'env> CfgBuilder<'env> {
                 break_continue,
             )
             .at(source),
+            cursor,
         );
 
         (when_true, when_false)
@@ -306,9 +335,9 @@ impl<'env> CfgBuilder<'env> {
                 .into_raw(),
         );
 
-        self.push_end(
-            cursor,
+        self.try_push_end(
             EndInstrKind::NewScope(in_scope.basicblock, close_scope.basicblock).at(source),
+            cursor,
         );
 
         (in_scope, close_scope)
@@ -338,7 +367,8 @@ impl<'env> CfgBuilder<'env> {
                     ));
                 };
 
-                bb.end.as_mut().unwrap().kind = EndInstrKind::Jump(*target, None, None);
+                bb.end.as_mut().unwrap().kind =
+                    EndInstrKind::Jump(*target, CfgValue::Void, None, None);
             }
         }
 

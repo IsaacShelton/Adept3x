@@ -5,7 +5,8 @@
 */
 
 use crate::{
-    BuiltinTypes, ExecutionCtx,
+    BasicBlockId, BuiltinTypes, ExecutionCtx,
+    conform::{ConformMode, UnaryCast, conform_to},
     repr::{Type, TypeKind, UnaliasedType},
 };
 use ast::ConformBehavior;
@@ -14,25 +15,81 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use primitives::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
+use target::Target;
+
+#[derive(Debug)]
+pub struct UnifySolution<'env> {
+    pub unified: UnaliasedType<'env>,
+    pub unary_casts: Vec<(BasicBlockId, UnaryCast<'env>)>,
+}
 
 pub fn unify_types<'env>(
+    ctx: &mut ExecutionCtx<'env>,
+    types_iter: impl Iterator<Item = (BasicBlockId, UnaliasedType<'env>)> + Clone,
+    behavior: ConformBehavior,
+    builtin_types: &'env BuiltinTypes<'env>,
+    target: &Target,
+    source: Source,
+) -> Option<UnifySolution<'env>> {
+    let to_ty = unify_types_trivial(
+        ctx,
+        types_iter.clone().map(|(_bb, ty)| ty),
+        behavior,
+        builtin_types,
+        source,
+    )?;
+
+    let mut casts = Vec::with_capacity(types_iter.clone().count());
+
+    for (bb_id, from_ty) in types_iter {
+        if from_ty.0.kind.is_never() {
+            continue;
+        }
+
+        let conformed = conform_to(
+            ctx,
+            from_ty,
+            to_ty,
+            behavior.c_integer_assumptions(),
+            builtin_types,
+            target,
+            ConformMode::Explicit,
+            // NOTE: We don't handle polymorphs, since this is only for trivial
+            // type unification.
+            |_, _| false,
+            source,
+        )
+        .expect("failed to conform value to unified type");
+
+        if let Some(cast) = conformed.cast {
+            casts.push((bb_id, cast));
+        }
+    }
+
+    Some(UnifySolution {
+        unified: to_ty,
+        unary_casts: casts,
+    })
+}
+
+pub fn unify_types_trivial<'env>(
     ctx: &mut ExecutionCtx<'env>,
     types_iter: impl Iterator<Item = UnaliasedType<'env>> + Clone,
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
     source: Source,
 ) -> Option<UnaliasedType<'env>> {
-    let types_iter = types_iter.filter(|ty| !ty.0.kind.is_never());
+    let incoming = types_iter.filter(|ty| !ty.0.kind.is_never());
 
     // If unreachable, the unifying type is the never type
-    if types_iter.clone().next().is_none() {
+    if incoming.clone().next().is_none() {
         return Some(builtin_types.never());
     }
 
     // If all the values have the same type, the unifying type is that type
-    if types_iter.clone().all_equal() {
+    if incoming.clone().all_equal() {
         return Some(
-            types_iter
+            incoming
                 .clone()
                 .next()
                 .unwrap_or_else(|| builtin_types.void()),
@@ -41,14 +98,14 @@ pub fn unify_types<'env>(
 
     // If all the values are integer literals, the unifying type is either
     // the preferred type or the default integer type
-    if types_iter
+    if incoming
         .clone()
         .all(|ty| ty.0.kind.is_integer_literal() || ty.0.kind.is_integer_literal_in_range())
     {
         let mut min = Option::<&'env BigInt>::None;
         let mut max = Option::<&'env BigInt>::None;
 
-        for ty in types_iter {
+        for ty in incoming {
             match &ty.0.kind {
                 TypeKind::IntegerLiteral(big_int) => {
                     if let Some(current_min) = min {
@@ -102,12 +159,12 @@ pub fn unify_types<'env>(
     }
 
     // If all the values are float literals, the unifying type is f64
-    if types_iter.clone().all(|ty| ty.0.kind.is_integer_literal()) {
+    if incoming.clone().all(|ty| ty.0.kind.is_integer_literal()) {
         return Some(builtin_types.f64());
     }
 
     // If all values are integer and floating literals, use the default floating-point type
-    if types_iter.clone().all(|ty| {
+    if incoming.clone().all(|ty| {
         matches!(
             ty.0.kind,
             TypeKind::IntegerLiteral(..) | TypeKind::FloatLiteral(..)
@@ -117,12 +174,12 @@ pub fn unify_types<'env>(
     }
 
     // If all values are integers and integer literals
-    if types_iter.clone().all(|ty| ty.0.kind.is_integer()) {
-        return compute_unifying_integer_type(ctx, types_iter, behavior, source);
+    if incoming.clone().all(|ty| ty.0.kind.is_integer()) {
+        return compute_unifying_integer_type(ctx, incoming, behavior, source);
     }
 
     // If all values are f32's and float literals, the result should be f32
-    if types_iter.clone().all(|ty| {
+    if incoming.clone().all(|ty| {
         matches!(
             ty.0.kind,
             TypeKind::Floating(FloatSize::Bits32) | TypeKind::FloatLiteral(_)
@@ -132,7 +189,7 @@ pub fn unify_types<'env>(
     }
 
     // Otherwise if all values floating points / integer literals, the result should be f64
-    if types_iter.clone().all(|ty| {
+    if incoming.clone().all(|ty| {
         matches!(
             ty.0.kind,
             TypeKind::Floating(_) | TypeKind::FloatLiteral(_) | TypeKind::IntegerLiteral(_)

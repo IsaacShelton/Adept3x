@@ -4,7 +4,7 @@ use compiler::BuildOptions;
 use diagnostics::{Diagnostics, ErrorDiagnostic, WarningDiagnostic};
 use itertools::Itertools;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     process::Command,

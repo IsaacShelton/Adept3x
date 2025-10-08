@@ -1,4 +1,4 @@
-use crate::{InstrRef, ir, repr::FuncBody};
+use crate::{CfgValue, InstrRef, ir, repr::FuncBody};
 use arena::Id;
 
 #[derive(Clone, Debug)]
@@ -51,7 +51,11 @@ impl<'env> IrBuilder<'env> {
         self.current_cfg_instr_index += 1;
     }
 
-    pub fn get_output(&self, instr_ref: InstrRef) -> ir::Value<'env> {
+    pub fn get_output(&self, cfg_value: CfgValue) -> ir::Value<'env> {
+        let CfgValue::Instr(instr_ref) = cfg_value else {
+            return ir::Literal::Void.into();
+        };
+
         *self.outputs[instr_ref.basicblock.into_usize()][instr_ref.instr_or_end as usize]
             .as_ref()
             .unwrap()
