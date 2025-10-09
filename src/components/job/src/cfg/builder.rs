@@ -133,8 +133,21 @@ impl<'env> CfgBuilder<'env> {
         };
 
         let bb = &self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
-        assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
-        bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
+
+        if (instr_ref.instr_or_end as usize) < bb.instrs.len() {
+            bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
+        } else {
+            let end = bb.end.as_ref().unwrap();
+
+            match end.kind {
+                EndInstrKind::Jump(_, _, _, unaliased_type) => unaliased_type.unwrap(),
+                // If nothing inside of taken branch, result is void
+                EndInstrKind::Branch(_, _, _, _) | EndInstrKind::NewScope(_, _) => {
+                    builtin_types.void()
+                }
+                _ => panic!("cannot get type of non-jump end instruction"),
+            }
+        }
     }
 
     pub fn set_primary_unary_cast(&mut self, instr_ref: InstrRef, cast: Option<UnaryCast<'env>>) {

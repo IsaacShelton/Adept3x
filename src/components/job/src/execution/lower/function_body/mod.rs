@@ -432,24 +432,29 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     ir::Literal::Void.into()
                 }
                 EndInstrKind::Jump(basic_block_id, value, cast, to_ty) => {
-                    let value = builder.get_output(*value);
-                    let to_ty = to_ty.unwrap();
-                    let to_ty = to_ir_type(ctx, self.view.target(), &to_ty.0)?;
-                    let value = perform_unary_cast_to(
-                        ctx,
-                        builder,
-                        value,
-                        &to_ty,
-                        cast.as_ref(),
-                        self.view.target(),
-                        end_instr.source,
-                    )?;
+                    if let Some(to_ty) = to_ty {
+                        let value = builder.get_output(*value);
+                        let to_ty = to_ir_type(ctx, self.view.target(), &to_ty.0)?;
+                        let value = perform_unary_cast_to(
+                            ctx,
+                            builder,
+                            value,
+                            &to_ty,
+                            cast.as_ref(),
+                            self.view.target(),
+                            end_instr.source,
+                        )?;
 
-                    builder.push(ir::Instr::Break(ir::Break {
-                        basicblock_id: basic_block_id.into_usize(),
-                    }));
-
-                    value
+                        builder.push(ir::Instr::Break(ir::Break {
+                            basicblock_id: basic_block_id.into_usize(),
+                        }));
+                        value
+                    } else {
+                        builder.push(ir::Instr::Break(ir::Break {
+                            basicblock_id: basic_block_id.into_usize(),
+                        }));
+                        ir::Literal::Void.into()
+                    }
                 }
                 EndInstrKind::Branch(condition, when_true, when_false, break_continue) => {
                     let condition = builder.get_output(*condition);

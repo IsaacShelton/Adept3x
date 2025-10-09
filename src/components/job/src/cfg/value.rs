@@ -13,6 +13,12 @@ pub enum CfgValue {
     Instr(InstrRef),
 }
 
+impl CfgValue {
+    pub fn is_known_void(&self) -> bool {
+        matches!(self, Self::Void)
+    }
+}
+
 impl Display for CfgValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
