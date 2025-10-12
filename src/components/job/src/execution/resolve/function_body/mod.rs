@@ -15,7 +15,7 @@ use crate::{
     unify::unify_types,
 };
 use arena::ArenaMap;
-use ast::Integer;
+use ast::{Integer, UnaryOperator};
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
@@ -445,7 +445,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
                 InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
-                    todo!()
+                    todo!("resolve binop")
                 }
                 InstrKind::BooleanLiteral(value) => {
                     cfg.set_typed(
@@ -631,7 +631,51 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::Member(instr_ref, _, privacy) => todo!("member"),
                 InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!("array access"),
                 InstrKind::StructLiteral(struct_literal_instr) => todo!("struct litereal"),
-                InstrKind::UnaryOperation(unary_operator, instr_ref) => todo!("unary operation"),
+
+                InstrKind::UnaryOperation(unary_operator, value, _) => {
+                    match unary_operator {
+                        ast::UnaryOperator::Math(ast::UnaryMathOperator::Not) => {
+                            let value_ty = cfg.get_typed(*value, builtin_types);
+
+                            if let TypeKind::BooleanLiteral(bool_value) = &value_ty.0.kind {
+                                cfg.set_typed(
+                                    instr_ref,
+                                    UnaliasedType(ctx.alloc(
+                                        TypeKind::BooleanLiteral(!bool_value).at(instr.source),
+                                    )),
+                                );
+                            } else {
+                                // 1] Conform the value to its default concrete type
+                                let conformed = conform_to_default(
+                                    ctx,
+                                    value_ty,
+                                    c_integer_assumptions,
+                                    builtin_types,
+                                    self.view.target(),
+                                )?;
+
+                                if !conformed.ty.0.kind.is_boolean() {
+                                    return Err(ErrorDiagnostic::new(
+                                        format!(
+                                            "Cannot perform not operator on non-bool value of type `{}`",
+                                            conformed.ty
+                                        ),
+                                        instr.source,
+                                    )
+                                    .into());
+                                }
+
+                                cfg.set_primary_unary_cast(instr_ref, conformed.cast);
+                                cfg.set_typed(instr_ref, builtin_types.bool());
+                            }
+                        }
+                        ast::UnaryOperator::Math(ast::UnaryMathOperator::Negate) => todo!(),
+                        ast::UnaryOperator::Math(ast::UnaryMathOperator::IsNonZero) => todo!(),
+                        ast::UnaryOperator::Math(ast::UnaryMathOperator::BitComplement) => todo!(),
+                        ast::UnaryOperator::AddressOf => todo!(),
+                        ast::UnaryOperator::Dereference => todo!(),
+                    }
+                }
                 InstrKind::SizeOf(_, size_of_mode) => todo!("sizeof"),
                 InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!("sizeof value"),
                 InstrKind::InterpreterSyscall(interpreter_syscall_instr) => {

@@ -19,7 +19,7 @@ use integer::*;
 use ir_builder::*;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use primitives::{FloatSize, IntegerBits, IntegerSign};
+use primitives::{FloatOrInteger, FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
 use target::Target;
 
@@ -371,7 +371,30 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::Member(instr_ref, _, privacy) => todo!(),
                     InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
                     InstrKind::StructLiteral(struct_literal_instr) => todo!(),
-                    InstrKind::UnaryOperation(unary_operator, instr_ref) => todo!(),
+                    InstrKind::UnaryOperation(unary_operator, cfg_value, cast) => {
+                        match unary_operator {
+                            ast::UnaryOperator::Math(ast::UnaryMathOperator::Not) => {
+                                let value = perform_unary_cast_to(
+                                    ctx,
+                                    builder,
+                                    builder.get_output(*cfg_value),
+                                    &ir::Type::Bool,
+                                    cast.as_ref(),
+                                    self.view.target(),
+                                    instr.source,
+                                )?;
+
+                                builder.push(ir::Instr::IsZero(value, FloatOrInteger::Integer))
+                            }
+                            ast::UnaryOperator::Math(ast::UnaryMathOperator::Negate) => todo!(),
+                            ast::UnaryOperator::Math(ast::UnaryMathOperator::IsNonZero) => todo!(),
+                            ast::UnaryOperator::Math(ast::UnaryMathOperator::BitComplement) => {
+                                todo!()
+                            }
+                            ast::UnaryOperator::AddressOf => todo!(),
+                            ast::UnaryOperator::Dereference => todo!(),
+                        }
+                    }
                     InstrKind::SizeOf(_, size_of_mode) => todo!(),
                     InstrKind::SizeOfValue(instr_ref, size_of_mode) => todo!(),
                     InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
@@ -490,6 +513,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
         // Attach body to function
         let ir = self.view.web.graph(self.view.graph, |graph| graph.ir);
         let ir_func = &ir.funcs[self.func];
+
         ir_func.basicblocks.set(basicblocks).unwrap();
         Ok(())
     }

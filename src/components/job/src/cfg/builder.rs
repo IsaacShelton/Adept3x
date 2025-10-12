@@ -171,7 +171,8 @@ impl<'env> CfgBuilder<'env> {
                 dest: _,
                 src: _,
                 src_cast: unary_cast,
-            } => *unary_cast = cast,
+            }
+            | InstrKind::UnaryOperation(_, _, unary_cast) => *unary_cast = cast,
             _ => unreachable!(),
         }
     }

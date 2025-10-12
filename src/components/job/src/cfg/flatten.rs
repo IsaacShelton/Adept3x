@@ -374,7 +374,7 @@ fn flatten_expr<'env>(
             builder
                 .try_push(
                     cursor,
-                    InstrKind::UnaryOperation(unary_op.operator, inner).at(expr.source),
+                    InstrKind::UnaryOperation(unary_op.operator, inner, None).at(expr.source),
                 )
                 .into()
         }

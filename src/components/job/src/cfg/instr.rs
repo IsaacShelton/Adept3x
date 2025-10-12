@@ -226,8 +226,12 @@ impl<'env> Display for InstrKind<'env> {
                     struct_lit.fill_behavior, struct_lit.language
                 )?;
             }
-            InstrKind::UnaryOperation(op, cfg_value) => {
+            InstrKind::UnaryOperation(op, cfg_value, cast) => {
                 write!(f, "unary_op {:?} {}", op, cfg_value)?;
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
+                }
             }
             InstrKind::SizeOf(ty, mode) => {
                 write!(f, "sizeof {} {:?}", ty, mode)?;
@@ -303,7 +307,7 @@ pub enum InstrKind<'env> {
     Member(CfgValue, &'env str, Privacy),
     ArrayAccess(CfgValue, CfgValue),
     StructLiteral(&'env StructLiteralInstr<'env>),
-    UnaryOperation(UnaryOperator, CfgValue),
+    UnaryOperation(UnaryOperator, CfgValue, Option<UnaryCast<'env>>),
     SizeOf(&'env ast::Type, Option<SizeOfMode>),
     SizeOfValue(CfgValue, Option<SizeOfMode>),
     InterpreterSyscall(&'env InterpreterSyscallInstr<'env>),
