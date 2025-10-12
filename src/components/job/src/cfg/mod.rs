@@ -95,6 +95,12 @@ impl<'env> Cfg<'env> {
         &self.basicblocks[unsafe { Idx::from_raw(id) }]
     }
 
+    #[inline]
+    pub fn get_end_ref(&self, id: BasicBlockId) -> InstrRef {
+        let bb = self.get_unsafe(id);
+        InstrRef::new(id, bb.instrs.len().try_into().unwrap())
+    }
+
     pub fn iter_instrs_ordered(&self) -> impl Iterator<Item = (InstrRef, &Instr<'env>)> {
         self.basicblocks.iter().flat_map(|(bb_id, bb)| {
             bb.instrs.iter().enumerate().map(move |(i, instr)| {

@@ -53,8 +53,6 @@ pub unsafe fn create_function_bodies<'env>(
             ));
         };
 
-        dbg!(ir_function_basicblocks);
-
         let mut builder = Builder::new();
         let mut value_catalog = ValueCatalog::new(ir_function_basicblocks.len());
 

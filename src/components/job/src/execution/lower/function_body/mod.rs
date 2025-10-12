@@ -1,7 +1,7 @@
 mod integer;
 mod ir_builder;
 use crate::{
-    CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
+    CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind, InstrRef,
     RevPostOrderIterWithEnds, Suspend,
     conform::UnaryCast,
     execution::lower::LowerFunctionHead,
@@ -136,40 +136,18 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         conform_behavior: _,
                     } => {
                         let unified_type = instr.typed.as_ref().unwrap();
-                        let ir_type = to_ir_type(ctx, self.view.target(), unified_type.0)?;
 
-                        let mut incoming = Vec::new();
-
-                        for (bb, _uncasted_value) in possible_incoming.iter() {
-                            let end = &cfg.get_unsafe(*bb).end;
-
-                            let value = if let EndInstrKind::Jump(_, value, cast, to_ty) = &end.kind
-                            {
-                                let to_ty = to_ir_type(ctx, self.view.target(), to_ty.unwrap().0)?;
-
-                                let casted = perform_unary_cast_to(
-                                    ctx,
-                                    builder,
-                                    builder.get_output(*value),
-                                    &to_ty,
-                                    cast.as_ref(),
-                                    self.view.target(),
-                                    end.source,
-                                )?;
-
-                                casted
-                            } else {
-                                ir::Value::Literal(ir::Literal::Void)
-                            };
-
-                            incoming.push(ir::PhiIncoming {
-                                basicblock_id: bb.into_usize(),
-                                value,
-                            });
-                        }
+                        let incoming =
+                            possible_incoming
+                                .iter()
+                                .map(|(bb, _uncasted_value)| ir::PhiIncoming {
+                                    basicblock_id: bb.into_usize(),
+                                    value: builder
+                                        .get_output(CfgValue::Instr(cfg.get_end_ref(*bb))),
+                                });
 
                         builder.push(ir::Instr::Phi(ir::Phi {
-                            ir_type,
+                            ir_type: to_ir_type(ctx, self.view.target(), unified_type.0)?,
                             incoming: ctx.alloc_slice_fill_iter(incoming.into_iter()),
                         }))
                     }
