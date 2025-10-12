@@ -1,5 +1,5 @@
 use crate::{
-    BasicBlockId, CfgValue, InstrRef,
+    BasicBlockId, CfgValue,
     conform::UnaryCast,
     module_graph::ModuleView,
     repr::{FuncHead, UnaliasedType, VariableRef},

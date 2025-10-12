@@ -34,7 +34,6 @@ use crate::{
     build_executable::link_result,
     ir,
     module_graph::{ModuleGraphMeta, ResolvedLinksetEntry},
-    repr::Compiler,
 };
 use append_only_vec::AppendOnlyVec;
 use colored::Colorize;
@@ -62,7 +61,6 @@ use target::TargetOs;
 
 pub unsafe fn llvm_backend<'env>(
     ctx: &mut ExecutionCtx<'env>,
-    compiler: &Compiler<'env>,
     options: &BuildOptions,
     ir_module: &'env ir::Ir<'env>,
     linksets: &'env AppendOnlyVec<Vec<ResolvedLinksetEntry<'env>>>,

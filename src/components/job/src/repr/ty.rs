@@ -188,6 +188,13 @@ impl<'env> TypeKind<'env> {
             TypeKind::DirectLabel(_) => false,
         }
     }
+
+    pub fn bit_integer_sign(&self) -> Option<IntegerSign> {
+        match self {
+            TypeKind::BitInteger(_, integer_sign) => Some(*integer_sign),
+            _ => None,
+        }
+    }
 }
 
 impl<'env> From<&IntegerKnown> for TypeKind<'env> {

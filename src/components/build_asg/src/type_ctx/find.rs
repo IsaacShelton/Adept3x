@@ -12,6 +12,8 @@ impl<'a> ResolveTypeCtx<'a> {
         type_args: &[TypeArg],
         source: Source,
     ) -> Result<Cow<'a, asg::TypeKind>, FindTypeError> {
+        // We don't need this anymore since we're transitioning to the new resolution system
+        /*
         let settings = &self.asg.workspace.settings[self
             .asg
             .workspace
@@ -19,6 +21,7 @@ impl<'a> ResolveTypeCtx<'a> {
             .get(self.file_fs_node_id)
             .unwrap()
             .settings];
+        */
 
         let decl = name_path
             .as_plain_str()

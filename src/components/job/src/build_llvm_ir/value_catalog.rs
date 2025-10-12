@@ -18,16 +18,36 @@ impl ValueCatalog {
         }
     }
 
-    pub fn get(&self, reference: &ValueReference) -> Option<LLVMValueRef> {
-        self.blocks.get(reference.basicblock_id).and_then(|block| {
-            block
-                .values
-                .get(reference.instruction_id)
-                .and_then(|value| *value)
-        })
+    pub fn get(&self, reference: &ValueReference) -> Result<LLVMValueRef, ValueReferenceError> {
+        let block = self.blocks.get(reference.basicblock_id).ok_or_else(|| {
+            ValueReferenceError::BasicBlockDoesNotExist {
+                count: self.blocks.len(),
+                got: reference.basicblock_id,
+            }
+        })?;
+
+        let instr = block.values.get(reference.instruction_id).ok_or_else(|| {
+            ValueReferenceError::InstructionDoesNotExist {
+                count: block.values.len(),
+                got: reference.instruction_id,
+            }
+        })?;
+
+        let value = instr.ok_or_else(|| ValueReferenceError::InstructionNotLoweredYet {
+            reference: *reference,
+        })?;
+
+        Ok(value)
     }
 
     pub fn push(&mut self, basicblock_id: usize, value: Option<LLVMValueRef>) {
         self.blocks[basicblock_id].values.push(value);
     }
+}
+
+#[derive(Debug)]
+pub enum ValueReferenceError {
+    BasicBlockDoesNotExist { count: usize, got: usize },
+    InstructionDoesNotExist { count: usize, got: usize },
+    InstructionNotLoweredYet { reference: ValueReference },
 }

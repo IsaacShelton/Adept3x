@@ -15,7 +15,7 @@ pub enum Volatility {
 }
 
 impl<'env> Builder<'env> {
-    pub fn load(&self, address: &Address, volatility: Volatility) -> LLVMValueRef {
+    pub fn load(&mut self, address: &Address, volatility: Volatility) -> LLVMValueRef {
         self.load_aligned(
             address.element_type(),
             address.base_pointer(),
@@ -26,7 +26,7 @@ impl<'env> Builder<'env> {
     }
 
     pub fn load_aligned(
-        &self,
+        &mut self,
         ty: LLVMTypeRef,
         pointer: LLVMValueRef,
         alignment: ByteUnits,

@@ -34,7 +34,7 @@ impl ParamValues {
 }
 
 pub struct ParamValueConstructionCtx<'a, 'env: 'a> {
-    pub builder: &'a Builder<'env>,
+    pub builder: &'a mut Builder<'env>,
     pub ctx: &'a BackendCtx<'a, 'env>,
     pub skeleton: &'a FunctionSkeleton<'env>,
     pub param_range: ParamRange,

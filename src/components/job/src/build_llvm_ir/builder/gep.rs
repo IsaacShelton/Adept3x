@@ -8,7 +8,7 @@ use llvm_sys::{core::LLVMBuildGEP2, prelude::LLVMValueRef};
 
 impl<'env> Builder<'env> {
     pub fn gep(
-        &self,
+        &mut self,
         target_data: &TargetData,
         address: &Address,
         field_index: u64,

@@ -8,7 +8,7 @@ use llvm_sys::{core::LLVMBuildInBoundsGEP2, prelude::LLVMValueRef};
 
 impl<'env> Builder<'env> {
     pub fn gep_in_bounds(
-        &self,
+        &mut self,
         target_data: &TargetData,
         address: &Address,
         field_index: u64,

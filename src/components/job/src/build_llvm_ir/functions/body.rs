@@ -13,10 +13,11 @@ use crate::{
 use data_units::AtomicByteUnits;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::{
-    core::{LLVMAddIncoming, LLVMAppendBasicBlock, LLVMDumpValue, LLVMGetUndef, LLVMInt32Type},
+    core::{LLVMAddIncoming, LLVMAppendBasicBlock, LLVMGetUndef, LLVMInt32Type},
     prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
 use std::cell::OnceCell;
+use std_ext::SmallVec16;
 
 pub struct BasicBlockInfo<'env> {
     pub id: usize,
@@ -52,6 +53,8 @@ pub unsafe fn create_function_bodies<'env>(
             ));
         };
 
+        dbg!(ir_function_basicblocks);
+
         let mut builder = Builder::new();
         let mut value_catalog = ValueCatalog::new(ir_function_basicblocks.len());
 
@@ -70,7 +73,7 @@ pub unsafe fn create_function_bodies<'env>(
 
                 Some(emit_prologue(
                     ctx,
-                    &builder,
+                    &mut builder,
                     skeleton,
                     abi_function,
                     alloca_point,
@@ -87,7 +90,7 @@ pub unsafe fn create_function_bodies<'env>(
 
                 emit_epilogue(
                     ctx,
-                    &builder,
+                    &mut builder,
                     skeleton,
                     epilogue_block,
                     prologue.return_location.as_ref(),
@@ -112,7 +115,7 @@ pub unsafe fn create_function_bodies<'env>(
                 ir_basicblock,
                 llvm_basicblock: LLVMAppendBasicBlock(skeleton.function, c"".as_ptr()),
             })
-            .collect::<Vec<_>>();
+            .collect::<SmallVec16<_>>();
 
         // Jump to first basicblock after prologue
         if let Some(prologue) = fn_ctx.prologue.as_ref() {
@@ -132,7 +135,7 @@ pub unsafe fn create_function_bodies<'env>(
         for basicblock in basicblocks.iter() {
             create_function_block(
                 ctx,
-                &builder,
+                &mut builder,
                 basicblock,
                 skeleton.function,
                 &basicblocks,
@@ -141,14 +144,15 @@ pub unsafe fn create_function_bodies<'env>(
             )?;
         }
 
-        for relocation in builder.take_phi_relocations().iter() {
-            for incoming in relocation.incoming.iter() {
+        for relocation in std::mem::take(&mut builder.phi_relocations) {
+            for edge in relocation.incoming {
                 let mut backend_block = basicblocks
-                    .get(incoming.basicblock_id)
-                    .expect("backend basicblock referenced by phi node to exist")
+                    .get(edge.basicblock_id)
+                    .expect("referenced basicblock to exist")
                     .llvm_basicblock;
 
-                let mut value = build_value(ctx, &value_catalog, &builder, &incoming.value)?;
+                let mut value = build_value(ctx, &value_catalog, &mut builder, &edge.value)?;
+
                 LLVMAddIncoming(relocation.phi_node, &mut value, &mut backend_block, 1);
             }
         }

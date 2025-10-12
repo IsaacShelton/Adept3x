@@ -1,4 +1,4 @@
-use crate::{CfgValue, InstrRef, ir, repr::FuncBody};
+use crate::{CfgValue, ir, repr::FuncBody};
 use arena::Id;
 
 #[derive(Clone, Debug)]

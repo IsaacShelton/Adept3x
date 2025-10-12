@@ -29,7 +29,7 @@ use std::{borrow::Cow, ffi::CStr};
 
 pub fn build_default_align_tmp_alloca(
     target_data: &TargetData,
-    builder: &Builder,
+    builder: &mut Builder,
     alloca_point: LLVMValueRef,
     ty: LLVMTypeRef,
     name: &CStr,
@@ -40,7 +40,7 @@ pub fn build_default_align_tmp_alloca(
 
 pub fn build_tmp<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     alloca_point: LLVMValueRef,
     ir_type: &'env ir::Type<'env>,
     name: Option<&CStr>,
@@ -59,7 +59,7 @@ pub fn build_tmp<'env>(
 }
 
 pub fn build_tmp_alloca_address(
-    builder: &Builder,
+    builder: &mut Builder,
     alloca_point: LLVMValueRef,
     ty: LLVMTypeRef,
     alignment: ByteUnits,
@@ -78,7 +78,7 @@ pub fn build_tmp_alloca_address(
 }
 
 pub fn build_tmp_alloca_inst(
-    builder: &Builder,
+    builder: &mut Builder,
     ty: LLVMTypeRef,
     name: &CStr,
     array_size: Option<LLVMValueRef>,
@@ -100,7 +100,7 @@ pub fn build_tmp_alloca_inst(
 
 pub fn build_mem_tmp<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     alloca_point: LLVMValueRef,
     ir_type: &'env ir::Type<'env>,
     name: &CStr,
@@ -111,7 +111,7 @@ pub fn build_mem_tmp<'env>(
 
 pub fn build_mem_tmp_with_alignment<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     alloca_point: LLVMValueRef,
     ir_type: &'env ir::Type<'env>,
     alignment: ByteUnits,
@@ -131,7 +131,7 @@ pub fn build_mem_tmp_with_alignment<'env>(
 
 pub fn build_mem_tmp_without_cast<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     alloca_point: LLVMValueRef,
     ir_type: &'env ir::Type<'env>,
     alignment: ByteUnits,
@@ -155,7 +155,7 @@ pub fn build_mem_tmp_without_cast<'env>(
 }
 
 pub fn build_tmp_alloca_without_cast<'env>(
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     alloca_point: LLVMValueRef,
     ty: LLVMTypeRef,
     alignment: ByteUnits,
@@ -211,7 +211,7 @@ pub fn get_natural_type_alignment<'env>(
 }
 
 pub fn emit_address_at_offset<'a>(
-    builder: &Builder,
+    builder: &mut Builder,
     target_data: &TargetData,
     abi_type: &ABIType,
     address: &'a Address,
@@ -229,7 +229,7 @@ pub fn emit_address_at_offset<'a>(
 }
 
 pub fn enter_struct_pointer_for_coerced_access(
-    builder: &Builder,
+    builder: &mut Builder,
     target_data: &TargetData,
     source_pointer: &Address,
     source_struct_type: LLVMTypeRef,
@@ -270,7 +270,7 @@ pub fn enter_struct_pointer_for_coerced_access(
     }
 }
 pub fn coerce_integer_likes(
-    builder: &Builder,
+    builder: &mut Builder,
     target_data: &TargetData,
     source: LLVMValueRef,
     destination_type: LLVMTypeRef,
@@ -318,7 +318,7 @@ pub fn coerce_integer_likes(
 }
 
 pub fn build_tmp_alloca_for_coerce(
-    builder: &Builder,
+    builder: &mut Builder,
     target_data: &TargetData,
     ty: LLVMTypeRef,
     min_alignment: ByteUnits,
@@ -331,7 +331,7 @@ pub fn build_tmp_alloca_for_coerce(
 
 pub fn build_coerced_load(
     ctx: &BackendCtx,
-    builder: &Builder,
+    builder: &mut Builder,
     source: &Address,
     desired_type: LLVMTypeRef,
     alloca_point: LLVMValueRef,
@@ -381,7 +381,7 @@ pub fn build_coerced_load(
 }
 
 pub fn build_coerced_store(
-    builder: &Builder,
+    builder: &mut Builder,
     target_data: &TargetData,
     source: LLVMValueRef,
     destination: &Address,
@@ -451,7 +451,7 @@ pub fn build_coerced_store(
 }
 
 pub fn emit_load_of_scalar(
-    builder: &Builder,
+    builder: &mut Builder,
     address: &Address,
     volatility: Volatility,
     ir_type: &ir::Type,
@@ -479,7 +479,11 @@ fn is_thread_local(value: LLVMValueRef) -> bool {
     }
 }
 
-pub fn emit_from_mem(builder: &Builder, value: LLVMValueRef, ir_type: &ir::Type) -> LLVMValueRef {
+pub fn emit_from_mem(
+    builder: &mut Builder,
+    value: LLVMValueRef,
+    ir_type: &ir::Type,
+) -> LLVMValueRef {
     match ir_type {
         ir::Type::Bool => unsafe {
             LLVMBuildTruncOrBitCast(builder.get(), value, LLVMInt1Type(), c"".as_ptr())

@@ -11,6 +11,7 @@ use crate::{
 };
 use ast::ConformBehavior;
 use data_units::BitUnits;
+use diagnostics::ErrorDiagnostic;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use primitives::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign};
@@ -30,14 +31,17 @@ pub fn unify_types<'env>(
     builtin_types: &'env BuiltinTypes<'env>,
     target: &Target,
     source: Source,
-) -> Result<UnifySolution<'env>, ()> {
-    let to_ty = unify_types_trivial(
+) -> Result<Option<UnifySolution<'env>>, ErrorDiagnostic> {
+    let Some(to_ty) = unify_types_trivial(
         ctx,
         types_iter.clone().map(|(_bb, ty)| ty),
         behavior,
         builtin_types,
         source,
-    )?;
+    )?
+    else {
+        return Ok(None);
+    };
 
     let mut casts = Vec::with_capacity(types_iter.clone().count());
 
@@ -46,7 +50,7 @@ pub fn unify_types<'env>(
             continue;
         }
 
-        let conformed = conform_to(
+        let Some(conformed) = conform_to(
             ctx,
             from_ty,
             to_ty,
@@ -58,18 +62,25 @@ pub fn unify_types<'env>(
             // type unification.
             |_, _| false,
             source,
-        )
-        .expect("failed to conform value to calculated unifying type");
+        ) else {
+            return Err(ErrorDiagnostic::ice(
+                format!(
+                    "Failed to conform value of {} to calculated unifying type {}",
+                    from_ty, to_ty
+                ),
+                Some(source),
+            ));
+        };
 
         if let Some(cast) = conformed.cast {
             casts.push((bb_id, cast));
         }
     }
 
-    Ok(UnifySolution {
+    Ok(Some(UnifySolution {
         unified: to_ty,
         unary_casts: casts,
-    })
+    }))
 }
 
 pub fn unify_types_trivial<'env>(
@@ -78,20 +89,22 @@ pub fn unify_types_trivial<'env>(
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
     source: Source,
-) -> Result<UnaliasedType<'env>, ()> {
+) -> Result<Option<UnaliasedType<'env>>, ErrorDiagnostic> {
     let incoming = types_iter.filter(|ty| !ty.0.kind.is_never());
 
     // If unreachable, the unifying type is the never type
     if incoming.clone().next().is_none() {
-        return Ok(builtin_types.never());
+        return Ok(Some(builtin_types.never()));
     }
 
     // If all the values have the same type, the unifying type is that type
     if incoming.clone().all_equal() {
-        return Ok(incoming
-            .clone()
-            .next()
-            .unwrap_or_else(|| builtin_types.void()));
+        return Ok(Some(
+            incoming
+                .clone()
+                .next()
+                .unwrap_or_else(|| builtin_types.void()),
+        ));
     }
 
     // If all the values are integer literals, the unifying type is either
@@ -144,7 +157,7 @@ pub fn unify_types_trivial<'env>(
         // We're guarenteed to have these, because of the check for "never" done earlier
         let (min, max) = min.zip(max).unwrap();
 
-        return Ok(UnaliasedType(
+        return Ok(Some(UnaliasedType(
             ctx.alloc(
                 if min == max {
                     TypeKind::IntegerLiteral(min)
@@ -153,12 +166,12 @@ pub fn unify_types_trivial<'env>(
                 }
                 .at(source),
             ),
-        ));
+        )));
     }
 
     // If all the values are float literals, the unifying type is f64
     if incoming.clone().all(|ty| ty.0.kind.is_integer_literal()) {
-        return Ok(builtin_types.f64());
+        return Ok(Some(builtin_types.f64()));
     }
 
     // If all values are integer and floating literals, use the default floating-point type
@@ -168,7 +181,7 @@ pub fn unify_types_trivial<'env>(
             TypeKind::IntegerLiteral(..) | TypeKind::FloatLiteral(..)
         )
     }) {
-        return Ok(builtin_types.f64());
+        return Ok(Some(builtin_types.f64()));
     }
 
     // If all values are integers and integer literals
@@ -183,7 +196,7 @@ pub fn unify_types_trivial<'env>(
             TypeKind::Floating(FloatSize::Bits32) | TypeKind::FloatLiteral(_)
         )
     }) {
-        return Ok(builtin_types.f32());
+        return Ok(Some(builtin_types.f32()));
     }
 
     // Otherwise if all values floating points / integer literals, the result should be f64
@@ -193,10 +206,10 @@ pub fn unify_types_trivial<'env>(
             TypeKind::Floating(_) | TypeKind::FloatLiteral(_) | TypeKind::IntegerLiteral(_)
         )
     }) {
-        return Ok(builtin_types.f64());
+        return Ok(Some(builtin_types.f64()));
     }
 
-    Err(())
+    Ok(None)
 }
 
 fn compute_unifying_integer_type<'env>(
@@ -204,13 +217,16 @@ fn compute_unifying_integer_type<'env>(
     types_iter: impl Iterator<Item = UnaliasedType<'env>>,
     behavior: ConformBehavior,
     source: Source,
-) -> Result<UnaliasedType<'env>, ()> {
-    let IntegerProperties {
+) -> Result<Option<UnaliasedType<'env>>, ErrorDiagnostic> {
+    let Some(IntegerProperties {
         largest_loose_used,
         required_bits,
         required_sign,
         ..
-    } = IntegerProperties::compute(types_iter, behavior.c_integer_assumptions()).ok_or(())?;
+    }) = IntegerProperties::compute(types_iter, behavior.c_integer_assumptions())
+    else {
+        return Ok(None);
+    };
 
     let required_sign = required_sign.unwrap_or(IntegerSign::Signed);
     let assumptions = behavior.c_integer_assumptions();
@@ -220,16 +236,16 @@ fn compute_unifying_integer_type<'env>(
             CInteger::smallest_that_fits(c_integer, required_bits.unwrap(), assumptions)
                 .unwrap_or(CInteger::LongLong);
 
-        return Ok(UnaliasedType(ctx.alloc(
+        return Ok(Some(UnaliasedType(ctx.alloc(
             TypeKind::CInteger(c_integer, Some(required_sign)).at(source),
-        )));
+        ))));
     }
 
     let required_bits = required_bits.unwrap_or(IntegerBits::Bits32);
 
-    return Ok(UnaliasedType(ctx.alloc(
+    return Ok(Some(UnaliasedType(ctx.alloc(
         TypeKind::BitInteger(required_bits, required_sign).at(source),
-    )));
+    ))));
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

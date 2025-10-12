@@ -167,7 +167,7 @@ impl ParamValues {
 
     fn push_direct_trivial(
         &mut self,
-        builder: &Builder,
+        builder: &mut Builder,
         coerce_to_type: LLVMTypeRef,
         argument: LLVMValueRef,
         param_range: ParamRange,

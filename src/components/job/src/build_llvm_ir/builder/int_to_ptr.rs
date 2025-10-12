@@ -5,7 +5,7 @@ use llvm_sys::{
 };
 
 impl<'env> Builder<'env> {
-    pub fn int_to_ptr(&self, value: LLVMValueRef, integer_type: LLVMTypeRef) -> LLVMValueRef {
+    pub fn int_to_ptr(&mut self, value: LLVMValueRef, integer_type: LLVMTypeRef) -> LLVMValueRef {
         unsafe { LLVMBuildIntToPtr(self.get(), value, integer_type, c"".as_ptr()) }
     }
 }

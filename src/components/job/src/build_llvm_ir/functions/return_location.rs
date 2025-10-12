@@ -29,7 +29,7 @@ pub struct ReturnLocation {
 impl ReturnLocation {
     pub fn indirect<'env>(
         ctx: &BackendCtx<'_, 'env>,
-        builder: &Builder<'env>,
+        builder: &mut Builder<'env>,
         ir_function: &'env ir::Func<'env>,
         function: LLVMValueRef,
         indirect: &Indirect,
@@ -66,7 +66,7 @@ impl ReturnLocation {
 
     pub fn inalloca<'env>(
         ctx: &BackendCtx<'_, 'env>,
-        builder: &Builder<'env>,
+        builder: &mut Builder<'env>,
         skeleton: &FunctionSkeleton<'env>,
         inalloca: &InAlloca,
         inalloca_subtypes: &[LLVMTypeRef],
@@ -137,7 +137,7 @@ impl ReturnLocation {
 
     pub fn normal<'env>(
         ctx: &BackendCtx<'_, 'env>,
-        builder: &Builder<'env>,
+        builder: &mut Builder<'env>,
         alloca_point: LLVMValueRef,
         return_ir_type: &'env ir::Type<'env>,
     ) -> Result<Self, ErrorDiagnostic> {

@@ -7,7 +7,7 @@ use llvm_sys::{
 };
 
 impl<'env> Builder<'env> {
-    pub fn store(&self, value: LLVMValueRef, destination: &Address) -> LLVMValueRef {
+    pub fn store(&mut self, value: LLVMValueRef, destination: &Address) -> LLVMValueRef {
         self.store_aligned_raw(
             value,
             destination.base_pointer(),
@@ -15,12 +15,12 @@ impl<'env> Builder<'env> {
         )
     }
 
-    pub fn store_raw(&self, value: LLVMValueRef, destination: LLVMValueRef) -> LLVMValueRef {
+    pub fn store_raw(&mut self, value: LLVMValueRef, destination: LLVMValueRef) -> LLVMValueRef {
         unsafe { LLVMBuildStore(self.get(), value, destination) }
     }
 
     pub fn store_aligned_raw(
-        &self,
+        &mut self,
         value: LLVMValueRef,
         destination: LLVMValueRef,
         alignment: ByteUnits,

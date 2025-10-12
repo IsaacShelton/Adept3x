@@ -13,7 +13,7 @@ use llvm_sys::{
 
 impl<'env> Builder<'env> {
     pub fn gep_struct(
-        &self,
+        &mut self,
         target_data: &TargetData,
         address: &Address,
         index: usize,

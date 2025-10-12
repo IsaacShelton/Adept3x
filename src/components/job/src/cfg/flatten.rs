@@ -408,8 +408,13 @@ fn flatten_expr<'env>(
             }
 
             if let Some(otherwise) = &conditional.otherwise {
+                let inner = flatten_stmts(ctx, builder, cursor, &otherwise.stmts, is_value);
+
                 incoming.push(JoinedCursor::new(
-                    flatten_stmts(ctx, builder, cursor, &otherwise.stmts, is_value),
+                    match is_value {
+                        IsValue::RequireValue => inner,
+                        IsValue::NeglectValue => builder.never_or_void(cursor),
+                    },
                     std::mem::replace(cursor, close_scope),
                 ));
             } else {

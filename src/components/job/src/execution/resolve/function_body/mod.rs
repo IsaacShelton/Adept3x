@@ -20,6 +20,7 @@ use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
+use itertools::Itertools;
 use primitives::{CInteger, CIntegerAssumptions};
 
 #[derive(Clone, Derivative)]
@@ -237,16 +238,24 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         .map(|(bb_id, value)| (*bb_id, cfg.get_typed(*value, builtin_types)));
 
                     // 1] Determine unifying type
-                    let Ok(unified) = unify_types(
+                    let Some(unified) = unify_types(
                         ctx,
-                        types_iter,
+                        types_iter.clone(),
                         conform_behavior.expect("conform behavior for >2 incoming phi"),
                         builtin_types,
                         self.view.target(),
                         instr.source,
-                    ) else {
+                    )?
+                    else {
                         return Err(ErrorDiagnostic::new(
-                            "Cannot unify incompatible values from branches",
+                            format!(
+                                "Cannot merge incompatible types: {}",
+                                types_iter
+                                    .map(|(_, ty)| ty)
+                                    .unique()
+                                    .map(|ty| format!("`{}`", ty))
+                                    .join(", ")
+                            ),
                             instr.source,
                         )
                         .into());

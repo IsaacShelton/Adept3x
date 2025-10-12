@@ -4,7 +4,7 @@ use llvm_sys::{core::LLVMBuildMemCpy, prelude::LLVMValueRef};
 
 impl<'env> Builder<'env> {
     pub fn memcpy(
-        &self,
+        &mut self,
         destination: &Address,
         source: &Address,
         size: LLVMValueRef,

@@ -6,7 +6,7 @@ use llvm_sys::{
 
 impl<'env> Builder<'env> {
     pub fn int_cast(
-        &self,
+        &mut self,
         value: LLVMValueRef,
         integer_type: LLVMTypeRef,
         signed: bool,

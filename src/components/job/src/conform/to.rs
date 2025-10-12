@@ -9,9 +9,10 @@ use crate::{
 };
 use data_units::implies;
 use derive_more::IsVariant;
+use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use ordered_float::NotNan;
-use primitives::{CIntegerAssumptions, IntegerBits};
+use primitives::{CIntegerAssumptions, IntegerBits, IntegerSign};
 use source_files::Source;
 use target::Target;
 
@@ -55,7 +56,7 @@ pub fn conform_to<'env>(
         TypeKind::IntegerLiteral(from) => match &to_ty.0.kind {
             TypeKind::IntegerLiteralInRange(min, max) => {
                 if from >= min && from <= max {
-                    Some(Conform::identity(to_ty))
+                    Some(Conform::new(to_ty, UnaryCast::SpecializeInteger(from)))
                 } else {
                     None
                 }
@@ -95,6 +96,17 @@ pub fn conform_to<'env>(
                         UnaryCast::SpecializeFloat(NotNan::new(from).ok()),
                     ))
                 })
+            }
+            _ => None,
+        },
+        TypeKind::IntegerLiteralInRange(from_min, from_max) => match &to_ty.0.kind {
+            TypeKind::IntegerLiteralInRange(to_min, to_max) => {
+                if from_min >= to_min && from_max <= to_max {
+                    let sign = IntegerSign::new(**to_min < BigInt::ZERO);
+                    Some(Conform::new(to_ty, UnaryCast::Extend(sign)))
+                } else {
+                    None
+                }
             }
             _ => None,
         },

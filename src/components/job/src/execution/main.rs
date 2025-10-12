@@ -146,7 +146,6 @@ impl<'env> Executable<'env> for Main<'env> {
         let linking_duration = unsafe {
             llvm_backend(
                 ctx,
-                compiler,
                 self.build_options,
                 ir,
                 linksets,

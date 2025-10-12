@@ -45,11 +45,12 @@ use llvm_sys::{
 };
 use primitives::{FloatOrInteger, FloatOrSign, FloatSize, IntegerBits, IntegerSign};
 use std::{borrow::Cow, ptr::null_mut, sync::atomic};
+use std_ext::{SmallVec8, SmallVec16};
 use target::Target;
 
 pub unsafe fn create_function_block<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     basicblock: &BasicBlockInfo<'env>,
     function_skeleton: LLVMValueRef,
     basicblocks: &[BasicBlockInfo<'env>],
@@ -627,7 +628,7 @@ pub unsafe fn create_function_block<'env>(
                     let backend_type = to_backend_type(ctx.for_making_type(), &phi.ir_type)?;
                     let phi_node = LLVMBuildPhi(builder.get(), backend_type, c"".as_ptr());
 
-                    builder.add_phi_relocation(PhiRelocation {
+                    builder.phi_relocations.push(PhiRelocation {
                         phi_node,
                         incoming: phi.incoming,
                     });
@@ -697,7 +698,7 @@ pub unsafe fn create_function_block<'env>(
 unsafe fn build_binary_operands<'env>(
     ctx: &BackendCtx<'_, 'env>,
     value_catalog: &ValueCatalog,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     operands: &ir::BinaryOperands<'env>,
 ) -> Result<(LLVMValueRef, LLVMValueRef), ErrorDiagnostic> {
     let left = build_value(ctx, value_catalog, builder, &operands.left)?;
@@ -706,7 +707,7 @@ unsafe fn build_binary_operands<'env>(
 }
 
 unsafe fn promote_variadic_argument(
-    builder: &Builder,
+    builder: &mut Builder,
     target: &Target,
     value: LLVMValueRef,
 ) -> LLVMValueRef {
@@ -764,7 +765,7 @@ fn promote_variadic_argument_type<'env>(
 
 unsafe fn emit_call<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     call: &Call<'env>,
     fn_ctx: &FnCtx,
     value_catalog: &mut ValueCatalog,
@@ -798,17 +799,18 @@ unsafe fn emit_call<'env>(
                 }
             })
         })
-        .collect::<Result<Vec<LLVMValueRef>, _>>()?;
+        .collect::<Result<SmallVec8<LLVMValueRef>, _>>()?;
 
     if ir_function.abide_abi {
         let abi_function = skeleton.abi_function.as_ref().expect("abi function");
 
-        let variadic_argument_types =
-            call.unpromoted_variadic_arg_types
-                .iter()
-                .map(|argument_type| {
-                    promote_variadic_argument_type(ctx, builder, &ctx.meta.target, argument_type)
-                });
+        let variadic_argument_types = call
+            .unpromoted_variadic_arg_types
+            .iter()
+            .map(|argument_type| {
+                promote_variadic_argument_type(ctx, builder, &ctx.meta.target, argument_type)
+            })
+            .collect::<SmallVec8<_>>();
 
         let argument_types_iter = ir_function.params.iter().chain(variadic_argument_types);
 
@@ -1136,7 +1138,11 @@ unsafe fn emit_call<'env>(
     }
 }
 
-fn convert_tmp_to_rvalue(builder: &Builder, address: &Address, ir_type: &ir::Type) -> LLVMValueRef {
+fn convert_tmp_to_rvalue(
+    builder: &mut Builder,
+    address: &Address,
+    ir_type: &ir::Type,
+) -> LLVMValueRef {
     if has_scalar_evaluation_kind(ir_type) {
         emit_load_of_scalar(builder, address, Volatility::Normal, ir_type)
     } else if ir_type.is_complex() {
@@ -1149,7 +1155,7 @@ fn convert_tmp_to_rvalue(builder: &Builder, address: &Address, ir_type: &ir::Typ
 #[allow(clippy::too_many_arguments)]
 fn indirect<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     alloca_point: LLVMValueRef,
     argument: LLVMValueRef,
     argument_type: &'env ir::Type<'env>,
@@ -1179,7 +1185,7 @@ fn indirect<'env>(
 }
 
 fn coerce_and_expand<'env>(
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     ctx: &BackendCtx<'_, 'env>,
     alloca_point: LLVMValueRef,
     argument: LLVMValueRef,
@@ -1238,7 +1244,7 @@ fn coerce_and_expand<'env>(
 }
 
 fn expand<'env>(
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     ctx: &BackendCtx<'_, 'env>,
     alloca_point: LLVMValueRef,
     argument: LLVMValueRef,
@@ -1277,7 +1283,7 @@ fn expand<'env>(
 }
 
 fn expand_type_to_args<'env>(
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     ctx: &BackendCtx<'_, 'env>,
     argument_address: &Address,
     argument_type: &'env ir::Type<'env>,
@@ -1308,7 +1314,7 @@ fn expand_type_to_args<'env>(
             let precomputed_field_types = fields
                 .iter()
                 .map(|field| unsafe { to_backend_type(ctx.for_making_type(), &field.ir_type) })
-                .collect::<Result<Box<[_]>, _>>()?;
+                .collect::<Result<SmallVec16<_>, _>>()?;
 
             for (field_i, field) in fields.iter().enumerate() {
                 let element_address = builder.gep_struct(
@@ -1357,7 +1363,7 @@ fn expand_type_to_args<'env>(
 
 #[allow(clippy::too_many_arguments)]
 fn direct_or_extend<'env>(
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     ctx: &BackendCtx<'_, 'env>,
     alloca_point: LLVMValueRef,
     argument: LLVMValueRef,
@@ -1459,7 +1465,7 @@ fn direct_or_extend<'env>(
 
 #[allow(clippy::too_many_arguments)]
 fn trivial_direct_or_extend(
-    builder: &Builder,
+    builder: &mut Builder,
     argument: LLVMValueRef,
     abi_param: &ABIParam,
     param_mapping: &Param,

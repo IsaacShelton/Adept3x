@@ -27,7 +27,7 @@ pub struct PrologueInfo {
 
 pub fn emit_prologue<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     skeleton: &FunctionSkeleton<'env>,
     abi_function: &ABIFunction<'env>,
     alloca_point: LLVMValueRef,

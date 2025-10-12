@@ -139,6 +139,12 @@ pub fn conform_to_default<'env>(
                     )
                 })
             })
+            .map(|found| {
+                Conform::new(
+                    found.ty,
+                    UnaryCast::Extend(found.ty.0.kind.bit_integer_sign().unwrap()),
+                )
+            })
             .next()
             .ok_or_else(|| {
                 ErrorDiagnostic::new(

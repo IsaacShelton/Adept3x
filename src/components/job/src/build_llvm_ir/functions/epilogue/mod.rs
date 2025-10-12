@@ -34,7 +34,7 @@ pub struct EpilogueInfo {
 
 pub fn emit_epilogue<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     skeleton: &FunctionSkeleton<'env>,
     epilogue_basicblock: LLVMBasicBlockRef,
     return_location: Option<&ReturnLocation>,

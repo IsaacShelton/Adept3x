@@ -273,7 +273,10 @@ impl Intrinsics {
         })
     }
 
-    pub unsafe fn on_overflow<'env>(&self, builder: &Builder<'env>) -> (LLVMValueRef, LLVMTypeRef) {
+    pub unsafe fn on_overflow<'env>(
+        &self,
+        builder: &mut Builder<'env>,
+    ) -> (LLVMValueRef, LLVMTypeRef) {
         *self.on_overflow.get_or_init(|| {
             let mut parameter_types = [];
             let is_var_arg = false;

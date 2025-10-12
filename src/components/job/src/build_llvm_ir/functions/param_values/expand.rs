@@ -72,7 +72,7 @@ impl ParamValues {
 
 fn expand_type_from_args<'env>(
     ctx: &BackendCtx<'_, 'env>,
-    builder: &Builder<'env>,
+    builder: &mut Builder<'env>,
     llvm_function: LLVMValueRef,
     ir_type: &'env ir::Type<'env>,
     base_address: &Address,
