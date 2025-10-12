@@ -29,7 +29,7 @@ pub fn conform_to<'env>(
     original_from_ty: UnaliasedType<'env>,
     to_ty: UnaliasedType<'env>,
     assumptions: CIntegerAssumptions,
-    _builtin_types: &'env BuiltinTypes<'env>,
+    builtin_types: &'env BuiltinTypes<'env>,
     target: &Target,
     _mode: ConformMode,
     on_polymorph: impl OnPolymorph<'env>,
@@ -53,6 +53,10 @@ pub fn conform_to<'env>(
     }
 
     let inner_conform = match &from_ty.0.kind {
+        TypeKind::BooleanLiteral(value) => Some(Conform::new(
+            builtin_types.bool(),
+            UnaryCast::SpecializeBoolean(*value),
+        )),
         TypeKind::IntegerLiteral(from) => match &to_ty.0.kind {
             TypeKind::IntegerLiteralInRange(min, max) => {
                 if from >= min && from <= max {
