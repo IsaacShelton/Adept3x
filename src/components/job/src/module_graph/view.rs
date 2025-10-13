@@ -139,6 +139,7 @@ impl<'env> ModuleView<'env> {
 
                     module.arena[handle.module_ref]
                         .iter_symbols(func_search.name, handle.part_ref)
+                        .filter(|symbol| symbol.is_func_like())
                         .next()
                 });
 
@@ -152,6 +153,21 @@ impl<'env> ModuleView<'env> {
 
                     module.arena[handle.module_ref]
                         .iter_symbols(namespace_search.name, handle.part_ref)
+                        .filter(|symbol| symbol.is_value_like())
+                        .next()
+                });
+
+                if let Some(found) = found {
+                    return Ok(found);
+                }
+            }
+            Search::Type(type_search) => {
+                let found = self.web.graph(graph, |graph| {
+                    let module = graph.modules.lock().unwrap();
+
+                    module.arena[handle.module_ref]
+                        .iter_symbols(type_search.name, handle.part_ref)
+                        .filter(|symbol| symbol.is_type_like())
                         .next()
                 });
 

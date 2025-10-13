@@ -1,7 +1,7 @@
 mod integer;
 mod ir_builder;
 use crate::{
-    CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind, InstrRef,
+    CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
     RevPostOrderIterWithEnds, Suspend,
     conform::UnaryCast,
     execution::lower::LowerFunctionHead,

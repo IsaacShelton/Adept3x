@@ -58,6 +58,7 @@ impl<'env> From<ErrorDiagnostic> for Continuation<'env> {
 pub enum Search<'env> {
     Func(FuncSearch<'env>),
     Namespace(NamespaceSearch<'env>),
+    Type(TypeSearch<'env>),
 }
 
 impl<'env> Search<'env> {
@@ -65,6 +66,7 @@ impl<'env> Search<'env> {
         match self {
             Self::Func(func_search) => func_search.name,
             Self::Namespace(namespace_search) => namespace_search.name,
+            Self::Type(type_search) => type_search.name,
         }
     }
 
@@ -72,6 +74,7 @@ impl<'env> Search<'env> {
         match self {
             Self::Func(func_search) => Some(func_search.source),
             Self::Namespace(namespace_search) => Some(namespace_search.source),
+            Self::Type(type_search) => Some(type_search.source),
         }
     }
 
@@ -79,6 +82,7 @@ impl<'env> Search<'env> {
         match self {
             Self::Func(_) => Some("function"),
             Self::Namespace(_) => Some("namespace"),
+            Self::Type(_) => Some("type"),
         }
     }
 }
@@ -91,6 +95,12 @@ pub struct FuncSearch<'env> {
 
 #[derive(Clone, Debug)]
 pub struct NamespaceSearch<'env> {
+    pub name: &'env str,
+    pub source: Source,
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeSearch<'env> {
     pub name: &'env str,
     pub source: Source,
 }

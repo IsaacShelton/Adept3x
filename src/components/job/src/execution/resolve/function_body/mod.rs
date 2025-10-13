@@ -15,7 +15,7 @@ use crate::{
     unify::unify_types,
 };
 use arena::ArenaMap;
-use ast::{Integer, UnaryOperator};
+use ast::Integer;
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
@@ -630,8 +630,24 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 }
                 InstrKind::Member(instr_ref, _, privacy) => todo!("member"),
                 InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!("array access"),
-                InstrKind::StructLiteral(struct_literal_instr) => todo!("struct litereal"),
+                InstrKind::StructLiteral(struct_literal) => {
+                    // Resolve type head
+                    let Some(resolved_type) = executor.demand(self.resolved_type) else {
+                        return suspend!(
+                            self.resolved_type,
+                            executor.request(ResolveType::new(self.view, struct_literal.ast_type)),
+                            ctx
+                        );
+                    };
 
+                    // Resolve body of struct type
+
+                    // Conform field values to field types
+
+                    // Fill in remaining fields according to fill behavior
+
+                    todo!("struct literal for type {}", resolved_type);
+                }
                 InstrKind::UnaryOperation(unary_operator, value, _) => {
                     match unary_operator {
                         ast::UnaryOperator::Math(ast::UnaryMathOperator::Not) => {

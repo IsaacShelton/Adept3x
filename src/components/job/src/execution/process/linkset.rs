@@ -3,7 +3,6 @@ use crate::{
     module_graph::{ModuleView, ResolvedLinksetEntry},
     repr::Compiler,
 };
-use ast::Linkset;
 use by_address::ByAddress;
 use derivative::Derivative;
 use itertools::Itertools;
@@ -16,14 +15,14 @@ pub struct ProcessLinkset<'env> {
     #[derivative(Debug = "ignore")]
     compiler: ByAddress<&'env Compiler<'env>>,
 
-    linkset: ByAddress<&'env Linkset>,
+    linkset: ByAddress<&'env ast::Linkset>,
 }
 
 impl<'env> ProcessLinkset<'env> {
     pub fn new(
         view: &'env ModuleView<'env>,
         compiler: &'env Compiler<'env>,
-        linkset: &'env Linkset,
+        linkset: &'env ast::Linkset,
     ) -> Self {
         Self {
             view,

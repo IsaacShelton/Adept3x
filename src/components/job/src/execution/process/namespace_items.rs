@@ -1,5 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ProcessLinkset, ProcessPragma,
+    ProcessStructure,
     execution::process::{ProcessFunction, ProcessNamespace, ProcessWhen},
     module_graph::ModuleView,
     repr::Compiler,
@@ -65,6 +66,10 @@ impl<'env> Executable<'env> for ProcessNamespaceItems<'env> {
 
         ctx.suspend_on(namespace_items.linksets.iter().map(|linkset| {
             executor.request(ProcessLinkset::new(self.view, &self.compiler, linkset))
+        }));
+
+        ctx.suspend_on(namespace_items.structs.iter().map(|structure| {
+            executor.request(ProcessStructure::new(self.view, &self.compiler, structure))
         }));
 
         ctx.suspend_on(

@@ -1,7 +1,9 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, Suspend,
+    Continuation, Executable, ExecutionCtx, Executor, Suspend, TypeSearch,
+    execution::resolve::ResolveNamespace,
     module_graph::ModuleView,
     repr::{Type, TypeKind, UnaliasedType},
+    sub_task::SubTask,
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -18,6 +20,11 @@ pub struct ResolveType<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     inner_type: Suspend<'env, UnaliasedType<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    resolved_namespace: Option<ResolveNamespace<'env>>,
     /*
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -37,6 +44,7 @@ impl<'env> ResolveType<'env> {
             ast_type: ByAddress(ast_type),
             view,
             inner_type: None,
+            resolved_namespace: None,
         }
     }
 }
@@ -45,7 +53,7 @@ impl<'env> Executable<'env> for ResolveType<'env> {
     type Output = UnaliasedType<'env>;
 
     fn execute(
-        self,
+        mut self,
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
@@ -82,8 +90,38 @@ impl<'env> Executable<'env> for ResolveType<'env> {
             }
             ast::TypeKind::Void => TypeKind::Void,
             ast::TypeKind::Never => TypeKind::Never,
-            ast::TypeKind::Named(_name, _type_args) => {
-                todo!("resolve named type")
+            ast::TypeKind::Named(name_path, _type_args) => {
+                let basename = name_path.basename();
+
+                let view = if name_path.has_namespace() {
+                    let resolved_namespace = self.resolved_namespace.get_or_insert_with(|| {
+                        ResolveNamespace::new(self.view, self.ast_type.source)
+                    });
+
+                    execute_sub_task!(
+                        self,
+                        resolved_namespace,
+                        executor,
+                        ctx,
+                        name_path.namespaces()
+                    )
+                    .expect("infallible")
+                } else {
+                    *self.view
+                };
+
+                let symbol = match view.find_symbol(
+                    executor,
+                    TypeSearch {
+                        name: basename,
+                        source: self.ast_type.source,
+                    },
+                ) {
+                    Ok(symbol) => symbol,
+                    Err(into_continuation) => return Err(into_continuation(self.into())),
+                };
+
+                todo!("resolve named type - {:?} {:?}", basename, symbol);
 
                 // NOTE: We will also need to unalias here,
                 // although perhaps we have a separate option

@@ -47,7 +47,10 @@ impl ValueCatalog {
 
 #[derive(Debug)]
 pub enum ValueReferenceError {
+    #[allow(unused)]
     BasicBlockDoesNotExist { count: usize, got: usize },
+    #[allow(unused)]
     InstructionDoesNotExist { count: usize, got: usize },
+    #[allow(unused)]
     InstructionNotLoweredYet { reference: ValueReference },
 }

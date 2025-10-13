@@ -1,10 +1,10 @@
 use super::{FuncHead, TypeHead};
 use crate::module_graph::ModuleRef;
 use ast_workspace::TypeDeclRef;
-use derive_more::From;
+use derive_more::{From, IsVariant};
 
 /// A symbol declaration
-#[derive(Copy, Clone, Debug, From)]
+#[derive(Copy, Clone, Debug, From, IsVariant)]
 pub enum DeclHead<'env> {
     FuncLike(&'env FuncHead<'env>),
     TypeLike(DeclHeadTypeLike<'env>),
