@@ -51,10 +51,14 @@ impl<'a, 'env: 'a> ItaniumRecordLayoutBuilder<'a, 'env> {
         type_layout_cache: &'a TypeLayoutCache<'env>,
         diagnostics: &'a Diagnostics,
         info: &RecordInfo<'env>,
-        name: Option<&'a str>,
+        friendly_record_name: Option<&'a str>,
     ) -> ASTRecordLayout {
-        let mut builder =
-            ItaniumRecordLayoutBuilder::new(type_layout_cache, None, diagnostics, name);
+        let mut builder = ItaniumRecordLayoutBuilder::new(
+            type_layout_cache,
+            None,
+            diagnostics,
+            friendly_record_name,
+        );
         builder.layout(info);
 
         let size = ByteUnits::try_from(builder.size).unwrap();
@@ -143,7 +147,7 @@ impl<'a, 'env: 'a> ItaniumRecordLayoutBuilder<'a, 'env> {
 
     pub fn layout_field(
         &mut self,
-        field: &ir::Field<'env>,
+        field: &'env ir::Field<'env>,
         insert_extra_padding: bool,
         field_i: usize,
     ) {

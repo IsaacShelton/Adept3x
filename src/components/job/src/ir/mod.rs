@@ -2,7 +2,7 @@ mod field;
 mod instr;
 mod value;
 
-pub use crate::ir::field::Field;
+pub use crate::ir::field::*;
 use arena::{Idx, LockFreeArena, new_id_with_niche};
 use attributes::SymbolOwnership;
 use derivative::Derivative;
@@ -23,8 +23,8 @@ pub type GlobalRef<'env> = Idx<GlobalId, Global<'env>>;
 
 #[derive(Clone, Debug)]
 pub struct Struct<'env> {
-    pub name: &'env str,
-    pub fields: &'env [&'env Field<'env>],
+    pub friendly_record_name: &'env str,
+    pub fields: &'env [Field<'env>],
     pub is_packed: bool,
     pub source: Source,
 }
@@ -117,10 +117,10 @@ impl<'env> Type<'env> {
         }
     }
 
-    pub fn struct_fields(&self, ir_module: &'env Ir<'env>) -> Option<&'env [&'env Field<'env>]> {
+    pub fn struct_fields(&self, ir_module: &'env Ir<'env>) -> Option<&'env [Field<'env>]> {
         match self {
-            Type::Struct(struct_ref) => Some(&ir_module.structs[*struct_ref].fields[..]),
-            Type::AnonymousComposite(composite) => Some(&composite.fields[..]),
+            Type::Struct(struct_ref) => Some(ir_module.structs[*struct_ref].fields),
+            Type::AnonymousComposite(composite) => Some(composite.fields),
             _ => None,
         }
     }
@@ -129,7 +129,7 @@ impl<'env> Type<'env> {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct TypeComposite<'env> {
-    pub fields: &'env [&'env Field<'env>],
+    pub fields: &'env [Field<'env>],
     pub is_packed: bool,
 
     #[derivative(Hash = "ignore")]

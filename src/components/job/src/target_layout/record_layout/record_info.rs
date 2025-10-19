@@ -3,7 +3,7 @@ use source_files::Source;
 
 #[derive(Clone, Debug)]
 pub struct RecordInfo<'env> {
-    pub fields: &'env [&'env ir::Field<'env>],
+    pub fields: &'env [ir::Field<'env>],
     pub is_packed: bool,
     pub is_union: bool,
     pub is_natural_align: bool,
@@ -14,7 +14,7 @@ pub struct RecordInfo<'env> {
 impl<'env> RecordInfo<'env> {
     pub fn from_struct(structure: &'env ir::Struct) -> Self {
         RecordInfo {
-            fields: &structure.fields[..],
+            fields: structure.fields,
             is_packed: structure.is_packed,
             is_union: false,
             is_natural_align: false,
@@ -25,7 +25,7 @@ impl<'env> RecordInfo<'env> {
 
     pub fn from_composite(composite: &'env ir::TypeComposite) -> Self {
         RecordInfo {
-            fields: &composite.fields[..],
+            fields: composite.fields,
             is_packed: composite.is_packed,
             is_union: false,
             is_natural_align: false,
@@ -50,7 +50,7 @@ impl<'env> RecordInfo<'env> {
 
 impl<'env> RecordInfo<'env> {
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &'env ir::Field<'env>> + use<'a, 'env> {
-        self.fields.iter().copied()
+        self.fields.iter()
     }
 
     pub fn len(&self) -> usize {

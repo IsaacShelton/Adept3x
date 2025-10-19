@@ -123,6 +123,23 @@ impl<'env> CfgBuilder<'env> {
         instr.typed = Some(callee.return_type);
     }
 
+    pub fn set_struct_literal_unary_casts(
+        &mut self,
+        instr_ref: InstrRef,
+        unary_casts: &'env [Option<UnaryCast<'env>>],
+    ) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+        assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
+        let instr = &mut bb.instrs[instr_ref.instr_or_end as usize];
+
+        match &mut instr.kind {
+            InstrKind::StructLiteral(_, field_value_casts) => {
+                *field_value_casts = Some(unary_casts);
+            }
+            _ => panic!("cannot set_struct_literal_unary_casts for non-struct-literal"),
+        }
+    }
+
     pub fn get_typed(
         &self,
         cfg_value: CfgValue,

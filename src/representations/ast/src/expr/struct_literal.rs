@@ -1,4 +1,4 @@
-use crate::{Expr, Language, Type};
+use crate::{ConformBehavior, Expr, Type};
 use derive_more::IsVariant;
 
 #[derive(Clone, Debug)]
@@ -6,7 +6,7 @@ pub struct StructLiteral {
     pub ast_type: Type,
     pub fields: Vec<FieldInitializer>,
     pub fill_behavior: FillBehavior,
-    pub language: Language,
+    pub conform_behavior: ConformBehavior,
 }
 
 #[derive(Clone, Debug)]

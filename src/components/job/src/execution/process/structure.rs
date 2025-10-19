@@ -52,7 +52,7 @@ impl<'env> Executable<'env> for ProcessStructure<'env> {
                 arity: 0,
                 rest: TypeHeadRest {
                     kind: TypeHeadRestKind::Struct(self.structure),
-                    view: self.view,
+                    view: ByAddress(self.view),
                 },
             });
 

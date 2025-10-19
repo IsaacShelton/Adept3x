@@ -246,17 +246,15 @@ pub fn resolve_expr(
                 ast_type,
                 fields,
                 fill_behavior,
-                language,
+                conform_behavior,
             } = &**literal;
-
-            let conform_behavior = ctx.conform_behavior(*language);
 
             resolve_struct_literal_expr(
                 ctx,
                 ast_type,
                 fields,
                 *fill_behavior,
-                conform_behavior,
+                *conform_behavior,
                 source,
             )
         }

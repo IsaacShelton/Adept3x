@@ -1,7 +1,5 @@
 use super::{ParseError, Parser};
-use ast::{
-    Expr, ExprKind, FieldInitializer, FillBehavior, Language, NamePath, StructLiteral, Type,
-};
+use ast::{Expr, ExprKind, FieldInitializer, FillBehavior, NamePath, StructLiteral, Type};
 use infinite_iterator::InfinitePeekable;
 use source_files::Source;
 use token::{Token, TokenKind};
@@ -27,7 +25,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 ast_type,
                 fields,
                 fill_behavior,
-                language: Language::Adept,
+                conform_behavior: self.conform_behavior,
             })),
             source,
         ))

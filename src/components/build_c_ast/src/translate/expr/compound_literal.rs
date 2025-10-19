@@ -34,7 +34,7 @@ pub fn translate_compound_literal(
         ast_type,
         fields,
         fill_behavior: ast::FillBehavior::Zeroed,
-        language: ast::Language::C,
+        conform_behavior: ast::ConformBehavior::C,
     }))
     .at(source))
 }

@@ -19,7 +19,7 @@ pub unsafe fn to_backend_struct_type<'env>(
 
         ctx.visited.borrow_mut().insert(struct_ref);
         let mut subtypes =
-            to_backend_types(ctx, ir_structure.fields.iter().map(|field| field.ir_type))?;
+            to_backend_types(ctx, ir_structure.fields.iter().map(|field| &field.ir_type))?;
 
         ctx.visited.borrow_mut().remove(&struct_ref);
 

@@ -5,23 +5,25 @@ use crate::{
     BasicBlockId, CfgBuilder, CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx,
     Executor, FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
     conform::{ConformMode, conform_to, conform_to_default},
-    execution::resolve::{ResolveNamespace, ResolveType},
+    execution::resolve::{ResolveNamespace, ResolveType, structure::ResolveStructureBody},
     flatten_func,
     module_graph::ModuleView,
     repr::{
-        Compiler, DeclHead, FuncBody, FuncHead, Type, TypeKind, UnaliasedType, Variable, Variables,
+        Compiler, DeclHead, FuncBody, FuncHead, StructBody, Type, TypeHeadRest, TypeHeadRestKind,
+        TypeKind, UnaliasedType, UserDefinedType, Variable, Variables,
     },
     sub_task::SubTask,
     unify::unify_types,
 };
 use arena::ArenaMap;
-use ast::Integer;
+use ast::{ConformBehavior, Integer};
 use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
 use itertools::Itertools;
 use primitives::{CInteger, CIntegerAssumptions};
+use std::collections::HashSet;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -67,6 +69,11 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     resolved_namespace: Option<ResolveNamespace<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    resolved_struct_body: Suspend<'env, &'env StructBody<'env>>,
 }
 
 impl<'env> ResolveFunctionBody<'env> {
@@ -88,6 +95,7 @@ impl<'env> ResolveFunctionBody<'env> {
             dominators_and_post_order: None,
             variables: None,
             resolved_namespace: None,
+            resolved_struct_body: None,
         }
     }
 }
@@ -517,7 +525,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             ctx,
                             name_path.namespaces()
                         )
-                        .expect("infallible")
                     } else {
                         *self.view
                     };
@@ -630,7 +637,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 }
                 InstrKind::Member(instr_ref, _, privacy) => todo!("member"),
                 InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!("array access"),
-                InstrKind::StructLiteral(struct_literal) => {
+                InstrKind::StructLiteral(struct_literal, _) => {
                     // Resolve type head
                     let Some(resolved_type) = executor.demand(self.resolved_type) else {
                         return suspend!(
@@ -640,13 +647,136 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         );
                     };
 
+                    // Extract struct type
+                    let TypeKind::UserDefined(UserDefinedType {
+                        name: _,
+                        rest:
+                            TypeHeadRest {
+                                kind: TypeHeadRestKind::Struct(structure),
+                                view,
+                            },
+                        args: _,
+                    }) = &resolved_type.0.kind
+                    else {
+                        return Err(ErrorDiagnostic::new(
+                            "Cannot create struct literal for non-struct type",
+                            instr.source,
+                        )
+                        .into());
+                    };
+
                     // Resolve body of struct type
+                    let Some(resolved_struct_body) = executor.demand(self.resolved_struct_body)
+                    else {
+                        return suspend!(
+                            self.resolved_struct_body,
+                            executor.request(ResolveStructureBody::new(
+                                view,
+                                &self.compiler,
+                                structure
+                            )),
+                            ctx
+                        );
+                    };
 
-                    // Conform field values to field types
+                    // Resolve field initializers (no suspend)
+                    let unary_casts = (|| -> Result<_, ErrorDiagnostic> {
+                        // Conform field values to field types
+                        let mut unary_casts = Vec::with_capacity(struct_literal.fields.len());
+                        let mut next_index = 0;
+                        let mut seen = HashSet::new();
 
-                    // Fill in remaining fields according to fill behavior
+                        for field_init in struct_literal.fields {
+                            let Some(field_name) = field_init.name.or_else(|| {
+                                structure
+                                    .fields
+                                    .get_index(next_index)
+                                    .map(|(n, _)| n.as_str())
+                            }) else {
+                                return Err(ErrorDiagnostic::new(
+                                    "Out of fields to populate for struct literal",
+                                    instr.source,
+                                )
+                                .into());
+                            };
 
-                    todo!("struct literal for type {}", resolved_type);
+                            if !seen.insert(field_name) {
+                                return Err(ErrorDiagnostic::new(
+                                    format!(
+                                        "Field `{}` cannot be specified more than once",
+                                        field_name
+                                    ),
+                                    instr.source,
+                                )
+                                .into());
+                            }
+
+                            let Some((index, _, field)) =
+                                resolved_struct_body.fields.get_full(field_name)
+                            else {
+                                return Err(ErrorDiagnostic::new(
+                                    format!("Field `{}` does not exist on struct", field_name),
+                                    instr.source,
+                                )
+                                .into());
+                            };
+
+                            let conform_behavior = struct_literal.conform_behavior;
+
+                            let mode = match conform_behavior {
+                                ConformBehavior::Adept(_) => ConformMode::Normal,
+                                ConformBehavior::C => ConformMode::Explicit,
+                            };
+
+                            let Some(conformed) = conform_to(
+                                ctx,
+                                cfg.get_typed(field_init.value, builtin_types),
+                                field.ty,
+                                conform_behavior.c_integer_assumptions(),
+                                builtin_types,
+                                self.view.target(),
+                                mode,
+                                |_, _| {
+                                    unimplemented!(
+                                        "on polymorph not supported for polymorphic struct type literals yet"
+                                    )
+                                },
+                                instr.source,
+                            ) else {
+                                return Err(ErrorDiagnostic::new(
+                                    format!(
+                                        "Expected value of type `{}` for field `{}`",
+                                        field.ty, field_name
+                                    ),
+                                    instr.source,
+                                )
+                                .into());
+                            };
+
+                            unary_casts.push(conformed.cast);
+                            next_index += 1;
+                        }
+
+                        // TODO: Fill in remaining fields according to fill behavior
+                        if structure.fields.len() < struct_literal.fields.len() {
+                            return Err(ErrorDiagnostic::new(
+                                "Missing fields for struct literal",
+                                instr.source,
+                            )
+                            .into());
+                        }
+
+                        Ok(unary_casts)
+                    })()?;
+
+                    // WARNING: We should never suspend anymore here, due to previous no suspend
+                    // block...
+
+                    cfg.set_struct_literal_unary_casts(
+                        instr_ref,
+                        ctx.alloc_slice_fill_iter(unary_casts.into_iter()),
+                    );
+                    cfg.set_typed(instr_ref, resolved_type);
                 }
                 InstrKind::UnaryOperation(unary_operator, value, _) => {
                     match unary_operator {
@@ -723,6 +853,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
             // Reset suspension states for next instruction to use
             self.resolved_type = None;
             self.resolved_namespace = None;
+            self.resolved_struct_body = None;
 
             rev_post_order.next_in_builder(cfg, post_order);
         }

@@ -1,5 +1,5 @@
+use crate::repr::TypeHeadRest;
 use ast::IntegerKnown;
-use ast_workspace::TypeDeclRef;
 use derivative::Derivative;
 use derive_more::IsVariant;
 use num_bigint::BigInt;
@@ -295,7 +295,7 @@ impl<'env> Display for TypeKind<'env> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UserDefinedType<'env> {
     pub name: &'env str,
-    pub type_decl_ref: TypeDeclRef,
+    pub rest: TypeHeadRest<'env>,
     pub args: &'env [TypeArg<'env>],
 }
 
@@ -305,7 +305,7 @@ impl<'env> UserDefinedType<'env> {
     }
 
     pub fn contains_type_alias(&self) -> bool {
-        self.type_decl_ref.is_alias() || self.args.iter().any(|arg| arg.contains_type_alias())
+        self.rest.kind.is_alias() || self.args.iter().any(|arg| arg.contains_type_alias())
     }
 }
 

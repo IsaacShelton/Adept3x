@@ -204,7 +204,7 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::ArrayAccess(subject, index) => {
                 write!(f, "array_access {} {}", subject, index)?;
             }
-            InstrKind::StructLiteral(struct_lit) => {
+            InstrKind::StructLiteral(struct_lit, _casts) => {
                 write!(f, "struct_lit {} {{ ", struct_lit.ast_type)?;
 
                 for (i, field) in struct_lit.fields.iter().enumerate() {
@@ -223,7 +223,7 @@ impl<'env> Display for InstrKind<'env> {
                 write!(
                     f,
                     "}} {:?} {:?}",
-                    struct_lit.fill_behavior, struct_lit.language
+                    struct_lit.fill_behavior, struct_lit.conform_behavior
                 )?;
             }
             InstrKind::UnaryOperation(op, cfg_value, cast) => {
@@ -306,7 +306,10 @@ pub enum InstrKind<'env> {
     ),
     Member(CfgValue, &'env str, Privacy),
     ArrayAccess(CfgValue, CfgValue),
-    StructLiteral(&'env StructLiteralInstr<'env>),
+    StructLiteral(
+        &'env StructLiteralInstr<'env>,
+        Option<&'env [Option<UnaryCast<'env>>]>,
+    ),
     UnaryOperation(UnaryOperator, CfgValue, Option<UnaryCast<'env>>),
     SizeOf(&'env ast::Type, Option<SizeOfMode>),
     SizeOfValue(CfgValue, Option<SizeOfMode>),
@@ -343,12 +346,28 @@ pub struct CallTarget<'env> {
     pub view: &'env ModuleView<'env>,
 }
 
+impl<'env> CallTarget<'env> {
+    pub fn get_param_or_arg_type(&self, i: usize) -> UnaliasedType<'env> {
+        self.callee
+            .params
+            .required
+            .get(i)
+            .map(|param| param.ty)
+            .or_else(|| {
+                self.variadic_arg_types
+                    .get(i - self.callee.params.required.len())
+                    .copied()
+            })
+            .expect("call target info to know parameter or argument type")
+    }
+}
+
 #[derive(Debug)]
 pub struct StructLiteralInstr<'env> {
     pub ast_type: &'env ast::Type,
     pub fields: &'env [FieldInitializer<'env>],
     pub fill_behavior: FillBehavior,
-    pub language: Language,
+    pub conform_behavior: ConformBehavior,
 }
 
 #[derive(Debug)]

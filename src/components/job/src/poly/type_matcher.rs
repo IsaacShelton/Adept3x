@@ -1,7 +1,9 @@
 #![allow(unused)]
 
 use super::PolyValue;
-use crate::repr::{Type, TypeArg, TypeKind, UnaliasedType, UserDefinedType};
+use crate::repr::{
+    Type, TypeArg, TypeHeadRest, TypeHeadRestKind, TypeKind, UnaliasedType, UserDefinedType,
+};
 use ast_workspace::{TypeAliasRef, TypeDeclRef};
 use indexmap::IndexMap;
 use std::borrow::Cow;
@@ -133,30 +135,35 @@ pub fn are_types_equal<'env>(
         }
         // Type aliases were already handled
         TypeKind::UserDefined(UserDefinedType {
-            type_decl_ref: TypeDeclRef::Alias(a_type_alias_ref),
+            rest:
+                TypeHeadRest {
+                    kind: TypeHeadRestKind::Alias(..),
+                    ..
+                },
             args: a_args,
             ..
-        }) => unreachable!(),
+        }) => {
+            unreachable!()
+        }
         // Non-aliases
         TypeKind::UserDefined(
             a_udt @ UserDefinedType {
-                type_decl_ref: a_type_decl_ref,
+                rest: TypeHeadRest { kind: a_kind, .. },
                 ..
             },
         ) => {
             if let TypeKind::UserDefined(
                 b_udt @ UserDefinedType {
-                    type_decl_ref: b_type_decl_ref,
+                    rest: TypeHeadRest { kind: b_kind, .. },
                     ..
                 },
             ) = b
             {
                 // The type alias cases should have already been handled
-                assert!(!matches!(a_type_decl_ref, TypeDeclRef::Alias(_)));
-                assert!(!matches!(b_type_decl_ref, TypeDeclRef::Alias(_)));
+                assert!(!a_kind.is_alias());
+                assert!(!b_kind.is_alias());
 
-                a_type_decl_ref == b_type_decl_ref
-                    && are_type_arg_lists_equal(a_udt.args, b_udt.args)
+                a_kind == b_kind && are_type_arg_lists_equal(a_udt.args, b_udt.args)
             } else {
                 false
             }

@@ -361,11 +361,14 @@ fn flatten_expr<'env>(
                 ast_type: &struct_literal.ast_type,
                 fields,
                 fill_behavior: struct_literal.fill_behavior,
-                language: struct_literal.language,
+                conform_behavior: struct_literal.conform_behavior,
             });
 
             builder
-                .try_push(cursor, InstrKind::StructLiteral(literal).at(expr.source))
+                .try_push(
+                    cursor,
+                    InstrKind::StructLiteral(literal, None).at(expr.source),
+                )
                 .into()
         }
         ast::ExprKind::UnaryOperation(unary_op) => {

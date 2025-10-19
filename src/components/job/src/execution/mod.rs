@@ -9,10 +9,10 @@ mod util;
 use crate::{
     Artifact, Continuation, ExecutionCtx, Executor, TaskRef, UnwrapFrom,
     execution::{
-        lower::{LowerFunctionBody, LowerFunctionHead, LowerType},
+        lower::{LowerFunctionBody, LowerFunctionHead, LowerType, LowerTypeStructure},
         resolve::{
             EvaluateComptime, ResolveEvaluation, ResolveFunctionBody, ResolveFunctionHead,
-            ResolveType,
+            ResolveStructureBody, ResolveType,
         },
     },
 };
@@ -91,12 +91,14 @@ pub enum Execution<'env> {
     ResolveFunction(ProcessFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
+    ResolveStructureBody(ResolveStructureBody<'env>),
 
     // Comptime
     EvaluateComptime(EvaluateComptime<'env>),
 
     // Lowering
     LowerType(LowerType<'env>),
+    LowerTypeStructure(LowerTypeStructure<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
     LowerFunctionBody(LowerFunctionBody<'env>),
 }
@@ -132,12 +134,14 @@ pub enum Request<'env> {
     ResolveFunction(ProcessFunction<'env>),
     ResolveFunctionHead(ResolveFunctionHead<'env>),
     ResolveFunctionBody(ResolveFunctionBody<'env>),
+    ResolveStructureBody(ResolveStructureBody<'env>),
 
     // Comptime
     EvaluateComptime(EvaluateComptime<'env>),
 
     // Lowering
     LowerType(LowerType<'env>),
+    LowerTypeStructure(LowerTypeStructure<'env>),
     LowerFunctionHead(LowerFunctionHead<'env>),
     LowerFunctionBody(LowerFunctionBody<'env>),
 }

@@ -53,7 +53,7 @@ macro_rules! suspend_many_assoc {
 
 #[allow(unused)]
 macro_rules! suspend_from_subtask {
-    ($self:ident, $field:ident, $task_ref:expr, $ctx:expr) => {{
+    ($self:ident.$field:ident, $task_ref:expr, $ctx:expr) => {{
         let pending = $task_ref;
 
         $ctx.suspend_on(::std::iter::once(pending.raw_task_ref()));

@@ -44,7 +44,7 @@ pub unsafe fn to_backend_type<'a, 'env: 'a>(
         ir::Type::Union(_) => todo!("to_backend_type for ir::Type::Union"),
         ir::Type::AnonymousComposite(composite) => {
             let mut subtypes =
-                to_backend_types(ctx, composite.fields.iter().map(|field| field.ir_type))?;
+                to_backend_types(ctx, composite.fields.iter().map(|field| &field.ir_type))?;
 
             LLVMStructType(
                 subtypes.as_mut_ptr(),

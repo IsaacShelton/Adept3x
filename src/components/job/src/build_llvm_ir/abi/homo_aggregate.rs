@@ -50,7 +50,7 @@ pub fn is_homo_aggregate<'env>(
                 decider,
                 ir_type,
                 ir_module,
-                &structure.fields[..],
+                structure.fields,
                 existing_base,
                 type_layout_cache,
             )
@@ -59,7 +59,7 @@ pub fn is_homo_aggregate<'env>(
             decider,
             ir_type,
             ir_module,
-            &anonymous_composite.fields[..],
+            anonymous_composite.fields,
             existing_base,
             type_layout_cache,
         ),
@@ -108,7 +108,7 @@ fn is_homo_aggregate_record<'env>(
     decider: &impl HomoDecider<'env>,
     record_ir_type: &'env ir::Type<'env>,
     ir_module: &'env ir::Ir<'env>,
-    fields: &'env [&'env ir::Field<'env>],
+    fields: &'env [ir::Field<'env>],
     existing_base: Option<&'env ir::Type>,
     type_layout_cache: &TypeLayoutCache<'env>,
 ) -> Option<HomoAggregate<'env>> {

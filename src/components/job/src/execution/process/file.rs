@@ -47,7 +47,7 @@ pub struct ProcessFile<'env> {
 
 impl<'env> ProcessFile<'env> {
     pub fn new(
-        compiler: &'env Compiler,
+        compiler: &'env Compiler<'env>,
         canonical_filename: &'env Path,
         require_metadata: bool,
         view: &'env ModuleView<'env>,

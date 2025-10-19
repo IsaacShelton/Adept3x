@@ -156,7 +156,7 @@ impl Expand {
 #[derive(Clone, Debug)]
 pub enum TypeExpansion<'env> {
     FixedArray(&'env ir::FixedArray<'env>),
-    Record(&'env [&'env ir::Field<'env>]),
+    Record(&'env [ir::Field<'env>]),
     Complex(&'env ir::Type<'env>),
     None,
 }

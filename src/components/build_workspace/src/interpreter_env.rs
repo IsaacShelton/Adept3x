@@ -1,7 +1,7 @@
 use ast::{
     Call, Enum, EnumMember, ExprKind, Field, FieldInitializer, FillBehavior, Func, FuncHead,
-    InterpreterSyscall, Language, NamePath, Param, Params, RawAstFile, StmtKind, Struct,
-    StructLiteral, TypeKind, TypeParams,
+    InterpreterSyscall, NamePath, Param, Params, RawAstFile, StmtKind, Struct, StructLiteral,
+    TypeKind, TypeParams,
 };
 use attributes::{Exposure, Privacy, SymbolOwnership, Tag};
 use indexmap::IndexMap;
@@ -10,6 +10,7 @@ use interpret::{
     syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
 };
 use interpreter_api::Syscall;
+use primitives::CIntegerAssumptions;
 use source_files::Source;
 
 fn thin_void_func(name: impl Into<String>, syscall: Syscall) -> Func {
@@ -340,7 +341,9 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile, is_pragma: 
                             value: ExprKind::Variable(NamePath::new_plain("namespace")).at(source),
                         }],
                         fill_behavior: FillBehavior::Forbid,
-                        language: Language::Adept,
+                        conform_behavior: ast::ConformBehavior::Adept(
+                            CIntegerAssumptions::default(),
+                        ),
                     }))
                     .at(source),
                 ))

@@ -2,27 +2,26 @@ use super::{EnumBody, StructBody, TypeAliasBody, trait_body::TraitBody};
 use crate::module_graph::ModuleView;
 use by_address::ByAddress;
 use derivative::Derivative;
+use derive_more::IsVariant;
 
-#[derive(Clone, Debug, Derivative)]
+#[derive(Copy, Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct TypeHead<'env> {
     pub name: &'env str,
     pub arity: usize,
-
-    #[derivative(Hash = "ignore")]
-    #[derivative(PartialEq = "ignore")]
     pub rest: TypeHeadRest<'env>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeHeadRest<'env> {
     pub kind: TypeHeadRestKind<'env>,
-    pub view: &'env ModuleView<'env>,
+    pub view: ByAddress<&'env ModuleView<'env>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, IsVariant)]
 pub enum TypeHeadRestKind<'env> {
     Struct(ByAddress<&'env ast::Struct>),
+    Alias(ByAddress<&'env ast::TypeAlias>),
 }
 
 impl<'env> TypeHead<'env> {

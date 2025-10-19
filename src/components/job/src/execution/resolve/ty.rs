@@ -2,11 +2,12 @@ use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend, TypeSearch,
     execution::resolve::ResolveNamespace,
     module_graph::ModuleView,
-    repr::{Type, TypeKind, UnaliasedType},
+    repr::{DeclHead, DeclHeadTypeLike, Type, TypeKind, UnaliasedType, UserDefinedType},
     sub_task::SubTask,
 };
 use by_address::ByAddress;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -90,7 +91,7 @@ impl<'env> Executable<'env> for ResolveType<'env> {
             }
             ast::TypeKind::Void => TypeKind::Void,
             ast::TypeKind::Never => TypeKind::Never,
-            ast::TypeKind::Named(name_path, _type_args) => {
+            ast::TypeKind::Named(name_path, type_args) => {
                 let basename = name_path.basename();
 
                 let view = if name_path.has_namespace() {
@@ -105,7 +106,6 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                         ctx,
                         name_path.namespaces()
                     )
-                    .expect("infallible")
                 } else {
                     *self.view
                 };
@@ -121,50 +121,29 @@ impl<'env> Executable<'env> for ResolveType<'env> {
                     Err(into_continuation) => return Err(into_continuation(self.into())),
                 };
 
-                todo!("resolve named type - {:?} {:?}", basename, symbol);
-
-                // NOTE: We will also need to unalias here,
-                // although perhaps we have a separate option
-                // for this to enable the preservation of type alises.
-
-                /*
-                let Some(name) = name.as_plain_str() else {
-                    unimplemented!("we don't handle namespaced types yet");
+                let DeclHead::TypeLike(DeclHeadTypeLike::Type(type_head)) = symbol else {
+                    return Err(ErrorDiagnostic::new(
+                        format!("Symbol `{}` must be a type", basename),
+                        self.ast_type.source,
+                    )
+                    .into());
                 };
 
-                let Some(inner) = executor.demand(self.inner_find_type) else {
-                    return suspend!(
-                        self.inner_find_type,
-                        executor.request(FindType::new(
-                            workspace,
-                            self.view,
-                            name,
-                            type_args.len()
-                        )),
-                        ctx
-                    );
-                };
+                if type_args.len() != 0 {
+                    return Err(ErrorDiagnostic::new("Type args on user-defined types are not supported for new type resolution system yet", self.ast_type.source).into());
+                }
 
-                let Ok(Some(found)) = inner else {
-                    unimplemented!("we don't report errors yet for failing to find a type!");
-                };
+                let udt = TypeKind::UserDefined(UserDefinedType {
+                    name: type_head.name,
+                    rest: type_head.rest,
+                    args: &[],
+                });
 
-                let Some(type_args) = executor.demand_many(&self.type_args) else {
-                    return suspend_many!(
-                        self.type_args,
-                        executor.request_many(type_args.iter().map(|type_arg| {
-                            ResolveTypeArg::new(workspace, type_arg, self.view)
-                        })),
-                        ctx
-                    );
-                };
+                // TODO: We need to unalias any type aliases here...
 
-                TypeKind::UserDefined(UserDefinedType {
-                    name: name.into(),
-                    type_decl_ref: found,
-                    args: ctx.alloc_slice_fill_iter(type_args.into_iter().cloned()),
-                })
-                */
+                // TODO: We also need to handle type args here...
+
+                udt
             }
             ast::TypeKind::AnonymousStruct(_) => {
                 unimplemented!("we don't resolve anonymous structs yet")

@@ -27,7 +27,7 @@ impl<'env> ResolveNamespace<'env> {
 
 impl<'env> SubTask<'env> for ResolveNamespace<'env> {
     type SubArtifact<'a>
-        = Result<ModuleView<'env>, std::convert::Infallible>
+        = ModuleView<'env>
     where
         Self: 'a,
         'env: 'a;
@@ -82,6 +82,6 @@ impl<'env> SubTask<'env> for ResolveNamespace<'env> {
             self.index += 1;
         }
 
-        Ok(Ok(self.view))
+        Ok(self.view)
     }
 }

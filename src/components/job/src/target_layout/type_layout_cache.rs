@@ -56,7 +56,7 @@ impl<'env> TypeLayoutCache<'env> {
                 let structure = &self.structs[*struct_ref];
 
                 let info = RecordInfo::from_struct(structure);
-                self.get_impl_record_layout(&info, Some(structure.name))
+                self.get_impl_record_layout(&info, Some(structure.friendly_record_name))
             }
             ir::Type::AnonymousComposite(type_composite) => {
                 let info = RecordInfo::from_composite(type_composite);
@@ -81,14 +81,21 @@ impl<'env> TypeLayoutCache<'env> {
         }
     }
 
-    fn get_impl_record_layout(&self, info: &RecordInfo<'env>, name: Option<&str>) -> TypeLayout {
-        // TODO: We should cache this
+    fn get_impl_record_layout(
+        &self,
+        info: &RecordInfo<'env>,
+        friendly_record_name: Option<&str>,
+    ) -> TypeLayout {
+        // TODO: SPEED: PERFORMANCE: We should probably cache this, since record layouts depend on themselves recursively
 
-        let record_layout =
-            ItaniumRecordLayoutBuilder::generate(self, self.diagnostics, info, name);
+        let record_layout = ItaniumRecordLayoutBuilder::generate(
+            self,
+            self.diagnostics,
+            info,
+            friendly_record_name,
+        );
 
-        // NOTE: We don't support alignment attributes yet,
-        // so this will always be none
+        // NOTE: We don't support alignment attributes yet, so this will always be none
         let alignment_requirement = AlignRequirement::None;
 
         TypeLayout {

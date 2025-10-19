@@ -40,7 +40,7 @@ pub fn value_for_bit_integer(
     .map(|literal| ir::Value::Literal(literal))
     .map_err(|expected_type| {
         ErrorDiagnostic::new(
-            format!("Cannot fit value {} in '{}'", value, expected_type),
+            format!("Cannot fit value {} in `{}`", value, expected_type),
             source,
         )
     })

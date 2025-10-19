@@ -1,21 +1,24 @@
-mod integer;
+mod deref_dest;
 mod ir_builder;
+
 use crate::{
     CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
-    RevPostOrderIterWithEnds, Suspend,
+    RevPostOrderIterWithEnds, Suspend, SuspendMany,
     conform::UnaryCast,
-    execution::lower::LowerFunctionHead,
+    execution::lower::{
+        LowerFunctionHead, LowerType, bits_and_sign_for_invisible_integer_in_range,
+        function_body::deref_dest::DerefDest, value_for_bit_integer,
+    },
     ir,
     module_graph::ModuleView,
-    repr::{self, Compiler, FuncBody, FuncHead, TypeKind, VariableRef},
-    target_layout::TargetLayout,
+    repr::{Compiler, FuncBody, FuncHead, TypeKind, VariableId, VariableRef},
+    sub_task::SubTask,
 };
 use arena::Id;
 use by_address::ByAddress;
 use core::f64;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
-use integer::*;
 use ir_builder::*;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -53,7 +56,22 @@ pub struct LowerFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    did_allocate_variables: bool,
+    variables: usize,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    lowered_type: Suspend<'env, ir::Type<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    deref_dest: Option<DerefDest<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    lowered_ir_types: SuspendMany<'env, ir::Type<'env>>,
 }
 
 impl<'env> LowerFunctionBody<'env> {
@@ -73,7 +91,10 @@ impl<'env> LowerFunctionBody<'env> {
             builder: None,
             rev_post_order: None,
             suspend_on_func: None,
-            did_allocate_variables: false,
+            variables: 0,
+            lowered_type: None,
+            deref_dest: None,
+            lowered_ir_types: None,
         }
     }
 }
@@ -91,21 +112,29 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
         let cfg = self.body.cfg;
 
-        let builder = self
-            .builder
-            .get_or_insert_with(|| IrBuilder::new(&self.body));
-
-        if !self.did_allocate_variables {
+        let builder = self.builder.get_or_insert_with(|| {
+            let mut builder = IrBuilder::new(&self.body);
             builder.set_position(0);
+            builder
+        });
 
-            // These will be referenced by calculating the the variable id from the beginning
-            // of the first basicblock.
-            for variable in self.body.variables.iter() {
-                let ir_ty = to_ir_type(ctx, self.view.target(), &variable.ty.0)?;
-                builder.push(ir::Instr::Alloca(ir_ty));
-            }
+        while self.variables < self.body.variables.len() {
+            let variable = self
+                .body
+                .variables
+                .get(unsafe { VariableRef::from_raw(VariableId::from_usize(self.variables)) });
 
-            self.did_allocate_variables = true;
+            let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                return suspend!(
+                    self.lowered_type,
+                    executor.request(LowerType::new(self.view, &self.compiler, &variable.ty.0)),
+                    ctx
+                );
+            };
+
+            builder.push(ir::Instr::Alloca(lowered_type));
+            self.variables += 1;
+            self.lowered_type = None;
         }
 
         let get_variable_alloca = |variable_ref: VariableRef<'env>| {
@@ -137,6 +166,18 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     } => {
                         let unified_type = instr.typed.as_ref().unwrap();
 
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    unified_type.0
+                                )),
+                                ctx
+                            );
+                        };
+
                         let incoming =
                             possible_incoming
                                 .iter()
@@ -147,7 +188,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 });
 
                         builder.push(ir::Instr::Phi(ir::Phi {
-                            ir_type: to_ir_type(ctx, self.view.target(), unified_type.0)?,
+                            ir_type: lowered_type,
                             incoming: ctx.alloc_slice_fill_iter(incoming.into_iter()),
                         }))
                     }
@@ -157,21 +198,29 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     }
                     InstrKind::Declare(_, _, value, unary_cast, variable_ref) => {
                         if let Some(value) = value {
-                            let value = builder.get_output(*value);
                             let variable_ref = variable_ref.unwrap();
-                            let variable_ir_ty = to_ir_type(
-                                ctx,
-                                self.view.target(),
-                                &self.body.variables.get(variable_ref).ty.0,
-                            )?;
+                            let variable_type = &self.body.variables.get(variable_ref).ty.0;
 
+                            let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                                return suspend!(
+                                    self.lowered_type,
+                                    executor.request(LowerType::new(
+                                        self.view,
+                                        &self.compiler,
+                                        variable_type
+                                    )),
+                                    ctx
+                                );
+                            };
+
+                            let value = builder.get_output(*value);
                             let stack_memory = get_variable_alloca(variable_ref);
 
                             let value = perform_unary_cast_to(
                                 ctx,
                                 builder,
                                 value,
-                                &variable_ir_ty,
+                                &lowered_type,
                                 unary_cast.as_ref(),
                                 self.view.target(),
                                 instr.source,
@@ -192,7 +241,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     } => {
                         let new_value = builder.get_output(*src);
 
-                        let TypeKind::Deref(mut to_ty) = cfg.get_typed(*dest, builtin_types).0.kind
+                        let TypeKind::Deref(to_ty) = cfg.get_typed(*dest, builtin_types).0.kind
                         else {
                             return Err(ErrorDiagnostic::new(
                                 "Could not assign value, left hand side is not mutable",
@@ -201,20 +250,19 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             .into());
                         };
 
-                        let mut dest = builder.get_output(*dest);
-
-                        while let TypeKind::Deref(inner_to_ty) = &to_ty.kind {
-                            dest = builder.push(ir::Instr::Load {
-                                pointer: dest,
-                                // Warning: Since we want to keep the outer `deref` layer , we pretend
-                                // that the pointee type is the type itself. As the pointee type should
-                                // be `Deref(inner_to_ty)` which is the same as `to_ty`.
-                                pointee: to_ir_type(ctx, self.view.target(), to_ty)?,
-                            });
-                            to_ty = inner_to_ty;
-                        }
-
-                        let to_ir_ty = to_ir_type(ctx, self.view.target(), to_ty)?;
+                        let (dest, to_ir_ty) = execute_sub_task!(
+                            self,
+                            self.deref_dest.get_or_insert_with(|| DerefDest::new(
+                                self.view,
+                                &self.compiler,
+                                builder.get_output(*dest),
+                                to_ty,
+                                instr.source
+                            )),
+                            executor,
+                            ctx,
+                            builder
+                        );
 
                         let new_value = perform_unary_cast_to(
                             ctx,
@@ -249,6 +297,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                                 instr.source,
                                             )
                                         })?;
+
                                 value_for_bit_integer(value, bits, sign, instr.source)?
                             }
                             TypeKind::BitInteger(bits, sign) => {
@@ -275,7 +324,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::NullLiteral => todo!(),
                     InstrKind::VoidLiteral => ir::Value::Literal(ir::Literal::Void),
                     InstrKind::Call(call, target) => {
-                        let target = target
+                        let call_target = target
                             .as_ref()
                             .expect("call without target cannot be lowered");
 
@@ -283,38 +332,50 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             return suspend!(
                                 self.suspend_on_func,
                                 executor.request(LowerFunctionHead::new(
-                                    target.view,
+                                    call_target.view,
                                     &self.compiler,
-                                    target.callee,
+                                    call_target.callee,
                                 )),
                                 ctx
                             );
                         };
 
+                        let Some(param_ir_types) = executor.demand_many(&self.lowered_ir_types)
+                        else {
+                            return suspend_many!(
+                                self.lowered_ir_types,
+                                call.args
+                                    .iter()
+                                    .copied()
+                                    .enumerate()
+                                    .map(|(i, _)| {
+                                        executor.request(LowerType::new(
+                                            self.view,
+                                            &self.compiler,
+                                            &call_target.get_param_or_arg_type(i).0,
+                                        ))
+                                    })
+                                    .collect(),
+                                ctx
+                            );
+                        };
+
+                        // Perform unary casts for all values to parameter types
                         let mut args = vec![];
-                        for (i, (arg_instr, unary_cast)) in call
+                        for ((arg_instr, unary_cast), param_ir_ty) in call
                             .args
                             .iter()
                             .copied()
-                            .zip(target.arg_casts.iter())
-                            .enumerate()
+                            .zip(call_target.arg_casts.iter())
+                            .zip(param_ir_types.iter())
                         {
                             let value = builder.get_output(arg_instr);
-
-                            let param_ty = if let Some(param) = target.callee.params.required.get(i)
-                            {
-                                param.ty
-                            } else {
-                                target.variadic_arg_types[i - target.callee.params.required.len()]
-                            };
-
-                            let param_ir_ty = to_ir_type(ctx, self.view.target(), param_ty.0)?;
 
                             let value = perform_unary_cast_to(
                                 ctx,
                                 builder,
                                 value,
-                                &param_ir_ty,
+                                param_ir_ty,
                                 unary_cast.as_ref(),
                                 self.view.target(),
                                 instr.source,
@@ -323,41 +384,40 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             args.push(value);
                         }
 
-                        let args = ctx.alloc_slice_fill_iter(args.into_iter());
-
-                        let mut unpromoted_variadic_arg_types = vec![];
-                        for var_arg_ty in target.variadic_arg_types.iter() {
-                            unpromoted_variadic_arg_types.push(to_ir_type(
-                                ctx,
-                                self.view.target(),
-                                var_arg_ty.0,
-                            )?);
-                        }
-
-                        let unpromoted_variadic_arg_types =
-                            ctx.alloc_slice_fill_iter(unpromoted_variadic_arg_types.into_iter());
-
                         // Reset ability to suspend on IR function head
                         self.suspend_on_func = None;
 
                         builder.push(ir::Instr::Call(ir::Call {
                             func: ir_func_ref,
-                            args,
-                            unpromoted_variadic_arg_types,
+                            args: ctx.alloc_slice_fill_iter(args.into_iter()),
+                            unpromoted_variadic_arg_types: ctx.alloc_slice_fill_iter(
+                                param_ir_types
+                                    .into_iter()
+                                    .skip(call_target.callee.params.required.len()),
+                            ),
                         }))
                     }
                     InstrKind::DeclareAssign(_, value, unary_cast, variable_ref) => {
                         let variable_ref = variable_ref.unwrap();
                         let value = builder.get_output(*value);
 
-                        let cfg_ty = instr.typed.unwrap();
-                        let ir_ty = to_ir_type(ctx, self.view.target(), &cfg_ty.0)?;
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    &instr.typed.unwrap().0
+                                )),
+                                ctx
+                            );
+                        };
 
                         let value = perform_unary_cast_to(
                             ctx,
                             builder,
                             value,
-                            &ir_ty,
+                            &lowered_type,
                             unary_cast.as_ref(),
                             self.view.target(),
                             instr.source,
@@ -370,7 +430,9 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     }
                     InstrKind::Member(instr_ref, _, privacy) => todo!(),
                     InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
-                    InstrKind::StructLiteral(struct_literal_instr) => todo!(),
+                    InstrKind::StructLiteral(struct_literal_instr, _) => {
+                        todo!("lower struct literal")
+                    }
                     InstrKind::UnaryOperation(unary_operator, cfg_value, cast) => {
                         match unary_operator {
                             ast::UnaryOperator::Math(ast::UnaryMathOperator::Not) => {
@@ -400,13 +462,23 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::InterpreterSyscall(interpreter_syscall_instr) => todo!(),
                     InstrKind::IntegerPromote(instr_ref) => todo!(),
                     InstrKind::ConformToBool(value, _language, unary_cast) => {
-                        let to_ty = to_ir_type(ctx, self.view.target(), instr.typed.unwrap().0)?;
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    &instr.typed.unwrap().0
+                                )),
+                                ctx
+                            );
+                        };
 
                         perform_unary_cast_to(
                             ctx,
                             builder,
                             builder.get_output(*value),
-                            &to_ty,
+                            &lowered_type,
                             unary_cast.as_ref(),
                             self.view.target(),
                             instr.source,
@@ -415,6 +487,10 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::Is(instr_ref, _) => todo!(),
                     InstrKind::LabelLiteral(_) => todo!(),
                 };
+
+                self.lowered_type = None;
+                self.deref_dest = None;
+                self.lowered_ir_types = None;
 
                 builder.push_output(result);
                 rev_post_order.next(cfg, self.body.post_order);
@@ -431,23 +507,29 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     let return_instr = ir::Instr::Return(if let CfgValue::Void = return_value {
                         None
                     } else {
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    self.head.return_type.0
+                                )),
+                                ctx
+                            );
+                        };
+
                         // TODO: Technically, this should be expanded to handle the case
                         // where we return void as a value.
-                        Some(
-                            to_ir_type(ctx, self.view.target(), self.head.return_type.0).and_then(
-                                |ir_return_ty| {
-                                    perform_unary_cast_to(
-                                        ctx,
-                                        builder,
-                                        builder.get_output(*return_value),
-                                        &ir_return_ty,
-                                        unary_cast.as_ref(),
-                                        self.view.target(),
-                                        end_instr.source,
-                                    )
-                                },
-                            )?,
-                        )
+                        Some(perform_unary_cast_to(
+                            ctx,
+                            builder,
+                            builder.get_output(*return_value),
+                            &lowered_type,
+                            unary_cast.as_ref(),
+                            self.view.target(),
+                            end_instr.source,
+                        )?)
                     });
 
                     builder.push(return_instr);
@@ -455,13 +537,23 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 }
                 EndInstrKind::Jump(basic_block_id, value, cast, to_ty) => {
                     if let Some(to_ty) = to_ty {
-                        let value = builder.get_output(*value);
-                        let to_ty = to_ir_type(ctx, self.view.target(), &to_ty.0)?;
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    to_ty.0
+                                )),
+                                ctx
+                            );
+                        };
+
                         let value = perform_unary_cast_to(
                             ctx,
                             builder,
-                            value,
-                            &to_ty,
+                            builder.get_output(*value),
+                            &lowered_type,
                             cast.as_ref(),
                             self.view.target(),
                             end_instr.source,
@@ -499,6 +591,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 EndInstrKind::Unreachable => todo!(),
             };
 
+            self.lowered_type = None;
             builder.push_output(result);
             rev_post_order.next(cfg, self.body.post_order);
         }
@@ -602,7 +695,7 @@ fn perform_unary_cast_to<'env>(
             }
             UnaryCast::SpecializeAsciiChar(_) => todo!("specialize ascii char"),
             UnaryCast::Dereference { after_deref, then } => {
-                let after_deref = to_ir_type(ctx, target, after_deref.0)?;
+                let after_deref = todo!("perform_unary_cast_to UnaryCast::Deference async"); // to_ir_type(ctx, target, after_deref.0)?;
                 next_cast = then;
 
                 builder.push(ir::Instr::Load {
@@ -620,56 +713,4 @@ fn perform_unary_cast_to<'env>(
             }
         };
     }
-}
-
-fn to_ir_type<'env>(
-    ctx: &mut ExecutionCtx<'env>,
-    target: &Target,
-    ty: &repr::Type<'env>,
-) -> Result<ir::Type<'env>, ErrorDiagnostic> {
-    // TODO: This should probably be replaced with `LowerType`, which is cached and can suspend,
-    // or this could be used as a wrapper to avoid having to spawn for simple types.
-
-    Ok(match &ty.kind {
-        TypeKind::IntegerLiteral(_) => ir::Type::Void,
-        TypeKind::IntegerLiteralInRange(min, max) => {
-            let (bits, sign) =
-                bits_and_sign_for_invisible_integer_in_range(min, max).map_err(|_| {
-                    ErrorDiagnostic::new("Integer range too large to represent", ty.source)
-                })?;
-
-            ir::Type::I(bits, sign)
-        }
-        TypeKind::FloatLiteral(_) => ir::Type::Void,
-        TypeKind::BooleanLiteral(_) => ir::Type::Void,
-        TypeKind::NullLiteral => ir::Type::Void,
-        TypeKind::AsciiCharLiteral(_) => ir::Type::Void,
-        TypeKind::Boolean => ir::Type::Bool,
-        TypeKind::BitInteger(bits, sign) => ir::Type::I(*bits, *sign),
-        TypeKind::CInteger(c_integer, sign) => {
-            let bytes = target.c_integer_bytes(*c_integer);
-            let Some(bits) = IntegerBits::new(bytes.to_bits()) else {
-                return Err(ErrorDiagnostic::new(
-                    "C integer is larger that supported",
-                    ty.source,
-                ));
-            };
-
-            ir::Type::I(
-                bits,
-                sign.unwrap_or_else(|| target.default_c_integer_sign(*c_integer)),
-            )
-        }
-        TypeKind::SizeInteger(integer_sign) => todo!(),
-        TypeKind::Floating(float_size) => ir::Type::F(*float_size),
-        TypeKind::Ptr(inner_ty) | TypeKind::Deref(inner_ty) => {
-            ir::Type::Ptr(ctx.alloc(to_ir_type(ctx, target, inner_ty)?))
-        }
-        TypeKind::Void => ir::Type::Void,
-        TypeKind::Never => ir::Type::Void,
-        TypeKind::FixedArray(_, _) => todo!(),
-        TypeKind::UserDefined(user_defined_type) => todo!(),
-        TypeKind::Polymorph(_) => panic!("Cannot convert unspecialized polymorph to IR type!"),
-        TypeKind::DirectLabel(_) => ir::Type::Void,
-    })
 }
