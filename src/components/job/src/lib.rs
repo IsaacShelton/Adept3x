@@ -52,7 +52,7 @@ macro_rules! suspend_many_assoc {
 }
 
 #[allow(unused)]
-macro_rules! suspend_from_subtask {
+macro_rules! suspend_from_sub_task {
     ($self:ident.$field:ident, $task_ref:expr, $ctx:expr) => {{
         let pending = $task_ref;
 

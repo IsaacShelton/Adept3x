@@ -147,7 +147,7 @@ impl<'env> SubTask<'env> for PerformUnaryCast<'env> {
                     self.unary_cast = Some(cast);
 
                     let Some(after_deref) = executor.demand(self.lowered_type) else {
-                        return suspend_from_subtask!(
+                        return suspend_from_sub_task!(
                             self.lowered_type,
                             executor.request(LowerType::new(
                                 self.view,

@@ -66,7 +66,7 @@ impl<'env> SubTask<'env> for DerefDest<'env> {
             };
 
             let Some(lowered_type) = executor.demand(self.lowered_type) else {
-                return suspend_from_subtask!(
+                return suspend_from_sub_task!(
                     self.lowered_type,
                     executor.request(LowerType::new(self.view, self.compiler, nested)),
                     ctx
@@ -82,7 +82,7 @@ impl<'env> SubTask<'env> for DerefDest<'env> {
         }
 
         let Some(lowered_type) = executor.demand(self.lowered_type) else {
-            return suspend_from_subtask!(
+            return suspend_from_sub_task!(
                 self.lowered_type,
                 executor.request(LowerType::new(&self.view, &self.compiler, &self.ty)),
                 ctx
