@@ -7,14 +7,12 @@ use crate::{
     sub_task::SubTask,
 };
 use diagnostics::ErrorDiagnostic;
-use source_files::Source;
 
 #[derive(Clone)]
 pub struct DerefDest<'env> {
     view: &'env ModuleView<'env>,
     compiler: &'env Compiler<'env>,
     ty: &'env Type<'env>,
-    source: Source,
     dest: ir::Value<'env>,
     lowered_type: Suspend<'env, ir::Type<'env>>,
 }
@@ -25,14 +23,12 @@ impl<'env> DerefDest<'env> {
         compiler: &'env Compiler<'env>,
         dest: ir::Value<'env>,
         ty: &'env Type<'env>,
-        source: Source,
     ) -> Self {
         Self {
             view,
             compiler,
             dest,
             ty,
-            source,
             lowered_type: None,
         }
     }
@@ -88,7 +84,7 @@ impl<'env> SubTask<'env> for DerefDest<'env> {
         let Some(lowered_type) = executor.demand(self.lowered_type) else {
             return suspend_from_subtask!(
                 self.lowered_type,
-                executor.request(LowerType::new(&&self.view, &&self.compiler, &&self.ty)),
+                executor.request(LowerType::new(&self.view, &self.compiler, &self.ty)),
                 ctx
             );
         };

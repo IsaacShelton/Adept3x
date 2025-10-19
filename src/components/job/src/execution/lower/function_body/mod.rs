@@ -1,13 +1,14 @@
 mod deref_dest;
 mod ir_builder;
+mod perform_unary_cast;
 
 use crate::{
     CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, InstrKind,
     RevPostOrderIterWithEnds, Suspend, SuspendMany,
-    conform::UnaryCast,
     execution::lower::{
         LowerFunctionHead, LowerType, bits_and_sign_for_invisible_integer_in_range,
-        function_body::deref_dest::DerefDest, value_for_bit_integer,
+        function_body::{deref_dest::DerefDest, perform_unary_cast::PerformUnaryCast},
+        value_for_bit_integer,
     },
     ir,
     module_graph::ModuleView,
@@ -16,15 +17,10 @@ use crate::{
 };
 use arena::Id;
 use by_address::ByAddress;
-use core::f64;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use ir_builder::*;
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
-use primitives::{FloatOrInteger, FloatSize, IntegerBits, IntegerSign};
-use source_files::Source;
-use target::Target;
+use primitives::FloatOrInteger;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -72,6 +68,16 @@ pub struct LowerFunctionBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     lowered_ir_types: SuspendMany<'env, ir::Type<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    perform_unary_cast: Option<PerformUnaryCast<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    call_args: Vec<ir::Value<'env>>,
 }
 
 impl<'env> LowerFunctionBody<'env> {
@@ -95,6 +101,8 @@ impl<'env> LowerFunctionBody<'env> {
             lowered_type: None,
             deref_dest: None,
             lowered_ir_types: None,
+            perform_unary_cast: None,
+            call_args: vec![],
         }
     }
 }
@@ -213,22 +221,26 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 );
                             };
 
-                            let value = builder.get_output(*value);
-                            let stack_memory = get_variable_alloca(variable_ref);
-
-                            let value = perform_unary_cast_to(
+                            let value = execute_sub_task!(
+                                self,
+                                self.perform_unary_cast.get_or_insert_with(|| {
+                                    PerformUnaryCast::new(
+                                        self.view,
+                                        &self.compiler,
+                                        builder.get_output(*value),
+                                        lowered_type,
+                                        unary_cast.as_ref(),
+                                        instr.source,
+                                    )
+                                }),
+                                executor,
                                 ctx,
-                                builder,
-                                value,
-                                &lowered_type,
-                                unary_cast.as_ref(),
-                                self.view.target(),
-                                instr.source,
-                            )?;
+                                builder
+                            );
 
                             builder.push(ir::Instr::Store(ir::Store {
                                 new_value: value,
-                                destination: stack_memory,
+                                destination: get_variable_alloca(variable_ref),
                             }));
                         }
 
@@ -237,7 +249,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::Assign {
                         dest,
                         src,
-                        src_cast: cast,
+                        src_cast,
                     } => {
                         let new_value = builder.get_output(*src);
 
@@ -250,29 +262,35 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             .into());
                         };
 
-                        let (dest, to_ir_ty) = execute_sub_task!(
+                        let (dest, dest_ir_type) = execute_sub_task!(
                             self,
                             self.deref_dest.get_or_insert_with(|| DerefDest::new(
                                 self.view,
                                 &self.compiler,
                                 builder.get_output(*dest),
                                 to_ty,
-                                instr.source
                             )),
                             executor,
                             ctx,
                             builder
                         );
 
-                        let new_value = perform_unary_cast_to(
+                        let new_value = execute_sub_task!(
+                            self,
+                            self.perform_unary_cast.get_or_insert_with(|| {
+                                PerformUnaryCast::new(
+                                    self.view,
+                                    &self.compiler,
+                                    new_value,
+                                    dest_ir_type,
+                                    src_cast.as_ref(),
+                                    instr.source,
+                                )
+                            }),
+                            executor,
                             ctx,
-                            builder,
-                            new_value,
-                            &to_ir_ty,
-                            cast.as_ref(),
-                            self.view.target(),
-                            instr.source,
-                        )?;
+                            builder
+                        );
 
                         builder.push(ir::Instr::Store(ir::Store {
                             new_value,
@@ -361,27 +379,29 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         };
 
                         // Perform unary casts for all values to parameter types
-                        let mut args = vec![];
-                        for ((arg_instr, unary_cast), param_ir_ty) in call
-                            .args
-                            .iter()
-                            .copied()
-                            .zip(call_target.arg_casts.iter())
-                            .zip(param_ir_types.iter())
-                        {
-                            let value = builder.get_output(arg_instr);
+                        while self.call_args.len() < call.args.len() {
+                            let i = self.call_args.len();
+                            let arg_instr = call.args[i];
+                            let unary_cast = &call_target.arg_casts[i];
 
-                            let value = perform_unary_cast_to(
+                            let value = execute_sub_task!(
+                                self,
+                                self.perform_unary_cast.get_or_insert_with(|| {
+                                    PerformUnaryCast::new(
+                                        self.view,
+                                        &self.compiler,
+                                        builder.get_output(arg_instr),
+                                        param_ir_types[i],
+                                        unary_cast.as_ref(),
+                                        instr.source,
+                                    )
+                                }),
+                                executor,
                                 ctx,
-                                builder,
-                                value,
-                                param_ir_ty,
-                                unary_cast.as_ref(),
-                                self.view.target(),
-                                instr.source,
-                            )?;
+                                builder
+                            );
 
-                            args.push(value);
+                            self.call_args.push(value);
                         }
 
                         // Reset ability to suspend on IR function head
@@ -389,7 +409,9 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                         builder.push(ir::Instr::Call(ir::Call {
                             func: ir_func_ref,
-                            args: ctx.alloc_slice_fill_iter(args.into_iter()),
+                            args: ctx.alloc_slice_fill_iter(
+                                std::mem::take(&mut self.call_args).into_iter(),
+                            ),
                             unpromoted_variadic_arg_types: ctx.alloc_slice_fill_iter(
                                 param_ir_types
                                     .into_iter()
@@ -399,7 +421,6 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     }
                     InstrKind::DeclareAssign(_, value, unary_cast, variable_ref) => {
                         let variable_ref = variable_ref.unwrap();
-                        let value = builder.get_output(*value);
 
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
@@ -413,15 +434,22 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             );
                         };
 
-                        let value = perform_unary_cast_to(
+                        let value = execute_sub_task!(
+                            self,
+                            self.perform_unary_cast.get_or_insert_with(|| {
+                                PerformUnaryCast::new(
+                                    self.view,
+                                    &self.compiler,
+                                    builder.get_output(*value),
+                                    lowered_type,
+                                    unary_cast.as_ref(),
+                                    instr.source,
+                                )
+                            }),
+                            executor,
                             ctx,
-                            builder,
-                            value,
-                            &lowered_type,
-                            unary_cast.as_ref(),
-                            self.view.target(),
-                            instr.source,
-                        )?;
+                            builder
+                        );
 
                         builder.push(ir::Instr::Store(ir::Store {
                             new_value: value,
@@ -436,15 +464,22 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::UnaryOperation(unary_operator, cfg_value, cast) => {
                         match unary_operator {
                             ast::UnaryOperator::Math(ast::UnaryMathOperator::Not) => {
-                                let value = perform_unary_cast_to(
+                                let value = execute_sub_task!(
+                                    self,
+                                    self.perform_unary_cast.get_or_insert_with(|| {
+                                        PerformUnaryCast::new(
+                                            self.view,
+                                            &self.compiler,
+                                            builder.get_output(*cfg_value),
+                                            ir::Type::Bool,
+                                            cast.as_ref(),
+                                            instr.source,
+                                        )
+                                    }),
+                                    executor,
                                     ctx,
-                                    builder,
-                                    builder.get_output(*cfg_value),
-                                    &ir::Type::Bool,
-                                    cast.as_ref(),
-                                    self.view.target(),
-                                    instr.source,
-                                )?;
+                                    builder
+                                );
 
                                 builder.push(ir::Instr::IsZero(value, FloatOrInteger::Integer))
                             }
@@ -474,15 +509,22 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             );
                         };
 
-                        perform_unary_cast_to(
+                        execute_sub_task!(
+                            self,
+                            self.perform_unary_cast.get_or_insert_with(|| {
+                                PerformUnaryCast::new(
+                                    self.view,
+                                    &self.compiler,
+                                    builder.get_output(*value),
+                                    lowered_type,
+                                    unary_cast.as_ref(),
+                                    instr.source,
+                                )
+                            }),
+                            executor,
                             ctx,
-                            builder,
-                            builder.get_output(*value),
-                            &lowered_type,
-                            unary_cast.as_ref(),
-                            self.view.target(),
-                            instr.source,
-                        )?
+                            builder
+                        )
                     }
                     InstrKind::Is(instr_ref, _) => todo!(),
                     InstrKind::LabelLiteral(_) => todo!(),
@@ -491,6 +533,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                 self.lowered_type = None;
                 self.deref_dest = None;
                 self.lowered_ir_types = None;
+                self.perform_unary_cast = None;
 
                 builder.push_output(result);
                 rev_post_order.next(cfg, self.body.post_order);
@@ -521,21 +564,28 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                         // TODO: Technically, this should be expanded to handle the case
                         // where we return void as a value.
-                        Some(perform_unary_cast_to(
+                        Some(execute_sub_task!(
+                            self,
+                            self.perform_unary_cast.get_or_insert_with(|| {
+                                PerformUnaryCast::new(
+                                    self.view,
+                                    &self.compiler,
+                                    builder.get_output(*return_value),
+                                    lowered_type,
+                                    unary_cast.as_ref(),
+                                    end_instr.source,
+                                )
+                            }),
+                            executor,
                             ctx,
-                            builder,
-                            builder.get_output(*return_value),
-                            &lowered_type,
-                            unary_cast.as_ref(),
-                            self.view.target(),
-                            end_instr.source,
-                        )?)
+                            builder
+                        ))
                     });
 
                     builder.push(return_instr);
                     ir::Literal::Void.into()
                 }
-                EndInstrKind::Jump(basic_block_id, value, cast, to_ty) => {
+                EndInstrKind::Jump(basic_block_id, value, unary_cast, to_ty) => {
                     if let Some(to_ty) = to_ty {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
@@ -549,15 +599,22 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             );
                         };
 
-                        let value = perform_unary_cast_to(
+                        let value = execute_sub_task!(
+                            self,
+                            self.perform_unary_cast.get_or_insert_with(|| {
+                                PerformUnaryCast::new(
+                                    self.view,
+                                    &self.compiler,
+                                    builder.get_output(*value),
+                                    lowered_type,
+                                    unary_cast.as_ref(),
+                                    end_instr.source,
+                                )
+                            }),
+                            executor,
                             ctx,
-                            builder,
-                            builder.get_output(*value),
-                            &lowered_type,
-                            cast.as_ref(),
-                            self.view.target(),
-                            end_instr.source,
-                        )?;
+                            builder
+                        );
 
                         builder.push(ir::Instr::Break(ir::Break {
                             basicblock_id: basic_block_id.into_usize(),
@@ -592,6 +649,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
             };
 
             self.lowered_type = None;
+            self.perform_unary_cast = None;
+
             builder.push_output(result);
             rev_post_order.next(cfg, self.body.post_order);
         }
@@ -609,108 +668,5 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
         ir_func.basicblocks.set(basicblocks).unwrap();
         Ok(())
-    }
-}
-
-fn perform_unary_cast_to<'env>(
-    ctx: &mut ExecutionCtx<'env>,
-    builder: &mut IrBuilder<'env>,
-    value: ir::Value<'env>,
-    to_ty: &ir::Type<'env>,
-    cast: Option<&UnaryCast<'env>>,
-    target: &Target,
-    source: Source,
-) -> Result<ir::Value<'env>, ErrorDiagnostic> {
-    let mut value = value;
-    let mut next_cast = cast;
-
-    loop {
-        let Some(cast) = next_cast.take() else {
-            return Ok(value);
-        };
-
-        use IntegerBits::*;
-        use IntegerSign::*;
-
-        let cast_failed = |_| {
-            ErrorDiagnostic::ice(
-                format!("Failed to perform cast to {:?}", to_ty),
-                Some(source),
-            )
-        };
-
-        value = match *cast {
-            UnaryCast::SpecializeBoolean(value) => ir::Literal::Boolean(value).into(),
-            UnaryCast::SpecializeInteger(value) => match to_ty {
-                ir::Type::Bool => ir::Literal::Boolean(*value != BigInt::ZERO).into(),
-                ir::Type::I(Bits8, Signed) => {
-                    ir::Literal::Signed8(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits16, Signed) => {
-                    ir::Literal::Signed16(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits32, Signed) => {
-                    ir::Literal::Signed32(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits64, Signed) => {
-                    ir::Literal::Signed64(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits8, Unsigned) => {
-                    ir::Literal::Unsigned8(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits16, Unsigned) => {
-                    ir::Literal::Unsigned16(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits32, Unsigned) => {
-                    ir::Literal::Unsigned32(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::I(Bits64, Unsigned) => {
-                    ir::Literal::Unsigned64(value.try_into().map_err(cast_failed)?).into()
-                }
-                ir::Type::F(FloatSize::Bits32) => {
-                    ir::Literal::Float32(value.to_f32().unwrap_or_else(|| {
-                        if *value < BigInt::ZERO {
-                            f32::NEG_INFINITY
-                        } else {
-                            f32::INFINITY
-                        }
-                    }))
-                    .into()
-                }
-                ir::Type::F(FloatSize::Bits64) => {
-                    ir::Literal::Float64(value.to_f64().unwrap_or_else(|| {
-                        if *value < BigInt::ZERO {
-                            f64::NEG_INFINITY
-                        } else {
-                            f64::INFINITY
-                        }
-                    }))
-                    .into()
-                }
-                _ => panic!("Cannot specialize integer for type {:?}", to_ty),
-            },
-            UnaryCast::SpecializeFloat(not_nan) => todo!("specialize float"),
-            UnaryCast::SpecializePointerOuter(unaliased_type) => {
-                todo!("specialize pointer outer")
-            }
-            UnaryCast::SpecializeAsciiChar(_) => todo!("specialize ascii char"),
-            UnaryCast::Dereference { after_deref, then } => {
-                let after_deref = todo!("perform_unary_cast_to UnaryCast::Deference async"); // to_ir_type(ctx, target, after_deref.0)?;
-                next_cast = then;
-
-                builder.push(ir::Instr::Load {
-                    pointer: value,
-                    pointee: after_deref,
-                })
-            }
-            UnaryCast::Extend(from_sign) => {
-                assert!(to_ty.is_i());
-                builder.push(ir::Instr::Extend(value, from_sign, *to_ty))
-            }
-            UnaryCast::Truncate => {
-                assert!(to_ty.is_i());
-                builder.push(ir::Instr::Truncate(value, *to_ty))
-            }
-        };
     }
 }
