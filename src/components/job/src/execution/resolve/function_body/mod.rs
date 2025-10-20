@@ -770,19 +770,37 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             .into());
                         }
 
+                        // Report error for any missing fields
                         if struct_literal.fields.len() != structure.fields.len() {
                             let missing_fields = structure
                                 .fields
                                 .keys()
                                 .filter(|name| !seen.contains(name.as_str()))
-                                .map(|name| format!("`{}`", name))
-                                .join(", ");
+                                .map(|name| format!("'{}'", name))
+                                .collect_vec();
 
-                            return Err(ErrorDiagnostic::new(
-                                format!("Missing fields {} for struct literal", missing_fields),
-                                instr.source,
-                            )
-                            .into());
+                            let message = if missing_fields.len() == 1 {
+                                format!("Missing field {} for struct literal", missing_fields[0])
+                            } else if missing_fields.len() <= 5 {
+                                let before_and = missing_fields
+                                    .iter()
+                                    .take(missing_fields.len() - 1)
+                                    .join(", ");
+
+                                let after_and = &missing_fields[missing_fields.len() - 1];
+
+                                format!(
+                                    "Missing fields {}, and {} for struct literal",
+                                    before_and, after_and
+                                )
+                            } else {
+                                format!(
+                                    "Missing fields {}, and more, for struct literal",
+                                    missing_fields.iter().take(5).join(", ")
+                                )
+                            };
+
+                            return Err(ErrorDiagnostic::new(message, instr.source).into());
                         }
 
                         Ok(unary_casts_and_indices)
