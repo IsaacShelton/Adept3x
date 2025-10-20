@@ -67,7 +67,7 @@ pub struct LowerFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    lowered_ir_types: SuspendMany<'env, ir::Type<'env>>,
+    lowered_types: SuspendMany<'env, ir::Type<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -77,7 +77,7 @@ pub struct LowerFunctionBody<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    call_args: Vec<ir::Value<'env>>,
+    values: Vec<ir::Value<'env>>,
 }
 
 impl<'env> LowerFunctionBody<'env> {
@@ -100,9 +100,9 @@ impl<'env> LowerFunctionBody<'env> {
             variables: 0,
             lowered_type: None,
             deref_dest: None,
-            lowered_ir_types: None,
+            lowered_types: None,
             perform_unary_cast: None,
-            call_args: vec![],
+            values: vec![],
         }
     }
 }
@@ -358,10 +358,9 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             );
                         };
 
-                        let Some(param_ir_types) = executor.demand_many(&self.lowered_ir_types)
-                        else {
+                        let Some(param_ir_types) = executor.demand_many(&self.lowered_types) else {
                             return suspend_many!(
-                                self.lowered_ir_types,
+                                self.lowered_types,
                                 call.args
                                     .iter()
                                     .copied()
@@ -379,8 +378,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         };
 
                         // Perform unary casts for all values to parameter types
-                        while self.call_args.len() < call.args.len() {
-                            let i = self.call_args.len();
+                        while self.values.len() < call.args.len() {
+                            let i = self.values.len();
                             let arg_instr = call.args[i];
                             let unary_cast = &call_target.arg_casts[i];
 
@@ -401,7 +400,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 builder
                             );
 
-                            self.call_args.push(value);
+                            self.values.push(value);
+                            self.perform_unary_cast = None;
                         }
 
                         // Reset ability to suspend on IR function head
@@ -410,7 +410,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         builder.push(ir::Instr::Call(ir::Call {
                             func: ir_func_ref,
                             args: ctx.alloc_slice_fill_iter(
-                                std::mem::take(&mut self.call_args).into_iter(),
+                                std::mem::take(&mut self.values).into_iter(),
                             ),
                             unpromoted_variadic_arg_types: ctx.alloc_slice_fill_iter(
                                 param_ir_types
@@ -458,8 +458,79 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     }
                     InstrKind::Member(instr_ref, _, privacy) => todo!(),
                     InstrKind::ArrayAccess(instr_ref, instr_ref1) => todo!(),
-                    InstrKind::StructLiteral(struct_literal_instr, _) => {
-                        todo!("lower struct literal")
+                    InstrKind::StructLiteral(struct_literal, unary_casts) => {
+                        let cfg_type = instr.typed.unwrap();
+                        let unary_casts_and_indices = unary_casts.unwrap();
+
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    &cfg_type.0
+                                )),
+                                ctx
+                            );
+                        };
+
+                        let lowered_struct = match lowered_type {
+                            ir::Type::Struct(idx) => {
+                                self.view.graph(|graph| &graph.ir.structs[idx])
+                            }
+                            _ => {
+                                return Err(ErrorDiagnostic::new(
+                                    "Cannot create struct-literal for non-struct type",
+                                    instr.source,
+                                )
+                                .into());
+                            }
+                        };
+
+                        while self.values.len() < struct_literal.fields.len() {
+                            let i = self.values.len();
+                            let field_init = &struct_literal.fields[i];
+                            let (index, unary_cast) = &unary_casts_and_indices[i];
+                            let ir_field = &lowered_struct.fields[*index];
+
+                            let value = execute_sub_task!(
+                                self,
+                                self.perform_unary_cast.get_or_insert_with(|| {
+                                    PerformUnaryCast::new(
+                                        self.view,
+                                        &self.compiler,
+                                        builder.get_output(field_init.value),
+                                        ir_field.ir_type,
+                                        unary_cast.as_ref(),
+                                        instr.source,
+                                    )
+                                }),
+                                executor,
+                                ctx,
+                                builder
+                            );
+
+                            self.values.push(value);
+                            self.perform_unary_cast = None;
+                        }
+
+                        let mut ordered = vec![None; lowered_struct.fields.len()];
+
+                        for (value, index) in std::mem::take(&mut self.values).into_iter().zip(
+                            unary_casts_and_indices
+                                .iter()
+                                .map(|(index, _)| index)
+                                .copied(),
+                        ) {
+                            ordered[index] = Some(value);
+                        }
+
+                        builder.push(ir::Instr::StructLiteral(
+                            lowered_type,
+                            ctx.alloc_slice_fill_iter(ordered.into_iter().map(|value| {
+                                value.expect("value to be specified for field in struct literal")
+                            })),
+                        ))
                     }
                     InstrKind::UnaryOperation(unary_operator, cfg_value, cast) => {
                         match unary_operator {
@@ -532,7 +603,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                 self.lowered_type = None;
                 self.deref_dest = None;
-                self.lowered_ir_types = None;
+                self.lowered_types = None;
                 self.perform_unary_cast = None;
 
                 builder.push_output(result);

@@ -308,7 +308,7 @@ pub enum InstrKind<'env> {
     ArrayAccess(CfgValue, CfgValue),
     StructLiteral(
         &'env StructLiteralInstr<'env>,
-        Option<&'env [Option<UnaryCast<'env>>]>,
+        Option<&'env [(usize, Option<UnaryCast<'env>>)]>,
     ),
     UnaryOperation(UnaryOperator, CfgValue, Option<UnaryCast<'env>>),
     SizeOf(&'env ast::Type, Option<SizeOfMode>),

@@ -680,9 +680,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     };
 
                     // Resolve field initializers (no suspend)
-                    let unary_casts = (|| -> Result<_, ErrorDiagnostic> {
+                    let unary_casts_and_indices = (|| -> Result<_, ErrorDiagnostic> {
                         // Conform field values to field types
-                        let mut unary_casts = Vec::with_capacity(struct_literal.fields.len());
+                        let mut unary_casts_and_indices =
+                            Vec::with_capacity(struct_literal.fields.len());
                         let mut next_index = 0;
                         let mut seen = HashSet::new();
 
@@ -753,8 +754,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 .into());
                             };
 
-                            unary_casts.push(conformed.cast);
-                            next_index += 1;
+                            unary_casts_and_indices.push((index, conformed.cast));
+                            next_index = index + 1;
                         }
 
                         // TODO: Fill in remaining fields according to fill behavior
@@ -766,15 +767,15 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             .into());
                         }
 
-                        Ok(unary_casts)
+                        Ok(unary_casts_and_indices)
                     })()?;
 
                     // WARNING: We should never suspend anymore here, due to previous no suspend
                     // block...
 
-                    cfg.set_struct_literal_unary_casts(
+                    cfg.set_struct_literal_unary_casts_and_indices(
                         instr_ref,
-                        ctx.alloc_slice_fill_iter(unary_casts.into_iter()),
+                        ctx.alloc_slice_fill_iter(unary_casts_and_indices.into_iter()),
                     );
                     cfg.set_typed(instr_ref, resolved_type);
                 }

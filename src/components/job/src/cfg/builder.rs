@@ -123,10 +123,10 @@ impl<'env> CfgBuilder<'env> {
         instr.typed = Some(callee.return_type);
     }
 
-    pub fn set_struct_literal_unary_casts(
+    pub fn set_struct_literal_unary_casts_and_indices(
         &mut self,
         instr_ref: InstrRef,
-        unary_casts: &'env [Option<UnaryCast<'env>>],
+        unary_casts: &'env [(usize, Option<UnaryCast<'env>>)],
     ) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
