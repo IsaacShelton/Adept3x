@@ -73,7 +73,7 @@ impl<'env> SubTask<'env> for ResolveNamespace<'env> {
                 }
                 _ => {
                     return Err(Err(ErrorDiagnostic::new(
-                        format!("'{}' is not a namespace", name),
+                        format!("`{}` is not a namespace", name),
                         self.source,
                     )));
                 }

@@ -192,14 +192,14 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             return Err(ErrorDiagnostic::new(
                                 if matches!(value, CfgValue::Void) && !self.resolved_head.return_type.0.kind.is_void() {
                                     format!(
-                                        "Must return a value of type '{}' before exiting function '{}'",
-                                        self.resolved_head.return_type, self.resolved_head.name
+                                        "Must return a value of type `{}` before exiting function `{}`",
+                                        self.resolved_head.return_type.display(), self.resolved_head.name
                                     )
                                 } else {
                                     format!(
-                                        "Cannot return value of type '{}', expected '{}'",
-                                        cfg.get_typed((*value).into(), builtin_types).0,
-                                        self.resolved_head.return_type.0
+                                        "Cannot return value of type `{}`, expected `{}`",
+                                        cfg.get_typed((*value).into(), builtin_types).display(),
+                                        self.resolved_head.return_type.display()
                                     )
                                 },
                                 instr.source,
@@ -261,7 +261,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 types_iter
                                     .map(|(_, ty)| ty)
                                     .unique()
-                                    .map(|ty| format!("`{}`", ty))
+                                    .map(|ty| format!("`{}`", ty.display()))
                                     .join(", ")
                             ),
                             instr.source,
@@ -319,7 +319,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         // within the function.
                         if dom_ref == next_dom_ref {
                             return Err(ErrorDiagnostic::new(
-                                format!("Undeclared variable '{}'", needle),
+                                format!("Undeclared variable `{}`", needle),
                                 instr.source,
                             )
                             .into());
@@ -369,7 +369,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     // 2] Ensure variable has initial value
                     let Some(value) = value else {
                         return Err(ErrorDiagnostic::new(
-                            format!("Variable '{}' must have an initial value", name),
+                            format!("Variable `{}` must have an initial value", name),
                             instr.source,
                         )
                         .into());
@@ -389,9 +389,9 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     ) else {
                         return Err(ErrorDiagnostic::new(
                             format!(
-                                "Incompatible types '{}' and '{}'",
-                                cfg.get_typed(*value, builtin_types),
-                                resolved_type
+                                "Incompatible types `{}` and `{}`",
+                                cfg.get_typed(*value, builtin_types).display(),
+                                resolved_type.display()
                             ),
                             instr.source,
                         )
@@ -440,9 +440,9 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     ) else {
                         return Err(ErrorDiagnostic::new(
                             format!(
-                                "Incompatible types '{}' and '{}'",
-                                cfg.get_typed(*src, builtin_types),
-                                dest_ty
+                                "Incompatible types `{}` and `{}`",
+                                cfg.get_typed(*src, builtin_types).display(),
+                                dest_ty.display()
                             ),
                             instr.source,
                         )
@@ -571,10 +571,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             ) else {
                                 return Err(ErrorDiagnostic::new(
                                     format!(
-                                        "Expected '{}' for argument #{}, but got '{}'",
-                                        expected_type,
+                                        "Expected `{}` for argument #{}, but got `{}`",
+                                        expected_type.display(),
                                         i + 1,
-                                        got_type
+                                        got_type.display()
                                     ),
                                     instr.source,
                                 )
@@ -747,7 +747,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 return Err(ErrorDiagnostic::new(
                                     format!(
                                         "Expected value of type `{}` for field `{}`",
-                                        field.ty, field_name
+                                        field.ty.display(),
+                                        field_name
                                     ),
                                     instr.source,
                                 )
@@ -776,7 +777,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 .fields
                                 .keys()
                                 .filter(|name| !seen.contains(name.as_str()))
-                                .map(|name| format!("'{}'", name))
+                                .map(|name| format!("`{}`", name))
                                 .collect_vec();
 
                             let message = if missing_fields.len() == 1 {
@@ -841,7 +842,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                     return Err(ErrorDiagnostic::new(
                                         format!(
                                             "Cannot perform not operator on non-bool value of type `{}`",
-                                            conformed.ty
+                                            conformed.ty.display()
                                         ),
                                         instr.source,
                                     )
@@ -894,275 +895,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
             rev_post_order.next_in_builder(cfg, post_order);
         }
-
-        /*
-        while self.num_resolved_nodes < post_order.len() {
-            // We must process nodes in reverse post-order to ensure proper ordering, lexical
-            // ordering is not enough! Consider `goto` for example.
-            let node_ref = post_order[post_order.len() - 1 - self.num_resolved_nodes];
-            let node = &cfg.nodes[node_ref];
-
-            let get_typed = |node_ref: NodeRef| -> &Resolved<'env> {
-                return self.resolved_nodes.get(node_ref.into_raw()).unwrap();
-            };
-
-            let resolved_node = match &node.kind {
-                NodeKind::Start(_) => Resolved::from_type(builtin_types.void()),
-                NodeKind::Sequential(sequential_node) => match &sequential_node.kind {
-                    SequentialNodeKind::Join1(incoming) => get_typed(*incoming).clone(),
-                    SequentialNodeKind::JoinN(items, Some(conform_behavior)) => {
-                        let edges = items
-                            .iter()
-                            .map(|(_, incoming)| Value::new(*incoming))
-                            .collect_vec();
-
-                        let Some(unified) = unify_types(
-                            ctx,
-                            None,
-                            edges
-                                .iter()
-                                .map(|value| value.ty(&self.resolved_nodes, builtin_types)),
-                            *conform_behavior,
-                            builtin_types,
-                            node.source,
-                        ) else {
-                            // TODO: Improve error message
-                            return Err(ErrorDiagnostic::new(
-                                format!("Inconsistent types from incoming blocks"),
-                                node.source,
-                            )
-                            .into());
-                        };
-
-                        Resolved::from_type(unified)
-                    }
-                    SequentialNodeKind::JoinN(items, None) => {
-                        Resolved::from_type(builtin_types.void())
-                    }
-                    SequentialNodeKind::Const(_) => {
-                        // For this case, we will have to suspend until the result
-                        // of the calcuation is complete
-                        unimplemented!("SequentialNodeKind::Const not supported yet")
-                    }
-                    SequentialNodeKind::Name(needle) => {
-                        let mut dominator_ref = *dominators
-                            .get(node_ref.into_raw())
-                            .expect("dominator to exist");
-
-                        let found = loop {
-                            let dom = &cfg.nodes[dominator_ref];
-
-                            match &dom.kind {
-                                NodeKind::Start(_) => {
-                                    return Err(ErrorDiagnostic::new(
-                                        format!("Undeclared variable '{}'", needle),
-                                        node.source,
-                                    )
-                                    .into());
-                                }
-                                NodeKind::Sequential(SequentialNode {
-                                    kind:
-                                        SequentialNodeKind::Parameter(name, _, _)
-                                        | SequentialNodeKind::Declare(name, _, _)
-                                        | SequentialNodeKind::DeclareAssign(name, _),
-                                    ..
-                                }) if needle.as_plain_str() == Some(name) => {
-                                    break dominator_ref;
-                                }
-                                _ => (),
-                            }
-
-                            dominator_ref = *dominators.get(dominator_ref.into_raw()).unwrap();
-                        };
-
-                        let var_ty = variables
-                            .get(found)
-                            .expect("variable to be tracked")
-                            .ty
-                            .expect("variable to have had type resolved");
-
-                        eprintln!("Variable {} has type {:?}", needle, var_ty);
-                        Resolved::from_type(var_ty.clone())
-                    }
-                    SequentialNodeKind::Declare(_, ast_type, _)
-                    | SequentialNodeKind::Parameter(_, ast_type, _) => {
-                        // Resolve variable type
-                        let Some(resolved_type) = executor.demand(self.resolved_type) else {
-                            return suspend!(
-                                self.resolved_type,
-                                executor.request(ResolveType::new(self.view, ast_type,)),
-                                ctx
-                            );
-                        };
-
-                        variables.assign_resolved_type(node_ref, resolved_type);
-
-                        // Reset suspend on type for next node that needs it
-                        self.resolved_type = None;
-
-                        Resolved::from_type(builtin_types.void())
-                    }
-                    SequentialNodeKind::Assign(_, _) => Resolved::from_type(builtin_types.void()),
-                    SequentialNodeKind::BinOp(left, bin_op, right, language) => {
-                        let left_ty = get_typed(*left).ty();
-                        let right_ty = get_typed(*right).ty();
-
-                        if let (TypeKind::IntegerLiteral(left), TypeKind::IntegerLiteral(right)) =
-                            (&left_ty.0.kind, &right_ty.0.kind)
-                        {
-                            resolve_basic_binary_operation_expr_on_literals(
-                                ctx,
-                                bin_op,
-                                &left,
-                                &right,
-                                node.source,
-                            )
-                            .map_err(Continuation::Error)?
-                        } else {
-                            let conform_behavior = match language {
-                                ast::Language::Adept => {
-                                    ConformBehavior::Adept(c_integer_assumptions)
-                                }
-                                ast::Language::C => ConformBehavior::C,
-                            };
-
-                            let preferred_type = preferred_types.get(node_ref.into_raw()).copied();
-
-                            let Some(unified_type) = unify_types(
-                                ctx,
-                                preferred_type,
-                                [left_ty, right_ty].into_iter(),
-                                conform_behavior,
-                                builtin_types,
-                                node.source,
-                            ) else {
-                                return Err(ErrorDiagnostic::new(
-                                    format!(
-                                        "Incompatible types '{}' and '{}' for '{}'",
-                                        left_ty, right_ty, bin_op
-                                    ),
-                                    node.source,
-                                )
-                                .into());
-                            };
-
-                            let operator =
-                                resolve_basic_binary_operator(bin_op, unified_type, node.source)
-                                    .map_err(Continuation::Error)?;
-
-                            dbg!(&preferred_type, &unified_type, &operator);
-                            let result_type = if bin_op.returns_boolean() {
-                                builtin_types.bool()
-                            } else {
-                                unified_type
-                            };
-
-                            Resolved::new(result_type, ResolvedData::BinaryImplicitCast(operator))
-                        }
-                    }
-                    SequentialNodeKind::Boolean(value) => Resolved::from_type(UnaliasedType(
-                        ctx.alloc(TypeKind::BooleanLiteral(*value).at(node.source)),
-                    )),
-                    SequentialNodeKind::Integer(integer) => {
-                        let source = node.source;
-
-                        let ty = match integer {
-                            ast::Integer::Known(known) => TypeKind::from(known.as_ref()).at(source),
-                            ast::Integer::Generic(value) => {
-                                TypeKind::IntegerLiteral(value.clone()).at(source)
-                            }
-                        };
-
-                        Resolved::from_type(UnaliasedType(ctx.alloc(ty)))
-                    }
-                    SequentialNodeKind::Float(_) => todo!("Float"),
-                    SequentialNodeKind::AsciiChar(_) => todo!("AsciiChar"),
-                    SequentialNodeKind::Utf8Char(_) => todo!("Utf8Char"),
-                    SequentialNodeKind::String(_) => todo!("String"),
-                    SequentialNodeKind::NullTerminatedString(cstring) => {
-                        let char = TypeKind::CInteger(CInteger::Char, None).at(node.source);
-                        Resolved::from_type(UnaliasedType(
-                            ctx.alloc(TypeKind::Ptr(ctx.alloc(char)).at(node.source)),
-                        ))
-                    }
-                    SequentialNodeKind::Null => todo!("Null"),
-                    SequentialNodeKind::Void => Resolved::from_type(builtin_types.void()),
-                    SequentialNodeKind::Call(node_call) => {
-                        todo!("call expressions are not supported yet by ResolveFunctionBody")
-                        // let found = find_or_suspend();
-
-                        // let all_conformed = existing_conformed.conform_rest(rest).or_suspend();
-
-                        // result
-                    }
-                    SequentialNodeKind::DeclareAssign(_name, value) => {
-                        let declared = conform_to_default(
-                            ctx,
-                            get_typed(*value).ty(),
-                            c_integer_assumptions,
-                            builtin_types,
-                        )?;
-                        variables.assign_resolved_type(node_ref, declared.ty());
-                        declared
-                    }
-                    SequentialNodeKind::Member(idx, _, privacy) => todo!("Member"),
-                    SequentialNodeKind::ArrayAccess(idx, idx1) => todo!("ArrayAccess"),
-                    SequentialNodeKind::StructLiteral(node_struct_literal) => {
-                        todo!("StructLiteral")
-                    }
-                    SequentialNodeKind::UnaryOperation(unary_operator, idx) => {
-                        todo!("UnaryOperation")
-                    }
-                    SequentialNodeKind::StaticMemberValue(static_member_value) => {
-                        todo!("StaticMemberValue")
-                    }
-                    SequentialNodeKind::StaticMemberCall(node_static_member_call) => {
-                        todo!("StaticMemberCall")
-                    }
-                    SequentialNodeKind::SizeOf(_, _) => todo!("SizeOf"),
-                    SequentialNodeKind::SizeOfValue(_, _) => todo!("SizeOfValue"),
-                    SequentialNodeKind::InterpreterSyscall(node_interpreter_syscall) => {
-                        todo!("InterpreterSyscall")
-                    }
-                    SequentialNodeKind::IntegerPromote(idx) => todo!("IntegerPromote"),
-                    SequentialNodeKind::StaticAssert(idx, _) => todo!("StaticAssert"),
-                    SequentialNodeKind::ConformToBool(idx, language) => {
-                        if let ast::Language::Adept = language {
-                            Resolved::from_type(builtin_types.bool())
-                        } else {
-                            todo!("ConformToBool")
-                        }
-                    }
-                    SequentialNodeKind::Is(idx, _) => unimplemented!("Is"),
-                    SequentialNodeKind::DirectGoto(label_value) => {
-                        Resolved::from_type(builtin_types.never())
-                    }
-                    SequentialNodeKind::LabelLiteral(name) => {
-                        return Err(ErrorDiagnostic::new(
-                            "Indirect goto labels are not supported yet",
-                            node.source,
-                        )
-                        .into());
-                    }
-                },
-                NodeKind::Branching(branch_node) => Resolved::from_type(builtin_types.void()),
-                NodeKind::Terminating(terminating_node) => {
-                    Resolved::from_type(builtin_types.never())
-                }
-                NodeKind::Scope(_) => {
-                    // When joining control flow paths, consider the path immediately
-                    // from this "begin scope" node to diverge since it's not a real branch.
-                    // Since it's only used for scoping, so don't take it into account
-                    // during type unifying from multiple code paths.
-                    Resolved::from_type(builtin_types.never())
-                }
-            };
-
-            self.resolved_nodes
-                .insert(node_ref.into_raw(), resolved_node);
-            self.num_resolved_nodes += 1;
-        }
-        */
 
         let final_cfg = ctx.alloc(self.cfg.take().unwrap().finish(ctx));
 

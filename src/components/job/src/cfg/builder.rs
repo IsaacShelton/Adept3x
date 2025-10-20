@@ -380,7 +380,7 @@ impl<'env> CfgBuilder<'env> {
         for label in std::mem::take(&mut self.labels).into_iter() {
             if labels.contains_key(&label.name) {
                 return Err(ErrorDiagnostic::new(
-                    format!("Duplicate label '@{}@'", &label.name),
+                    format!("Duplicate label `@{}@`", &label.name),
                     label.source,
                 ));
             }
@@ -393,7 +393,7 @@ impl<'env> CfgBuilder<'env> {
             if let EndInstrKind::IncompleteGoto(label_name) = &mut bb.end.as_mut().unwrap().kind {
                 let Some(target) = labels.get(label_name) else {
                     return Err(ErrorDiagnostic::new(
-                        format!("Undefined label '@{}@'", label_name),
+                        format!("Undefined label `@{}@`", label_name),
                         bb.end.as_mut().unwrap().source,
                     ));
                 };

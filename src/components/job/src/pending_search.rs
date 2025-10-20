@@ -175,7 +175,7 @@ impl<'env> PendingSearchMapInner<'env> {
             for (_, search) in pending_search.tasks.iter() {
                 let error_diagnostic = ErrorDiagnostic::new_maybe_source(
                     format!(
-                        "Undefined {} '{}'",
+                        "Undefined {} `{}`",
                         search.symbol_kind_name().unwrap_or("symbol"),
                         search.name()
                     ),

@@ -66,7 +66,8 @@ pub fn unify_types<'env>(
             return Err(ErrorDiagnostic::ice(
                 format!(
                     "Failed to conform value of {} to calculated unifying type {}",
-                    from_ty, to_ty
+                    from_ty.display(),
+                    to_ty.display()
                 ),
                 Some(source),
             ));

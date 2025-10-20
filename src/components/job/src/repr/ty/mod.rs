@@ -1,21 +1,21 @@
+mod displayer;
+
 use crate::repr::TypeHeadRest;
 use ast::IntegerKnown;
 use derivative::Derivative;
 use derive_more::IsVariant;
+pub use displayer::*;
 use num_bigint::BigInt;
 use ordered_float::NotNan;
-use primitives::{
-    CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, NumericMode, fmt_c_integer,
-};
+use primitives::{CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, NumericMode};
 use source_files::Source;
-use std::fmt::Display;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UnaliasedType<'env>(pub &'env Type<'env>);
 
-impl<'env> Display for UnaliasedType<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl<'env> UnaliasedType<'env> {
+    pub fn display(&self) -> TypeDisplayer<'_, 'env> {
+        self.0.display()
     }
 }
 
@@ -41,11 +41,9 @@ impl<'env> Type<'env> {
     pub fn contains_type_alias(&self) -> bool {
         self.kind.contains_type_alias()
     }
-}
 
-impl<'env> Display for Type<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)
+    pub fn display(&self) -> TypeDisplayer<'_, 'env> {
+        TypeDisplayer::new(self)
     }
 }
 
@@ -67,15 +65,6 @@ impl<'env> TypeArg<'env> {
         match self {
             TypeArg::Type(ty) => ty.contains_type_alias(),
             TypeArg::Integer(_) => false,
-        }
-    }
-}
-
-impl<'env> Display for TypeArg<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TypeArg::Type(ty) => write!(f, "{}", ty),
-            TypeArg::Integer(integer) => write!(f, "{}", integer),
         }
     }
 }
@@ -203,91 +192,6 @@ impl<'env> From<&IntegerKnown> for TypeKind<'env> {
             IntegerRigidity::Fixed(bits, sign) => TypeKind::BitInteger(bits, sign),
             IntegerRigidity::Loose(c_integer, sign) => TypeKind::CInteger(c_integer, sign),
             IntegerRigidity::Size(sign) => TypeKind::SizeInteger(sign),
-        }
-    }
-}
-
-impl<'env> Display for TypeKind<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TypeKind::IntegerLiteral(integer) => write!(f, "integer {}", integer),
-            TypeKind::IntegerLiteralInRange(min, max) => {
-                write!(f, "integer {}..={}", min, max)
-            }
-            TypeKind::FloatLiteral(Some(float)) => write!(f, "float {}", float),
-            TypeKind::FloatLiteral(None) => write!(f, "float NaN"),
-            TypeKind::Boolean => write!(f, "bool"),
-            TypeKind::NullLiteral => write!(f, "null"),
-            TypeKind::AsciiCharLiteral(c) => {
-                if c.is_ascii_graphic() || *c == b' ' {
-                    write!(f, "'{}'", *c)
-                } else if *c == b'\n' {
-                    write!(f, "'\\n'")
-                } else if *c == b'\t' {
-                    write!(f, "'\\t'")
-                } else if *c == b'\r' {
-                    write!(f, "'\\r'")
-                } else if *c == 0x1B {
-                    write!(f, "'\\e'")
-                } else if *c == b'\0' {
-                    write!(f, "'\\0'")
-                } else {
-                    write!(f, "'\\x{:02X}'", *c as i32)
-                }
-            }
-            TypeKind::BooleanLiteral(value) => write!(f, "bool {}", value),
-            TypeKind::BitInteger(bits, sign) => f.write_str(match (bits, sign) {
-                (IntegerBits::Bits8, IntegerSign::Signed) => "i8",
-                (IntegerBits::Bits8, IntegerSign::Unsigned) => "u8",
-                (IntegerBits::Bits16, IntegerSign::Signed) => "i16",
-                (IntegerBits::Bits16, IntegerSign::Unsigned) => "u16",
-                (IntegerBits::Bits32, IntegerSign::Signed) => "i32",
-                (IntegerBits::Bits32, IntegerSign::Unsigned) => "u32",
-                (IntegerBits::Bits64, IntegerSign::Signed) => "i64",
-                (IntegerBits::Bits64, IntegerSign::Unsigned) => "u64",
-            }),
-            TypeKind::CInteger(cinteger, sign) => fmt_c_integer(f, *cinteger, *sign),
-            TypeKind::SizeInteger(sign) => f.write_str(match sign {
-                IntegerSign::Signed => "isize",
-                IntegerSign::Unsigned => "usize",
-            }),
-
-            TypeKind::Floating(float_size) => f.write_str(match float_size {
-                FloatSize::Bits32 => "f32",
-                FloatSize::Bits64 => "f64",
-            }),
-            TypeKind::Ptr(inner) => {
-                write!(f, "ptr'{}", inner)
-            }
-            TypeKind::Deref(inner) => {
-                write!(f, "deref'{}", inner)
-            }
-            TypeKind::Void => write!(f, "void"),
-            TypeKind::Never => write!(f, "never"),
-            TypeKind::FixedArray(inner, count) => write!(f, "array<{}, {}>", count, inner),
-            TypeKind::UserDefined(user_defined_type) => {
-                write!(f, "{}", user_defined_type.name)?;
-
-                if user_defined_type.args.len() > 0 {
-                    write!(f, "<")?;
-
-                    for (i, arg) in user_defined_type.args.iter().enumerate() {
-                        write!(f, "{}", arg)?;
-
-                        if i + 1 < user_defined_type.args.len() {
-                            write!(f, ", ")?;
-                        }
-                    }
-
-                    write!(f, ">")?;
-                }
-
-                Ok(())
-            }
-            TypeKind::Polymorph(polymorph) => write!(f, "${}", polymorph),
-            // NOTE: Direct labels are not "real types". They are zero-sized, compile-time-known,
-            // and can't be named, returned, etc.
-            TypeKind::DirectLabel(name) => write!(f, "@{}@", name),
         }
     }
 }
