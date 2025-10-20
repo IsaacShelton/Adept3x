@@ -202,7 +202,7 @@ impl Aarch64 {
                 return Ok(ABIType::new_ignore());
             }
 
-            if is_empty_record && size.is_zero() {
+            if size.is_zero() {
                 return Ok(ABIType::new_ignore());
             }
 

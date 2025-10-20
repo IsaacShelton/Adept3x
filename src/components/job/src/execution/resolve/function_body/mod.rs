@@ -759,9 +759,27 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         }
 
                         // TODO: Fill in remaining fields according to fill behavior
-                        if structure.fields.len() < struct_literal.fields.len() {
+                        if !struct_literal.fill_behavior.is_forbid() {
                             return Err(ErrorDiagnostic::new(
-                                "Missing fields for struct literal",
+                                format!(
+                                    "Unimplemented struct literal fill behavior - {:?}",
+                                    struct_literal.fill_behavior
+                                ),
+                                instr.source,
+                            )
+                            .into());
+                        }
+
+                        if struct_literal.fields.len() != structure.fields.len() {
+                            let missing_fields = structure
+                                .fields
+                                .keys()
+                                .filter(|name| !seen.contains(name.as_str()))
+                                .map(|name| format!("`{}`", name))
+                                .join(", ");
+
+                            return Err(ErrorDiagnostic::new(
+                                format!("Missing fields {} for struct literal", missing_fields),
                                 instr.source,
                             )
                             .into());
