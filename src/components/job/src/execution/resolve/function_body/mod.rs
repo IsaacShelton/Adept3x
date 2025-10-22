@@ -193,13 +193,13 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 if matches!(value, CfgValue::Void) && !self.resolved_head.return_type.0.kind.is_void() {
                                     format!(
                                         "Must return a value of type `{}` before exiting function `{}`",
-                                        self.resolved_head.return_type.display(), self.resolved_head.name
+                                        self.resolved_head.return_type.display(self.view), self.resolved_head.name
                                     )
                                 } else {
                                     format!(
                                         "Cannot return value of type `{}`, expected `{}`",
-                                        cfg.get_typed((*value).into(), builtin_types).display(),
-                                        self.resolved_head.return_type.display()
+                                        cfg.get_typed((*value).into(), builtin_types).display(self.view),
+                                        self.resolved_head.return_type.display(self.view)
                                     )
                                 },
                                 instr.source,
@@ -251,7 +251,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         types_iter.clone(),
                         conform_behavior.expect("conform behavior for >2 incoming phi"),
                         builtin_types,
-                        self.view.target(),
+                        self.view,
                         instr.source,
                     )?
                     else {
@@ -261,7 +261,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 types_iter
                                     .map(|(_, ty)| ty)
                                     .unique()
-                                    .map(|ty| format!("`{}`", ty.display()))
+                                    .map(|ty| format!("`{}`", ty.display(self.view)))
                                     .join(", ")
                             ),
                             instr.source,
@@ -390,8 +390,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types `{}` and `{}`",
-                                cfg.get_typed(*value, builtin_types).display(),
-                                resolved_type.display()
+                                cfg.get_typed(*value, builtin_types).display(self.view),
+                                resolved_type.display(self.view)
                             ),
                             instr.source,
                         )
@@ -441,8 +441,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types `{}` and `{}`",
-                                cfg.get_typed(*src, builtin_types).display(),
-                                dest_ty.display()
+                                cfg.get_typed(*src, builtin_types).display(self.view),
+                                dest_ty.display(self.view)
                             ),
                             instr.source,
                         )
@@ -572,9 +572,9 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 return Err(ErrorDiagnostic::new(
                                     format!(
                                         "Expected `{}` for argument #{}, but got `{}`",
-                                        expected_type.display(),
+                                        expected_type.display(self.view),
                                         i + 1,
-                                        got_type.display()
+                                        got_type.display(self.view)
                                     ),
                                     instr.source,
                                 )
@@ -653,7 +653,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         rest:
                             TypeHeadRest {
                                 kind: TypeHeadRestKind::Struct(structure),
-                                view,
+                                view: struct_view,
                             },
                         args: _,
                     }) = &resolved_type.0.kind
@@ -671,7 +671,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         return suspend!(
                             self.resolved_struct_body,
                             executor.request(ResolveStructureBody::new(
-                                view,
+                                struct_view,
                                 &self.compiler,
                                 structure
                             )),
@@ -747,7 +747,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 return Err(ErrorDiagnostic::new(
                                     format!(
                                         "Expected value of type `{}` for field `{}`",
-                                        field.ty.display(),
+                                        field.ty.display(struct_view),
                                         field_name
                                     ),
                                     instr.source,
@@ -842,7 +842,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                     return Err(ErrorDiagnostic::new(
                                         format!(
                                             "Cannot perform not operator on non-bool value of type `{}`",
-                                            conformed.ty.display()
+                                            conformed.ty.display(self.view)
                                         ),
                                         instr.source,
                                     )

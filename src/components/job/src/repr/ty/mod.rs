@@ -1,6 +1,6 @@
 mod displayer;
 
-use crate::repr::TypeHeadRest;
+use crate::{module_graph::ModuleView, repr::TypeHeadRest};
 use ast::IntegerKnown;
 use derivative::Derivative;
 use derive_more::IsVariant;
@@ -14,8 +14,8 @@ use source_files::Source;
 pub struct UnaliasedType<'env>(pub &'env Type<'env>);
 
 impl<'env> UnaliasedType<'env> {
-    pub fn display(&self) -> TypeDisplayer<'_, 'env> {
-        self.0.display()
+    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> TypeDisplayer<'a, 'b, 'env> {
+        self.0.display(view)
     }
 }
 
@@ -42,8 +42,8 @@ impl<'env> Type<'env> {
         self.kind.contains_type_alias()
     }
 
-    pub fn display(&self) -> TypeDisplayer<'_, 'env> {
-        TypeDisplayer::new(self)
+    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> TypeDisplayer<'a, 'b, 'env> {
+        TypeDisplayer::new(self, view)
     }
 }
 

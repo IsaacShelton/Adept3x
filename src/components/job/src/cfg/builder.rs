@@ -21,6 +21,35 @@ impl<'env> PartialBasicBlock<'env> {
             .try_into()
             .expect("cannot have more than 2^32-1 instructions in a basicblock")
     }
+
+    pub fn display<'a, 'b>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+    ) -> PartialBasicBlockDisplayer<'a, 'b, 'env> {
+        PartialBasicBlockDisplayer {
+            basicblock: self,
+            view,
+        }
+    }
+}
+
+pub struct PartialBasicBlockDisplayer<'a, 'b, 'env: 'a + 'b> {
+    basicblock: &'a PartialBasicBlock<'env>,
+    view: &'b ModuleView<'env>,
+}
+
+impl<'a, 'b, 'env: 'a + 'b> Display for PartialBasicBlockDisplayer<'a, 'b, 'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (index, instr) in self.basicblock.instrs.iter().enumerate() {
+            write!(f, "  {:04} {}", index, instr.display(self.view))?;
+        }
+        if let Some(end) = &self.basicblock.end {
+            write!(f, "  {:04} {}", self.basicblock.instrs.len(), end)?;
+        } else {
+            writeln!(f, "  {:04} <missing>", self.basicblock.instrs.len())?;
+        }
+        Ok(())
+    }
 }
 
 pub struct Cursor {
@@ -405,15 +434,34 @@ impl<'env> CfgBuilder<'env> {
 
         Ok(self)
     }
+
+    pub fn display<'a, 'b>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+    ) -> CfgBuilderDisplayer<'a, 'b, 'env> {
+        CfgBuilderDisplayer {
+            cfg_builder: self,
+            view,
+        }
+    }
 }
 
-impl<'env> Display for CfgBuilder<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "BUILDER WITH {} BASICBLOCKS", self.basicblocks.len())?;
+pub struct CfgBuilderDisplayer<'a, 'b, 'env: 'a + 'b> {
+    cfg_builder: &'a CfgBuilder<'env>,
+    view: &'b ModuleView<'env>,
+}
 
-        for (i, block) in &self.basicblocks {
+impl<'a, 'b, 'env: 'a + 'b> Display for CfgBuilderDisplayer<'a, 'b, 'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "BUILDER WITH {} BASICBLOCKS",
+            self.cfg_builder.basicblocks.len()
+        )?;
+
+        for (i, block) in &self.cfg_builder.basicblocks {
             let i = i.into_raw();
-            writeln!(f, "{}\n{}", i, block)?;
+            writeln!(f, "{}\n{}", i, block.display(self.view))?;
         }
         Ok(())
     }

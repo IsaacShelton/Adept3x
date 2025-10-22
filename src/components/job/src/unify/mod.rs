@@ -7,6 +7,7 @@
 use crate::{
     BasicBlockId, BuiltinTypes, ExecutionCtx,
     conform::{ConformMode, UnaryCast, conform_to},
+    module_graph::ModuleView,
     repr::{Type, TypeKind, UnaliasedType},
 };
 use ast::ConformBehavior;
@@ -16,7 +17,6 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use primitives::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign};
 use source_files::Source;
-use target::Target;
 
 #[derive(Debug)]
 pub struct UnifySolution<'env> {
@@ -29,9 +29,11 @@ pub fn unify_types<'env>(
     types_iter: impl Iterator<Item = (BasicBlockId, UnaliasedType<'env>)> + Clone,
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
-    target: &Target,
+    view: &'env ModuleView<'env>,
     source: Source,
 ) -> Result<Option<UnifySolution<'env>>, ErrorDiagnostic> {
+    let target = view.target();
+
     let Some(to_ty) = unify_types_trivial(
         ctx,
         types_iter.clone().map(|(_bb, ty)| ty),
@@ -66,8 +68,8 @@ pub fn unify_types<'env>(
             return Err(ErrorDiagnostic::ice(
                 format!(
                     "Failed to conform value of {} to calculated unifying type {}",
-                    from_ty.display(),
-                    to_ty.display()
+                    from_ty.display(view),
+                    to_ty.display(view)
                 ),
                 Some(source),
             ));

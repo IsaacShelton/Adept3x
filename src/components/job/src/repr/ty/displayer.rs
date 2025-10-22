@@ -1,18 +1,22 @@
-use crate::repr::{Type, TypeArg, TypeKind};
+use crate::{
+    module_graph::ModuleView,
+    repr::{Type, TypeArg, TypeKind},
+};
 use primitives::{FloatSize, IntegerBits, IntegerSign, fmt_c_integer};
 use std::fmt::Display;
 
-pub struct TypeDisplayer<'a, 'env: 'a> {
+pub struct TypeDisplayer<'a, 'b, 'env: 'a + 'b> {
     ty: &'a Type<'env>,
+    view: &'b ModuleView<'env>,
 }
 
-impl<'a, 'env: 'a> TypeDisplayer<'a, 'env> {
-    pub fn new(ty: &'a Type<'env>) -> Self {
-        Self { ty }
+impl<'a, 'b, 'env: 'a + 'b> TypeDisplayer<'a, 'b, 'env> {
+    pub fn new(ty: &'a Type<'env>, view: &'b ModuleView<'env>) -> Self {
+        Self { ty, view }
     }
 }
 
-impl<'a, 'env: 'a> Display for TypeDisplayer<'a, 'env> {
+impl<'a, 'b, 'env: 'a + 'b> Display for TypeDisplayer<'a, 'b, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let kind = &self.ty.kind;
 
@@ -64,15 +68,15 @@ impl<'a, 'env: 'a> Display for TypeDisplayer<'a, 'env> {
                 FloatSize::Bits64 => "f64",
             }),
             TypeKind::Ptr(inner) => {
-                write!(f, "ptr'{}", inner.display())
+                write!(f, "ptr'{}", inner.display(self.view))
             }
             TypeKind::Deref(inner) => {
-                write!(f, "deref'{}", inner.display())
+                write!(f, "deref'{}", inner.display(self.view))
             }
             TypeKind::Void => write!(f, "void"),
             TypeKind::Never => write!(f, "never"),
             TypeKind::FixedArray(inner, count) => {
-                write!(f, "array<{}, {}>", count, inner.display())
+                write!(f, "array<{}, {}>", count, inner.display(self.view))
             }
             TypeKind::UserDefined(user_defined_type) => {
                 write!(f, "{}", user_defined_type.name)?;
@@ -82,7 +86,7 @@ impl<'a, 'env: 'a> Display for TypeDisplayer<'a, 'env> {
 
                     for (i, arg) in user_defined_type.args.iter().enumerate() {
                         match arg {
-                            TypeArg::Type(arg) => write!(f, "{}", arg.display())?,
+                            TypeArg::Type(arg) => write!(f, "{}", arg.display(self.view))?,
                             TypeArg::Integer(big_int) => write!(f, "{}", big_int)?,
                         }
 

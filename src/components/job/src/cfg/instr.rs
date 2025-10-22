@@ -99,12 +99,26 @@ pub struct Instr<'env> {
     pub source: Source,
 }
 
-impl<'env> Display for Instr<'env> {
+impl<'env> Instr<'env> {
+    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> InstrDisplayer<'a, 'b, 'env> {
+        InstrDisplayer {
+            instr: self,
+            view: view,
+        }
+    }
+}
+
+pub struct InstrDisplayer<'a, 'b, 'env: 'a + 'b> {
+    instr: &'a Instr<'env>,
+    view: &'b ModuleView<'env>,
+}
+
+impl<'a, 'b, 'env: 'a + 'b> Display for InstrDisplayer<'a, 'b, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(typed) = &self.typed {
-            writeln!(f, "{}  ->  {}", self.kind, typed.0.display())?;
+        if let Some(typed) = &self.instr.typed {
+            writeln!(f, "{}  ->  {}", self.instr.kind, typed.display(self.view))?;
         } else {
-            writeln!(f, "{}", self.kind)?;
+            writeln!(f, "{}", self.instr.kind)?;
         }
 
         Ok(())

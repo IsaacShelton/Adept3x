@@ -3,7 +3,7 @@ mod flatten;
 mod instr;
 mod value;
 
-use crate::{BuiltinTypes, repr::UnaliasedType};
+use crate::{BuiltinTypes, module_graph::ModuleView, repr::UnaliasedType};
 use arena::{Arena, Id, Idx, new_id_with_niche};
 pub use builder::*;
 use diagnostics::ErrorDiagnostic;
@@ -125,15 +125,24 @@ impl<'env> Cfg<'env> {
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());
         bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
     }
+
+    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> CfgDisplayer<'a, 'b, 'env> {
+        CfgDisplayer { cfg: self, view }
+    }
 }
 
-impl<'env> Display for Cfg<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "CFG WITH {} BASICBLOCKS", self.len())?;
+pub struct CfgDisplayer<'a, 'b, 'env: 'a + 'b> {
+    cfg: &'a Cfg<'env>,
+    view: &'b ModuleView<'env>,
+}
 
-        for (i, block) in &self.basicblocks {
+impl<'a, 'b, 'env: 'a + 'b> Display for CfgDisplayer<'a, 'b, 'env> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "CFG WITH {} BASICBLOCKS", self.cfg.len())?;
+
+        for (i, block) in &self.cfg.basicblocks {
             let i = i.into_raw();
-            writeln!(f, "{}\n{}", i, block)?;
+            writeln!(f, "{}\n{}", i, block.display(self.view))?;
         }
         Ok(())
     }
@@ -145,26 +154,34 @@ pub struct BasicBlock<'env> {
     pub end: EndInstr<'env>,
 }
 
-impl<'env> Display for BasicBlock<'env> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (index, instr) in self.instrs.iter().enumerate() {
-            write!(f, "  {:04} {}", index, instr)?;
+impl<'env> BasicBlock<'env> {
+    pub fn display<'a, 'b>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+    ) -> BasicBlockDisplayer<'a, 'b, 'env> {
+        BasicBlockDisplayer {
+            basicblock: self,
+            view,
         }
-        write!(f, "  {:04} {}", self.instrs.len(), self.end)?;
-        Ok(())
     }
 }
 
-impl<'env> Display for PartialBasicBlock<'env> {
+pub struct BasicBlockDisplayer<'a, 'b, 'env: 'a + 'b> {
+    basicblock: &'a BasicBlock<'env>,
+    view: &'b ModuleView<'env>,
+}
+
+impl<'a, 'b, 'env: 'a + 'b> Display for BasicBlockDisplayer<'a, 'b, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (index, instr) in self.instrs.iter().enumerate() {
-            write!(f, "  {:04} {}", index, instr)?;
+        for (index, instr) in self.basicblock.instrs.iter().enumerate() {
+            write!(f, "  {:04} {}", index, instr.display(self.view))?;
         }
-        if let Some(end) = &self.end {
-            write!(f, "  {:04} {}", self.instrs.len(), end)?;
-        } else {
-            writeln!(f, "  {:04} <missing>", self.instrs.len())?;
-        }
+        write!(
+            f,
+            "  {:04} {}",
+            self.basicblock.instrs.len(),
+            self.basicblock.end
+        )?;
         Ok(())
     }
 }
