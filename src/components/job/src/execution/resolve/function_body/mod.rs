@@ -9,8 +9,9 @@ use crate::{
     flatten_func,
     module_graph::ModuleView,
     repr::{
-        Compiler, DeclHead, FuncBody, FuncHead, StructBody, Type, TypeHeadRest, TypeHeadRestKind,
-        TypeKind, UnaliasedType, UserDefinedType, Variable, Variables,
+        Compiler, DeclHead, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation,
+        TypeHeadRest, TypeHeadRestKind, TypeKind, UnaliasedType, UserDefinedType, Variable,
+        Variables,
     },
     sub_task::SubTask,
     unify::unify_types,
@@ -193,13 +194,17 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 if matches!(value, CfgValue::Void) && !self.resolved_head.return_type.0.kind.is_void() {
                                     format!(
                                         "Must return a value of type `{}` before exiting function `{}`",
-                                        self.resolved_head.return_type.display(self.view), self.resolved_head.name
+                                        self.resolved_head.return_type.display_one(self.view), self.resolved_head.name
                                     )
                                 } else {
+                                    let expected = self.resolved_head.return_type;
+                                    let got = cfg.get_typed((*value).into(), builtin_types);
+                                    let disambiguation = TypeDisplayerDisambiguation::new([got.0, expected.0].into_iter());
+
                                     format!(
                                         "Cannot return value of type `{}`, expected `{}`",
-                                        cfg.get_typed((*value).into(), builtin_types).display(self.view),
-                                        self.resolved_head.return_type.display(self.view)
+                                        got.display(self.view, &disambiguation),
+                                        expected.display(self.view, &disambiguation)
                                     )
                                 },
                                 instr.source,
@@ -255,13 +260,20 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         instr.source,
                     )?
                     else {
+                        let disambiguation = TypeDisplayerDisambiguation::new(
+                            types_iter.clone().map(|(_, ty)| ty.0),
+                        );
+
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Cannot merge incompatible types: {}",
                                 types_iter
                                     .map(|(_, ty)| ty)
                                     .unique()
-                                    .map(|ty| format!("`{}`", ty.display(self.view)))
+                                    .map(|ty| format!(
+                                        "`{}`",
+                                        ty.display(self.view, &disambiguation)
+                                    ))
                                     .join(", ")
                             ),
                             instr.source,
@@ -387,11 +399,16 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         |_, _| todo!("handle polymorphs"),
                         instr.source,
                     ) else {
+                        let got = cfg.get_typed(*value, builtin_types);
+                        let expected = resolved_type;
+                        let disambiguation =
+                            TypeDisplayerDisambiguation::new([expected.0, got.0].into_iter());
+
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types `{}` and `{}`",
-                                cfg.get_typed(*value, builtin_types).display(self.view),
-                                resolved_type.display(self.view)
+                                got.display(self.view, &disambiguation),
+                                expected.display(self.view, &disambiguation),
                             ),
                             instr.source,
                         )
@@ -438,11 +455,16 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         |_, _| todo!("handle polymorphs"),
                         instr.source,
                     ) else {
+                        let got = cfg.get_typed(*src, builtin_types);
+                        let expected = dest_ty;
+                        let disambiguation =
+                            TypeDisplayerDisambiguation::new([expected.0, got.0].into_iter());
+
                         return Err(ErrorDiagnostic::new(
                             format!(
                                 "Incompatible types `{}` and `{}`",
-                                cfg.get_typed(*src, builtin_types).display(self.view),
-                                dest_ty.display(self.view)
+                                got.display(self.view, &disambiguation),
+                                expected.display(self.view, &disambiguation),
                             ),
                             instr.source,
                         )
@@ -569,12 +591,16 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 |_, _| todo!("handle polymorphs"),
                                 instr.source,
                             ) else {
+                                let disambiguation = TypeDisplayerDisambiguation::new(
+                                    [expected_type.0, got_type.0].into_iter(),
+                                );
+
                                 return Err(ErrorDiagnostic::new(
                                     format!(
                                         "Expected `{}` for argument #{}, but got `{}`",
-                                        expected_type.display(self.view),
+                                        expected_type.display(self.view, &disambiguation),
                                         i + 1,
-                                        got_type.display(self.view)
+                                        got_type.display(self.view, &disambiguation)
                                     ),
                                     instr.source,
                                 )
@@ -729,9 +755,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 ConformBehavior::C => ConformMode::Explicit,
                             };
 
+                            let got_type = cfg.get_typed(field_init.value, builtin_types);
                             let Some(conformed) = conform_to(
                                 ctx,
-                                cfg.get_typed(field_init.value, builtin_types),
+                                got_type,
                                 field.ty,
                                 conform_behavior.c_integer_assumptions(),
                                 builtin_types,
@@ -744,10 +771,15 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 },
                                 instr.source,
                             ) else {
+                                let expected_type = field.ty.0;
+                                let disambiguation = TypeDisplayerDisambiguation::new(
+                                    [expected_type, got_type.0].into_iter(),
+                                );
+
                                 return Err(ErrorDiagnostic::new(
                                     format!(
                                         "Expected value of type `{}` for field `{}`",
-                                        field.ty.display(struct_view),
+                                        field.ty.display(struct_view, &disambiguation),
                                         field_name
                                     ),
                                     instr.source,
@@ -842,7 +874,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                     return Err(ErrorDiagnostic::new(
                                         format!(
                                             "Cannot perform not operator on non-bool value of type `{}`",
-                                            conformed.ty.display(self.view)
+                                            conformed.ty.display_one(self.view)
                                         ),
                                         instr.source,
                                     )

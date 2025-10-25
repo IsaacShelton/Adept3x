@@ -3,6 +3,7 @@ use crate::module_graph::ModuleView;
 use by_address::ByAddress;
 use derivative::Derivative;
 use derive_more::IsVariant;
+use source_files::Source;
 
 #[derive(Copy, Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
@@ -22,6 +23,15 @@ pub struct TypeHeadRest<'env> {
 pub enum TypeHeadRestKind<'env> {
     Struct(ByAddress<&'env ast::Struct>),
     Alias(ByAddress<&'env ast::TypeAlias>),
+}
+
+impl<'env> TypeHeadRestKind<'env> {
+    pub fn source(&self) -> Source {
+        match self {
+            TypeHeadRestKind::Struct(item) => item.source,
+            TypeHeadRestKind::Alias(item) => item.source,
+        }
+    }
 }
 
 impl<'env> TypeHead<'env> {

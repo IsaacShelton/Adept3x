@@ -62,6 +62,10 @@ impl<'env> ModuleView<'env> {
         &self.meta.target
     }
 
+    pub fn compiler(&self) -> &'env Compiler<'env> {
+        self.web.compiler
+    }
+
     #[must_use]
     pub fn upsert_part(&self, canonical_filename: &'env Path) -> Upserted<ModuleView<'env>> {
         let new_part_ref = self.web.graph_mut(self.graph, |graph| {

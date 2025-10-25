@@ -92,7 +92,7 @@ impl<'env> Executable<'env> for Main<'env> {
 
         let web = *self
             .module_graph_web
-            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST, ctx)));
+            .get_or_insert_with(|| ctx.alloc(ModuleGraphWeb::new(Target::HOST, compiler, ctx)));
 
         let meta = web.graph(ModuleGraphRef::Runtime, |graph| graph.meta());
 

@@ -3,7 +3,11 @@ mod flatten;
 mod instr;
 mod value;
 
-use crate::{BuiltinTypes, module_graph::ModuleView, repr::UnaliasedType};
+use crate::{
+    BuiltinTypes,
+    module_graph::ModuleView,
+    repr::{TypeDisplayerDisambiguation, UnaliasedType},
+};
 use arena::{Arena, Id, Idx, new_id_with_niche};
 pub use builder::*;
 use diagnostics::ErrorDiagnostic;
@@ -126,14 +130,23 @@ impl<'env> Cfg<'env> {
         bb.instrs[instr_ref.instr_or_end as usize].typed.unwrap()
     }
 
-    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> CfgDisplayer<'a, 'b, 'env> {
-        CfgDisplayer { cfg: self, view }
+    pub fn display<'a, 'b>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+        disambiguation: &'a TypeDisplayerDisambiguation<'env>,
+    ) -> CfgDisplayer<'a, 'b, 'env> {
+        CfgDisplayer {
+            cfg: self,
+            view,
+            disambiguation,
+        }
     }
 }
 
 pub struct CfgDisplayer<'a, 'b, 'env: 'a + 'b> {
     cfg: &'a Cfg<'env>,
     view: &'b ModuleView<'env>,
+    disambiguation: &'a TypeDisplayerDisambiguation<'env>,
 }
 
 impl<'a, 'b, 'env: 'a + 'b> Display for CfgDisplayer<'a, 'b, 'env> {
@@ -142,7 +155,12 @@ impl<'a, 'b, 'env: 'a + 'b> Display for CfgDisplayer<'a, 'b, 'env> {
 
         for (i, block) in &self.cfg.basicblocks {
             let i = i.into_raw();
-            writeln!(f, "{}\n{}", i, block.display(self.view))?;
+            writeln!(
+                f,
+                "{}\n{}",
+                i,
+                block.display(self.view, self.disambiguation)
+            )?;
         }
         Ok(())
     }
@@ -158,10 +176,12 @@ impl<'env> BasicBlock<'env> {
     pub fn display<'a, 'b>(
         &'a self,
         view: &'b ModuleView<'env>,
+        disambiguation: &'a TypeDisplayerDisambiguation<'env>,
     ) -> BasicBlockDisplayer<'a, 'b, 'env> {
         BasicBlockDisplayer {
             basicblock: self,
             view,
+            disambiguation,
         }
     }
 }
@@ -169,12 +189,18 @@ impl<'env> BasicBlock<'env> {
 pub struct BasicBlockDisplayer<'a, 'b, 'env: 'a + 'b> {
     basicblock: &'a BasicBlock<'env>,
     view: &'b ModuleView<'env>,
+    disambiguation: &'a TypeDisplayerDisambiguation<'env>,
 }
 
 impl<'a, 'b, 'env: 'a + 'b> Display for BasicBlockDisplayer<'a, 'b, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (index, instr) in self.basicblock.instrs.iter().enumerate() {
-            write!(f, "  {:04} {}", index, instr.display(self.view))?;
+            write!(
+                f,
+                "  {:04} {}",
+                index,
+                instr.display(self.view, self.disambiguation)
+            )?;
         }
         write!(
             f,

@@ -5,21 +5,31 @@ use crate::{
         meta::ModuleGraphMeta, module_graph_ref::ComptimeKind, view::ModuleView,
         web_inner::ModuleGraphWebInner,
     },
-    repr::DeclHead,
+    repr::{Compiler, DeclHead},
 };
 use attributes::Privacy;
+use derivative::Derivative;
 use std::{path::Path, sync::RwLock};
 use target::Target;
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct ModuleGraphWeb<'env> {
     inner: RwLock<ModuleGraphWebInner<'env>>,
+
+    #[derivative(Debug = "ignore")]
+    pub compiler: &'env Compiler<'env>,
 }
 
 impl<'env> ModuleGraphWeb<'env> {
-    pub fn new(target: Target, ctx: &mut ExecutionCtx<'env>) -> Self {
+    pub fn new(
+        target: Target,
+        compiler: &'env Compiler<'env>,
+        ctx: &mut ExecutionCtx<'env>,
+    ) -> Self {
         Self {
             inner: RwLock::new(ModuleGraphWebInner::new(target, ctx)),
+            compiler,
         }
     }
 

@@ -1,6 +1,9 @@
 mod displayer;
 
-use crate::{module_graph::ModuleView, repr::TypeHeadRest};
+use crate::{
+    module_graph::ModuleView,
+    repr::{TypeHeadRest, TypeHeadRestKind},
+};
 use ast::IntegerKnown;
 use derivative::Derivative;
 use derive_more::IsVariant;
@@ -9,13 +12,25 @@ use num_bigint::BigInt;
 use ordered_float::NotNan;
 use primitives::{CInteger, FloatSize, IntegerBits, IntegerRigidity, IntegerSign, NumericMode};
 use source_files::Source;
+use std::borrow::Cow;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UnaliasedType<'env>(pub &'env Type<'env>);
 
 impl<'env> UnaliasedType<'env> {
-    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> TypeDisplayer<'a, 'b, 'env> {
-        self.0.display(view)
+    pub fn display<'a, 'b, 'c>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+        disambiguation: &'c TypeDisplayerDisambiguation<'env>,
+    ) -> TypeDisplayer<'a, 'b, 'c, 'env> {
+        self.0.display(view, disambiguation)
+    }
+
+    pub fn display_one<'a, 'b, 'c>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+    ) -> TypeDisplayer<'a, 'b, 'c, 'env> {
+        self.0.display_one(view)
     }
 }
 
@@ -42,8 +57,23 @@ impl<'env> Type<'env> {
         self.kind.contains_type_alias()
     }
 
-    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> TypeDisplayer<'a, 'b, 'env> {
-        TypeDisplayer::new(self, view)
+    pub fn display<'a, 'b, 'c>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+        disambiguation: &'c TypeDisplayerDisambiguation<'env>,
+    ) -> TypeDisplayer<'a, 'b, 'c, 'env> {
+        TypeDisplayer::new(self, view, Cow::Borrowed(disambiguation))
+    }
+
+    pub fn display_one<'a, 'b, 'c>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+    ) -> TypeDisplayer<'a, 'b, 'c, 'env> {
+        TypeDisplayer::new(
+            self,
+            view,
+            Cow::Owned(TypeDisplayerDisambiguation::single(self)),
+        )
     }
 }
 
@@ -134,7 +164,9 @@ impl<'env> TypeKind<'env> {
         }
     }
 
-    pub fn contains_polymorph(&self) -> bool {
+    pub fn traverse_bfs<T>(&self, initial: T, f: &mut impl FnMut(T, &TypeKind<'env>) -> T) -> T {
+        let mut acc = f(initial, self);
+
         match self {
             TypeKind::Boolean
             | TypeKind::NullLiteral
@@ -146,36 +178,45 @@ impl<'env> TypeKind<'env> {
             | TypeKind::IntegerLiteralInRange(..)
             | TypeKind::FloatLiteral(_)
             | TypeKind::Floating(_)
-            | TypeKind::AsciiCharLiteral(_) => false,
-            TypeKind::Ptr(inner) | TypeKind::Deref(inner) => inner.kind.contains_polymorph(),
-            TypeKind::Void | TypeKind::Never => false,
-            TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
-            TypeKind::Polymorph(_) => true,
-            TypeKind::UserDefined(user_defined_type) => user_defined_type.contains_polymorph(),
-            TypeKind::DirectLabel(_) => false,
+            | TypeKind::AsciiCharLiteral(_)
+            | TypeKind::Void
+            | TypeKind::Never
+            | TypeKind::Polymorph(_)
+            | TypeKind::DirectLabel(_) => acc,
+            TypeKind::UserDefined(udt) => {
+                for arg in udt.args.iter() {
+                    match arg {
+                        TypeArg::Type(ty) => acc = ty.kind.traverse_bfs(acc, f),
+                        TypeArg::Integer(_) => (),
+                    }
+                }
+                acc
+            }
+            TypeKind::Ptr(inner) | TypeKind::Deref(inner) | TypeKind::FixedArray(inner, _) => {
+                inner.kind.traverse_bfs(acc, f)
+            }
         }
     }
 
+    pub fn contains_polymorph(&self) -> bool {
+        self.traverse_bfs(false, &mut |acc, kind| {
+            acc || matches!(kind, TypeKind::Polymorph(_))
+        })
+    }
+
     pub fn contains_type_alias(&self) -> bool {
-        match self {
-            TypeKind::Boolean
-            | TypeKind::NullLiteral
-            | TypeKind::BooleanLiteral(_)
-            | TypeKind::BitInteger(_, _)
-            | TypeKind::CInteger(_, _)
-            | TypeKind::SizeInteger(_)
-            | TypeKind::IntegerLiteral(_)
-            | TypeKind::IntegerLiteralInRange(..)
-            | TypeKind::FloatLiteral(_)
-            | TypeKind::Floating(_)
-            | TypeKind::AsciiCharLiteral(_) => false,
-            TypeKind::Ptr(inner) | TypeKind::Deref(inner) => inner.kind.contains_type_alias(),
-            TypeKind::Void | TypeKind::Never => false,
-            TypeKind::FixedArray(inner, _) => inner.kind.contains_polymorph(),
-            TypeKind::Polymorph(_) => true,
-            TypeKind::UserDefined(user_defined_type) => user_defined_type.contains_type_alias(),
-            TypeKind::DirectLabel(_) => false,
-        }
+        self.traverse_bfs(false, &mut |acc, kind| {
+            acc || matches!(
+                kind,
+                TypeKind::UserDefined(UserDefinedType {
+                    rest: TypeHeadRest {
+                        kind: TypeHeadRestKind::Alias(_),
+                        ..
+                    },
+                    ..
+                })
+            )
+        })
     }
 
     pub fn bit_integer_sign(&self) -> Option<IntegerSign> {
@@ -201,16 +242,6 @@ pub struct UserDefinedType<'env> {
     pub name: &'env str,
     pub rest: TypeHeadRest<'env>,
     pub args: &'env [TypeArg<'env>],
-}
-
-impl<'env> UserDefinedType<'env> {
-    pub fn contains_polymorph(&self) -> bool {
-        self.args.iter().any(|arg| arg.contains_polymorph())
-    }
-
-    pub fn contains_type_alias(&self) -> bool {
-        self.rest.kind.is_alias() || self.args.iter().any(|arg| arg.contains_type_alias())
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

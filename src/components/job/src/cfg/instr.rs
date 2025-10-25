@@ -2,7 +2,7 @@ use crate::{
     BasicBlockId, CfgValue,
     conform::UnaryCast,
     module_graph::ModuleView,
-    repr::{FuncHead, UnaliasedType, VariableRef},
+    repr::{FuncHead, TypeDisplayerDisambiguation, UnaliasedType, VariableRef},
 };
 use ast::{ConformBehavior, FillBehavior, Integer, Language, NamePath, SizeOfMode, UnaryOperator};
 use attributes::Privacy;
@@ -100,10 +100,15 @@ pub struct Instr<'env> {
 }
 
 impl<'env> Instr<'env> {
-    pub fn display<'a, 'b>(&'a self, view: &'b ModuleView<'env>) -> InstrDisplayer<'a, 'b, 'env> {
+    pub fn display<'a, 'b>(
+        &'a self,
+        view: &'b ModuleView<'env>,
+        disambiguation: &'a TypeDisplayerDisambiguation<'env>,
+    ) -> InstrDisplayer<'a, 'b, 'env> {
         InstrDisplayer {
             instr: self,
-            view: view,
+            view,
+            disambiguation,
         }
     }
 }
@@ -111,12 +116,18 @@ impl<'env> Instr<'env> {
 pub struct InstrDisplayer<'a, 'b, 'env: 'a + 'b> {
     instr: &'a Instr<'env>,
     view: &'b ModuleView<'env>,
+    disambiguation: &'a TypeDisplayerDisambiguation<'env>,
 }
 
 impl<'a, 'b, 'env: 'a + 'b> Display for InstrDisplayer<'a, 'b, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(typed) = &self.instr.typed {
-            writeln!(f, "{}  ->  {}", self.instr.kind, typed.display(self.view))?;
+            writeln!(
+                f,
+                "{}  ->  {}",
+                self.instr.kind,
+                typed.display(self.view, self.disambiguation)
+            )?;
         } else {
             writeln!(f, "{}", self.instr.kind)?;
         }

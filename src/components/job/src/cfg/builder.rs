@@ -22,26 +22,34 @@ impl<'env> PartialBasicBlock<'env> {
             .expect("cannot have more than 2^32-1 instructions in a basicblock")
     }
 
-    pub fn display<'a, 'b>(
+    pub fn display<'a, 'b, 'c>(
         &'a self,
         view: &'b ModuleView<'env>,
-    ) -> PartialBasicBlockDisplayer<'a, 'b, 'env> {
+        disambiguation: &'c TypeDisplayerDisambiguation<'env>,
+    ) -> PartialBasicBlockDisplayer<'a, 'b, 'c, 'env> {
         PartialBasicBlockDisplayer {
             basicblock: self,
             view,
+            disambiguation,
         }
     }
 }
 
-pub struct PartialBasicBlockDisplayer<'a, 'b, 'env: 'a + 'b> {
+pub struct PartialBasicBlockDisplayer<'a, 'b, 'c, 'env: 'a + 'b + 'c> {
     basicblock: &'a PartialBasicBlock<'env>,
     view: &'b ModuleView<'env>,
+    disambiguation: &'c TypeDisplayerDisambiguation<'env>,
 }
 
-impl<'a, 'b, 'env: 'a + 'b> Display for PartialBasicBlockDisplayer<'a, 'b, 'env> {
+impl<'a, 'b, 'c, 'env: 'a + 'b + 'c> Display for PartialBasicBlockDisplayer<'a, 'b, 'c, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (index, instr) in self.basicblock.instrs.iter().enumerate() {
-            write!(f, "  {:04} {}", index, instr.display(self.view))?;
+            write!(
+                f,
+                "  {:04} {}",
+                index,
+                instr.display(self.view, self.disambiguation)
+            )?;
         }
         if let Some(end) = &self.basicblock.end {
             write!(f, "  {:04} {}", self.basicblock.instrs.len(), end)?;
@@ -435,23 +443,26 @@ impl<'env> CfgBuilder<'env> {
         Ok(self)
     }
 
-    pub fn display<'a, 'b>(
+    pub fn display<'a, 'b, 'c>(
         &'a self,
         view: &'b ModuleView<'env>,
-    ) -> CfgBuilderDisplayer<'a, 'b, 'env> {
+        disambiguation: &'c TypeDisplayerDisambiguation<'env>,
+    ) -> CfgBuilderDisplayer<'a, 'b, 'c, 'env> {
         CfgBuilderDisplayer {
             cfg_builder: self,
             view,
+            disambiguation,
         }
     }
 }
 
-pub struct CfgBuilderDisplayer<'a, 'b, 'env: 'a + 'b> {
+pub struct CfgBuilderDisplayer<'a, 'b, 'c, 'env: 'a + 'b + 'c> {
     cfg_builder: &'a CfgBuilder<'env>,
     view: &'b ModuleView<'env>,
+    disambiguation: &'c TypeDisplayerDisambiguation<'env>,
 }
 
-impl<'a, 'b, 'env: 'a + 'b> Display for CfgBuilderDisplayer<'a, 'b, 'env> {
+impl<'a, 'b, 'c, 'env: 'a + 'b + 'c> Display for CfgBuilderDisplayer<'a, 'b, 'c, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -461,7 +472,12 @@ impl<'a, 'b, 'env: 'a + 'b> Display for CfgBuilderDisplayer<'a, 'b, 'env> {
 
         for (i, block) in &self.cfg_builder.basicblocks {
             let i = i.into_raw();
-            writeln!(f, "{}\n{}", i, block.display(self.view))?;
+            writeln!(
+                f,
+                "{}\n{}",
+                i,
+                block.display(self.view, self.disambiguation)
+            )?;
         }
         Ok(())
     }

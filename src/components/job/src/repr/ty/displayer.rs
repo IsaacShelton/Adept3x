@@ -1,22 +1,80 @@
 use crate::{
     module_graph::ModuleView,
-    repr::{Type, TypeArg, TypeKind},
+    repr::{Type, TypeArg, TypeHeadRestKind, TypeKind},
 };
+use diagnostics::minimal_filename;
 use primitives::{FloatSize, IntegerBits, IntegerSign, fmt_c_integer};
-use std::fmt::Display;
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
-pub struct TypeDisplayer<'a, 'b, 'env: 'a + 'b> {
-    ty: &'a Type<'env>,
-    view: &'b ModuleView<'env>,
+#[derive(Clone)]
+pub struct TypeDisplayerDisambiguation<'env> {
+    ambiguous_names: HashSet<&'env str>,
 }
 
-impl<'a, 'b, 'env: 'a + 'b> TypeDisplayer<'a, 'b, 'env> {
-    pub fn new(ty: &'a Type<'env>, view: &'b ModuleView<'env>) -> Self {
-        Self { ty, view }
+impl<'env> TypeDisplayerDisambiguation<'env> {
+    pub fn single<'a>(ty: &'a Type<'env>) -> Self {
+        Self::new(std::iter::once(ty))
+    }
+
+    pub fn new<'a>(types: impl Iterator<Item = &'a Type<'env>>) -> Self
+    where
+        'env: 'a,
+    {
+        let mut states = HashMap::<&'env str, Result<TypeHeadRestKind, ()>>::new();
+
+        // NOTE: We will also need to handle polymorph type disambiguation eventually,
+        // I think it has to happen at a higher level than this though
+        for ty in types {
+            ty.kind.traverse_bfs((), &mut |_, kind| match kind {
+                TypeKind::UserDefined(udt) => {
+                    if let Some(existing) = states.get(udt.name) {
+                        if let Ok(existing) = existing {
+                            if *existing != udt.rest.kind {
+                                states.insert(udt.name, Err(()));
+                            }
+                        }
+                    } else {
+                        states.insert(udt.name, Ok(udt.rest.kind));
+                    }
+                }
+                _ => (),
+            });
+        }
+
+        Self {
+            ambiguous_names: states
+                .into_iter()
+                .filter_map(|(name, state)| state.is_err().then_some(name))
+                .collect(),
+        }
     }
 }
 
-impl<'a, 'b, 'env: 'a + 'b> Display for TypeDisplayer<'a, 'b, 'env> {
+pub struct TypeDisplayer<'a, 'b, 'c, 'env: 'a + 'b + 'c> {
+    ty: &'a Type<'env>,
+    view: &'b ModuleView<'env>,
+    disambiguation: Cow<'c, TypeDisplayerDisambiguation<'env>>,
+}
+
+impl<'a, 'b, 'c, 'env: 'a + 'b + 'c> TypeDisplayer<'a, 'b, 'c, 'env> {
+    pub fn new(
+        ty: &'a Type<'env>,
+        view: &'b ModuleView<'env>,
+        disambiguation: Cow<'c, TypeDisplayerDisambiguation<'env>>,
+    ) -> Self {
+        Self {
+            ty,
+            view,
+            disambiguation,
+        }
+    }
+}
+
+impl<'a, 'b, 'c, 'env: 'a + 'b + 'c> Display for TypeDisplayer<'a, 'b, 'c, 'env> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let kind = &self.ty.kind;
 
@@ -68,29 +126,49 @@ impl<'a, 'b, 'env: 'a + 'b> Display for TypeDisplayer<'a, 'b, 'env> {
                 FloatSize::Bits64 => "f64",
             }),
             TypeKind::Ptr(inner) => {
-                write!(f, "ptr'{}", inner.display(self.view))
+                write!(f, "ptr'{}", inner.display(self.view, &self.disambiguation))
             }
             TypeKind::Deref(inner) => {
-                write!(f, "deref'{}", inner.display(self.view))
+                write!(
+                    f,
+                    "deref'{}",
+                    inner.display(self.view, &self.disambiguation)
+                )
             }
             TypeKind::Void => write!(f, "void"),
             TypeKind::Never => write!(f, "never"),
             TypeKind::FixedArray(inner, count) => {
-                write!(f, "array<{}, {}>", count, inner.display(self.view))
+                write!(
+                    f,
+                    "array<{}, {}>",
+                    count,
+                    inner.display(self.view, &self.disambiguation)
+                )
             }
-            TypeKind::UserDefined(user_defined_type) => {
-                write!(f, "{}", user_defined_type.name)?;
+            TypeKind::UserDefined(udt) => {
+                if self.disambiguation.ambiguous_names.contains(udt.name) {
+                    let filename = minimal_filename(
+                        udt.rest.kind.source(),
+                        self.view.compiler().source_files,
+                        Some(self.view.compiler().project_root),
+                    );
+                    write!(f, "[\"{}\"]::", filename)?;
+                }
 
-                if user_defined_type.args.len() > 0 {
+                write!(f, "{}", udt.name)?;
+
+                if udt.args.len() > 0 {
                     write!(f, "<")?;
 
-                    for (i, arg) in user_defined_type.args.iter().enumerate() {
+                    for (i, arg) in udt.args.iter().enumerate() {
                         match arg {
-                            TypeArg::Type(arg) => write!(f, "{}", arg.display(self.view))?,
+                            TypeArg::Type(arg) => {
+                                write!(f, "{}", arg.display(self.view, &self.disambiguation))?
+                            }
                             TypeArg::Integer(big_int) => write!(f, "{}", big_int)?,
                         }
 
-                        if i + 1 < user_defined_type.args.len() {
+                        if i + 1 < udt.args.len() {
                             write!(f, ", ")?;
                         }
                     }

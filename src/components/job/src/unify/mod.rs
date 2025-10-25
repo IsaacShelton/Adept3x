@@ -8,7 +8,7 @@ use crate::{
     BasicBlockId, BuiltinTypes, ExecutionCtx,
     conform::{ConformMode, UnaryCast, conform_to},
     module_graph::ModuleView,
-    repr::{Type, TypeKind, UnaliasedType},
+    repr::{Type, TypeDisplayerDisambiguation, TypeKind, UnaliasedType},
 };
 use ast::ConformBehavior;
 use data_units::BitUnits;
@@ -65,11 +65,13 @@ pub fn unify_types<'env>(
             |_, _| false,
             source,
         ) else {
+            let disambiguation = TypeDisplayerDisambiguation::new([from_ty.0, to_ty.0].into_iter());
+
             return Err(ErrorDiagnostic::ice(
                 format!(
                     "Failed to conform value of {} to calculated unifying type {}",
-                    from_ty.display(view),
-                    to_ty.display(view)
+                    from_ty.display(view, &disambiguation),
+                    to_ty.display(view, &disambiguation)
                 ),
                 Some(source),
             ));
