@@ -192,8 +192,8 @@ pub unsafe fn create_function_block<'env>(
                             LLVMBuildLShr(builder.get(), left, right, c"".as_ptr())
                         }
                     },
-                    ir::BinOp::FloatOrSign(op) => match op {
-                        ir::BinOpFloatOrSign::Divide(sign) => match sign {
+                    ir::BinOp::FloatOrSign(op, sign) => match op {
+                        ir::BinOpFloatOrSign::Divide => match sign {
                             FloatOrSign::Integer(IntegerSign::Signed) => {
                                 LLVMBuildSDiv(builder.get(), left, right, c"".as_ptr())
                             }
@@ -204,7 +204,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFDiv(builder.get(), left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrSign::Modulus(sign) => match sign {
+                        ir::BinOpFloatOrSign::Modulus => match sign {
                             FloatOrSign::Integer(IntegerSign::Signed) => {
                                 LLVMBuildSRem(builder.get(), left, right, c"".as_ptr())
                             }
@@ -215,7 +215,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFRem(builder.get(), left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrSign::LessThan(sign) => match sign {
+                        ir::BinOpFloatOrSign::LessThan => match sign {
                             FloatOrSign::Integer(sign) => LLVMBuildICmp(
                                 builder.get(),
                                 match sign {
@@ -230,7 +230,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFCmp(builder.get(), LLVMRealOLT, left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrSign::LessThanEq(sign) => match sign {
+                        ir::BinOpFloatOrSign::LessThanEq => match sign {
                             FloatOrSign::Integer(sign) => LLVMBuildICmp(
                                 builder.get(),
                                 match sign {
@@ -245,7 +245,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFCmp(builder.get(), LLVMRealOLE, left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrSign::GreaterThan(sign) => match sign {
+                        ir::BinOpFloatOrSign::GreaterThan => match sign {
                             FloatOrSign::Integer(sign) => LLVMBuildICmp(
                                 builder.get(),
                                 match sign {
@@ -260,7 +260,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFCmp(builder.get(), LLVMRealOGT, left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrSign::GreaterThanEq(sign) => match sign {
+                        ir::BinOpFloatOrSign::GreaterThanEq => match sign {
                             FloatOrSign::Integer(sign) => LLVMBuildICmp(
                                 builder.get(),
                                 match sign {
@@ -276,8 +276,8 @@ pub unsafe fn create_function_block<'env>(
                             }
                         },
                     },
-                    ir::BinOp::FloatOrInteger(op) => match op {
-                        ir::BinOpFloatOrInteger::Add(mode) => match mode {
+                    ir::BinOp::FloatOrInteger(op, mode) => match op {
+                        ir::BinOpFloatOrInteger::Add => match mode {
                             FloatOrInteger::Integer => {
                                 LLVMBuildAdd(builder.get(), left, right, c"".as_ptr())
                             }
@@ -285,7 +285,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFAdd(builder.get(), left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrInteger::Subtract(mode) => match mode {
+                        ir::BinOpFloatOrInteger::Subtract => match mode {
                             FloatOrInteger::Integer => {
                                 LLVMBuildSub(builder.get(), left, right, c"".as_ptr())
                             }
@@ -293,7 +293,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFSub(builder.get(), left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrInteger::Multiply(mode) => match mode {
+                        ir::BinOpFloatOrInteger::Multiply => match mode {
                             FloatOrInteger::Integer => {
                                 LLVMBuildMul(builder.get(), left, right, c"".as_ptr())
                             }
@@ -301,7 +301,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFMul(builder.get(), left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrInteger::Equals(mode) => match mode {
+                        ir::BinOpFloatOrInteger::Equals => match mode {
                             FloatOrInteger::Integer => {
                                 LLVMBuildICmp(builder.get(), LLVMIntEQ, left, right, c"".as_ptr())
                             }
@@ -309,7 +309,7 @@ pub unsafe fn create_function_block<'env>(
                                 LLVMBuildFCmp(builder.get(), LLVMRealOEQ, left, right, c"".as_ptr())
                             }
                         },
-                        ir::BinOpFloatOrInteger::NotEquals(mode) => match mode {
+                        ir::BinOpFloatOrInteger::NotEquals => match mode {
                             FloatOrInteger::Integer => {
                                 LLVMBuildICmp(builder.get(), LLVMIntNE, left, right, c"".as_ptr())
                             }

@@ -52,8 +52,8 @@ pub enum Instr<'env> {
 #[derive(Clone, Debug)]
 pub enum BinOp {
     Simple(BinOpSimple),
-    FloatOrSign(BinOpFloatOrSign),
-    FloatOrInteger(BinOpFloatOrInteger),
+    FloatOrSign(BinOpFloatOrSign, FloatOrSign),
+    FloatOrInteger(BinOpFloatOrInteger, FloatOrInteger),
     Checked(OverflowOperation),
 }
 
@@ -71,28 +71,21 @@ pub enum BinOpSimple {
 
 #[derive(Clone, Debug)]
 pub enum BinOpFloatOrSign {
-    Divide(FloatOrSign),
-    Modulus(FloatOrSign),
-    LessThan(FloatOrSign),
-    LessThanEq(FloatOrSign),
-    GreaterThan(FloatOrSign),
-    GreaterThanEq(FloatOrSign),
+    Divide,
+    Modulus,
+    LessThan,
+    LessThanEq,
+    GreaterThan,
+    GreaterThanEq,
 }
 
 #[derive(Clone, Debug)]
 pub enum BinOpFloatOrInteger {
-    Add(FloatOrInteger),
-    Subtract(FloatOrInteger),
-    Multiply(FloatOrInteger),
-    Equals(FloatOrInteger),
-    NotEquals(FloatOrInteger),
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum OverflowOperator {
     Add,
     Subtract,
     Multiply,
+    Equals,
+    NotEquals,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -100,6 +93,13 @@ pub struct OverflowOperation {
     pub operator: OverflowOperator,
     pub sign: IntegerSign,
     pub bits: IntegerBits,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum OverflowOperator {
+    Add,
+    Subtract,
+    Multiply,
 }
 
 #[derive(Clone, Debug)]
