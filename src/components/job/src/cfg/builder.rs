@@ -242,7 +242,7 @@ impl<'env> CfgBuilder<'env> {
 
         // Sequential Instruction
         match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
-            InstrKind::BinOp(_, _, _, _, a_unary_cast, b_unary_cast) => {
+            InstrKind::BinOp(_, _, _, _, a_unary_cast, b_unary_cast, _) => {
                 *a_unary_cast = a_cast;
                 *b_unary_cast = b_cast;
             }

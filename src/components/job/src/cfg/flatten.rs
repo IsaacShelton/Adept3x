@@ -148,6 +148,7 @@ fn flatten_stmt<'env>(
                             assignment.conform_behavior,
                             None,
                             None,
+                            None,
                         )
                         .at(stmt.source),
                     ),
@@ -290,8 +291,16 @@ fn flatten_expr<'env>(
             builder
                 .try_push(
                     cursor,
-                    InstrKind::BinOp(left, bin_op.operator, right, ConformBehavior::C, None, None)
-                        .at(expr.source),
+                    InstrKind::BinOp(
+                        left,
+                        bin_op.operator,
+                        right,
+                        ConformBehavior::C,
+                        None,
+                        None,
+                        None,
+                    )
+                    .at(expr.source),
                 )
                 .into()
         }

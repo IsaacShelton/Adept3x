@@ -1,6 +1,7 @@
 use crate::{
     BasicBlockId, CfgValue,
     conform::UnaryCast,
+    ir::BinOp,
     module_graph::ModuleView,
     repr::{FuncHead, TypeDisplayerDisambiguation, UnaliasedType, VariableRef},
 };
@@ -184,7 +185,7 @@ impl<'env> Display for InstrKind<'env> {
                     write!(f, "\n        | casts to: {:?}", cast)?;
                 }
             }
-            InstrKind::BinOp(a, op, b, language, _, _) => {
+            InstrKind::BinOp(a, op, b, language, _, _, _) => {
                 write!(f, "bin_op {} {} {} {:?}", a, op, b, language)?;
             }
             InstrKind::BooleanLiteral(value) => {
@@ -327,6 +328,7 @@ pub enum InstrKind<'env> {
         ConformBehavior,
         Option<UnaryCast<'env>>,
         Option<UnaryCast<'env>>,
+        Option<BinOp>,
     ),
     BooleanLiteral(bool),
     IntegerLiteral(&'env Integer),

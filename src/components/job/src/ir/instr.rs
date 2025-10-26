@@ -18,26 +18,7 @@ pub enum Instr<'env> {
     SizeOf(Type<'env>, Option<SizeOfMode>),
     Parameter(u32),
     GlobalVariable(GlobalRef<'env>),
-    Add(BinaryOperands<'env>, FloatOrInteger),
-    Checked(OverflowOperation, BinaryOperands<'env>),
-    Subtract(BinaryOperands<'env>, FloatOrInteger),
-    Multiply(BinaryOperands<'env>, FloatOrInteger),
-    Divide(BinaryOperands<'env>, FloatOrSign),
-    Modulus(BinaryOperands<'env>, FloatOrSign),
-    Equals(BinaryOperands<'env>, FloatOrInteger),
-    NotEquals(BinaryOperands<'env>, FloatOrInteger),
-    LessThan(BinaryOperands<'env>, FloatOrSign),
-    LessThanEq(BinaryOperands<'env>, FloatOrSign),
-    GreaterThan(BinaryOperands<'env>, FloatOrSign),
-    GreaterThanEq(BinaryOperands<'env>, FloatOrSign),
-    And(BinaryOperands<'env>),
-    Or(BinaryOperands<'env>),
-    BitwiseAnd(BinaryOperands<'env>),
-    BitwiseOr(BinaryOperands<'env>),
-    BitwiseXor(BinaryOperands<'env>),
-    LeftShift(BinaryOperands<'env>),
-    ArithmeticRightShift(BinaryOperands<'env>),
-    LogicalRightShift(BinaryOperands<'env>),
+    BinOp(BinaryOperands<'env>, BinOp),
     Bitcast(Value<'env>, Type<'env>),
     Extend(Value<'env>, IntegerSign, Type<'env>),
     FloatExtend(Value<'env>, Type<'env>),
@@ -66,6 +47,45 @@ pub enum Instr<'env> {
     ConditionalBreak(Value<'env>, ConditionalBreak),
     Phi(Phi<'env>),
     InterpreterSyscall(interpreter_api::Syscall, &'env [Value<'env>]),
+}
+
+#[derive(Clone, Debug)]
+pub enum BinOp {
+    Simple(BinOpSimple),
+    FloatOrSign(BinOpFloatOrSign),
+    FloatOrInteger(BinOpFloatOrInteger),
+    Checked(OverflowOperation),
+}
+
+#[derive(Clone, Debug)]
+pub enum BinOpSimple {
+    And,
+    Or,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    ArithmeticRightShift,
+    LogicalRightShift,
+}
+
+#[derive(Clone, Debug)]
+pub enum BinOpFloatOrSign {
+    Divide(FloatOrSign),
+    Modulus(FloatOrSign),
+    LessThan(FloatOrSign),
+    LessThanEq(FloatOrSign),
+    GreaterThan(FloatOrSign),
+    GreaterThanEq(FloatOrSign),
+}
+
+#[derive(Clone, Debug)]
+pub enum BinOpFloatOrInteger {
+    Add(FloatOrInteger),
+    Subtract(FloatOrInteger),
+    Multiply(FloatOrInteger),
+    Equals(FloatOrInteger),
+    NotEquals(FloatOrInteger),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

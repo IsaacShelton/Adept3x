@@ -496,7 +496,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
-                InstrKind::BinOp(a, op, b, conform_behavior, _, _) => {
+                InstrKind::BinOp(a, op, b, conform_behavior, _, _, _) => {
                     let a_ty = cfg.get_typed(*a, builtin_types);
                     let b_ty = cfg.get_typed(*b, builtin_types);
 

@@ -39,7 +39,7 @@ use diagnostics::ErrorDiagnostic;
 use itertools::izip;
 use llvm_sys::{
     LLVMIntPredicate::*,
-    LLVMRealPredicate::{self, *},
+    LLVMRealPredicate::*,
     core::*,
     prelude::{LLVMTypeRef, LLVMValueRef},
 };
@@ -168,270 +168,230 @@ pub unsafe fn create_function_block<'env>(
                 ))
             }
             Instr::Call(call) => Some(emit_call(ctx, builder, call, fn_ctx, value_catalog)?),
-            Instr::Add(operands, mode) => {
+            Instr::BinOp(operands, bin_op) => {
                 let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
 
-                Some(match mode {
-                    FloatOrInteger::Integer => {
-                        LLVMBuildAdd(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrInteger::Float => {
-                        LLVMBuildFAdd(builder.get(), left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::Checked(operation, operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                let (expect_i1_fn, expect_i1_fn_type) = ctx.intrinsics.expect_i1();
-                let (overflow_panic_fn, overflow_panic_fn_type) =
-                    ctx.intrinsics.on_overflow(builder);
-
-                let mut arguments = [left, right];
-
-                let (fn_value, fn_type) = ctx.intrinsics.overflow_operation(operation);
-
-                let info = LLVMBuildCall2(
-                    builder.get(),
-                    fn_type,
-                    fn_value,
-                    arguments.as_mut_ptr(),
-                    arguments.len().try_into().unwrap(),
-                    c"".as_ptr(),
-                );
-
-                // `result = info.0`
-                // `overflow = info.1`
-                let result = LLVMBuildExtractValue(builder.get(), info, 0, c"".as_ptr());
-                let overflowed = LLVMBuildExtractValue(builder.get(), info, 1, c"".as_ptr());
-
-                // `llvm.expect.i1(overflowed, false)`
-                let mut arguments = [
-                    overflowed,
-                    LLVMConstInt(LLVMInt1Type(), false.into(), false.into()),
-                ];
-                LLVMBuildCall2(
-                    builder.get(),
-                    expect_i1_fn_type,
-                    expect_i1_fn,
-                    arguments.as_mut_ptr(),
-                    arguments.len().try_into().unwrap(),
-                    c"".as_ptr(),
-                );
-
-                let overflow_basicblock = *fn_ctx.overflow_basicblock.get_or_init(|| {
-                    let overflow_basicblock = LLVMAppendBasicBlock(function_skeleton, c"".as_ptr());
-                    let mut args = [];
-
-                    builder.position(overflow_basicblock);
-
-                    LLVMBuildCall2(
-                        builder.get(),
-                        overflow_panic_fn_type,
-                        overflow_panic_fn,
-                        args.as_mut_ptr(),
-                        args.len().try_into().unwrap(),
-                        c"".as_ptr(),
-                    );
-                    LLVMBuildUnreachable(builder.get());
-
-                    builder.position(llvm_basicblock);
-                    overflow_basicblock
-                });
-
-                // Break to either "ok" basicblock or "overflow occurred" basicblock
-                let ok_basicblock = LLVMAppendBasicBlock(function_skeleton, c"".as_ptr());
-                LLVMBuildCondBr(
-                    builder.get(),
-                    overflowed,
-                    overflow_basicblock,
-                    ok_basicblock,
-                );
-
-                // Switch over to new continuation basicblock
-                builder.position(ok_basicblock);
-                llvm_basicblock = ok_basicblock;
-                Some(result)
-            }
-            Instr::Subtract(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrInteger::Integer => {
-                        LLVMBuildSub(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrInteger::Float => {
-                        LLVMBuildFSub(builder.get(), left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::Multiply(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrInteger::Integer => {
-                        LLVMBuildMul(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrInteger::Float => {
-                        LLVMBuildFMul(builder.get(), left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::Divide(operands, sign) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match sign {
-                    FloatOrSign::Integer(IntegerSign::Signed) => {
-                        LLVMBuildSDiv(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrSign::Integer(IntegerSign::Unsigned) => {
-                        LLVMBuildUDiv(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrSign::Float => LLVMBuildFDiv(builder.get(), left, right, c"".as_ptr()),
-                })
-            }
-            Instr::Modulus(operands, sign) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match sign {
-                    FloatOrSign::Integer(IntegerSign::Signed) => {
-                        LLVMBuildSRem(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrSign::Integer(IntegerSign::Unsigned) => {
-                        LLVMBuildURem(builder.get(), left, right, c"".as_ptr())
-                    }
-                    FloatOrSign::Float => LLVMBuildFRem(builder.get(), left, right, c"".as_ptr()),
-                })
-            }
-            Instr::Equals(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrInteger::Integer => {
-                        LLVMBuildICmp(builder.get(), LLVMIntEQ, left, right, c"".as_ptr())
-                    }
-                    FloatOrInteger::Float => {
-                        LLVMBuildFCmp(builder.get(), LLVMRealOEQ, left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::NotEquals(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrInteger::Integer => {
-                        LLVMBuildICmp(builder.get(), LLVMIntNE, left, right, c"".as_ptr())
-                    }
-                    FloatOrInteger::Float => {
-                        LLVMBuildFCmp(builder.get(), LLVMRealONE, left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::LessThan(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrSign::Integer(sign) => LLVMBuildICmp(
-                        builder.get(),
-                        match sign {
-                            IntegerSign::Signed => LLVMIntSLT,
-                            IntegerSign::Unsigned => LLVMIntULT,
+                Some(match bin_op {
+                    ir::BinOp::Simple(op) => match op {
+                        ir::BinOpSimple::And | ir::BinOpSimple::BitwiseAnd => {
+                            LLVMBuildAnd(builder.get(), left, right, c"".as_ptr())
+                        }
+                        ir::BinOpSimple::Or | ir::BinOpSimple::BitwiseOr => {
+                            LLVMBuildOr(builder.get(), left, right, c"".as_ptr())
+                        }
+                        ir::BinOpSimple::BitwiseXor => {
+                            LLVMBuildXor(builder.get(), left, right, c"".as_ptr())
+                        }
+                        ir::BinOpSimple::LeftShift => {
+                            LLVMBuildShl(builder.get(), left, right, c"".as_ptr())
+                        }
+                        ir::BinOpSimple::ArithmeticRightShift => {
+                            LLVMBuildAShr(builder.get(), left, right, c"".as_ptr())
+                        }
+                        ir::BinOpSimple::LogicalRightShift => {
+                            LLVMBuildLShr(builder.get(), left, right, c"".as_ptr())
+                        }
+                    },
+                    ir::BinOp::FloatOrSign(op) => match op {
+                        ir::BinOpFloatOrSign::Divide(sign) => match sign {
+                            FloatOrSign::Integer(IntegerSign::Signed) => {
+                                LLVMBuildSDiv(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrSign::Integer(IntegerSign::Unsigned) => {
+                                LLVMBuildUDiv(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrSign::Float => {
+                                LLVMBuildFDiv(builder.get(), left, right, c"".as_ptr())
+                            }
                         },
-                        left,
-                        right,
-                        c"".as_ptr(),
-                    ),
-                    FloatOrSign::Float => {
-                        LLVMBuildFCmp(builder.get(), LLVMRealOLT, left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::LessThanEq(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrSign::Integer(sign) => LLVMBuildICmp(
-                        builder.get(),
-                        match sign {
-                            IntegerSign::Signed => LLVMIntSLE,
-                            IntegerSign::Unsigned => LLVMIntULE,
+                        ir::BinOpFloatOrSign::Modulus(sign) => match sign {
+                            FloatOrSign::Integer(IntegerSign::Signed) => {
+                                LLVMBuildSRem(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrSign::Integer(IntegerSign::Unsigned) => {
+                                LLVMBuildURem(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrSign::Float => {
+                                LLVMBuildFRem(builder.get(), left, right, c"".as_ptr())
+                            }
                         },
-                        left,
-                        right,
-                        c"".as_ptr(),
-                    ),
-                    FloatOrSign::Float => {
-                        LLVMBuildFCmp(builder.get(), LLVMRealOLE, left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::GreaterThan(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrSign::Integer(sign) => LLVMBuildICmp(
-                        builder.get(),
-                        match sign {
-                            IntegerSign::Signed => LLVMIntSGT,
-                            IntegerSign::Unsigned => LLVMIntUGT,
+                        ir::BinOpFloatOrSign::LessThan(sign) => match sign {
+                            FloatOrSign::Integer(sign) => LLVMBuildICmp(
+                                builder.get(),
+                                match sign {
+                                    IntegerSign::Signed => LLVMIntSLT,
+                                    IntegerSign::Unsigned => LLVMIntULT,
+                                },
+                                left,
+                                right,
+                                c"".as_ptr(),
+                            ),
+                            FloatOrSign::Float => {
+                                LLVMBuildFCmp(builder.get(), LLVMRealOLT, left, right, c"".as_ptr())
+                            }
                         },
-                        left,
-                        right,
-                        c"".as_ptr(),
-                    ),
-                    FloatOrSign::Float => {
-                        LLVMBuildFCmp(builder.get(), LLVMRealOGT, left, right, c"".as_ptr())
-                    }
-                })
-            }
-            Instr::GreaterThanEq(operands, mode) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(match mode {
-                    FloatOrSign::Integer(sign) => LLVMBuildICmp(
-                        builder.get(),
-                        match sign {
-                            IntegerSign::Signed => LLVMIntSGE,
-                            IntegerSign::Unsigned => LLVMIntUGE,
+                        ir::BinOpFloatOrSign::LessThanEq(sign) => match sign {
+                            FloatOrSign::Integer(sign) => LLVMBuildICmp(
+                                builder.get(),
+                                match sign {
+                                    IntegerSign::Signed => LLVMIntSLE,
+                                    IntegerSign::Unsigned => LLVMIntULE,
+                                },
+                                left,
+                                right,
+                                c"".as_ptr(),
+                            ),
+                            FloatOrSign::Float => {
+                                LLVMBuildFCmp(builder.get(), LLVMRealOLE, left, right, c"".as_ptr())
+                            }
                         },
-                        left,
-                        right,
-                        c"".as_ptr(),
-                    ),
-                    FloatOrSign::Float => {
-                        LLVMBuildFCmp(builder.get(), LLVMRealOGE, left, right, c"".as_ptr())
+                        ir::BinOpFloatOrSign::GreaterThan(sign) => match sign {
+                            FloatOrSign::Integer(sign) => LLVMBuildICmp(
+                                builder.get(),
+                                match sign {
+                                    IntegerSign::Signed => LLVMIntSGT,
+                                    IntegerSign::Unsigned => LLVMIntUGT,
+                                },
+                                left,
+                                right,
+                                c"".as_ptr(),
+                            ),
+                            FloatOrSign::Float => {
+                                LLVMBuildFCmp(builder.get(), LLVMRealOGT, left, right, c"".as_ptr())
+                            }
+                        },
+                        ir::BinOpFloatOrSign::GreaterThanEq(sign) => match sign {
+                            FloatOrSign::Integer(sign) => LLVMBuildICmp(
+                                builder.get(),
+                                match sign {
+                                    IntegerSign::Signed => LLVMIntSGE,
+                                    IntegerSign::Unsigned => LLVMIntUGE,
+                                },
+                                left,
+                                right,
+                                c"".as_ptr(),
+                            ),
+                            FloatOrSign::Float => {
+                                LLVMBuildFCmp(builder.get(), LLVMRealOGE, left, right, c"".as_ptr())
+                            }
+                        },
+                    },
+                    ir::BinOp::FloatOrInteger(op) => match op {
+                        ir::BinOpFloatOrInteger::Add(mode) => match mode {
+                            FloatOrInteger::Integer => {
+                                LLVMBuildAdd(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrInteger::Float => {
+                                LLVMBuildFAdd(builder.get(), left, right, c"".as_ptr())
+                            }
+                        },
+                        ir::BinOpFloatOrInteger::Subtract(mode) => match mode {
+                            FloatOrInteger::Integer => {
+                                LLVMBuildSub(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrInteger::Float => {
+                                LLVMBuildFSub(builder.get(), left, right, c"".as_ptr())
+                            }
+                        },
+                        ir::BinOpFloatOrInteger::Multiply(mode) => match mode {
+                            FloatOrInteger::Integer => {
+                                LLVMBuildMul(builder.get(), left, right, c"".as_ptr())
+                            }
+                            FloatOrInteger::Float => {
+                                LLVMBuildFMul(builder.get(), left, right, c"".as_ptr())
+                            }
+                        },
+                        ir::BinOpFloatOrInteger::Equals(mode) => match mode {
+                            FloatOrInteger::Integer => {
+                                LLVMBuildICmp(builder.get(), LLVMIntEQ, left, right, c"".as_ptr())
+                            }
+                            FloatOrInteger::Float => {
+                                LLVMBuildFCmp(builder.get(), LLVMRealOEQ, left, right, c"".as_ptr())
+                            }
+                        },
+                        ir::BinOpFloatOrInteger::NotEquals(mode) => match mode {
+                            FloatOrInteger::Integer => {
+                                LLVMBuildICmp(builder.get(), LLVMIntNE, left, right, c"".as_ptr())
+                            }
+                            FloatOrInteger::Float => {
+                                LLVMBuildFCmp(builder.get(), LLVMRealONE, left, right, c"".as_ptr())
+                            }
+                        },
+                    },
+                    ir::BinOp::Checked(op) => {
+                        let (expect_i1_fn, expect_i1_fn_type) = ctx.intrinsics.expect_i1();
+                        let (overflow_panic_fn, overflow_panic_fn_type) =
+                            ctx.intrinsics.on_overflow(builder);
+
+                        let mut arguments = [left, right];
+                        let (fn_value, fn_type) = ctx.intrinsics.overflow_operation(op);
+
+                        let info = LLVMBuildCall2(
+                            builder.get(),
+                            fn_type,
+                            fn_value,
+                            arguments.as_mut_ptr(),
+                            arguments.len().try_into().unwrap(),
+                            c"".as_ptr(),
+                        );
+
+                        // `result = info.0`
+                        // `overflow = info.1`
+                        let result = LLVMBuildExtractValue(builder.get(), info, 0, c"".as_ptr());
+                        let overflowed =
+                            LLVMBuildExtractValue(builder.get(), info, 1, c"".as_ptr());
+
+                        // `llvm.expect.i1(overflowed, false)`
+                        let mut arguments = [
+                            overflowed,
+                            LLVMConstInt(LLVMInt1Type(), false.into(), false.into()),
+                        ];
+                        LLVMBuildCall2(
+                            builder.get(),
+                            expect_i1_fn_type,
+                            expect_i1_fn,
+                            arguments.as_mut_ptr(),
+                            arguments.len().try_into().unwrap(),
+                            c"".as_ptr(),
+                        );
+
+                        // Get or create block for panicing on overflow
+                        let overflow_basicblock = *fn_ctx.overflow_basicblock.get_or_init(|| {
+                            let overflow_basicblock =
+                                LLVMAppendBasicBlock(function_skeleton, c"".as_ptr());
+                            let mut args = [];
+
+                            builder.position(overflow_basicblock);
+
+                            LLVMBuildCall2(
+                                builder.get(),
+                                overflow_panic_fn_type,
+                                overflow_panic_fn,
+                                args.as_mut_ptr(),
+                                args.len().try_into().unwrap(),
+                                c"".as_ptr(),
+                            );
+                            LLVMBuildUnreachable(builder.get());
+
+                            builder.position(llvm_basicblock);
+                            overflow_basicblock
+                        });
+
+                        // Break to either "ok" basicblock or "overflow occurred" basicblock
+                        let ok_basicblock = LLVMAppendBasicBlock(function_skeleton, c"".as_ptr());
+                        LLVMBuildCondBr(
+                            builder.get(),
+                            overflowed,
+                            overflow_basicblock,
+                            ok_basicblock,
+                        );
+
+                        // Switch over to new continuation basicblock
+                        builder.position(ok_basicblock);
+                        llvm_basicblock = ok_basicblock;
+                        result
                     }
                 })
-            }
-            Instr::And(operands) | Instr::BitwiseAnd(operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(LLVMBuildAnd(builder.get(), left, right, c"".as_ptr()))
-            }
-            Instr::Or(operands) | Instr::BitwiseOr(operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(LLVMBuildOr(builder.get(), left, right, c"".as_ptr()))
-            }
-            Instr::BitwiseXor(operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(LLVMBuildXor(builder.get(), left, right, c"".as_ptr()))
-            }
-            Instr::LeftShift(operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(LLVMBuildShl(builder.get(), left, right, c"".as_ptr()))
-            }
-            Instr::ArithmeticRightShift(operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(LLVMBuildAShr(builder.get(), left, right, c"".as_ptr()))
-            }
-            Instr::LogicalRightShift(operands) => {
-                let (left, right) = build_binary_operands(ctx, value_catalog, builder, operands)?;
-
-                Some(LLVMBuildLShr(builder.get(), left, right, c"".as_ptr()))
             }
             Instr::Bitcast(value, ir_type) => {
                 let value = build_value(ctx, value_catalog, builder, value)?;
@@ -558,7 +518,7 @@ pub unsafe fn create_function_block<'env>(
                     FloatOrInteger::Integer => LLVMBuildIsNull(builder.get(), value, c"".as_ptr()),
                     FloatOrInteger::Float => LLVMBuildFCmp(
                         builder.get(),
-                        LLVMRealPredicate::LLVMRealOEQ,
+                        LLVMRealOEQ,
                         value,
                         LLVMConstNull(LLVMTypeOf(value)),
                         c"".as_ptr(),
@@ -574,7 +534,7 @@ pub unsafe fn create_function_block<'env>(
                     }
                     FloatOrInteger::Float => LLVMBuildFCmp(
                         builder.get(),
-                        LLVMRealPredicate::LLVMRealONE,
+                        LLVMRealONE,
                         value,
                         LLVMConstNull(LLVMTypeOf(value)),
                         c"".as_ptr(),
