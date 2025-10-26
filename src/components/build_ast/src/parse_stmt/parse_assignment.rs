@@ -1,6 +1,7 @@
 use super::{super::error::ParseError, Parser};
 use ast::{Assignment, BasicBinaryOperator, Expr, Stmt, StmtKind};
 use infinite_iterator::InfinitePeekable;
+use primitives::CIntegerAssumptions;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -36,6 +37,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             destination,
             value,
             operator,
+            conform_behavior: ast::ConformBehavior::Adept(CIntegerAssumptions::default()),
         }))
         .at(source))
     }

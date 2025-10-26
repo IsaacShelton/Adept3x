@@ -117,7 +117,7 @@ fn flatten_stmt<'env>(
                 .into()
         }
         ast::StmtKind::Assignment(assignment) => {
-            let dest = flatten_expr(
+            let raw_dest = flatten_expr(
                 ctx,
                 builder,
                 cursor,
@@ -125,13 +125,36 @@ fn flatten_stmt<'env>(
                 IsValue::RequireValue,
             );
 
-            let src = flatten_expr(
+            let dest = CfgValue::Instr(
+                builder.try_push(cursor, InstrKind::IntoDest(raw_dest, None).at(stmt.source)),
+            );
+
+            let raw_src = flatten_expr(
                 ctx,
                 builder,
                 cursor,
                 &assignment.value,
                 IsValue::RequireValue,
             );
+
+            let src = if let Some(operator) = assignment.operator {
+                CfgValue::Instr(
+                    builder.try_push(
+                        cursor,
+                        InstrKind::BinOp(
+                            dest,
+                            operator,
+                            raw_src,
+                            assignment.conform_behavior,
+                            None,
+                            None,
+                        )
+                        .at(stmt.source),
+                    ),
+                )
+            } else {
+                raw_src
+            };
 
             builder.try_push(
                 cursor,
@@ -267,7 +290,8 @@ fn flatten_expr<'env>(
             builder
                 .try_push(
                     cursor,
-                    InstrKind::BinOp(left, bin_op.operator, right, bin_op.language).at(expr.source),
+                    InstrKind::BinOp(left, bin_op.operator, right, ConformBehavior::C, None, None)
+                        .at(expr.source),
                 )
                 .into()
         }

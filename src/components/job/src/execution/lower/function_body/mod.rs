@@ -246,6 +246,38 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                         ir::Literal::Void.into()
                     }
+                    InstrKind::IntoDest(value, unary_cast) => {
+                        let dest_type = instr.typed.unwrap().0;
+
+                        let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                            return suspend!(
+                                self.lowered_type,
+                                executor.request(LowerType::new(
+                                    self.view,
+                                    &self.compiler,
+                                    dest_type,
+                                )),
+                                ctx
+                            );
+                        };
+
+                        execute_sub_task!(
+                            self,
+                            self.perform_unary_cast.get_or_insert_with(|| {
+                                PerformUnaryCast::new(
+                                    self.view,
+                                    &self.compiler,
+                                    builder.get_output(*value),
+                                    lowered_type,
+                                    unary_cast.as_ref(),
+                                    instr.source,
+                                )
+                            }),
+                            executor,
+                            ctx,
+                            builder
+                        )
+                    }
                     InstrKind::Assign {
                         dest,
                         src,
@@ -297,8 +329,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             destination: dest,
                         }))
                     }
-                    InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
-                        todo!()
+                    InstrKind::BinOp(a, op, b, language, a_cast, b_cast) => {
+                        todo!("lower binop")
                     }
                     InstrKind::BooleanLiteral(value) => ir::Literal::Boolean(*value).into(),
                     InstrKind::IntegerLiteral(integer) => {

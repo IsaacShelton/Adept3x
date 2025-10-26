@@ -32,6 +32,19 @@ impl<'env> UnaliasedType<'env> {
     ) -> TypeDisplayer<'a, 'b, 'c, 'env> {
         self.0.display_one(view)
     }
+
+    pub fn without_leading_derefs(&self, count: usize) -> UnaliasedType<'env> {
+        let mut ty = self.0;
+
+        for _ in 0..count {
+            match &ty.kind {
+                TypeKind::Deref(inner) => ty = *inner,
+                _ => break,
+            }
+        }
+
+        UnaliasedType(ty)
+    }
 }
 
 #[derive(Clone, Debug, Derivative)]
@@ -45,6 +58,10 @@ pub struct Type<'env> {
 }
 
 impl<'env> Type<'env> {
+    pub fn count_leading_derefs(&self) -> usize {
+        self.kind.count_leading_derefs()
+    }
+
     pub fn numeric_mode(&self) -> Option<NumericMode> {
         self.kind.numeric_mode()
     }
@@ -141,7 +158,7 @@ impl<'env> TypeKind<'env> {
         Type { kind: self, source }
     }
 
-    pub fn is_integer(&self) -> bool {
+    pub fn is_integer_like(&self) -> bool {
         matches!(
             self,
             Self::IntegerLiteral(..)
@@ -161,6 +178,21 @@ impl<'env> TypeKind<'env> {
             }),
             Self::Floating(_) => Some(NumericMode::Float),
             _ => None,
+        }
+    }
+
+    pub fn count_leading_derefs(&self) -> usize {
+        let mut count = 0;
+        let mut kind = self;
+
+        loop {
+            match kind {
+                TypeKind::Deref(inner) => {
+                    kind = &inner.kind;
+                    count += 1;
+                }
+                _ => return count,
+            }
         }
     }
 

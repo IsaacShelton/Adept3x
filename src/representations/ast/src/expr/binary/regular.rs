@@ -33,6 +33,29 @@ pub enum BasicBinaryOperator {
 }
 
 impl BasicBinaryOperator {
+    pub fn verb(&self) -> &'static str {
+        match self {
+            BasicBinaryOperator::Add => "add",
+            BasicBinaryOperator::Subtract => "subtract",
+            BasicBinaryOperator::Multiply => "multiply",
+            BasicBinaryOperator::Divide => "divide",
+            BasicBinaryOperator::Modulus => "modulo",
+            BasicBinaryOperator::Equals => "compare",
+            BasicBinaryOperator::NotEquals => "compare",
+            BasicBinaryOperator::LessThan => "compare",
+            BasicBinaryOperator::LessThanEq => "compare",
+            BasicBinaryOperator::GreaterThan => "compare",
+            BasicBinaryOperator::GreaterThanEq => "compare",
+            BasicBinaryOperator::BitwiseAnd => "bitwise-and",
+            BasicBinaryOperator::BitwiseOr => "bitwise-or",
+            BasicBinaryOperator::BitwiseXor => "bitwise-xor",
+            BasicBinaryOperator::LeftShift => "left-shift",
+            BasicBinaryOperator::RightShift => "right-shift",
+            BasicBinaryOperator::LogicalLeftShift => "logical-left-shift",
+            BasicBinaryOperator::LogicalRightShift => "logical-right-shift",
+        }
+    }
+
     pub fn returns_boolean(&self) -> bool {
         match self {
             Self::Equals

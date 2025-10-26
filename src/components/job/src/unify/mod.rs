@@ -5,7 +5,7 @@
 */
 
 use crate::{
-    BasicBlockId, BuiltinTypes, ExecutionCtx,
+    BuiltinTypes, ExecutionCtx,
     conform::{ConformMode, UnaryCast, conform_to},
     module_graph::ModuleView,
     repr::{Type, TypeDisplayerDisambiguation, TypeKind, UnaliasedType},
@@ -15,28 +15,30 @@ use data_units::BitUnits;
 use diagnostics::ErrorDiagnostic;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use primitives::{CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign};
+use primitives::{
+    CInteger, CIntegerAssumptions, FloatSize, IntegerBits, IntegerSign, OptionIntegerSignExt,
+};
 use source_files::Source;
 
 #[derive(Debug)]
-pub struct UnifySolution<'env> {
+pub struct UnifySolution<'env, T> {
     pub unified: UnaliasedType<'env>,
-    pub unary_casts: Vec<(BasicBlockId, UnaryCast<'env>)>,
+    pub unary_casts: Vec<(T, UnaryCast<'env>)>,
 }
 
-pub fn unify_types<'env>(
+pub fn unify_types<'env, T>(
     ctx: &mut ExecutionCtx<'env>,
-    types_iter: impl Iterator<Item = (BasicBlockId, UnaliasedType<'env>)> + Clone,
+    types_iter: impl Iterator<Item = (T, UnaliasedType<'env>)> + Clone,
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
     view: &'env ModuleView<'env>,
     source: Source,
-) -> Result<Option<UnifySolution<'env>>, ErrorDiagnostic> {
+) -> Result<Option<UnifySolution<'env, T>>, ErrorDiagnostic> {
     let target = view.target();
 
-    let Some(to_ty) = unify_types_trivial(
+    let Some(to_ty) = unify_types_find_solution(
         ctx,
-        types_iter.clone().map(|(_bb, ty)| ty),
+        types_iter.clone().map(|(_id, ty)| ty),
         behavior,
         builtin_types,
         source,
@@ -47,7 +49,7 @@ pub fn unify_types<'env>(
 
     let mut casts = Vec::with_capacity(types_iter.clone().count());
 
-    for (bb_id, from_ty) in types_iter {
+    for (id, from_ty) in types_iter {
         if from_ty.0.kind.is_never() {
             continue;
         }
@@ -78,7 +80,7 @@ pub fn unify_types<'env>(
         };
 
         if let Some(cast) = conformed.cast {
-            casts.push((bb_id, cast));
+            casts.push((id, cast));
         }
     }
 
@@ -88,13 +90,20 @@ pub fn unify_types<'env>(
     }))
 }
 
-pub fn unify_types_trivial<'env>(
+pub fn unify_types_find_solution<'env>(
     ctx: &mut ExecutionCtx<'env>,
     types_iter: impl Iterator<Item = UnaliasedType<'env>> + Clone,
     behavior: ConformBehavior,
     builtin_types: &'env BuiltinTypes<'env>,
     source: Source,
 ) -> Result<Option<UnaliasedType<'env>>, ErrorDiagnostic> {
+    let (min, max) = types_iter.clone().fold((0, 0), |(min, max), ty| {
+        let has = ty.0.count_leading_derefs();
+        (min.min(has), max.max(has))
+    });
+    let derefs_to_remove = max - min;
+
+    let types_iter = types_iter.map(|ty| ty.without_leading_derefs(derefs_to_remove));
     let incoming = types_iter.filter(|ty| !ty.0.kind.is_never());
 
     // If unreachable, the unifying type is the never type
@@ -190,7 +199,7 @@ pub fn unify_types_trivial<'env>(
     }
 
     // If all values are integers and integer literals
-    if incoming.clone().all(|ty| ty.0.kind.is_integer()) {
+    if incoming.clone().all(|ty| ty.0.kind.is_integer_like()) {
         return compute_unifying_integer_type(ctx, incoming, behavior, source);
     }
 
@@ -333,7 +342,27 @@ pub fn unify_integer_properties(
     let b_sign = b.required_sign;
 
     if !a.is_concrete || !b.is_concrete {
-        let bits = IntegerBits::new(a_bits.max(b_bits).into()).unwrap_or(IntegerBits::Bits64);
+        let bits = if a_bits == b_bits {
+            if a_sign.is_signed() != b_sign.is_signed() {
+                a_bits + BitUnits::of(1)
+            } else {
+                a_bits
+            }
+        } else if a_bits > b_bits {
+            if a_sign.is_signed() && !b_sign.is_signed() {
+                a_bits + BitUnits::of(1)
+            } else {
+                a_bits
+            }
+        } else {
+            if b_sign.is_signed() && !a_sign.is_signed() {
+                b_bits + BitUnits::of(1)
+            } else {
+                b_bits
+            }
+        };
+
+        let bits = IntegerBits::new(bits).unwrap_or(IntegerBits::Bits64);
 
         let largest_loose_used =
             CInteger::largest(a.largest_loose_used, b.largest_loose_used).map(|c_integer| {

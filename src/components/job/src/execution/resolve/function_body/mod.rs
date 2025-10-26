@@ -4,7 +4,7 @@ mod dominators;
 use crate::{
     BasicBlockId, CfgBuilder, CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx,
     Executor, FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
-    conform::{ConformMode, conform_to, conform_to_default},
+    conform::{ConformMode, UnaryCast, conform_to, conform_to_default},
     execution::resolve::{ResolveNamespace, ResolveType, structure::ResolveStructureBody},
     flatten_func,
     module_graph::ModuleView,
@@ -422,6 +422,29 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
+                InstrKind::IntoDest(dest, _) => {
+                    let mut dest_ty = cfg.get_typed(*dest, builtin_types).0;
+                    let mut unary_cast = None;
+
+                    loop {
+                        let TypeKind::Deref(inner_ty) = dest_ty.kind else {
+                            break;
+                        };
+
+                        let TypeKind::Deref(nested_ty) = inner_ty.kind else {
+                            break;
+                        };
+
+                        dest_ty = inner_ty;
+                        unary_cast = Some(UnaryCast::Dereference {
+                            after_deref: UnaliasedType(inner_ty),
+                            then: ctx.alloc(unary_cast).as_ref(),
+                        });
+                    }
+
+                    cfg.set_typed(instr_ref, UnaliasedType(dest_ty));
+                    cfg.set_primary_unary_cast(instr_ref, unary_cast);
+                }
                 InstrKind::Assign {
                     dest,
                     src,
@@ -429,7 +452,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 } => {
                     let dest_ty = cfg.get_typed(*dest, builtin_types);
 
-                    let TypeKind::Deref(mut dest_ty) = cfg.get_typed(*dest, builtin_types).0.kind
+                    // NOTE: Assigment itself does not handle nested deref'deref'...,
+                    // this is handled by another instruction.
+
+                    let TypeKind::Deref(dest_ty) = cfg.get_typed(*dest, builtin_types).0.kind
                     else {
                         return Err(ErrorDiagnostic::new(
                             format!("Left side of assignment is not mutable"),
@@ -437,10 +463,6 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         )
                         .into());
                     };
-
-                    while let TypeKind::Deref(inner_dest_ty) = &dest_ty.kind {
-                        dest_ty = inner_dest_ty;
-                    }
 
                     let dest_ty = UnaliasedType(dest_ty);
 
@@ -474,8 +496,55 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_primary_unary_cast(instr_ref, conformed.cast);
                     cfg.set_typed(instr_ref, builtin_types.void());
                 }
-                InstrKind::BinOp(instr_ref, basic_binary_operator, instr_ref1, language) => {
-                    todo!("resolve binop")
+                InstrKind::BinOp(a, op, b, conform_behavior, _, _) => {
+                    let a_ty = cfg.get_typed(*a, builtin_types);
+                    let b_ty = cfg.get_typed(*b, builtin_types);
+
+                    let types_iter = [(false, a_ty), (true, b_ty)].into_iter();
+
+                    let Some(unified) = unify_types(
+                        ctx,
+                        types_iter.clone(),
+                        *conform_behavior,
+                        builtin_types,
+                        self.view,
+                        instr.source,
+                    )?
+                    else {
+                        let disambiguation = TypeDisplayerDisambiguation::new(
+                            types_iter.clone().map(|(_, ty)| ty.0),
+                        );
+
+                        return Err(ErrorDiagnostic::new(
+                            format!(
+                                "Cannot {} incompatible types {}",
+                                op.verb(),
+                                types_iter
+                                    .map(|(_, ty)| ty)
+                                    .unique()
+                                    .map(|ty| format!(
+                                        "`{}`",
+                                        ty.display(self.view, &disambiguation)
+                                    ))
+                                    .join(" and ")
+                            ),
+                            instr.source,
+                        )
+                        .into());
+                    };
+
+                    let mut a_cast = None;
+                    let mut b_cast = None;
+
+                    for (index, cast) in unified.unary_casts {
+                        match index {
+                            false => a_cast = Some(cast),
+                            true => b_cast = Some(cast),
+                        }
+                    }
+
+                    cfg.set_binop_unary_casts(instr_ref, a_cast, b_cast);
+                    cfg.set_typed(instr_ref, unified.unified);
                 }
                 InstrKind::BooleanLiteral(value) => {
                     cfg.set_typed(
@@ -889,7 +958,29 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         ast::UnaryOperator::Math(ast::UnaryMathOperator::IsNonZero) => todo!(),
                         ast::UnaryOperator::Math(ast::UnaryMathOperator::BitComplement) => todo!(),
                         ast::UnaryOperator::AddressOf => todo!(),
-                        ast::UnaryOperator::Dereference => todo!(),
+                        ast::UnaryOperator::Dereference => {
+                            let conformed = conform_to_default(
+                                ctx,
+                                cfg.get_typed(*value, builtin_types),
+                                c_integer_assumptions,
+                                builtin_types,
+                                self.view.target(),
+                            )?;
+
+                            if !conformed.ty.0.kind.is_ptr() {
+                                return Err(ErrorDiagnostic::new(
+                                    format!(
+                                        "Cannot dereference non-pointer value of type `{}`",
+                                        conformed.ty.display_one(self.view)
+                                    ),
+                                    instr.source,
+                                )
+                                .into());
+                            }
+
+                            cfg.set_primary_unary_cast(instr_ref, conformed.cast);
+                            cfg.set_typed(instr_ref, builtin_types.bool());
+                        }
                     }
                 }
                 InstrKind::SizeOf(_, size_of_mode) => todo!("sizeof"),

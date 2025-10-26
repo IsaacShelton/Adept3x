@@ -166,6 +166,13 @@ impl<'env> Display for InstrKind<'env> {
                     write!(f, "\n        | casts to: {:?}", cast)?;
                 }
             }
+            InstrKind::IntoDest(dest, cast) => {
+                write!(f, "into_dest {}", dest)?;
+
+                if let Some(cast) = cast {
+                    write!(f, "\n        | casts to: {:?}", cast)?;
+                }
+            }
             InstrKind::Assign {
                 dest,
                 src,
@@ -177,7 +184,7 @@ impl<'env> Display for InstrKind<'env> {
                     write!(f, "\n        | casts to: {:?}", cast)?;
                 }
             }
-            InstrKind::BinOp(a, op, b, language) => {
+            InstrKind::BinOp(a, op, b, language, _, _) => {
                 write!(f, "bin_op {} {} {} {:?}", a, op, b, language)?;
             }
             InstrKind::BooleanLiteral(value) => {
@@ -307,12 +314,20 @@ pub enum InstrKind<'env> {
         Option<UnaryCast<'env>>,
         Option<VariableRef<'env>>,
     ),
+    IntoDest(CfgValue, Option<UnaryCast<'env>>),
     Assign {
         dest: CfgValue,
         src: CfgValue,
         src_cast: Option<UnaryCast<'env>>,
     },
-    BinOp(CfgValue, ast::BasicBinaryOperator, CfgValue, Language),
+    BinOp(
+        CfgValue,
+        ast::BasicBinaryOperator,
+        CfgValue,
+        ConformBehavior,
+        Option<UnaryCast<'env>>,
+        Option<UnaryCast<'env>>,
+    ),
     BooleanLiteral(bool),
     IntegerLiteral(&'env Integer),
     FloatLiteral(f64),

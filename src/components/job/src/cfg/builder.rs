@@ -226,7 +226,26 @@ impl<'env> CfgBuilder<'env> {
                 src: _,
                 src_cast: unary_cast,
             }
-            | InstrKind::UnaryOperation(_, _, unary_cast) => *unary_cast = cast,
+            | InstrKind::UnaryOperation(_, _, unary_cast)
+            | InstrKind::IntoDest(_, unary_cast) => *unary_cast = cast,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn set_binop_unary_casts(
+        &mut self,
+        instr_ref: InstrRef,
+        a_cast: Option<UnaryCast<'env>>,
+        b_cast: Option<UnaryCast<'env>>,
+    ) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+
+        // Sequential Instruction
+        match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
+            InstrKind::BinOp(_, _, _, _, a_unary_cast, b_unary_cast) => {
+                *a_unary_cast = a_cast;
+                *b_unary_cast = b_cast;
+            }
             _ => unreachable!(),
         }
     }
