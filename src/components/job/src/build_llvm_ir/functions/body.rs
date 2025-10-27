@@ -13,10 +13,13 @@ use crate::{
 use data_units::AtomicByteUnits;
 use diagnostics::ErrorDiagnostic;
 use llvm_sys::{
-    core::{LLVMAddIncoming, LLVMAppendBasicBlock, LLVMGetUndef, LLVMInt32Type},
+    core::{
+        LLVMAddIncoming, LLVMAppendBasicBlock, LLVMGetFirstInstruction, LLVMGetUndef,
+        LLVMInt32Type, LLVMRemoveBasicBlockFromParent,
+    },
     prelude::{LLVMBasicBlockRef, LLVMValueRef},
 };
-use std::cell::OnceCell;
+use std::{cell::OnceCell, ptr::null_mut};
 use std_ext::SmallVec16;
 
 pub struct BasicBlockInfo<'env> {
@@ -105,7 +108,7 @@ pub unsafe fn create_function_bodies<'env>(
             max_vector_width_bytes: AtomicByteUnits::of(0),
         };
 
-        let basicblocks = ir_function_basicblocks
+        let mut basicblocks = ir_function_basicblocks
             .iter()
             .enumerate()
             .map(|(id, ir_basicblock)| BasicBlockInfo {
@@ -140,6 +143,15 @@ pub unsafe fn create_function_bodies<'env>(
                 &fn_ctx,
                 &mut value_catalog,
             )?;
+        }
+
+        // Remove unused basicblocks (LLVM does not like empty basicblocks)
+        for basicblock in basicblocks.iter_mut() {
+            let llvm_basicblock = basicblock.llvm_basicblock;
+            if LLVMGetFirstInstruction(llvm_basicblock) == null_mut() {
+                LLVMRemoveBasicBlockFromParent(llvm_basicblock);
+                basicblock.llvm_basicblock = null_mut();
+            }
         }
 
         for relocation in std::mem::take(&mut builder.phi_relocations) {
