@@ -8,10 +8,14 @@ use attributes::Privacy;
 use indexmap::IndexMap;
 use infinite_iterator::InfinitePeekable;
 use optional_string::NoneStr;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_structure(&mut self, annotations: Vec<Annotation>) -> Result<Struct, ParseError> {
+    pub fn parse_structure(
+        &mut self,
+        annotations: SmallVec4<Annotation>,
+    ) -> Result<Struct, ParseError> {
         let source = self.input.here();
         self.input.advance();
 

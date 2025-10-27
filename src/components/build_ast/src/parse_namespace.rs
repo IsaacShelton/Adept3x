@@ -6,12 +6,13 @@ use super::{
 use ast::Namespace;
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_namespace(
         &mut self,
-        annotations: Vec<Annotation>,
+        annotations: SmallVec4<Annotation>,
     ) -> Result<Namespace, ParseError> {
         let source = self.input.peek().source;
         self.input.advance().kind.unwrap_namespace_keyword();

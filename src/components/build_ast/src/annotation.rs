@@ -25,7 +25,7 @@ pub enum AnnotationKind {
     Protected,
     Private,
     Template,
-    Using(Given),
+    Using(Box<Given>),
     Comptime,
 }
 

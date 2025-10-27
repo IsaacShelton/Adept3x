@@ -236,6 +236,7 @@ dependencies = [
  "primitives",
  "smallvec",
  "source_files",
+ "std_ext",
  "text",
  "token",
 ]
@@ -389,6 +390,7 @@ dependencies = [
  "path-absolutize",
  "pp_ast",
  "primitives",
+ "smallvec",
  "source_files",
  "target",
  "text",

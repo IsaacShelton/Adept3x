@@ -39,6 +39,7 @@ line_column = { version = "0.1.0", path = "../../support/line_column" }
 path-absolutize.workspace = true
 pp_ast = { version = "0.1.0", path = "../../representations/pp_ast" }
 primitives = { version = "0.1.0", path = "../../representations/primitives" }
+smallvec = "1.15.1"
 source_files = { version = "0.1.0", path = "../../representations/source_files" }
 target = { version = "0.1.0", path = "../../support/target" }
 text = { version = "0.1.0", path = "../../support/text" }

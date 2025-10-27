@@ -1137,6 +1137,9 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 }
                 InstrKind::Is(instr_ref, _) => todo!("is"),
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
+                InstrKind::Comptime(comptime_builder) => {
+                    todo!("resolve comptime evaluation {:?}", comptime_builder)
+                }
             }
 
             // Reset suspension states for next instruction to use

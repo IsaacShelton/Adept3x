@@ -6,10 +6,14 @@ use super::{
 use ast::Global;
 use attributes::{Privacy, SymbolOwnership};
 use infinite_iterator::InfinitePeekable;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_global(&mut self, annotations: Vec<Annotation>) -> Result<Global, ParseError> {
+    pub fn parse_global(
+        &mut self,
+        annotations: SmallVec4<Annotation>,
+    ) -> Result<Global, ParseError> {
         // my_global_name Type
         //      ^
 

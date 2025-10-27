@@ -6,6 +6,7 @@ use attributes::{Exposure, Privacy, SymbolOwnership};
 use build_ast::{Input, Parser, error::ParseError};
 use diagnostics::{ErrorDiagnostic, Show, into_show};
 use infinite_iterator::InfinitePeekable;
+use smallvec::smallvec;
 use source_files::Source;
 use token::{Token, TokenKind};
 
@@ -40,7 +41,7 @@ impl PragmaSection {
             if allow_experimental_pragma_features {
                 while !parser.input.peek_is_or_eof(TokenKind::CloseCurly) {
                     parser
-                        .parse_top_level(&mut ast_file, vec![])
+                        .parse_top_level(&mut ast_file, smallvec![])
                         .map_err(into_show)?;
                     parser.input.ignore_newlines();
                 }

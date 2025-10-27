@@ -517,6 +517,9 @@ pub fn resolve_expr(
         ast::ExprKind::LabelLiteral(..) => {
             unimplemented!("legacy resolution of label expression");
         }
+        ast::ExprKind::Comptime(_) => {
+            unimplemented!("legacy resolution does not support comptime evaluation");
+        }
     }?;
 
     Ok(resolved_expr)

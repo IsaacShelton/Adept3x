@@ -2,10 +2,14 @@ use super::{Parser, annotation::Annotation, error::ParseError};
 use ast::{Linkset, LinksetEntry};
 use infinite_iterator::InfinitePeekable;
 use std::path::Path;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_linkset(&mut self, annotations: Vec<Annotation>) -> Result<Linkset, ParseError> {
+    pub fn parse_linkset(
+        &mut self,
+        annotations: SmallVec4<Annotation>,
+    ) -> Result<Linkset, ParseError> {
         self.input.advance().kind.unwrap_linkset_keyword();
 
         for annotation in annotations {

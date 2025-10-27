@@ -6,12 +6,13 @@ use super::{
 use ast::ExprAlias;
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_helper_expr(
         &mut self,
-        annotations: Vec<Annotation>,
+        annotations: SmallVec4<Annotation>,
     ) -> Result<ExprAlias, ParseError> {
         let source = self.input.here();
         self.input.advance();

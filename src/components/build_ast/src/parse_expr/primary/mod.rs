@@ -5,13 +5,16 @@ mod static_member;
 mod struct_literal;
 
 use super::{super::error::ParseError, Parser, is_right_associative, is_terminating_token};
-use crate::{array_last, error::ParseErrorKind, parse_util::into_plain_name};
+use crate::{
+    annotation::AnnotationKind, array_last, error::ParseErrorKind, parse_util::into_plain_name,
+};
 use ast::{
     Block, Conditional, Expr, ExprKind, Integer, SizeOfMode, TypeArg, TypeKind, UnaryMathOperator,
     UnaryOperation, UnaryOperator, While,
 };
 use infinite_iterator::InfinitePeekable;
 use std::ffi::CString;
+use std_ext::SmallVec4;
 use token::{StringLiteral, StringModifier, Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -25,6 +28,27 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
         let source = *source;
 
         match kind {
+            TokenKind::Hash => {
+                let mut annotations = SmallVec4::new();
+
+                while self.input.peek().is_hash() {
+                    annotations.extend(self.parse_annotation_list()?);
+                    self.input.ignore_newlines();
+                }
+
+                let mut wrapped = self.parse_expr()?;
+
+                for annotation in annotations.iter().rev() {
+                    match &annotation.kind {
+                        AnnotationKind::Comptime => {
+                            wrapped = ExprKind::Comptime(Box::new(wrapped)).at(annotation.source)
+                        }
+                        _ => return Err(self.unexpected_annotation(annotation, "for expression")),
+                    }
+                }
+
+                Ok(wrapped)
+            }
             TokenKind::TrueKeyword => {
                 self.input.advance().kind.unwrap_true_keyword();
                 Ok(ExprKind::Boolean(true).at(source))

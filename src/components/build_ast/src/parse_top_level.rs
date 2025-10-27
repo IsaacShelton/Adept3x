@@ -6,6 +6,8 @@ use super::{
 use ast::{NamespaceItems, Pragma, UseBinding, When};
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
+use smallvec::smallvec;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
@@ -14,7 +16,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         let mut items = NamespaceItems::default();
         while !self.input.peek_is_or_eof(TokenKind::CloseCurly) {
-            self.parse_top_level(&mut items, vec![])?;
+            self.parse_top_level(&mut items, smallvec![])?;
             self.ignore_newlines();
         }
         Ok(items)
@@ -23,7 +25,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_top_level_block(
         &mut self,
         namespace_items: &mut NamespaceItems,
-        parent_annotations: Vec<Annotation>,
+        parent_annotations: SmallVec4<Annotation>,
     ) -> Result<(), ParseError> {
         self.input
             .expect(TokenKind::OpenCurly, "to open top level block")?;
@@ -42,14 +44,14 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
     pub fn parse_top_level_new_block(&mut self) -> Result<NamespaceItems, ParseError> {
         let mut namespace_items = NamespaceItems::default();
-        self.parse_top_level_block(&mut namespace_items, vec![])?;
+        self.parse_top_level_block(&mut namespace_items, smallvec![])?;
         Ok(namespace_items)
     }
 
     pub fn parse_top_level(
         &mut self,
         namespace_items: &mut NamespaceItems,
-        parent_annotations: Vec<Annotation>,
+        parent_annotations: SmallVec4<Annotation>,
     ) -> Result<(), ParseError> {
         let mut annotations = parent_annotations;
 
@@ -58,7 +60,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
 
         // Parse annotations
         while self.input.peek().is_hash() {
-            annotations.extend(self.parse_annotation()?);
+            annotations.extend(self.parse_annotation_list()?);
             self.ignore_newlines();
         }
 

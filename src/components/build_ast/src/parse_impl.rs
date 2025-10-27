@@ -7,10 +7,12 @@ use ast::{Impl, TypeParams};
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
 use optional_string::NoneStr;
+use smallvec::smallvec;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_impl(&mut self, annotations: Vec<Annotation>) -> Result<Impl, ParseError> {
+    pub fn parse_impl(&mut self, annotations: SmallVec4<Annotation>) -> Result<Impl, ParseError> {
         let source = self.input.peek().source;
         self.input.advance().kind.unwrap_impl_keyword();
 
@@ -42,9 +44,9 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
             self.ignore_newlines();
 
             // Parse annotations
-            let mut annotations = vec![];
+            let mut annotations = smallvec![];
             while self.input.peek().is_hash() {
-                annotations.extend(self.parse_annotation()?);
+                annotations.extend(self.parse_annotation_list()?);
                 self.ignore_newlines();
             }
 

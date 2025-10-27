@@ -5,10 +5,11 @@ use attributes::Privacy;
 use indexmap::IndexMap;
 use infinite_iterator::InfinitePeekable;
 use num::{BigInt, Zero};
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_enum(&mut self, annotations: Vec<Annotation>) -> Result<Enum, ParseError> {
+    pub fn parse_enum(&mut self, annotations: SmallVec4<Annotation>) -> Result<Enum, ParseError> {
         let source = self.input.here();
         assert!(self.input.advance().is_enum_keyword());
 

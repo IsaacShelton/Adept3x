@@ -6,10 +6,11 @@ use super::{
 use ast::{Func, FuncHead, TypeKind};
 use attributes::{Privacy, SymbolOwnership, Tag};
 use infinite_iterator::InfinitePeekable;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_func(&mut self, annotations: Vec<Annotation>) -> Result<Func, ParseError> {
+    pub fn parse_func(&mut self, annotations: SmallVec4<Annotation>) -> Result<Func, ParseError> {
         // func functionName {
         //   ^
 
@@ -37,7 +38,7 @@ impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
                 AnnotationKind::Public => privacy = Privacy::Public,
                 AnnotationKind::Private => privacy = Privacy::Private,
                 AnnotationKind::Using(given) => {
-                    givens.push(given);
+                    givens.push(*given);
                 }
                 _ => return Err(self.unexpected_annotation(&annotation, "for function")),
             }

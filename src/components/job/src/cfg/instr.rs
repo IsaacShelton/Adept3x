@@ -1,5 +1,5 @@
 use crate::{
-    BasicBlockId, CfgValue,
+    BasicBlockId, Cfg, CfgBuilder, CfgValue,
     conform::UnaryCast,
     ir::BinOp,
     module_graph::ModuleView,
@@ -299,6 +299,9 @@ impl<'env> Display for InstrKind<'env> {
             InstrKind::LabelLiteral(label) => {
                 write!(f, "label_lit {}", label)?;
             }
+            InstrKind::Comptime(_) => {
+                write!(f, "comptime <...>")?;
+            }
         }
         Ok(())
     }
@@ -368,6 +371,7 @@ pub enum InstrKind<'env> {
     ConformToBool(CfgValue, Language, Option<UnaryCast<'env>>),
     Is(CfgValue, &'env str),
     LabelLiteral(&'env str),
+    Comptime(CfgBuilder<'env>),
 }
 
 impl<'env> InstrKind<'env> {

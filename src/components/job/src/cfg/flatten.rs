@@ -563,6 +563,24 @@ fn flatten_expr<'env>(
         ast::ExprKind::LabelLiteral(label_name) => builder
             .try_push(cursor, InstrKind::LabelLiteral(label_name).at(expr.source))
             .into(),
+        ast::ExprKind::Comptime(comptime_expr) => {
+            let (mut comptime_builder, mut comptime_cursor) = CfgBuilder::new();
+
+            let cfg_value = flatten_expr(
+                ctx,
+                &mut comptime_builder,
+                &mut comptime_cursor,
+                comptime_expr,
+                IsValue::RequireValue,
+            );
+
+            builder
+                .try_push(
+                    cursor,
+                    InstrKind::Comptime(comptime_builder).at(expr.source),
+                )
+                .into()
+        }
     }
 }
 

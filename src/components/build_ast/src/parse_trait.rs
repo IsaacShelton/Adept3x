@@ -6,10 +6,11 @@ use super::{
 use ast::{Params, Trait, TraitFunc};
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
-    pub fn parse_trait(&mut self, annotations: Vec<Annotation>) -> Result<Trait, ParseError> {
+    pub fn parse_trait(&mut self, annotations: SmallVec4<Annotation>) -> Result<Trait, ParseError> {
         let source = self.input.here();
         self.input.advance();
 

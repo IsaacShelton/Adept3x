@@ -4,12 +4,13 @@ use ast::TypeAlias;
 use attributes::Privacy;
 use infinite_iterator::InfinitePeekable;
 use optional_string::NoneStr;
+use std_ext::SmallVec4;
 use token::{Token, TokenKind};
 
 impl<'a, I: InfinitePeekable<Token>> Parser<'a, I> {
     pub fn parse_type_alias(
         &mut self,
-        annotations: Vec<Annotation>,
+        annotations: SmallVec4<Annotation>,
     ) -> Result<TypeAlias, ParseError> {
         let source = self.input.here();
         assert!(self.input.advance().is_type_alias_keyword());
