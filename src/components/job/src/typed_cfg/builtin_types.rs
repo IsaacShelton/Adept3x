@@ -12,6 +12,7 @@ pub struct BuiltinTypes<'env> {
     pub ptr_char: Type<'env>,
     pub null: Type<'env>,
     pub bool: Type<'env>,
+    pub u8: Type<'env>,
     pub i32: Type<'env>,
     pub u32: Type<'env>,
     pub i64: Type<'env>,
@@ -33,6 +34,8 @@ impl<'env> BuiltinTypes<'env> {
             .at(Source::internal()),
             null: TypeKind::NullLiteral.at(Source::internal()),
             bool: TypeKind::Boolean.at(Source::internal()),
+            u8: TypeKind::BitInteger(IntegerBits::Bits8, IntegerSign::Unsigned)
+                .at(Source::internal()),
             i32: TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Signed)
                 .at(Source::internal()),
             u32: TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Unsigned)
@@ -67,6 +70,10 @@ impl<'env> BuiltinTypes<'env> {
 
     pub fn bool(&'env self) -> UnaliasedType<'env> {
         UnaliasedType(&self.bool)
+    }
+
+    pub fn u8(&'env self) -> UnaliasedType<'env> {
+        UnaliasedType(&self.u8)
     }
 
     pub fn i32(&'env self) -> UnaliasedType<'env> {

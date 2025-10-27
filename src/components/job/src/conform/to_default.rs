@@ -29,29 +29,29 @@ impl<'env> Conform<'env> {
         Self { ty, cast: None }
     }
 
-    pub fn after_dereference(self, ctx: &mut ExecutionCtx<'env>) -> Self {
-        let cast = self.cast.map(|cast| ctx.alloc(cast));
+    pub fn after_implicit_dereferences(
+        self,
+        ctx: &mut ExecutionCtx<'env>,
+        mut from_ty: UnaliasedType<'env>,
+        mut count: usize,
+    ) -> Self {
+        let mut result: Conform<'env> = self;
 
-        let is_nested_dereference = cast.as_ref().map_or(false, |cast| cast.is_dereference());
+        while count > 0 {
+            let TypeKind::Deref(after_deref) = &from_ty.0.kind else {
+                panic!("cannot implicitly dereference non deref'$T type");
+            };
 
-        Self {
-            ty: self.ty,
-            cast: Some(UnaryCast::Dereference {
-                then: cast.map(|v| &*v),
-                after_deref: if is_nested_dereference {
-                    UnaliasedType(ctx.alloc(TypeKind::Deref(self.ty.0).at(Source::internal())))
-                } else {
-                    self.ty
+            result = Self::new(
+                from_ty,
+                UnaryCast::Dereference {
+                    after_deref: UnaliasedType(*after_deref),
+                    then: std::mem::take(&mut result.cast).map(|cast| &*ctx.alloc(cast)),
                 },
-            }),
-        }
-    }
+            );
 
-    pub fn after_dereferences(self, ctx: &mut ExecutionCtx<'env>, count: usize) -> Self {
-        let mut result = self;
-
-        for _ in 0..count {
-            result = result.after_dereference(ctx);
+            from_ty = UnaliasedType(after_deref);
+            count -= 1;
         }
 
         result
@@ -157,18 +157,12 @@ pub fn conform_to_default<'env>(
             UnaryCast::SpecializePointerOuter(builtin_types.ptr_void()),
         ),
         TypeKind::AsciiCharLiteral(value) => {
-            Conform::new(builtin_types.bool(), UnaryCast::SpecializeAsciiChar(*value))
+            Conform::new(builtin_types.u8(), UnaryCast::SpecializeAsciiChar(*value))
         }
         _ => Conform::identity(ty),
     };
 
-    let mut result = inner_conform;
-
-    for _ in 0..dereferences {
-        result = result.after_dereference(ctx);
-    }
-
-    Ok(result)
+    Ok(inner_conform.after_implicit_dereferences(ctx, original_from_ty, dereferences))
 }
 
 fn default_from_integer_literal<'env>(

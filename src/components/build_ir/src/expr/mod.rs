@@ -738,11 +738,11 @@ pub fn lower_basic_binary_operation(
         })),
         asg::BasicBinaryOperator::Divide(mode) => Ok(builder.push(ir::Instr::Divide(
             operands,
-            builder.target().default_float_or_sign(mode),
+            builder.target().default_float_or_sign_from_lax(mode),
         ))),
         asg::BasicBinaryOperator::Modulus(mode) => Ok(builder.push(ir::Instr::Modulus(
             operands,
-            builder.target().default_float_or_sign(mode),
+            builder.target().default_float_or_sign_from_lax(mode),
         ))),
         asg::BasicBinaryOperator::Equals(mode) => {
             Ok(builder.push(ir::Instr::Equals(operands, *mode)))
@@ -752,19 +752,22 @@ pub fn lower_basic_binary_operation(
         }
         asg::BasicBinaryOperator::LessThan(mode) => Ok(builder.push(ir::Instr::LessThan(
             operands,
-            builder.target().default_float_or_sign(mode),
+            builder.target().default_float_or_sign_from_lax(mode),
         ))),
         asg::BasicBinaryOperator::LessThanEq(mode) => Ok(builder.push(ir::Instr::LessThanEq(
             operands,
-            builder.target().default_float_or_sign(mode),
+            builder.target().default_float_or_sign_from_lax(mode),
         ))),
         asg::BasicBinaryOperator::GreaterThan(mode) => Ok(builder.push(ir::Instr::GreaterThan(
             operands,
-            builder.target().default_float_or_sign(mode),
+            builder.target().default_float_or_sign_from_lax(mode),
         ))),
-        asg::BasicBinaryOperator::GreaterThanEq(mode) => Ok(builder.push(
-            ir::Instr::GreaterThanEq(operands, builder.target().default_float_or_sign(mode)),
-        )),
+        asg::BasicBinaryOperator::GreaterThanEq(mode) => {
+            Ok(builder.push(ir::Instr::GreaterThanEq(
+                operands,
+                builder.target().default_float_or_sign_from_lax(mode),
+            )))
+        }
         asg::BasicBinaryOperator::BitwiseAnd => Ok(builder.push(ir::Instr::BitwiseAnd(operands))),
         asg::BasicBinaryOperator::BitwiseOr => Ok(builder.push(ir::Instr::BitwiseOr(operands))),
         asg::BasicBinaryOperator::BitwiseXor => Ok(builder.push(ir::Instr::BitwiseXor(operands))),

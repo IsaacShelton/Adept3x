@@ -7,6 +7,7 @@ use crate::{
     conform::{ConformMode, UnaryCast, conform_to, conform_to_default},
     execution::resolve::{ResolveNamespace, ResolveType, structure::ResolveStructureBody},
     flatten_func,
+    ir::{BinOp, BinOpFloatOrInteger, BinOpFloatOrSign},
     module_graph::ModuleView,
     repr::{
         Compiler, DeclHead, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation,
@@ -502,24 +503,17 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     let types_iter = [(false, a_ty), (true, b_ty)].into_iter();
 
-                    let Some(unified) = unify_types(
-                        ctx,
-                        types_iter.clone(),
-                        *conform_behavior,
-                        builtin_types,
-                        self.view,
-                        instr.source,
-                    )?
-                    else {
+                    let cannot = || {
                         let disambiguation = TypeDisplayerDisambiguation::new(
                             types_iter.clone().map(|(_, ty)| ty.0),
                         );
 
-                        return Err(ErrorDiagnostic::new(
+                        Continuation::from(ErrorDiagnostic::new(
                             format!(
                                 "Cannot {} incompatible types {}",
                                 op.verb(),
                                 types_iter
+                                    .clone()
                                     .map(|(_, ty)| ty)
                                     .unique()
                                     .map(|ty| format!(
@@ -529,8 +523,80 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                     .join(" and ")
                             ),
                             instr.source,
-                        )
-                        .into());
+                        ))
+                    };
+
+                    let Some(mut unified) = unify_types(
+                        ctx,
+                        types_iter.clone(),
+                        *conform_behavior,
+                        builtin_types,
+                        self.view,
+                        instr.source,
+                    )?
+                    else {
+                        return Err(cannot());
+                    };
+
+                    let properties = match &unified.unified.0.kind {
+                        TypeKind::IntegerLiteral(big_int) => {
+                            // TODO: We can be smarter here, but for now, we will replace `a` and
+                            // `b` with the specialized version of the literal.
+
+                            let specialization = conform_to_default(
+                                ctx,
+                                unified.unified,
+                                conform_behavior.c_integer_assumptions(),
+                                builtin_types,
+                                self.view.target(),
+                            )?;
+
+                            unified.unified = specialization.ty;
+                            unified.unary_casts.clear();
+
+                            if let Some(cast) = specialization.cast {
+                                unified.unary_casts.push((false, cast.clone()));
+                                unified.unary_casts.push((true, cast));
+                            }
+                        }
+                        TypeKind::IntegerLiteralInRange(_, _) => todo!(),
+                        TypeKind::FloatLiteral(_) => todo!(),
+                        TypeKind::AsciiCharLiteral(_) => todo!(),
+                        _ => (),
+                    };
+
+                    let Some(numeric_mode) = unified.unified.0.numeric_mode() else {
+                        return Err(cannot());
+                    };
+
+                    let bin_op = match op {
+                        ast::BasicBinaryOperator::Add => BinOp::FloatOrInteger(
+                            BinOpFloatOrInteger::Add,
+                            numeric_mode.float_or_integer(),
+                        ),
+                        ast::BasicBinaryOperator::Subtract => todo!(),
+                        ast::BasicBinaryOperator::Multiply => todo!(),
+                        ast::BasicBinaryOperator::Divide => todo!(),
+                        ast::BasicBinaryOperator::Modulus => todo!(),
+                        ast::BasicBinaryOperator::Equals => todo!(),
+                        ast::BasicBinaryOperator::NotEquals => todo!(),
+                        ast::BasicBinaryOperator::LessThan => todo!(),
+                        ast::BasicBinaryOperator::LessThanEq => todo!(),
+                        ast::BasicBinaryOperator::GreaterThan => BinOp::FloatOrSign(
+                            BinOpFloatOrSign::GreaterThan,
+                            self.view.target().default_float_or_sign(numeric_mode),
+                        ),
+                        ast::BasicBinaryOperator::GreaterThanEq => BinOp::FloatOrSign(
+                            BinOpFloatOrSign::GreaterThanEq,
+                            self.view.target().default_float_or_sign(numeric_mode),
+                        ),
+                        ast::BasicBinaryOperator::BitwiseAnd => todo!(),
+                        ast::BasicBinaryOperator::BitwiseOr => todo!(),
+                        ast::BasicBinaryOperator::BitwiseXor => todo!(),
+                        ast::BasicBinaryOperator::LeftShift => todo!(),
+                        ast::BasicBinaryOperator::RightShift => todo!(),
+                        ast::BasicBinaryOperator::LogicalLeftShift => todo!(),
+                        ast::BasicBinaryOperator::LogicalRightShift => todo!(),
                     };
 
                     let mut a_cast = None;
@@ -543,8 +609,15 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         }
                     }
 
-                    cfg.set_binop_unary_casts(instr_ref, a_cast, b_cast);
-                    cfg.set_typed(instr_ref, unified.unified);
+                    cfg.set_typed(
+                        instr_ref,
+                        if op.returns_boolean() {
+                            builtin_types.bool()
+                        } else {
+                            unified.unified
+                        },
+                    );
+                    cfg.set_binop_resolution(instr_ref, a_cast, b_cast, bin_op, unified.unified);
                 }
                 InstrKind::BooleanLiteral(value) => {
                     cfg.set_typed(

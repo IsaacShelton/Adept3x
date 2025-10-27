@@ -5,7 +5,7 @@ mod os;
 pub use arch::{TargetArch, TargetArchExt};
 pub use display::IntoDisplay;
 pub use os::{TargetOs, TargetOsExt};
-use primitives::{CInteger, FloatOrSign, FloatOrSignLax, IntegerSign};
+use primitives::{CInteger, FloatOrSign, FloatOrSignLax, IntegerSign, NumericMode};
 use std::{
     ffi::{OsStr, OsString},
     fmt::Display,
@@ -90,13 +90,27 @@ impl Target {
         }
     }
 
-    pub fn default_float_or_sign(&self, float_or_sign_lax: &FloatOrSignLax) -> FloatOrSign {
+    pub fn default_float_or_sign_from_lax(
+        &self,
+        float_or_sign_lax: &FloatOrSignLax,
+    ) -> FloatOrSign {
         match float_or_sign_lax {
             FloatOrSignLax::Integer(sign) => FloatOrSign::Integer(*sign),
             FloatOrSignLax::IndeterminateInteger(c_integer) => {
                 FloatOrSign::Integer(self.default_c_integer_sign(*c_integer))
             }
             FloatOrSignLax::Float => FloatOrSign::Float,
+        }
+    }
+
+    pub fn default_float_or_sign(&self, numeric_mode: NumericMode) -> FloatOrSign {
+        match numeric_mode {
+            NumericMode::Integer(sign) => FloatOrSign::Integer(sign),
+            NumericMode::LooseIndeterminateSignInteger(c_integer) => {
+                FloatOrSign::Integer(self.default_c_integer_sign(c_integer))
+            }
+            NumericMode::CheckOverflow(_, sign) => FloatOrSign::Integer(sign),
+            NumericMode::Float => FloatOrSign::Float,
         }
     }
 

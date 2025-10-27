@@ -52,6 +52,12 @@ impl<'env> TypeDisplayerDisambiguation<'env> {
                 .collect(),
         }
     }
+
+    pub fn empty() -> Self {
+        Self {
+            ambiguous_names: Default::default(),
+        }
+    }
 }
 
 pub struct TypeDisplayer<'a, 'b, 'c, 'env: 'a + 'b + 'c> {

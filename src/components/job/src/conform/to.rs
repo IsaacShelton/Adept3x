@@ -49,7 +49,11 @@ pub fn conform_to<'env>(
     }
 
     if are_types_equal(from_ty, to_ty, on_polymorph) {
-        return Some(Conform::identity(to_ty).after_dereferences(ctx, dereferences));
+        return Some(Conform::identity(to_ty).after_implicit_dereferences(
+            ctx,
+            original_from_ty,
+            dereferences,
+        ));
     }
 
     let inner_conform = match &from_ty.0.kind {
@@ -145,7 +149,7 @@ pub fn conform_to<'env>(
         _ => None,
     }?;
 
-    Some(inner_conform.after_dereferences(ctx, dereferences))
+    Some(inner_conform.after_implicit_dereferences(ctx, original_from_ty, dereferences))
 }
 
 /*

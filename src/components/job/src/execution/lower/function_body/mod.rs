@@ -10,7 +10,7 @@ use crate::{
         function_body::{deref_dest::DerefDest, perform_unary_cast::PerformUnaryCast},
         value_for_bit_integer,
     },
-    ir,
+    ir::{self, BinaryOperands},
     module_graph::ModuleView,
     repr::{Compiler, FuncBody, FuncHead, TypeKind, VariableId, VariableRef},
     sub_task::SubTask,
@@ -329,8 +329,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             destination: dest,
                         }))
                     }
-                    InstrKind::BinOp(a, op, b, language, a_cast, b_cast, op_mode) => {
-                        let unified_type = instr.typed.unwrap().0;
+                    InstrKind::BinOp(a, _op, b, _language, a_cast, b_cast, resolution) => {
+                        let (op_mode, unified_type) = resolution.as_ref().unwrap();
 
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
@@ -338,7 +338,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 executor.request(LowerType::new(
                                     self.view,
                                     &self.compiler,
-                                    unified_type,
+                                    unified_type.0,
                                 )),
                                 ctx
                             );
@@ -361,6 +361,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 ctx,
                                 builder
                             ));
+                            self.perform_unary_cast = None;
                         }
 
                         if self.values.len() == 1 {
@@ -372,7 +373,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                         &self.compiler,
                                         builder.get_output(*b),
                                         lowered_type,
-                                        a_cast.as_ref(),
+                                        b_cast.as_ref(),
                                         instr.source,
                                     )
                                 }),
@@ -380,9 +381,18 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 ctx,
                                 builder
                             ));
+                            self.perform_unary_cast = None;
                         }
 
-                        builder.push(todo!("lower binop"))
+                        let values = std::mem::take(&mut self.values);
+
+                        builder.push(ir::Instr::BinOp(
+                            BinaryOperands {
+                                left: values[0],
+                                right: values[1],
+                            },
+                            op_mode.clone(),
+                        ))
                     }
                     InstrKind::BooleanLiteral(value) => ir::Literal::Boolean(*value).into(),
                     InstrKind::IntegerLiteral(integer) => {

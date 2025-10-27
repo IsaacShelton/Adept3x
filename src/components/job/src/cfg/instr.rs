@@ -211,7 +211,7 @@ impl<'env> Display for InstrKind<'env> {
             }
             InstrKind::NullLiteral => write!(f, "null_lit")?,
             InstrKind::VoidLiteral => write!(f, "void_lit")?,
-            InstrKind::Call(call, _) => {
+            InstrKind::Call(call, call_target) => {
                 write!(f, "call {} (", call.name_path)?;
 
                 for (i, cfg_value) in call.args.iter().enumerate() {
@@ -222,7 +222,15 @@ impl<'env> Display for InstrKind<'env> {
                     }
                 }
 
-                write!(f, ") {:?} {:?}", call.generics, call.expected_to_return)?;
+                write!(
+                    f,
+                    ") {:?} {:?} {:?}",
+                    call.generics,
+                    call.expected_to_return,
+                    call_target
+                        .as_ref()
+                        .map(|call_target| call_target.arg_casts)
+                )?;
             }
             InstrKind::DeclareAssign(name, cfg_value, cast, _) => {
                 write!(f, "declare_assign {} {}", name, cfg_value)?;
@@ -296,8 +304,8 @@ impl<'env> Display for InstrKind<'env> {
     }
 }
 
-// Getting this down to 32 is going to take some extreme manual layout optimization
-const _: () = assert!(std::mem::size_of::<InstrKind>() <= 72);
+// Getting this down is going to take some extreme manual layout optimization
+const _: () = assert!(std::mem::size_of::<InstrKind>() <= 88);
 const _: () = assert!(std::mem::align_of::<InstrKind>() <= 8);
 
 #[derive(Clone, Debug)]
@@ -328,7 +336,7 @@ pub enum InstrKind<'env> {
         ConformBehavior,
         Option<UnaryCast<'env>>,
         Option<UnaryCast<'env>>,
-        Option<BinOp>,
+        Option<(BinOp, UnaliasedType<'env>)>,
     ),
     BooleanLiteral(bool),
     IntegerLiteral(&'env Integer),

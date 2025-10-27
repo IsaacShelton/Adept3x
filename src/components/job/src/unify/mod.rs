@@ -295,9 +295,11 @@ impl IntegerProperties {
             TypeKind::IntegerLiteral(value) => {
                 let unsigned_bits = value.bits();
 
-                let sign = (**value < BigInt::ZERO).then_some(IntegerSign::Signed);
+                let sign = (**value < BigInt::ZERO)
+                    .then_some(IntegerSign::Signed)
+                    .unwrap_or(IntegerSign::Signed);
 
-                let bits = BitUnits::of(if sign == Some(IntegerSign::Signed) {
+                let bits = BitUnits::of(if sign == IntegerSign::Signed {
                     unsigned_bits + 1
                 } else {
                     unsigned_bits
@@ -306,7 +308,7 @@ impl IntegerProperties {
                 Some(Self {
                     largest_loose_used: None,
                     required_bits: Some(IntegerBits::new(bits)?),
-                    required_sign: sign,
+                    required_sign: Some(sign),
                     is_concrete: false,
                 })
             }
@@ -349,13 +351,13 @@ pub fn unify_integer_properties(
                 a_bits
             }
         } else if a_bits > b_bits {
-            if a_sign.is_signed() && !b_sign.is_signed() {
+            if !a_sign.is_signed() && b_sign.is_signed() {
                 a_bits + BitUnits::of(1)
             } else {
                 a_bits
             }
         } else {
-            if b_sign.is_signed() && !a_sign.is_signed() {
+            if !b_sign.is_signed() && a_sign.is_signed() {
                 b_bits + BitUnits::of(1)
             } else {
                 b_bits

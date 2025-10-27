@@ -3,6 +3,7 @@ use crate::{
     BuiltinTypes, ExecutionCtx,
     cfg::instr::{BreakContinue, CallTarget},
     conform::UnaryCast,
+    ir::BinOp,
     module_graph::ModuleView,
     repr::{FuncHead, VariableRef},
 };
@@ -232,19 +233,22 @@ impl<'env> CfgBuilder<'env> {
         }
     }
 
-    pub fn set_binop_unary_casts(
+    pub fn set_binop_resolution(
         &mut self,
         instr_ref: InstrRef,
         a_cast: Option<UnaryCast<'env>>,
         b_cast: Option<UnaryCast<'env>>,
+        bin_op: BinOp,
+        unified_type: UnaliasedType<'env>,
     ) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
 
         // Sequential Instruction
         match &mut bb.instrs[instr_ref.instr_or_end as usize].kind {
-            InstrKind::BinOp(_, _, _, _, a_unary_cast, b_unary_cast, _) => {
+            InstrKind::BinOp(_, _, _, _, a_unary_cast, b_unary_cast, resolution) => {
                 *a_unary_cast = a_cast;
                 *b_unary_cast = b_cast;
+                *resolution = Some((bin_op, unified_type));
             }
             _ => unreachable!(),
         }
