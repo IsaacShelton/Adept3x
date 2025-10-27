@@ -7,7 +7,7 @@ use crate::{
     conform::{ConformMode, UnaryCast, conform_to, conform_to_default},
     execution::resolve::{ResolveNamespace, ResolveType, structure::ResolveStructureBody},
     flatten_func,
-    ir::{BinOp, BinOpFloatOrInteger, BinOpFloatOrSign},
+    ir::{BinOp, BinOpFloatOrInteger, BinOpFloatOrSign, BinOpSimple},
     module_graph::ModuleView,
     repr::{
         Compiler, DeclHead, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation,
@@ -503,15 +503,16 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
 
                     let types_iter = [(false, a_ty), (true, b_ty)].into_iter();
 
-                    let cannot = || {
+                    let cannot = |incompatible: &str| {
                         let disambiguation = TypeDisplayerDisambiguation::new(
                             types_iter.clone().map(|(_, ty)| ty.0),
                         );
 
                         Continuation::from(ErrorDiagnostic::new(
                             format!(
-                                "Cannot {} incompatible types {}",
+                                "Cannot {} {} types {}",
                                 op.verb(),
+                                incompatible,
                                 types_iter
                                     .clone()
                                     .map(|(_, ty)| ty)
@@ -535,7 +536,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         instr.source,
                     )?
                     else {
-                        return Err(cannot());
+                        return Err(cannot("incompatible"));
                     };
 
                     let properties = match &unified.unified.0.kind {
@@ -566,7 +567,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     };
 
                     let Some(numeric_mode) = unified.unified.0.numeric_mode() else {
-                        return Err(cannot());
+                        return Err(cannot("unsupported"));
                     };
 
                     let bin_op = match op {
@@ -574,14 +575,38 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             BinOpFloatOrInteger::Add,
                             numeric_mode.float_or_integer(),
                         ),
-                        ast::BasicBinaryOperator::Subtract => todo!(),
-                        ast::BasicBinaryOperator::Multiply => todo!(),
-                        ast::BasicBinaryOperator::Divide => todo!(),
-                        ast::BasicBinaryOperator::Modulus => todo!(),
-                        ast::BasicBinaryOperator::Equals => todo!(),
-                        ast::BasicBinaryOperator::NotEquals => todo!(),
-                        ast::BasicBinaryOperator::LessThan => todo!(),
-                        ast::BasicBinaryOperator::LessThanEq => todo!(),
+                        ast::BasicBinaryOperator::Subtract => BinOp::FloatOrInteger(
+                            BinOpFloatOrInteger::Subtract,
+                            numeric_mode.float_or_integer(),
+                        ),
+                        ast::BasicBinaryOperator::Multiply => BinOp::FloatOrInteger(
+                            BinOpFloatOrInteger::Multiply,
+                            numeric_mode.float_or_integer(),
+                        ),
+                        ast::BasicBinaryOperator::Divide => BinOp::FloatOrSign(
+                            BinOpFloatOrSign::Divide,
+                            self.view.target().default_float_or_sign(numeric_mode),
+                        ),
+                        ast::BasicBinaryOperator::Modulus => BinOp::FloatOrSign(
+                            BinOpFloatOrSign::Modulus,
+                            self.view.target().default_float_or_sign(numeric_mode),
+                        ),
+                        ast::BasicBinaryOperator::Equals => BinOp::FloatOrInteger(
+                            BinOpFloatOrInteger::Equals,
+                            numeric_mode.float_or_integer(),
+                        ),
+                        ast::BasicBinaryOperator::NotEquals => BinOp::FloatOrInteger(
+                            BinOpFloatOrInteger::NotEquals,
+                            numeric_mode.float_or_integer(),
+                        ),
+                        ast::BasicBinaryOperator::LessThan => BinOp::FloatOrSign(
+                            BinOpFloatOrSign::LessThanEq,
+                            self.view.target().default_float_or_sign(numeric_mode),
+                        ),
+                        ast::BasicBinaryOperator::LessThanEq => BinOp::FloatOrSign(
+                            BinOpFloatOrSign::LessThanEq,
+                            self.view.target().default_float_or_sign(numeric_mode),
+                        ),
                         ast::BasicBinaryOperator::GreaterThan => BinOp::FloatOrSign(
                             BinOpFloatOrSign::GreaterThan,
                             self.view.target().default_float_or_sign(numeric_mode),
@@ -590,13 +615,43 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                             BinOpFloatOrSign::GreaterThanEq,
                             self.view.target().default_float_or_sign(numeric_mode),
                         ),
-                        ast::BasicBinaryOperator::BitwiseAnd => todo!(),
-                        ast::BasicBinaryOperator::BitwiseOr => todo!(),
-                        ast::BasicBinaryOperator::BitwiseXor => todo!(),
-                        ast::BasicBinaryOperator::LeftShift => todo!(),
-                        ast::BasicBinaryOperator::RightShift => todo!(),
-                        ast::BasicBinaryOperator::LogicalLeftShift => todo!(),
-                        ast::BasicBinaryOperator::LogicalRightShift => todo!(),
+                        ast::BasicBinaryOperator::BitwiseAnd => {
+                            if numeric_mode.is_float() {
+                                return Err(cannot("non-integer"));
+                            }
+                            BinOp::Simple(BinOpSimple::BitwiseAnd)
+                        }
+                        ast::BasicBinaryOperator::BitwiseOr => {
+                            if numeric_mode.is_float() {
+                                return Err(cannot("non-integer"));
+                            }
+                            BinOp::Simple(BinOpSimple::BitwiseOr)
+                        }
+                        ast::BasicBinaryOperator::BitwiseXor => {
+                            if numeric_mode.is_float() {
+                                return Err(cannot("non-integer"));
+                            }
+                            BinOp::Simple(BinOpSimple::BitwiseXor)
+                        }
+                        ast::BasicBinaryOperator::LeftShift
+                        | ast::BasicBinaryOperator::LogicalLeftShift => {
+                            if numeric_mode.is_float() {
+                                return Err(cannot("non-integer"));
+                            }
+                            BinOp::Simple(BinOpSimple::LeftShift)
+                        }
+                        ast::BasicBinaryOperator::RightShift => {
+                            if numeric_mode.is_float() {
+                                return Err(cannot("non-integer"));
+                            }
+                            BinOp::Simple(BinOpSimple::ArithmeticRightShift)
+                        }
+                        ast::BasicBinaryOperator::LogicalRightShift => {
+                            if numeric_mode.is_float() {
+                                return Err(cannot("non-integer"));
+                            }
+                            BinOp::Simple(BinOpSimple::LogicalRightShift)
+                        }
                     };
 
                     let mut a_cast = None;

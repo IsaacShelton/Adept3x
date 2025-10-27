@@ -18,4 +18,11 @@ impl NumericMode {
             Self::Float => FloatOrInteger::Float,
         }
     }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            NumericMode::Float => true,
+            _ => false,
+        }
+    }
 }
