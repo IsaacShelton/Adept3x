@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+num-bigint.workspace = true
+primitives = { version = "0.1.0", path = "../primitives" }

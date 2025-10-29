@@ -105,11 +105,7 @@ impl<'env> Executable<'env> for ProcessFile<'env> {
         let Some(_) = self.all_items_resolved else {
             return suspend!(
                 self.all_items_resolved,
-                executor.spawn(ProcessNamespaceItems::new(
-                    self.view,
-                    &self.compiler,
-                    ctx.alloc(ast),
-                )),
+                executor.spawn(ProcessNamespaceItems::new(self.view, ctx.alloc(ast))),
                 ctx
             );
         };

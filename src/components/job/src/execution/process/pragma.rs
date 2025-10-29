@@ -1,7 +1,7 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ProcessFile, canonicalize_or_error,
     module_graph::{ModuleBreakOffMode, ModuleView, Upserted},
-    repr::{Compiler, DeclHead, ValueLikeRef},
+    repr::{DeclHead, ValueLikeRef},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -12,9 +12,6 @@ use std::{borrow::Cow, path::Path};
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessPragma<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
 
     pragma: ByAddress<&'env ast::Pragma>,
 
@@ -30,14 +27,9 @@ pub struct ProcessPragma<'env> {
 }
 
 impl<'env> ProcessPragma<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        pragma: &'env ast::Pragma,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, pragma: &'env ast::Pragma) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             pragma: ByAddress(pragma),
             load_target: None,
             spawned_children: false,
@@ -70,7 +62,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
         };
 
         let new_filename = ctx.alloc(canonicalize_or_error(
-            Some(&self.compiler),
+            Some(self.view.compiler()),
             &self
                 .view
                 .canonical_filename
@@ -83,7 +75,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
 
         let new_view = self
             .view
-            .break_off(load_target.mode, new_filename, &self.compiler);
+            .break_off(load_target.mode, new_filename, self.view.compiler());
 
         self.spawned_children = true;
 
@@ -107,7 +99,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
         ctx.suspend_on(std::iter::once(
             executor
                 .request(ProcessFile::new(
-                    &self.compiler,
+                    self.view.compiler(),
                     new_filename,
                     false,
                     ctx.alloc(created),

@@ -6,7 +6,7 @@ use crate::{
     },
     ir,
     module_graph::ModuleView,
-    repr::{Compiler, FuncBody, FuncHead},
+    repr::{FuncBody, FuncHead},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -15,9 +15,6 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessFunction<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
 
     func: ByAddress<&'env ast::Func>,
 
@@ -53,14 +50,9 @@ pub struct ProcessFunction<'env> {
 }
 
 impl<'env> ProcessFunction<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        func: &'env ast::Func,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, func: &'env ast::Func) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             func: ByAddress(func),
             resolved_head: None,
             resolved_body: None,
@@ -87,11 +79,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                 let Some(resolved_head) = executor.demand(self.resolving_head) else {
                     return suspend!(
                         self.resolving_head,
-                        executor.request(ResolveFunctionHead::new(
-                            self.view,
-                            &self.compiler,
-                            &self.func.head,
-                        )),
+                        executor.request(ResolveFunctionHead::new(self.view, &self.func.head)),
                         ctx
                     );
                 };
@@ -119,7 +107,6 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                         self.resolving_body,
                         executor.request(ResolveFunctionBody::new(
                             self.view,
-                            &self.compiler,
                             &self.func,
                             resolved_head
                         )),
@@ -139,11 +126,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
         let Some(lowered_head) = executor.demand(self.lowering_head) else {
             return suspend!(
                 self.lowering_head,
-                executor.request(LowerFunctionHead::new(
-                    self.view,
-                    &self.compiler,
-                    resolved_head
-                )),
+                executor.request(LowerFunctionHead::new(self.view, resolved_head)),
                 ctx
             );
         };
@@ -153,7 +136,6 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                 self.lowering_body,
                 executor.request(LowerFunctionBody::new(
                     self.view,
-                    &self.compiler,
                     lowered_head,
                     resolved_head,
                     resolved_body

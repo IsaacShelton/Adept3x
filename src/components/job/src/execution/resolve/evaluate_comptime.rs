@@ -2,7 +2,7 @@ use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ProcessFile, Suspend,
     execution::resolve::ResolveEvaluation,
     module_graph::{ModuleView, Upserted},
-    repr::{Compiler, Evaluated},
+    repr::Evaluated,
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -13,9 +13,6 @@ use diagnostics::ErrorDiagnostic;
 pub struct EvaluateComptime<'env> {
     view: &'env ModuleView<'env>,
 
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     expr: ByAddress<&'env ast::Expr>,
 
     #[derivative(Hash = "ignore")]
@@ -25,14 +22,9 @@ pub struct EvaluateComptime<'env> {
 }
 
 impl<'env> EvaluateComptime<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        expr: &'env ast::Expr,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, expr: &'env ast::Expr) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             expr: ByAddress(expr),
             evaluated: None,
         }
@@ -78,7 +70,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
 
         if let Upserted::Created(created) = comptime_module {
             let _ = executor.spawn_raw(ProcessFile::new(
-                &self.compiler,
+                self.view.compiler(),
                 created.canonical_module_filename,
                 false,
                 ctx.alloc(created),
@@ -87,26 +79,22 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
         }
 
         let comptime_module = comptime_module.out_of();
-        let comptime_part = comptime_module.upsert_part(self.view.canonical_filename);
+        let comptime_part_view = comptime_module.upsert_part(self.view.canonical_filename);
 
-        if let Upserted::Created(created) = comptime_part {
+        if let Upserted::Created(created) = comptime_part_view {
             let _ = executor.spawn_raw(ProcessFile::new(
-                &self.compiler,
+                self.view.compiler(),
                 created.canonical_filename,
                 false,
                 ctx.alloc(created),
                 None,
             ));
         }
-        let comptime_part = comptime_part.out_of();
+        let comptime_part_view = ctx.alloc(comptime_part_view.out_of());
 
         return suspend!(
             self.evaluated,
-            executor.request(ResolveEvaluation::new(
-                comptime_part,
-                &self.compiler,
-                &self.expr
-            )),
+            executor.request(ResolveEvaluation::new(comptime_part_view, &self.expr)),
             ctx
         );
     }

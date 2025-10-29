@@ -1,5 +1,5 @@
 use crate::{
-    Continuation, Execution, Executor, Search, execution,
+    Continuation, Execution, ExecutionCtx, Executor, Search, execution,
     module_graph::{
         ModuleBreakOffMode, ModuleGraph, ModuleGraphMeta, ModuleGraphRef, ModuleGraphWeb,
         ModulePartHandle, ModulePartVisibility, Upserted,
@@ -11,7 +11,7 @@ use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use source_files::SourceFiles;
-use std::path::Path;
+use std::{cell::OnceCell, path::Path};
 use target::Target;
 
 #[derive(Copy, Clone, Derivative)]
@@ -64,6 +64,39 @@ impl<'env> ModuleView<'env> {
 
     pub fn compiler(&self) -> &'env Compiler<'env> {
         self.web.compiler
+    }
+
+    pub fn comptime(&'env self, ctx: &mut ExecutionCtx<'env>) -> &'env Self {
+        let Some(comptime_graph_ref) = self.graph.default_comptime() else {
+            return self;
+        };
+
+        let (handle, meta) = self.web.graph_mut(comptime_graph_ref, |graph| {
+            let module_ref = graph
+                .find_or_create_module(self.canonical_module_filename, ModulePartVisibility::Hidden)
+                .out_of()
+                .module_ref;
+
+            let meta = graph.meta();
+
+            let part_ref = graph.modules.get_mut().unwrap().arena[module_ref]
+                .find_or_create_part(self.canonical_filename, ModulePartVisibility::Hidden)
+                .if_found(|found| {
+                    graph.unhide_mut(ModulePartHandle::new(self.handle.module_ref, found))
+                })
+                .out_of();
+
+            (ModulePartHandle::new(module_ref, part_ref), meta)
+        });
+
+        ctx.alloc(Self {
+            web: self.web,
+            graph: comptime_graph_ref,
+            handle,
+            meta,
+            canonical_filename: self.canonical_filename,
+            canonical_module_filename: self.canonical_module_filename,
+        })
     }
 
     #[must_use]

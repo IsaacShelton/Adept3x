@@ -12,10 +12,6 @@ use indexmap::IndexMap;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ResolveStructureBody<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     structure: ByAddress<&'env ast::Struct>,
 
     #[derivative(Hash = "ignore")]
@@ -30,14 +26,9 @@ pub struct ResolveStructureBody<'env> {
 }
 
 impl<'env> ResolveStructureBody<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        structure: &'env ast::Struct,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, structure: &'env ast::Struct) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             structure: ByAddress(structure),
             fields: IndexMap::with_capacity(structure.fields.len()),
             resolved_type: None,

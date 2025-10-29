@@ -13,22 +13,13 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessNamespaceItems<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     namespace_items: Option<ByAddress<&'env NamespaceItems>>,
 }
 
 impl<'env> ProcessNamespaceItems<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        namespace_items: &'env NamespaceItems,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, namespace_items: &'env NamespaceItems) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             namespace_items: Some(ByAddress(namespace_items)),
         }
     }
@@ -51,31 +42,42 @@ impl<'env> Executable<'env> for ProcessNamespaceItems<'env> {
             namespace_items
                 .whens
                 .iter()
-                .map(|when| executor.request(ProcessWhen::new(self.view, &self.compiler, when))),
+                .map(|when| executor.request(ProcessWhen::new(self.view, when))),
         );
 
-        ctx.suspend_on(namespace_items.namespaces.iter().map(|namespace| {
-            executor.request(ProcessNamespace::new(self.view, &self.compiler, namespace))
-        }));
-
         ctx.suspend_on(
-            namespace_items.pragmas.iter().map(|pragma| {
-                executor.request(ProcessPragma::new(self.view, &self.compiler, pragma))
-            }),
+            namespace_items
+                .namespaces
+                .iter()
+                .map(|namespace| executor.request(ProcessNamespace::new(self.view, namespace))),
         );
 
-        ctx.suspend_on(namespace_items.linksets.iter().map(|linkset| {
-            executor.request(ProcessLinkset::new(self.view, &self.compiler, linkset))
-        }));
-
-        ctx.suspend_on(namespace_items.structs.iter().map(|structure| {
-            executor.request(ProcessStructure::new(self.view, &self.compiler, structure))
-        }));
+        ctx.suspend_on(
+            namespace_items
+                .pragmas
+                .iter()
+                .map(|pragma| executor.request(ProcessPragma::new(self.view, pragma))),
+        );
 
         ctx.suspend_on(
-            namespace_items.funcs.iter().map(|func| {
-                executor.request(ProcessFunction::new(self.view, &self.compiler, func))
-            }),
+            namespace_items
+                .linksets
+                .iter()
+                .map(|linkset| executor.request(ProcessLinkset::new(self.view, linkset))),
+        );
+
+        ctx.suspend_on(
+            namespace_items
+                .structs
+                .iter()
+                .map(|structure| executor.request(ProcessStructure::new(self.view, structure))),
+        );
+
+        ctx.suspend_on(
+            namespace_items
+                .funcs
+                .iter()
+                .map(|func| executor.request(ProcessFunction::new(self.view, func))),
         );
 
         Err(Continuation::Suspend(self.into()))

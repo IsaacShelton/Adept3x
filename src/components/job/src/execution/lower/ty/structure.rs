@@ -12,10 +12,6 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerTypeStructure<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     structure: ByAddress<&'env ast::Struct>,
     struct_body: ByAddress<&'env StructBody<'env>>,
 
@@ -28,13 +24,11 @@ pub struct LowerTypeStructure<'env> {
 impl<'env> LowerTypeStructure<'env> {
     pub fn new(
         view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
         structure: &'env ast::Struct,
         struct_body: &'env StructBody<'env>,
     ) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             structure: ByAddress(structure),
             struct_body: ByAddress(struct_body),
             lowered_types: None,
@@ -58,9 +52,7 @@ impl<'env> Executable<'env> for LowerTypeStructure<'env> {
                 self.struct_body
                     .fields
                     .values()
-                    .map(|field| {
-                        executor.request(LowerType::new(self.view, &self.compiler, &field.ty.0))
-                    })
+                    .map(|field| { executor.request(LowerType::new(self.view, &field.ty.0)) })
                     .collect(),
                 ctx
             );

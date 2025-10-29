@@ -130,7 +130,7 @@ pub fn compile(compiler: &mut Compiler, single_file: Option<PathBuf>) -> Result<
             "Tasks: {}/{}",
             executed.num_completed, executed.num_scheduled,
         );
-        println!("Queued: {}/{}", executed.num_cleared, executed.num_queued,);
+        println!("Queued: {}/{}", executed.num_cleared, executed.num_queued);
     }
 
     if let Some(executable_filepath) = executed.truth.demand(main_task) {

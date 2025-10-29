@@ -3,7 +3,7 @@ use crate::{
     execution::lower::{LowerType, function_body::ir_builder::IrBuilder},
     ir,
     module_graph::ModuleView,
-    repr::{Compiler, Type, TypeKind},
+    repr::{Type, TypeKind},
     sub_task::SubTask,
 };
 use diagnostics::ErrorDiagnostic;
@@ -11,22 +11,15 @@ use diagnostics::ErrorDiagnostic;
 #[derive(Clone)]
 pub struct DerefDest<'env> {
     view: &'env ModuleView<'env>,
-    compiler: &'env Compiler<'env>,
     ty: &'env Type<'env>,
     dest: ir::Value<'env>,
     lowered_type: Suspend<'env, ir::Type<'env>>,
 }
 
 impl<'env> DerefDest<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        dest: ir::Value<'env>,
-        ty: &'env Type<'env>,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, dest: ir::Value<'env>, ty: &'env Type<'env>) -> Self {
         Self {
             view,
-            compiler,
             dest,
             ty,
             lowered_type: None,
@@ -68,7 +61,7 @@ impl<'env> SubTask<'env> for DerefDest<'env> {
             let Some(lowered_type) = executor.demand(self.lowered_type) else {
                 return suspend_from_sub_task!(
                     self.lowered_type,
-                    executor.request(LowerType::new(self.view, self.compiler, nested)),
+                    executor.request(LowerType::new(self.view, nested)),
                     ctx
                 );
             };
@@ -84,7 +77,7 @@ impl<'env> SubTask<'env> for DerefDest<'env> {
         let Some(lowered_type) = executor.demand(self.lowered_type) else {
             return suspend_from_sub_task!(
                 self.lowered_type,
-                executor.request(LowerType::new(&self.view, &self.compiler, &self.ty)),
+                executor.request(LowerType::new(&self.view, &self.ty)),
                 ctx
             );
         };

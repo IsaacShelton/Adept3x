@@ -15,7 +15,7 @@ pub enum ModuleGraphRef {
 
 impl ModuleGraphRef {
     pub fn default_comptime(self) -> Option<Self> {
-        self.target_comptime()
+        self.sandbox_comptime()
     }
 
     pub fn comptime(self, kind: ComptimeKind) -> Option<Self> {

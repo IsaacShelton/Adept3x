@@ -163,6 +163,9 @@ impl SyscallHandler for BuildSystemSyscallHandler {
                 #[allow(unreachable_code)]
                 ValueKind::Literal(ir::Literal::Void).untainted()
             }
+            Syscall::Bake => {
+                panic!("cannot bake from build syscall handler");
+            }
         }
     }
 }

@@ -2,10 +2,7 @@ use crate::{
     Continuation, Executable, ExecutionCtx, Executor, SuspendMany,
     execution::resolve::ResolveType,
     module_graph::ModuleView,
-    repr::{
-        Compiler, DeclHead, FuncHead, FuncMetadata, ImplParams, Param, Params, TargetAbi,
-        UnaliasedType,
-    },
+    repr::{DeclHead, FuncHead, FuncMetadata, ImplParams, Param, Params, TargetAbi, UnaliasedType},
 };
 use attributes::{Exposure, SymbolOwnership, Tag};
 use by_address::ByAddress;
@@ -15,10 +12,6 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ResolveFunctionHead<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     head: ByAddress<&'env ast::FuncHead>,
 
     #[derivative(Hash = "ignore")]
@@ -28,14 +21,9 @@ pub struct ResolveFunctionHead<'env> {
 }
 
 impl<'env> ResolveFunctionHead<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        head: &'env ast::FuncHead,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, head: &'env ast::FuncHead) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             head: ByAddress(head),
             inner_types: None,
         }

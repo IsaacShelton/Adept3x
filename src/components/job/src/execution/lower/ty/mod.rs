@@ -7,7 +7,7 @@ use crate::{
     },
     ir,
     module_graph::ModuleView,
-    repr::{Compiler, StructBody, Type, TypeHeadRestKind, TypeKind},
+    repr::{StructBody, Type, TypeHeadRestKind, TypeKind},
     target_layout::TargetLayout,
 };
 use by_address::ByAddress;
@@ -20,9 +20,6 @@ pub use structure::LowerTypeStructure;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerType<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
 
     ty: ByAddress<&'env Type<'env>>,
 
@@ -38,14 +35,9 @@ pub struct LowerType<'env> {
 }
 
 impl<'env> LowerType<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        ty: &'env Type<'env>,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, ty: &'env Type<'env>) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             ty: ByAddress(ty),
             inner_type: None,
             resolved_struct_body: None,
@@ -61,7 +53,7 @@ impl<'env> Executable<'env> for LowerType<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let target = self.compiler.target(self.view.graph);
+        let target = self.view.target();
 
         return Ok(match &self.ty.kind {
             TypeKind::IntegerLiteral(_) => ir::Type::Void,
@@ -111,7 +103,7 @@ impl<'env> Executable<'env> for LowerType<'env> {
                 let Some(lowered_inner) = executor.demand(self.inner_type) else {
                     return suspend!(
                         self.inner_type,
-                        executor.request(LowerType::new(self.view, &self.compiler, *inner)),
+                        executor.request(LowerType::new(self.view, *inner)),
                         ctx
                     );
                 };
@@ -129,11 +121,7 @@ impl<'env> Executable<'env> for LowerType<'env> {
                         else {
                             return suspend!(
                                 self.resolved_struct_body,
-                                executor.request(ResolveStructureBody::new(
-                                    self.view,
-                                    &self.compiler,
-                                    structure
-                                )),
+                                executor.request(ResolveStructureBody::new(self.view, structure)),
                                 ctx
                             );
                         };
@@ -143,7 +131,6 @@ impl<'env> Executable<'env> for LowerType<'env> {
                                 self.inner_type,
                                 executor.request(LowerTypeStructure::new(
                                     self.view,
-                                    &self.compiler,
                                     structure,
                                     resolved_struct_body
                                 )),

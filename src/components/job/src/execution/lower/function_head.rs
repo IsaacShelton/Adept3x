@@ -13,10 +13,6 @@ use std::sync::OnceLock;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerFunctionHead<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     head: ByAddress<&'env FuncHead<'env>>,
 
     #[derivative(Hash = "ignore")]
@@ -26,14 +22,9 @@ pub struct LowerFunctionHead<'env> {
 }
 
 impl<'env> LowerFunctionHead<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        head: &'env FuncHead<'env>,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, head: &'env FuncHead<'env>) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             head: ByAddress(head),
             inner_types: None,
         }
@@ -62,7 +53,7 @@ impl<'env> Executable<'env> for LowerFunctionHead<'env> {
             return suspend_many!(
                 self.inner_types,
                 suspend_on_types
-                    .map(|ty| executor.request(LowerType::new(self.view, &self.compiler, ty.0)))
+                    .map(|ty| executor.request(LowerType::new(self.view, ty.0)))
                     .collect(),
                 ctx
             );

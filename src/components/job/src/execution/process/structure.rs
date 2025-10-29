@@ -1,7 +1,7 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor,
     module_graph::ModuleView,
-    repr::{Compiler, DeclHead, DeclHeadTypeLike, TypeHead, TypeHeadRest, TypeHeadRestKind},
+    repr::{DeclHead, DeclHeadTypeLike, TypeHead, TypeHeadRest, TypeHeadRestKind},
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -10,10 +10,6 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessStructure<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     structure: ByAddress<&'env ast::Struct>,
 
     #[derivative(Hash = "ignore")]
@@ -23,14 +19,9 @@ pub struct ProcessStructure<'env> {
 }
 
 impl<'env> ProcessStructure<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        structure: &'env ast::Struct,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, structure: &'env ast::Struct) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             structure: ByAddress(structure),
             resolved_head: false,
         }

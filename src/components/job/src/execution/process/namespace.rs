@@ -1,6 +1,4 @@
-use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, module_graph::ModuleView, repr::Compiler,
-};
+use crate::{Continuation, Executable, ExecutionCtx, Executor, module_graph::ModuleView};
 use ast::Namespace;
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -9,22 +7,13 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ProcessNamespace<'env> {
     view: &'env ModuleView<'env>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     namespace: Option<ByAddress<&'env Namespace>>,
 }
 
 impl<'env> ProcessNamespace<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        namespace: &'env Namespace,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, namespace: &'env Namespace) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             namespace: Some(ByAddress(namespace)),
         }
     }

@@ -4,7 +4,6 @@ use crate::{
     execution::lower::{LowerType, function_body::ir_builder::IrBuilder},
     ir,
     module_graph::ModuleView,
-    repr::Compiler,
     sub_task::SubTask,
 };
 use diagnostics::ErrorDiagnostic;
@@ -16,7 +15,6 @@ use source_files::Source;
 #[derive(Clone)]
 pub struct PerformUnaryCast<'env> {
     view: &'env ModuleView<'env>,
-    compiler: &'env Compiler<'env>,
     from: ir::Value<'env>,
     to: ir::Type<'env>,
     unary_cast: Option<&'env UnaryCast<'env>>,
@@ -27,7 +25,6 @@ pub struct PerformUnaryCast<'env> {
 impl<'env> PerformUnaryCast<'env> {
     pub fn new(
         view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
         from: ir::Value<'env>,
         to: ir::Type<'env>,
         unary_cast: Option<&'env UnaryCast<'env>>,
@@ -35,7 +32,6 @@ impl<'env> PerformUnaryCast<'env> {
     ) -> Self {
         Self {
             view,
-            compiler,
             from,
             to,
             unary_cast,
@@ -149,11 +145,7 @@ impl<'env> SubTask<'env> for PerformUnaryCast<'env> {
                     let Some(after_deref) = executor.demand(self.lowered_type) else {
                         return suspend_from_sub_task!(
                             self.lowered_type,
-                            executor.request(LowerType::new(
-                                self.view,
-                                &self.compiler,
-                                after_deref.0
-                            )),
+                            executor.request(LowerType::new(self.view, after_deref.0)),
                             ctx
                         );
                     };

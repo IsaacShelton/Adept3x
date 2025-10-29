@@ -379,7 +379,7 @@ pub fn resolve_static_member_call_polymorph(
                 if let Some(p) = preferred_type.map(|p| p.view(&ctx.asg)) {
                     format!("Cannot conform argument to expected type '{}'", p)
                 } else {
-                    format!("Cannot conform argument to default type",)
+                    format!("Cannot conform argument to default type")
                 },
                 arg.expr.source,
             ));

@@ -1,5 +1,5 @@
 use crate::{
-    BasicBlockId, Cfg, CfgBuilder, CfgValue,
+    BasicBlockId, CfgValue,
     conform::UnaryCast,
     ir::BinOp,
     module_graph::ModuleView,
@@ -371,7 +371,7 @@ pub enum InstrKind<'env> {
     ConformToBool(CfgValue, Language, Option<UnaryCast<'env>>),
     Is(CfgValue, &'env str),
     LabelLiteral(&'env str),
-    Comptime(CfgBuilder<'env>),
+    Comptime(&'env ast::Expr),
 }
 
 impl<'env> InstrKind<'env> {

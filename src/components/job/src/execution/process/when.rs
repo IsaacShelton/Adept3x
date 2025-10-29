@@ -11,9 +11,6 @@ use derivative::Derivative;
 pub struct ProcessWhen<'env> {
     view: &'env ModuleView<'env>,
 
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
-
     when: ByAddress<&'env When>,
 
     // The next condition/otherwise index to check, or None if
@@ -31,14 +28,9 @@ pub struct ProcessWhen<'env> {
 }
 
 impl<'env> ProcessWhen<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
-        when: &'env When,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, when: &'env When) -> Self {
         Self {
             view,
-            compiler: ByAddress(compiler),
             when: ByAddress(when),
             next_condition_index: Some(0),
             condition: None,
@@ -71,9 +63,9 @@ impl<'env> Executable<'env> for ProcessWhen<'env> {
                     .unwrap_or_else(|| self.when.otherwise.as_ref().unwrap());
 
                 self.next_condition_index = None;
-                ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                    ProcessNamespaceItems::new(self.view, &self.compiler, then),
-                )));
+                ctx.suspend_on(std::iter::once(
+                    executor.spawn_raw(ProcessNamespaceItems::new(self.view, then)),
+                ));
                 return Err(Continuation::Suspend(self.into()));
             } else {
                 *next_condition_index += 1;
@@ -86,7 +78,7 @@ impl<'env> Executable<'env> for ProcessWhen<'env> {
 
             return suspend!(
                 self.condition,
-                executor.spawn(EvaluateComptime::new(self.view, &self.compiler, condition)),
+                executor.spawn(EvaluateComptime::new(self.view, condition)),
                 ctx
             );
         }
@@ -94,9 +86,9 @@ impl<'env> Executable<'env> for ProcessWhen<'env> {
         // Suspend on "else" items if present and no condition was met
         if let Some(otherwise) = &self.when.otherwise {
             self.next_condition_index = None;
-            ctx.suspend_on(std::iter::once(executor.spawn_raw(
-                ProcessNamespaceItems::new(self.view, &self.compiler, otherwise),
-            )));
+            ctx.suspend_on(std::iter::once(
+                executor.spawn_raw(ProcessNamespaceItems::new(self.view, otherwise)),
+            ));
             return Err(Continuation::Suspend(self.into()));
         }
 

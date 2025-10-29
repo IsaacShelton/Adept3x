@@ -5,14 +5,15 @@ use crate::{
     BasicBlockId, CfgBuilder, CfgValue, Continuation, EndInstrKind, Executable, ExecutionCtx,
     Executor, FuncSearch, InstrKind, RevPostOrderIterWithEnds, Suspend, SuspendMany,
     conform::{ConformMode, UnaryCast, conform_to, conform_to_default},
-    execution::resolve::{ResolveNamespace, ResolveType, structure::ResolveStructureBody},
+    execution::resolve::{
+        EvaluateComptime, ResolveNamespace, ResolveType, structure::ResolveStructureBody,
+    },
     flatten_func,
     ir::{BinOp, BinOpFloatOrInteger, BinOpFloatOrSign, BinOpSimple},
     module_graph::ModuleView,
     repr::{
-        Compiler, DeclHead, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation,
-        TypeHeadRest, TypeHeadRestKind, TypeKind, UnaliasedType, UserDefinedType, Variable,
-        Variables,
+        DeclHead, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation, TypeHeadRest,
+        TypeHeadRestKind, TypeKind, UnaliasedType, UserDefinedType, Variable, Variables,
     },
     sub_task::SubTask,
     unify::unify_types,
@@ -33,9 +34,6 @@ pub struct ResolveFunctionBody<'env> {
     view: &'env ModuleView<'env>,
     func: ByAddress<&'env ast::Func>,
     resolved_head: ByAddress<&'env FuncHead<'env>>,
-
-    #[derivative(Debug = "ignore")]
-    compiler: ByAddress<&'env Compiler<'env>>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -81,7 +79,6 @@ pub struct ResolveFunctionBody<'env> {
 impl<'env> ResolveFunctionBody<'env> {
     pub fn new(
         view: &'env ModuleView<'env>,
-        compiler: &'env Compiler<'env>,
         func: &'env ast::Func,
         resolved_head: &'env FuncHead<'env>,
     ) -> Self {
@@ -92,7 +89,6 @@ impl<'env> ResolveFunctionBody<'env> {
             inner_types: None,
             rev_post_order: None,
             resolved_type: None,
-            compiler: ByAddress(compiler),
             cfg: None,
             dominators_and_post_order: None,
             variables: None,
@@ -125,15 +121,13 @@ impl<'env> ResolveFunctionBody<'env> {
 impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
     type Output = &'env FuncBody<'env>;
 
-    #[allow(unused_variables)]
-    #[allow(unreachable_code)]
     fn execute(
         mut self,
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         let def = self.func;
-        let builtin_types = self.compiler.builtin_types;
+        let builtin_types = self.view.compiler().builtin_types;
 
         // 0) Foreign functions do not have bodies
         assert!(def.head.ownership.is_owned());
@@ -893,11 +887,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     else {
                         return suspend!(
                             self.resolved_struct_body,
-                            executor.request(ResolveStructureBody::new(
-                                struct_view,
-                                &self.compiler,
-                                structure
-                            )),
+                            executor.request(ResolveStructureBody::new(struct_view, structure)),
                             ctx
                         );
                     };
@@ -1137,8 +1127,12 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 }
                 InstrKind::Is(instr_ref, _) => todo!("is"),
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
-                InstrKind::Comptime(comptime_builder) => {
-                    todo!("resolve comptime evaluation {:?}", comptime_builder)
+                InstrKind::Comptime(expr) => {
+                    // Use EvaluateComptime to evaluate
+
+                    let request = executor.request(EvaluateComptime::new(self.view, expr));
+
+                    todo!("resolve comptime evaluation {:?}", request)
                 }
             }
 

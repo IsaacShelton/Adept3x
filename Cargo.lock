@@ -726,6 +726,10 @@ dependencies = [
 [[package]]
 name = "interpreter_api"
 version = "0.1.0"
+dependencies = [
+ "num-bigint",
+ "primitives",
+]
 
 [[package]]
 name = "ir"

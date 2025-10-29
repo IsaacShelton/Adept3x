@@ -1221,12 +1221,12 @@ mod test {
         assert_eq!(
             861,
             t0.join()
-                .expect("thread 0 will return after calculating additions",)
+                .expect("thread 0 will return after calculating additions")
         );
         assert_eq!(
             39916800,
             t1.join()
-                .expect("thread 1 will return after calculating multiplications",)
+                .expect("thread 1 will return after calculating multiplications")
         );
     }
 

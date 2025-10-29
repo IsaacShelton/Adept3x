@@ -1,3 +1,5 @@
+use primitives::IntegerSign;
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Syscall {
     Println,
@@ -9,4 +11,13 @@ pub enum Syscall {
     ImportNamespace,
     DontAssumeIntAtLeast32Bits,
     UseDependency,
+    Bake,
+}
+
+pub enum ConstantValue {
+    Integer(u64),
+}
+
+pub enum ConstantValueSchema {
+    Integer(IntegerSign),
 }
