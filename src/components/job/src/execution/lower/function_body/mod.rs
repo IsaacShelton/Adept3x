@@ -759,7 +759,10 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
 
                     ir::Literal::Void.into()
                 }
-                EndInstrKind::Unreachable => todo!(),
+                EndInstrKind::Unreachable => todo!("LowerFunctionBody lower unreachable"),
+                EndInstrKind::ExitInterpreter(_) => {
+                    todo!("LowerFunctionBody lower ExitInterpreter")
+                }
             };
 
             self.lowered_type = None;

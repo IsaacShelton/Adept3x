@@ -1,12 +1,11 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, ProcessFile, Suspend,
+    Continuation, Executable, ExecutionCtx, Executor, ProcessFile, RequireFileHeader, Suspend,
     execution::resolve::ResolveEvaluation,
     module_graph::{ModuleView, Upserted},
     repr::Evaluated,
 };
 use by_address::ByAddress;
 use derivative::Derivative;
-use diagnostics::ErrorDiagnostic;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -32,7 +31,7 @@ impl<'env> EvaluateComptime<'env> {
 }
 
 impl<'env> Executable<'env> for EvaluateComptime<'env> {
-    type Output = bool;
+    type Output = &'env Evaluated;
 
     fn execute(
         self,
@@ -40,14 +39,7 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
         if let Some(evaluated) = executor.demand(self.evaluated) {
-            match evaluated {
-                Evaluated::Bool(whether) => return Ok(*whether),
-                _ => {
-                    return Err(
-                        ErrorDiagnostic::plain("Expected bool from comptime evaluation").into(),
-                    );
-                }
-            }
+            return Ok(evaluated);
         }
 
         eprintln!(
@@ -69,26 +61,34 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
         );
 
         if let Upserted::Created(created) = comptime_module {
-            let _ = executor.spawn_raw(ProcessFile::new(
-                self.view.compiler(),
-                created.canonical_module_filename,
-                false,
-                ctx.alloc(created),
-                None,
-            ));
+            let processing_file = executor
+                .request(ProcessFile::new(
+                    self.view.compiler(),
+                    created.canonical_module_filename,
+                    RequireFileHeader::Ignore,
+                    ctx.alloc(created),
+                    None,
+                ))
+                .raw_task_ref();
+
+            ctx.suspend_on(std::iter::once(processing_file));
         }
 
         let comptime_module = comptime_module.out_of();
         let comptime_part_view = comptime_module.upsert_part(self.view.canonical_filename);
 
         if let Upserted::Created(created) = comptime_part_view {
-            let _ = executor.spawn_raw(ProcessFile::new(
-                self.view.compiler(),
-                created.canonical_filename,
-                false,
-                ctx.alloc(created),
-                None,
-            ));
+            let processing_file = executor
+                .request(ProcessFile::new(
+                    self.view.compiler(),
+                    created.canonical_filename,
+                    RequireFileHeader::Ignore,
+                    ctx.alloc(created),
+                    None,
+                ))
+                .raw_task_ref();
+
+            ctx.suspend_on(std::iter::once(processing_file));
         }
         let comptime_part_view = ctx.alloc(comptime_part_view.out_of());
 

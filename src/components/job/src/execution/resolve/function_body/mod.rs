@@ -12,8 +12,9 @@ use crate::{
     ir::{BinOp, BinOpFloatOrInteger, BinOpFloatOrSign, BinOpSimple},
     module_graph::ModuleView,
     repr::{
-        DeclHead, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation, TypeHeadRest,
-        TypeHeadRestKind, TypeKind, UnaliasedType, UserDefinedType, Variable, Variables,
+        DeclHead, Evaluated, FuncBody, FuncHead, StructBody, Type, TypeDisplayerDisambiguation,
+        TypeHeadRest, TypeHeadRestKind, TypeKind, UnaliasedType, UserDefinedType, Variable,
+        Variables,
     },
     sub_task::SubTask,
     unify::unify_types,
@@ -74,6 +75,11 @@ pub struct ResolveFunctionBody<'env> {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
     resolved_struct_body: Suspend<'env, &'env StructBody<'env>>,
+
+    #[derivative(Hash = "ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    evaluated_comptime: Suspend<'env, &'env Evaluated>,
 }
 
 impl<'env> ResolveFunctionBody<'env> {
@@ -94,6 +100,7 @@ impl<'env> ResolveFunctionBody<'env> {
             variables: None,
             resolved_namespace: None,
             resolved_struct_body: None,
+            evaluated_comptime: None,
         }
     }
 }
@@ -214,6 +221,9 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     | EndInstrKind::Branch(..)
                     | EndInstrKind::NewScope(..)
                     | EndInstrKind::Unreachable => (),
+                    EndInstrKind::ExitInterpreter(_) => {
+                        todo!("resolve EndInstrKind::ExitInterpreter")
+                    }
                 }
 
                 rev_post_order.next_in_builder(cfg, post_order);
@@ -1128,11 +1138,15 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                 InstrKind::Is(instr_ref, _) => todo!("is"),
                 InstrKind::LabelLiteral(_) => todo!("label literal"),
                 InstrKind::Comptime(expr) => {
-                    // Use EvaluateComptime to evaluate
+                    let Some(evaluated) = executor.demand(self.evaluated_comptime) else {
+                        return suspend!(
+                            self.evaluated_comptime,
+                            executor.request(EvaluateComptime::new(self.view, expr)),
+                            ctx
+                        );
+                    };
 
-                    let request = executor.request(EvaluateComptime::new(self.view, expr));
-
-                    todo!("resolve comptime evaluation {:?}", request)
+                    todo!("comptime result is {:?}", evaluated)
                 }
             }
 
@@ -1140,6 +1154,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
             self.resolved_type = None;
             self.resolved_namespace = None;
             self.resolved_struct_body = None;
+            self.evaluated_comptime = None;
 
             rev_post_order.next_in_builder(cfg, post_order);
         }

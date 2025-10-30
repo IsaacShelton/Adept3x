@@ -6,6 +6,7 @@ use crate::{
 use build_ast::{Input, Parser};
 use build_token::Lexer;
 use derivative::Derivative;
+use derive_more::IsVariant;
 use diagnostics::ErrorDiagnostic;
 use infinite_iterator::InfiniteIteratorPeeker;
 use primitives::CIntegerAssumptions;
@@ -22,7 +23,7 @@ pub struct ProcessFile<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    require_metadata: bool,
+    require_file_header: RequireFileHeader,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -45,17 +46,23 @@ pub struct ProcessFile<'env> {
     all_items_resolved: Suspend<'env, ()>,
 }
 
+#[derive(Clone, Debug, IsVariant)]
+pub enum RequireFileHeader {
+    Require,
+    Ignore,
+}
+
 impl<'env> ProcessFile<'env> {
     pub fn new(
         compiler: &'env Compiler<'env>,
         canonical_filename: &'env Path,
-        require_metadata: bool,
+        require_file_header: RequireFileHeader,
         view: &'env ModuleView<'env>,
         source: Option<Source>,
     ) -> Self {
         Self {
             compiler,
-            require_metadata,
+            require_file_header,
             read_file: ReadFile::new(canonical_filename),
             view,
             source,
@@ -92,7 +99,7 @@ impl<'env> Executable<'env> for ProcessFile<'env> {
         );
         let file_header = parser.parse_file_header()?;
 
-        if file_header.is_none() && self.require_metadata {
+        if file_header.is_none() && self.require_file_header.is_require() {
             return Err(ErrorDiagnostic::new(
                 "Expected metadata at top of file, for example: { adept: \"3.0\" }",
                 parser.input.here(),

@@ -1,5 +1,6 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, ProcessFile, canonicalize_or_error,
+    Continuation, Executable, ExecutionCtx, Executor, ProcessFile, RequireFileHeader,
+    canonicalize_or_error,
     module_graph::{ModuleBreakOffMode, ModuleView, Upserted},
     repr::{DeclHead, ValueLikeRef},
 };
@@ -101,7 +102,7 @@ impl<'env> Executable<'env> for ProcessPragma<'env> {
                 .request(ProcessFile::new(
                     self.view.compiler(),
                     new_filename,
-                    false,
+                    RequireFileHeader::Ignore,
                     ctx.alloc(created),
                     Some(self.pragma.expr.source),
                 ))

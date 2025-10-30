@@ -7,7 +7,7 @@ mod pragma;
 mod structure;
 mod when;
 
-pub use file::ProcessFile;
+pub use file::{ProcessFile, RequireFileHeader};
 pub use function::ProcessFunction;
 pub use linkset::ProcessLinkset;
 pub use namespace::ProcessNamespace;

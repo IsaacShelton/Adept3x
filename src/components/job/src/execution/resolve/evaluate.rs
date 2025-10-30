@@ -1,5 +1,6 @@
 use crate::{
-    CfgBuilder, Continuation, Executable, ExecutionCtx, Executor, IsValue, flatten_expr,
+    CfgBuilder, Continuation, EndInstrKind, Executable, ExecutionCtx, Executor, IsValue,
+    flatten_expr,
     module_graph::ModuleView,
     repr::{Evaluated, TypeDisplayerDisambiguation},
 };
@@ -40,9 +41,14 @@ impl<'env> Executable<'env> for ResolveEvaluation<'env> {
             IsValue::RequireValue,
         );
 
+        comptime_builder.try_push_end(
+            EndInstrKind::ExitInterpreter(cfg_value).at(self.expr.source),
+            &mut comptime_cursor,
+        );
+
         dbg!(self.expr);
-        eprintln!(
-            "{}",
+        todo!(
+            "we need to evaluate {}",
             comptime_builder.display(&self.view, &TypeDisplayerDisambiguation::empty())
         );
 
@@ -73,6 +79,6 @@ impl<'env> Executable<'env> for ResolveEvaluation<'env> {
         // 10) Translate the constant value into a literal value
         // and/or static data that can be used as a literal.
 
-        Ok(ctx.alloc(Evaluated::Bool(true)))
+        Ok(ctx.alloc(Evaluated::new_boolean(true)))
     }
 }

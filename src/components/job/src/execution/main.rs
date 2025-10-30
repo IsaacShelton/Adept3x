@@ -1,6 +1,6 @@
 use super::Executable;
 use crate::{
-    BuiltinTypes, Continuation, ExecutionCtx, Executor, ProcessFile, Suspend,
+    BuiltinTypes, Continuation, ExecutionCtx, Executor, ProcessFile, RequireFileHeader, Suspend,
     build_llvm_ir::llvm_backend,
     canonicalize_or_error,
     module_graph::{ModuleGraphRef, ModuleGraphWeb},
@@ -114,7 +114,7 @@ impl<'env> Executable<'env> for Main<'env> {
                 executor.spawn(ProcessFile::new(
                     compiler,
                     single_file.into(),
-                    true,
+                    RequireFileHeader::Require,
                     ctx.alloc(runtime),
                     None
                 )),

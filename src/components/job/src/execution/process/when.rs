@@ -1,10 +1,11 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, ProcessNamespaceItems, Suspend,
-    execution::resolve::EvaluateComptime, module_graph::ModuleView, repr::Compiler,
+    execution::resolve::EvaluateComptime, module_graph::ModuleView, repr::Evaluated,
 };
 use ast::When;
 use by_address::ByAddress;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -24,7 +25,7 @@ pub struct ProcessWhen<'env> {
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    condition: Suspend<'env, bool>,
+    condition: Suspend<'env, &'env Evaluated>,
 }
 
 impl<'env> ProcessWhen<'env> {
@@ -54,6 +55,16 @@ impl<'env> Executable<'env> for ProcessWhen<'env> {
         // Was waiting on evaluation
         if let Some(yes) = executor.demand(self.condition) {
             self.condition = None;
+
+            let Some(yes) = yes.as_bool() else {
+                let (condition, _) = &self.when.conditions[*next_condition_index];
+                return Err(ErrorDiagnostic::new(
+                    "Expected value of type `bool` for condition of 'when'",
+                    condition.source,
+                )
+                .into());
+            };
+
             if yes {
                 let then = self
                     .when
@@ -67,9 +78,10 @@ impl<'env> Executable<'env> for ProcessWhen<'env> {
                     executor.spawn_raw(ProcessNamespaceItems::new(self.view, then)),
                 ));
                 return Err(Continuation::Suspend(self.into()));
-            } else {
-                *next_condition_index += 1;
             }
+
+            // This is not the branch to take, try the next one
+            *next_condition_index += 1;
         }
 
         // Suspend on next condition if there is one

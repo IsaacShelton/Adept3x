@@ -14,10 +14,13 @@ pub enum Syscall {
     Bake,
 }
 
+#[derive(Debug)]
 pub enum ConstantValue {
-    Integer(u64),
+    SmallData(u64),
 }
 
+#[derive(Debug)]
 pub enum ConstantValueSchema {
+    Boolean,
     Integer(IntegerSign),
 }
