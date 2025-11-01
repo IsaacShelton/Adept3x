@@ -123,7 +123,7 @@ impl<'env> CfgBuilder<'env> {
                 *unary_cast = cast;
                 *ty = Some(to_ty);
             }
-            _ => panic!("cannot set_jump_pre_conform for non-jump"),
+            _ => panic!("expected to resolve Jump instruction"),
         }
     }
 
@@ -140,7 +140,7 @@ impl<'env> CfgBuilder<'env> {
                 *unary_cast = cast;
                 *ty = Some(to_ty);
             }
-            _ => panic!("cannot set_jump_pre_conform for non-jump"),
+            _ => panic!("expected to resolve ExitInterpreter instruction"),
         }
     }
 
