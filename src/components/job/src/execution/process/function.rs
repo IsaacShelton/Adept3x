@@ -131,7 +131,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
             );
         };
 
-        let Some(_lowered_body) = self.lowering_body else {
+        let Some(_lowered_body) = executor.demand(self.lowering_body) else {
             return suspend!(
                 self.lowering_body,
                 executor.request(LowerFunctionBody::new(

@@ -186,6 +186,16 @@ fn flatten_stmt<'env>(
                 cursor,
             )
             .into(),
+        ast::StmtKind::ExitInterpreter(expr) => {
+            let value = flatten_expr(ctx, builder, cursor, expr, IsValue::RequireValue);
+
+            builder
+                .try_push_end(
+                    EndInstrKind::ExitInterpreter(value, None, None).at(stmt.source),
+                    cursor,
+                )
+                .into()
+        }
     }
 }
 

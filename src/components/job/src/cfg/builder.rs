@@ -127,6 +127,23 @@ impl<'env> CfgBuilder<'env> {
         }
     }
 
+    pub fn set_exit_interpreter_cast(
+        &mut self,
+        instr_ref: InstrRef,
+        to_ty: UnaliasedType<'env>,
+        cast: Option<UnaryCast<'env>>,
+    ) {
+        let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
+
+        match &mut bb.end.as_mut().unwrap().kind {
+            EndInstrKind::ExitInterpreter(_, ty, unary_cast) => {
+                *unary_cast = cast;
+                *ty = Some(to_ty);
+            }
+            _ => panic!("cannot set_jump_pre_conform for non-jump"),
+        }
+    }
+
     pub fn set_typed(&mut self, instr_ref: InstrRef, typed: UnaliasedType<'env>) {
         let bb = &mut self.basicblocks[unsafe { Idx::from_raw(instr_ref.basicblock) }];
         assert!((instr_ref.instr_or_end as usize) < bb.instrs.len());

@@ -11,6 +11,8 @@ pub enum StmtKind {
     Label(String),
     // NOTE: This should eventually be an Expr to support computed gotos
     Goto(String),
+    // NOTE: This should eventually be a 'env reference
+    ExitInterpreter(Box<Expr>),
 }
 
 impl StmtKind {

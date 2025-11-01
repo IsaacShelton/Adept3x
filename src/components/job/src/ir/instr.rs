@@ -47,6 +47,7 @@ pub enum Instr<'env> {
     ConditionalBreak(Value<'env>, ConditionalBreak),
     Phi(Phi<'env>),
     InterpreterSyscall(interpreter_api::Syscall, &'env [Value<'env>]),
+    ExitInterpreter(Value<'env>),
 }
 
 #[derive(Clone, Debug)]

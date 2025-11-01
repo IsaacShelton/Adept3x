@@ -48,7 +48,7 @@ impl<'env> Display for EndInstrKind<'env> {
             }
             EndInstrKind::NewScope(a, b) => writeln!(f, "new_scope {} {}", a, b),
             EndInstrKind::Unreachable => writeln!(f, "unreachable"),
-            EndInstrKind::ExitInterpreter(value) => {
+            EndInstrKind::ExitInterpreter(value, _, _) => {
                 writeln!(f, "exit_interpreter {}", value)
             }
         }
@@ -88,7 +88,11 @@ pub enum EndInstrKind<'env> {
     Branch(CfgValue, BasicBlockId, BasicBlockId, Option<BreakContinue>),
     NewScope(BasicBlockId, BasicBlockId),
     Unreachable,
-    ExitInterpreter(CfgValue),
+    ExitInterpreter(
+        CfgValue,
+        Option<UnaliasedType<'env>>,
+        Option<UnaryCast<'env>>,
+    ),
 }
 
 impl<'env> EndInstrKind<'env> {

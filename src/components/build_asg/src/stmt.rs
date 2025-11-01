@@ -211,5 +211,8 @@ pub fn resolve_stmt(
         }
         ast::StmtKind::Label(_) => unimplemented!("Label for old resolution system"),
         ast::StmtKind::Goto(_) => unimplemented!("Goto for old resolution system"),
+        ast::StmtKind::ExitInterpreter(_) => {
+            unimplemented!("ExitInterpreter for old resolution system")
+        }
     }
 }

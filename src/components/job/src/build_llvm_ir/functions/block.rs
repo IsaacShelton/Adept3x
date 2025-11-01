@@ -647,6 +647,12 @@ pub unsafe fn create_function_block<'env>(
                     }
                 })
             }
+            Instr::ExitInterpreter(_) => {
+                return Err(ErrorDiagnostic::ice(
+                    "Cannot emit LLVM IR for ExitInterpreter instruction",
+                    None,
+                ));
+            }
         };
 
         value_catalog.push(ir_basicblock_id, result);

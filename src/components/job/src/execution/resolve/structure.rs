@@ -2,7 +2,7 @@ use crate::{
     Continuation, Executable, ExecutionCtx, Executor, Suspend,
     execution::resolve::ResolveType,
     module_graph::ModuleView,
-    repr::{Compiler, Field, StructBody, UnaliasedType},
+    repr::{Field, StructBody, UnaliasedType},
 };
 use by_address::ByAddress;
 use derivative::Derivative;

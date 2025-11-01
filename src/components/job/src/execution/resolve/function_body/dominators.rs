@@ -135,7 +135,7 @@ fn depth_first_search(cfg: &CfgBuilder) -> (Vec<BasicBlockId>, PostOrderIndexMap
                 enqueue(in_scope) || enqueue(close_scope)
             }
             EndInstrKind::Unreachable => false,
-            EndInstrKind::ExitInterpreter(_) => false,
+            EndInstrKind::ExitInterpreter(..) => false,
         };
 
         if !pending {

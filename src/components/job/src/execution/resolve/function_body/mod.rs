@@ -26,7 +26,7 @@ use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
 use itertools::Itertools;
-use primitives::{CInteger, CIntegerAssumptions};
+use primitives::{CInteger, CIntegerAssumptions, IntegerBits, IntegerSign};
 use std::collections::HashSet;
 
 #[derive(Clone, Derivative)]
@@ -221,8 +221,30 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     | EndInstrKind::Branch(..)
                     | EndInstrKind::NewScope(..)
                     | EndInstrKind::Unreachable => (),
-                    EndInstrKind::ExitInterpreter(_) => {
-                        todo!("resolve EndInstrKind::ExitInterpreter")
+                    EndInstrKind::ExitInterpreter(value, _, _) => {
+                        let got_type = cfg.get_typed(*value, builtin_types);
+
+                        let defaulted = conform_to_default(
+                            ctx,
+                            got_type,
+                            CIntegerAssumptions::default(),
+                            builtin_types,
+                            self.view.target(),
+                        )?;
+
+                        if let TypeKind::BitInteger(IntegerBits::Bits32, IntegerSign::Signed) =
+                            defaulted.ty.0.kind
+                        {
+                            // (continue onwards)
+                        } else {
+                            return Err(ErrorDiagnostic::new(
+                                "Only i32 can be returned from compile time evaluation for now",
+                                instr.source,
+                            )
+                            .into());
+                        }
+
+                        cfg.set_exit_interpreter_cast(instr_ref, defaulted.ty, defaulted.cast);
                     }
                 }
 
@@ -312,9 +334,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         let dom = &cfg.get_unsafe(dom_ref);
 
                         // Loop through the instructions in reverse order to find declaration
-                        for (instr_index, instr) in
-                            dom.instrs.iter().take(num_take).enumerate().rev()
-                        {
+                        for instr in dom.instrs.iter().take(num_take).rev() {
                             if let Some(found) = match &instr.kind {
                                 InstrKind::Parameter(name, _, _, variable_ref)
                                 | InstrKind::Declare(name, _, _, _, variable_ref)

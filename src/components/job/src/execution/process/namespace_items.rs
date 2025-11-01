@@ -3,7 +3,6 @@ use crate::{
     ProcessStructure,
     execution::process::{ProcessFunction, ProcessNamespace, ProcessWhen},
     module_graph::ModuleView,
-    repr::Compiler,
 };
 use ast::NamespaceItems;
 use by_address::ByAddress;

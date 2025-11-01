@@ -760,8 +760,35 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     ir::Literal::Void.into()
                 }
                 EndInstrKind::Unreachable => todo!("LowerFunctionBody lower unreachable"),
-                EndInstrKind::ExitInterpreter(_) => {
-                    todo!("LowerFunctionBody lower ExitInterpreter")
+                EndInstrKind::ExitInterpreter(cfg_value, resolved_type, unary_cast) => {
+                    let resolved_type = resolved_type.expect("resolved type for exit interpreter");
+
+                    let Some(lowered_type) = executor.demand(self.lowered_type) else {
+                        return suspend!(
+                            self.lowered_type,
+                            executor.request(LowerType::new(self.view, resolved_type.0)),
+                            ctx
+                        );
+                    };
+
+                    let value = execute_sub_task!(
+                        self,
+                        self.perform_unary_cast.get_or_insert_with(|| {
+                            PerformUnaryCast::new(
+                                self.view,
+                                builder.get_output(*cfg_value),
+                                lowered_type,
+                                unary_cast.as_ref(),
+                                end_instr.source,
+                            )
+                        }),
+                        executor,
+                        ctx,
+                        builder
+                    );
+
+                    builder.push(ir::Instr::ExitInterpreter(value));
+                    ir::Literal::Void.into()
                 }
             };
 
