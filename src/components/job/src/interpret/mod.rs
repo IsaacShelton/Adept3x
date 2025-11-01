@@ -135,7 +135,6 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                 ir::Instr::Alloca(ty) => {
                     ValueKind::Literal(self.memory.alloc_stack(self.size_of(&ty))?).untainted()
                 }
-
                 ir::Instr::Store(store) => {
                     let new_value = self.eval(&registers, &store.new_value);
                     let dest = self.eval(&registers, &store.destination).as_u64().unwrap();
@@ -196,6 +195,14 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     operands,
                     BinOp::FloatOrInteger(BinOpFloatOrInteger::Multiply, _),
                 ) => self.mul(operands, &registers),
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::FloatOrInteger(BinOpFloatOrInteger::Equals, _),
+                ) => self.eq(operands, &registers),
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::FloatOrInteger(BinOpFloatOrInteger::NotEquals, _),
+                ) => self.neq(operands, &registers),
                 ir::Instr::BinOp(operands, _) => {
                     todo!("Interpreter / ir::Instruction::BinOp")
                 }
@@ -203,8 +210,6 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                 ir::Instr::Checked(_, _) => todo!(),
                 ir::Instr::Divide(ops, _f_or_sign) => self.div(ops, &registers)?,
                 ir::Instr::Modulus(ops, _f_or_sign) => self.rem(ops, &registers)?,
-                ir::Instr::Equals(ops, _f_or_i) => self.eq(ops, &registers),
-                ir::Instr::NotEquals(ops, _f_or_i) => self.neq(ops, &registers),
                 ir::Instr::LessThan(ops, _f_or_i) => self.lt(ops, &registers),
                 ir::Instr::LessThanEq(ops, _f_or_i) => self.lte(ops, &registers),
                 ir::Instr::GreaterThan(ops, _f_or_i) => self.gt(ops, &registers),

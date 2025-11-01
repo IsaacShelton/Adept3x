@@ -121,8 +121,15 @@ pub fn unify_types_find_solution<'env>(
         ));
     }
 
-    // If all the values are integer literals, the unifying type is either
-    // the preferred type or the default integer type
+    // If all the values are booleans and boolean literals, the unifying type is boolean
+    if incoming
+        .clone()
+        .all(|ty| ty.0.kind.is_boolean() || ty.0.kind.is_boolean_literal())
+    {
+        return Ok(Some(builtin_types.bool()));
+    }
+
+    // If all the values are integer literals, the unifying type is the integer range
     if incoming
         .clone()
         .all(|ty| ty.0.kind.is_integer_literal() || ty.0.kind.is_integer_literal_in_range())

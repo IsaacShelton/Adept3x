@@ -29,7 +29,7 @@ use interpreter_api::ConstantValueSchema;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_traits::FromPrimitive;
-use primitives::{CInteger, CIntegerAssumptions, IntegerBits, IntegerSign};
+use primitives::{CInteger, CIntegerAssumptions, IntegerBits, IntegerSign, NumericMode};
 use std::collections::HashSet;
 
 #[derive(Clone, Derivative)]
@@ -593,7 +593,25 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         _ => (),
                     };
 
-                    let Some(numeric_mode) = unified.unified.0.numeric_mode() else {
+                    // NOTE: For comparing literal values such as bool literals, int literals,
+                    // float literals, etc. We will need to enhance this to take non-concrete
+                    // types into account.
+                    let Some(numeric_mode) = unified.unified.0.numeric_mode().or_else(|| {
+                        if unified.unified.0.kind.is_boolean() {
+                            match op {
+                                ast::BasicBinaryOperator::Equals
+                                | ast::BasicBinaryOperator::NotEquals
+                                | ast::BasicBinaryOperator::BitwiseAnd
+                                | ast::BasicBinaryOperator::BitwiseOr
+                                | ast::BasicBinaryOperator::BitwiseXor => {
+                                    Some(NumericMode::Integer(IntegerSign::Unsigned))
+                                }
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        }
+                    }) else {
                         return Err(cannot("unsupported"));
                     };
 

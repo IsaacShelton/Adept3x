@@ -8,7 +8,6 @@ pub enum InterpreterError {
     SegfaultRead,
     DivideByZero,
     RemainderByZero,
-    PolymorphicEntryPoint,
     CannotCallForeignFunction(String),
 }
 
@@ -31,7 +30,6 @@ impl Display for InterpreterError {
             }
             InterpreterError::DivideByZero => write!(f, "Divide by Zero"),
             InterpreterError::RemainderByZero => write!(f, "Remainder by Zero"),
-            InterpreterError::PolymorphicEntryPoint => write!(f, "Entry point is polymorphic"),
             InterpreterError::CannotCallForeignFunction(name) => {
                 write!(f, "Cannot call foreign function '{}' at compile-time", name)
             }
