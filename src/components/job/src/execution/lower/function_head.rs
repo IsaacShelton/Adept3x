@@ -1,9 +1,6 @@
 use crate::{
-    Continuation, Executable, ExecutionCtx, Executor, SuspendMany,
-    execution::lower::LowerType,
-    ir,
-    module_graph::ModuleView,
-    repr::{Compiler, FuncHead},
+    Continuation, Executable, ExecutionCtx, Executor, SuspendMany, execution::lower::LowerType, ir,
+    module_graph::ModuleView, repr::FuncHead,
 };
 use by_address::ByAddress;
 use derivative::Derivative;

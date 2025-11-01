@@ -6,8 +6,8 @@ use ast::{
 use attributes::{Exposure, Privacy, SymbolOwnership, Tag};
 use indexmap::IndexMap;
 use interpret::{
-    Interpreter, InterpreterError,
-    syscall_handler::{BuildSystemSyscallHandler, ProjectKind},
+    OldInterpreter, OldInterpreterError,
+    syscall_handler::{OldBuildSystemSyscallHandler, ProjectKind},
 };
 use interpreter_api::Syscall;
 use primitives::CIntegerAssumptions;
@@ -353,16 +353,16 @@ pub fn setup_build_system_interpreter_symbols(file: &mut RawAstFile, is_pragma: 
     }
 }
 
-pub fn run_build_system_interpreter<'a>(
+pub fn run_old_build_system_interpreter<'a>(
     ir_module: &'a ir::Module,
-) -> Result<Interpreter<'a, BuildSystemSyscallHandler>, InterpreterError> {
+) -> Result<OldInterpreter<'a, OldBuildSystemSyscallHandler>, OldInterpreterError> {
     let interpreter_entry_point = ir_module
         .interpreter_entry_point
-        .ok_or_else(|| InterpreterError::PolymorphicEntryPoint)?;
+        .ok_or_else(|| OldInterpreterError::PolymorphicEntryPoint)?;
 
     let max_steps = Some(1_000_000);
-    let handler = BuildSystemSyscallHandler::default();
-    let mut interpreter = Interpreter::new(handler, ir_module, max_steps);
+    let handler = OldBuildSystemSyscallHandler::default();
+    let mut interpreter = OldInterpreter::new(handler, ir_module, max_steps);
 
     let result = interpreter.run(interpreter_entry_point)?;
 

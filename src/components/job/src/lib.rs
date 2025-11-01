@@ -86,6 +86,7 @@ mod continuation;
 mod execution;
 mod execution_ctx;
 mod executor;
+mod interpret;
 mod io;
 mod ir;
 mod main_executor;

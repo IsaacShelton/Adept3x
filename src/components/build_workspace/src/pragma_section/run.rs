@@ -1,6 +1,6 @@
 use super::PragmaSection;
 use crate::interpreter_env::{
-    run_build_system_interpreter, setup_build_system_interpreter_symbols,
+    run_old_build_system_interpreter, setup_build_system_interpreter_symbols,
 };
 use ast_workspace::AstWorkspace;
 use ast_workspace_settings::Settings;
@@ -59,7 +59,7 @@ impl PragmaSection {
         let asg = resolve(&workspace, &compiler.options).map_err(into_show)?;
         let ir_module = lower(&compiler.options, &asg).map_err(into_show)?;
 
-        let mut user_settings = run_build_system_interpreter(&ir_module)
+        let mut user_settings = run_old_build_system_interpreter(&ir_module)
             .map_err(|interpretter_error| {
                 into_show(
                     ParseErrorKind::Other {

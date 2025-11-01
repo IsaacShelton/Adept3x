@@ -1,9 +1,10 @@
 use interpreter_api::{ConstantValue, ConstantValueSchema};
+use primitives::IntegerSign;
 
 #[derive(Debug)]
 pub struct Evaluated {
-    schema: ConstantValueSchema,
-    value: ConstantValue,
+    pub schema: ConstantValueSchema,
+    pub value: ConstantValue,
 }
 
 impl Evaluated {
@@ -11,6 +12,13 @@ impl Evaluated {
         Self {
             schema: ConstantValueSchema::Boolean,
             value: ConstantValue::SmallData(whether as u64),
+        }
+    }
+
+    pub fn new_unsigned(value: u64) -> Self {
+        Self {
+            schema: ConstantValueSchema::Integer(IntegerSign::Unsigned),
+            value: ConstantValue::SmallData(value),
         }
     }
 

@@ -1,33 +1,40 @@
 use super::Memory;
 use crate::{
-    error::OldInterpreterError,
-    value::{Tainted, Value, ValueKind},
+    interpret::{
+        InterpreterError, Value,
+        value::{Tainted, ValueKind},
+    },
+    ir,
 };
 use ir::Literal;
+use primitives::{FloatSize, IntegerBits, IntegerSign};
 
 impl Memory {
-    pub fn read<'a>(
+    pub fn read<'env>(
         &mut self,
         from: u64,
         ir_type: &ir::Type,
-    ) -> Result<Value<'a>, OldInterpreterError> {
+    ) -> Result<Value<'env>, InterpreterError> {
         if self.is_reserved_address(from) {
-            return Err(OldInterpreterError::SegfaultRead);
+            return Err(InterpreterError::SegfaultRead);
         }
+
+        use IntegerBits::*;
+        use IntegerSign::*;
 
         Ok(match ir_type {
             ir::Type::Ptr(_) => self.read_u64(from),
             ir::Type::Bool => self.read_u1(from),
-            ir::Type::S8 => self.read_s8(from),
-            ir::Type::S16 => self.read_s16(from),
-            ir::Type::S32 => self.read_s32(from),
-            ir::Type::S64 => self.read_s64(from),
-            ir::Type::U8 => self.read_u8(from),
-            ir::Type::U16 => self.read_u16(from),
-            ir::Type::U32 => self.read_u32(from),
-            ir::Type::U64 => self.read_u64(from),
-            ir::Type::F32 => self.read_f32(from),
-            ir::Type::F64 => self.read_f64(from),
+            ir::Type::I(Bits8, Signed) => self.read_s8(from),
+            ir::Type::I(Bits16, Signed) => self.read_s16(from),
+            ir::Type::I(Bits32, Signed) => self.read_s32(from),
+            ir::Type::I(Bits64, Signed) => self.read_s64(from),
+            ir::Type::I(Bits8, Unsigned) => self.read_u8(from),
+            ir::Type::I(Bits16, Unsigned) => self.read_u16(from),
+            ir::Type::I(Bits32, Unsigned) => self.read_u32(from),
+            ir::Type::I(Bits64, Unsigned) => self.read_u64(from),
+            ir::Type::F(FloatSize::Bits32) => self.read_f32(from),
+            ir::Type::F(FloatSize::Bits64) => self.read_f64(from),
             ir::Type::Void => Value::new_untainted(ValueKind::Literal(Literal::Void)),
             ir::Type::Union(_) => todo!("interpreter read union"),
             ir::Type::Struct(_) => todo!("interpreter read structure"),

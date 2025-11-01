@@ -1,19 +1,19 @@
 use super::{
-    super::{error::OldInterpreterError, size_of::size_of, value::Value},
-    Memory,
+    super::{error::InterpreterError, size_of::size_of, value::Value},
+    Memory, ir,
 };
-use crate::value::{StructLiteral, Tainted, ValueKind};
+use crate::interpret::value::{StructLiteral, Tainted, ValueKind};
 
 // TODO: Clean up and reduce redundancy
 impl Memory {
-    pub fn write(
+    pub fn write<'env>(
         &mut self,
         destination: u64,
-        value: Value<'_>,
-        ir_module: &ir::Module,
-    ) -> Result<(), OldInterpreterError> {
+        value: Value<'env>,
+        ir_module: &'env ir::Ir<'env>,
+    ) -> Result<(), InterpreterError> {
         if self.is_reserved_address(destination) {
-            return Err(OldInterpreterError::SegfaultWrite);
+            return Err(InterpreterError::SegfaultWrite);
         }
 
         match value.kind {
@@ -27,12 +27,12 @@ impl Memory {
         }
     }
 
-    fn write_struct_literal(
+    fn write_struct_literal<'env>(
         &mut self,
         destination: u64,
-        literal: StructLiteral,
-        ir_module: &ir::Module,
-    ) -> Result<(), OldInterpreterError> {
+        literal: StructLiteral<'env>,
+        ir_module: &'env ir::Ir<'env>,
+    ) -> Result<(), InterpreterError> {
         let mut offset = destination;
 
         for (field, value) in literal.fields.iter().zip(literal.values.iter()) {
@@ -44,13 +44,13 @@ impl Memory {
         Ok(())
     }
 
-    fn write_literal(
+    fn write_literal<'env>(
         &mut self,
         destination: u64,
-        literal: ir::Literal,
+        literal: ir::Literal<'env>,
         tainted: Option<Tainted>,
-        ir_module: &ir::Module,
-    ) -> Result<(), OldInterpreterError> {
+        ir_module: &'env ir::Ir<'env>,
+    ) -> Result<(), InterpreterError> {
         match literal {
             ir::Literal::Void => (),
             ir::Literal::Boolean(x) => self.write_bytes(destination, &[x.into()], tainted),
@@ -66,7 +66,7 @@ impl Memory {
             ir::Literal::Float64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
             ir::Literal::NullTerminatedString(value) => {
                 // TODO: Cache the allocation
-                let string_bytes = value.as_bytes_with_nul();
+                let string_bytes = value.to_bytes_with_nul();
                 let alloced = self.alloc_permanent_raw(string_bytes.len().try_into().unwrap());
                 self.write_bytes(alloced, string_bytes, tainted);
                 self.write_bytes(destination, &alloced.to_le_bytes(), tainted);

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
-pub enum OldInterpreterError {
+pub enum InterpreterError {
     TimedOut,
     StackOverflow,
     SegfaultWrite,
@@ -12,27 +12,27 @@ pub enum OldInterpreterError {
     CannotCallForeignFunction(String),
 }
 
-impl Display for OldInterpreterError {
+impl Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OldInterpreterError::TimedOut => write!(f, "Exceeded max computation time"),
-            OldInterpreterError::StackOverflow => write!(f, "Stack overflow"),
-            OldInterpreterError::SegfaultWrite => {
+            InterpreterError::TimedOut => write!(f, "Exceeded max computation time"),
+            InterpreterError::StackOverflow => write!(f, "Stack overflow"),
+            InterpreterError::SegfaultWrite => {
                 write!(
                     f,
                     "Write segfault - tried to write to null or reserved address"
                 )
             }
-            OldInterpreterError::SegfaultRead => {
+            InterpreterError::SegfaultRead => {
                 write!(
                     f,
                     "Read segfault - tried to read from null or reserved address"
                 )
             }
-            OldInterpreterError::DivideByZero => write!(f, "Divide by Zero"),
-            OldInterpreterError::RemainderByZero => write!(f, "Remainder by Zero"),
-            OldInterpreterError::PolymorphicEntryPoint => write!(f, "Entry point is polymorphic"),
-            OldInterpreterError::CannotCallForeignFunction(name) => {
+            InterpreterError::DivideByZero => write!(f, "Divide by Zero"),
+            InterpreterError::RemainderByZero => write!(f, "Remainder by Zero"),
+            InterpreterError::PolymorphicEntryPoint => write!(f, "Entry point is polymorphic"),
+            InterpreterError::CannotCallForeignFunction(name) => {
                 write!(f, "Cannot call foreign function '{}' at compile-time", name)
             }
         }

@@ -10,25 +10,32 @@ mod value;
 use self::{
     ip::InstructionPointer, memory::Memory, size_of::size_of, syscall_handler::SyscallHandler,
 };
-use crate::{registers::Registers, value::StructLiteral};
+use crate::{
+    interpret::{registers::Registers, value::StructLiteral},
+    ir::{self, BinOp, BinOpFloatOrInteger},
+};
 use ast::SizeOfMode;
-pub use error::OldInterpreterError;
-use ir;
+pub use error::InterpreterError;
 use std::collections::HashMap;
 pub use value::Value;
 use value::{Tainted, ValueKind};
 
 #[derive(Debug)]
-pub struct OldInterpreter<'a, S: SyscallHandler> {
+pub struct Interpreter<'env, S: SyscallHandler> {
     pub syscall_handler: S,
     max_steps_left: Option<u64>,
-    ir_module: &'a ir::Module,
+    ir_module: &'env ir::Ir<'env>,
     memory: Memory,
-    global_addresses: HashMap<ir::GlobalRef, ir::Literal>,
+    global_addresses: HashMap<ir::GlobalRef<'env>, ir::Literal<'env>>,
+    exit_value: Option<u64>,
 }
 
-impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
-    pub fn new(syscall_handler: S, ir_module: &'a ir::Module, max_steps_left: Option<u64>) -> Self {
+impl<'env, S: SyscallHandler> Interpreter<'env, S> {
+    pub fn new(
+        syscall_handler: S,
+        ir_module: &'env ir::Ir<'env>,
+        max_steps_left: Option<u64>,
+    ) -> Self {
         let mut memory = Memory::new();
 
         let mut global_addresses = HashMap::new();
@@ -43,13 +50,14 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
             memory,
             global_addresses,
             syscall_handler,
+            exit_value: None,
         }
     }
 
     pub fn run(
         &mut self,
-        interpreter_entry_point: ir::FuncRef,
-    ) -> Result<Value<'a>, OldInterpreterError> {
+        interpreter_entry_point: ir::FuncRef<'env>,
+    ) -> Result<Value<'env>, InterpreterError> {
         // The entry point for the interpreter always takes zero arguments
         // and can return anything. It is up to the producer of the ir::Module
         // to create an interpreter entry point that calls the actual function(s)
@@ -57,16 +65,20 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
         self.call(interpreter_entry_point, vec![])
     }
 
-    pub fn call(
+    pub fn exit_value(&self) -> Option<u64> {
+        self.exit_value
+    }
+
+    pub fn call<'a>(
         &mut self,
-        func_ref: ir::FuncRef,
-        args: Vec<Value<'a>>,
-    ) -> Result<Value<'a>, OldInterpreterError> {
+        func_ref: ir::FuncRef<'env>,
+        args: Vec<Value<'env>>,
+    ) -> Result<Value<'env>, InterpreterError> {
         let function = &self.ir_module.funcs[func_ref];
 
         if function.ownership.is_reference() {
-            return Err(OldInterpreterError::CannotCallForeignFunction(
-                function.mangled_name.clone(),
+            return Err(InterpreterError::CannotCallForeignFunction(
+                function.mangled_name.to_string(),
             ));
         }
 
@@ -79,28 +91,37 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
 
         assert_eq!(function.params.len(), args.len());
 
-        let mut registers = Registers::<'a>::new(&function.basicblocks);
-        let mut ip = InstructionPointer::default();
+        let mut registers = Registers::<'env>::new(
+            &function
+                .basicblocks
+                .get()
+                .expect("callee to have body resolved")[..],
+        );
 
+        let mut ip = InstructionPointer::default();
         let fp = self.memory.stack_save();
         let mut came_from_block = 0;
 
         let return_value = loop {
             if let Some(max_steps) = &mut self.max_steps_left {
                 if *max_steps == 0 {
-                    return Err(OldInterpreterError::TimedOut);
+                    return Err(InterpreterError::TimedOut);
                 }
 
                 *max_steps -= 1;
             }
 
-            let instruction =
-                &function.basicblocks.blocks[ip.basicblock_id].instructions[ip.instruction_id];
+            let instruction = &function.basicblocks.get().unwrap()[ip.basicblock_id].instructions
+                [ip.instruction_id];
             let mut new_ip = None;
 
             let result = match instruction {
+                ir::Instr::ExitInterpreter(argument) => {
+                    self.exit_value = self.eval(&registers, argument).as_u64();
+                    break Some(ir::Value::Literal(ir::Literal::Void));
+                }
                 ir::Instr::Return(value) => {
-                    break value;
+                    break *value;
                 }
                 ir::Instr::Call(call) => {
                     let mut arguments = Vec::with_capacity(call.args.len());
@@ -122,9 +143,9 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
                     self.memory.write(dest, new_value, self.ir_module)?;
                     ValueKind::Undefined.untainted()
                 }
-                ir::Instr::Load((value, ty)) => {
-                    let address = self.eval(&registers, &value).as_u64().unwrap();
-                    self.memory.read(address, ty)?
+                ir::Instr::Load { pointer, pointee } => {
+                    let address = self.eval(&registers, &pointer).as_u64().unwrap();
+                    self.memory.read(address, pointee)?
                 }
                 ir::Instr::Malloc(ir_type) => {
                     let bytes = self.size_of(ir_type);
@@ -164,10 +185,22 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
                     ValueKind::Literal(self.global_addresses.get(global_ref).unwrap().clone())
                         .untainted()
                 }
-                ir::Instr::Add(ops, _f_or_i) => self.add(ops, &registers),
+                ir::Instr::BinOp(operands, BinOp::FloatOrInteger(BinOpFloatOrInteger::Add, _)) => {
+                    self.add(operands, &registers)
+                }
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::FloatOrInteger(BinOpFloatOrInteger::Subtract, _),
+                ) => self.sub(operands, &registers),
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::FloatOrInteger(BinOpFloatOrInteger::Multiply, _),
+                ) => self.mul(operands, &registers),
+                ir::Instr::BinOp(operands, _) => {
+                    todo!("Interpreter / ir::Instruction::BinOp")
+                }
+                /*
                 ir::Instr::Checked(_, _) => todo!(),
-                ir::Instr::Subtract(ops, _f_or_i) => self.sub(ops, &registers),
-                ir::Instr::Multiply(ops, _f_or_i) => self.mul(ops, &registers),
                 ir::Instr::Divide(ops, _f_or_sign) => self.div(ops, &registers)?,
                 ir::Instr::Modulus(ops, _f_or_sign) => self.rem(ops, &registers)?,
                 ir::Instr::Equals(ops, _f_or_i) => self.eq(ops, &registers),
@@ -192,12 +225,10 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
                 ir::Instr::LogicalRightShift(_) => {
                     todo!("Interpreter / ir::Instruction::LogicalRightShift")
                 }
+                */
                 ir::Instr::Bitcast(_, _) => todo!("Interpreter / ir::Instruction::BitCast"),
-                ir::Instr::ZeroExtend(_, _) => {
-                    todo!("Interpreter / ir::Instruction::ZeroExtend")
-                }
-                ir::Instr::SignExtend(_, _) => {
-                    todo!("Interpreter / ir::Instruction::SignExtend")
+                ir::Instr::Extend(_, _, _) => {
+                    todo!("Interpreter / ir::Instruction::Extend")
                 }
                 ir::Instr::FloatExtend(_, _) => {
                     todo!("Interpreter / ir::Instruction::FloatExtend")
@@ -241,7 +272,7 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
                 ir::Instr::StructLiteral(ty, values) => {
                     let mut field_values = Vec::with_capacity(values.len());
 
-                    for value in values {
+                    for value in *values {
                         field_values.push(self.eval(&registers, value));
                     }
 
@@ -361,14 +392,14 @@ impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
             .unwrap_or(ValueKind::Literal(ir::Literal::Void).untainted()))
     }
 
-    pub fn eval(&self, registers: &Registers<'a>, value: &ir::Value) -> Value<'a> {
+    pub fn eval(&self, registers: &Registers<'env>, value: &ir::Value<'env>) -> Value<'env> {
         match value {
-            ir::Value::Literal(literal) => ValueKind::Literal(literal.clone()).untainted(),
+            ir::Value::Literal(literal) => ValueKind::Literal(*literal).untainted(),
             ir::Value::Reference(reference) => registers.get(reference).clone(),
         }
     }
 
-    pub fn size_of(&self, ir_type: &ir::Type) -> u64 {
+    pub fn size_of(&self, ir_type: &ir::Type<'env>) -> u64 {
         size_of(ir_type, self.ir_module)
     }
 }

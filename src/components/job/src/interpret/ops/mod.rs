@@ -1,18 +1,17 @@
 use super::{Registers, SyscallHandler};
 use crate::{
-    OldInterpreter,
-    error::OldInterpreterError,
-    value::{Tainted, Value, ValueKind},
+    interpret::{Interpreter, InterpreterError, Value, ValueKind, value::Tainted},
+    ir,
+    ir::BinaryOperands,
 };
-use ir::BinaryOperands;
 
 macro_rules! impl_op_basic {
     ($name:ident, $wrapping_name:ident, $op:tt, $bool_op:tt) => {
-        pub fn $name(
+        pub fn $name<'a>(
             &mut self,
-            operands: &BinaryOperands,
-            registers: &Registers<'a>,
-        ) -> Value<'a> {
+            operands: &'a BinaryOperands<'env>,
+            registers: &'a Registers<'env>,
+        ) -> Value<'env> {
             let (left, right, tainted) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
@@ -51,7 +50,7 @@ macro_rules! impl_op_basic {
                     ir::Literal::Float64(left $op right.clone().unwrap_float_64())
                 }
                 ir::Literal::NullTerminatedString(_) => ir::Literal::Unsigned64(0),
-                ir::Literal::Zeroed(ty) => ir::Literal::Zeroed(ty.clone()),
+                ir::Literal::Zeroed(ty) => ir::Literal::Zeroed(ty),
             };
 
             Value { kind: ValueKind::Literal(literal), tainted }
@@ -61,11 +60,11 @@ macro_rules! impl_op_basic {
 
 macro_rules! impl_op_divmod {
     ($name:ident, $checked_name:ident, $op:tt, $error_name:ident) => {
-        pub fn $name(
+        pub fn $name<'a>(
             &mut self,
-            operands: &BinaryOperands,
-            registers: &Registers<'a>,
-        ) -> Result<Value<'a>, OldInterpreterError> {
+            operands: &'a BinaryOperands<'env>,
+            registers: &'a Registers<'env>,
+        ) -> Result<Value<'env>, InterpreterError> {
             let (left, right, tainted) = self.eval_binary_ops(operands, registers);
 
             let literal = match left {
@@ -74,47 +73,47 @@ macro_rules! impl_op_divmod {
                     if right.clone().unwrap_boolean() {
                         ir::Literal::Boolean(left)
                     } else {
-                        return Err(OldInterpreterError::$error_name);
+                        return Err(InterpreterError::$error_name);
                     }
                 }
                 ir::Literal::Signed8(left) => {
                     ir::Literal::Signed8(
-                        left.$checked_name(right.clone().unwrap_signed_8()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_signed_8()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Signed16(left) => {
                     ir::Literal::Signed16(
-                        left.$checked_name(right.clone().unwrap_signed_16()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_signed_16()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Signed32(left) => {
                     ir::Literal::Signed32(
-                        left.$checked_name(right.clone().unwrap_signed_32()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_signed_32()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Signed64(left) => {
                     ir::Literal::Signed64(
-                        left.$checked_name(right.clone().unwrap_signed_64()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_signed_64()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Unsigned8(left) => {
                     ir::Literal::Unsigned8(
-                        left.$checked_name(right.clone().unwrap_unsigned_8()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_unsigned_8()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Unsigned16(left) => {
                     ir::Literal::Unsigned16(
-                        left.$checked_name(right.clone().unwrap_unsigned_16()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_unsigned_16()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Unsigned32(left) => {
                     ir::Literal::Unsigned32(
-                        left.$checked_name(right.clone().unwrap_unsigned_32()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_unsigned_32()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Unsigned64(left) => {
                     ir::Literal::Unsigned64(
-                        left.$checked_name(right.clone().unwrap_unsigned_64()).ok_or(OldInterpreterError::$error_name)?
+                        left.$checked_name(right.clone().unwrap_unsigned_64()).ok_or(InterpreterError::$error_name)?
                     )
                 }
                 ir::Literal::Float32(left) => {
@@ -124,7 +123,7 @@ macro_rules! impl_op_divmod {
                     ir::Literal::Float64(left $op right.clone().unwrap_float_64())
                 }
                 ir::Literal::NullTerminatedString(_) => ir::Literal::Unsigned64(0),
-                ir::Literal::Zeroed(_) => return Err(OldInterpreterError::$error_name),
+                ir::Literal::Zeroed(_) => return Err(InterpreterError::$error_name),
             };
 
             Ok(Value{
@@ -137,11 +136,11 @@ macro_rules! impl_op_divmod {
 
 macro_rules! impl_op_cmp {
     ($name:ident, $op:tt) => {
-        pub fn $name(
+        pub fn $name<'a>(
             &mut self,
-            operands: &BinaryOperands,
-            registers: &Registers<'a>,
-        ) -> Value<'a> {
+            operands: &'a BinaryOperands<'env>,
+            registers: &'a Registers<'env>,
+        ) -> Value<'env> {
             let (left, right, tainted) = self.eval_binary_ops(operands, registers);
 
             let value = match left {
@@ -191,21 +190,24 @@ macro_rules! impl_op_cmp {
     };
 }
 
-impl<'a, S: SyscallHandler> OldInterpreter<'a, S> {
-    fn eval_into_literal(
+impl<'env, S: SyscallHandler> Interpreter<'env, S> {
+    fn eval_into_literal<'a>(
         &self,
-        registers: &Registers<'a>,
-        value: &ir::Value,
-    ) -> (ir::Literal, Option<Tainted>) {
+        registers: &'a Registers<'env>,
+        value: &'a ir::Value<'env>,
+    ) -> (ir::Literal<'env>, Option<Tainted>) {
         let reg = self.eval(registers, value);
         (reg.kind.unwrap_literal(), reg.tainted)
     }
 
-    fn eval_binary_ops(
+    fn eval_binary_ops<'a>(
         &self,
-        operands: &BinaryOperands,
-        registers: &Registers<'a>,
-    ) -> (ir::Literal, ir::Literal, Option<Tainted>) {
+        operands: &'a BinaryOperands<'env>,
+        registers: &'a Registers<'env>,
+    ) -> (ir::Literal<'env>, ir::Literal<'env>, Option<Tainted>)
+    where
+        'env: 'a,
+    {
         let (left, l_tainted) = self.eval_into_literal(registers, &operands.left);
         let (right, r_tainted) = self.eval_into_literal(registers, &operands.right);
         (left, right, l_tainted.or(r_tainted))

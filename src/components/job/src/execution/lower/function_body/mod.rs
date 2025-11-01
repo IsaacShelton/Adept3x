@@ -649,7 +649,8 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     InstrKind::Is(instr_ref, _) => todo!(),
                     InstrKind::LabelLiteral(_) => todo!(),
                     InstrKind::Comptime(_) => {
-                        todo!("lower comptime - use resulting value from comptime")
+                        // Nothing to do, since this should have resolved to a literal
+                        ir::Literal::Void.into()
                     }
                 };
 

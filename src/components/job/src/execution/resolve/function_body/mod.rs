@@ -25,7 +25,10 @@ use by_address::ByAddress;
 use derivative::Derivative;
 use diagnostics::ErrorDiagnostic;
 use dominators::{PostOrder, compute_idom_tree};
+use interpreter_api::ConstantValueSchema;
 use itertools::Itertools;
+use num_bigint::BigInt;
+use num_traits::FromPrimitive;
 use primitives::{CInteger, CIntegerAssumptions, IntegerBits, IntegerSign};
 use std::collections::HashSet;
 
@@ -1166,7 +1169,36 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         );
                     };
 
-                    todo!("comptime result is {:?}", evaluated)
+                    match evaluated.schema {
+                        ConstantValueSchema::Boolean => {
+                            let value = evaluated.value.unwrap_small_data() != 0;
+
+                            cfg.set_typed(
+                                instr_ref,
+                                UnaliasedType(
+                                    ctx.alloc(TypeKind::BooleanLiteral(value).at(instr.source)),
+                                ),
+                            );
+                        }
+                        ConstantValueSchema::Integer(sign) => {
+                            let value = evaluated.value.unwrap_small_data();
+
+                            let value = ctx.alloc(
+                                match sign {
+                                    IntegerSign::Signed => BigInt::from_i64(value as i64),
+                                    IntegerSign::Unsigned => BigInt::from_u64(value),
+                                }
+                                .expect("infallible"),
+                            );
+
+                            cfg.set_typed(
+                                instr_ref,
+                                UnaliasedType(
+                                    ctx.alloc(TypeKind::IntegerLiteral(value).at(instr.source)),
+                                ),
+                            );
+                        }
+                    }
                 }
             }
 

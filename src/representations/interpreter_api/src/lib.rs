@@ -19,6 +19,14 @@ pub enum ConstantValue {
     SmallData(u64),
 }
 
+impl ConstantValue {
+    pub fn unwrap_small_data(&self) -> u64 {
+        match self {
+            ConstantValue::SmallData(value) => *value,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum ConstantValueSchema {
     Boolean,

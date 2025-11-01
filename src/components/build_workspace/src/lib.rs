@@ -26,7 +26,7 @@ use diagnostics::{Show, unerror};
 use explore_within::{ExploreWithinResult, explore_within};
 use export_and_link::export_and_link;
 use fs_tree::Fs;
-use interpreter_env::{run_build_system_interpreter, setup_build_system_interpreter_symbols};
+use interpreter_env::{run_old_build_system_interpreter, setup_build_system_interpreter_symbols};
 use job::BumpAllocatorPool;
 use lex_and_parse::lex_and_parse_workspace_in_parallel;
 use queue::LexParseInfo;
@@ -200,7 +200,7 @@ pub fn compile_workspace(
 
     // Run in interpreter if requesting to be run in interpreter
     if compiler.options.interpret {
-        return run_build_system_interpreter(&ir_module)
+        return run_old_build_system_interpreter(&ir_module)
             .map(|_state| ())
             .map_err(|err| eprintln!("{}", err));
     }

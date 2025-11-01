@@ -32,7 +32,7 @@ pub enum ProjectKind {
 }
 
 #[derive(Debug)]
-pub struct BuildSystemSyscallHandler {
+pub struct OldBuildSystemSyscallHandler {
     pub projects: Vec<Project>,
     pub version: Option<AdeptVersion>,
     pub link_filenames: HashSet<String>,
@@ -43,7 +43,7 @@ pub struct BuildSystemSyscallHandler {
     pub namespace_to_dependency: HashMap<String, Vec<String>>,
 }
 
-impl Default for BuildSystemSyscallHandler {
+impl Default for OldBuildSystemSyscallHandler {
     fn default() -> Self {
         Self {
             projects: vec![],
@@ -74,7 +74,7 @@ fn read_cstring(memory: &Memory, value: &Value) -> String {
     string
 }
 
-impl SyscallHandler for BuildSystemSyscallHandler {
+impl SyscallHandler for OldBuildSystemSyscallHandler {
     fn syscall<'a>(
         &mut self,
         memory: &mut Memory,

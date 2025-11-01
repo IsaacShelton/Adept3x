@@ -1,7 +1,7 @@
 mod read;
 mod write;
 
-use super::error::OldInterpreterError;
+use super::error::InterpreterError;
 use crate::ir;
 use bit_vec::BitVec;
 
@@ -35,7 +35,7 @@ impl Memory {
         }
     }
 
-    pub fn alloc_permanent(&mut self, bytes: u64) -> ir::Literal {
+    pub fn alloc_permanent<'env>(&mut self, bytes: u64) -> ir::Literal<'env> {
         ir::Literal::Unsigned64(self.alloc_permanent_raw(bytes))
     }
 
@@ -47,24 +47,24 @@ impl Memory {
         address
     }
 
-    pub fn alloc_heap(&mut self, bytes: u64) -> ir::Literal {
+    pub fn alloc_heap<'env>(&mut self, bytes: u64) -> ir::Literal<'env> {
         // NOTE: We don't use an actual heap allocator, since this interpreter
         // is meant for running small portions of code that probably
         // don't have a lot of temporary allocations
         self.alloc_permanent(bytes)
     }
 
-    pub fn free_heap(&mut self, _pointer: ir::Literal) {
+    pub fn free_heap<'env>(&mut self, _pointer: ir::Literal<'env>) {
         // NOTE: We don't use an actual heap allocator, since this interpreter
         // is meant for running small portions of code that probably
         // don't have a lot of temporary allocations
     }
 
-    pub fn alloc_stack(&mut self, bytes: u64) -> Result<ir::Literal, OldInterpreterError> {
+    pub fn alloc_stack<'env>(&mut self, bytes: u64) -> Result<ir::Literal<'env>, InterpreterError> {
         let raw_address = Self::STACK_OFFSET + u64::try_from(self.stack.len()).unwrap();
 
         if self.is_heap_address(raw_address + bytes - 1) {
-            return Err(OldInterpreterError::StackOverflow);
+            return Err(InterpreterError::StackOverflow);
         }
 
         let address = ir::Literal::Unsigned64(raw_address);

@@ -4,6 +4,7 @@ use crate::{
         lower::{LowerFunctionBody, LowerFunctionHead},
         resolve::{ResolveFunctionBody, ResolveFunctionHead},
     },
+    interpret::{Interpreter, syscall_handler::ComptimeSystemSyscallHandler},
     ir,
     module_graph::ModuleView,
     repr::{Evaluated, FuncBody, FuncHead},
@@ -11,6 +12,7 @@ use crate::{
 use attributes::{Exposure, Privacy, SymbolOwnership, Tag};
 use by_address::ByAddress;
 use derivative::Derivative;
+use diagnostics::ErrorDiagnostic;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -136,26 +138,38 @@ impl<'env> Executable<'env> for ResolveEvaluation<'env> {
             );
         };
 
-        self.comptime_view.graph(|graph| {
-            let ir_func = &graph.ir.funcs[lowered_func_head];
-            dbg!(ir_func);
-        });
+        // 4) Obtain the intermediate representation for comptime so far
+        let ir = self.comptime_view.graph(|graph| graph.ir);
 
-        dbg!(_lowered_func_body);
+        // 5) Interpret the function and raise any interpretation errors
+        let mut interpreter =
+            Interpreter::new(ComptimeSystemSyscallHandler::default(), ir, Some(1_000_000));
 
-        // 4) Interpret the function.
-        todo!("interpret func ref {:?}", lowered_func_head);
+        let entry_point_result = interpreter
+            .run(lowered_func_head)
+            .map_err(|e| ErrorDiagnostic::new(format!("{}", e), self.expr.source))?;
 
-        // 5) Examine the result value that was baked by the function
+        // The actual entry point result should be void
+        entry_point_result.kind.unwrap_literal().unwrap_void();
 
-        // 6) Raise error message if took too long
+        // 6) Examine the result value that was baked by the function
+        let exit_value = interpreter.exit_value();
 
-        // 7) Panic if not set, (or was set multiple times), as this
-        // should never happen
+        // 7) Expect that the exit value is transferrable
+        let Some(exit_value) = exit_value else {
+            return Err(ErrorDiagnostic::new(
+                "Compile-time evaluation must evaluate to transferable value",
+                self.expr.source,
+            )
+            .into());
+        };
 
         // 8) Translate the constant value into a literal value
         // and/or static data that can be used as a literal.
+        Ok(ctx.alloc(Evaluated::new_unsigned(exit_value)))
 
-        Ok(ctx.alloc(Evaluated::new_boolean(true)))
+        // TODO: We need to be able to support different types than just unsigned values, such as
+        // booleans, etc.
+        // Ok(ctx.alloc(Evaluated::new_boolean(true)))
     }
 }
