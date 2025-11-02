@@ -3,7 +3,7 @@ use crate::{
     interpret::{Interpreter, InterpreterError, Value, ValueKind, value::Tainted},
     ir::{self, BinaryOperands, IntegerImmediate},
 };
-use primitives::{IntegerBits, IntegerConstant, IntegerSign};
+use primitives::{IntegerConstant, IntegerSign};
 
 macro_rules! impl_op_basic {
     ($name:ident, $wrapping_name:ident, $op:tt, $bool_op:tt) => {
@@ -42,7 +42,7 @@ macro_rules! impl_op_basic {
                 ir::Literal::Float64(left) => {
                     ir::Literal::Float64(left $op right.clone().unwrap_float_64())
                 }
-                ir::Literal::NullTerminatedString(_) => ir::Literal::new_integer(0i64, IntegerBits::Bits64).unwrap(),
+                ir::Literal::NullTerminatedString(_) => ir::Literal::new_u64(0),
                 ir::Literal::Zeroed(ty) => ir::Literal::Zeroed(ty),
             };
 
@@ -92,7 +92,7 @@ macro_rules! impl_op_divmod {
                 ir::Literal::Float64(left) => {
                     ir::Literal::Float64(left $op right.clone().unwrap_float_64())
                 }
-                ir::Literal::NullTerminatedString(_) => ir::Literal::new_integer(0i64, IntegerBits::Bits64).unwrap(),
+                ir::Literal::NullTerminatedString(_) => ir::Literal::new_u64(0),
                 ir::Literal::Zeroed(_) => return Err(InterpreterError::$error_name),
             };
 

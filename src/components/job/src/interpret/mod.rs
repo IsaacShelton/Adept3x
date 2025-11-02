@@ -17,7 +17,7 @@ use crate::{
 use ast::SizeOfMode;
 use data_units::ByteUnits;
 pub use error::InterpreterError;
-use primitives::{IntegerBits, IntegerConstant, IntegerSign};
+use primitives::{IntegerBits, IntegerConstant};
 use std::collections::HashMap;
 pub use value::Value;
 use value::{Tainted, ValueKind};
@@ -170,25 +170,16 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     }
                     Some(SizeOfMode::Compilation) => {
                         // If explicitly marked as compilation sizeof, then don't consider tainted
-                        ValueKind::Literal(
-                            ir::Literal::new_integer(
-                                IntegerConstant::Unsigned(self.size_of(ty).bytes()),
-                                IntegerBits::Bits64,
-                            )
-                            .expect("sizeof is representable in u64"),
-                        )
-                        .untainted()
+                        ValueKind::Literal(ir::Literal::new_u64(self.size_of(ty).bytes()))
+                            .untainted()
                     }
                     None => {
                         // To help prevent accidentally mixing "compilation sizeof" and "target sizeof"
                         // when running code at compile time, mark the ambiguous sizeof as tainted,
                         // which we will throw an error for if it any derived value obviously leaks
                         // into the parent time.
-                        ValueKind::Literal(
-                            ir::Literal::new_integer(self.size_of(ty).bytes(), IntegerBits::Bits64)
-                                .expect("sizeof is representable in u64"),
-                        )
-                        .tainted(Tainted::ByCompilationHostSizeof)
+                        ValueKind::Literal(ir::Literal::new_u64(self.size_of(ty).bytes()))
+                            .tainted(Tainted::ByCompilationHostSizeof)
                     }
                 },
                 ir::Instr::Parameter(index) => args[usize::try_from(*index).unwrap()].clone(),
@@ -302,16 +293,8 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                         .fold(0, |acc, f| acc + self.size_of(&f.ir_type).bytes());
 
                     let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
-                    ValueKind::Literal(
-                        ir::Literal::new_integer(
-                            subject_pointer.wrapping_add(offset),
-                            IntegerBits::Bits64,
-                        )
-                        .expect(
-                            "pointer calculated for member offset in interpreter to fit in u64",
-                        ),
-                    )
-                    .untainted()
+                    ValueKind::Literal(ir::Literal::new_u64(subject_pointer.wrapping_add(offset)))
+                        .untainted()
                 }
                 ir::Instr::ArrayAccess { .. } => {
                     todo!("Interpreter / ir::Instruction::ArrayAccess")

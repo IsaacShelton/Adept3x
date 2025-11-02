@@ -38,8 +38,7 @@ impl Memory {
     }
 
     pub fn alloc_permanent<'env>(&mut self, bytes: ByteUnits) -> ir::Literal<'env> {
-        ir::Literal::new_integer(self.alloc_permanent_raw(bytes), IntegerBits::Bits64)
-            .expect("interpreter allocated heap address to be representable in u64")
+        ir::Literal::new_u64(self.alloc_permanent_raw(bytes))
     }
 
     pub fn alloc_permanent_raw(&mut self, bytes: ByteUnits) -> u64 {
@@ -73,9 +72,7 @@ impl Memory {
             return Err(InterpreterError::StackOverflow);
         }
 
-        let address = ir::Literal::new_integer(raw_address, IntegerBits::Bits64)
-            .expect("interpreter allocated stack address to be representable in u64");
-
+        let address = ir::Literal::new_u64(raw_address);
         let bytes = usize::try_from(bytes.bytes()).unwrap();
         self.stack.extend(std::iter::repeat(0).take(bytes));
         self.stack_tainted_by_comptime_sizeof.grow(bytes, false);

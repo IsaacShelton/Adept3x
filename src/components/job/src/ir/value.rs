@@ -27,6 +27,12 @@ impl<'env> Literal<'env> {
         IntegerImmediate::new(value.into(), bits).map(Self::Integer)
     }
 
+    pub fn new_u64(value: u64) -> Self {
+        IntegerImmediate::new(value.into(), IntegerBits::Bits64)
+            .map(Self::Integer)
+            .unwrap()
+    }
+
     pub fn unwrap_signed(&self) -> i64 {
         match self {
             Literal::Integer(immediate) => immediate.value().unwrap_signed(),
