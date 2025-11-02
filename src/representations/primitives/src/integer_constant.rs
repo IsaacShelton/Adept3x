@@ -29,6 +29,13 @@ impl IntegerConstant {
         }
     }
 
+    pub fn from_raw_data(raw_data: u64, sign: IntegerSign) -> Self {
+        match sign {
+            IntegerSign::Signed => Self::Signed(raw_data as i64),
+            IntegerSign::Unsigned => Self::Unsigned(raw_data),
+        }
+    }
+
     pub fn sign(&self) -> IntegerSign {
         match self {
             Self::Signed(_) => IntegerSign::Signed,

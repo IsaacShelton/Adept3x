@@ -12,11 +12,12 @@ use self::{
 };
 use crate::{
     interpret::{registers::Registers, value::StructLiteral},
-    ir::{self, BinOp, BinOpFloatOrInteger},
+    ir::{self, BinOp, BinOpFloatOrInteger, IntegerImmediate},
 };
 use ast::SizeOfMode;
+use data_units::ByteUnits;
 pub use error::InterpreterError;
-use primitives::{IntegerBits, IntegerConstant};
+use primitives::{IntegerBits, IntegerConstant, IntegerSign};
 use std::collections::HashMap;
 pub use value::Value;
 use value::{Tainted, ValueKind};
@@ -171,7 +172,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                         // If explicitly marked as compilation sizeof, then don't consider tainted
                         ValueKind::Literal(
                             ir::Literal::new_integer(
-                                IntegerConstant::Unsigned(self.size_of(ty)),
+                                IntegerConstant::Unsigned(self.size_of(ty).bytes()),
                                 IntegerBits::Bits64,
                             )
                             .expect("sizeof is representable in u64"),
@@ -184,7 +185,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                         // which we will throw an error for if it any derived value obviously leaks
                         // into the parent time.
                         ValueKind::Literal(
-                            ir::Literal::new_integer(self.size_of(ty), IntegerBits::Bits64)
+                            ir::Literal::new_integer(self.size_of(ty).bytes(), IntegerBits::Bits64)
                                 .expect("sizeof is representable in u64"),
                         )
                         .tainted(Tainted::ByCompilationHostSizeof)
@@ -247,12 +248,25 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     let size = self.size_of(ty);
                     let value = self.eval(&registers, value);
 
-                    todo!(
-                        "Interpreter / ir::Instruction::Extend {:?} {:?} {:?} {:?}",
-                        value,
-                        sign,
-                        ty,
-                        size
+                    let integer_bits = IntegerBits::new(size.into())
+                        .expect("integer size is representable in interpreter");
+
+                    let raw_data = value
+                        .kind
+                        .unwrap_literal()
+                        .unwrap_integer()
+                        .value()
+                        .raw_data();
+
+                    Value::new(
+                        ValueKind::Literal(ir::Literal::Integer(
+                            IntegerImmediate::new(
+                                IntegerConstant::from_raw_data(raw_data, *sign),
+                                integer_bits,
+                            )
+                            .unwrap(),
+                        )),
+                        value.tainted,
                     )
                 }
                 ir::Instr::FloatExtend(_, _) => {
@@ -285,7 +299,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     let offset = fields
                         .iter()
                         .take(*index)
-                        .fold(0, |acc, f| acc + self.size_of(&f.ir_type));
+                        .fold(0, |acc, f| acc + self.size_of(&f.ir_type).bytes());
 
                     let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
                     ValueKind::Literal(
@@ -427,7 +441,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
         }
     }
 
-    pub fn size_of(&self, ir_type: &ir::Type<'env>) -> u64 {
+    pub fn size_of(&self, ir_type: &ir::Type<'env>) -> ByteUnits {
         size_of(ir_type, self.ir_module)
     }
 }

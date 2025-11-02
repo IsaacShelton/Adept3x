@@ -4,6 +4,7 @@ mod write;
 use super::error::InterpreterError;
 use crate::ir;
 use bit_vec::BitVec;
+use data_units::ByteUnits;
 use primitives::IntegerBits;
 
 #[derive(Debug)]
@@ -36,20 +37,20 @@ impl Memory {
         }
     }
 
-    pub fn alloc_permanent<'env>(&mut self, bytes: u64) -> ir::Literal<'env> {
+    pub fn alloc_permanent<'env>(&mut self, bytes: ByteUnits) -> ir::Literal<'env> {
         ir::Literal::new_integer(self.alloc_permanent_raw(bytes), IntegerBits::Bits64)
             .expect("interpreter allocated heap address to be representable in u64")
     }
 
-    pub fn alloc_permanent_raw(&mut self, bytes: u64) -> u64 {
+    pub fn alloc_permanent_raw(&mut self, bytes: ByteUnits) -> u64 {
         let address = Self::HEAP_OFFSET + u64::try_from(self.heap.len()).unwrap();
-        let bytes = usize::try_from(bytes).unwrap();
+        let bytes = usize::try_from(bytes.bytes()).unwrap();
         self.heap.extend(std::iter::repeat(0).take(bytes));
         self.heap_tainted_by_comptime_sizeof.grow(bytes, false);
         address
     }
 
-    pub fn alloc_heap<'env>(&mut self, bytes: u64) -> ir::Literal<'env> {
+    pub fn alloc_heap<'env>(&mut self, bytes: ByteUnits) -> ir::Literal<'env> {
         // NOTE: We don't use an actual heap allocator, since this interpreter
         // is meant for running small portions of code that probably
         // don't have a lot of temporary allocations
@@ -62,17 +63,20 @@ impl Memory {
         // don't have a lot of temporary allocations
     }
 
-    pub fn alloc_stack<'env>(&mut self, bytes: u64) -> Result<ir::Literal<'env>, InterpreterError> {
+    pub fn alloc_stack<'env>(
+        &mut self,
+        bytes: ByteUnits,
+    ) -> Result<ir::Literal<'env>, InterpreterError> {
         let raw_address = Self::STACK_OFFSET + u64::try_from(self.stack.len()).unwrap();
 
-        if self.is_heap_address(raw_address + bytes - 1) {
+        if self.is_heap_address(raw_address + bytes.bytes() - 1) {
             return Err(InterpreterError::StackOverflow);
         }
 
         let address = ir::Literal::new_integer(raw_address, IntegerBits::Bits64)
             .expect("interpreter allocated stack address to be representable in u64");
 
-        let bytes = usize::try_from(bytes).unwrap();
+        let bytes = usize::try_from(bytes.bytes()).unwrap();
         self.stack.extend(std::iter::repeat(0).take(bytes));
         self.stack_tainted_by_comptime_sizeof.grow(bytes, false);
         Ok(address)

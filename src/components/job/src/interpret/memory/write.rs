@@ -38,7 +38,7 @@ impl Memory {
         for (field, value) in literal.fields.iter().zip(literal.values.iter()) {
             let size = size_of(&field.ir_type, ir_module);
             self.write(offset, value.clone(), ir_module)?;
-            offset += size;
+            offset += size.bytes();
         }
 
         Ok(())
@@ -70,11 +70,11 @@ impl Memory {
                 let size = size_of(&ty, ir_module);
 
                 if self.is_heap_address(destination) {
-                    for i in 0..size {
+                    for i in 0..size.bytes() {
                         self.heap[(destination - Self::HEAP_OFFSET + i) as usize] = 0;
                     }
                 } else {
-                    for i in 0..size {
+                    for i in 0..size.bytes() {
                         self.stack[(destination - Self::STACK_OFFSET + i) as usize] = 0;
                     }
                 }

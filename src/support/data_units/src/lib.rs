@@ -102,6 +102,14 @@ impl TryFrom<BitUnits> for ByteUnits {
     }
 }
 
+impl TryFrom<usize> for ByteUnits {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, ()> {
+        value.try_into().map(|units| Self { units }).map_err(|_| ())
+    }
+}
+
 impl From<ByteUnits> for BitUnits {
     fn from(value: ByteUnits) -> Self {
         Self {
