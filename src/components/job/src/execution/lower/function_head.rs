@@ -1,6 +1,6 @@
 use crate::{
     Continuation, Executable, ExecutionCtx, Executor, SuspendMany, execution::lower::LowerType, ir,
-    module_graph::ModuleView, repr::FuncHead,
+    repr::FuncHead,
 };
 use by_address::ByAddress;
 use derivative::Derivative;
@@ -9,7 +9,6 @@ use std::sync::OnceLock;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerFunctionHead<'env> {
-    view: &'env ModuleView<'env>,
     head: ByAddress<&'env FuncHead<'env>>,
 
     #[derivative(Hash = "ignore")]
@@ -19,9 +18,8 @@ pub struct LowerFunctionHead<'env> {
 }
 
 impl<'env> LowerFunctionHead<'env> {
-    pub fn new(view: &'env ModuleView<'env>, head: &'env FuncHead<'env>) -> Self {
+    pub fn new(head: &'env FuncHead<'env>) -> Self {
         Self {
-            view,
             head: ByAddress(head),
             inner_types: None,
         }
@@ -36,7 +34,8 @@ impl<'env> Executable<'env> for LowerFunctionHead<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let ir = self.view.web.graph(self.view.graph, |graph| graph.ir);
+        let view = self.head.view;
+        let ir = view.web.graph(view.graph, |graph| graph.ir);
 
         let Some(inner_types) = executor.demand_many(&self.inner_types) else {
             let suspend_on_types = self
@@ -50,7 +49,7 @@ impl<'env> Executable<'env> for LowerFunctionHead<'env> {
             return suspend_many!(
                 self.inner_types,
                 suspend_on_types
-                    .map(|ty| executor.request(LowerType::new(self.view, ty.0)))
+                    .map(|ty| executor.request(LowerType::new(view, ty.0)))
                     .collect(),
                 ctx
             );

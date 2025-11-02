@@ -116,6 +116,12 @@ impl<'env> Cfg<'env> {
         })
     }
 
+    pub fn iter_instrs_unordered(&self) -> impl Iterator<Item = &Instr<'env>> {
+        self.basicblocks
+            .iter()
+            .flat_map(|(_bb_id, bb)| bb.instrs.iter())
+    }
+
     pub fn get_typed(
         &self,
         cfg_value: CfgValue,

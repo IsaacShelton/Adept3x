@@ -11,7 +11,6 @@ use crate::{
         literal_value_for_bit_integer,
     },
     ir::{self, BinaryOperands},
-    module_graph::ModuleView,
     repr::{FuncBody, FuncHead, TypeKind, VariableId, VariableRef},
     sub_task::SubTask,
 };
@@ -25,7 +24,6 @@ use primitives::FloatOrInteger;
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct LowerFunctionBody<'env> {
-    view: &'env ModuleView<'env>,
     func: ir::FuncRef<'env>,
     head: ByAddress<&'env FuncHead<'env>>,
     body: ByAddress<&'env FuncBody<'env>>,
@@ -78,13 +76,11 @@ pub struct LowerFunctionBody<'env> {
 
 impl<'env> LowerFunctionBody<'env> {
     pub fn new(
-        view: &'env ModuleView<'env>,
         func: ir::FuncRef<'env>,
         head: &'env FuncHead<'env>,
         body: &'env FuncBody<'env>,
     ) -> Self {
         Self {
-            view,
             func,
             head: ByAddress(head),
             body: ByAddress(body),
@@ -112,6 +108,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
         // TODO: Before here is where we'll do monomorphization (but only for the function body)...
         // Should function body monomorphization be a separate step or combined with lowering?
 
+        let view = self.head.view;
         let cfg = self.body.cfg;
 
         let builder = self.builder.get_or_insert_with(|| {
@@ -129,7 +126,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
             let Some(lowered_type) = executor.demand(self.lowered_type) else {
                 return suspend!(
                     self.lowered_type,
-                    executor.request(LowerType::new(self.view, &variable.ty.0)),
+                    executor.request(LowerType::new(view, &variable.ty.0)),
                     ctx
                 );
             };
@@ -150,7 +147,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
             .rev_post_order
             .get_or_insert_with(|| RevPostOrderIterWithEnds::new(self.body.post_order));
 
-        let builtin_types = self.view.compiler().builtin_types;
+        let builtin_types = view.compiler().builtin_types;
 
         while let Some(instr_ref) = rev_post_order.peek() {
             let bb_id = instr_ref.basicblock;
@@ -171,7 +168,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor.request(LowerType::new(self.view, unified_type.0)),
+                                executor.request(LowerType::new(view, unified_type.0)),
                                 ctx
                             );
                         };
@@ -202,7 +199,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             let Some(lowered_type) = executor.demand(self.lowered_type) else {
                                 return suspend!(
                                     self.lowered_type,
-                                    executor.request(LowerType::new(self.view, variable_type)),
+                                    executor.request(LowerType::new(view, variable_type)),
                                     ctx
                                 );
                             };
@@ -211,7 +208,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 self,
                                 self.perform_unary_cast.get_or_insert_with(|| {
                                     PerformUnaryCast::new(
-                                        self.view,
+                                        view,
                                         builder.get_output(*value),
                                         lowered_type,
                                         unary_cast.as_ref(),
@@ -237,7 +234,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor.request(LowerType::new(self.view, dest_type)),
+                                executor.request(LowerType::new(view, dest_type)),
                                 ctx
                             );
                         };
@@ -246,7 +243,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             self,
                             self.perform_unary_cast.get_or_insert_with(|| {
                                 PerformUnaryCast::new(
-                                    self.view,
+                                    view,
                                     builder.get_output(*value),
                                     lowered_type,
                                     unary_cast.as_ref(),
@@ -277,7 +274,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let (dest, dest_ir_type) = execute_sub_task!(
                             self,
                             self.deref_dest.get_or_insert_with(|| DerefDest::new(
-                                self.view,
+                                view,
                                 builder.get_output(*dest),
                                 to_ty,
                             )),
@@ -290,7 +287,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             self,
                             self.perform_unary_cast.get_or_insert_with(|| {
                                 PerformUnaryCast::new(
-                                    self.view,
+                                    view,
                                     new_value,
                                     dest_ir_type,
                                     src_cast.as_ref(),
@@ -313,7 +310,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor.request(LowerType::new(self.view, unified_type.0)),
+                                executor.request(LowerType::new(view, unified_type.0)),
                                 ctx
                             );
                         };
@@ -323,7 +320,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 self,
                                 self.perform_unary_cast.get_or_insert_with(|| {
                                     PerformUnaryCast::new(
-                                        self.view,
+                                        view,
                                         builder.get_output(*a),
                                         lowered_type,
                                         a_cast.as_ref(),
@@ -342,7 +339,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 self,
                                 self.perform_unary_cast.get_or_insert_with(|| {
                                     PerformUnaryCast::new(
-                                        self.view,
+                                        view,
                                         builder.get_output(*b),
                                         lowered_type,
                                         b_cast.as_ref(),
@@ -420,10 +417,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(ir_func_ref) = executor.demand(self.suspend_on_func) else {
                             return suspend!(
                                 self.suspend_on_func,
-                                executor.request(LowerFunctionHead::new(
-                                    call_target.view,
-                                    call_target.callee,
-                                )),
+                                executor.request(LowerFunctionHead::new(call_target.callee)),
                                 ctx
                             );
                         };
@@ -437,7 +431,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                     .enumerate()
                                     .map(|(i, _)| {
                                         executor.request(LowerType::new(
-                                            self.view,
+                                            view,
                                             &call_target.get_param_or_arg_type(i).0,
                                         ))
                                     })
@@ -456,7 +450,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 self,
                                 self.perform_unary_cast.get_or_insert_with(|| {
                                     PerformUnaryCast::new(
-                                        self.view,
+                                        view,
                                         builder.get_output(arg_instr),
                                         param_ir_types[i],
                                         unary_cast.as_ref(),
@@ -493,8 +487,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor
-                                    .request(LowerType::new(self.view, &instr.typed.unwrap().0)),
+                                executor.request(LowerType::new(view, &instr.typed.unwrap().0)),
                                 ctx
                             );
                         };
@@ -503,7 +496,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             self,
                             self.perform_unary_cast.get_or_insert_with(|| {
                                 PerformUnaryCast::new(
-                                    self.view,
+                                    view,
                                     builder.get_output(*value),
                                     lowered_type,
                                     unary_cast.as_ref(),
@@ -529,15 +522,13 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor.request(LowerType::new(self.view, &cfg_type.0)),
+                                executor.request(LowerType::new(view, &cfg_type.0)),
                                 ctx
                             );
                         };
 
                         let lowered_struct = match lowered_type {
-                            ir::Type::Struct(idx) => {
-                                self.view.graph(|graph| &graph.ir.structs[idx])
-                            }
+                            ir::Type::Struct(idx) => view.graph(|graph| &graph.ir.structs[idx]),
                             _ => {
                                 return Err(ErrorDiagnostic::new(
                                     "Cannot create struct-literal for non-struct type",
@@ -557,7 +548,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                 self,
                                 self.perform_unary_cast.get_or_insert_with(|| {
                                     PerformUnaryCast::new(
-                                        self.view,
+                                        view,
                                         builder.get_output(field_init.value),
                                         ir_field.ir_type,
                                         unary_cast.as_ref(),
@@ -598,7 +589,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                     self,
                                     self.perform_unary_cast.get_or_insert_with(|| {
                                         PerformUnaryCast::new(
-                                            self.view,
+                                            view,
                                             builder.get_output(*cfg_value),
                                             ir::Type::Bool,
                                             cast.as_ref(),
@@ -629,8 +620,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor
-                                    .request(LowerType::new(self.view, &instr.typed.unwrap().0)),
+                                executor.request(LowerType::new(view, &instr.typed.unwrap().0)),
                                 ctx
                             );
                         };
@@ -639,7 +629,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             self,
                             self.perform_unary_cast.get_or_insert_with(|| {
                                 PerformUnaryCast::new(
-                                    self.view,
+                                    view,
                                     builder.get_output(*value),
                                     lowered_type,
                                     unary_cast.as_ref(),
@@ -682,8 +672,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor
-                                    .request(LowerType::new(self.view, self.head.return_type.0)),
+                                executor.request(LowerType::new(view, self.head.return_type.0)),
                                 ctx
                             );
                         };
@@ -694,7 +683,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             self,
                             self.perform_unary_cast.get_or_insert_with(|| {
                                 PerformUnaryCast::new(
-                                    self.view,
+                                    view,
                                     builder.get_output(*return_value),
                                     lowered_type,
                                     unary_cast.as_ref(),
@@ -715,7 +704,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         let Some(lowered_type) = executor.demand(self.lowered_type) else {
                             return suspend!(
                                 self.lowered_type,
-                                executor.request(LowerType::new(self.view, to_ty.0)),
+                                executor.request(LowerType::new(view, to_ty.0)),
                                 ctx
                             );
                         };
@@ -724,7 +713,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                             self,
                             self.perform_unary_cast.get_or_insert_with(|| {
                                 PerformUnaryCast::new(
-                                    self.view,
+                                    view,
                                     builder.get_output(*value),
                                     lowered_type,
                                     unary_cast.as_ref(),
@@ -772,7 +761,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                     let Some(lowered_type) = executor.demand(self.lowered_type) else {
                         return suspend!(
                             self.lowered_type,
-                            executor.request(LowerType::new(self.view, resolved_type.0)),
+                            executor.request(LowerType::new(view, resolved_type.0)),
                             ctx
                         );
                     };
@@ -781,7 +770,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         self,
                         self.perform_unary_cast.get_or_insert_with(|| {
                             PerformUnaryCast::new(
-                                self.view,
+                                view,
                                 builder.get_output(*cfg_value),
                                 lowered_type,
                                 unary_cast.as_ref(),
@@ -813,7 +802,7 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
         }));
 
         // Attach body to function
-        let ir = self.view.web.graph(self.view.graph, |graph| graph.ir);
+        let ir = view.web.graph(view.graph, |graph| graph.ir);
         let ir_func = &ir.funcs[self.func];
 
         ir_func.basicblocks.set(basicblocks).unwrap();

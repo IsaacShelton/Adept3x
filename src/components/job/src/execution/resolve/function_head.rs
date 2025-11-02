@@ -12,7 +12,7 @@ use derivative::Derivative;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ResolveFunctionHead<'env> {
     view: &'env ModuleView<'env>,
-    head: ByAddress<&'env ast::FuncHead>,
+    ast_func: ByAddress<&'env ast::Func>,
 
     #[derivative(Hash = "ignore")]
     #[derivative(Debug = "ignore")]
@@ -21,10 +21,10 @@ pub struct ResolveFunctionHead<'env> {
 }
 
 impl<'env> ResolveFunctionHead<'env> {
-    pub fn new(view: &'env ModuleView<'env>, head: &'env ast::FuncHead) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, ast_func: &'env ast::Func) -> Self {
         Self {
             view,
-            head: ByAddress(head),
+            ast_func: ByAddress(ast_func),
             inner_types: None,
         }
     }
@@ -38,14 +38,15 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
+        let ast_head = &self.ast_func.head;
+
         let Some(inner_types) = executor.demand_many(&self.inner_types) else {
-            let suspend_on_types = self
-                .head
+            let suspend_on_types = ast_head
                 .params
                 .required
                 .iter()
                 .map(|param| &param.ast_type)
-                .chain(std::iter::once(&self.head.return_type));
+                .chain(std::iter::once(&ast_head.return_type));
 
             return suspend_many!(
                 self.inner_types,
@@ -59,19 +60,19 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         let mut inner_types = inner_types.into_iter();
 
         let params = Params {
-            required: ctx.alloc_slice_fill_iter(self.head.params.required.iter().map(|param| {
+            required: ctx.alloc_slice_fill_iter(ast_head.params.required.iter().map(|param| {
                 Param {
                     name: param.name.as_ref().map(|name| name.as_str()),
                     ty: inner_types.next().unwrap(),
                 }
             })),
-            is_cstyle_vararg: self.head.params.is_cstyle_vararg,
+            is_cstyle_vararg: ast_head.params.is_cstyle_vararg,
         };
 
         let return_type = inner_types.next().unwrap();
 
         let impl_params = ImplParams::default();
-        assert_eq!(self.head.givens.len(), 0); // We don't support impl params yet
+        assert_eq!(ast_head.givens.len(), 0); // We don't support impl params yet
 
         /*
         let impl_params = ImplParams {
@@ -94,36 +95,36 @@ impl<'env> Executable<'env> for ResolveFunctionHead<'env> {
         };
         */
 
-        let ownership = (self.head.tag == Some(Tag::Main))
+        let ownership = (ast_head.tag == Some(Tag::Main))
             .then_some(SymbolOwnership::Owned(Exposure::Exposed))
-            .unwrap_or(self.head.ownership);
+            .unwrap_or(ast_head.ownership);
 
         let func_head = ctx.alloc(FuncHead {
-            name: self.head.name.as_str(),
-            type_params: self.head.type_params.clone(),
+            name: ast_head.name.as_str(),
+            type_params: ast_head.type_params.clone(),
             params,
             return_type,
             impl_params,
-            source: self.head.source,
+            source: ast_head.source,
             metadata: FuncMetadata {
-                abi: self
-                    .head
+                abi: ast_head
                     .abide_abi
                     .then_some(TargetAbi::C)
                     .unwrap_or(TargetAbi::Abstract),
                 ownership,
-                tag: self.head.tag,
+                tag: ast_head.tag,
             },
             view: self.view,
+            ast_func: self.ast_func.0,
         });
 
         self.view.add_symbol(
-            self.head.privacy,
-            self.head.name.as_str(),
+            ast_head.privacy,
+            ast_head.name.as_str(),
             DeclHead::FuncLike(func_head),
         );
 
-        executor.wake_pending_search(self.view.graph, &self.head.name);
+        executor.wake_pending_search(self.view.graph, &ast_head.name);
         Ok(func_head)
     }
 }

@@ -36,7 +36,6 @@ use std::collections::HashSet;
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct ResolveFunctionBody<'env> {
     view: &'env ModuleView<'env>,
-    func: ByAddress<&'env ast::Func>,
     resolved_head: ByAddress<&'env FuncHead<'env>>,
 
     #[derivative(Hash = "ignore")]
@@ -86,14 +85,9 @@ pub struct ResolveFunctionBody<'env> {
 }
 
 impl<'env> ResolveFunctionBody<'env> {
-    pub fn new(
-        view: &'env ModuleView<'env>,
-        func: &'env ast::Func,
-        resolved_head: &'env FuncHead<'env>,
-    ) -> Self {
+    pub fn new(view: &'env ModuleView<'env>, resolved_head: &'env FuncHead<'env>) -> Self {
         Self {
             view,
-            func: ByAddress(func),
             resolved_head: ByAddress(resolved_head),
             inner_types: None,
             rev_post_order: None,
@@ -136,7 +130,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
         executor: &Executor<'env>,
         ctx: &mut ExecutionCtx<'env>,
     ) -> Result<Self::Output, Continuation<'env>> {
-        let def = self.func;
+        let def = self.resolved_head.ast_func;
         let builtin_types = self.view.compiler().builtin_types;
 
         // 0) Foreign functions do not have bodies
@@ -1168,9 +1162,14 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     )?;
 
                     if !conformed.ty.0.kind.is_boolean() {
-                        return Err(
-                            ErrorDiagnostic::new("Expected 'bool' value", instr.source).into()
-                        );
+                        return Err(ErrorDiagnostic::new(
+                            format!(
+                                "Expected `bool` value, got `{}`",
+                                conformed.ty.display_one(self.view)
+                            ),
+                            instr.source,
+                        )
+                        .into());
                     }
 
                     cfg.set_typed(instr_ref, conformed.ty);

@@ -273,12 +273,10 @@ impl<'env> Executor<'env> {
     where
         T: UnwrapFrom<Artifact<'env>> + Copy,
     {
-        pending_list.as_ref().map(|pending_list| {
-            self.truth
-                .read()
-                .unwrap()
-                .demand_many(pending_list.iter().copied())
-        })
+        let truth = self.truth.read().unwrap();
+        pending_list
+            .as_ref()
+            .map(|pending_list| truth.demand_many(pending_list.iter().copied()))
     }
 
     #[inline]
@@ -290,12 +288,10 @@ impl<'env> Executor<'env> {
         T: UnwrapFrom<Artifact<'env>> + Copy,
         K: Copy,
     {
-        pending_list.as_ref().map(|pending_list| {
-            self.truth
-                .read()
-                .unwrap()
-                .demand_many_assoc(pending_list.into_iter().copied())
-        })
+        let truth = self.truth.read().unwrap();
+        pending_list
+            .as_ref()
+            .map(|pending_list| truth.demand_many_assoc(pending_list.into_iter().copied()))
     }
 
     pub fn wake_pending_search(&self, graph_ref: ModuleGraphRef, name: &'env str) {

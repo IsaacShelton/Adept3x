@@ -18,6 +18,7 @@ pub struct FuncHead<'env> {
     pub source: Source,
     pub metadata: FuncMetadata,
     pub view: &'env ModuleView<'env>,
+    pub ast_func: &'env ast::Func,
 }
 
 #[derive(Clone, Debug)]

@@ -79,7 +79,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                 let Some(resolved_head) = executor.demand(self.resolving_head) else {
                     return suspend!(
                         self.resolving_head,
-                        executor.request(ResolveFunctionHead::new(self.view, &self.func.head)),
+                        executor.request(ResolveFunctionHead::new(self.view, &self.func)),
                         ctx
                     );
                 };
@@ -105,11 +105,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
                 let Some(resolved_body) = executor.demand(self.resolving_body) else {
                     return suspend!(
                         self.resolving_body,
-                        executor.request(ResolveFunctionBody::new(
-                            self.view,
-                            &self.func,
-                            resolved_head
-                        )),
+                        executor.request(ResolveFunctionBody::new(self.view, resolved_head)),
                         ctx
                     );
                 };
@@ -126,7 +122,7 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
         let Some(lowered_head) = executor.demand(self.lowering_head) else {
             return suspend!(
                 self.lowering_head,
-                executor.request(LowerFunctionHead::new(self.view, resolved_head)),
+                executor.request(LowerFunctionHead::new(resolved_head)),
                 ctx
             );
         };
@@ -135,7 +131,6 @@ impl<'env> Executable<'env> for ProcessFunction<'env> {
             return suspend!(
                 self.lowering_body,
                 executor.request(LowerFunctionBody::new(
-                    self.view,
                     lowered_head,
                     resolved_head,
                     resolved_body

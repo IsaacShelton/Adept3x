@@ -97,7 +97,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
             &function
                 .basicblocks
                 .get()
-                .expect("callee to have body resolved")[..],
+                .expect("callee to have body lowered")[..],
         );
 
         let mut ip = InstructionPointer::default();

@@ -11,7 +11,7 @@ use primitives::{CIntegerAssumptions, IntegerSign};
 use source_files::Source;
 use target::Target;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Conform<'env> {
     pub ty: UnaliasedType<'env>,
     pub cast: Option<UnaryCast<'env>>,
@@ -42,15 +42,16 @@ impl<'env> Conform<'env> {
                 panic!("cannot implicitly dereference non deref'$T type");
             };
 
+            from_ty = UnaliasedType(after_deref);
+
             result = Self::new(
                 from_ty,
                 UnaryCast::Dereference {
-                    after_deref: UnaliasedType(*after_deref),
+                    after_deref: from_ty,
                     then: std::mem::take(&mut result.cast).map(|cast| &*ctx.alloc(cast)),
                 },
             );
 
-            from_ty = UnaliasedType(after_deref);
             count -= 1;
         }
 
