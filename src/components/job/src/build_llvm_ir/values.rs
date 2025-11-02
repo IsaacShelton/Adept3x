@@ -21,30 +21,11 @@ pub unsafe fn build_value<'env>(
             ir::Literal::Boolean(value) => {
                 LLVMConstInt(LLVMInt1Type(), *value as c_ulonglong, false as LLVMBool)
             }
-            ir::Literal::Signed8(value) => {
-                LLVMConstInt(LLVMInt8Type(), *value as c_ulonglong, true as LLVMBool)
-            }
-            ir::Literal::Signed16(value) => {
-                LLVMConstInt(LLVMInt16Type(), *value as c_ulonglong, true as LLVMBool)
-            }
-            ir::Literal::Signed32(value) => {
-                LLVMConstInt(LLVMInt32Type(), *value as c_ulonglong, true as LLVMBool)
-            }
-            ir::Literal::Signed64(value) => {
-                LLVMConstInt(LLVMInt64Type(), *value as c_ulonglong, true as LLVMBool)
-            }
-            ir::Literal::Unsigned8(value) => {
-                LLVMConstInt(LLVMInt8Type(), *value as c_ulonglong, false as LLVMBool)
-            }
-            ir::Literal::Unsigned16(value) => {
-                LLVMConstInt(LLVMInt16Type(), *value as c_ulonglong, false as LLVMBool)
-            }
-            ir::Literal::Unsigned32(value) => {
-                LLVMConstInt(LLVMInt32Type(), *value as c_ulonglong, false as LLVMBool)
-            }
-            ir::Literal::Unsigned64(value) => {
-                LLVMConstInt(LLVMInt64Type(), *value as c_ulonglong, false as LLVMBool)
-            }
+            ir::Literal::Integer(immediate) => LLVMConstInt(
+                LLVMIntType(immediate.bits().bytes().to_bits().bits() as u32),
+                immediate.value().raw_data() as c_ulonglong,
+                immediate.value().sign().is_signed() as LLVMBool,
+            ),
             ir::Literal::Float32(value) => LLVMConstReal(LLVMFloatType(), *value as c_double),
             ir::Literal::Float64(value) => LLVMConstReal(LLVMDoubleType(), *value as c_double),
             ir::Literal::NullTerminatedString(value) => {

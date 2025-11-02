@@ -2,14 +2,14 @@ use crate::{
     Continuation, Execution, ExecutionCtx, Executor, Suspend,
     conform::UnaryCast,
     execution::lower::{LowerType, function_body::ir_builder::IrBuilder},
-    ir,
+    ir::{self, IntegerImmediate},
     module_graph::ModuleView,
     sub_task::SubTask,
 };
 use diagnostics::ErrorDiagnostic;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use primitives::{FloatSize, IntegerBits, IntegerSign};
+use primitives::FloatSize;
 use source_files::Source;
 
 #[derive(Clone)]
@@ -63,7 +63,7 @@ impl<'env> SubTask<'env> for PerformUnaryCast<'env> {
         Self::SubArtifact<'a>,
         Result<impl FnOnce(Execution<'env>) -> Continuation<'env> + 'env, ErrorDiagnostic>,
     > {
-        let cast_failed = |_| {
+        let cast_failed = || {
             Err(ErrorDiagnostic::ice(
                 format!("Failed to perform cast to {:?}", self.to),
                 Some(self.source),
@@ -75,37 +75,15 @@ impl<'env> SubTask<'env> for PerformUnaryCast<'env> {
                 return Ok(self.from);
             };
 
-            use IntegerBits::*;
-            use IntegerSign::*;
-
             self.from = match *cast {
                 UnaryCast::SpecializeBoolean(value) => ir::Literal::Boolean(value).into(),
                 UnaryCast::SpecializeInteger(value) => match &self.to {
                     ir::Type::Bool => ir::Literal::Boolean(*value != BigInt::ZERO).into(),
-                    ir::Type::I(Bits8, Signed) => {
-                        ir::Literal::Signed8(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits16, Signed) => {
-                        ir::Literal::Signed16(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits32, Signed) => {
-                        ir::Literal::Signed32(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits64, Signed) => {
-                        ir::Literal::Signed64(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits8, Unsigned) => {
-                        ir::Literal::Unsigned8(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits16, Unsigned) => {
-                        ir::Literal::Unsigned16(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits32, Unsigned) => {
-                        ir::Literal::Unsigned32(value.try_into().map_err(cast_failed)?).into()
-                    }
-                    ir::Type::I(Bits64, Unsigned) => {
-                        ir::Literal::Unsigned64(value.try_into().map_err(cast_failed)?).into()
-                    }
+                    ir::Type::I(bits, sign) => ir::Literal::Integer(
+                        IntegerImmediate::new_with_bits_and_sign(value, *sign, *bits)
+                            .ok_or_else(cast_failed)?,
+                    )
+                    .into(),
                     ir::Type::F(FloatSize::Bits32) => {
                         ir::Literal::Float32(value.to_f32().unwrap_or_else(|| {
                             if *value < BigInt::ZERO {

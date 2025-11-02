@@ -4,6 +4,7 @@ mod write;
 use super::error::InterpreterError;
 use crate::ir;
 use bit_vec::BitVec;
+use primitives::IntegerBits;
 
 #[derive(Debug)]
 pub struct Memory {
@@ -36,7 +37,8 @@ impl Memory {
     }
 
     pub fn alloc_permanent<'env>(&mut self, bytes: u64) -> ir::Literal<'env> {
-        ir::Literal::Unsigned64(self.alloc_permanent_raw(bytes))
+        ir::Literal::new_integer(self.alloc_permanent_raw(bytes), IntegerBits::Bits64)
+            .expect("interpreter allocated heap address to be representable in u64")
     }
 
     pub fn alloc_permanent_raw(&mut self, bytes: u64) -> u64 {
@@ -67,7 +69,9 @@ impl Memory {
             return Err(InterpreterError::StackOverflow);
         }
 
-        let address = ir::Literal::Unsigned64(raw_address);
+        let address = ir::Literal::new_integer(raw_address, IntegerBits::Bits64)
+            .expect("interpreter allocated stack address to be representable in u64");
+
         let bytes = usize::try_from(bytes).unwrap();
         self.stack.extend(std::iter::repeat(0).take(bytes));
         self.stack_tainted_by_comptime_sizeof.grow(bytes, false);

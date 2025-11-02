@@ -45,6 +45,46 @@ impl IntegerBits {
             IntegerBits::Bits64 => ByteUnits::of(8),
         }
     }
+
+    pub fn min_signed(&self) -> i64 {
+        match self {
+            IntegerBits::Bits8 => i8::MIN.into(),
+            IntegerBits::Bits16 => i16::MIN.into(),
+            IntegerBits::Bits32 => i32::MIN.into(),
+            IntegerBits::Bits64 => i64::MIN,
+        }
+    }
+
+    pub fn max_signed(&self) -> i64 {
+        match self {
+            IntegerBits::Bits8 => i8::MAX.into(),
+            IntegerBits::Bits16 => i16::MAX.into(),
+            IntegerBits::Bits32 => i32::MAX.into(),
+            IntegerBits::Bits64 => i64::MAX,
+        }
+    }
+
+    pub fn min_unsigned(&self) -> u64 {
+        match self {
+            IntegerBits::Bits8 => u8::MIN.into(),
+            IntegerBits::Bits16 => u16::MIN.into(),
+            IntegerBits::Bits32 => u32::MIN.into(),
+            IntegerBits::Bits64 => u64::MIN,
+        }
+    }
+
+    pub fn max_unsigned(&self) -> u64 {
+        match self {
+            IntegerBits::Bits8 => u8::MAX.into(),
+            IntegerBits::Bits16 => u16::MAX.into(),
+            IntegerBits::Bits32 => u32::MAX.into(),
+            IntegerBits::Bits64 => u64::MAX,
+        }
+    }
+
+    pub fn mask(&self) -> u64 {
+        self.max_unsigned()
+    }
 }
 
 impl Ord for IntegerBits {

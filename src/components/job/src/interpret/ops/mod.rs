@@ -1,9 +1,9 @@
 use super::{Registers, SyscallHandler};
 use crate::{
     interpret::{Interpreter, InterpreterError, Value, ValueKind, value::Tainted},
-    ir,
-    ir::BinaryOperands,
+    ir::{self, BinaryOperands, IntegerImmediate},
 };
+use primitives::{IntegerBits, IntegerConstant, IntegerSign};
 
 macro_rules! impl_op_basic {
     ($name:ident, $wrapping_name:ident, $op:tt, $bool_op:tt) => {
@@ -19,29 +19,22 @@ macro_rules! impl_op_basic {
                 ir::Literal::Boolean(left) => {
                     ir::Literal::Boolean(left $bool_op right.clone().unwrap_boolean())
                 }
-                ir::Literal::Signed8(left) => {
-                    ir::Literal::Signed8(left.$wrapping_name(right.clone().unwrap_signed_8()))
-                }
-                ir::Literal::Signed16(left) => {
-                    ir::Literal::Signed16(left.$wrapping_name(right.clone().unwrap_signed_16()))
-                }
-                ir::Literal::Signed32(left) => {
-                    ir::Literal::Signed32(left.$wrapping_name(right.clone().unwrap_signed_32()))
-                }
-                ir::Literal::Signed64(left) => {
-                    ir::Literal::Signed64(left.$wrapping_name(right.clone().unwrap_signed_64()))
-                }
-                ir::Literal::Unsigned8(left) => {
-                    ir::Literal::Unsigned8(left.$wrapping_name(right.clone().unwrap_unsigned_8()))
-                }
-                ir::Literal::Unsigned16(left) => {
-                    ir::Literal::Unsigned16(left.$wrapping_name(right.clone().unwrap_unsigned_16()))
-                }
-                ir::Literal::Unsigned32(left) => {
-                    ir::Literal::Unsigned32(left.$wrapping_name(right.clone().unwrap_unsigned_32()))
-                }
-                ir::Literal::Unsigned64(left) => {
-                    ir::Literal::Unsigned64(left.$wrapping_name(right.clone().unwrap_unsigned_64()))
+                ir::Literal::Integer(immediate) => {
+                    let register: u64 = match immediate.value() {
+                        IntegerConstant::Signed(left) => left.$wrapping_name(right.unwrap_signed()) as u64,
+                        IntegerConstant::Unsigned(left) => left.$wrapping_name(right.unwrap_unsigned()),
+                    } & immediate.mask();
+
+                    ir::Literal::Integer(
+                        IntegerImmediate::new(
+                            match immediate.value().sign() {
+                                IntegerSign::Signed => IntegerConstant::Signed(register as i64),
+                                IntegerSign::Unsigned => IntegerConstant::Unsigned(register as u64),
+                            },
+                            immediate.bits(),
+                        )
+                        .expect("interpreter operation to remain inbounds of integer type"),
+                    )
                 }
                 ir::Literal::Float32(left) => {
                     ir::Literal::Float32(left $op right.clone().unwrap_float_32())
@@ -49,7 +42,7 @@ macro_rules! impl_op_basic {
                 ir::Literal::Float64(left) => {
                     ir::Literal::Float64(left $op right.clone().unwrap_float_64())
                 }
-                ir::Literal::NullTerminatedString(_) => ir::Literal::Unsigned64(0),
+                ir::Literal::NullTerminatedString(_) => ir::Literal::new_integer(0i64, IntegerBits::Bits64).unwrap(),
                 ir::Literal::Zeroed(ty) => ir::Literal::Zeroed(ty),
             };
 
@@ -76,44 +69,21 @@ macro_rules! impl_op_divmod {
                         return Err(InterpreterError::$error_name);
                     }
                 }
-                ir::Literal::Signed8(left) => {
-                    ir::Literal::Signed8(
-                        left.$checked_name(right.clone().unwrap_signed_8()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Signed16(left) => {
-                    ir::Literal::Signed16(
-                        left.$checked_name(right.clone().unwrap_signed_16()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Signed32(left) => {
-                    ir::Literal::Signed32(
-                        left.$checked_name(right.clone().unwrap_signed_32()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Signed64(left) => {
-                    ir::Literal::Signed64(
-                        left.$checked_name(right.clone().unwrap_signed_64()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Unsigned8(left) => {
-                    ir::Literal::Unsigned8(
-                        left.$checked_name(right.clone().unwrap_unsigned_8()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Unsigned16(left) => {
-                    ir::Literal::Unsigned16(
-                        left.$checked_name(right.clone().unwrap_unsigned_16()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Unsigned32(left) => {
-                    ir::Literal::Unsigned32(
-                        left.$checked_name(right.clone().unwrap_unsigned_32()).ok_or(InterpreterError::$error_name)?
-                    )
-                }
-                ir::Literal::Unsigned64(left) => {
-                    ir::Literal::Unsigned64(
-                        left.$checked_name(right.clone().unwrap_unsigned_64()).ok_or(InterpreterError::$error_name)?
+                ir::Literal::Integer(immediate) => {
+                    let register: u64 = match immediate.value() {
+                        IntegerConstant::Signed(left) => left.$checked_name(right.unwrap_signed()).ok_or(InterpreterError::$error_name)? as u64,
+                        IntegerConstant::Unsigned(left) => left.$checked_name(right.unwrap_unsigned()).ok_or(InterpreterError::$error_name)?,
+                    } & immediate.mask();
+
+                    ir::Literal::Integer(
+                        IntegerImmediate::new(
+                            match immediate.value().sign() {
+                                IntegerSign::Signed => IntegerConstant::Signed(register as i64),
+                                IntegerSign::Unsigned => IntegerConstant::Unsigned(register as u64),
+                            },
+                            immediate.bits(),
+                        )
+                        .expect("checked interpreter operation to remain inbounds of integer type"),
                     )
                 }
                 ir::Literal::Float32(left) => {
@@ -122,7 +92,7 @@ macro_rules! impl_op_divmod {
                 ir::Literal::Float64(left) => {
                     ir::Literal::Float64(left $op right.clone().unwrap_float_64())
                 }
-                ir::Literal::NullTerminatedString(_) => ir::Literal::Unsigned64(0),
+                ir::Literal::NullTerminatedString(_) => ir::Literal::new_integer(0i64, IntegerBits::Bits64).unwrap(),
                 ir::Literal::Zeroed(_) => return Err(InterpreterError::$error_name),
             };
 
@@ -148,29 +118,11 @@ macro_rules! impl_op_cmp {
                 ir::Literal::Boolean(left) => {
                     left $op right.clone().unwrap_boolean()
                 }
-                ir::Literal::Signed8(left) => {
-                    left $op right.clone().unwrap_signed_8()
-                }
-                ir::Literal::Signed16(left) => {
-                    left $op right.clone().unwrap_signed_16()
-                }
-                ir::Literal::Signed32(left) => {
-                    left $op right.clone().unwrap_signed_32()
-                }
-                ir::Literal::Signed64(left) => {
-                    left $op right.clone().unwrap_signed_64()
-                }
-                ir::Literal::Unsigned8(left) => {
-                    left $op right.clone().unwrap_unsigned_8()
-                }
-                ir::Literal::Unsigned16(left) => {
-                    left $op right.clone().unwrap_unsigned_16()
-                }
-                ir::Literal::Unsigned32(left) => {
-                    left $op right.clone().unwrap_unsigned_32()
-                }
-                ir::Literal::Unsigned64(left) => {
-                    left $op right.clone().unwrap_unsigned_64()
+                ir::Literal::Integer(immediate) => {
+                    match immediate.value() {
+                        IntegerConstant::Signed(left) => left $op right.unwrap_signed(),
+                        IntegerConstant::Unsigned(left) => left $op right.unwrap_unsigned(),
+                    }
                 }
                 ir::Literal::Float32(left) => {
                     left $op right.clone().unwrap_float_32()

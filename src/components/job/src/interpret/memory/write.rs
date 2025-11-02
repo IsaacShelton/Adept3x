@@ -54,14 +54,9 @@ impl Memory {
         match literal {
             ir::Literal::Void => (),
             ir::Literal::Boolean(x) => self.write_bytes(destination, &[x.into()], tainted),
-            ir::Literal::Signed8(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Unsigned8(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Signed16(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Unsigned16(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Signed32(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Unsigned32(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Signed64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
-            ir::Literal::Unsigned64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
+            ir::Literal::Integer(immediate) => {
+                self.write_bytes(destination, &immediate.to_le_bytes(), tainted)
+            }
             ir::Literal::Float32(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
             ir::Literal::Float64(x) => self.write_bytes(destination, &x.to_le_bytes(), tainted),
             ir::Literal::NullTerminatedString(value) => {

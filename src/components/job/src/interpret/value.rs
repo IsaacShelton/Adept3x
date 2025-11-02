@@ -66,14 +66,7 @@ impl<'env> Value<'env> {
         match &self.kind {
             ValueKind::Literal(literal) => match literal {
                 ir::Literal::Boolean(value) => Some((*value).into()),
-                ir::Literal::Signed8(value) => (*value).try_into().ok(),
-                ir::Literal::Signed16(value) => (*value).try_into().ok(),
-                ir::Literal::Signed32(value) => (*value).try_into().ok(),
-                ir::Literal::Signed64(value) => (*value).try_into().ok(),
-                ir::Literal::Unsigned8(value) => Some((*value).into()),
-                ir::Literal::Unsigned16(value) => Some((*value).into()),
-                ir::Literal::Unsigned32(value) => Some((*value).into()),
-                ir::Literal::Unsigned64(value) => Some(*value),
+                ir::Literal::Integer(immediate) => immediate.value().try_into().ok(),
                 ir::Literal::Zeroed(ty) if ty.is_integer_like() => Some(0),
                 _ => None,
             },

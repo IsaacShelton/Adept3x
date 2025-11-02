@@ -8,7 +8,7 @@ use crate::{
     execution::lower::{
         LowerFunctionHead, LowerType, bits_and_sign_for_invisible_integer_in_range,
         function_body::{deref_dest::DerefDest, perform_unary_cast::PerformUnaryCast},
-        value_for_bit_integer,
+        literal_value_for_bit_integer,
     },
     ir::{self, BinaryOperands},
     module_graph::ModuleView,
@@ -382,11 +382,16 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                                             )
                                         })?;
 
-                                value_for_bit_integer(value, bits, sign, instr.source)?
+                                ir::Value::Literal(literal_value_for_bit_integer(
+                                    value,
+                                    bits,
+                                    sign,
+                                    instr.source,
+                                )?)
                             }
-                            TypeKind::BitInteger(bits, sign) => {
-                                value_for_bit_integer(value, *bits, *sign, instr.source)?
-                            }
+                            TypeKind::BitInteger(bits, sign) => ir::Value::Literal(
+                                literal_value_for_bit_integer(value, *bits, *sign, instr.source)?,
+                            ),
                             _ => {
                                 return Err(ErrorDiagnostic::new(
                                     "Cannot lower integer literal to unsupported type",

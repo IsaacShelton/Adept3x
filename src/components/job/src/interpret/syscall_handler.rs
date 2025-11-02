@@ -1,5 +1,6 @@
 use super::{Value, memory::Memory};
 use interpreter_api::Syscall;
+use primitives::{IntegerBits, IntegerSign};
 
 pub trait SyscallHandler {
     fn syscall<'a>(
@@ -24,7 +25,10 @@ fn read_cstring(memory: &Memory, value: &Value) -> String {
     let mut address = value.as_u64().unwrap();
 
     loop {
-        let c = memory.read_u8(address).as_u64().unwrap() as u8;
+        let c = memory
+            .read_integer(address, IntegerSign::Unsigned, IntegerBits::Bits8)
+            .as_u64()
+            .unwrap() as u8;
         if c == 0 {
             break;
         }

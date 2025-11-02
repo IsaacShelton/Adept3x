@@ -31,6 +31,13 @@ impl IntegerSign {
             None
         }
     }
+
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            IntegerSign::Signed => "i",
+            IntegerSign::Unsigned => "u",
+        }
+    }
 }
 
 impl From<&BigInt> for IntegerSign {
