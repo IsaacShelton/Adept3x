@@ -188,25 +188,13 @@ impl<'env> Executable<'env> for LowerFunctionBody<'env> {
                         }))
                     }
                     InstrKind::Name(_, variable_ref) => get_variable_alloca(variable_ref.unwrap()),
-                    InstrKind::DeclareParameter(_, _, index, _) => {
+                    InstrKind::DeclareParameter(_, _, index, variable_ref) => {
                         let new_value = builder.push(ir::Instr::Parameter(*index));
-
-                        // WARNING: We're assuming that the first N instructions are allocas for
-                        // holding the parameters
-                        let destination = ir::ValueReference {
-                            basicblock_id: 0,
-                            instruction_id: *index as usize,
-                        };
-                        assert!(
-                            builder
-                                .inspect_for_testing(destination)
-                                .expect("alloca for param to exist")
-                                .is_alloca()
-                        );
+                        let variable_ref = variable_ref.expect("parameter to have alloca");
 
                         builder.push(ir::Instr::Store(ir::Store {
                             new_value,
-                            destination: ir::Value::Reference(destination),
+                            destination: get_variable_alloca(variable_ref),
                         }))
                     }
                     InstrKind::Declare(_, _, value, unary_cast, variable_ref) => {
