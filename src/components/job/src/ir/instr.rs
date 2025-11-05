@@ -1,6 +1,7 @@
 use crate::ir::{FuncRef, GlobalRef, Type, value::Value};
 use ast::SizeOfMode;
 use primitives::{FloatOrInteger, FloatOrSign, IntegerBits, IntegerSign};
+use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 pub enum Instr<'env> {
@@ -89,18 +90,28 @@ pub enum BinOpFloatOrInteger {
     NotEquals,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct OverflowOperation {
     pub operator: OverflowOperator,
     pub sign: IntegerSign,
     pub bits: IntegerBits,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum OverflowOperator {
     Add,
     Subtract,
     Multiply,
+}
+
+impl Display for OverflowOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            OverflowOperator::Add => "+",
+            OverflowOperator::Subtract => "-",
+            OverflowOperator::Multiply => "*",
+        })
+    }
 }
 
 #[derive(Clone, Debug)]

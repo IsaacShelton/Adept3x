@@ -1,7 +1,7 @@
 use super::{Registers, SyscallHandler};
 use crate::{
     interpret::{Interpreter, InterpreterError, Value, ValueKind, value::Tainted},
-    ir::{self, BinaryOperands, IntegerImmediate},
+    ir::{self, BinaryOperands, IntegerImmediate, OverflowOperation},
 };
 use primitives::{IntegerConstant, IntegerSign};
 
@@ -47,6 +47,77 @@ macro_rules! impl_op_basic {
             };
 
             Value { kind: ValueKind::Literal(literal), tainted }
+        }
+    };
+}
+
+macro_rules! impl_op_checked {
+    ($name:ident, $checked_name:ident) => {
+        pub fn $name<'a>(
+            &mut self,
+            operands: &'a BinaryOperands<'env>,
+            registers: &'a Registers<'env>,
+            operation: &'a OverflowOperation,
+        ) -> Result<Value<'env>, InterpreterError> {
+            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+
+            let overflow_operator = &operation.operator;
+            let integer_bits = operation.bits;
+
+            let literal = match left {
+                ir::Literal::Integer(immediate) => {
+                    // TODO: CLEANUP: Clean up this part
+                    let integer_constant = match immediate.value() {
+                        IntegerConstant::Signed(left) => {
+                            let right = right.unwrap_signed();
+
+                            let checked_result = left
+                                .$checked_name(right)
+                                .into_iter()
+                                .flat_map(|x| {
+                                    (integer_bits.min_signed() <= x
+                                        && x <= integer_bits.max_signed())
+                                    .then_some(x)
+                                })
+                                .next()
+                                .ok_or(InterpreterError::CheckedOperationFailed(
+                                    *overflow_operator,
+                                ))?;
+
+                            IntegerConstant::Signed(checked_result)
+                        }
+                        IntegerConstant::Unsigned(left) => {
+                            let right = right.unwrap_unsigned();
+
+                            let checked_result = left
+                                .$checked_name(right)
+                                .into_iter()
+                                .flat_map(|x| {
+                                    (integer_bits.min_unsigned() <= x
+                                        && x <= integer_bits.max_unsigned())
+                                    .then_some(x)
+                                })
+                                .next()
+                                .ok_or(InterpreterError::CheckedOperationFailed(
+                                    *overflow_operator,
+                                ))?;
+
+                            IntegerConstant::Unsigned(checked_result)
+                        }
+                    };
+
+                    ir::Literal::Integer(
+                        IntegerImmediate::new(integer_constant, immediate.bits())
+                            .expect("interpreter operation to remain inbounds of integer type"),
+                    )
+                }
+                _ => ir::Literal::Void,
+            };
+
+            Ok(Value {
+                kind: ValueKind::Literal(literal),
+                tainted,
+            })
         }
     };
 }
@@ -142,6 +213,41 @@ macro_rules! impl_op_cmp {
     };
 }
 
+macro_rules! impl_op_bitwise {
+    ($name:ident, $bitwise_op:tt, $bool_op:tt) => {
+        pub fn $name<'a>(
+            &mut self,
+            operands: &'a BinaryOperands<'env>,
+            registers: &'a Registers<'env>,
+        ) -> Value<'env> {
+            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+
+            // TODO: Clean this up, we really shouldn't need to rely on the type of the data
+            let literal = if left.is_boolean() || right.is_boolean() {
+                let l = left.unwrap_boolean();
+                let r = right.unwrap_boolean();
+                ir::Literal::Boolean(l $bool_op r)
+            } else {
+                let properties = left.unwrap_integer();
+                let l = left.unwrap_integer().value().raw_data();
+                let r = right.unwrap_integer().value().raw_data();
+                let raw_result = l $bitwise_op r;
+                let bits = properties.bits();
+                let sign = properties.value().sign();
+                ir::Literal::Integer(
+                    IntegerImmediate::new(IntegerConstant::from_raw_data(raw_result, sign), bits)
+                        .expect("bitwise operation result to fit within same integer range"),
+                )
+            };
+
+            Value {
+                kind: ValueKind::Literal(literal),
+                tainted,
+            }
+        }
+    };
+}
+
 impl<'env, S: SyscallHandler> Interpreter<'env, S> {
     fn eval_into_literal<'a>(
         &self,
@@ -168,6 +274,9 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
     impl_op_basic!(add, wrapping_add, +, |);
     impl_op_basic!(sub, wrapping_sub, -, ^);
     impl_op_basic!(mul, wrapping_mul, *, &);
+    impl_op_checked!(checked_add, checked_add);
+    impl_op_checked!(checked_sub, checked_sub);
+    impl_op_checked!(checked_mul, checked_mul);
     impl_op_divmod!(div, checked_div, /, DivideByZero);
     impl_op_divmod!(rem, checked_rem, %, RemainderByZero);
     impl_op_cmp!(eq, ==);
@@ -176,4 +285,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
     impl_op_cmp!(lte, <=);
     impl_op_cmp!(gt, >);
     impl_op_cmp!(gte, >=);
+    impl_op_bitwise!(bitwise_and, &, &&);
+    impl_op_bitwise!(bitwise_or, &, &&);
+    impl_op_bitwise!(bitwise_xor, ^, ^);
 }

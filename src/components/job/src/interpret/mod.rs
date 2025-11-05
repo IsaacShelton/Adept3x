@@ -12,7 +12,7 @@ use self::{
 };
 use crate::{
     interpret::{registers::Registers, value::StructLiteral},
-    ir::{self, BinOp, BinOpFloatOrInteger, IntegerImmediate},
+    ir::{self, BinOp, BinOpFloatOrInteger, BinOpFloatOrSign, BinOpSimple, IntegerImmediate},
 };
 use ast::SizeOfMode;
 use data_units::ByteUnits;
@@ -206,35 +206,58 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     operands,
                     BinOp::FloatOrInteger(BinOpFloatOrInteger::NotEquals, _),
                 ) => self.neq(operands, &registers),
-                ir::Instr::BinOp(operands, _) => {
-                    todo!("Interpreter / ir::Instruction::BinOp")
+                ir::Instr::BinOp(operands, BinOp::FloatOrSign(BinOpFloatOrSign::Divide, _)) => {
+                    self.div(operands, &registers)?
                 }
-                /*
-                ir::Instr::Checked(_, _) => todo!(),
-                ir::Instr::Divide(ops, _f_or_sign) => self.div(ops, &registers)?,
-                ir::Instr::Modulus(ops, _f_or_sign) => self.rem(ops, &registers)?,
-                ir::Instr::LessThan(ops, _f_or_i) => self.lt(ops, &registers),
-                ir::Instr::LessThanEq(ops, _f_or_i) => self.lte(ops, &registers),
-                ir::Instr::GreaterThan(ops, _f_or_i) => self.gt(ops, &registers),
-                ir::Instr::GreaterThanEq(ops, _f_or_i) => self.gte(ops, &registers),
-                ir::Instr::And(_) => todo!("Interpreter / ir::Instruction::And"),
-                ir::Instr::Or(_) => todo!("Interpreter / ir::Instruction::Or"),
-                ir::Instr::BitwiseAnd(_) => {
-                    todo!("Interpreter / ir::Instruction::BitwiseAnd")
+                ir::Instr::BinOp(operands, BinOp::FloatOrSign(BinOpFloatOrSign::Modulus, _)) => {
+                    self.rem(operands, &registers)?
                 }
-                ir::Instr::BitwiseOr(_) => todo!("Interpreter / ir::Instruction::BitwiseOr"),
-                ir::Instr::BitwiseXor(_) => {
-                    todo!("Interpreter / ir::Instruction::BitwiseXor")
+                ir::Instr::BinOp(operands, BinOp::FloatOrSign(BinOpFloatOrSign::LessThan, _)) => {
+                    self.lt(operands, &registers)
                 }
-                ir::Instr::LeftShift(_) => todo!("Interpreter / ir::Instruction::LeftShift"),
-                ir::Instr::ArithmeticRightShift(_) => {
-                    todo!("Interpreter / ir::Instruction::ArithmeticRightShift")
+                ir::Instr::BinOp(operands, BinOp::FloatOrSign(BinOpFloatOrSign::LessThanEq, _)) => {
+                    self.lte(operands, &registers)
                 }
-                ir::Instr::LogicalRightShift(_) => {
-                    todo!("Interpreter / ir::Instruction::LogicalRightShift")
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::FloatOrSign(BinOpFloatOrSign::GreaterThan, _),
+                ) => self.gt(operands, &registers),
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::FloatOrSign(BinOpFloatOrSign::GreaterThanEq, _),
+                ) => self.gte(operands, &registers),
+                ir::Instr::BinOp(operands, BinOp::Checked(operation)) => match operation.operator {
+                    ir::OverflowOperator::Add => {
+                        self.checked_add(operands, &registers, operation)?
+                    }
+                    ir::OverflowOperator::Subtract => {
+                        self.checked_sub(operands, &registers, operation)?
+                    }
+                    ir::OverflowOperator::Multiply => {
+                        self.checked_mul(operands, &registers, operation)?
+                    }
+                },
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::Simple(BinOpSimple::And | BinOpSimple::BitwiseAnd),
+                ) => self.bitwise_and(operands, &registers),
+                ir::Instr::BinOp(
+                    operands,
+                    BinOp::Simple(BinOpSimple::Or | BinOpSimple::BitwiseOr),
+                ) => self.bitwise_or(operands, &registers),
+                ir::Instr::BinOp(operands, BinOp::Simple(BinOpSimple::BitwiseXor)) => {
+                    self.bitwise_xor(operands, &registers)
                 }
-                */
-                ir::Instr::Bitcast(_, _) => todo!("Interpreter / ir::Instruction::BitCast"),
+                ir::Instr::BinOp(operands, BinOp::Simple(BinOpSimple::LeftShift)) => {
+                    todo!("Interpreter / Left Shift")
+                }
+                ir::Instr::BinOp(operands, BinOp::Simple(BinOpSimple::LogicalRightShift)) => {
+                    todo!("Interpreter / Logical Right Shift Shift")
+                }
+                ir::Instr::BinOp(operands, BinOp::Simple(BinOpSimple::ArithmeticRightShift)) => {
+                    todo!("Interpreter / Arithmetic Right Shift Shift")
+                }
+                ir::Instr::Bitcast(_, _) => todo!("Interpreter / ir::Instr::BitCast"),
                 ir::Instr::Extend(value, sign, ty) => {
                     let size = self.size_of(ty);
                     let value = self.eval(&registers, value);
@@ -261,24 +284,24 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     )
                 }
                 ir::Instr::FloatExtend(_, _) => {
-                    todo!("Interpreter / ir::Instruction::FloatExtend")
+                    todo!("Interpreter / ir::Instr::FloatExtend")
                 }
-                ir::Instr::Truncate(_, _) => todo!("Interpreter / ir::Instruction::Truncate"),
+                ir::Instr::Truncate(_, _) => todo!("Interpreter / ir::Instr::Truncate"),
                 ir::Instr::TruncateFloat(_, _) => {
-                    todo!("Interpreter / ir::Instruction::TruncateFloat")
+                    todo!("Interpreter / ir::Instr::TruncateFloat")
                 }
                 ir::Instr::IntegerToPointer(..) => {
-                    todo!("Interpreter / ir::Instruction::IntegerToPointer");
+                    todo!("Interpreter / ir::Instr::IntegerToPointer");
                 }
                 ir::Instr::PointerToInteger(..) => {
-                    todo!("Interpreter / ir::Instruction::PointerToInteger");
+                    todo!("Interpreter / ir::Instr::PointerToInteger");
                 }
 
                 ir::Instr::FloatToInteger(..) => {
-                    todo!("Interpreter / ir::Instruction::FloatToInteger");
+                    todo!("Interpreter / ir::Instr::FloatToInteger");
                 }
                 ir::Instr::IntegerToFloat(..) => {
-                    todo!("Interpreter / ir::Instruction::IntegerToFloat");
+                    todo!("Interpreter / ir::Instr::IntegerToFloat");
                 }
                 ir::Instr::Member {
                     struct_type,
@@ -297,7 +320,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                         .untainted()
                 }
                 ir::Instr::ArrayAccess { .. } => {
-                    todo!("Interpreter / ir::Instruction::ArrayAccess")
+                    todo!("Interpreter / ir::Instr::ArrayAccess")
                 }
                 ir::Instr::StructLiteral(ty, values) => {
                     let mut field_values = Vec::with_capacity(values.len());
@@ -320,7 +343,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     }
                 }
                 ir::Instr::IsZero(_value, _) => {
-                    todo!("Interpreter / ir::Instruction::IsZero")
+                    todo!("Interpreter / ir::Instr::IsZero")
                 }
                 ir::Instr::IsNonZero(value, _) => {
                     let value = self.eval(&registers, value);
@@ -344,9 +367,9 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     }
                     .untainted()
                 }
-                ir::Instr::Negate(..) => todo!("Interpreter / ir::Instruction::Negate"),
+                ir::Instr::Negate(..) => todo!("Interpreter / ir::Instr::Negate"),
                 ir::Instr::BitComplement(_) => {
-                    todo!("Interpreter / ir::Instruction::BitComplement")
+                    todo!("Interpreter / ir::Instr::BitComplement")
                 }
                 ir::Instr::Break(break_info) => {
                     new_ip = Some(InstructionPointer {
