@@ -1,9 +1,10 @@
 use crate::ir::{FuncRef, GlobalRef, Type, value::Value};
 use ast::SizeOfMode;
+use derive_more::IsVariant;
 use primitives::{FloatOrInteger, FloatOrSign, IntegerBits, IntegerSign};
 use std::fmt::Display;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IsVariant)]
 pub enum Instr<'env> {
     Return(Option<Value<'env>>),
     Call(Call<'env>),

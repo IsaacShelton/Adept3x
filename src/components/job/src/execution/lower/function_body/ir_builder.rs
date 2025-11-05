@@ -1,4 +1,8 @@
-use crate::{CfgValue, ir, repr::FuncBody};
+use crate::{
+    CfgValue,
+    ir::{self, ValueReference},
+    repr::FuncBody,
+};
 use arena::Id;
 
 #[derive(Clone, Debug)]
@@ -59,6 +63,12 @@ impl<'env> IrBuilder<'env> {
         *self.outputs[instr_ref.basicblock.into_usize()][instr_ref.instr_or_end as usize]
             .as_ref()
             .unwrap()
+    }
+
+    pub fn inspect_for_testing(&self, reference: ValueReference) -> Option<&ir::Instr<'env>> {
+        self.basicblocks
+            .get(reference.basicblock_id)?
+            .get(reference.instruction_id)
     }
 
     pub fn finish(&mut self) -> Vec<Vec<ir::Instr<'env>>> {

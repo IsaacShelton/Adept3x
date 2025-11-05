@@ -24,6 +24,7 @@ impl<'env> ExecutionCtx<'env> {
         self.io_response.take()
     }
 
+    // NOTE: All takes suspended on must be unique
     pub fn suspend_on(&mut self, tasks: impl IntoIterator<Item = impl Into<TaskRef<'env>>>) {
         self.suspend_on
             .extend(tasks.into_iter().map(|task| task.into()));

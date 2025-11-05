@@ -333,7 +333,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         // Loop through the instructions in reverse order to find declaration
                         for instr in dom.instrs.iter().take(num_take).rev() {
                             if let Some(found) = match &instr.kind {
-                                InstrKind::Parameter(name, _, _, variable_ref)
+                                InstrKind::DeclareParameter(name, _, _, variable_ref)
                                 | InstrKind::Declare(name, _, _, _, variable_ref)
                                 | InstrKind::DeclareAssign(name, _, _, variable_ref)
                                     if name == needle =>
@@ -373,7 +373,7 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                     cfg.set_typed(instr_ref, deref_variable_type);
                     cfg.set_variable_ref(instr_ref, found);
                 }
-                InstrKind::Parameter(_, ast_type, _, _) => {
+                InstrKind::DeclareParameter(_, ast_type, _, _) => {
                     // 0] Resolve variable type
                     let Some(resolved_type) = executor.demand(self.resolved_type) else {
                         return suspend!(

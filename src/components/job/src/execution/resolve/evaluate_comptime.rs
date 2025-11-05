@@ -6,6 +6,7 @@ use crate::{
 };
 use by_address::ByAddress;
 use derivative::Derivative;
+use std_ext::SmallVec2;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -42,10 +43,6 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             return Ok(evaluated);
         }
 
-        eprintln!(
-            "warning: EvaluateComptime is not fully implemented yet, and will not wait for children"
-        );
-
         let comptime_graph = self
             .view
             .graph
@@ -60,18 +57,20 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
             self.view.canonical_module_filename,
         );
 
-        if let Upserted::Created(created) = comptime_module {
-            let processing_file = executor
-                .request(ProcessFile::new(
-                    self.view.compiler(),
-                    created.canonical_module_filename,
-                    RequireFileHeader::Ignore,
-                    ctx.alloc(created),
-                    None,
-                ))
-                .raw_task_ref();
+        let mut wait_for = SmallVec2::new();
 
-            ctx.suspend_on(std::iter::once(processing_file));
+        if let Upserted::Created(created) = comptime_module {
+            wait_for.push(
+                executor
+                    .request(ProcessFile::new(
+                        self.view.compiler(),
+                        created.canonical_module_filename,
+                        RequireFileHeader::Ignore,
+                        ctx.alloc(created),
+                        None,
+                    ))
+                    .raw_task_ref(),
+            );
         }
 
         let comptime_module = comptime_module.out_of();
@@ -88,9 +87,22 @@ impl<'env> Executable<'env> for EvaluateComptime<'env> {
                 ))
                 .raw_task_ref();
 
-            ctx.suspend_on(std::iter::once(processing_file));
+            if !wait_for.contains(&processing_file) {
+                wait_for.push(processing_file);
+            }
         }
+
         let comptime_part_view = ctx.alloc(comptime_part_view.out_of());
+
+        // We wait on the files /comptime/ processing (which includes function heads, etc.)
+        // so we get consistent error messages. It's possible that symbols are invalidated after
+        // we've evaluated the expression that wouldn't have the time to raise errors otherwise.
+        // TODO: This waiting should actually happen at a higher level though, since it's
+        // possible that a function head or similar can depend on a compile-time evaluation
+        // within the same scope and comptime-ness graph.
+        if !wait_for.is_empty() {
+            ctx.suspend_on(wait_for.drain(..));
+        }
 
         return suspend!(
             self.evaluated,

@@ -27,7 +27,7 @@ pub fn flatten_func<'env>(
 
         builder.try_push(
             &mut cursor,
-            InstrKind::Parameter(
+            InstrKind::DeclareParameter(
                 name,
                 &param.ast_type,
                 index.try_into().expect("reasonable number of parameters"),

@@ -161,7 +161,7 @@ impl<'env> Display for InstrKind<'env> {
                 write!(f, "{:?}", conform_behavior)?;
             }
             InstrKind::Name(name, _) => write!(f, "name {}", name)?,
-            InstrKind::Parameter(name, ty, index, _) => {
+            InstrKind::DeclareParameter(name, ty, index, _) => {
                 write!(f, "param {} {} {}", name, ty, index)?;
             }
             InstrKind::Declare(name, ty, cfg_value, cast, _) => {
@@ -326,7 +326,7 @@ pub enum InstrKind<'env> {
         conform_behavior: Option<ConformBehavior>,
     },
     Name(&'env str, Option<VariableRef<'env>>),
-    Parameter(&'env str, &'env ast::Type, u32, Option<VariableRef<'env>>),
+    DeclareParameter(&'env str, &'env ast::Type, u32, Option<VariableRef<'env>>),
     Declare(
         &'env str,
         &'env ast::Type,

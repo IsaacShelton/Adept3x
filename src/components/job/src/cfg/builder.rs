@@ -279,7 +279,9 @@ impl<'env> CfgBuilder<'env> {
             InstrKind::DeclareAssign(_, _, _, variable_ref)
             | InstrKind::Declare(_, _, _, _, variable_ref)
             | InstrKind::Name(_, variable_ref)
-            | InstrKind::Parameter(_, _, _, variable_ref) => *variable_ref = Some(new_variable_ref),
+            | InstrKind::DeclareParameter(_, _, _, variable_ref) => {
+                *variable_ref = Some(new_variable_ref)
+            }
             _ => unreachable!(),
         }
     }
