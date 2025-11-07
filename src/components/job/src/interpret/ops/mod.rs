@@ -1,6 +1,6 @@
 use super::{Registers, SyscallHandler};
 use crate::{
-    interpret::{Interpreter, InterpreterError, Value, ValueKind, value::Tainted},
+    interpret::{Interpreter, InterpreterError, Value, ValueKind},
     ir::{self, BinaryOperands, IntegerImmediate, OverflowOperation},
 };
 use primitives::{IntegerConstant, IntegerSign};
@@ -12,7 +12,7 @@ macro_rules! impl_op_basic {
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Value<'env> {
-            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = registers.eval_binary_ops(operands);
 
             let literal = match left {
                 ir::Literal::Void => ir::Literal::Void,
@@ -59,7 +59,7 @@ macro_rules! impl_op_checked {
             registers: &'a Registers<'env>,
             operation: &'a OverflowOperation,
         ) -> Result<Value<'env>, InterpreterError> {
-            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = registers.eval_binary_ops(operands);
 
             let overflow_operator = &operation.operator;
             let integer_bits = operation.bits;
@@ -129,7 +129,7 @@ macro_rules! impl_op_divmod {
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Result<Value<'env>, InterpreterError> {
-            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = registers.eval_binary_ops(operands);
 
             let literal = match left {
                 ir::Literal::Void => ir::Literal::Void,
@@ -182,7 +182,7 @@ macro_rules! impl_op_cmp {
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Value<'env> {
-            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = registers.eval_binary_ops(operands);
 
             let value = match left {
                 ir::Literal::Void => false,
@@ -220,7 +220,7 @@ macro_rules! impl_op_bitwise {
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Value<'env> {
-            let (left, right, tainted) = self.eval_binary_ops(operands, registers);
+            let (left, right, tainted) = registers.eval_binary_ops(operands);
 
             // TODO: Clean this up, we really shouldn't need to rely on the type of the data
             let literal = if left.is_boolean() || right.is_boolean() {
@@ -249,28 +249,6 @@ macro_rules! impl_op_bitwise {
 }
 
 impl<'env, S: SyscallHandler> Interpreter<'env, S> {
-    fn eval_into_literal<'a>(
-        &self,
-        registers: &'a Registers<'env>,
-        value: &'a ir::Value<'env>,
-    ) -> (ir::Literal<'env>, Option<Tainted>) {
-        let reg = self.eval(registers, value);
-        (reg.kind.unwrap_literal(), reg.tainted)
-    }
-
-    fn eval_binary_ops<'a>(
-        &self,
-        operands: &'a BinaryOperands<'env>,
-        registers: &'a Registers<'env>,
-    ) -> (ir::Literal<'env>, ir::Literal<'env>, Option<Tainted>)
-    where
-        'env: 'a,
-    {
-        let (left, l_tainted) = self.eval_into_literal(registers, &operands.left);
-        let (right, r_tainted) = self.eval_into_literal(registers, &operands.right);
-        (left, right, l_tainted.or(r_tainted))
-    }
-
     impl_op_basic!(add, wrapping_add, +, |);
     impl_op_basic!(sub, wrapping_sub, -, ^);
     impl_op_basic!(mul, wrapping_mul, *, &);

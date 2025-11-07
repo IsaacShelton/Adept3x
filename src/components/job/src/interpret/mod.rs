@@ -119,7 +119,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
 
             let result = match instruction {
                 ir::Instr::ExitInterpreter(argument) => {
-                    self.exit_value = self.eval(&registers, argument).as_u64();
+                    self.exit_value = registers.eval(argument).as_u64();
                     break Some(ir::Value::Literal(ir::Literal::Void));
                 }
                 ir::Instr::Return(value) => {
@@ -129,7 +129,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     let mut arguments = Vec::with_capacity(call.args.len());
 
                     for argument in call.args.iter() {
-                        arguments.push(self.eval(&registers, argument));
+                        arguments.push(registers.eval(argument));
                     }
 
                     self.call(call.func, arguments)?
@@ -138,14 +138,14 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     ValueKind::Literal(self.memory.alloc_stack(self.size_of(&ty))?).untainted()
                 }
                 ir::Instr::Store(store) => {
-                    let new_value = self.eval(&registers, &store.new_value);
-                    let dest = self.eval(&registers, &store.destination).as_u64().unwrap();
+                    let new_value = registers.eval(&store.new_value);
+                    let dest = registers.eval(&store.destination).as_u64().unwrap();
 
                     self.memory.write(dest, new_value, self.ir_module)?;
                     ValueKind::Undefined.untainted()
                 }
                 ir::Instr::Load { pointer, pointee } => {
-                    let address = self.eval(&registers, &pointer).as_u64().unwrap();
+                    let address = registers.eval(&pointer).as_u64().unwrap();
                     self.memory.read(address, pointee)?
                 }
                 ir::Instr::Malloc(ir_type) => {
@@ -153,13 +153,13 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     ValueKind::Literal(self.memory.alloc_heap(bytes)).untainted()
                 }
                 ir::Instr::MallocArray(ir_type, count) => {
-                    let count = self.eval(&registers, count);
+                    let count = registers.eval(count);
                     let count = count.as_u64().unwrap();
                     let bytes = self.size_of(ir_type);
                     ValueKind::Literal(self.memory.alloc_heap(bytes * count)).untainted()
                 }
                 ir::Instr::Free(value) => {
-                    let value = self.eval(&registers, value).kind.unwrap_literal();
+                    let value = registers.eval(value).kind.unwrap_literal();
                     self.memory.free_heap(value);
                     ValueKind::Literal(ir::Literal::Void).untainted()
                 }
@@ -260,7 +260,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                 ir::Instr::Bitcast(_, _) => todo!("Interpreter / ir::Instr::BitCast"),
                 ir::Instr::Extend(value, sign, ty) => {
                     let size = self.size_of(ty);
-                    let value = self.eval(&registers, value);
+                    let value = registers.eval(value);
 
                     let integer_bits = IntegerBits::new(size.into())
                         .expect("integer size is representable in interpreter");
@@ -315,7 +315,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                         .take(*index)
                         .fold(0, |acc, f| acc + self.size_of(&f.ir_type).bytes());
 
-                    let subject_pointer = self.eval(&registers, subject_pointer).as_u64().unwrap();
+                    let subject_pointer = registers.eval(subject_pointer).as_u64().unwrap();
                     ValueKind::Literal(ir::Literal::new_u64(subject_pointer.wrapping_add(offset)))
                         .untainted()
                 }
@@ -326,7 +326,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     let mut field_values = Vec::with_capacity(values.len());
 
                     for value in *values {
-                        field_values.push(self.eval(&registers, value));
+                        field_values.push(registers.eval(value));
                     }
 
                     let tainted = field_values
@@ -346,7 +346,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     todo!("Interpreter / ir::Instr::IsZero")
                 }
                 ir::Instr::IsNonZero(value, _) => {
-                    let value = self.eval(&registers, value);
+                    let value = registers.eval(value);
 
                     match &value.kind {
                         ValueKind::Undefined => ValueKind::Undefined,
@@ -379,7 +379,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     ValueKind::Undefined.untainted()
                 }
                 ir::Instr::ConditionalBreak(value, break_info) => {
-                    let value = self.eval(&registers, value);
+                    let value = registers.eval(value);
 
                     let should = match &value.kind {
                         ValueKind::Literal(ir::Literal::Boolean(value)) => *value,
@@ -402,7 +402,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
 
                     for incoming in phi.incoming.iter() {
                         if incoming.basicblock_id == came_from_block {
-                            found = Some(self.eval(&registers, &incoming.value));
+                            found = Some(registers.eval(&incoming.value));
                             break;
                         }
                     }
@@ -413,7 +413,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
                     let mut args = Vec::with_capacity(args.len());
 
                     for supplied_arg in supplied_args.iter() {
-                        args.push(self.eval(&registers, supplied_arg));
+                        args.push(registers.eval(supplied_arg));
                     }
 
                     self.syscall_handler
@@ -436,15 +436,8 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
         self.memory.stack_restore(fp);
         Ok(return_value
             .as_ref()
-            .map(|value| self.eval(&registers, value))
+            .map(|value| registers.eval(value))
             .unwrap_or(ValueKind::Literal(ir::Literal::Void).untainted()))
-    }
-
-    pub fn eval(&self, registers: &Registers<'env>, value: &ir::Value<'env>) -> Value<'env> {
-        match value {
-            ir::Value::Literal(literal) => ValueKind::Literal(*literal).untainted(),
-            ir::Value::Reference(reference) => registers.get(reference).clone(),
-        }
     }
 
     pub fn size_of(&self, ir_type: &ir::Type<'env>) -> ByteUnits {

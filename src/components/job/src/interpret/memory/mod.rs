@@ -5,7 +5,6 @@ use super::error::InterpreterError;
 use crate::ir;
 use bit_vec::BitVec;
 use data_units::ByteUnits;
-use primitives::IntegerBits;
 
 #[derive(Debug)]
 pub struct Memory {

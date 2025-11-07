@@ -1,7 +1,7 @@
 use super::{Value, ip::InstructionPointer};
 use crate::{
-    interpret::value::ValueKind,
-    ir::{self, ValueReference},
+    interpret::value::{Tainted, ValueKind},
+    ir::{self, BinaryOperands, ValueReference},
 };
 
 #[derive(Debug)]
@@ -36,5 +36,29 @@ impl<'env> Registers<'env> {
 
     pub fn get_raw(&self, block: usize, instruction: usize) -> &Value<'env> {
         &self.registers[block][instruction]
+    }
+
+    pub fn eval(self: &Registers<'env>, value: &ir::Value<'env>) -> Value<'env> {
+        match value {
+            ir::Value::Literal(literal) => ValueKind::Literal(*literal).untainted(),
+            ir::Value::Reference(reference) => self.get(reference).clone(),
+        }
+    }
+
+    pub fn eval_into_literal(
+        &self,
+        value: &ir::Value<'env>,
+    ) -> (ir::Literal<'env>, Option<Tainted>) {
+        let reg = self.eval(value);
+        (reg.kind.unwrap_literal(), reg.tainted)
+    }
+
+    pub fn eval_binary_ops(
+        &self,
+        operands: &BinaryOperands<'env>,
+    ) -> (ir::Literal<'env>, ir::Literal<'env>, Option<Tainted>) {
+        let (left, l_tainted) = self.eval_into_literal(&operands.left);
+        let (right, r_tainted) = self.eval_into_literal(&operands.right);
+        (left, right, l_tainted.or(r_tainted))
     }
 }
