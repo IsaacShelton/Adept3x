@@ -78,7 +78,7 @@ impl Memory {
         Ok(address)
     }
 
-    pub fn stack_save(&mut self) -> usize {
+    pub fn stack_save(&self) -> usize {
         self.stack.len()
     }
 

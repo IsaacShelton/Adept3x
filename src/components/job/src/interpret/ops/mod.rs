@@ -8,7 +8,7 @@ use primitives::{IntegerConstant, IntegerSign};
 macro_rules! impl_op_basic {
     ($name:ident, $wrapping_name:ident, $op:tt, $bool_op:tt) => {
         pub fn $name<'a>(
-            &mut self,
+            &self,
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Value<'env> {
@@ -54,7 +54,7 @@ macro_rules! impl_op_basic {
 macro_rules! impl_op_checked {
     ($name:ident, $checked_name:ident) => {
         pub fn $name<'a>(
-            &mut self,
+            &self,
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
             operation: &'a OverflowOperation,
@@ -125,7 +125,7 @@ macro_rules! impl_op_checked {
 macro_rules! impl_op_divmod {
     ($name:ident, $checked_name:ident, $op:tt, $error_name:ident) => {
         pub fn $name<'a>(
-            &mut self,
+            &self,
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Result<Value<'env>, InterpreterError> {
@@ -178,7 +178,7 @@ macro_rules! impl_op_divmod {
 macro_rules! impl_op_cmp {
     ($name:ident, $op:tt) => {
         pub fn $name<'a>(
-            &mut self,
+            &self,
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Value<'env> {
@@ -216,7 +216,7 @@ macro_rules! impl_op_cmp {
 macro_rules! impl_op_bitwise {
     ($name:ident, $bitwise_op:tt, $bool_op:tt) => {
         pub fn $name<'a>(
-            &mut self,
+            &self,
             operands: &'a BinaryOperands<'env>,
             registers: &'a Registers<'env>,
         ) -> Value<'env> {
