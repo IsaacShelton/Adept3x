@@ -1,13 +1,7 @@
-#[cfg(unix)]
-use std::os::unix::io::AsRawFd;
-#[cfg(windows)]
-use std::os::windows::fs::OpenOptionsExt;
 use std::{
     fs::{File, OpenOptions},
     path::PathBuf,
 };
-#[cfg(windows)]
-use windows_sys::Win32::Storage::FileSystem::*;
 
 pub fn lockfile_path() -> PathBuf {
     std::env::current_dir().unwrap().join("adeptd.lock")
@@ -22,6 +16,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
             libc,
             libc::{F_SETLK, F_WRLCK, SEEK_SET, fcntl, flock as RawFlock},
         };
+        use std::os::unix::io::AsRawFd;
 
         let file = OpenOptions::new().create(true).write(true).open(&path)?;
 
@@ -49,7 +44,11 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
 
     #[cfg(windows)]
     {
-        use std::{ffi::OsStr, os::windows::ffi::OsStrExt};
+        use std::{
+            ffi::OsStr,
+            os::windows::{ffi::OsStrExt, fs::OpenOptionsExt, io::FromRawHandle},
+        };
+        use windows_sys::Win32::Storage::FileSystem::*;
 
         let wide: Vec<u16> = OsStr::new(&path)
             .encode_wide()

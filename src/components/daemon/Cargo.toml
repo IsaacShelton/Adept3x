@@ -8,6 +8,7 @@ ctrlc = "3.5.1"
 nix = { version = "0.30.1", features = ["fs"] }
 smol = "2.0.2"
 notify = { version = "8.1.0", optional = true }
+windows-sys = { version = "0.61.2", option = true }
 
 [features]
-watch = ["notify"]
+watch = ["notify", "windows_sys"]
