@@ -12,10 +12,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
 
     #[cfg(unix)]
     {
-        use nix::{
-            libc,
-            libc::{F_SETLK, F_WRLCK, SEEK_SET, fcntl, flock as RawFlock},
-        };
+        use nix::libc::{F_SETLK, F_WRLCK, SEEK_SET, fcntl, flock as RawFlock};
         use std::{io::ErrorKind, os::unix::io::AsRawFd};
 
         let file = OpenOptions::new().create(true).write(true).open(&path)?;
@@ -32,10 +29,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
         if unsafe { fcntl(file.as_raw_fd(), F_SETLK, &fl) } == -1 {
             let error = std::io::Error::last_os_error();
 
-            if matches!(
-                errno.kind(),
-                ErrorKind::WouldBlock | ErrorKind::PermissionDenied
-            ) {
+            if let ErrorKind::WouldBlock | ErrorKind::PermissionDenied = error.kind() {
                 return Ok(None);
             } else {
                 return Err(error);
