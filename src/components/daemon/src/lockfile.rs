@@ -29,7 +29,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
         if unsafe { fcntl(file.as_raw_fd(), F_SETLK, &fl) } == -1 {
             let error = std::io::Error::last_os_error();
 
-            if let ErrorKind::WouldBlock | ErrorKind::PermissionDenied = error.kind() {
+            if let ErrorKind::ResourceBusy | ErrorKind::PermissionDenied = error.kind() {
                 return Ok(None);
             } else {
                 return Err(error);
