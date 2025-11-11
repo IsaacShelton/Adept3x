@@ -19,7 +19,7 @@ pub fn c_code(
     text: impl Text,
     key: SourceFileKey,
     c_file_type: CFileType,
-) -> Result<RawAstFile, Box<(dyn Show + 'static)>> {
+) -> Result<RawAstFile, Box<dyn Show + 'static>> {
     let Preprocessed {
         document,
         defines,

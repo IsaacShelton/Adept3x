@@ -75,7 +75,7 @@ pub fn compile_rest_module_file<'a, I: InfinitePeekable<Token>>(
     rest_input: Input<'a, I>,
     conform_behavior: ConformBehavior,
     out_ast_files: &AppendOnlyVec<(FsNodeId, RawAstFile)>,
-) -> Result<ByteUnits, Box<(dyn Show + 'static)>> {
+) -> Result<ByteUnits, Box<dyn Show + 'static>> {
     let mut parser = Parser::new(rest_input, conform_behavior);
     out_ast_files.push((module_file.fs_node_id, parser.parse().map_err(into_show)?));
     Ok(ByteUnits::ZERO) // No new bytes processed

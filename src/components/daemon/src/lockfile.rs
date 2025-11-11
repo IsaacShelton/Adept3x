@@ -45,7 +45,10 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
             ffi::OsStr,
             os::windows::{ffi::OsStrExt, fs::OpenOptionsExt, io::FromRawHandle},
         };
-        use windows_sys::Win32::Storage::FileSystem::*;
+        use windows_sys::Win32::{
+            Foundation::{GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+            Storage::FileSystem::{FILE_ATTRIBUTE_NORMAL, OPEN_ALWAYS},
+        };
 
         let wide: Vec<u16> = OsStr::new(&path)
             .encode_wide()
@@ -60,7 +63,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
                 std::ptr::null_mut(),
                 OPEN_ALWAYS,
                 FILE_ATTRIBUTE_NORMAL,
-                0,
+                std::ptr::null_mut(),
             )
         };
 
