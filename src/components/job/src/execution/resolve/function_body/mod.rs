@@ -548,6 +548,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         ))
                     };
 
+                    // TODO: We need to be able to smartly adjust integer ranges when using
+                    // operators on them. E.g. 0..=255 + 0..=255 should not have the type 0..=255
+                    let for_subtract = matches!(op, ast::BasicBinaryOperator::Subtract);
+
                     let Some(mut unified) = unify_types(
                         ctx,
                         types_iter.clone(),
@@ -560,8 +564,8 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         return Err(cannot("incompatible"));
                     };
 
-                    let properties = match &unified.unified.0.kind {
-                        TypeKind::IntegerLiteral(big_int) => {
+                    match &unified.unified.0.kind {
+                        TypeKind::IntegerLiteral(_) => {
                             // TODO: We can be smarter here, but for now, we will replace `a` and
                             // `b` with the specialized version of the literal.
 
@@ -581,11 +585,10 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                                 unified.unary_casts.push((true, cast));
                             }
                         }
-                        TypeKind::IntegerLiteralInRange(_, _) => todo!(),
                         TypeKind::FloatLiteral(_) => todo!(),
                         TypeKind::AsciiCharLiteral(_) => todo!(),
                         _ => (),
-                    };
+                    }
 
                     // NOTE: For comparing literal values such as bool literals, int literals,
                     // float literals, etc. We will need to enhance this to take non-concrete
@@ -862,14 +865,28 @@ impl<'env> Executable<'env> for ResolveFunctionBody<'env> {
                         arg_casts.push(conformed.cast);
                     }
 
+                    if call.args.len() < func_head.params.required.len() {
+                        let count = func_head.params.required.len() - call.args.len();
+                        return Err(ErrorDiagnostic::new(
+                            format!(
+                                "Missing {} required argument{} for '{}'",
+                                count,
+                                if count > 1 { "s" } else { "" },
+                                func_head.name
+                            ),
+                            instr.source,
+                        )
+                        .into());
+                    }
+
                     let arg_casts = ctx.alloc_slice_fill_iter(arg_casts.into_iter());
                     let variadic_arg_types =
                         ctx.alloc_slice_fill_iter(variadic_arg_types.into_iter());
 
                     assert_eq!(arg_casts.len(), call.args.len());
                     assert_eq!(
-                        variadic_arg_types.len(),
-                        call.args.len() - func_head.params.required.len()
+                        func_head.params.required.len() + variadic_arg_types.len(),
+                        call.args.len(),
                     );
 
                     cfg.set_typed_and_callee(

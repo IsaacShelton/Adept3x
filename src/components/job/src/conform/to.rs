@@ -108,6 +108,51 @@ pub fn conform_to<'env>(
             _ => None,
         },
         TypeKind::IntegerLiteralInRange(from_min, from_max) => match &to_ty.0.kind {
+            TypeKind::BitInteger(bits, sign) => {
+                let (to_min, to_max) = if sign.is_signed() {
+                    (
+                        BigInt::from(bits.min_signed()),
+                        BigInt::from(bits.max_signed()),
+                    )
+                } else {
+                    (
+                        BigInt::from(bits.min_unsigned()),
+                        BigInt::from(bits.max_unsigned()),
+                    )
+                };
+
+                if **from_min >= to_min && **from_max <= to_max {
+                    let sign = IntegerSign::new(to_min < BigInt::ZERO);
+                    Some(Conform::new(to_ty, UnaryCast::Extend(sign)))
+                } else {
+                    None
+                }
+            }
+            TypeKind::CInteger(c_integer, sign) => {
+                let sign = sign.unwrap_or_else(|| target.default_c_integer_sign(*c_integer));
+                let bytes = target.c_integer_bytes(*c_integer);
+
+                let range = if sign.is_signed() {
+                    bytes
+                        .min_max_signed()
+                        .map(|(min, max)| (BigInt::from(min), BigInt::from(max)))
+                } else {
+                    bytes
+                        .min_max_unsigned()
+                        .map(|(min, max)| (BigInt::from(min), BigInt::from(max)))
+                };
+
+                if let Some((to_min, to_max)) = range {
+                    if **from_min >= to_min && **from_max <= to_max {
+                        let sign = IntegerSign::new(to_min < BigInt::ZERO);
+                        Some(Conform::new(to_ty, UnaryCast::Extend(sign)))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
             TypeKind::IntegerLiteralInRange(to_min, to_max) => {
                 if from_min >= to_min && from_max <= to_max {
                     let sign = IntegerSign::new(**to_min < BigInt::ZERO);

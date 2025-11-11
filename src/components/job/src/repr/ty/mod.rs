@@ -177,6 +177,13 @@ impl<'env> TypeKind<'env> {
                 NumericMode::LooseIndeterminateSignInteger(*c_integer)
             }),
             Self::Floating(_) => Some(NumericMode::Float),
+            Self::IntegerLiteralInRange(a, b) => Some(NumericMode::Integer(
+                if **a < BigInt::ZERO || **b < BigInt::ZERO {
+                    IntegerSign::Signed
+                } else {
+                    IntegerSign::Unsigned
+                },
+            )),
             _ => None,
         }
     }

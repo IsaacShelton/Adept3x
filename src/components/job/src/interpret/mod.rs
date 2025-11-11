@@ -146,7 +146,7 @@ impl<'env, S: SyscallHandler> Interpreter<'env, S> {
         self.exit_value
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn step(&mut self) -> Result<Option<Value<'env>>, InterpreterError> {
         let frame = self.call_stack.last().expect("function to run");
         let registers = &frame.registers;

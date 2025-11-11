@@ -49,6 +49,34 @@ impl ByteUnits {
     pub fn next_power_of_two(self) -> Self {
         Self::of(self.units.next_power_of_two())
     }
+
+    pub fn min_max_unsigned(self) -> Option<(u64, u64)> {
+        self.min_unsigned()
+            .and_then(|min| self.max_unsigned().map(|max| (min, max)))
+            .ok()
+    }
+
+    pub fn min_max_signed(self) -> Option<(i64, i64)> {
+        self.min_signed()
+            .and_then(|min| self.max_signed().map(|max| (min, max)))
+            .ok()
+    }
+
+    pub fn min_unsigned(self) -> Result<u64, ()> {
+        self.to_bits().min_unsigned()
+    }
+
+    pub fn max_unsigned(self) -> Result<u64, ()> {
+        self.to_bits().max_unsigned()
+    }
+
+    pub fn min_signed(self) -> Result<i64, ()> {
+        self.to_bits().min_signed()
+    }
+
+    pub fn max_signed(self) -> Result<i64, ()> {
+        self.to_bits().max_signed()
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
@@ -63,6 +91,36 @@ impl BitUnits {
 
     pub const fn bits(&self) -> u64 {
         self.units
+    }
+
+    pub fn min_unsigned(self) -> Result<u64, ()> {
+        Ok(0)
+    }
+
+    pub fn max_unsigned(self) -> Result<u64, ()> {
+        if self.units == 64 {
+            Ok(u64::MAX)
+        } else if self.units < 64 {
+            Ok((1u64 << self.units) - 1)
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn min_signed(self) -> Result<i64, ()> {
+        if self.units == 0 {
+            Ok(0)
+        } else {
+            Ok(-(BitUnits::of(self.units - 1).max_unsigned()? as i64) - 1)
+        }
+    }
+
+    pub fn max_signed(self) -> Result<i64, ()> {
+        if self.units == 0 {
+            Ok(0)
+        } else {
+            Ok(BitUnits::of(self.units - 1).max_unsigned()? as i64)
+        }
     }
 }
 
