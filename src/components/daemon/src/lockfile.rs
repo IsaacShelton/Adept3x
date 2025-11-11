@@ -16,7 +16,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
             libc,
             libc::{F_SETLK, F_WRLCK, SEEK_SET, fcntl, flock as RawFlock},
         };
-        use std::os::unix::io::AsRawFd;
+        use std::{io::ErrorKind, os::unix::io::AsRawFd};
 
         let file = OpenOptions::new().create(true).write(true).open(&path)?;
 
@@ -30,12 +30,15 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
 
         // F_SETLK for a whole-file exclusive lock
         if unsafe { fcntl(file.as_raw_fd(), F_SETLK, &fl) } == -1 {
-            let errno = unsafe { *libc::__error() };
+            let error = std::io::Error::last_os_error();
 
-            if errno == libc::EACCES || errno == libc::EAGAIN {
+            if matches!(
+                errno.kind(),
+                ErrorKind::WouldBlock | ErrorKind::PermissionDenied
+            ) {
                 return Ok(None);
             } else {
-                return Err(std::io::Error::last_os_error());
+                return Err(error);
             }
         }
 
