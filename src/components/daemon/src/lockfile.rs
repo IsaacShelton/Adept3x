@@ -1,7 +1,4 @@
-use std::{
-    fs::{File, OpenOptions},
-    path::PathBuf,
-};
+use std::{fs::File, path::PathBuf};
 
 pub fn lockfile_path() -> PathBuf {
     std::env::current_dir().unwrap().join("adeptd.lock")
@@ -13,7 +10,7 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
     #[cfg(unix)]
     {
         use nix::libc::{F_SETLK, F_WRLCK, SEEK_SET, fcntl, flock as RawFlock};
-        use std::{io::ErrorKind, os::unix::io::AsRawFd};
+        use std::{fs::OpenOptions, io::ErrorKind, os::unix::io::AsRawFd};
 
         let file = OpenOptions::new().create(true).write(true).open(&path)?;
 
@@ -43,11 +40,11 @@ pub fn try_acquire_lock() -> std::io::Result<Option<File>> {
     {
         use std::{
             ffi::OsStr,
-            os::windows::{ffi::OsStrExt, fs::OpenOptionsExt, io::FromRawHandle},
+            os::windows::{ffi::OsStrExt, io::FromRawHandle},
         };
         use windows_sys::Win32::{
             Foundation::{GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
-            Storage::FileSystem::{FILE_ATTRIBUTE_NORMAL, OPEN_ALWAYS},
+            Storage::FileSystem::{CreateFileW, FILE_ATTRIBUTE_NORMAL, OPEN_ALWAYS},
         };
 
         let wide: Vec<u16> = OsStr::new(&path)
