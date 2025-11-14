@@ -731,6 +731,19 @@ name = "data_units"
 version = "0.1.0"
 
 [[package]]
+name = "db"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "derive_more",
+ "diagnostics",
+ "enum_dispatch",
+ "slotmap",
+ "smallvec",
+ "std_ext",
+]
+
+[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
