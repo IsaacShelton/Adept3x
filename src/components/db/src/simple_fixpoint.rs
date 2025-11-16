@@ -21,32 +21,25 @@ impl Repl {
 
             let parts: Vec<_> = buffer.split_whitespace().collect();
 
-            if let Some(("get", name)) = parts.get(0).copied().zip(parts.get(1).copied()) {
-                return Some(Req::GetSymbol(name.into()));
-            }
-
-            if let Some(("del", name)) = parts.get(0).copied().zip(parts.get(1).copied()) {
-                self.del_symbols.push(name.into());
-            }
-
-            if let Some(("add", (name, def))) = parts
-                .get(0)
-                .copied()
-                .zip(parts.get(1).copied().zip(parts.get(2).copied()))
-            {
-                self.new_symbols.push((name.into(), Symbol(def.into())));
-            }
-
-            if let Some(("pair", (a, b))) = parts
-                .get(0)
-                .copied()
-                .zip(parts.get(1).copied().zip(parts.get(2).copied()))
-            {
-                return Some(Req::Pair(a.into(), b.into()));
-            }
-
-            if let Some("quit" | "exit" | ".quit" | ".exit") = parts.get(0).copied() {
-                return None;
+            match parts.as_slice() {
+                &["get", name] => {
+                    return Some(Req::GetSymbol(name.into()));
+                }
+                &["del", name] => {
+                    self.del_symbols.push(name.into());
+                }
+                &["add", name, def] => {
+                    self.new_symbols.push((name.into(), Symbol(def.into())));
+                }
+                &["pair", a, b] => {
+                    return Some(Req::Pair(a.into(), b.into()));
+                }
+                &["quit" | "exit" | ".quit" | ".exit"] => {
+                    return None;
+                }
+                _ => {
+                    eprintln!("<invalid repl command>");
+                }
             }
         }
     }
