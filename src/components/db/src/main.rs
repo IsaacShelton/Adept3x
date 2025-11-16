@@ -10,6 +10,7 @@ mod req_state;
 mod rev;
 mod rt;
 mod rt_st_incr;
+mod simple_fixpoint;
 mod timeout;
 mod wake_after;
 
@@ -25,14 +26,17 @@ pub use rev::*;
 pub use rt::*;
 pub use rt_st_incr::*;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     num::NonZero,
+    sync::Arc,
     time::{Duration, Instant},
 };
-use std_ext::{SmallVec1, SmallVec4};
 pub use wake_after::*;
 
 fn main() {
+    simple_fixpoint::main();
+
+    /*
     let bump = bumpalo::Bump::default();
     let mut runtime = StIncrRt::new(&bump);
     runtime.set_input(
@@ -40,6 +44,8 @@ fn main() {
         NumberedRevision::default(),
         Artifact::String("Hi, world!".into()),
     );
+
     let result = runtime.block_on(Req::BuildExecutable, TimeoutNever);
     let _ = dbg!(&result);
+    */
 }

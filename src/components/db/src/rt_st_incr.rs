@@ -27,6 +27,34 @@ impl<'env> StIncrRt<'env> {
             current_revision: NumberedRevision::default(),
         }
     }
+
+    pub fn spawn(&mut self, child: Req, parent: Option<&Req>) {
+        let is_complete = if let Some(running) = self.requests.get(&child) {
+            running
+                .state
+                .as_ref()
+                .expect("not processing")
+                .is_complete()
+        } else {
+            self.requests
+                .insert(child, ReqInfo::initial(self.current_revision));
+            self.queue.push(child);
+            false
+        };
+
+        if let Some(parent) = parent {
+            if !is_complete {
+                self.needs_before_wake
+                    .entry(*parent)
+                    .or_default()
+                    .insert(child);
+                self.after_done_maybe_wake
+                    .entry(child)
+                    .or_default()
+                    .push(*parent);
+            }
+        }
+    }
 }
 
 impl<'env> Rt for StIncrRt<'env> {
@@ -56,11 +84,14 @@ impl<'env> Rt for StIncrRt<'env> {
             let mut thrd = StIncrThrd {
                 runtime: self,
                 wake_after: vec![],
+                spawn_detached: vec![],
             };
 
             let polled = req.poll(&mut thrd, &mut state);
             let wake_after = std::mem::take(&mut thrd.wake_after);
+            let spawn_detached = std::mem::take(&mut thrd.spawn_detached);
             let is_complete = state.is_complete();
+            drop(thrd);
 
             self.requests.get_mut(&req).unwrap().state = Some(state);
 
@@ -69,30 +100,22 @@ impl<'env> Rt for StIncrRt<'env> {
             }
 
             if is_complete {
-                for dependant in self.after_done_maybe_wake.remove(&req).unwrap_or_default() {
-                    let waiting_on = self.needs_before_wake.get_mut(&dependant).unwrap();
+                for child in self.after_done_maybe_wake.remove(&req).unwrap_or_default() {
+                    let waiting_on = self.needs_before_wake.get_mut(&child).unwrap();
                     assert!(waiting_on.remove(&req));
 
                     if waiting_on.is_empty() {
-                        self.queue.push(dependant);
+                        self.queue.push(child);
                     }
                 }
             } else {
-                for requirement in wake_after {
-                    let before_wake = self.needs_before_wake.entry(req).or_default();
-                    before_wake.insert(requirement);
-
-                    self.after_done_maybe_wake
-                        .entry(requirement)
-                        .or_default()
-                        .push(req);
-
-                    if self.requests.get(&requirement).is_none() {
-                        self.requests
-                            .insert(requirement, ReqInfo::initial(self.current_revision));
-                        self.queue.push(requirement);
-                    }
+                for new in wake_after {
+                    self.spawn(new, Some(&req));
                 }
+            }
+
+            for new in spawn_detached.into_iter() {
+                self.spawn(new, None);
             }
 
             if timeout.should_unblock() {
@@ -120,6 +143,7 @@ impl<'env> Rt for StIncrRt<'env> {
 pub struct StIncrThrd<'rt, 'env> {
     runtime: &'rt StIncrRt<'env>,
     wake_after: Vec<Req>,
+    spawn_detached: Vec<Req>,
 }
 
 impl<'rt, 'env> Thrd for StIncrThrd<'rt, 'env> {
@@ -144,5 +168,9 @@ impl<'rt, 'env> Thrd for StIncrThrd<'rt, 'env> {
         };
 
         Ok(artifact)
+    }
+
+    fn anticipate(&mut self, req: Req) {
+        self.spawn_detached.push(req);
     }
 }

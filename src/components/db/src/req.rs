@@ -1,11 +1,14 @@
 use crate::{Artifact, Control, ReqState, Rt, Thrd, WakeAfter};
 use diagnostics::ErrorDiagnostic;
 
+type Search = ();
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Req {
     BuildExecutable,
     RootFile,
     Test,
+    Search(Search),
 }
 
 impl Req {
@@ -20,6 +23,10 @@ impl Req {
             Req::BuildExecutable => {
                 let test = thread.demand(Req::Test)?;
                 *state = ReqState::Complete(test.clone());
+                return Ok(());
+            }
+            Req::Search(_) => {
+                *state = ReqState::Complete(Artifact::Void);
                 return Ok(());
             }
         }
