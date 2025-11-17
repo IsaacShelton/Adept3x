@@ -41,11 +41,7 @@ impl Repl {
                 }
                 &["del", name] => {
                     self.last_changed = current_revision;
-                    for _ in self
-                        .root_file
-                        .funcs
-                        .extract_if(.., |func| func.name == name)
-                    {}
+                    self.root_file.funcs.retain(|func| func.name != name)
                 }
                 &["add", name] => {
                     self.last_changed = current_revision;
@@ -79,11 +75,7 @@ impl Repl {
                 }
                 &["deleval", name] => {
                     self.last_changed = current_revision;
-                    for _ in self
-                        .root_file
-                        .evals
-                        .extract_if(.., |eval| eval.callee == name)
-                    {}
+                    self.root_file.evals.retain(|eval| eval.callee != name)
                 }
                 &["pair", a, b] => {
                     return Some(Req::Pair(a.into(), b.into()));
