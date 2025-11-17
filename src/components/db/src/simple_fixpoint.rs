@@ -3,10 +3,17 @@ use std::{
     io::Write,
 };
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Func {
+    name: String,
+    body: Option<String>,
+}
+
 #[derive(Default)]
 pub struct Repl {
-    pub new_symbols: Vec<(String, Symbol)>,
+    pub new_symbols: Vec<Func>,
     pub del_symbols: Vec<String>,
+    pub new_evals: Vec<String>,
 }
 
 impl Repl {
@@ -28,8 +35,20 @@ impl Repl {
                 &["del", name] => {
                     self.del_symbols.push(name.into());
                 }
-                &["add", name, def] => {
-                    self.new_symbols.push((name.into(), Symbol(def.into())));
+                &["add", name] => {
+                    self.new_symbols.push(Func {
+                        name: name.into(),
+                        body: None,
+                    });
+                }
+                &["add", name, body] => {
+                    self.new_symbols.push(Func {
+                        name: name.into(),
+                        body: Some(body.into()),
+                    });
+                }
+                &["addeval", name] => {
+                    self.new_evals.push(name.into());
                 }
                 &["pair", a, b] => {
                     return Some(Req::Pair(a.into(), b.into()));
@@ -91,9 +110,11 @@ pub struct CompletedTask {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Artifact {
     Void,
-    Found(Vec<Symbol>),
-    AddSymbols(Vec<(String, Symbol)>),
+    Found(Vec<Func>),
+    AddSymbols(Vec<Func>),
     DelSymbols(Vec<String>),
+    AddEvals(Vec<String>),
+    Error(String),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -123,13 +144,14 @@ impl Req {
 
 #[derive(Debug, Default)]
 pub struct SymbolCollection {
-    symbols: Vec<Symbol>,
+    symbols: Vec<Func>,
     last_changed: Revision,
 }
 
 #[derive(Debug, Default)]
 pub struct SymbolMap {
     pub symbols: HashMap<String, SymbolCollection>,
+    pub evals: HashSet<String>,
 }
 
 #[derive(Debug)]
@@ -216,11 +238,12 @@ pub fn main() {
                     // If we added a symbol, we made progress towards the fixpoint,
                     // and the request to move towards the fixpoint should be re-requested.
                     if let Artifact::AddSymbols(symbols) = &artifact {
-                        for (name, symbol) in symbols {
-                            let collection = symbol_map.symbols.entry(name.clone()).or_default();
+                        for func in symbols {
+                            let collection =
+                                symbol_map.symbols.entry(func.name.clone()).or_default();
                             collection.last_changed = current_revision;
                             collection.last_changed.iteration += 1;
-                            collection.symbols.push(symbol.clone());
+                            collection.symbols.push(func.clone());
                         }
                         progress = true;
                     }
@@ -236,6 +259,16 @@ pub fn main() {
                             collection.symbols.clear();
                         }
                         progress = true;
+                    }
+
+                    // If we deleted a symbol, we made progress towards the fixpoint,
+                    // and the request to move towards the fixpoint should be re-requested.
+                    if let Artifact::AddEvals(symbols) = &artifact {
+                        for name in symbols {
+                            if symbol_map.evals.insert(name.into()) {
+                                progress = true;
+                            }
+                        }
                     }
 
                     // If the new completed artifact matches the old one
@@ -385,10 +418,39 @@ fn process(
         Req::MoveTowardsFixpoint => {
             if !repl.new_symbols.is_empty() {
                 return Ok(Artifact::AddSymbols(std::mem::take(&mut repl.new_symbols)));
-            }
-            if !repl.del_symbols.is_empty() {
+            } else if !repl.del_symbols.is_empty() {
                 return Ok(Artifact::DelSymbols(std::mem::take(&mut repl.del_symbols)));
+            } else if !repl.new_evals.is_empty() {
+                return Ok(Artifact::AddEvals(std::mem::take(&mut repl.new_evals)));
             } else {
+                for eval in symbol_map.evals.iter() {
+                    let callee = request(
+                        cache,
+                        symbol_map,
+                        Req::GetSymbol(eval.into()),
+                        current_revision,
+                    )?;
+
+                    let func = match &callee {
+                        Artifact::Found(funcs) => match &funcs[..] {
+                            [f] => f,
+                            [] => {
+                                return Ok(Artifact::Error(format!(
+                                    "Callee '{}' does not exist",
+                                    eval
+                                )));
+                            }
+                            [..] => {
+                                return Ok(Artifact::Error(format!(
+                                    "Ambiguous call to '{}'",
+                                    eval
+                                )));
+                            }
+                        },
+                        _ => return Ok(Artifact::Error("Not callable".into())),
+                    };
+                }
+
                 return Ok(Artifact::Void);
             }
         }
