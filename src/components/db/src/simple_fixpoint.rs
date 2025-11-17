@@ -1,23 +1,30 @@
 use std::{
+    cmp::max,
     collections::{HashMap, HashSet},
     io::Write,
+    thread::current,
 };
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Eval {
+    callee: String,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Func {
     name: String,
     body: Option<String>,
+    from_eval: Option<Eval>,
 }
 
 #[derive(Default)]
 pub struct Repl {
-    pub new_symbols: Vec<Func>,
-    pub del_symbols: Vec<String>,
-    pub new_evals: Vec<String>,
+    pub last_changed: Revision,
+    pub root_file: File,
 }
 
 impl Repl {
-    pub fn run(&mut self) -> Option<Req> {
+    pub fn run(&mut self, current_revision: Revision) -> Option<Req> {
         loop {
             let mut buffer = String::new();
             let stdin = std::io::stdin();
@@ -33,22 +40,50 @@ impl Repl {
                     return Some(Req::GetSymbol(name.into()));
                 }
                 &["del", name] => {
-                    self.del_symbols.push(name.into());
+                    self.last_changed = current_revision;
+                    for _ in self
+                        .root_file
+                        .funcs
+                        .extract_if(.., |func| func.name == name)
+                    {}
                 }
                 &["add", name] => {
-                    self.new_symbols.push(Func {
+                    self.last_changed = current_revision;
+                    self.root_file.funcs.push(Func {
                         name: name.into(),
                         body: None,
+                        from_eval: None,
                     });
                 }
                 &["add", name, body] => {
-                    self.new_symbols.push(Func {
+                    self.last_changed = current_revision;
+                    self.root_file.funcs.push(Func {
                         name: name.into(),
                         body: Some(body.into()),
+                        from_eval: None,
                     });
                 }
+                &["list"] => {
+                    for func in self.root_file.funcs.iter() {
+                        eprintln!("{:?}", func);
+                    }
+                    for eval in self.root_file.evals.iter() {
+                        eprintln!("{:?}", eval);
+                    }
+                }
                 &["addeval", name] => {
-                    self.new_evals.push(name.into());
+                    self.last_changed = current_revision;
+                    self.root_file.evals.push(Eval {
+                        callee: name.into(),
+                    });
+                }
+                &["deleval", name] => {
+                    self.last_changed = current_revision;
+                    for _ in self
+                        .root_file
+                        .evals
+                        .extract_if(.., |eval| eval.callee == name)
+                    {}
                 }
                 &["pair", a, b] => {
                     return Some(Req::Pair(a.into(), b.into()));
@@ -70,13 +105,26 @@ pub struct Revision {
     iteration: usize,
 }
 
+impl Revision {
+    pub fn next_iteration(&self) -> Self {
+        Self {
+            major: self.major,
+            iteration: self.iteration + 1,
+        }
+    }
+}
+
+impl Ord for Revision {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.major
+            .cmp(&other.major)
+            .then(self.iteration.cmp(&other.iteration))
+    }
+}
+
 impl PartialOrd for Revision {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.major.partial_cmp(&other.major) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.iteration.partial_cmp(&other.iteration)
+        Some(self.cmp(other))
     }
 }
 
@@ -111,10 +159,15 @@ pub struct CompletedTask {
 pub enum Artifact {
     Void,
     Found(Vec<Func>),
-    AddSymbols(Vec<Func>),
-    DelSymbols(Vec<String>),
-    AddEvals(Vec<String>),
+    NewSymbolMap(SymbolMap),
+    File(File),
     Error(String),
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct File {
+    funcs: Vec<Func>,
+    evals: Vec<Eval>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -123,35 +176,49 @@ pub struct Symbol(pub String);
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Req {
     MoveTowardsFixpoint,
+    GetRootFile,
     GetSymbol(String),
     Pair(String, String),
 }
 
 impl Req {
-    pub fn is_still_valid(&self, verified_at: Revision, symbol_map: &SymbolMap) -> bool {
+    pub fn is_still_valid(
+        &self,
+        verified_at: Revision,
+        symbol_map: &SymbolMap,
+        repl: &Repl,
+    ) -> bool {
         match self {
             Req::GetSymbol(name) => {
-                if let Some(collection) = symbol_map.symbols.get(name) {
+                if let Some(collection) = symbol_map.funcs.get(name) {
                     collection.last_changed <= verified_at
                 } else {
                     true
                 }
             }
+            Req::GetRootFile => repl.last_changed <= verified_at,
             _ => false,
         }
     }
 }
 
-#[derive(Debug, Default)]
-pub struct SymbolCollection {
-    symbols: Vec<Func>,
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FuncCollection {
+    funcs: Vec<Func>,
     last_changed: Revision,
 }
 
-#[derive(Debug, Default)]
+impl FuncCollection {
+    pub fn push(&mut self, func: Func, revision: Revision) {
+        self.funcs.push(func);
+        self.last_changed = max(self.last_changed, revision);
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SymbolMap {
-    pub symbols: HashMap<String, SymbolCollection>,
-    pub evals: HashSet<String>,
+    pub funcs: HashMap<String, FuncCollection>,
+    pub evals: HashSet<Eval>,
 }
 
 #[derive(Debug)]
@@ -171,7 +238,7 @@ pub fn main() {
 
     let mut start_req = None;
     let mut current_revision = Revision::default();
-    current_revision.major += 1;
+    let mut next_symbol_map = None;
 
     loop {
         let mut progress = false;
@@ -197,7 +264,7 @@ pub fn main() {
                 TaskStatus::Completed(completed_task) => {
                     // If it hasn't been verified for this revision+iteration
                     if completed_task.task.verified_at < current_revision
-                        && !req.is_still_valid(completed_task.task.verified_at, &symbol_map)
+                        && !req.is_still_valid(completed_task.task.verified_at, &symbol_map, &repl)
                     {
                         RunningTask {
                             state: TaskState::Initial,
@@ -235,39 +302,9 @@ pub fn main() {
             // Check the result
             match result {
                 Ok(artifact) => {
-                    // If we added a symbol, we made progress towards the fixpoint,
-                    // and the request to move towards the fixpoint should be re-requested.
-                    if let Artifact::AddSymbols(symbols) = &artifact {
-                        for func in symbols {
-                            let collection =
-                                symbol_map.symbols.entry(func.name.clone()).or_default();
-                            collection.last_changed = current_revision;
-                            collection.last_changed.iteration += 1;
-                            collection.symbols.push(func.clone());
-                        }
-                        progress = true;
-                    }
-
-                    // If we deleted a symbol, we made progress towards the fixpoint,
-                    // and the request to move towards the fixpoint should be re-requested.
-                    // Unlike adding symbols, this can happen via user input, hence
-                    // the overall function is still monotonic.
-                    if let Artifact::DelSymbols(symbols) = &artifact {
-                        for name in symbols {
-                            let collection = symbol_map.symbols.entry(name.clone()).or_default();
-                            collection.last_changed = current_revision;
-                            collection.symbols.clear();
-                        }
-                        progress = true;
-                    }
-
-                    // If we deleted a symbol, we made progress towards the fixpoint,
-                    // and the request to move towards the fixpoint should be re-requested.
-                    if let Artifact::AddEvals(symbols) = &artifact {
-                        for name in symbols {
-                            if symbol_map.evals.insert(name.into()) {
-                                progress = true;
-                            }
+                    if let Artifact::NewSymbolMap(new_symbol_map) = &artifact {
+                        if symbol_map != *new_symbol_map {
+                            next_symbol_map = Some(new_symbol_map.clone());
                         }
                     }
 
@@ -359,7 +396,7 @@ pub fn main() {
 
         let max_iterations = 1000;
 
-        if !progress || current_revision.iteration >= max_iterations {
+        if next_symbol_map.is_none() || current_revision.iteration >= max_iterations {
             // Done evaluating, ask repl
 
             if current_revision.iteration >= max_iterations {
@@ -385,19 +422,22 @@ pub fn main() {
             queue.clear();
             waiting.clear();
 
-            let Some(new_req) = repl.run() else {
+            current_revision.major += 1;
+            current_revision.iteration = 0;
+            println!("REPL - REVISION {:?}", current_revision);
+
+            let Some(new_req) = repl.run(current_revision) else {
                 break;
             };
 
             start_req = Some(new_req.clone());
-            current_revision.major += 1;
-            current_revision.iteration = 0;
             queue.push(Req::MoveTowardsFixpoint);
             queue.push(new_req);
             continue;
         }
 
         eprintln!("next iteration");
+        symbol_map = next_symbol_map.take().expect("new symbol map");
         current_revision.iteration += 1;
         queue.push(Req::MoveTowardsFixpoint);
         queue.push(start_req.clone().expect("starting request"));
@@ -416,64 +456,145 @@ fn process(
 
     match req {
         Req::MoveTowardsFixpoint => {
-            if !repl.new_symbols.is_empty() {
-                return Ok(Artifact::AddSymbols(std::mem::take(&mut repl.new_symbols)));
-            } else if !repl.del_symbols.is_empty() {
-                return Ok(Artifact::DelSymbols(std::mem::take(&mut repl.del_symbols)));
-            } else if !repl.new_evals.is_empty() {
-                return Ok(Artifact::AddEvals(std::mem::take(&mut repl.new_evals)));
-            } else {
-                for eval in symbol_map.evals.iter() {
-                    let callee = request(
-                        cache,
-                        symbol_map,
-                        Req::GetSymbol(eval.into()),
-                        current_revision,
-                    )?;
+            let mut new_symbol_map = SymbolMap::default();
 
-                    let func = match &callee {
-                        Artifact::Found(funcs) => match &funcs[..] {
-                            [f] => f,
-                            [] => {
-                                return Ok(Artifact::Error(format!(
-                                    "Callee '{}' does not exist",
-                                    eval
-                                )));
-                            }
-                            [..] => {
-                                return Ok(Artifact::Error(format!(
-                                    "Ambiguous call to '{}'",
-                                    eval
-                                )));
-                            }
-                        },
-                        _ => return Ok(Artifact::Error("Not callable".into())),
-                    };
+            let root_file = request(cache, symbol_map, repl, Req::GetRootFile, current_revision)?;
+            let root_file = match root_file {
+                Artifact::File(file) => file,
+                _ => unreachable!("expected root file"),
+            };
+
+            for func in root_file.funcs.iter() {
+                if let Some(existing) = symbol_map
+                    .funcs
+                    .get(&func.name)
+                    .and_then(|funcs| funcs.funcs.iter().find(|f| *f == func))
+                {
+                    new_symbol_map
+                        .funcs
+                        .entry(func.name.clone())
+                        .or_default()
+                        .push(
+                            existing.clone(),
+                            symbol_map.funcs.get(&func.name).unwrap().last_changed,
+                        );
+                } else {
+                    new_symbol_map
+                        .funcs
+                        .entry(func.name.clone())
+                        .or_default()
+                        .push(func.clone(), current_revision.next_iteration());
                 }
-
-                return Ok(Artifact::Void);
             }
+
+            for eval in root_file.evals.iter() {
+                new_symbol_map.evals.insert(eval.clone());
+
+                let callee = request(
+                    cache,
+                    symbol_map,
+                    repl,
+                    Req::GetSymbol(eval.callee.clone()),
+                    current_revision,
+                )?;
+
+                match callee {
+                    Artifact::Found(funcs) => match &funcs[..] {
+                        [] => {
+                            eprintln!("Function does not exist");
+                        }
+                        [f] => {
+                            if let Some(body) = &f.body {
+                                if let Some(existing) = symbol_map.funcs.get(body).and_then(|c| {
+                                    c.funcs.iter().find(|f| f.from_eval.as_ref() == Some(eval))
+                                }) {
+                                    new_symbol_map.funcs.entry(body.into()).or_default().push(
+                                        Func {
+                                            name: body.into(),
+                                            body: None,
+                                            from_eval: Some(eval.clone()),
+                                        },
+                                        symbol_map.funcs.get(body).unwrap().last_changed,
+                                    );
+                                } else {
+                                    new_symbol_map.funcs.entry(body.into()).or_default().push(
+                                        Func {
+                                            name: body.into(),
+                                            body: None,
+                                            from_eval: Some(eval.clone()),
+                                        },
+                                        current_revision.next_iteration(),
+                                    );
+                                }
+                            }
+                        }
+                        [..] => {
+                            eprintln!("Ambiguous function call");
+                        }
+                    },
+                    _ => panic!("not callable"),
+                }
+            }
+
+            // Make sure that any function deletions correctly update the last_changed
+            // timestamp for the function collection.
+            for (name, collection) in symbol_map.funcs.iter() {
+                let Some(new_func_list) = new_symbol_map.funcs.get_mut(name) else {
+                    // We have to keep a gravestone around for functions that used to exist, to
+                    // show that anything that previously looked for them is outdated.
+                    new_symbol_map.funcs.insert(
+                        name.clone(),
+                        FuncCollection {
+                            funcs: vec![],
+                            last_changed: if collection.funcs.is_empty() {
+                                collection.last_changed
+                            } else {
+                                current_revision.next_iteration()
+                            },
+                        },
+                    );
+                    continue;
+                };
+
+                // If any function in the old symbol map is gone, then consider this a change
+                for old_func in collection.funcs.iter() {
+                    if !new_func_list.funcs.contains(old_func) {
+                        new_func_list.last_changed = max(
+                            new_func_list.last_changed,
+                            current_revision.next_iteration(),
+                        );
+                        break;
+                    }
+                }
+            }
+
+            return Ok(Artifact::NewSymbolMap(new_symbol_map));
         }
         Req::GetSymbol(name) => {
             return Ok(Artifact::Found(
                 symbol_map
-                    .symbols
+                    .funcs
                     .get(name)
                     .into_iter()
-                    .flat_map(|collection| collection.symbols.iter().cloned())
+                    .flat_map(|collection| collection.funcs.iter().cloned())
                     .collect(),
             ));
+        }
+        Req::GetRootFile => {
+            return Ok(Artifact::File(repl.root_file.clone()));
         }
         Req::Pair(a, b) => {
             let a_artifact = request(
                 cache,
                 symbol_map,
+                repl,
                 Req::GetSymbol(a.into()),
                 current_revision,
             )?;
             let b_artifact = request(
                 cache,
                 symbol_map,
+                repl,
                 Req::GetSymbol(b.into()),
                 current_revision,
             )?;
@@ -495,6 +616,7 @@ fn process(
 pub fn request<'a, 'b>(
     cache: &'a Cache,
     symbol_map: &'b SymbolMap,
+    repl: &Repl,
     req: Req,
     current_revision: Revision,
 ) -> Result<&'a Artifact, Vec<Req>> {
@@ -505,7 +627,7 @@ pub fn request<'a, 'b>(
     };
 
     if completed_task.task.verified_at < current_revision
-        && !req.is_still_valid(completed_task.task.verified_at, symbol_map)
+        && !req.is_still_valid(completed_task.task.verified_at, symbol_map, repl)
     {
         eprintln!("  It's out of date");
         return Err(vec![req]);
