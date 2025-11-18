@@ -48,7 +48,6 @@ members = [
     "src/support/append_only_vec",
     "src/support/threadpool",
     "src/components/daemon",
-    "src/components/db",
 ]
 
 [workspace.dependencies]
