@@ -1,9 +1,0 @@
-[package]
-name = "diagnostics"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-append_only_vec = { version = "0.1.0", path = "../../support/append_only_vec" }
-colored.workspace = true
-source_files = { path = "../../representations/source_files" }

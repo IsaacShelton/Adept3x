@@ -1,7 +1,0 @@
-[package]
-name = "arena"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-append_only_vec = { version = "0.1.0", path = "../../support/append_only_vec" }

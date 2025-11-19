@@ -1,9 +1,0 @@
-[package]
-name = "fs_tree"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-append_only_vec = { version = "0.1.0", path = "../../support/append_only_vec" }
-arena = { version = "0.1.0", path = "../../support/arena" }
-once_map.workspace = true

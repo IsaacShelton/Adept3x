@@ -1,8 +1,0 @@
-[package]
-name = "target"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-data_units = { version = "0.1.0", path = "../data_units" }
-primitives = { version = "0.1.0", path = "../../representations/primitives" }
