@@ -2,8 +2,9 @@
 resolver = "3"
 members = [
     "src/adept",
-    "src/support/define_requests",
     "src/components/req",
+    "src/support/define_requests",
+    "src/support/iter_ext",
 ]
 
 [workspace.dependencies]

@@ -22,6 +22,7 @@ dependencies = [
 name = "define_requests"
 version = "0.1.0"
 dependencies = [
+ "iter_ext",
  "proc-macro2",
  "quote",
  "syn",
@@ -48,6 +49,10 @@ dependencies = [
  "syn",
  "unicode-xid",
 ]
+
+[[package]]
+name = "iter_ext"
+version = "0.1.0"
 
 [[package]]
 name = "proc-macro2"

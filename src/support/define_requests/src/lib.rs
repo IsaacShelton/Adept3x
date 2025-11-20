@@ -1,63 +1,37 @@
+mod afts;
+mod attrs;
+mod elt;
+mod hooks;
+mod pair;
+
+pub(crate) use afts::*;
+pub(crate) use attrs::*;
+pub(crate) use elt::*;
+pub(crate) use hooks::*;
+use iter_ext::{IterTupleMutExt, IterTupleRefExt};
+pub(crate) use pair::*;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
-use std::collections::HashMap;
-use syn::{Generics, Ident, Item};
-
-const STATE_SUFFIX: &'static str = "State";
-const ATTRIBUTE_HOOK: &'static str = "define_requests";
-
-struct SpecialItem {
-    request_name: String,
-    ident: Ident,
-    generics: Generics,
-    is_state: bool,
-    item: Item,
-}
-
-impl SpecialItem {
-    pub fn new(ident: Ident, generics: Generics, item: Item) -> Self {
-        let name = format!("{}", ident);
-        Self {
-            request_name: name.strip_suffix(STATE_SUFFIX).unwrap_or(&name).into(),
-            is_state: name.ends_with(STATE_SUFFIX),
-            ident,
-            generics,
-            item,
-        }
-    }
-
-    pub fn env(&self) -> TokenStream {
-        self.generics
-            .lt_token
-            .map(|_| quote! { <'env> })
-            .unwrap_or_default()
-    }
-
-    pub fn a(&self) -> TokenStream {
-        self.generics
-            .lt_token
-            .map(|_| quote! { <'a> })
-            .unwrap_or_default()
-    }
-}
+use std::str::FromStr;
+use syn::{Ident, Item, ItemMod, Type, parse, parse_macro_input};
 
 #[proc_macro_attribute]
 pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
-    let input_mod = syn::parse_macro_input!(input as syn::ItemMod);
+    let input_mod = parse_macro_input!(input as ItemMod);
     let content = input_mod.content.unwrap().1;
 
-    let mut special_items = Vec::new();
+    let mut elts = Vec::new();
     let mut rest = Vec::new();
 
     for item in content {
-        special_items.push(match item {
-            syn::Item::Enum(item_enum) => SpecialItem::new(
+        elts.push(match item {
+            Item::Enum(item_enum) => Elt::new(
                 item_enum.ident.clone(),
                 item_enum.generics.clone(),
                 item_enum.into(),
             ),
-            syn::Item::Struct(item_struct) => SpecialItem::new(
+            Item::Struct(item_struct) => Elt::new(
                 item_struct.ident.clone(),
                 item_struct.generics.clone(),
                 item_struct.into(),
@@ -69,191 +43,148 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
         });
     }
 
-    let pairs: Vec<(SpecialItem, SpecialItem)> = pair_up(special_items);
-    let any_state_env = pairs
+    let mut pairs = pair_up(elts);
+    let mut all_st = TokenStream::new();
+    let mut st_wrap = TokenStream::new();
+    let mut st_unwrap = TokenStream::new();
+
+    let any_st_e = pairs
         .iter()
-        .flat_map(|(_, state)| state.generics.lt_token.map(|_| quote! { <'env> }))
-        .next()
+        .b()
+        .map(|st| st.e())
+        .find(|e| !e.is_empty())
         .unwrap_or_default();
 
-    let mut all_states = TokenStream::new();
-    let mut req_state_wrap = TokenStream::new();
-    let mut req_state_unwrap = TokenStream::new();
-
-    for (req, state) in pairs.iter() {
+    for (req, st) in pairs.iter() {
         let req_ident = &req.ident;
-        let req_env = req.env();
-        let state_ident = &state.ident;
-        let state_env = state.env();
-        let state_a = state.a();
-        all_states.extend(quote! { #req_ident(#state_ident #state_env), });
-        req_state_wrap.extend(quote! {
-            impl #any_state_env From<#state_ident #state_env> for ReqState #any_state_env {
-                fn from(value: #state_ident #state_env) -> Self {
+        let req_e = req.e();
+        let st_ident = &st.ident;
+        let st_e = st.e();
+        let st_a = st.a();
+        all_st.extend(quote! { #req_ident(#st_ident #st_e), });
+        st_wrap.extend(quote! {
+            impl #any_st_e From<#st_ident #st_e> for St #any_st_e {
+                fn from(value: #st_ident #st_e) -> Self {
                     Self::#req_ident(value)
                 }
             }
         });
-        req_state_unwrap.extend(quote! {
-            impl<'env> UnwrapReqState<'env> for #req_ident #req_env {
-                type Unwrapped<'a> = #state_ident #state_a;
-                fn unwrap_req_state(req_state: ReqState #any_state_env) -> Self::Unwrapped<'env> {
-                    match req_state {
-                        ReqState::#req_ident(state) => state,
-                        _ => panic!("unwrap_req_state failed!"),
+        st_unwrap.extend(quote! {
+            impl<'e> UnwrapSt<'e> for #req_ident #req_e {
+                type St<'a> = #st_ident #st_a;
+                fn unwrap_st(st: &mut St #any_st_e) -> &mut Self::St<'e> {
+                    match st {
+                        St::#req_ident(st) => st,
+                        _ => panic!("unwrap_st failed!"),
                     }
                 }
             }
         });
     }
 
-    let mut returns = Vec::new();
-    let requests = TokenStream::from_iter(pairs.iter().map(|(req, _)| {
-        let mut skinned_item = req.item.clone();
-        match &mut skinned_item {
+    let reqs = TokenStream::from_iter(pairs.iter_mut().a().map(|req| {
+        let mut item = req.item.clone();
+        match &mut item {
             Item::Enum(item_enum) => {
-                process_attrs(req, &item_enum.ident, &mut item_enum.attrs, &mut returns)
+                inspect_attrs(req, &item_enum.ident, &mut item_enum.attrs);
             }
-            Item::Struct(item_struct) => process_attrs(
-                req,
-                &item_struct.ident,
-                &mut item_struct.attrs,
-                &mut returns,
-            ),
+            Item::Struct(item_struct) => {
+                inspect_attrs(req, &item_struct.ident, &mut item_struct.attrs);
+            }
             _ => (),
         }
-        skinned_item.to_token_stream()
+        item.to_token_stream()
     }));
 
-    let states = TokenStream::from_iter(pairs.iter().map(|(_, st)| st.item.to_token_stream()));
+    let sts = TokenStream::from_iter(pairs.iter().b().map(|st| st.item.to_token_stream()));
     let rest = TokenStream::from_iter(rest.iter().map(ToTokens::to_token_stream));
 
-    let mut unique_types = Vec::from_iter(
-        returns
-            .iter()
-            .map(|(_item, ty)| (format!("{}", ty.to_token_stream()), ty)),
-    );
-    unique_types.sort_by(|a, b| a.0.cmp(&b.0));
-    unique_types.dedup_by(|a, b| a.0 == b.0);
+    let afts = Afts::from_iter(pairs.iter().a().map(|req| match &req.aft {
+        Some(aft) => aft.clone(),
+        None => {
+            assert!(!req.is_st);
+            panic!("Missing aft for {}", req.ident)
+        }
+    }));
 
-    let any_artifact_env = unique_types
-        .iter()
-        .any(|(name, _)| name.contains("'"))
-        .then(|| quote! { <'env> })
-        .unwrap_or_default();
+    let any_aft_e = &afts.e;
 
-    let artifacts = Vec::from_iter(
-        unique_types
-            .into_iter()
-            .enumerate()
-            .map(|(i, (_, ty))| (ty, format!("_Artifact{}", i))),
-    );
-    let artifact_to_type =
-        HashMap::<&str, &syn::Type>::from_iter(artifacts.iter().map(|(a, b)| (b.as_str(), *a)));
-
-    let mut all_artifacts = TokenStream::new();
-    for (ty, name) in artifacts.iter() {
+    let all_afts = TokenStream::from_iter(afts.by_tyn.values().map(|(name, ty)| {
         let name = Ident::new(name, Span::call_site());
-        all_artifacts.extend(quote! {
-            #name(#ty),
-        });
-    }
+        quote! { #name(#ty), }
+    }));
+
+    let aft_wrap = TokenStream::from_iter(afts.by_tyn.values().map(|(name, ty)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! {
+            impl From<#ty> for Aft {
+                fn from(value: #ty) -> Self {
+                    Self::#name(value)
+                }
+            }
+        }
+    }));
+
+    let aft_unwrap = TokenStream::from_iter(pairs.iter().a().map(|req| {
+        let req_ident = &req.ident;
+        let req_e = req.e();
+
+        let Some(aft_ty) = &req.aft else {
+            panic!("Missing #[{}::returns(...)] for {}", ATTR_HOOK, req.ident);
+        };
+
+        let (aft_ident, tyn) = afts.by_ty(&aft_ty);
+        let aft_ident = Ident::new(aft_ident, Span::call_site());
+        let aft_ty_in_a = parse::<Type>(TokenStream1::from_str(&tyn.replace("'e", "'a")).unwrap())
+            .expect("aft_ty_in_a");
+
+        quote! {
+            impl<'e> UnwrapAft<'e> for #req_ident #req_e {
+                type Aft<'a> = #aft_ty_in_a;
+                fn unwrap_aft(aft: Aft #any_aft_e) -> Self::Aft<'e> {
+                    match aft {
+                        Aft::#aft_ident(aft) => aft,
+                        _ => panic!("unwrap_aft failed!"),
+                    }
+                }
+            }
+        }
+    }));
 
     quote! {
         mod requests {
             #rest
-            pub enum ReqState #any_state_env {
-                #all_states
+            pub enum St #any_st_e {
+                #all_st
             }
-            pub enum Artifact #any_artifact_env {
-                #all_artifacts
+            pub trait UnwrapSt<'e> {
+                type St<'a>;
+                fn unwrap_st(st: &mut St #any_st_e) -> &mut Self::St<'e>;
             }
-            pub trait UnwrapReqState<'env> {
-                type Unwrapped<'a>;
-                fn unwrap_req_state(req_state: ReqState #any_state_env) -> Self::Unwrapped<'env>;
+            #reqs
+            #sts
+            #st_wrap
+            #st_unwrap
+            pub enum Aft #any_aft_e {
+                #all_afts
             }
-            #requests
-            #states
-            #req_state_wrap
-            #req_state_unwrap
+            pub trait UnwrapAft<'e> {
+                type Aft<'a>;
+                fn unwrap_aft(aft: Aft #any_aft_e) -> Self::Aft<'e>;
+            }
+            #aft_wrap
+            #aft_unwrap
+            pub trait Run<'e>: UnwrapSt<'e> + UnwrapAft<'e> {
+                fn run(&self, st: &mut Self::St<'e>, th: &mut impl Th) -> Result<Self::Aft<'e>, Suspend>;
+            }
+            pub trait RunA<'e>: Run<'e> where Aft: From<<Self as UnwrapAft<'e>>::Aft<'e>> {
+                fn run_a(&self, st: &mut St #any_st_e, th: &mut impl Th) -> Result<Aft #any_aft_e, Suspend> {
+                    self.run(Self::unwrap_st(st), th).map(|aft| aft.into())
+                }
+            }
+            struct Suspend;
+            trait Th {}
         }
     }
     .into()
-}
-
-fn pair_up(special_items: Vec<SpecialItem>) -> Vec<(SpecialItem, SpecialItem)> {
-    let mut pairs = Vec::with_capacity(special_items.len());
-    let mut needs_state = HashMap::new();
-    let mut needs_request = HashMap::new();
-
-    for item in special_items {
-        if item.is_state {
-            if let Some(request) = needs_request.remove(&item.request_name) {
-                pairs.push((request, item));
-            } else {
-                needs_state.insert(item.request_name.clone(), item);
-            }
-        } else {
-            if let Some(state) = needs_state.remove(&item.request_name) {
-                pairs.push((item, state));
-            } else {
-                needs_request.insert(item.request_name.clone(), item);
-            }
-        }
-    }
-
-    let missing = Vec::from_iter(needs_state.values().chain(needs_request.values()));
-    if !missing.is_empty() {
-        let mut missing = Vec::from_iter(
-            missing
-                .iter()
-                .map(|special_item| &special_item.request_name),
-        );
-        missing.sort();
-        panic!("Incomplete pairs - {:?}", missing);
-    }
-
-    pairs
-}
-
-fn process_attrs<'a, 'b, 'c>(
-    request: &'a SpecialItem,
-    item_ident: &'b Ident,
-    item_attrs: &'c mut Vec<syn::Attribute>,
-    returns: &mut Vec<(&'a SpecialItem, syn::Type)>,
-) {
-    let attrs = std::mem::take(item_attrs);
-    let mut untouched = Vec::new();
-
-    for attr in attrs {
-        match attr.meta {
-            syn::Meta::List(meta_list) => {
-                let segments = meta_list.path.segments;
-                let Some((namespace, directive)) = segments.get(0).zip(segments.get(1)) else {
-                    continue;
-                };
-
-                if format!("{}", namespace.ident) != ATTRIBUTE_HOOK {
-                    continue;
-                }
-
-                match format!("{}", directive.ident).as_str() {
-                    "returns" => {
-                        let Ok(ty) = syn::parse::<syn::Type>(meta_list.tokens.into()) else {
-                            panic!(
-                                "Failed to parse type for {}::returns on {}",
-                                ATTRIBUTE_HOOK, item_ident
-                            );
-                        };
-
-                        returns.push((request, ty));
-                    }
-                    _ => panic!("Unrecognized directive in {}", ATTRIBUTE_HOOK),
-                }
-            }
-            _ => untouched.push(attr),
-        }
-    }
-
-    *item_attrs = untouched;
 }
