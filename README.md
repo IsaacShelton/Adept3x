@@ -52,7 +52,7 @@ It will have a comprehensive set of features that no other language fully offers
 | 2025-11-01 | Arbitrary Compile-Time Evaluation    | ☑
 | 2025-11-01 | Milestone 1                          | ☑
 | 2025-11-21 | Incremental Compilation Architecture | ☑
-| TBD        | New Compilation System 3nd Iteration | 90 days 
+| TBD        | New Compilation System 3rd Iteration | 90 days 
 | TBD        | Background Compilation Daemon        | 30 days
 | TBD        | Language Server Integration          | 30 days
 | TBD        | Compile-Time Function Generation     | 14 days
