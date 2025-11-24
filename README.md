@@ -16,12 +16,11 @@ Adept 3.x is an attempt at creating a Next-Gen Programming Language.
 
 It will have a comprehensive set of features that no other language fully offers:
 
-- Easily Execute Regular Code at Compile-Time
-- Easily Generate Functions, Structures, etc. at Compile-Time (even from within same file)
+- Easily Run Code at Compile-Time (no function annotations or separate file requirements)
+- Easily Generate Arbitrary Functions, Structures, etc. at Compile-Time (even within same file - no ordering/annotation requirements)
 - Easily Reference Values Safely with Borrow Checking & Move Semantics
 - Easily Manage Data Variants with Pattern Matching & Sum Types
-- Control-Flow Sensitive Type Checking
-- Safely Use Arbitrary Intrafunction Gotos
+- Consider Goto Unharmful, Since They Are Safe and Structured in Adept
 - Import C Headers and Source Files with First-Class Support
 - Easily Cross-Compile to Other Platforms
 - Compile Your Code Blazingly Fast (with or without Incrementatal Compilation)
