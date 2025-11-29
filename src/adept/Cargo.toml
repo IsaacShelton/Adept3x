@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-rt = { version = "0.1.0", path = "../components/rt" }
+daemon = { version = "0.1.0", path = "../components/daemon" }

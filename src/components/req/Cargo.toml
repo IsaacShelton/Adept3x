@@ -4,4 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+by_address = "1.2.1"
 define_requests = { version = "0.1.0", path = "../../support/define_requests" }
+infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
+line_column = { version = "0.1.0", path = "../../support/line_column" }
+serde = { version = "1.0.228", features = ["derive", "rc"] }
+text = { version = "0.1.0", path = "../../support/text" }
+thiserror = "2.0.17"
+top_n = { version = "0.1.0", path = "../../support/top_n" }
+vfs = { version = "0.1.0", path = "../vfs" }

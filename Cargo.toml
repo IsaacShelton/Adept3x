@@ -3,31 +3,13 @@ resolver = "3"
 members = [
     "src/adept",
     "src/components/req",
+    "src/components/vfs",
+    "src/components/daemon",
     "src/support/define_requests",
     "src/support/iter_ext",
+    "src/support/top_n",
+    "src/support/infinite_iterator",
+    "src/support/line_column",
+    "src/support/text",
 ]
 
-[workspace.dependencies]
-colored = "2.1.0"
-derive_more = { version = "2.0.1", features = ["full"] }
-num-bigint = "0.4.4"
-num-traits = "0.2.18"
-cstr = "0.2.11"
-slotmap = "1.0.7"
-indoc = "2"
-memo-map = "0.3.2"
-indexmap = "2.2.5"
-itertools = "0.13.0"
-lazy_format = "2.0.3"
-once_map = "0.4.18"
-num = "0.4.3"
-num-derive = "0.4.2"
-derivative = "2.2.0"
-ignore = "0.4.22"
-humansize = "2.1.3"
-thousands = "0.2.0"
-path-absolutize = { version = "3.1.1", features = ["once_cell_cache"] }
-ordered-float = "4.5.0"
-enum_dispatch = "0.3.13"
-by_address = "1.2.1"
-bit-vec = "0.8.0"
