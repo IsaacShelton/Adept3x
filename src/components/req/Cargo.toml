@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+build_token = { version = "0.1.0", path = "../build_token" }
 by_address = "1.2.1"
 define_requests = { version = "0.1.0", path = "../../support/define_requests" }
 infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }

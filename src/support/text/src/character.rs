@@ -1,13 +1,12 @@
 use infinite_iterator::InfiniteIteratorEnd;
-use line_column::Location;
 
 #[derive(Clone, Debug)]
-pub enum Character {
-    At(char, Location),
-    End(Location),
+pub enum Character<S: Copy> {
+    At(char, S),
+    End(S),
 }
 
-impl Character {
+impl<S: Copy> Character<S> {
     #[inline]
     pub fn or_nul(self) -> char {
         match self {
@@ -17,7 +16,7 @@ impl Character {
     }
 
     #[inline]
-    pub fn unwrap(&self) -> (char, Location) {
+    pub fn unwrap(&self) -> (char, S) {
         match self {
             Character::At(c, source) => (*c, *source),
             Character::End(_) => panic!("unwrap of end character"),
@@ -25,7 +24,7 @@ impl Character {
     }
 
     #[inline]
-    pub fn expect(&self, message: &str) -> (char, Location) {
+    pub fn expect(&self, message: &str) -> (char, S) {
         match self {
             Character::At(c, source) => (*c, *source),
             Character::End(_) => panic!("{}", message),
@@ -76,7 +75,7 @@ impl Character {
     }
 
     #[inline]
-    pub fn source(&self) -> Location {
+    pub fn source(&self) -> S {
         match self {
             Character::At(_, source) => *source,
             Character::End(source) => *source,
@@ -101,7 +100,7 @@ pub fn is_c_non_digit(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_' || c == '$'
 }
 
-impl InfiniteIteratorEnd for Character {
+impl<S: Copy> InfiniteIteratorEnd for Character<S> {
     fn is_end(&self) -> bool {
         matches!(self, Self::End(..))
     }

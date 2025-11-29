@@ -1,8 +1,10 @@
 use crate::{
     Err, Errs, FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, UnwrapSt,
 };
+use build_token::Lexer;
+use infinite_iterator::{InfiniteIteratorPeeker, InfinitePeekable};
 use std::{path::PathBuf, sync::Arc};
-use text::{CharacterInfiniteIterator, CharacterPeeker, Text};
+use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 impl<'e, P: Pf> Run<'e, P> for GetProject {
     fn run(
@@ -19,9 +21,11 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
             Err(errors) => return Ok(Err(errors.clone())),
         };
 
-        let mut chars = CharacterPeeker::new(CharacterInfiniteIterator::new(content.chars()));
+        let chars =
+            CharacterPeeker::new(CharacterInfiniteIterator::new(content.chars(), |loc| loc));
+        let mut lexer = InfiniteIteratorPeeker::new(Lexer::new(chars));
 
-        if !chars.eat('{') {
+        if !lexer.peek().is_open_curly() {
             return Ok(Err(Errs::from(Err::ExpectedChar('{')).into()));
         }
 

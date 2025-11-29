@@ -1,19 +1,18 @@
 use crate::{Character, Text};
 use infinite_iterator::InfiniteIterator;
-use line_column::Location;
 use std::collections::VecDeque;
 
-pub struct CharacterPeeker<I>
+pub struct CharacterPeeker<I, S: Copy>
 where
-    I: InfiniteIterator<Item = Character>,
+    I: InfiniteIterator<Item = Character<S>>,
 {
     stream: I,
-    queue: VecDeque<(char, Location)>,
+    queue: VecDeque<(char, S)>,
 }
 
-impl<I> CharacterPeeker<I>
+impl<I, S: Copy> CharacterPeeker<I, S>
 where
-    I: InfiniteIterator<Item = Character>,
+    I: InfiniteIterator<Item = Character<S>>,
 {
     pub fn new(stream: I) -> Self {
         Self {
@@ -23,13 +22,14 @@ where
     }
 }
 
-impl<I> InfiniteIterator for CharacterPeeker<I>
+impl<I, S> InfiniteIterator for CharacterPeeker<I, S>
 where
-    I: InfiniteIterator<Item = Character>,
+    I: InfiniteIterator<Item = Character<S>>,
+    S: Copy,
 {
-    type Item = Character;
+    type Item = Character<S>;
 
-    fn next(&mut self) -> Character {
+    fn next(&mut self) -> Self::Item {
         self.queue
             .pop_front()
             .map(|(c, source)| Character::At(c, source))
@@ -37,11 +37,12 @@ where
     }
 }
 
-impl<I> Text for CharacterPeeker<I>
+impl<I, S> Text<S> for CharacterPeeker<I, S>
 where
-    I: InfiniteIterator<Item = Character>,
+    I: InfiniteIterator<Item = Character<S>>,
+    S: Copy,
 {
-    fn peek_nth(&mut self, n: usize) -> Character {
+    fn peek_nth(&mut self, n: usize) -> I::Item {
         while self.queue.len() <= n {
             match self.stream.next() {
                 Character::At(c, source) => self.queue.push_back((c, source)),

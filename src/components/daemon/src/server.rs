@@ -11,13 +11,7 @@ use smol::{
     net::{TcpListener, TcpStream},
     stream::StreamExt,
 };
-use std::{
-    sync::{Arc, mpsc},
-    time::Duration,
-};
-
-#[derive(Debug)]
-pub enum Event {}
+use std::{sync::Arc, time::Duration};
 
 pub struct Server {
     pub idle_tracker: Arc<Mutex<IdleTracker>>,
@@ -32,8 +26,6 @@ impl Server {
 }
 
 pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
-    let (_rx, _tx) = mpsc::channel::<Event>();
-
     smol::block_on(async {
         let listener = TcpListener::bind("127.0.0.1:6000").await?;
         println!("Listening on {}", listener.local_addr()?);

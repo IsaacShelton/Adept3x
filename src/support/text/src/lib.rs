@@ -8,16 +8,15 @@ pub use character_infinite_iterator::CharacterInfiniteIterator;
 pub use character_peeker::CharacterPeeker;
 pub use eatable::Eatable;
 use infinite_iterator::InfiniteIterator;
-use line_column::Location;
 
-pub trait Text: InfiniteIterator<Item = Character> {
-    fn peek_nth(&mut self, n: usize) -> Character;
+pub trait Text<S: Copy>: InfiniteIterator<Item = Character<S>> {
+    fn peek_nth(&mut self, n: usize) -> Self::Item;
 
-    fn peek_n<const N: usize>(&mut self) -> [Character; N] {
+    fn peek_n<const N: usize>(&mut self) -> [Self::Item; N] {
         std::array::from_fn(|i| self.peek_nth(i))
     }
 
-    fn peek(&mut self) -> Character {
+    fn peek(&mut self) -> Self::Item {
         self.peek_nth(0)
     }
 
@@ -34,7 +33,7 @@ pub trait Text: InfiniteIterator<Item = Character> {
         self.eat_remember(expected).is_ok()
     }
 
-    fn eat_remember(&mut self, expected: impl Eatable) -> Result<Location, Location> {
+    fn eat_remember(&mut self, expected: impl Eatable) -> Result<S, S> {
         let start = self.peek().source();
         let mut count = 0;
 
@@ -59,7 +58,7 @@ pub trait Text: InfiniteIterator<Item = Character> {
         Ok(start)
     }
 
-    fn source(&mut self) -> Location {
+    fn source(&mut self) -> S {
         self.peek().source()
     }
 }
