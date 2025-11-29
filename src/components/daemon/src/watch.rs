@@ -57,7 +57,7 @@ where
     let mut query = rt.query(req.into());
 
     loop {
-        // NOTE: Despite the processing by RT being synchonous,
+        // NOTE: Despite the processing by RT being synchronous,
         // we break it into small chucks so we can sort of fake it
         // being async by yielding to the executor often.
         let query_timeout = TimeoutAt(Instant::now() + Duration::from_millis(10));

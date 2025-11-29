@@ -55,7 +55,7 @@ where
         }
 
         // SAFETY: We have initialized all elements
-        // Why does Rust not have a stablized method to do this?
+        // Why does Rust not have a stabilized method to do this?
         unsafe { MaybeUninit::array_assume_init(array) }
     }
 }

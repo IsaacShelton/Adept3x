@@ -10,6 +10,7 @@ pub struct Elt {
     pub is_st: bool,
     pub item: Item,
     pub aft: Option<Type>,
+    pub pure: bool,
 }
 
 impl Elt {
@@ -22,6 +23,7 @@ impl Elt {
             generics,
             item,
             aft: None,
+            pure: true,
         }
     }
 

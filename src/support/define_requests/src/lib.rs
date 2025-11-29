@@ -197,6 +197,21 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
         }
     }));
 
+    let mut impure_arms = TokenStream::new();
+    for req in pairs.iter().a() {
+        let value = if req.pure {
+            quote! { false }
+        } else {
+            quote! { true}
+        };
+
+        let ident = &req.ident;
+
+        impure_arms.extend(quote! {
+            Self::#ident(..) => #value,
+        });
+    }
+
     quote! {
         mod requests {
             #rest
@@ -248,11 +263,21 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
             impl Pf for PfIn {
                 type Rev = Rev;
                 type Req<'e> = Req #any_req_e;
-                type Aft<'e> = Aft<Self, #any_aft_short_e>;
+                type Aft<'e> = Aft<Self #any_aft_short_e>;
                 type St<'e> = St #any_st_e;
             }
             #reqs
             #req_wrap
+            pub trait IsImpure {
+                fn is_impure(&self) -> bool;
+            }
+            impl #any_req_e IsImpure for Req #any_req_e {
+                fn is_impure(&self) -> bool {
+                    match self {
+                        #impure_arms
+                    }
+                }
+            }
         }
     }
     .into()

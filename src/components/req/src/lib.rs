@@ -2,7 +2,6 @@ mod as_syms;
 mod block_on;
 mod errors;
 mod is_div;
-mod is_impure;
 mod like;
 mod pf;
 mod rt;
@@ -19,7 +18,6 @@ pub use block_on::*;
 use by_address::ByAddress;
 pub use errors::*;
 pub use is_div::*;
-pub use is_impure::*;
 pub use like::*;
 pub use pf::*;
 pub use requests::*;
@@ -42,6 +40,7 @@ pub struct Project {
 mod requests {
     use super::*;
 
+    #[define_requests::impure]
     #[define_requests::returns(Result<Arc<str>, Arc<Errs>>)]
     pub struct FindProjectConfig {
         pub working_directory: Arc<Path>,
@@ -77,17 +76,4 @@ mod requests {
     }
     #[derive(Default)]
     pub struct ListSymbolsState;
-}
-
-impl<'e> IsImpure for Req<'e> {
-    fn is_impure(&self) -> bool {
-        match self {
-            Req::GetRootSourceFile(..) => false,
-            Req::Search(..) => false,
-            Req::Approach(..) => false,
-            Req::ListSymbols(..) => false,
-            Req::FindProjectConfig(..) => true,
-            Req::GetProject(..) => false,
-        }
-    }
 }
