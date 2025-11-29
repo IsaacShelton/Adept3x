@@ -15,7 +15,6 @@ mod unblock;
 
 pub use as_syms::*;
 pub use block_on::*;
-use by_address::ByAddress;
 pub use errors::*;
 pub use is_div::*;
 pub use like::*;
@@ -29,7 +28,6 @@ pub use syms::*;
 pub use task::*;
 pub use un_like::*;
 pub use unblock::*;
-use vfs::Vfs;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Project {
@@ -41,6 +39,7 @@ mod requests {
     use super::*;
 
     #[define_requests::impure]
+    #[define_requests::never_persist]
     #[define_requests::returns(Result<Arc<str>, Arc<Errs>>)]
     pub struct FindProjectConfig {
         pub working_directory: Arc<Path>,
@@ -56,11 +55,6 @@ mod requests {
     pub struct GetProjectState;
 
     #[define_requests::returns(String)]
-    pub struct GetRootSourceFile;
-    #[derive(Default)]
-    pub struct GetRootSourceFileState;
-
-    #[define_requests::returns(String)]
     pub struct Search<'e>(&'e str);
     #[derive(Default)]
     pub struct SearchState;
@@ -71,9 +65,7 @@ mod requests {
     pub struct ApproachState;
 
     #[define_requests::returns(Vec<String>)]
-    pub struct ListSymbols {
-        pub vfs: ByAddress<Arc<Vfs>>,
-    }
+    pub struct ListSymbols;
     #[derive(Default)]
     pub struct ListSymbolsState;
 }

@@ -1,4 +1,4 @@
-use crate::{AFT_DTV, ATTR_HOOK, Elt, IMPURE_DTV};
+use crate::{ATTR_HOOK, Elt};
 use syn::{Attribute, Ident, Meta, Type, parse};
 
 pub fn inspect_attrs<'a, 'b, 'c>(
@@ -22,24 +22,24 @@ pub fn inspect_attrs<'a, 'b, 'c>(
         }
 
         match format!("{}", dtv.ident).as_str() {
-            AFT_DTV => {
-                let Meta::List(ml) = attr.meta else {
+            "returns" => {
+                let Meta::List(ml) = &attr.meta else {
                     panic!(
                         "Expected type for #[{}::{}(...)] on {}",
-                        ATTR_HOOK, AFT_DTV, item_ident
+                        ATTR_HOOK, dtv.ident, item_ident
                     );
                 };
 
-                let Ok(ty) = parse::<Type>(ml.tokens.into()) else {
+                let Ok(ty) = parse::<Type>(ml.tokens.clone().into()) else {
                     panic!(
                         "Failed to parse type for #[{}::{}(...)] on {}",
-                        ATTR_HOOK, AFT_DTV, item_ident
+                        ATTR_HOOK, dtv.ident, item_ident
                     );
                 };
 
                 req.aft = Some(ty);
             }
-            IMPURE_DTV => {
+            "impure" => {
                 let Meta::Path(_) = attr.meta else {
                     panic!(
                         "Extra data cannot be specified for #[{}::{}] on {}",
@@ -47,6 +47,15 @@ pub fn inspect_attrs<'a, 'b, 'c>(
                     );
                 };
                 req.pure = false;
+            }
+            "never_persist" => {
+                let Meta::Path(_) = attr.meta else {
+                    panic!(
+                        "Extra data cannot be specified for #[{}::{}] on {}",
+                        ATTR_HOOK, dtv.ident, item_ident
+                    );
+                };
+                req.persist = false;
             }
             _ => panic!("Unrecognized directive {} in {}", dtv.ident, ATTR_HOOK),
         }

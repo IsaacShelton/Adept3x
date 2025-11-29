@@ -60,7 +60,7 @@ where
         // NOTE: Despite the processing by RT being synchronous,
         // we break it into small chucks so we can sort of fake it
         // being async by yielding to the executor often.
-        let query_timeout = TimeoutAt(Instant::now() + Duration::from_millis(10));
+        let query_timeout = TimeoutAt(Instant::now() + Duration::from_millis(50));
 
         match rt.block_on(query, query_timeout)? {
             BlockOn::Complete(aft) => {

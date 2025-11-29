@@ -11,6 +11,7 @@ pub struct Elt {
     pub item: Item,
     pub aft: Option<Type>,
     pub pure: bool,
+    pub persist: bool,
 }
 
 impl Elt {
@@ -24,6 +25,7 @@ impl Elt {
             item,
             aft: None,
             pure: true,
+            persist: true,
         }
     }
 

@@ -198,17 +198,22 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
     }));
 
     let mut impure_arms = TokenStream::new();
+    let mut run_dispatch_arms = TokenStream::new();
     for req in pairs.iter().a() {
         let value = if req.pure {
             quote! { false }
         } else {
-            quote! { true}
+            quote! { true }
         };
 
         let ident = &req.ident;
 
         impure_arms.extend(quote! {
             Self::#ident(..) => #value,
+        });
+
+        run_dispatch_arms.extend(quote! {
+            Req::#ident(req) => req.run(st, th).map(|aft| P::Aft::un_like(Aft::from(aft))),
         });
     }
 
@@ -275,6 +280,21 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
                 fn is_impure(&self) -> bool {
                     match self {
                         #impure_arms
+                    }
+                }
+            }
+            impl<'e, P: Pf> RunDispatch<'e, P> for P::Req<'e>
+            where
+                P::Req<'e>: Like<Req<'e>>,
+                P::Aft<'e>: UnLike<Aft<P>>,
+            {
+                fn run_dispath(
+                    &self,
+                    st: &mut P::St<'e>,
+                    th: &mut impl Th<'e, P>,
+                ) -> Result<P::Aft<'e>, Suspend<'e, P>> {
+                    match self.like_ref() {
+                        #run_dispatch_arms
                     }
                 }
             }

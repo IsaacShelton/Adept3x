@@ -15,7 +15,6 @@ use std::{
     sync::{Arc, mpsc},
     time::Duration,
 };
-use vfs::Vfs;
 
 #[derive(Debug)]
 pub enum Event {}
@@ -36,23 +35,14 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
     let (_rx, _tx) = mpsc::channel::<Event>();
 
     smol::block_on(async {
-        // Create a listener.
         let listener = TcpListener::bind("127.0.0.1:6000").await?;
         println!("Listening on {}", listener.local_addr()?);
-        let mut incoming = listener.incoming();
 
-        let vfs = Arc::new(Vfs::default());
+        let mut incoming = listener.incoming();
         let server = Arc::new(Server::new(max_idle_time).await);
         let rt = Arc::new(Mutex::new(RtStIn::<PfIn>::new(Cache::default())));
 
-        smol::spawn(watch(
-            server.clone(),
-            rt.clone(),
-            req::ListSymbols {
-                vfs: vfs.clone().into(),
-            },
-        ))
-        .detach();
+        smol::spawn(watch(server.clone(), rt.clone(), req::ListSymbols)).detach();
 
         loop {
             let mut next_connection = async || Ok(incoming.next().await);
