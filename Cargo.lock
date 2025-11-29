@@ -230,6 +230,7 @@ dependencies = [
  "req",
  "smol",
  "vfs",
+ "windows-sys",
 ]
 
 [[package]]

@@ -9,4 +9,4 @@ nix = { version = "0.30.1", features = ["fs"] }
 req = { version = "0.1.0", path = "../req" }
 smol = "2.0.2"
 vfs = { version = "0.1.0", path = "../vfs" }
-
+windows-sys = { version = "0.61.2" }
