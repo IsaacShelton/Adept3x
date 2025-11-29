@@ -85,7 +85,7 @@ jobs:
       - name: Build (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          cargo build --release --target x86_64-pc-windows-gnu --features watch
+          cargo build --release --target x86_64-pc-windows-gnu
         env:
           CFLAGS: -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
           CXXFLAGS: -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
@@ -97,7 +97,7 @@ jobs:
       - name: Build (macOS)
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
-          cargo build --release --features watch
+          cargo build --release
         env:
           CC: /opt/homebrew/opt/llvm/bin/clang
           LLVM_SYS_181_PREFIX: /opt/homebrew/opt/llvm@18
@@ -108,7 +108,7 @@ jobs:
       - name: Build (Ubuntu)
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          cargo build --release --features watch
+          cargo build --release
         env:
           LLVM_SYS_181_PREFIX: /home/linuxbrew/.linuxbrew/opt/llvm@18
           zstd_DIR: /home/linuxbrew/.linuxbrew/opt/zstd
