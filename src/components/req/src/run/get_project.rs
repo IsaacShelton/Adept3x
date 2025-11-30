@@ -1,6 +1,4 @@
-use crate::{
-    Err, Errs, FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, UnwrapSt,
-};
+use crate::{Error, FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, UnwrapSt};
 use build_aon::parse_aon;
 use build_token::Lexer;
 use infinite_iterator::InfiniteIteratorPeeker;
@@ -27,22 +25,22 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
         let mut lexer = InfiniteIteratorPeeker::new(Lexer::new(chars));
 
         let Ok(config) = parse_aon(&mut lexer) else {
-            return Ok(Err(Errs::from(Err::InvalidProjectConfigSyntax).into()));
+            return Error::InvalidProjectConfigSyntax.into();
         };
 
         if config.get("adept").and_then(|v| v.as_str()) != Some("3.0") {
-            return Ok(Err(Errs::from(Err::UnsupportedAdeptVersion).into()));
+            return Error::UnsupportedAdeptVersion.into();
         };
 
         let Some(main) = config.get("main").and_then(|entry| entry.as_str()) else {
-            return Ok(Err(Errs::from(Err::MissingRootFileInProjectConfig).into()));
+            return Error::MissingRootFileInProjectConfig.into();
         };
 
         const _VERSION: &'static str = env!("CARGO_PKG_VERSION");
         let path = PathBuf::from(main);
 
-        Ok(Ok(Arc::new(Project {
+        Ok(Ok(Project {
             root: Arc::from(path.into_boxed_path()),
-        })))
+        }))
     }
 }

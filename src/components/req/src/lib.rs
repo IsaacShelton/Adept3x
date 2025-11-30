@@ -10,6 +10,7 @@ mod run;
 mod succ;
 mod syms;
 mod task;
+mod top_errors;
 mod un_like;
 mod unblock;
 
@@ -26,10 +27,11 @@ use std::{path::Path, sync::Arc};
 pub use succ::*;
 pub use syms::*;
 pub use task::*;
+pub use top_errors::*;
 pub use un_like::*;
 pub use unblock::*;
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Project {
     root: Arc<Path>,
 }
@@ -40,7 +42,7 @@ mod requests {
 
     #[define_requests::impure]
     #[define_requests::never_persist]
-    #[define_requests::returns(Result<Arc<str>, Arc<Errs>>)]
+    #[define_requests::returns(Result<Arc<str>, TopErrors>)]
     pub struct FindProjectConfig {
         pub working_directory: Arc<Path>,
     }
@@ -48,7 +50,7 @@ mod requests {
     pub struct FindProjectConfigState;
 
     #[define_requests::never_persist]
-    #[define_requests::returns(Result<Arc<Project>, Arc<Errs>>)]
+    #[define_requests::returns(Result<Project, TopErrors>)]
     pub struct GetProject {
         pub working_directory: Arc<Path>,
     }

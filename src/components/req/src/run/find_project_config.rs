@@ -1,4 +1,4 @@
-use crate::{Err, Errs, FindProjectConfig, Like, Pf, Rt, Run, Suspend, Th, UnwrapSt};
+use crate::{Error, FindProjectConfig, Like, Pf, Rt, Run, Suspend, Th, UnwrapSt};
 use std::io::Read;
 use vfs::{BlockingFs, Canonical};
 
@@ -18,20 +18,18 @@ impl<'e, P: Pf> Run<'e, P> for FindProjectConfig {
             }
         }
 
-        Ok(
-            match std::fs::File::open(self.working_directory.join("adept.build")) {
-                Ok(mut file) => {
-                    let mut content = String::new();
-                    match file.read_to_string(&mut content) {
-                        Ok(_) => Ok(content.into()),
-                        Err(_) => Err(Errs::from(Err::MissingProjectFile).into()),
-                    }
+        match std::fs::File::open(self.working_directory.join("adept.build")) {
+            Ok(mut file) => {
+                let mut content = String::new();
+                match file.read_to_string(&mut content) {
+                    Ok(_) => Ok(Ok(content.into())),
+                    Err(_) => Error::MissingProjectFile.into(),
                 }
-                Err(error) => match error.kind() {
-                    std::io::ErrorKind::NotFound => Err(Errs::from(Err::MissingProjectFile).into()),
-                    _ => Err(Errs::from(Err::FailedToOpenProjectFile).into()),
-                },
+            }
+            Err(error) => match error.kind() {
+                std::io::ErrorKind::NotFound => Error::MissingProjectFile.into(),
+                _ => Error::FailedToOpenProjectFile.into(),
             },
-        )
+        }
     }
 }

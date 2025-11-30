@@ -1,5 +1,5 @@
 use crate::server::Server;
-use req::{Aft, BlockOn, Errs, Major, Pf, Rt, RtStIn, ShouldUnblock, TimeoutAt, UnwrapAft};
+use req::{Aft, BlockOn, Major, Pf, Rt, RtStIn, ShouldUnblock, TimeoutAt, TopErrors, UnwrapAft};
 use smol::{Timer, future::FutureExt, lock::Mutex};
 use std::{
     fmt::Debug,
@@ -50,7 +50,7 @@ async fn watch_query<
     rt: &mut RT,
     req: REQ,
     mut timeout: impl ShouldUnblock,
-) -> Result<BlockOn<REQ::Aft<'e>, ()>, Errs>
+) -> Result<BlockOn<REQ::Aft<'e>, ()>, TopErrors>
 where
     P::Aft<'e>: Into<Aft<P>>,
 {

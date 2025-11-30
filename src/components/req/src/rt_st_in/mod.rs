@@ -4,7 +4,7 @@ mod react;
 mod wake_dependants;
 
 use crate::{
-    Approach, BlockOn, Errs, IsDiv, Major, Minor, Pf, Rt, ShouldUnblock, Syms, TaskStatusKind,
+    Approach, BlockOn, IsDiv, Major, Minor, Pf, Rt, ShouldUnblock, Syms, TaskStatusKind, TopErrors,
     rt_st_in::query::RtStInQuery,
 };
 pub use cache::*;
@@ -66,7 +66,7 @@ where
         &mut self,
         mut query: Self::Query,
         mut timeout: impl ShouldUnblock,
-    ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, Errs> {
+    ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, TopErrors> {
         loop {
             while let Some(req) = query.queue.pop() {
                 react(self, &mut query, req);
