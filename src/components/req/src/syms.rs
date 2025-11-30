@@ -80,6 +80,10 @@ impl<P: Pf> SymGrp<P> {
 
         false
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Sym> {
+        self.syms.iter()
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

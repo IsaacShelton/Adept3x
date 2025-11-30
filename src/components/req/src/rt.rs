@@ -19,7 +19,7 @@ where
 {
     type Rt: Rt<'e, P>;
     fn rt(&self) -> &Self::Rt;
-    fn demand<R>(&mut self, req: R) -> Result<&R::Aft<'e>, Suspend<'e, P>>
+    fn demand<R>(&self, req: R) -> Result<&R::Aft<'e>, Suspend<'e, P>>
     where
         R: Into<Req<'e>> + UnwrapAft<'e, P>;
 }

@@ -67,7 +67,7 @@ mod requests {
     #[derive(Default)]
     pub struct ApproachState;
 
-    #[define_requests::returns(Vec<String>)]
+    #[define_requests::returns(Result<Vec<String>, TopErrors>)]
     pub struct ListSymbols;
     #[derive(Default)]
     pub struct ListSymbolsState;
