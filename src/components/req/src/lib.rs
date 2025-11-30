@@ -47,6 +47,7 @@ mod requests {
     #[derive(Default)]
     pub struct FindProjectConfigState;
 
+    #[define_requests::never_persist]
     #[define_requests::returns(Result<Arc<Project>, Arc<Errs>>)]
     pub struct GetProject {
         pub working_directory: Arc<Path>,

@@ -46,4 +46,10 @@ pub enum Err {
     FailedToOpenProjectFile,
     #[error("Expected char `{0}`")]
     ExpectedChar(char),
+    #[error("Invalid syntax in `adept.build`")]
+    InvalidProjectConfigSyntax,
+    #[error(
+        "Missing root file for `adept.build`, e.g. `{{ adept: \"3.0\", main: \"main.adept\" }}`"
+    )]
+    MissingRootFileInProjectConfig,
 }

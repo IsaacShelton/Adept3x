@@ -11,6 +11,22 @@ pub enum Aon {
     Object(HashMap<String, Aon>),
 }
 
+impl Aon {
+    pub fn get(&self, key: &str) -> Option<&Aon> {
+        match self {
+            Aon::Object(map) => map.get(key),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Aon::String(string) => Some(string),
+            _ => None,
+        }
+    }
+}
+
 pub fn parse_aon<S: Copy, I: InfinitePeekable<Token<S>>>(lexer: &mut I) -> Result<Aon, ()> {
     let result = parse_aon_inner(lexer, 10)?;
     if !lexer.peek().is_end_of_file() {
