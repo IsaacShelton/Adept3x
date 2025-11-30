@@ -1,8 +1,11 @@
+mod token_eat;
+
 use derivative::Derivative;
 use derive_more::{Deref, IsVariant, Unwrap};
 use infinite_iterator::InfiniteIteratorEnd;
 use num_bigint::BigInt;
 use std::fmt::Display;
+pub use token_eat::*;
 
 #[derive(Clone, Debug, Deref, Derivative)]
 #[derivative(PartialEq)]

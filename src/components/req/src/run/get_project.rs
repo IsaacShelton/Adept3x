@@ -1,8 +1,7 @@
-use crate::{
-    Err, Errs, FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, UnwrapSt,
-};
+use crate::{FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, UnwrapSt};
+use build_aon::parse_aon;
 use build_token::Lexer;
-use infinite_iterator::{InfiniteIteratorPeeker, InfinitePeekable};
+use infinite_iterator::InfiniteIteratorPeeker;
 use std::{path::PathBuf, sync::Arc};
 use text::{CharacterInfiniteIterator, CharacterPeeker};
 
@@ -25,9 +24,8 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
             CharacterPeeker::new(CharacterInfiniteIterator::new(content.chars(), |loc| loc));
         let mut lexer = InfiniteIteratorPeeker::new(Lexer::new(chars));
 
-        if !lexer.peek().is_open_curly() {
-            return Ok(Err(Errs::from(Err::ExpectedChar('{')).into()));
-        }
+        let config = parse_aon(&mut lexer);
+        dbg!(&config);
 
         const _VERSION: &'static str = env!("CARGO_PKG_VERSION");
         let path = PathBuf::from("");

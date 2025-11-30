@@ -5,6 +5,7 @@ members = [
     "src/components/req",
     "src/components/vfs",
     "src/components/daemon",
+    "src/components/build_aon",
     "src/components/build_token",
     "src/representations/token",
     "src/support/define_requests",

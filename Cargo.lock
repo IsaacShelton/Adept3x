@@ -169,6 +169,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "build_aon"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "infinite_iterator",
+ "num-bigint",
+ "num-traits",
+ "text",
+ "token",
+]
+
+[[package]]
 name = "build_token"
 version = "0.1.0"
 dependencies = [
@@ -521,6 +533,7 @@ dependencies = [
 name = "req"
 version = "0.1.0"
 dependencies = [
+ "build_aon",
  "build_token",
  "by_address",
  "define_requests",
@@ -529,6 +542,7 @@ dependencies = [
  "serde",
  "text",
  "thiserror",
+ "token",
  "top_n",
  "vfs",
 ]
