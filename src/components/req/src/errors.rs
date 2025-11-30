@@ -52,4 +52,6 @@ pub enum Err {
         "Missing root file for `adept.build`, e.g. `{{ adept: \"3.0\", main: \"main.adept\" }}`"
     )]
     MissingRootFileInProjectConfig,
+    #[error("Unsupported Adept version in `adept.build`, try `{{ adept: \"3.0\" }}`")]
+    UnsupportedAdeptVersion,
 }

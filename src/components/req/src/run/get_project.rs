@@ -30,12 +30,11 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
             return Ok(Err(Errs::from(Err::InvalidProjectConfigSyntax).into()));
         };
 
-        let Some(main) = config
-            .get("main")
-            .into_iter()
-            .flat_map(|entry| entry.as_str())
-            .next()
-        else {
+        if config.get("adept").and_then(|v| v.as_str()) != Some("3.0") {
+            return Ok(Err(Errs::from(Err::UnsupportedAdeptVersion).into()));
+        };
+
+        let Some(main) = config.get("main").and_then(|entry| entry.as_str()) else {
             return Ok(Err(Errs::from(Err::MissingRootFileInProjectConfig).into()));
         };
 
