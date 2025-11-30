@@ -33,7 +33,9 @@ pub use unblock::*;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Project {
-    root: Arc<Path>,
+    pub root: Arc<Path>,
+    pub interval_ms: Option<u64>,
+    pub cache_to_disk: Option<bool>,
 }
 
 #[define_requests::group]

@@ -8,9 +8,11 @@ build_aon = { version = "0.1.0", path = "../build_aon" }
 build_token = { version = "0.1.0", path = "../build_token" }
 by_address = "1.2.1"
 define_requests = { version = "0.1.0", path = "../../support/define_requests" }
+derive_more = { workspace = true, features = ["full"] }
 infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
 line_column = { version = "0.1.0", path = "../../support/line_column" }
 serde = { version = "1.0.228", features = ["derive", "rc"] }
+smallvec = "1.15.1"
 text = { version = "0.1.0", path = "../../support/text" }
 thiserror = "2.0.17"
 token = { version = "0.1.0", path = "../../representations/token" }

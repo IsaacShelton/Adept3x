@@ -5,6 +5,7 @@ use token::{StringModifier, Token, TokenEat, TokenKind};
 #[derive(Clone, Debug)]
 pub enum Aon {
     Null,
+    Bool(bool),
     Integer(i64),
     String(String),
     Array(Vec<Aon>),
@@ -19,9 +20,51 @@ impl Aon {
         }
     }
 
+    pub fn remove(&mut self, key: &str) -> Option<Aon> {
+        match self {
+            Aon::Object(map) => map.remove(key),
+            _ => None,
+        }
+    }
+
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Aon::String(string) => Some(string),
+            _ => None,
+        }
+    }
+
+    pub fn as_u64(&self) -> Option<u64> {
+        match self {
+            Aon::Integer(value) => (*value).try_into().ok(),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Aon::Bool(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            Aon::String(string) => Some(string),
+            _ => None,
+        }
+    }
+
+    pub fn into_u64(self) -> Option<u64> {
+        match self {
+            Aon::Integer(value) => value.try_into().ok(),
+            _ => None,
+        }
+    }
+
+    pub fn into_bool(self) -> Option<bool> {
+        match self {
+            Aon::Bool(value) => Some(value),
             _ => None,
         }
     }
@@ -62,6 +105,16 @@ fn parse_aon_inner<S: Copy, I: InfinitePeekable<Token<S>>>(
     if lexer.eat(TokenKind::NullKeyword) {
         lexer.eat_newlines();
         return Ok(Aon::Null);
+    }
+
+    if lexer.eat(TokenKind::TrueKeyword) {
+        lexer.eat_newlines();
+        return Ok(Aon::Bool(true));
+    }
+
+    if lexer.eat(TokenKind::FalseKeyword) {
+        lexer.eat_newlines();
+        return Ok(Aon::Bool(false));
     }
 
     if lexer.eat(TokenKind::OpenBracket) {

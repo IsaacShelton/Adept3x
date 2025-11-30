@@ -4,8 +4,8 @@ mod react;
 mod wake_dependants;
 
 use crate::{
-    Approach, BlockOn, IsDiv, Major, Minor, Pf, Rt, ShouldUnblock, Syms, TaskStatusKind, TopErrors,
-    rt_st_in::query::RtStInQuery,
+    Approach, BlockOn, IsDiv, Major, Minor, Pf, QueryMode, Rt, ShouldUnblock, Syms, TaskStatusKind,
+    TopErrors, rt_st_in::query::RtStInQuery,
 };
 pub use cache::*;
 use react::*;
@@ -43,8 +43,12 @@ where
 {
     type Query = RtStInQuery<'e, P>;
 
-    fn query(&mut self, req: P::Req<'e>) -> RtStInQuery<'e, P> {
-        self.current = self.current.major();
+    fn query(&mut self, req: P::Req<'e>, mode: QueryMode) -> RtStInQuery<'e, P> {
+        if let QueryMode::New = mode {
+            self.current = self.current.major();
+            dbg!(self.current);
+        }
+
         RtStInQuery {
             queue: vec![Approach.into(), req.clone()],
             waiting: HashMap::new(),

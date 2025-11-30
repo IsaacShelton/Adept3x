@@ -1,9 +1,14 @@
 use crate::{BlockOn, Pf, Req, ShouldUnblock, Suspend, Syms, Task, TopErrors, UnLike, UnwrapAft};
 use vfs::Vfs;
 
+pub enum QueryMode {
+    New,
+    Continue,
+}
+
 pub trait Rt<'e, P: Pf>: Send {
     type Query: Send;
-    fn query(&mut self, req: P::Req<'e>) -> Self::Query;
+    fn query(&mut self, req: P::Req<'e>, mode: QueryMode) -> Self::Query;
     fn block_on(
         &mut self,
         query: Self::Query,

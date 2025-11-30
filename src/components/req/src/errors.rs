@@ -1,6 +1,8 @@
+use derive_more::IsVariant;
+use std::sync::Arc;
 use thiserror::Error;
 
-#[derive(Clone, Debug, Error, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Error, Hash, PartialEq, Eq, PartialOrd, Ord, IsVariant)]
 pub enum Error {
     #[error("Missing project file `adept.build`")]
     MissingProjectFile,
@@ -18,4 +20,6 @@ pub enum Error {
     MissingRootFileInProjectConfig,
     #[error("Unsupported Adept version in `adept.build`, try `{{ adept: \"3.0\" }}`")]
     UnsupportedAdeptVersion,
+    #[error("Invalid option `{0}` in `adept.build`")]
+    InvalidProjectConfigOption(Arc<str>),
 }

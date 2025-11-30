@@ -1,5 +1,8 @@
 use crate::server::Server;
-use req::{Aft, BlockOn, Major, Pf, Rt, RtStIn, ShouldUnblock, TimeoutAt, TopErrors, UnwrapAft};
+use req::{
+    Aft, BlockOn, GetProject, Major, Pf, QueryMode, Rt, RtStIn, ShouldUnblock, TimeoutAt,
+    TopErrors, UnwrapAft,
+};
 use smol::{Timer, future::FutureExt, lock::Mutex};
 use std::{
     fmt::Debug,
@@ -7,6 +10,20 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+
+pub struct WatchConfig {
+    pub interval_ms: u64,
+    pub cache_to_disk: bool,
+}
+
+impl Default for WatchConfig {
+    fn default() -> Self {
+        Self {
+            interval_ms: 2000,
+            cache_to_disk: true,
+        }
+    }
+}
 
 pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'e, P>>(
     server: Arc<Server>,
@@ -16,14 +33,50 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
     P::Rev: Major,
     REQ::Aft<'e>: Debug,
     Aft<P>: From<<P as Pf>::Aft<'e>>,
+    P::Req<'e>: From<GetProject>,
 {
+    let mut watch_config = WatchConfig::default();
+
     loop {
         // NOTE: We keep the lock acquired for the entire lifetime of the query
         let mut rt = rt.lock().await;
 
         let run = async {
+            // Read the new project while we're at it. Expect this to take <50ms
+            let new_project = watch_query(
+                rt.deref_mut(),
+                GetProject {
+                    working_directory: Arc::from(
+                        std::env::current_dir().unwrap().into_boxed_path(),
+                    ),
+                },
+                QueryMode::Continue,
+                TimeoutAt(Instant::now() + Duration::from_millis(50)),
+            )
+            .await;
+
+            match new_project {
+                Ok(BlockOn::Complete(Ok(project))) => {
+                    let defaults = WatchConfig::default();
+                    watch_config.interval_ms = project.interval_ms.unwrap_or(defaults.interval_ms);
+                    watch_config.cache_to_disk =
+                        project.cache_to_disk.unwrap_or(defaults.cache_to_disk);
+                }
+                Ok(BlockOn::Complete(Err(errors)))
+                    if !errors
+                        .iter_unordered()
+                        .any(|error| error.is_invalid_project_config_syntax()) =>
+                {
+                    // Failed to parse project file, don't change the configuration
+                }
+                _ => {
+                    // Failed to read project file
+                    watch_config = WatchConfig::default();
+                }
+            }
+
             let timeout = TimeoutAt(Instant::now() + Duration::from_secs(2));
-            Ok(watch_query(rt.deref_mut(), watchee.clone(), timeout).await)
+            Ok(watch_query(rt.deref_mut(), watchee.clone(), QueryMode::New, timeout).await)
         };
 
         let timeout = async {
@@ -32,7 +85,7 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
         };
 
         let _ = dbg!(run.or(timeout).await);
-        Timer::after(Duration::from_millis(2000)).await;
+        Timer::after(Duration::from_millis(watch_config.interval_ms)).await;
 
         if server.idle_tracker.lock().await.shutdown_if_idle() {
             break;
@@ -49,12 +102,13 @@ async fn watch_query<
 >(
     rt: &mut RT,
     req: REQ,
+    query_mode: QueryMode,
     mut timeout: impl ShouldUnblock,
 ) -> Result<BlockOn<REQ::Aft<'e>, ()>, TopErrors>
 where
     P::Aft<'e>: Into<Aft<P>>,
 {
-    let mut query = rt.query(req.into());
+    let mut query = rt.query(req.into(), query_mode);
 
     loop {
         // NOTE: Despite the processing by RT being synchronous,

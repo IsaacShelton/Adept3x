@@ -6,3 +6,4 @@ bin/
 obj/
 __pycache__
 docs/OLD
+adeptd.lock

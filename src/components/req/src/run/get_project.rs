@@ -1,5 +1,8 @@
-use crate::{Error, FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, UnwrapSt};
-use build_aon::parse_aon;
+use crate::{
+    Error, FindProjectConfig, GetProject, Like, Pf, Project, Run, Suspend, Th, TopErrorsNode,
+    UnwrapSt,
+};
+use build_aon::{Aon, parse_aon};
 use build_token::Lexer;
 use infinite_iterator::InfiniteIteratorPeeker;
 use std::{path::PathBuf, sync::Arc};
@@ -24,23 +27,50 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
             CharacterPeeker::new(CharacterInfiniteIterator::new(content.chars(), |loc| loc));
         let mut lexer = InfiniteIteratorPeeker::new(Lexer::new(chars));
 
-        let Ok(config) = parse_aon(&mut lexer) else {
+        let Ok(mut config) = parse_aon(&mut lexer) else {
             return Error::InvalidProjectConfigSyntax.into();
         };
 
-        if config.get("adept").and_then(|v| v.as_str()) != Some("3.0") {
+        if config
+            .remove("adept")
+            .and_then(|v| v.into_string())
+            .as_ref()
+            .map(|s| s.as_str())
+            != Some("3.0")
+        {
             return Error::UnsupportedAdeptVersion.into();
         };
 
-        let Some(main) = config.get("main").and_then(|entry| entry.as_str()) else {
+        let Some(main) = config.remove("main").and_then(|entry| entry.into_string()) else {
             return Error::MissingRootFileInProjectConfig.into();
         };
+
+        let interval_ms = config
+            .remove("interval_ms")
+            .and_then(|value| value.into_u64());
+        let cache_to_disk = config
+            .remove("cache_to_disk")
+            .and_then(|value| value.into_bool());
+
+        let Aon::Object(remaining) = config else {
+            return Error::InvalidProjectConfigSyntax.into();
+        };
+
+        let errors = TopErrorsNode::from_iter(
+            remaining
+                .into_keys()
+                .map(|name| Error::InvalidProjectConfigOption(Arc::from(name))),
+        );
+
+        dbg!(errors);
 
         const _VERSION: &'static str = env!("CARGO_PKG_VERSION");
         let path = PathBuf::from(main);
 
         Ok(Ok(Project {
             root: Arc::from(path.into_boxed_path()),
+            interval_ms,
+            cache_to_disk,
         }))
     }
 }

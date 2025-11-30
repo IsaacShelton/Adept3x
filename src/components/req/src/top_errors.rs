@@ -1,47 +1,99 @@
 use crate::Error;
-use std::{fmt::Display, sync::Arc};
+use smallvec::{SmallVec, smallvec};
+use std::sync::Arc;
 use top_n::TopN;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct TopErrors {
-    top_n: Arc<TopN<Error>>,
+pub type TopErrors = Arc<TopErrorsNode>;
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+pub struct TopErrorsNode {
+    errors: SmallVec<[Error; 1]>,
+
+    // We guarantee that this will always be acyclic by construction
+    parent: Option<Arc<TopErrorsNode>>,
 }
 
-impl TopErrors {
-    pub fn push(&mut self, error: Error) -> &mut Self {
-        Arc::make_mut(&mut self.top_n).push(error, |a, b| a.cmp(b));
+impl TopErrorsNode {
+    pub fn new(errors: impl IntoIterator<Item = Error>) -> Self {
+        Self {
+            errors: errors.into_iter().collect(),
+            parent: None,
+        }
+    }
+
+    pub fn new_with_parent(
+        errors: impl IntoIterator<Item = Error>,
+        parent: Arc<TopErrorsNode>,
+    ) -> Self {
+        Self {
+            errors: errors.into_iter().collect(),
+            parent: Some(parent),
+        }
+    }
+
+    pub fn with(mut self: Arc<Self>, new_errors: impl Iterator<Item = Error>) -> Arc<Self> {
+        Arc::make_mut(&mut self).errors.extend(new_errors);
         self
     }
-}
 
-impl Default for TopErrors {
-    fn default() -> Self {
-        Self {
-            top_n: Arc::new(TopN::new(1)),
-        }
+    pub fn top(&self, n: usize) -> TopN<&Error> {
+        TopN::from_iter(n, self.iter_unordered(), |a, b| a.cmp(b))
     }
-}
 
-impl Display for TopErrors {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for error in self.top_n.iter() {
-            writeln!(f, "{}", error)?;
-        }
-        Ok(())
-    }
-}
-
-impl From<Error> for TopErrors {
-    fn from(value: Error) -> Self {
-        Self {
-            top_n: Arc::new(TopN::from_iter(1, std::iter::once(value), |a, b| a.cmp(b))),
-        }
+    pub fn iter_unordered(&self) -> impl Iterator<Item = &Error> {
+        TopErrorsUnorderedIter::new(self)
     }
 }
 
 impl<T, S> Into<Result<Result<T, TopErrors>, S>> for Error {
     fn into(self) -> Result<Result<T, TopErrors>, S> {
-        Ok(Err(TopErrors::from(self)))
+        Ok(Err(Arc::new(TopErrorsNode::new([self]))))
+    }
+}
+
+impl FromIterator<Error> for Arc<TopErrorsNode> {
+    fn from_iter<T: IntoIterator<Item = Error>>(errors: T) -> Self {
+        Arc::new(TopErrorsNode::new(errors))
+    }
+}
+
+pub struct TopErrorsUnorderedIter<'a> {
+    stack: SmallVec<[&'a TopErrorsNode; 10]>,
+    slice: &'a [Error],
+}
+
+impl<'a> TopErrorsUnorderedIter<'a> {
+    pub fn new(top_errors: &'a TopErrorsNode) -> Self {
+        Self {
+            stack: smallvec![top_errors],
+            slice: &[],
+        }
+    }
+}
+
+impl<'a> Iterator for TopErrorsUnorderedIter<'a> {
+    type Item = &'a Error;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some((first, rest)) = self.slice.split_first() {
+                self.slice = rest;
+                return Some(first);
+            }
+
+            let node = self.stack.pop()?;
+            self.slice = &node.errors[..];
+
+            if let Some(node) = &node.parent {
+                self.stack.push(node.as_ref());
+            }
+        }
+    }
+}
+
+impl FromIterator<Error> for TopErrorsNode {
+    fn from_iter<T: IntoIterator<Item = Error>>(errors: T) -> Self {
+        Self::new(errors)
     }
 }
 
@@ -50,7 +102,7 @@ macro_rules! try_ok {
     ($expr:expr) => {
         match $expr {
             Ok(value) => value,
-            Err(err) => return Ok(Err(crate::TopErrors::clone(err))),
+            Err(err) => return Ok(Err(Arc::clone(err))),
         }
     };
 }
