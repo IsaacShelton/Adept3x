@@ -9,7 +9,11 @@ impl<'e, P: Pf> Run<'e, P> for ListSymbols {
             errors,
         } = th.demand(Approach)?;
 
-        let mut list = vec![];
+        let mut list = vec![
+            "example".into(),
+            "another_example".into(),
+            "final_example".into(),
+        ];
         for (name, _) in syms.named.iter() {
             list.push(name.into());
         }

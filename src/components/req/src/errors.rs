@@ -1,8 +1,11 @@
 use derive_more::IsVariant;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use thiserror::Error;
 
-#[derive(Clone, Debug, Error, Hash, PartialEq, Eq, PartialOrd, Ord, IsVariant)]
+#[derive(
+    Clone, Debug, Error, Hash, PartialEq, Eq, PartialOrd, Ord, IsVariant, Serialize, Deserialize,
+)]
 pub enum Error {
     #[error("Missing project file `adept.build`")]
     MissingProjectFile,

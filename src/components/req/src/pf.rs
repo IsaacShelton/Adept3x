@@ -1,4 +1,8 @@
-use crate::{Aft, Approach, AsSyms, IsDiv, IsImpure, Like, Minor, Req, RunDispatch, St, UnLike};
+use crate::{
+    Aft, Approach, AsSyms, IsDiv, IsImpure, Like, Minor, Req, RunDispatch, ShouldPersist, St,
+    UnLike,
+};
+use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash};
 
 pub trait Pf: Clone + Debug + Default {
@@ -9,9 +13,12 @@ pub trait Pf: Clone + Debug + Default {
         + Eq
         + Send
         + IsImpure
+        + ShouldPersist
         + From<Approach>
         + RunDispatch<'e, Self>
-        + UnLike<Req<'e>>;
+        + UnLike<Req>
+        + Serialize
+        + Deserialize<'e>;
     type Rev: Copy
         + Clone
         + Debug
@@ -22,7 +29,17 @@ pub trait Pf: Clone + Debug + Default {
         + Ord
         + Send
         + IsDiv
-        + Minor;
-    type Aft<'e>: Debug + Clone + Send + AsSyms<Self> + PartialEq + Eq + Like<Aft<Self>>;
+        + Minor
+        + Serialize
+        + for<'de> Deserialize<'de>;
+    type Aft<'e>: Debug
+        + Clone
+        + Send
+        + AsSyms<Self>
+        + PartialEq
+        + Eq
+        + Like<Aft<Self>>
+        + Serialize
+        + Deserialize<'e>;
     type St<'e>: Debug + Default + Send + Like<St>;
 }

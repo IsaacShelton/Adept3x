@@ -1,4 +1,5 @@
 use crate::IsDiv;
+use serde::{Deserialize, Serialize};
 
 pub trait Minor {
     fn minor(self) -> Self;
@@ -32,7 +33,7 @@ impl Major for Rev {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rev {
     major: u32,
     minor: u32,

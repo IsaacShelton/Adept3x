@@ -1,9 +1,10 @@
 use crate::Error;
+use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
 use std::sync::Arc;
 use top_n::TopN;
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopErrors {
     inner: Option<Arc<TopErrorsNode>>,
 }
@@ -31,7 +32,7 @@ impl From<Arc<TopErrorsNode>> for TopErrors {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopErrorsNode {
     errors: SmallVec<[Error; 1]>,
 

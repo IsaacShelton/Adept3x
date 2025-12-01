@@ -52,55 +52,62 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
         // NOTE: We keep the lock acquired for the entire lifetime of the query
         let mut rt = rt.lock().await;
 
-        let run = async {
-            // Read the new project while we're at it. This will likely have already been computed.
-            let new_project = watch_query(
-                rt.deref_mut(),
-                GetProject {
-                    working_directory: working_directory.clone(),
-                },
-                QueryMode::Continue,
-                TimeoutAt(Instant::now() + Duration::from_millis(50)),
-            )
-            .await;
+        // Read the new project while we're at it.
+        let new_project = watch_query(
+            rt.deref_mut(),
+            GetProject {
+                working_directory: working_directory.clone(),
+            },
+            QueryMode::New,
+            TimeoutAt(Instant::now() + Duration::from_millis(50)),
+        )
+        .await;
 
-            // Determine if the watch config was changed as part of the project config.
-            let new_watch_config = match new_project {
-                Ok(BlockOn::Complete(Ok(project))) => {
-                    let config = WatchConfig {
-                        interval_ms: project.interval_ms.unwrap_or(DEFAULTS.interval_ms),
-                        cache_to_disk: project.cache_to_disk.unwrap_or(DEFAULTS.cache_to_disk),
-                        max_idle_time_ms: project.max_idle_time_ms,
-                    };
+        // Determine if the watch config was changed as part of the project config.
+        let new_watch_config = match new_project {
+            Ok(BlockOn::Complete(Ok(project))) => {
+                let config = WatchConfig {
+                    interval_ms: project.interval_ms.unwrap_or(DEFAULTS.interval_ms),
+                    cache_to_disk: project.cache_to_disk.unwrap_or(DEFAULTS.cache_to_disk),
+                    max_idle_time_ms: project.max_idle_time_ms,
+                };
 
-                    (config != watch_config).then_some(config)
-                }
-                Ok(BlockOn::Complete(Err(errors)))
-                    if !errors
-                        .iter_unordered()
-                        .any(|error| error.is_invalid_project_config_syntax()) =>
-                {
-                    // Failed to parse project file, don't change the configuration
-                    None
-                }
-                _ => {
-                    // Failed to read project file
-                    (watch_config != DEFAULTS).then_some(DEFAULTS)
-                }
-            };
-
-            // If we have a new watch config, update it as well as the idle tracker.
-            if let Some(new_watch_config) = new_watch_config {
-                watch_config = new_watch_config;
-
-                let mut idle_tracker = server.idle_tracker.lock().await;
-                idle_tracker.last_active = Instant::now();
-                idle_tracker
-                    .set_max_idle_time(watch_config.max_idle_time_ms.map(Duration::from_millis));
+                (config != watch_config).then_some(config)
             }
+            Ok(BlockOn::Complete(Err(errors)))
+                if !errors
+                    .iter_unordered()
+                    .any(|error| error.is_invalid_project_config_syntax()) =>
+            {
+                // Failed to parse project file, don't change the configuration
+                None
+            }
+            _ => {
+                // Failed to read project file
+                (watch_config != DEFAULTS).then_some(DEFAULTS)
+            }
+        };
 
+        // If we have a new watch config, update it as well as the idle tracker.
+        if let Some(new_watch_config) = new_watch_config {
+            watch_config = new_watch_config;
+
+            let mut idle_tracker = server.idle_tracker.lock().await;
+            idle_tracker.last_active = Instant::now();
+            idle_tracker
+                .set_max_idle_time(watch_config.max_idle_time_ms.map(Duration::from_millis));
+            rt.cache_to_disk = watch_config.cache_to_disk;
+        }
+
+        let run = async {
             let timeout = TimeoutAt(Instant::now() + Duration::from_secs(2));
-            Ok(watch_query(rt.deref_mut(), watchee.clone(), QueryMode::New, timeout).await)
+            Ok(watch_query(
+                rt.deref_mut(),
+                watchee.clone(),
+                QueryMode::Continue,
+                timeout,
+            )
+            .await)
         };
 
         let timeout = async {
@@ -108,17 +115,16 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
             Err(())
         };
 
+        if server.idle_tracker.lock().await.shutdown_if_idle() {
+            break;
+        }
+
         log!("Watch Result is {:?}", run.or(timeout).await);
         Timer::after(Duration::from_millis(watch_config.interval_ms)).await;
 
         if server.idle_tracker.lock().await.shutdown_if_idle() {
             break;
         }
-    }
-
-    // Try to save the cache to disk before we exit if possible
-    if watch_config.cache_to_disk {
-        let _ = rt.lock().await.cache().save("adept.cache");
     }
 }
 

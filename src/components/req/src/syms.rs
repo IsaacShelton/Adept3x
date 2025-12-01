@@ -1,10 +1,11 @@
 use crate::{Pf, TopErrors};
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
 };
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WithErrors<T> {
     pub value: T,
     pub errors: TopErrors,
@@ -23,7 +24,7 @@ impl<T> WithErrors<T> {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Syms<P: Pf> {
     pub named: HashMap<String, SymGrp<P>>,
     pub evals: HashMap<Eval, P::Rev>,
@@ -37,7 +38,7 @@ impl<P: Pf> PartialEq for Syms<P> {
 
 impl<P: Pf> Eq for Syms<P> {}
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Eval(String);
 
 impl<P: Pf> Syms<P> {
@@ -70,7 +71,7 @@ impl<P: Pf> Syms<P> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SymGrp<P: Pf> {
     syms: HashSet<Sym>,
     last_changed: P::Rev,
@@ -105,20 +106,20 @@ impl<P: Pf> SymGrp<P> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SymId(usize);
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sym {
     kind: SymKind,
     id: SymId,
     from_eval: Option<Eval>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SymKind {
     Func(Func),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Func;

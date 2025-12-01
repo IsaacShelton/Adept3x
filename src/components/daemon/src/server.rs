@@ -49,6 +49,11 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
             }
         }
 
+        // Try to save the cache to disk before we exit if possible
+        if rt.lock().await.cache_to_disk {
+            let _ = rt.lock().await.cache().save("adept.cache");
+        }
+
         Ok(())
     })
 }

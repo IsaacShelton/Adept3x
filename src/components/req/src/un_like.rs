@@ -23,9 +23,9 @@ impl<P: Pf> UnLike<Aft<P>> for Aft<P> {
     }
 }
 
-impl<'e> UnLike<Req<'e>> for Req<'e> {
+impl UnLike<Req> for Req {
     #[inline(always)]
-    fn un_like(value: Req<'e>) -> Self {
+    fn un_like(value: Req) -> Self {
         value
     }
 

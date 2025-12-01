@@ -21,6 +21,7 @@ where
     pub(crate) syms: Syms<P>,
     pub(crate) current: P::Rev,
     pub(crate) vfs: Vfs,
+    pub cache_to_disk: bool,
 }
 
 impl<'e, P: Pf> RtStIn<'e, P>
@@ -33,6 +34,7 @@ where
             syms: Syms::default(),
             current: P::Rev::default(),
             vfs: Vfs::default(),
+            cache_to_disk: false,
         }
     }
 

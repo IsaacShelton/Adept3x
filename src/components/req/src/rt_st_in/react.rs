@@ -3,7 +3,7 @@ use crate::{
     Suspend, Task, TaskStatus, TaskStatusKind, Th, UnLike, UnwrapAft, log,
     rt_st_in::query::RtStInQuery, wake_dependants,
 };
-use std::{collections::HashSet, hash::RandomState};
+use std::collections::HashSet;
 
 pub fn react<'e, P: Pf>(rt: &mut RtStIn<'e, P>, query: &mut RtStInQuery<'e, P>, req: P::Req<'e>)
 where
@@ -231,7 +231,7 @@ where
 
     fn demand<R>(&mut self, req: R) -> Result<&R::Aft<'e>, Suspend>
     where
-        R: Into<Req<'e>> + UnwrapAft<'e, P>,
+        R: Into<Req> + UnwrapAft<'e, P>,
     {
         let req = req.into();
         log!("Requesting {:?}", req);

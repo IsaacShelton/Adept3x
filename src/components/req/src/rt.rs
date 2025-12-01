@@ -22,13 +22,13 @@ pub trait Rt<'e, P: Pf>: Send {
 
 pub trait Th<'e, P: Pf>
 where
-    P::Req<'e>: UnLike<Req<'e>>,
+    P::Req<'e>: UnLike<Req>,
 {
     type Rt: Rt<'e, P>;
     fn rt(&self) -> &Self::Rt;
     fn demand<R>(&mut self, req: R) -> Result<&R::Aft<'e>, Suspend>
     where
-        R: Into<Req<'e>> + UnwrapAft<'e, P>;
+        R: Into<Req> + UnwrapAft<'e, P>;
 }
 
 pub trait Ch<'e, P: Pf> {

@@ -23,6 +23,7 @@ pub use pf::*;
 pub use requests::*;
 pub use rt::*;
 pub use rt_st_in::*;
+use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc};
 pub use succ::*;
 pub use syms::*;
@@ -41,7 +42,7 @@ macro_rules! log {
     }};
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Project {
     pub root: Arc<Path>,
     pub interval_ms: Option<u64>,
@@ -71,10 +72,11 @@ mod requests {
     pub struct GetProjectState;
 
     #[define_requests::returns(String)]
-    pub struct Search<'e>(&'e str);
+    pub struct Search();
     #[derive(Default)]
     pub struct SearchState;
 
+    #[define_requests::never_persist]
     #[define_requests::returns(WithErrors<Syms<P>>)]
     pub struct Approach;
     #[derive(Default)]

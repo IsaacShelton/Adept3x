@@ -111,14 +111,14 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
                 inspect_attrs(req, &item_enum.ident, &mut item_enum.attrs);
                 item_enum
                     .attrs
-                    .push(parse_quote!(#[derive(Clone, Debug, Hash, PartialEq, Eq)]));
+                    .push(parse_quote!(#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]));
                 item.to_token_stream()
             }
             Item::Struct(item_struct) => {
                 inspect_attrs(req, &item_struct.ident, &mut item_struct.attrs);
                 item_struct
                     .attrs
-                    .push(parse_quote!(#[derive(Clone, Debug, Hash, PartialEq, Eq)]));
+                    .push(parse_quote!(#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]));
                 item.to_token_stream()
             }
             _ => item.to_token_stream(),
@@ -198,17 +198,26 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
     }));
 
     let mut impure_arms = TokenStream::new();
+    let mut should_persist_arms = TokenStream::new();
     let mut run_dispatch_arms = TokenStream::new();
     for req in pairs.iter().a() {
-        let value = if req.pure {
-            quote! { false }
-        } else {
-            quote! { true }
+        let boolean = |condition| {
+            if condition {
+                quote! { true }
+            } else {
+                quote! { false }
+            }
         };
 
         let ident = &req.ident;
 
+        let value = boolean(req.pure);
         impure_arms.extend(quote! {
+            Self::#ident(..) => #value,
+        });
+
+        let value = boolean(req.persist);
+        should_persist_arms.extend(quote! {
             Self::#ident(..) => #value,
         });
 
@@ -219,8 +228,9 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
 
     quote! {
         mod requests {
+            use ::serde::{Serialize, Deserialize};
             #rest
-            #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+            #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
             pub enum Req #any_req_e {
                 #all_req
             }
@@ -245,7 +255,7 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
             #sts
             #st_wrap
             #st_unwrap
-            #[derive(Debug, Clone, PartialEq, Eq)]
+            #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
             pub enum Aft<P: Pf #any_aft_short_e> {
                 #all_afts
             }
@@ -263,7 +273,7 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
                 fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend>;
             }
             pub struct Suspend;
-            #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
+            #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
             pub struct PfIn;
             impl Pf for PfIn {
                 type Rev = Rev;
@@ -276,6 +286,9 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
             pub trait IsImpure {
                 fn is_impure(&self) -> bool;
             }
+            pub trait ShouldPersist {
+                fn should_persist(&self) -> bool;
+            }
             impl #any_req_e IsImpure for Req #any_req_e {
                 fn is_impure(&self) -> bool {
                     match self {
@@ -283,9 +296,16 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
                     }
                 }
             }
+            impl #any_req_e ShouldPersist for Req #any_req_e {
+                fn should_persist(&self) -> bool {
+                    match self {
+                        #should_persist_arms
+                    }
+                }
+            }
             impl<'e, P: Pf> RunDispatch<'e, P> for P::Req<'e>
             where
-                P::Req<'e>: Like<Req<'e>>,
+                P::Req<'e>: Like<Req #any_req_e>,
                 P::Aft<'e>: UnLike<Aft<P>>,
             {
                 fn run_dispath(

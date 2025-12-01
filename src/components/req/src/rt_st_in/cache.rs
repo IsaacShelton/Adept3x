@@ -1,11 +1,11 @@
-use crate::{Pf, TaskStatus};
-use serde::ser::SerializeMap;
+use crate::{Pf, ShouldPersist, TaskStatus, TaskStatusKind};
+use serde::ser::{SerializeMap, SerializeSeq};
 use std::{collections::HashMap, io::Write, path::Path};
 
 const HEADER: &[u8] =
     b"This file is a local cache and *not* sharable. It should be ignored for version control purposes.\n";
 const COMPILER_BUILT_AT: u64 = compile_time::unix!();
-const HUMAN_READABLE: bool = true;
+const HUMAN_READABLE: bool = false;
 
 #[derive(Default)]
 pub struct Cache<'e, P: Pf> {
@@ -66,8 +66,29 @@ impl<'e, P: Pf> serde::Serialize for Kv<'e, P> {
     where
         S: serde::Serializer,
     {
-        let map = serializer.serialize_map(Some(0))?;
-        map.end()
+        let mut include = vec![];
+
+        for (key, value) in self.inner.iter() {
+            if !key.should_persist() {
+                continue;
+            }
+            match value {
+                Some(status) => match &status.kind {
+                    TaskStatusKind::Running(_) => (),
+                    TaskStatusKind::Completed(completed) => {
+                        include.push((key, &completed.aft));
+                    }
+                    TaskStatusKind::Restarting(_) => (),
+                },
+                None => (),
+            }
+        }
+
+        let mut seq = serializer.serialize_seq(Some(include.len()))?;
+        for entry in include {
+            seq.serialize_element(&entry)?;
+        }
+        seq.end()
     }
 }
 

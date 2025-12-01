@@ -6,7 +6,7 @@ pub trait Like<T> {
     fn like_mut(&mut self) -> &mut T;
 }
 
-impl<'e> Like<Req<'e>> for Req<'e> {
+impl<'e> Like<Req> for Req {
     #[inline(always)]
     fn like(self) -> Self {
         self
