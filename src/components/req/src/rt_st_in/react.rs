@@ -274,20 +274,15 @@ where
     let mut th = ThStIn::new(rt);
     let result = req.run_dispath(st, &mut th);
 
-    // TODO: CLEANUP: We need to be able to detect which dependencies are new, but also want
-    // to save space when possible.
-    let existing = HashSet::<_, RandomState>::from_iter(task.requested.iter());
-    let mut new_deps = Vec::new();
-    for subreq in th.suspend_on.drain() {
-        if !existing.contains(&subreq) {
-            new_deps.push(subreq);
-        }
+    // Remove existing dependencies from set of new requested dependencies
+    for existing_dep in task.requested.iter() {
+        th.suspend_on.remove(existing_dep);
     }
 
     // Check the result
     match result {
         Ok(aft) => {
-            task.requested.extend(new_deps);
+            task.requested.extend(th.suspend_on.drain());
 
             if let Some(new_syms) = aft.as_syms() {
                 if rt.syms.has_changed(new_syms) {
@@ -311,7 +306,7 @@ where
             log!("  It has outdated dependencies");
             running.left_waiting_on = 0;
 
-            for dep in &new_deps {
+            for dep in &th.suspend_on {
                 match rt.cache.get(&dep) {
                     Some(Some(TaskStatus {
                         kind: TaskStatusKind::Completed(..),
@@ -362,7 +357,7 @@ where
                 }
             }
 
-            task.requested.extend(new_deps);
+            task.requested.extend(th.suspend_on.drain());
 
             // Re-queue immediately if everything requested is already ready and valid
             if running.left_waiting_on == 0 {
