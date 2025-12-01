@@ -1,4 +1,4 @@
-use crate::{Major, Pf, RtStIn, TaskStatusKind, rt_st_in::query::RtStInQuery};
+use crate::{Major, Pf, RtStIn, TaskStatusKind, log, rt_st_in::query::RtStInQuery};
 
 pub fn wake_dependants<'e, P: Pf>(
     rt: &mut RtStIn<'e, P>,
@@ -18,20 +18,20 @@ pub fn wake_dependants<'e, P: Pf>(
                 .kind
             {
                 TaskStatusKind::Running(running) => {
-                    eprintln!("  Decrementing (running) {:?}", waiter);
+                    log!("  Decrementing (running) {:?}", waiter);
                     running.left_waiting_on -= 1;
 
                     if running.left_waiting_on == 0 {
-                        eprintln!("  Woke up (running) {:?}", waiter);
+                        log!("  Woke up (running) {:?}", waiter);
                         query.queue.push(waiter);
                     }
                 }
                 TaskStatusKind::Restarting(restarting) => {
-                    eprintln!("  Decrementing (restarting) {:?}", waiter);
+                    log!("  Decrementing (restarting) {:?}", waiter);
                     restarting.left_waiting_on -= 1;
 
                     if restarting.left_waiting_on == 0 {
-                        eprintln!("  Woke up (restarting) {:?}", waiter);
+                        log!("  Woke up (restarting) {:?}", waiter);
                         query.queue.push(waiter);
                     }
                 }

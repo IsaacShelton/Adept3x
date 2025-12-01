@@ -1,8 +1,27 @@
-use crate::Pf;
+use crate::{Pf, TopErrors};
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
 };
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+pub struct WithErrors<T> {
+    pub value: T,
+    pub errors: TopErrors,
+}
+
+impl<T> WithErrors<T> {
+    pub fn new(value: T, errors: TopErrors) -> Self {
+        Self { value, errors }
+    }
+
+    pub fn no_errors(value: T) -> Self {
+        Self {
+            value,
+            errors: TopErrors::default(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct Syms<P: Pf> {

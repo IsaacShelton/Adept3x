@@ -1,19 +1,15 @@
-use crate::{Error, FindProjectConfig, Like, Pf, Rt, Run, Suspend, Th, UnwrapSt};
+use crate::{Error, FindProjectConfig, Like, Pf, Rt, Run, Suspend, Th, UnwrapSt, log};
 use std::io::Read;
 use vfs::{BlockingFs, Canonical};
 
 impl<'e, P: Pf> Run<'e, P> for FindProjectConfig {
-    fn run(
-        &self,
-        st: &mut P::St<'e>,
-        th: &mut impl Th<'e, P>,
-    ) -> Result<Self::Aft<'e>, Suspend<'e, P>> {
+    fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend> {
         let _st = Self::unwrap_st(st.like_mut());
 
         if let Ok(path) = Canonical::new(self.working_directory.join("adept.build")) {
             if let Ok(got) = th.rt().vfs().read::<BlockingFs>(path) {
                 if got.changed_at.is_some() {
-                    let _ = dbg!(got.content.text());
+                    log!("  New content for adept.build is: {:?}", got.content.text());
                 }
             }
         }

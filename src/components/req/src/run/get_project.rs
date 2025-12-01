@@ -9,11 +9,7 @@ use std::{path::PathBuf, sync::Arc};
 use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 impl<'e, P: Pf> Run<'e, P> for GetProject {
-    fn run(
-        &self,
-        st: &mut P::St<'e>,
-        th: &mut impl Th<'e, P>,
-    ) -> Result<Self::Aft<'e>, Suspend<'e, P>> {
+    fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend> {
         let _st = Self::unwrap_st(st.like_mut());
 
         let content = match th.demand(FindProjectConfig {
@@ -48,6 +44,11 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
         let interval_ms = config
             .remove("interval_ms")
             .and_then(|value| value.into_u64());
+
+        let max_idle_time_ms = config
+            .remove("max_idle_time_ms")
+            .and_then(|value| value.into_u64());
+
         let cache_to_disk = config
             .remove("cache_to_disk")
             .and_then(|value| value.into_bool());
@@ -62,14 +63,14 @@ impl<'e, P: Pf> Run<'e, P> for GetProject {
                 .map(|name| Error::InvalidProjectConfigOption(Arc::from(name))),
         );
 
-        dbg!(errors);
-
-        const _VERSION: &'static str = env!("CARGO_PKG_VERSION");
-        let path = PathBuf::from(main);
+        if !errors.is_empty() {
+            return Ok(Err(errors.into()));
+        }
 
         Ok(Ok(Project {
-            root: Arc::from(path.into_boxed_path()),
+            root: Arc::from(PathBuf::from(main).into_boxed_path()),
             interval_ms,
+            max_idle_time_ms,
             cache_to_disk,
         }))
     }

@@ -3,7 +3,33 @@ use smallvec::{SmallVec, smallvec};
 use std::sync::Arc;
 use top_n::TopN;
 
-pub type TopErrors = Arc<TopErrorsNode>;
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+pub struct TopErrors {
+    inner: Option<Arc<TopErrorsNode>>,
+}
+
+impl TopErrors {
+    pub fn iter_unordered<'a>(&'a self) -> TopErrorsUnorderedIter<'a> {
+        self.inner
+            .as_ref()
+            .map(|inner| inner.iter_unordered())
+            .unwrap_or_default()
+    }
+}
+
+impl From<TopErrorsNode> for TopErrors {
+    fn from(value: TopErrorsNode) -> Self {
+        Self {
+            inner: Some(Arc::new(value)),
+        }
+    }
+}
+
+impl From<Arc<TopErrorsNode>> for TopErrors {
+    fn from(value: Arc<TopErrorsNode>) -> Self {
+        Self { inner: Some(value) }
+    }
+}
 
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub struct TopErrorsNode {
@@ -40,8 +66,12 @@ impl TopErrorsNode {
         TopN::from_iter(n, self.iter_unordered(), |a, b| a.cmp(b))
     }
 
-    pub fn iter_unordered(&self) -> impl Iterator<Item = &Error> {
+    pub fn iter_unordered<'a>(&'a self) -> TopErrorsUnorderedIter<'a> {
         TopErrorsUnorderedIter::new(self)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.iter_unordered().next().is_none()
     }
 }
 
@@ -51,6 +81,7 @@ impl FromIterator<Error> for Arc<TopErrorsNode> {
     }
 }
 
+#[derive(Default)]
 pub struct TopErrorsUnorderedIter<'a> {
     stack: SmallVec<[&'a TopErrorsNode; 10]>,
     slice: &'a [Error],
@@ -93,16 +124,6 @@ impl FromIterator<Error> for TopErrorsNode {
 
 impl<T, S> From<Error> for Result<Result<T, TopErrors>, S> {
     fn from(value: Error) -> Self {
-        Ok(Err(Arc::new(TopErrorsNode::new(std::iter::once(value)))))
+        Ok(Err(TopErrorsNode::new(std::iter::once(value)).into()))
     }
-}
-
-#[macro_export]
-macro_rules! try_ok {
-    ($expr:expr) => {
-        match $expr {
-            Ok(value) => value,
-            Err(err) => return Ok(Err(Arc::clone(err))),
-        }
-    };
 }

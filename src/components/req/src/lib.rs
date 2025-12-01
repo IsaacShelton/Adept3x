@@ -31,10 +31,21 @@ pub use top_errors::*;
 pub use un_like::*;
 pub use unblock::*;
 
+#[macro_export]
+macro_rules! log {
+    () => {
+        $crate::log!("\n")
+    };
+    ($($arg:tt)*) => {{
+        eprintln!($($arg)*);
+    }};
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Project {
     pub root: Arc<Path>,
     pub interval_ms: Option<u64>,
+    pub max_idle_time_ms: Option<u64>,
     pub cache_to_disk: Option<bool>,
 }
 
@@ -64,12 +75,12 @@ mod requests {
     #[derive(Default)]
     pub struct SearchState;
 
-    #[define_requests::returns(Syms<P>)]
+    #[define_requests::returns(WithErrors<Syms<P>>)]
     pub struct Approach;
     #[derive(Default)]
     pub struct ApproachState;
 
-    #[define_requests::returns(Result<Vec<String>, TopErrors>)]
+    #[define_requests::returns(WithErrors<Vec<String>>)]
     pub struct ListSymbols;
     #[derive(Default)]
     pub struct ListSymbolsState;

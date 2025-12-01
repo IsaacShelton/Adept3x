@@ -257,12 +257,12 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
             #aft_wrap
             #aft_unwrap
             pub trait RunDispatch<'e, P: Pf> {
-                fn run_dispath(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<P::Aft<'e>, Suspend<'e, P>>;
+                fn run_dispath(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<P::Aft<'e>, Suspend>;
             }
             pub trait Run<'e, P: Pf>: UnwrapSt<'e> + UnwrapAft<'e, P> {
-                fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend<'e, P>>;
+                fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend>;
             }
-            pub type Suspend<'e, P: Pf> = Vec<P::Req<'e>>;
+            pub struct Suspend;
             #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
             pub struct PfIn;
             impl Pf for PfIn {
@@ -292,7 +292,7 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
                     &self,
                     st: &mut P::St<'e>,
                     th: &mut impl Th<'e, P>,
-                ) -> Result<P::Aft<'e>, Suspend<'e, P>> {
+                ) -> Result<P::Aft<'e>, Suspend> {
                     match self.like_ref() {
                         #run_dispatch_arms
                     }

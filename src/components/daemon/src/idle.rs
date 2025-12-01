@@ -9,6 +9,7 @@ pub struct IdleTracker {
     pub num_connections: usize,
     pub should_shutdown: bool,
     pub max_idle_time: Duration,
+    pub original_max_idle_time: Duration,
 }
 
 impl IdleTracker {
@@ -18,6 +19,14 @@ impl IdleTracker {
             num_connections: 0,
             should_shutdown: false,
             max_idle_time,
+            original_max_idle_time: max_idle_time,
+        }
+    }
+
+    pub fn set_max_idle_time(&mut self, new_max_idle_time: Option<Duration>) {
+        match new_max_idle_time {
+            Some(new_max_idle_time) => self.max_idle_time = new_max_idle_time,
+            None => self.max_idle_time = self.original_max_idle_time,
         }
     }
 

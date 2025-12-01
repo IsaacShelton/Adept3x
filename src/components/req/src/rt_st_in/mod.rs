@@ -5,7 +5,7 @@ mod wake_dependants;
 
 use crate::{
     Approach, BlockOn, IsDiv, Major, Minor, Pf, QueryMode, Rt, ShouldUnblock, Syms, TaskStatusKind,
-    TopErrorsNode, rt_st_in::query::RtStInQuery,
+    TopErrorsNode, log, rt_st_in::query::RtStInQuery,
 };
 pub use cache::*;
 use react::*;
@@ -50,7 +50,7 @@ where
     fn query(&mut self, req: P::Req<'e>, mode: QueryMode) -> RtStInQuery<'e, P> {
         if let QueryMode::New = mode {
             self.current = self.current.major();
-            dbg!(self.current);
+            log!("Currently at: {:?}", self.current);
         }
 
         RtStInQuery {

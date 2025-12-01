@@ -1,8 +1,9 @@
 use crate::{
     AsSyms, Completed, IsImpure, Like, Major, Pf, Req, Restarting, RtStIn, RunDispatch, Running,
-    Suspend, Task, TaskStatus, TaskStatusKind, Th, UnLike, UnwrapAft, rt_st_in::query::RtStInQuery,
-    wake_dependants,
+    Suspend, Task, TaskStatus, TaskStatusKind, Th, UnLike, UnwrapAft, log,
+    rt_st_in::query::RtStInQuery, wake_dependants,
 };
+use std::{collections::HashSet, hash::RandomState};
 
 pub fn react<'e, P: Pf>(rt: &mut RtStIn<'e, P>, query: &mut RtStInQuery<'e, P>, req: P::Req<'e>)
 where
@@ -27,11 +28,13 @@ where
     // Acquire running task
     let mut status = entry.take().expect("task to not be processing");
 
+    log!("Reacting {:?}, deps: {:?}", &req, &status.task.requested);
+
     let (running, task) = match status.kind {
         TaskStatusKind::Running(running) => (running, status.task),
         TaskStatusKind::Completed(completed) => {
             if status.task.verified_at < rt.current {
-                println!("Not verified for this rev yet {:?}", req);
+                log!("  This isn't verified for this revision yet");
                 rt.cache.insert(
                     req.clone(),
                     Some(TaskStatus {
@@ -49,9 +52,10 @@ where
                     }),
                 );
 
+                log!("  Done reacting - Restarting");
                 query.queue.push(req.clone());
             } else {
-                println!("Already verified");
+                log!("  Done reacting - Already verified");
                 status.task.verified_at = rt.current;
                 *entry = Some(TaskStatus {
                     kind: TaskStatusKind::Completed(completed),
@@ -129,6 +133,9 @@ where
                             task: status.task,
                         }),
                     );
+                    log!(
+                        "  Done reacting - Dependencies for testing whether to restart are all ready and valid"
+                    );
                     return;
                 }
             }
@@ -161,6 +168,7 @@ where
                         },
                     }),
                 );
+                log!("  Done reacting - The existing result does not need to be recomputed");
                 return;
             }
 
@@ -168,12 +176,12 @@ where
                 Running {
                     st: P::St::default(),
                     prev_aft: Some(restarting.prev_aft),
-                    left_waiting_on: restarting.left_waiting_on,
+                    left_waiting_on: 0,
                 },
                 Task {
                     verified_at: rt.current,
                     changed_at: status.task.changed_at,
-                    requested: status.task.requested,
+                    requested: vec![],
                 },
             )
         }
@@ -181,6 +189,13 @@ where
 
     // Process the task
     let new_task_status = run_in_th(rt, query, &req, task, running);
+
+    log!(
+        "Done Reacting {:?}, deps: {:?}",
+        &req,
+        &new_task_status.task.requested
+    );
+
     rt.cache.insert(req, Some(new_task_status));
 }
 
@@ -189,6 +204,7 @@ where
     P::Rev: Major,
 {
     rt: &'rt RtStIn<'e, P>,
+    suspend_on: HashSet<P::Req<'e>>,
 }
 
 impl<'rt, 'e, P: Pf> ThStIn<'rt, 'e, P>
@@ -196,7 +212,10 @@ where
     P::Rev: Major,
 {
     pub fn new(rt: &'rt RtStIn<'e, P>) -> Self {
-        Self { rt }
+        Self {
+            rt,
+            suspend_on: HashSet::with_capacity(16),
+        }
     }
 }
 
@@ -210,30 +229,31 @@ where
         self.rt
     }
 
-    fn demand<R>(&self, req: R) -> Result<&R::Aft<'e>, Suspend<'e, P>>
+    fn demand<R>(&mut self, req: R) -> Result<&R::Aft<'e>, Suspend>
     where
         R: Into<Req<'e>> + UnwrapAft<'e, P>,
     {
         let req = req.into();
-        eprintln!("Requesting {:?}", req);
+        log!("Requesting {:?}", req);
 
         let existing = self.rt.cache.get(P::Req::un_like_ref(&req));
+        self.suspend_on.insert(P::Req::un_like(req));
 
         let Some(Some(TaskStatus {
             kind: TaskStatusKind::Completed(completed),
             task,
         })) = existing
         else {
-            eprintln!("  It's not ready");
-            return Err(vec![P::Req::un_like(req)]);
+            log!("  It's not ready");
+            return Err(Suspend);
         };
 
         if task.verified_at < self.rt.current {
-            eprintln!("  It's out of date");
-            return Err(vec![P::Req::un_like(req)]);
+            log!("  It's out of date");
+            return Err(Suspend);
         }
 
-        eprintln!("  It's verified for this revision");
+        log!("  It's verified for this revision");
         Ok(R::as_aft(&completed.aft.like_ref()).unwrap())
     }
 }
@@ -242,21 +262,33 @@ fn run_in_th<'e, P: Pf>(
     rt: &mut RtStIn<'e, P>,
     query: &mut RtStInQuery<'e, P>,
     req: &P::Req<'e>,
-    task: Task<'e, P>,
+    mut task: Task<'e, P>,
     mut running: Running<'e, P>,
 ) -> TaskStatus<'e, P>
 where
     P::Rev: Major,
 {
-    let st = &mut running.st;
+    log!("Processing {:?}, queue: {:?}", req, &query.queue);
 
-    eprintln!("Processing {:?}, {:?}", req, &query.queue);
+    let st = &mut running.st;
     let mut th = ThStIn::new(rt);
     let result = req.run_dispath(st, &mut th);
+
+    // TODO: CLEANUP: We need to be able to detect which dependencies are new, but also want
+    // to save space when possible.
+    let existing = HashSet::<_, RandomState>::from_iter(task.requested.iter());
+    let mut new_deps = Vec::new();
+    for subreq in th.suspend_on.drain() {
+        if !existing.contains(&subreq) {
+            new_deps.push(subreq);
+        }
+    }
 
     // Check the result
     match result {
         Ok(aft) => {
+            task.requested.extend(new_deps);
+
             if let Some(new_syms) = aft.as_syms() {
                 if rt.syms.has_changed(new_syms) {
                     query.new_syms = Some(new_syms.clone());
@@ -275,21 +307,21 @@ where
                 task,
             }
         }
-        Err(deps) => {
-            eprintln!("  It has outdated dependencies");
+        Err(Suspend {}) => {
+            log!("  It has outdated dependencies");
             running.left_waiting_on = 0;
 
-            for dep in &deps {
+            for dep in &new_deps {
                 match rt.cache.get(&dep) {
                     Some(Some(TaskStatus {
                         kind: TaskStatusKind::Completed(..),
                         task: dep_task,
                     })) => {
                         if dep_task.verified_at >= query.rev {
-                            eprintln!("  Dependency is already verified");
+                            log!("  Dependency is already verified");
                             continue;
                         } else {
-                            eprintln!("  Dependency is stale");
+                            log!("  Dependency is stale");
                             // The completed result is stale, we need to requeue it
                             query.queue.push(dep.clone());
                             query
@@ -307,7 +339,7 @@ where
                             ..
                         }),
                     ) => {
-                        eprintln!("  Dependency is already being processed");
+                        log!("  Dependency is already being processed");
                         // Already in queue/being processed
                         query
                             .waiting
@@ -317,7 +349,7 @@ where
                         running.left_waiting_on += 1;
                     }
                     None => {
-                        eprintln!("  Dependency has not started yet {:?}", &query.queue);
+                        log!("  Dependency has not started yet {:?}", &query.queue);
                         // Has never been invoked
                         query.queue.push(dep.clone());
                         query
@@ -330,12 +362,11 @@ where
                 }
             }
 
-            let mut task = task;
-            task.requested.extend(deps);
+            task.requested.extend(new_deps);
 
             // Re-queue immediately if everything requested is already ready and valid
             if running.left_waiting_on == 0 {
-                eprintln!("  No dependencies need to be waited on");
+                log!("  No dependencies need to be waited on");
                 query.queue.push(req.clone());
             }
 
