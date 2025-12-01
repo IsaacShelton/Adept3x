@@ -1,4 +1,6 @@
-use crate::{BlockOn, Pf, Req, ShouldUnblock, Suspend, Syms, Task, TopErrors, UnLike, UnwrapAft};
+use crate::{
+    BlockOn, Pf, Req, ShouldUnblock, Suspend, Syms, Task, TopErrorsNode, UnLike, UnwrapAft,
+};
 use vfs::Vfs;
 
 pub enum QueryMode {
@@ -13,7 +15,7 @@ pub trait Rt<'e, P: Pf>: Send {
         &mut self,
         query: Self::Query,
         timeout: impl ShouldUnblock,
-    ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, TopErrors>;
+    ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, TopErrorsNode>;
     fn syms(&self) -> Syms<P>;
     fn vfs(&self) -> &Vfs;
 }

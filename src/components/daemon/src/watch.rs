@@ -87,6 +87,10 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
         let _ = dbg!(run.or(timeout).await);
         Timer::after(Duration::from_millis(watch_config.interval_ms)).await;
 
+        if watch_config.cache_to_disk {
+            rt.cache().save("adept.cache").unwrap();
+        }
+
         if server.idle_tracker.lock().await.shutdown_if_idle() {
             break;
         }

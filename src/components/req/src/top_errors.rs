@@ -45,12 +45,6 @@ impl TopErrorsNode {
     }
 }
 
-impl<T, S> Into<Result<Result<T, TopErrors>, S>> for Error {
-    fn into(self) -> Result<Result<T, TopErrors>, S> {
-        Ok(Err(Arc::new(TopErrorsNode::new([self]))))
-    }
-}
-
 impl FromIterator<Error> for Arc<TopErrorsNode> {
     fn from_iter<T: IntoIterator<Item = Error>>(errors: T) -> Self {
         Arc::new(TopErrorsNode::new(errors))
@@ -94,6 +88,12 @@ impl<'a> Iterator for TopErrorsUnorderedIter<'a> {
 impl FromIterator<Error> for TopErrorsNode {
     fn from_iter<T: IntoIterator<Item = Error>>(errors: T) -> Self {
         Self::new(errors)
+    }
+}
+
+impl<T, S> From<Error> for Result<Result<T, TopErrors>, S> {
+    fn from(value: Error) -> Self {
+        Ok(Err(Arc::new(TopErrorsNode::new(std::iter::once(value)))))
     }
 }
 
