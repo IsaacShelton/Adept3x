@@ -30,12 +30,12 @@ impl UnLike<Req> for Req {
     }
 
     #[inline(always)]
-    fn un_like_ref(value: &Self) -> &Self {
+    fn un_like_ref(value: &Req) -> &Self {
         value
     }
 
     #[inline(always)]
-    fn un_like_mut(value: &mut Self) -> &mut Self {
+    fn un_like_mut(value: &mut Req) -> &mut Self {
         value
     }
 }

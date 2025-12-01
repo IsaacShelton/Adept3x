@@ -6,7 +6,7 @@ pub trait Like<T> {
     fn like_mut(&mut self) -> &mut T;
 }
 
-impl<'e> Like<Req> for Req {
+impl Like<Req> for Req {
     #[inline(always)]
     fn like(self) -> Self {
         self
@@ -23,7 +23,7 @@ impl<'e> Like<Req> for Req {
     }
 }
 
-impl<'e> Like<St> for St {
+impl Like<St> for St {
     #[inline(always)]
     fn like(self) -> Self {
         self
@@ -40,7 +40,7 @@ impl<'e> Like<St> for St {
     }
 }
 
-impl<'e, P: Pf> Like<Aft<P>> for Aft<P> {
+impl<P: Pf> Like<Aft<P>> for Aft<P> {
     #[inline(always)]
     fn like(self) -> Self {
         self

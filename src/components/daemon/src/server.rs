@@ -32,7 +32,7 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
 
         let mut incoming = listener.incoming();
         let server = Arc::new(Server::new(max_idle_time).await);
-        let rt = Arc::new(Mutex::new(RtStIn::<PfIn>::new(Cache::default())));
+        let rt = Arc::new(Mutex::new(RtStIn::<PfIn>::new(Cache::load("adept.cache"))));
 
         smol::spawn(watch(server.clone(), rt.clone(), req::ListSymbols)).detach();
 
