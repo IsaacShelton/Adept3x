@@ -38,7 +38,11 @@ macro_rules! log {
         $crate::log!("\n")
     };
     ($($arg:tt)*) => {{
-        eprintln!($($arg)*);
+        if true {
+            eprintln!($($arg)*);
+        } else {
+            let _ = format_args!($($arg)*);
+        }
     }};
 }
 
