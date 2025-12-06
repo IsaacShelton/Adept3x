@@ -1,4 +1,4 @@
-use crate::{Aft, Approach, Like, Pf, Syms, UnwrapAft};
+use crate::{Aft, Like, Pf, Symbols, Syms, UnwrapAft};
 
 pub trait AsSyms<P: Pf> {
     fn as_syms(&self) -> Option<&Syms<P>>;
@@ -9,6 +9,6 @@ where
     P::Aft<'e>: Like<Aft<P>>,
 {
     fn as_syms(&self) -> Option<&Syms<P>> {
-        Approach::as_aft(self.like_ref()).map(|aft| &aft.value)
+        Symbols::as_aft(self.like_ref()).map(|aft| &aft.value)
     }
 }

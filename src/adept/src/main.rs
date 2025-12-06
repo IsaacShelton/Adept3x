@@ -6,30 +6,17 @@ fn main() -> ExitCode {
 
     match args.peek().map(String::as_str) {
         Some("-h" | "--help") | None => show_help(),
-        Some("--server") => start_server(),
         Some("--daemon") => start_daemon(args),
         Some("--oneshot") => start_oneshot(args),
+        Some("--incremental") => start_incremental(),
         Some("--language-server") => start_language_server(args),
-        _ => start_server(),
+        _ => start_incremental(),
     }
 }
 
 fn show_help() -> ExitCode {
     println!("usage: adept FILENAME");
     ExitCode::FAILURE
-}
-
-fn start_server() -> ExitCode {
-    let connection = match connect_to_daemon() {
-        Ok(connection) => connection,
-        Err(err) => {
-            eprintln!("{}", err);
-            return ExitCode::FAILURE;
-        }
-    };
-
-    println!("Connected! {:?}", connection);
-    ExitCode::SUCCESS
 }
 
 fn start_daemon(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
@@ -45,10 +32,23 @@ fn start_daemon(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
     }
 }
 
+fn start_incremental() -> ExitCode {
+    let connection = match connect_to_daemon() {
+        Ok(connection) => connection,
+        Err(err) => {
+            eprintln!("{}", err);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    println!("Connected! {:?}", connection);
+    ExitCode::SUCCESS
+}
+
 fn start_oneshot(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
     todo!()
 }
 
 fn start_language_server(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
-    todo!()
+    language_server::start()
 }

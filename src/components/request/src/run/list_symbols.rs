@@ -1,4 +1,4 @@
-use crate::{Approach, Like, ListSymbols, Pf, Run, Suspend, Th, UnwrapSt, WithErrors};
+use crate::{Like, ListSymbols, Pf, Run, Suspend, Symbols, Th, UnwrapSt, WithErrors};
 
 impl<'e, P: Pf> Run<'e, P> for ListSymbols {
     fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend> {
@@ -7,7 +7,7 @@ impl<'e, P: Pf> Run<'e, P> for ListSymbols {
         let WithErrors {
             value: syms,
             errors,
-        } = th.demand(Approach)?;
+        } = th.demand(Symbols)?;
 
         let mut list = vec![
             "example".into(),

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 daemon = { version = "0.1.0", path = "../components/daemon" }
+language_server = { version = "0.1.0", path = "../components/language_server" }

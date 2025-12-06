@@ -54,9 +54,14 @@ pub struct Project {
     pub cache_to_disk: Option<bool>,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Ast;
+
 #[define_requests::group]
 mod requests {
     use super::*;
+    use std::path::PathBuf;
+    use vfs::Canonical;
 
     #[define_requests::impure]
     #[define_requests::never_persist]
@@ -82,12 +87,19 @@ mod requests {
 
     #[define_requests::never_persist]
     #[define_requests::returns(WithErrors<Syms<P>>)]
-    pub struct Approach;
+    pub struct Symbols;
     #[derive(Default)]
-    pub struct ApproachState;
+    pub struct SymbolsState;
 
     #[define_requests::returns(WithErrors<Vec<String>>)]
     pub struct ListSymbols;
     #[derive(Default)]
     pub struct ListSymbolsState;
+
+    #[define_requests::returns(WithErrors<Ast>)]
+    pub struct GetAst {
+        pub filename: Arc<Canonical<PathBuf>>,
+    }
+    #[derive(Default)]
+    pub struct GetAstState;
 }

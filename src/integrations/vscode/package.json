@@ -1,0 +1,87 @@
+{
+    "name": "adept",
+    "description": "Adept Programming Language",
+    "author": "Isaac Shelton",
+    "license": "GPL-3.0-only",
+    "version": "1.0.0",
+    "publisher": "dockysoft",
+    "categories": [],
+    "keywords": [],
+    "engines": {
+        "vscode": "^1.100.0"
+    },
+    "activationEvents": [
+        "onLanguage:plaintext"
+    ],
+    "main": "./client/out/extension",
+    "contributes": {
+        "configuration": {
+            "type": "object",
+            "title": "Adept Configuration",
+            "properties": {
+                "adept.maxNumberOfProblems": {
+                    "scope": "resource",
+                    "type": "number",
+                    "default": 100,
+                    "description": "Controls the maximum number of problems produced by the server."
+                },
+                "adept.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VS Code and the language server."
+                },
+                "adept.serverCommand": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "adept",
+                    "editPresentation": "multilineText",
+                    "description": "The command to start the language server."
+                },
+                "adept.serverCommandArguments": {
+                    "scope": "window",
+                    "type": "array",
+                    "default": [
+                        "--language-server"
+                    ],
+                    "description": "Command-line arguments to pass to the language server. Example: [\"--language-server\"]"
+                },
+                "adept.initializationOptions": {
+                    "scope": "window",
+                    "type": "object",
+                    "default": {},
+                    "description": "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initializeParams"
+                }
+            },
+            "commands": [
+                {
+                    "command": "adept.restartServer",
+                    "title": "Adept: Restart Language Server"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -b",
+        "watch": "tsc -b -w",
+        
+        "lint": "eslint",
+        "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.13.0",
+        "@stylistic/eslint-plugin": "^2.9.0",
+        "@types/mocha": "^10.0.6",
+        "@types/node": "^22",
+        "eslint": "^9.13.0",
+        "mocha": "^10.3.0",
+        "typescript": "^5.9.2",
+        "typescript-eslint": "^8.39.0"
+    }
+}

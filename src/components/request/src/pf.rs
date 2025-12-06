@@ -1,6 +1,5 @@
 use crate::{
-    Aft, Approach, AsSyms, IsDiv, IsImpure, Like, Minor, Req, RunDispatch, ShouldPersist, St,
-    UnLike,
+    Aft, AsSyms, IsDiv, IsImpure, Like, Minor, Req, RunDispatch, ShouldPersist, St, Symbols, UnLike,
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash};
@@ -14,7 +13,7 @@ pub trait Pf: Clone + Debug + Default {
         + Send
         + IsImpure
         + ShouldPersist
-        + From<Approach>
+        + From<Symbols>
         + RunDispatch<'e, Self>
         + UnLike<Req>
         + Serialize

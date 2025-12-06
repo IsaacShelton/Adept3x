@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 ctrlc = "3.5.1"
 nix = { version = "0.30.1", features = ["fs"] }
-req = { version = "0.1.0", path = "../req" }
+request = { version = "0.1.0", path = "../request" }
 smol = "2.0.2"
 vfs = { version = "0.1.0", path = "../vfs" }
 windows-sys = { version = "0.61.2" }

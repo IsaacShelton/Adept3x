@@ -1,7 +1,11 @@
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use thiserror::Error;
+use vfs::Canonical;
 
 #[derive(
     Clone, Debug, Error, Hash, PartialEq, Eq, PartialOrd, Ord, IsVariant, Serialize, Deserialize,
@@ -25,4 +29,8 @@ pub enum Error {
     UnsupportedAdeptVersion,
     #[error("Invalid option `{0}` in `adept.build`")]
     InvalidProjectConfigOption(Arc<str>),
+    #[error("Failed to get canonical path for `{0}`")]
+    FailedToCanonicalize(Arc<Path>),
+    #[error("Failed to open file `{0}`")]
+    FailedToOpenFile(Arc<Canonical<PathBuf>>),
 }

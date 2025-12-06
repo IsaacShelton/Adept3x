@@ -10,6 +10,10 @@ pub struct TopErrors {
 }
 
 impl TopErrors {
+    pub fn new_one(error: Error) -> Self {
+        Self::from(TopErrorsNode::new(std::iter::once(error)))
+    }
+
     pub fn iter_unordered<'a>(&'a self) -> TopErrorsUnorderedIter<'a> {
         self.inner
             .as_ref()

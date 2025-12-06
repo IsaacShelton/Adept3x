@@ -4,7 +4,7 @@ mod react;
 mod wake_dependants;
 
 use crate::{
-    Approach, BlockOn, IsDiv, Major, Minor, Pf, QueryMode, Rt, ShouldUnblock, Syms, TaskStatusKind,
+    BlockOn, IsDiv, Major, Minor, Pf, QueryMode, Rt, ShouldUnblock, Symbols, Syms, TaskStatusKind,
     TopErrorsNode, log, rt_st_in::query::RtStInQuery,
 };
 pub use cache::*;
@@ -56,7 +56,7 @@ where
         }
 
         RtStInQuery {
-            queue: vec![Approach.into(), req.clone()],
+            queue: vec![Symbols.into(), req.clone()],
             waiting: HashMap::new(),
             rev: self.current,
             req,
@@ -112,7 +112,7 @@ where
             self.syms = new_syms;
             self.current = self.current.minor();
             query.queue.push(query.req.clone());
-            query.queue.push(Approach.into());
+            query.queue.push(Symbols.into());
         }
     }
 }

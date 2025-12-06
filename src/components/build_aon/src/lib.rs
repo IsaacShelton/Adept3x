@@ -72,9 +72,11 @@ impl Aon {
 
 pub fn parse_aon<S: Copy, I: InfinitePeekable<Token<S>>>(lexer: &mut I) -> Result<Aon, ()> {
     let result = parse_aon_inner(lexer, 10)?;
+
     if !lexer.peek().is_end_of_file() {
         return Err(());
     }
+
     Ok(result)
 }
 

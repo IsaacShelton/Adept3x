@@ -2,7 +2,9 @@
 resolver = "3"
 members = [
     "src/adept",
-    "src/components/req",
+    "src/components/request",
+    "src/components/language_server",
+    "src/components/rg",
     "src/components/vfs",
     "src/components/daemon",
     "src/components/build_aon",

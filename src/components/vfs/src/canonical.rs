@@ -1,7 +1,8 @@
 use derive_more::Deref;
+use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Debug, Deref, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Deref, Hash, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Canonical<T>(T);
 
 impl Canonical<PathBuf> {

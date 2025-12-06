@@ -2,7 +2,7 @@ use crate::{
     idle::{IdleTracker, track_idle_time},
     watch::watch,
 };
-use req::{Cache, PfIn, RtStIn};
+use request::{Cache, PfIn, RtStIn};
 use smol::{
     Timer,
     future::FutureExt,
@@ -34,7 +34,7 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
         let server = Arc::new(Server::new(max_idle_time).await);
         let rt = Arc::new(Mutex::new(RtStIn::<PfIn>::new(Cache::load("adept.cache"))));
 
-        smol::spawn(watch(server.clone(), rt.clone(), req::ListSymbols)).detach();
+        smol::spawn(watch(server.clone(), rt.clone(), request::ListSymbols)).detach();
 
         loop {
             let mut next_connection = async || Ok(incoming.next().await);

@@ -1,0 +1,19 @@
+{
+    "name": "adept3-vscode-client",
+    "description": "VSCode part of a language server",
+    "author": "Isaac Shelton",
+    "license": "GPL-3.0-only",
+    "version": "1.0.0",
+    "publisher": "dockysoft",
+    "engines": {
+        "vscode": "^1.100.0"
+    },
+    "dependencies": {
+        "glob": "^11.0.0",
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.100.0",
+        "@vscode/test-electron": "^2.3.9"
+    }
+}
