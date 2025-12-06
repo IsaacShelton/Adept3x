@@ -135,7 +135,7 @@ impl Message {
 
 fn read_message_raw(reader: &mut (impl BufRead + ?Sized)) -> io::Result<Option<String>> {
     let mut size = None;
-    let mut buffer = String::new();
+    let mut buffer = String::with_capacity(1024);
 
     loop {
         buffer.clear();
@@ -144,20 +144,17 @@ fn read_message_raw(reader: &mut (impl BufRead + ?Sized)) -> io::Result<Option<S
             return Ok(None);
         }
 
-        if !buffer.ends_with("\r\n") {
+        let Some(buf) = buffer.strip_suffix("\r\n") else {
             return Err(malformed(format!("Malformed Header: {:?}", buffer)));
-        }
+        };
 
-        let buf = &buffer[..buffer.len() - 2];
         if buf.is_empty() {
             break;
         }
 
-        let mut parts = buf.splitn(2, ": ");
-        let header_name = parts.next().unwrap();
-        let header_value = parts
-            .next()
-            .ok_or_else(|| malformed(format!("Malformed Header: {:?}", buf)))?;
+        let Some((header_name, header_value)) = buf.split_once(": ") else {
+            return Err(malformed(format!("Malformed Header: {:?}", buf)));
+        };
 
         if header_name.eq_ignore_ascii_case("Content-Length") {
             size = Some(usize::from_str(header_value).map_err(malformed)?);
