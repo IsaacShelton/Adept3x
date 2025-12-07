@@ -1,5 +1,9 @@
 #![allow(unused)]
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    cmp::max,
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 #[derive(Clone, Debug)]
 pub struct GreenNodeId(usize);
@@ -15,9 +19,30 @@ pub enum GreenKind {
     Number,
     String,
     Array,
-    KeyValue,
-    Object,
     Value,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Reparse {
+    Value,
+    Array,
+}
+
+impl GreenKind {
+    pub fn can_reparse(&self) -> Option<Reparse> {
+        match self {
+            GreenKind::Error => None,
+            GreenKind::Whitespace => None,
+            GreenKind::Punct(_) => None,
+            GreenKind::Null => None,
+            GreenKind::True => None,
+            GreenKind::False => None,
+            GreenKind::Number => None,
+            GreenKind::String => None,
+            GreenKind::Array => Some(Reparse::Array),
+            GreenKind::Value => Some(Reparse::Value),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -100,9 +125,7 @@ impl GreenTree {
     }
 
     pub fn parse_root(&mut self, content: &str) -> Arc<GreenNode> {
-        let Some(parsed) = self.parse_value(content) else {
-            return self.new_error(content.into());
-        };
+        let parsed = self.parse_value(content);
 
         if parsed.consumed != content.len() {
             let error = self.new_error(content[parsed.consumed..].into());
@@ -208,7 +231,7 @@ impl GreenTree {
         })
     }
 
-    pub fn parse_value(&mut self, mut content: &str) -> Option<ParseResult> {
+    pub fn parse_value(&mut self, mut content: &str) -> ParseResult {
         let mut children = Vec::new();
 
         if let Some(ws) = self.parse_whitespace(&content) {
@@ -247,10 +270,10 @@ impl GreenTree {
             content = &content[ws.consumed..];
         }
 
-        Some(ParseResult {
+        ParseResult {
             consumed: children.iter().map(|child| child.content_bytes).sum(),
             green: self.new_parent(GreenKind::Value, children),
-        })
+        }
     }
 
     pub fn parse_array(&mut self, mut content: &str) -> Option<ParseResult> {
@@ -283,9 +306,7 @@ impl GreenTree {
                 });
             }
 
-            let Some(value) = self.parse_value(content) else {
-                break;
-            };
+            let value = self.parse_value(content);
 
             children.push(value.green);
             content = &content[value.consumed..];
@@ -311,6 +332,61 @@ impl GreenTree {
             green: self.new_parent(GreenKind::Array, children),
         })
     }
+
+    pub fn reparse(
+        &mut self,
+        root: &Arc<RedNode>,
+        old_content: &str,
+        edit_index: usize,
+        delete: usize,
+        insert: &str,
+    ) -> (Arc<GreenNode>, String) {
+        let content = format!(
+            "{}{}{}",
+            &old_content[..edit_index],
+            insert,
+            &old_content[edit_index + delete..]
+        );
+
+        //let new_root = reparse_range(root, 0, edit_index, edit_index + delete);
+        //dbg!(new_root);
+
+        /*
+        let (parent, path, start_index, end_index) =
+            find_lowest_affected(&root, 0, edit_index, edit_index + delete);
+
+        let Some(reparse) = parent.kind.can_reparse() else {
+            return (self.parse_root(&content), content);
+        };
+
+        let new_node = self.reparse_as(reparse, &content[start_index..end_index]);
+
+        dbg!(
+            parent,
+            path.iter().map(|x| x.0).collect::<Vec<_>>(),
+            reparse,
+            new_node,
+        );
+
+        let new_root = todo!();
+        */
+
+        //(new_root, content)
+        todo!()
+    }
+
+    pub fn reparse_as(&mut self, reparse: Reparse, content: &str) -> ParseResult {
+        match reparse {
+            Reparse::Value => self.parse_value(content),
+            Reparse::Array => {
+                if let Some(array) = self.parse_array(content) {
+                    array
+                } else {
+                    self.parse_value(content)
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -320,10 +396,93 @@ pub struct RedNode {
     absolute_position: usize,
 }
 
+impl RedNode {
+    pub fn new_arc(
+        parent: Option<Arc<RedNode>>,
+        green: Arc<GreenNode>,
+        absolute_position: usize,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            green,
+            parent,
+            absolute_position,
+        })
+    }
+
+    pub fn parent(&self) -> Option<&Arc<Self>> {
+        self.parent.as_ref()
+    }
+
+    pub fn children(self: &Arc<Self>) -> impl Iterator<Item = Arc<RedNode>> {
+        self.green
+            .children
+            .iter()
+            .scan(self.absolute_position, |acc, child| {
+                let start = *acc;
+                *acc += child.content_bytes;
+                Some((start, child))
+            })
+            .map(|(start, child)| RedNode::new_arc(Some(self.clone()), child.clone(), start))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ParseResult {
     green: Arc<GreenNode>,
     consumed: usize,
+}
+
+fn find_lowest_affected(
+    node: &Arc<GreenNode>,
+    node_absolute_index: usize,
+    min_absolute_index: usize,
+    max_absolute_index: usize,
+) -> (
+    Arc<GreenNode>,
+    VecDeque<(usize, Arc<GreenNode>)>,
+    usize,
+    usize,
+) {
+    let mut index = node_absolute_index;
+
+    for (i, child) in node.children.iter().enumerate() {
+        let node_left = index;
+        let node_right = index + child.content_bytes;
+
+        let left_in = node_left <= min_absolute_index;
+        let right_in = max_absolute_index <= node_right;
+        let contained = left_in && right_in;
+
+        if contained {
+            if child.kind.can_reparse().is_none() {
+                return (
+                    node.clone(),
+                    VecDeque::new(),
+                    node_absolute_index,
+                    node_absolute_index + node.content_bytes,
+                );
+            }
+
+            // Fits within child
+            let (parent, mut path, start_index, end_index) =
+                find_lowest_affected(child, index, min_absolute_index, max_absolute_index);
+
+            path.push_front((i, node.clone()));
+            return (parent, path, start_index, end_index);
+        } else if max_absolute_index < node_left {
+            // Does not fit within a single child
+            break;
+        } else {
+            index += child.content_bytes;
+        }
+    }
+
+    (
+        node.clone(),
+        VecDeque::new(),
+        node_absolute_index,
+        node_absolute_index + node.content_bytes,
+    )
 }
 
 fn main() {
@@ -338,7 +497,19 @@ fn main() {
 
     let mut green_tree = GreenTree::default();
     println!("Original source: {}", content);
-    let root = green_tree.parse_root(&content);
+    let root = RedNode::new_arc(None, green_tree.parse_root(&content), 0);
     println!("Original green tree:");
-    root.print(0);
+    root.green.print(0);
+
+    let old_text = "\"parser\"";
+    let edit_index = content.find(old_text).unwrap();
+    let delete_len = old_text.len();
+    let insert_text = "\"lexer\"";
+
+    println!("Changing {:?} to {:?}", old_text, insert_text);
+
+    let (new_root, new_content) =
+        green_tree.reparse(&root, content, edit_index, delete_len, insert_text);
+
+    dbg!(new_root, new_content);
 }
