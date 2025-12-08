@@ -3,12 +3,17 @@ use std::sync::Arc;
 use vfs::{BlockingFs, Canonical};
 
 impl<'e, P: Pf> Run<'e, P> for FindProjectConfig {
-    fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend> {
+    fn run(
+        &self,
+        _aft: Option<&Self::Aft<'e>>,
+        st: &mut P::St<'e>,
+        th: &mut impl Th<'e, P>,
+    ) -> Result<Self::Aft<'e>, Suspend> {
         let _st = Self::unwrap_st(st.like_mut());
 
         let filename = self.working_directory.join("adept.build");
 
-        let Ok(path) = Canonical::new(&filename) else {
+        let Ok(path) = Canonical::new(&filename).map(Arc::new) else {
             return Ok(Err(TopErrors::new_one(Error::FailedToCanonicalize(
                 Arc::from(filename.into_boxed_path()),
             ))));
@@ -21,9 +26,7 @@ impl<'e, P: Pf> Run<'e, P> for FindProjectConfig {
                 }
 
                 let Ok(text) = got.content.text() else {
-                    return Ok(Err(TopErrors::new_one(Error::FailedToOpenFile(Arc::new(
-                        path,
-                    )))));
+                    return Ok(Err(TopErrors::new_one(Error::FailedToOpenFile(path))));
                 };
 
                 Ok(Ok(text))

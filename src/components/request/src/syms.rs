@@ -1,4 +1,4 @@
-use crate::{Pf, TopErrors};
+use crate::{Error, Pf, TopErrors};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
@@ -14,6 +14,13 @@ pub struct WithErrors<T> {
 impl<T> WithErrors<T> {
     pub fn new(value: T, errors: TopErrors) -> Self {
         Self { value, errors }
+    }
+
+    pub fn new_one(value: T, error: Error) -> Self {
+        Self {
+            value,
+            errors: TopErrors::new_one(error),
+        }
     }
 
     pub fn no_errors(value: T) -> Self {
@@ -78,6 +85,13 @@ pub struct SymGrp<P: Pf> {
 }
 
 impl<P: Pf> SymGrp<P> {
+    pub fn new_empty(last_changed: P::Rev) -> Self {
+        Self {
+            syms: HashSet::default(),
+            last_changed,
+        }
+    }
+
     pub fn insert(&mut self, sym: Sym, rev: P::Rev) {
         self.syms.insert(sym);
         self.last_changed = max(self.last_changed, rev);

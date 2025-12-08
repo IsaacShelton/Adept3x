@@ -1,19 +1,20 @@
-use crate::{
+use super::{
     green::GreenNode,
-    text::{TextEdit, TextLength, TextPosition, TextRange},
+    text::{TextEdit, TextPosition, TextRange},
 };
-use std::{path::Path, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
+use vfs::Canonical;
 
 #[derive(Clone, Debug)]
 pub struct RedNode {
     pub(crate) green: Arc<GreenNode>,
-    pub(crate) parent: Result<Arc<RedNode>, Box<Path>>,
+    pub(crate) parent: Result<Arc<RedNode>, Option<Arc<Canonical<PathBuf>>>>,
     pub(crate) absolute_position: TextPosition,
 }
 
 impl RedNode {
     pub fn new_arc(
-        parent: Result<Arc<RedNode>, Box<Path>>,
+        parent: Result<Arc<RedNode>, Option<Arc<Canonical<PathBuf>>>>,
         green: Arc<GreenNode>,
         absolute_position: TextPosition,
     ) -> Arc<Self> {
@@ -24,8 +25,8 @@ impl RedNode {
         })
     }
 
-    pub fn parent(&self) -> Result<&Arc<Self>, &Box<Path>> {
-        self.parent.as_ref()
+    pub fn parent(&self) -> Result<&Arc<Self>, Option<&Arc<Canonical<PathBuf>>>> {
+        self.parent.as_ref().map_err(|err| err.as_ref())
     }
 
     pub fn children(self: &Arc<Self>) -> impl Iterator<Item = Arc<RedNode>> {
@@ -45,7 +46,7 @@ impl RedNode {
     }
 
     pub fn print(self: &Arc<Self>, depth: usize) {
-        if let Err(path) = &self.parent {
+        if let Err(Some(path)) = &self.parent {
             println!("{}", path.to_string_lossy());
         }
 

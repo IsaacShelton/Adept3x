@@ -1,7 +1,8 @@
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TextRange {
     start: TextPosition,
     length: TextLength,
@@ -63,12 +64,38 @@ impl Display for TextRange {
 }
 
 #[derive(
-    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Add, AddAssign, Sub, SubAssign, Sum,
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Add,
+    AddAssign,
+    Sub,
+    SubAssign,
+    Sum,
+    Serialize,
+    Deserialize,
 )]
 pub struct TextLength(pub usize);
 
 #[derive(
-    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Add, AddAssign, Sub, SubAssign, Sum,
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Add,
+    AddAssign,
+    Sub,
+    SubAssign,
+    Sum,
+    Serialize,
+    Deserialize,
 )]
 pub struct TextPosition(pub usize);
 

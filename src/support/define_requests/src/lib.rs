@@ -222,7 +222,11 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
         });
 
         run_dispatch_arms.extend(quote! {
-            Req::#ident(req) => req.run(st, th).map(|aft| P::Aft::un_like(Aft::from(aft))),
+            Req::#ident(req) => req.run(
+                aft.and_then(|aft| #ident::as_aft(aft)),
+                st,
+                th
+            ).map(|aft| P::Aft::un_like(Aft::from(aft))),
         });
     }
 
@@ -267,10 +271,10 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
             #aft_wrap
             #aft_unwrap
             pub trait RunDispatch<'e, P: Pf> {
-                fn run_dispath(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<P::Aft<'e>, Suspend>;
+                fn run_dispath(&self, aft: Option<&Aft<P>>, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<P::Aft<'e>, Suspend>;
             }
             pub trait Run<'e, P: Pf>: UnwrapSt<'e> + UnwrapAft<'e, P> {
-                fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend>;
+                fn run(&self, aft: Option<&Self::Aft<'e>>, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend>;
             }
             pub struct Suspend;
             #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -310,6 +314,7 @@ pub fn group(_attrs: TokenStream1, input: TokenStream1) -> TokenStream1 {
             {
                 fn run_dispath(
                     &self,
+                    aft: Option<&Aft<P>>,
                     st: &mut P::St<'e>,
                     th: &mut impl Th<'e, P>,
                 ) -> Result<P::Aft<'e>, Suspend> {

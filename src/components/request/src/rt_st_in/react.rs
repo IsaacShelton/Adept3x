@@ -272,7 +272,7 @@ where
 
     let st = &mut running.st;
     let mut th = ThStIn::new(rt);
-    let result = req.run_dispath(st, &mut th);
+    let result = req.run_dispath(running.prev_aft.as_ref().map(Like::like_ref), st, &mut th);
 
     // Remove existing dependencies from set of new requested dependencies
     for existing_dep in task.requested.iter() {

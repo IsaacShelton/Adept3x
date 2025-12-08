@@ -9,11 +9,13 @@ mod rt_st_in;
 mod run;
 mod succ;
 mod syms;
+mod syntax_tree;
 mod task;
 mod top_errors;
 mod un_like;
 mod unblock;
 
+use crate::syntax_tree::*;
 pub use as_syms::*;
 pub use block_on::*;
 pub use errors::*;
@@ -96,10 +98,10 @@ mod requests {
     #[derive(Default)]
     pub struct ListSymbolsState;
 
-    #[define_requests::returns(WithErrors<Ast>)]
-    pub struct GetAst {
+    #[define_requests::returns(WithErrors<SyntaxTree>)]
+    pub struct GetSyntaxTree {
         pub filename: Arc<Canonical<PathBuf>>,
     }
     #[derive(Default)]
-    pub struct GetAstState;
+    pub struct GetSyntaxTreeState;
 }

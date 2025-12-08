@@ -92,15 +92,16 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
         if let Some(new_watch_config) = new_watch_config {
             watch_config = new_watch_config;
 
-            let mut idle_tracker = server.idle_tracker.lock().await;
-            idle_tracker.last_active = Instant::now();
-            idle_tracker
+            server.idle_tracker.still_active();
+            server
+                .idle_tracker
                 .set_max_idle_time(watch_config.max_idle_time_ms.map(Duration::from_millis));
             rt.cache_to_disk = watch_config.cache_to_disk;
         }
 
         let run = async {
             let timeout = TimeoutAt(Instant::now() + Duration::from_secs(2));
+
             Ok(watch_query(
                 rt.deref_mut(),
                 watchee.clone(),
@@ -110,19 +111,19 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
             .await)
         };
 
+        if server.idle_tracker.shutdown_if_idle() {
+            break;
+        }
+
         let timeout = async {
             Timer::after(Duration::from_millis(500)).await;
             Err(())
         };
 
-        if server.idle_tracker.lock().await.shutdown_if_idle() {
-            break;
-        }
-
         log!("Watch Result is {:?}", run.or(timeout).await);
         Timer::after(Duration::from_millis(watch_config.interval_ms)).await;
 
-        if server.idle_tracker.lock().await.shutdown_if_idle() {
+        if server.idle_tracker.shutdown_if_idle() {
             break;
         }
     }

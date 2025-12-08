@@ -1,5 +1,4 @@
 mod error;
-mod idle;
 mod lockfile;
 mod serve;
 mod server;

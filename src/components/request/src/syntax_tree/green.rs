@@ -1,10 +1,9 @@
-use crate::{red::ReparseInnerResult, text::TextLength};
+use super::{red::ReparseInnerResult, text::TextLength};
+use derive_more::IsVariant;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
-pub struct GreenNodeId(usize);
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
 pub enum GreenKind {
     Error,
     Whitespace,
@@ -41,7 +40,7 @@ impl GreenKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GreenNode {
     pub(crate) kind: GreenKind,
     pub(crate) content_bytes: TextLength,
@@ -254,7 +253,6 @@ impl GreenNode {
 
         if let Some(ws) = Self::parse_whitespace(&content) {
             children.push(ws.green);
-            content = &content[ws.consumed.0..];
         }
 
         ParseResult {
@@ -304,12 +302,10 @@ impl GreenNode {
                 continue;
             } else if content.starts_with(']') {
                 children.push(Self::new_punct(']'));
-                content = &content[1..];
                 break;
             } else {
                 // Missing comma or bracket
                 children.push(Self::new_error(content.into()));
-                content = &content[content.len()..];
                 break;
             }
         }

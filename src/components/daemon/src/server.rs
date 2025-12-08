@@ -1,7 +1,5 @@
-use crate::{
-    idle::{IdleTracker, track_idle_time},
-    watch::watch,
-};
+use crate::watch::watch;
+use idle::{IdleTracker, track_idle_time};
 use request::{Cache, PfIn, RtStIn};
 use smol::{
     Timer,
@@ -14,12 +12,12 @@ use smol::{
 use std::{sync::Arc, time::Duration};
 
 pub struct Server {
-    pub idle_tracker: Arc<Mutex<IdleTracker>>,
+    pub idle_tracker: Arc<IdleTracker>,
 }
 
 impl Server {
     pub async fn new(max_idle_time: Duration) -> Self {
-        let idle_tracker = Arc::new(Mutex::new(IdleTracker::new(max_idle_time)));
+        let idle_tracker = Arc::new(IdleTracker::new(max_idle_time));
         smol::spawn(track_idle_time(idle_tracker.clone())).detach();
         Self { idle_tracker }
     }
@@ -32,7 +30,10 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
 
         let mut incoming = listener.incoming();
         let server = Arc::new(Server::new(max_idle_time).await);
-        let rt = Arc::new(Mutex::new(RtStIn::<PfIn>::new(Cache::load("adept.cache"))));
+        let rt = Arc::new(Mutex::new(RtStIn::<PfIn>::new(
+            Cache::load("adept.cache"),
+            Some(server.idle_tracker.clone()),
+        )));
 
         smol::spawn(watch(server.clone(), rt.clone(), request::ListSymbols)).detach();
 
@@ -44,7 +45,7 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
                 smol::spawn(talk_to_client(server.clone(), stream)).detach();
             }
 
-            if server.idle_tracker.lock().await.shutting_down() {
+            if server.idle_tracker.shutting_down() {
                 break;
             }
         }
@@ -59,9 +60,9 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
 }
 
 async fn talk_to_client(server: Arc<Server>, stream: TcpStream) -> io::Result<()> {
-    if server.idle_tracker.lock().await.add_connection().is_ok() {
+    if server.idle_tracker.add_connection().is_ok() {
         let _ = server.serve(stream).await;
-        server.idle_tracker.lock().await.remove_connection();
+        server.idle_tracker.remove_connection();
     }
     Ok(())
 }

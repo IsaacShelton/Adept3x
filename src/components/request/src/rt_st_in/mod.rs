@@ -8,8 +8,9 @@ use crate::{
     TopErrorsNode, log, rt_st_in::query::RtStInQuery,
 };
 pub use cache::*;
+use idle::IdleTracker;
 use react::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use vfs::Vfs;
 pub use wake_dependants::*;
 
@@ -28,12 +29,12 @@ impl<'e, P: Pf> RtStIn<'e, P>
 where
     P::Rev: Major,
 {
-    pub fn new(cache: Cache<'e, P>) -> Self {
+    pub fn new(cache: Cache<'e, P>, idle_tracker: Option<Arc<IdleTracker>>) -> Self {
         Self {
             cache,
             syms: Syms::default(),
             current: P::Rev::default(),
-            vfs: Vfs::default(),
+            vfs: Vfs::new(idle_tracker),
             cache_to_disk: false,
         }
     }
@@ -70,6 +71,10 @@ where
 
     fn vfs(&self) -> &Vfs {
         &self.vfs
+    }
+
+    fn current(&self) -> P::Rev {
+        self.current
     }
 
     fn block_on(

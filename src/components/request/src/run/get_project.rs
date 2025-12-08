@@ -9,7 +9,12 @@ use std::{path::PathBuf, sync::Arc};
 use text::{CharacterInfiniteIterator, CharacterPeeker};
 
 impl<'e, P: Pf> Run<'e, P> for GetProject {
-    fn run(&self, st: &mut P::St<'e>, th: &mut impl Th<'e, P>) -> Result<Self::Aft<'e>, Suspend> {
+    fn run(
+        &self,
+        _aft: Option<&Self::Aft<'e>>,
+        st: &mut P::St<'e>,
+        th: &mut impl Th<'e, P>,
+    ) -> Result<Self::Aft<'e>, Suspend> {
         let _st = Self::unwrap_st(st.like_mut());
 
         let content = match th.demand(FindProjectConfig {

@@ -20,6 +20,10 @@ impl TopErrors {
             .map(|inner| inner.iter_unordered())
             .unwrap_or_default()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_none()
+    }
 }
 
 impl From<TopErrorsNode> for TopErrors {

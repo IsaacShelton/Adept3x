@@ -21,3 +21,4 @@ thiserror = "2.0.17"
 token = { version = "0.1.0", path = "../../representations/token" }
 top_n = { version = "0.1.0", path = "../../support/top_n" }
 vfs = { version = "0.1.0", path = "../vfs" }
+idle = { version = "0.1.0", path = "../idle" }

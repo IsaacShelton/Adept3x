@@ -18,6 +18,7 @@ pub trait Rt<'e, P: Pf>: Send {
     ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, TopErrorsNode>;
     fn syms(&self) -> Syms<P>;
     fn vfs(&self) -> &Vfs;
+    fn current(&self) -> P::Rev;
 }
 
 pub trait Th<'e, P: Pf>
