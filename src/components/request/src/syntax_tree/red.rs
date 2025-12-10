@@ -1,8 +1,6 @@
-use super::{
-    green::GreenNode,
-    text::{TextEdit, TextPosition, TextRange},
-};
+use super::green::GreenNode;
 use std::{path::PathBuf, sync::Arc};
+use text_edit::{TextEdit, TextPosition, TextRange};
 use vfs::Canonical;
 
 #[derive(Clone, Debug)]

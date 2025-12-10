@@ -4,7 +4,10 @@ mod message;
 mod methods;
 
 use crate::message::{Message, Response};
+use daemon::connect_to_daemon;
 pub(crate) use document::*;
+use fingerprint::COMPILER_BUILT_AT;
+use ipc_message::{Ipc, IpcMessageId, IpcRequest};
 pub(crate) use log::*;
 use lsp_types::Uri;
 use std::{
@@ -17,7 +20,7 @@ use std::{
 pub struct Server {
     did_shutdown: bool,
     log: Logger,
-    daemon: Option<TcpStream>,
+    daemon: TcpStream,
     reader: BufReader<Stdin>,
     writer: BufWriter<Stdout>,
     documents: HashMap<Uri, DocumentBody>,
@@ -44,14 +47,31 @@ pub fn start() -> ExitCode {
         Logger::new_with_file("adept_language_server.log").expect("failed to create log file");
     let _ = writeln!(log, "Log file created");
 
+    let Ok(daemon) = connect_to_daemon() else {
+        return ExitCode::FAILURE;
+    };
+
     let mut server = Server {
         did_shutdown: false,
         log,
-        daemon: None,
+        daemon,
         reader: BufReader::new(std::io::stdin()),
         writer: BufWriter::new(std::io::stdout()),
         documents: Default::default(),
     };
+
+    serde_json::to_writer(
+        &mut server.daemon,
+        &Ipc::Request(
+            IpcMessageId(0),
+            IpcRequest::Initialize {
+                fingerprint: format!("{}", COMPILER_BUILT_AT),
+            },
+        ),
+    )
+    .unwrap();
+    writeln!(&mut server.daemon, "").unwrap();
+    server.daemon.flush().unwrap();
 
     loop {
         let Some(message) = server.recv_message() else {

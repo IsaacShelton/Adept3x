@@ -1,6 +1,6 @@
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TextRange {
@@ -123,8 +123,8 @@ impl std::ops::AddAssign<TextLength> for TextPosition {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TextEdit<'a> {
-    pub(crate) range: TextRange,
-    pub(crate) replace_with: &'a str,
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextEdit {
+    pub range: TextRange,
+    pub replace_with: Arc<str>,
 }

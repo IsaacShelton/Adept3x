@@ -1,6 +1,5 @@
-use crate::{
-    Cache, Completed, Kv, Pf, Task, TaskStatus, TaskStatusKind, rt_st_in::cache::COMPILER_BUILT_AT,
-};
+use crate::{Cache, Completed, Kv, Pf, Task, TaskStatus, TaskStatusKind};
+use fingerprint::COMPILER_BUILT_AT;
 use std::marker::PhantomData;
 
 impl<'de, P: Pf> serde::Deserialize<'de> for Cache<'de, P> {

@@ -292,9 +292,11 @@ version = "0.1.0"
 dependencies = [
  "ctrlc",
  "idle",
+ "ipc_message",
  "nix",
  "request",
  "smol",
+ "text_edit",
  "vfs",
  "windows-sys",
 ]
@@ -407,6 +409,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "fingerprint"
+version = "0.1.0"
+dependencies = [
+ "compile-time",
+]
+
+[[package]]
 name = "fluent-uri"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -458,6 +467,16 @@ name = "infinite_iterator"
 version = "0.1.0"
 
 [[package]]
+name = "ipc_message"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "text_edit",
+ "vfs",
+]
+
+[[package]]
 name = "iter_ext"
 version = "0.1.0"
 
@@ -481,11 +500,14 @@ name = "language_server"
 version = "0.1.0"
 dependencies = [
  "daemon",
+ "fingerprint",
+ "ipc_message",
  "lsp-types",
  "request",
  "serde",
  "serde_derive",
  "serde_json",
+ "text_edit",
  "vfs",
 ]
 
@@ -660,9 +682,9 @@ dependencies = [
  "build_aon",
  "build_token",
  "by_address",
- "compile-time",
  "define_requests",
  "derive_more",
+ "fingerprint",
  "idle",
  "infinite_iterator",
  "line_column",
@@ -670,6 +692,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "text",
+ "text_edit",
  "thiserror",
  "token",
  "top_n",
@@ -833,6 +856,14 @@ version = "0.1.0"
 dependencies = [
  "infinite_iterator",
  "line_column",
+]
+
+[[package]]
+name = "text_edit"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "serde",
 ]
 
 [[package]]

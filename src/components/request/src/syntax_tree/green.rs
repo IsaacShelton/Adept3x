@@ -1,7 +1,8 @@
-use super::{red::ReparseInnerResult, text::TextLength};
+use super::red::ReparseInnerResult;
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use text_edit::TextLength;
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
 pub enum GreenKind {

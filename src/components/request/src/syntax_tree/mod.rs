@@ -1,13 +1,12 @@
 mod green;
 mod red;
-mod text;
 
 use by_address::ByAddress;
 pub use green::{GreenKind, GreenNode};
 pub use red::RedNode;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc};
-pub use text::*;
+use text_edit::{TextLength, TextPosition};
 use vfs::Canonical;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

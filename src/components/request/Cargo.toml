@@ -8,7 +8,6 @@ bincode = { version = "2.0.1", features = ["serde"] }
 build_aon = { version = "0.1.0", path = "../build_aon" }
 build_token = { version = "0.1.0", path = "../build_token" }
 by_address = "1.2.1"
-compile-time = "0.2.0"
 define_requests = { version = "0.1.0", path = "../../support/define_requests" }
 derive_more = { workspace = true, features = ["full"] }
 infinite_iterator = { version = "0.1.0", path = "../../support/infinite_iterator" }
@@ -22,3 +21,5 @@ token = { version = "0.1.0", path = "../../representations/token" }
 top_n = { version = "0.1.0", path = "../../support/top_n" }
 vfs = { version = "0.1.0", path = "../vfs" }
 idle = { version = "0.1.0", path = "../idle" }
+text_edit = { version = "0.1.0", path = "../../representations/text_edit" }
+fingerprint = { version = "0.1.0", path = "../../representations/fingerprint" }

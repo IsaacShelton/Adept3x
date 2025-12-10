@@ -51,7 +51,6 @@ impl<'e, P: Pf> Run<'e, P> for Symbols {
         }
 
         let red_tree = syntax_tree.red_tree();
-        red_tree.print(0);
 
         if let GreenKind::Value = red_tree.green.kind {
             if let Some(array) = red_tree

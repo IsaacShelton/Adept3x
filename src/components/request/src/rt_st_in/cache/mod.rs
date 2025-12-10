@@ -14,7 +14,6 @@ use std::{
 
 const HEADER: &[u8] =
     b"This file is a local cache and *not* sharable. It should be ignored for version control purposes.\n";
-const COMPILER_BUILT_AT: u64 = compile_time::unix!();
 const HUMAN_READABLE: bool = true;
 
 #[derive(Debug, Default)]
