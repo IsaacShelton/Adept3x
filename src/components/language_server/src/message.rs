@@ -1,9 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
-use std::{
-    fmt,
-    io::{self, BufRead, Write},
-    str::FromStr,
-};
+use smol::io::{AsyncBufRead, AsyncWrite};
+use std::{fmt, pin::Pin};
+use transport::{read_message_raw, write_message_raw};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
@@ -105,8 +103,8 @@ struct JsonRpc<'a> {
 }
 
 impl Message {
-    pub fn read(reader: &mut (impl BufRead + ?Sized)) -> io::Result<Option<Message>> {
-        let Some(text) = read_message_raw(reader)? else {
+    pub async fn read(reader: Pin<&mut impl AsyncBufRead>) -> smol::io::Result<Option<Message>> {
+        let Some(text) = read_message_raw(reader).await? else {
             return Ok(None);
         };
 
@@ -123,59 +121,16 @@ impl Message {
         Ok(Some(msg))
     }
 
-    pub fn write(&self, writer: &mut impl Write) -> io::Result<()> {
+    pub async fn write(&self, writer: Pin<&mut impl AsyncWrite>) -> smol::io::Result<()> {
         let text = serde_json::to_string(&JsonRpc {
             jsonrpc: "2.0",
             msg: self,
         })?;
 
-        write_message_raw(writer, &text)
+        write_message_raw(writer, &text).await
     }
 }
 
-fn read_message_raw(reader: &mut (impl BufRead + ?Sized)) -> io::Result<Option<String>> {
-    let mut size = None;
-    let mut buffer = String::with_capacity(1024);
-
-    loop {
-        buffer.clear();
-
-        if reader.read_line(&mut buffer)? == 0 {
-            return Ok(None);
-        }
-
-        let Some(buf) = buffer.strip_suffix("\r\n") else {
-            return Err(malformed(format!("Malformed Header: {:?}", buffer)));
-        };
-
-        if buf.is_empty() {
-            break;
-        }
-
-        let Some((header_name, header_value)) = buf.split_once(": ") else {
-            return Err(malformed(format!("Malformed Header: {:?}", buf)));
-        };
-
-        if header_name.eq_ignore_ascii_case("Content-Length") {
-            size = Some(usize::from_str(header_value).map_err(malformed)?);
-        }
-    }
-
-    let size: usize = size.ok_or_else(|| malformed(format!("Missing Content-Length")))?;
-    let mut buffer = buffer.into_bytes();
-    buffer.resize(size, 0);
-    reader.read_exact(&mut buffer)?;
-
-    Ok(Some(String::from_utf8(buffer).map_err(malformed)?))
-}
-
-fn write_message_raw(writer: &mut impl Write, msg: &str) -> io::Result<()> {
-    write!(writer, "Content-Length: {}\r\n\r\n", msg.len())?;
-    writer.write_all(msg.as_bytes())?;
-    writer.flush()?;
-    Ok(())
-}
-
-fn malformed(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, error)
+fn malformed(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> smol::io::Error {
+    smol::io::Error::new(smol::io::ErrorKind::InvalidData, error)
 }

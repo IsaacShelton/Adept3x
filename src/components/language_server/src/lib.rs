@@ -10,71 +10,93 @@ use fingerprint::COMPILER_BUILT_AT;
 use ipc_message::{Ipc, IpcMessageId, IpcRequest};
 pub(crate) use log::*;
 use lsp_types::Uri;
+use pin_project_lite::pin_project;
+use smol::{
+    Async,
+    io::{AsyncWriteExt, BufReader, BufWriter},
+    net::TcpStream,
+};
 use std::{
     collections::HashMap,
-    io::{BufReader, BufWriter, Stdin, Stdout, Write},
-    net::TcpStream,
+    io::{Stdin, Stdout, Write},
+    pin::{Pin, pin},
     process::ExitCode,
 };
+use transport::write_message_raw;
 
-pub struct Server {
-    did_shutdown: bool,
-    log: Logger,
-    daemon: TcpStream,
-    reader: BufReader<Stdin>,
-    writer: BufWriter<Stdout>,
-    documents: HashMap<Uri, DocumentBody>,
+pin_project! {
+    pub struct Server {
+        did_shutdown: bool,
+        log: Logger,
+        #[pin]
+        daemon: TcpStream,
+        #[pin]
+        reader: BufReader<Async<Stdin>>,
+        #[pin]
+        writer: BufWriter<Async<Stdout>>,
+        documents: HashMap<Uri, DocumentBody>,
+    }
 }
 
 impl Server {
-    pub fn recv_message(&mut self) -> Option<Message> {
-        match Message::read(&mut self.reader) {
+    pub async fn recv_message(self: Pin<&mut Self>) -> Option<Message> {
+        let this = self.project();
+
+        match Message::read(this.reader).await {
             Ok(message) => message,
             Err(error) => {
-                let _ = writeln!(self.log, "Error: {}", error);
+                let _ = writeln!(this.log, "Error: {}", error);
                 None
             }
         }
     }
 
-    pub fn send_message(&mut self, message: Message) {
-        let _ = message.write(&mut self.writer);
+    pub async fn send_message(self: Pin<&mut Self>, message: Message) {
+        let this = self.project();
+        let _ = message.write(this.writer).await;
     }
 }
 
-pub fn start() -> ExitCode {
+pub async fn start() -> ExitCode {
     let mut log =
         Logger::new_with_file("adept_language_server.log").expect("failed to create log file");
     let _ = writeln!(log, "Log file created");
 
-    let Ok(daemon) = connect_to_daemon() else {
+    let Ok(daemon) = connect_to_daemon().await else {
+        let _ = writeln!(
+            log,
+            "Could not establish connection to project daemon process"
+        );
         return ExitCode::FAILURE;
     };
 
-    let mut server = Server {
+    let mut server = pin!(Server {
         did_shutdown: false,
         log,
         daemon,
-        reader: BufReader::new(std::io::stdin()),
-        writer: BufWriter::new(std::io::stdout()),
-        documents: Default::default(),
-    };
-
-    serde_json::to_writer(
-        &mut server.daemon,
-        &Ipc::Request(
-            IpcMessageId(0),
-            IpcRequest::Initialize {
-                fingerprint: format!("{}", COMPILER_BUILT_AT),
-            },
+        reader: BufReader::new(
+            Async::new(std::io::stdin()).expect("Failed to create reader to daemon"),
         ),
-    )
+        writer: BufWriter::new(
+            Async::new(std::io::stdout()).expect("Failed to create writer to daemon"),
+        ),
+        documents: Default::default(),
+    });
+
+    let data = serde_json::to_string(&Ipc::Request(
+        IpcMessageId(0),
+        IpcRequest::Initialize {
+            fingerprint: format!("{}", COMPILER_BUILT_AT),
+        },
+    ))
     .unwrap();
-    writeln!(&mut server.daemon, "").unwrap();
-    server.daemon.flush().unwrap();
+    write_message_raw(server.as_mut().project().daemon, &data)
+        .await
+        .unwrap();
+    server.as_mut().project().daemon.flush().await.unwrap();
 
     loop {
-        let Some(message) = server.recv_message() else {
+        let Some(message) = server.as_mut().recv_message().await else {
             continue;
         };
 
@@ -138,7 +160,7 @@ pub fn start() -> ExitCode {
 
                 if let Some(response) = response {
                     let _ = writeln!(server.log, "Sending message: {:?}", response);
-                    server.send_message(response);
+                    server.as_mut().send_message(response).await;
                 }
             }
             Message::Response(_) => (),

@@ -9,6 +9,7 @@ members = [
     "src/components/daemon",
     "src/components/build_aon",
     "src/components/build_token",
+    "src/components/transport",
     "src/representations/token",
     "src/representations/text_edit",
     "src/representations/ipc_message",

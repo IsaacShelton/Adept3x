@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "daemon",
  "language_server",
+ "smol",
 ]
 
 [[package]]
@@ -297,6 +298,7 @@ dependencies = [
  "request",
  "smol",
  "text_edit",
+ "transport",
  "vfs",
  "windows-sys",
 ]
@@ -503,11 +505,14 @@ dependencies = [
  "fingerprint",
  "ipc_message",
  "lsp-types",
+ "pin-project-lite",
  "request",
  "serde",
  "serde_derive",
  "serde_json",
+ "smol",
  "text_edit",
+ "transport",
  "vfs",
 ]
 
@@ -932,6 +937,13 @@ name = "top_n"
 version = "0.1.0"
 dependencies = [
  "itertools",
+]
+
+[[package]]
+name = "transport"
+version = "0.1.0"
+dependencies = [
+ "smol",
 ]
 
 [[package]]

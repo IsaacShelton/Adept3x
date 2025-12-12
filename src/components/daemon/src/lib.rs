@@ -7,12 +7,13 @@ mod watch;
 
 pub use error::*;
 pub use server::*;
+use smol::{Timer, net::TcpStream};
 pub use startup::*;
-use std::{net::TcpStream, thread, time::Duration};
+use std::time::Duration;
 
-pub fn connect_to_daemon() -> Result<TcpStream, StartError> {
+pub async fn connect_to_daemon() -> Result<TcpStream, StartError> {
     // Try connecting to existing instance
-    if let Ok(connection) = std::net::TcpStream::connect("127.0.0.1:6000") {
+    if let Ok(connection) = TcpStream::connect("127.0.0.1:6000").await {
         println!("Connected to existing daemon.");
         return Ok(connection);
     }
@@ -20,10 +21,10 @@ pub fn connect_to_daemon() -> Result<TcpStream, StartError> {
     spawn_daemon_process()?;
 
     for _ in 0..10 {
-        if let Ok(connection) = std::net::TcpStream::connect("127.0.0.1:6000") {
+        if let Ok(connection) = TcpStream::connect("127.0.0.1:6000").await {
             return Ok(connection);
         }
-        thread::sleep(Duration::from_millis(20));
+        Timer::after(Duration::from_millis(20)).await;
     }
 
     Err(StartError::FailedToStart)

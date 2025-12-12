@@ -8,9 +8,9 @@ fn main() -> ExitCode {
         Some("-h" | "--help") | None => show_help(),
         Some("--daemon") => start_daemon(args),
         Some("--oneshot") => start_oneshot(args),
-        Some("--incremental") => start_incremental(),
-        Some("--language-server") => start_language_server(args),
-        _ => start_incremental(),
+        Some("--incremental") => smol::block_on(start_incremental()),
+        Some("--language-server") => smol::block_on(start_language_server(args)),
+        _ => smol::block_on(start_incremental()),
     }
 }
 
@@ -32,8 +32,8 @@ fn start_daemon(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
     }
 }
 
-fn start_incremental() -> ExitCode {
-    let connection = match connect_to_daemon() {
+async fn start_incremental() -> ExitCode {
+    let connection = match connect_to_daemon().await {
         Ok(connection) => connection,
         Err(err) => {
             eprintln!("{}", err);
@@ -49,6 +49,6 @@ fn start_oneshot(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
     todo!()
 }
 
-fn start_language_server(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
-    language_server::start()
+async fn start_language_server(_args: Peekable<impl Iterator<Item = String>>) -> ExitCode {
+    language_server::start().await
 }

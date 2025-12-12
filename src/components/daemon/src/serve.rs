@@ -1,8 +1,10 @@
 use crate::server::Server;
 use smol::{
-    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{self, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
+use std::pin::pin;
+use transport::read_message_raw;
 
 impl Server {
     pub async fn serve(&self, mut stream: TcpStream) -> io::Result<()> {
@@ -15,10 +17,9 @@ impl Server {
 
         println!("Server received connection, and is ready to serve!");
 
-        let mut reader = BufReader::new(&mut stream);
-        let mut buf = String::new();
-        reader.read_line(&mut buf).await.unwrap();
-        dbg!(buf);
+        let reader = pin!(BufReader::new(&mut stream));
+        let content = read_message_raw(reader).await;
+        let _ = dbg!(content);
 
         // We are going to need buffered readers/writers here. Probably will need
         // to use Content-Length header for messages similar to what LSP uses.

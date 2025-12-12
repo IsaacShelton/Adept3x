@@ -14,3 +14,6 @@ daemon = { version = "0.1.0", path = "../daemon" }
 ipc_message = { version = "0.1.0", path = "../../representations/ipc_message" }
 text_edit = { version = "0.1.0", path = "../../representations/text_edit" }
 fingerprint = { version = "0.1.0", path = "../../representations/fingerprint" }
+transport = { version = "0.1.0", path = "../../components/transport" }
+smol = "2.0.2"
+pin-project-lite = "0.2"

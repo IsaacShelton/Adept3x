@@ -13,3 +13,4 @@ idle = { version = "0.1.0", path = "../idle" }
 windows-sys = { version = "0.61.2" }
 text_edit = { version = "0.1.0", path = "../../representations/text_edit" }
 ipc_message = { version = "0.1.0", path = "../../representations/ipc_message" }
+transport = { version = "0.1.0", path = "../../components/transport" }
