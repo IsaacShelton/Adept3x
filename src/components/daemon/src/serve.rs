@@ -1,21 +1,28 @@
 use crate::server::Server;
 use fingerprint::COMPILER_BUILT_AT;
-use ipc_message::{IpcMessage, IpcRequest, IpcResponse};
+use ipc_message::{IpcMessage, IpcNotification, IpcRequest, IpcResponse};
+use request::{Cache, PfIn, Rt, RtStIn, TimeoutAfterSteps};
 use smol::{
     io::{self, AsyncWriteExt, BufReader, BufWriter},
     net::TcpStream,
 };
-use std::pin::pin;
+use std::{num::NonZero, pin::pin};
 use transport::{read_message_raw_async, write_message_raw_async};
 
 impl Server {
     pub async fn serve(&self, mut stream: TcpStream) -> io::Result<()> {
-        // We will use serialized records to communicate here
-        // between us the daemon and the language server process.
+        let idle_tracker = self.idle_tracker.clone();
 
-        // The language server will need to be able to send us requests,
-        // and we will need to handle them in a separate rt compared
-        // to the normal background compilation process.
+        let thread = std::thread::spawn(move || {
+            let mut rt = RtStIn::<PfIn>::new(Cache::load("adeptls.cache"), Some(idle_tracker));
+            let query = rt.query(request::ListSymbols.into(), request::QueryMode::New);
+            let result = rt.block_on(query, TimeoutAfterSteps(NonZero::new(10_000).unwrap()));
+
+            match result {
+                Ok(request::BlockOn::Complete(result)) => eprintln!("From query, got {:?}", result),
+                _ => eprintln!("failed"),
+            }
+        });
 
         println!("daemon: Accepted language server connection!");
 
@@ -52,6 +59,10 @@ impl Server {
                     let writer = pin!(BufWriter::new(&mut stream));
                     write_message_raw_async(writer, &content).await?;
                 }
+                IpcMessage::Notification(IpcNotification::Exit) => {
+                    eprintln!("daemon: Exit requested...");
+                    break;
+                }
                 IpcMessage::Response(ref _id, ref _response) => {
                     todo!("daemon: unhandled response {:?}", message)
                 }
@@ -60,5 +71,8 @@ impl Server {
                 }
             }
         }
+
+        thread.join().unwrap();
+        Ok(())
     }
 }

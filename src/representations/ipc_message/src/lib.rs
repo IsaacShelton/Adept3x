@@ -10,6 +10,7 @@ pub struct IpcMessageId(pub usize);
 pub enum IpcMessage {
     Request(IpcMessageId, IpcRequest),
     Response(IpcMessageId, IpcResponse),
+    Notification(IpcNotification),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -39,4 +40,9 @@ pub enum IpcResponse {
     Saved,
     Completion(Vec<String>),
     Diagnostics(Vec<(String, TextPosition)>),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum IpcNotification {
+    Exit,
 }
