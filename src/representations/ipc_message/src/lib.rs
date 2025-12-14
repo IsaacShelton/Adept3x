@@ -7,7 +7,7 @@ use vfs::Canonical;
 pub struct IpcMessageId(pub usize);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Ipc {
+pub enum IpcMessage {
     Request(IpcMessageId, IpcRequest),
     Response(IpcMessageId, IpcResponse),
 }

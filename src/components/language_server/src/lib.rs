@@ -7,7 +7,7 @@ use crate::message::{Message, Response};
 use daemon::connect_to_daemon;
 pub(crate) use document::*;
 use fingerprint::COMPILER_BUILT_AT;
-use ipc_message::{Ipc, IpcMessageId, IpcRequest};
+use ipc_message::{IpcMessage, IpcMessageId, IpcRequest};
 pub(crate) use log::*;
 use lsp_types::Uri;
 use pin_project_lite::pin_project;
@@ -83,7 +83,7 @@ pub async fn start() -> ExitCode {
         documents: Default::default(),
     });
 
-    let data = serde_json::to_string(&Ipc::Request(
+    let data = serde_json::to_string(&IpcMessage::Request(
         IpcMessageId(0),
         IpcRequest::Initialize {
             fingerprint: format!("{}", COMPILER_BUILT_AT),
