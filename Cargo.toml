@@ -14,6 +14,7 @@ members = [
     "src/representations/text_edit",
     "src/representations/ipc_message",
     "src/representations/fingerprint",
+    "src/support/async_stdio",
     "src/support/define_requests",
     "src/support/iter_ext",
     "src/support/top_n",

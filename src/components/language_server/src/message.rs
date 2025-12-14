@@ -1,7 +1,13 @@
 use serde_derive::{Deserialize, Serialize};
 use smol::io::{AsyncBufRead, AsyncWrite};
-use std::{fmt, pin::Pin};
-use transport::{read_message_raw, write_message_raw};
+use std::{
+    fmt,
+    io::{self, BufRead, Write},
+    pin::Pin,
+};
+use transport::{
+    read_message_raw_async, read_message_raw_sync, write_message_raw_async, write_message_raw_sync,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
@@ -103,8 +109,8 @@ struct JsonRpc<'a> {
 }
 
 impl Message {
-    pub async fn read(reader: Pin<&mut impl AsyncBufRead>) -> smol::io::Result<Option<Message>> {
-        let Some(text) = read_message_raw(reader).await? else {
+    pub fn read_sync(reader: &mut impl BufRead) -> io::Result<Option<Message>> {
+        let Some(text) = read_message_raw_sync(reader)? else {
             return Ok(None);
         };
 
@@ -121,16 +127,43 @@ impl Message {
         Ok(Some(msg))
     }
 
-    pub async fn write(&self, writer: Pin<&mut impl AsyncWrite>) -> smol::io::Result<()> {
+    pub async fn read_async(reader: Pin<&mut impl AsyncBufRead>) -> io::Result<Option<Message>> {
+        let Some(text) = read_message_raw_async(reader).await? else {
+            return Ok(None);
+        };
+
+        let msg = match serde_json::from_str(&text) {
+            Ok(msg) => msg,
+            Err(error) => {
+                return Err(malformed(format!(
+                    "Malformed LSP payload `{:?}`: {:?}",
+                    error, text
+                )));
+            }
+        };
+
+        Ok(Some(msg))
+    }
+
+    pub fn write_sync(&self, writer: &mut impl Write) -> io::Result<()> {
         let text = serde_json::to_string(&JsonRpc {
             jsonrpc: "2.0",
             msg: self,
         })?;
 
-        write_message_raw(writer, &text).await
+        write_message_raw_sync(writer, &text)
+    }
+
+    pub async fn write_async(&self, writer: Pin<&mut impl AsyncWrite>) -> io::Result<()> {
+        let text = serde_json::to_string(&JsonRpc {
+            jsonrpc: "2.0",
+            msg: self,
+        })?;
+
+        write_message_raw_async(writer, &text).await
     }
 }
 
-fn malformed(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> smol::io::Error {
-    smol::io::Error::new(smol::io::ErrorKind::InvalidData, error)
+fn malformed(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> io::Error {
+    io::Error::new(smol::io::ErrorKind::InvalidData, error)
 }

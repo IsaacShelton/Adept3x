@@ -8,7 +8,7 @@ version = "0.1.0"
 dependencies = [
  "daemon",
  "language_server",
- "smol",
+ "smol 2.0.2",
 ]
 
 [[package]]
@@ -292,11 +292,13 @@ name = "daemon"
 version = "0.1.0"
 dependencies = [
  "ctrlc",
+ "fingerprint",
  "idle",
  "ipc_message",
  "nix",
  "request",
- "smol",
+ "serde_json",
+ "smol 2.0.2",
  "text_edit",
  "transport",
  "vfs",
@@ -461,7 +463,7 @@ checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
 name = "idle"
 version = "0.1.0"
 dependencies = [
- "smol",
+ "smol 2.0.2",
 ]
 
 [[package]]
@@ -510,7 +512,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "smol",
+ "smol 2.0.2",
  "text_edit",
  "transport",
  "vfs",
@@ -818,6 +820,13 @@ dependencies = [
 
 [[package]]
 name = "smol"
+version = "0.1.0"
+dependencies = [
+ "smol 2.0.2",
+]
+
+[[package]]
+name = "smol"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a33bd3e260892199c3ccfc487c88b2da2265080acb316cd920da72fdfd7c599f"
@@ -943,7 +952,7 @@ dependencies = [
 name = "transport"
 version = "0.1.0"
 dependencies = [
- "smol",
+ "smol 2.0.2",
 ]
 
 [[package]]

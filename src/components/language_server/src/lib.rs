@@ -11,18 +11,15 @@ use ipc_message::{IpcMessage, IpcMessageId, IpcRequest};
 pub(crate) use log::*;
 use lsp_types::Uri;
 use pin_project_lite::pin_project;
-use smol::{
-    Async,
-    io::{AsyncWriteExt, BufReader, BufWriter},
-    net::TcpStream,
-};
+use smol::{io::AsyncWriteExt, net::TcpStream};
 use std::{
     collections::HashMap,
-    io::{Stdin, Stdout, Write},
-    pin::{Pin, pin},
+    io::{BufReader, BufWriter, Stdin, Stdout, Write},
+    pin::pin,
     process::ExitCode,
 };
-use transport::write_message_raw;
+use text_edit::TextPosition;
+use transport::{read_message_raw_async, write_message_raw_async};
 
 pin_project! {
     pub struct Server {
@@ -30,30 +27,52 @@ pin_project! {
         log: Logger,
         #[pin]
         daemon: TcpStream,
-        #[pin]
-        reader: BufReader<Async<Stdin>>,
-        #[pin]
-        writer: BufWriter<Async<Stdout>>,
+        reader: Option<BufReader<Stdin>>,
+        writer: Option<BufWriter<Stdout>>,
         documents: HashMap<Uri, DocumentBody>,
     }
 }
 
 impl Server {
-    pub async fn recv_message(self: Pin<&mut Self>) -> Option<Message> {
-        let this = self.project();
+    pub async fn recv_message(self: &mut Self) -> Option<Message> {
+        let mut reader = self.reader.take()?;
 
-        match Message::read(this.reader).await {
+        // We need to unblock here, since we're using stdin
+        let (reader, result) = smol::unblock(move || {
+            let result = Message::read_sync(&mut reader);
+            (reader, result)
+        })
+        .await;
+
+        self.reader = Some(reader);
+
+        match result {
             Ok(message) => message,
             Err(error) => {
-                let _ = writeln!(this.log, "Error: {}", error);
+                let _ = writeln!(self.log, "Error: {}", error);
                 None
             }
         }
     }
 
-    pub async fn send_message(self: Pin<&mut Self>, message: Message) {
-        let this = self.project();
-        let _ = message.write(this.writer).await;
+    pub async fn send_message(&mut self, message: Message) {
+        let mut writer = self.writer.take().unwrap();
+
+        // We need to unblock here, since we're using stdout
+        let (writer, result) = smol::unblock(move || {
+            let result = message.write_sync(&mut writer);
+            (writer, result)
+        })
+        .await;
+
+        self.writer = Some(writer);
+
+        match result {
+            Ok(()) => (),
+            Err(error) => {
+                let _ = writeln!(self.log, "Error: {}", error);
+            }
+        }
     }
 }
 
@@ -74,12 +93,8 @@ pub async fn start() -> ExitCode {
         did_shutdown: false,
         log,
         daemon,
-        reader: BufReader::new(
-            Async::new(std::io::stdin()).expect("Failed to create reader to daemon"),
-        ),
-        writer: BufWriter::new(
-            Async::new(std::io::stdout()).expect("Failed to create writer to daemon"),
-        ),
+        reader: Some(BufReader::new(std::io::stdin())),
+        writer: Some(BufWriter::new(std::io::stdout())),
         documents: Default::default(),
     });
 
@@ -90,7 +105,29 @@ pub async fn start() -> ExitCode {
         },
     ))
     .unwrap();
-    write_message_raw(server.as_mut().project().daemon, &data)
+    write_message_raw_async(server.as_mut().project().daemon, &data)
+        .await
+        .unwrap();
+    server.as_mut().project().daemon.flush().await.unwrap();
+    let reader = pin!(smol::io::BufReader::new(server.as_mut().project().daemon));
+    let content = match read_message_raw_async(reader).await {
+        Ok(Some(response)) => response,
+        Ok(None) | Err(_) => return ExitCode::FAILURE,
+    };
+
+    let message = match serde_json::from_str::<IpcMessage>(&content) {
+        Ok(message) => message,
+        Err(_) => return ExitCode::FAILURE,
+    };
+
+    let _ = dbg!(message);
+
+    let data = serde_json::to_string(&IpcMessage::Request(
+        IpcMessageId(0),
+        IpcRequest::Completion(TextPosition(0)),
+    ))
+    .unwrap();
+    write_message_raw_async(server.as_mut().project().daemon, &data)
         .await
         .unwrap();
     server.as_mut().project().daemon.flush().await.unwrap();
