@@ -40,7 +40,7 @@ macro_rules! log {
         $crate::log!("\n")
     };
     ($($arg:tt)*) => {{
-        if false {
+        if true {
             eprintln!($($arg)*);
         } else {
             let _ = format_args!($($arg)*);
@@ -74,6 +74,7 @@ mod requests {
     #[derive(Default)]
     pub struct FindProjectConfigState;
 
+    #[define_requests::impure]
     #[define_requests::never_persist]
     #[define_requests::returns(Result<Project, TopErrors>)]
     pub struct GetProject {

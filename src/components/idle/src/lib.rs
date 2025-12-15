@@ -92,7 +92,12 @@ impl IdleTracker {
         let expire_at = self.shared.last_active_ms.load(Ordering::Relaxed)
             + self.shared.max_idle_time_ms.load(Ordering::Relaxed);
 
+        dbg!(self.shared.num_connections.load(Ordering::Relaxed));
+        dbg!(self.shared.last_active_ms.load(Ordering::Relaxed));
+        dbg!(self.shared.max_idle_time_ms.load(Ordering::Relaxed));
+
         if no_connections && now > expire_at {
+            dbg!("should shutdown");
             self.shared.should_shutdown.store(true, Ordering::Relaxed);
             true
         } else {

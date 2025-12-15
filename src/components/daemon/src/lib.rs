@@ -14,7 +14,7 @@ use std::time::Duration;
 pub async fn connect_to_daemon() -> Result<TcpStream, StartError> {
     // Try connecting to existing instance
     if let Ok(connection) = TcpStream::connect("127.0.0.1:6000").await {
-        println!("Connected to existing daemon.");
+        eprintln!("Connected to existing daemon.");
         return Ok(connection);
     }
 

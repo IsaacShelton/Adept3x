@@ -9,14 +9,14 @@ pub fn try_become_daemon(
     let maybe_lock = try_acquire_lock(path)?;
 
     let Some(lockfile) = maybe_lock else {
-        println!("Daemon already running.");
+        eprintln!("Daemon already running.");
         return Ok(());
     };
 
-    println!("Starting daemon...");
+    eprintln!("Starting daemon...");
     (main)()?;
 
-    println!("Daemon shutting down...");
+    eprintln!("Daemon shutting down...");
     drop(lockfile);
 
     let _ = remove_file(&lockfile_path(path));

@@ -30,7 +30,11 @@ pub fn completion(server: &Server, request: Request) -> <Completion as LspReques
         .documents
         .get(&params.text_document_position.text_document.uri)?;
 
-    let word = body.get_word_at(params.text_document_position.position)?;
+    let mut word = body.get_word_at(params.text_document_position.position)?;
+
+    if word == "" {
+        word = "what";
+    }
 
     return Some(CompletionResponse::List(CompletionList {
         is_incomplete: true,

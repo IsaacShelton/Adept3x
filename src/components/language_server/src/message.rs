@@ -1,7 +1,7 @@
+use ipc_message::GenericRequestId;
 use serde_derive::{Deserialize, Serialize};
 use smol::io::{AsyncBufRead, AsyncWrite};
 use std::{
-    fmt,
     io::{self, BufRead, Write},
     pin::Pin,
 };
@@ -35,37 +35,7 @@ impl From<Notification> for Message {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[serde(transparent)]
-pub struct RequestId(RequestIdRepr);
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[serde(untagged)]
-enum RequestIdRepr {
-    Int(i32),
-    String(String),
-}
-
-impl From<i32> for RequestId {
-    fn from(id: i32) -> RequestId {
-        RequestId(RequestIdRepr::Int(id))
-    }
-}
-
-impl From<String> for RequestId {
-    fn from(id: String) -> RequestId {
-        RequestId(RequestIdRepr::String(id))
-    }
-}
-
-impl fmt::Display for RequestId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            RequestIdRepr::Int(it) => write!(f, "{}", it),
-            RequestIdRepr::String(it) => write!(f, "{:?}", it),
-        }
-    }
-}
+pub type RequestId = GenericRequestId;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Request {

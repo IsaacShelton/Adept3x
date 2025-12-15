@@ -26,7 +26,7 @@ impl Server {
 pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
     smol::block_on(async {
         let listener = TcpListener::bind("127.0.0.1:6000").await?;
-        println!("Listening on {}", listener.local_addr()?);
+        eprintln!("Listening on {}", listener.local_addr()?);
 
         let mut incoming = listener.incoming();
         let server = Arc::new(Server::new(max_idle_time).await);

@@ -8,7 +8,7 @@ use lsp_types::{
     request::{Initialize, Request as LspRequest, Shutdown},
 };
 
-pub fn initialize(_request: Request) -> <Initialize as LspRequest>::Result {
+pub fn initialize() -> <Initialize as LspRequest>::Result {
     return InitializeResult {
         capabilities: ServerCapabilities {
             completion_provider: Some(CompletionOptions {

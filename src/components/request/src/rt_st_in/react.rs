@@ -140,7 +140,11 @@ where
                 }
             }
 
-            let needs_to_be_recomputed = req.is_impure()
+            // NOTE: We don't have a way of tracking impure inputs up the
+            // hierarchy yet, so we must always recompute children to update
+            // them to the latest rev.
+            let needs_to_be_recomputed = true
+                || req.is_impure()
                 || status.task.requested.iter().any(|req| {
                     rt.cache
                         .get(req)

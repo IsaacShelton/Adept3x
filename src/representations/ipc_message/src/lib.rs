@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{
+    fmt::{Display, Formatter},
+    path::PathBuf,
+    sync::Arc,
+};
 use text_edit::{TextEdit, TextPosition};
 use vfs::Canonical;
 
@@ -8,9 +12,9 @@ pub struct IpcMessageId(pub usize);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum IpcMessage {
-    Request(IpcMessageId, IpcRequest),
-    Response(IpcMessageId, IpcResponse),
-    Notification(IpcNotification),
+    Request(Option<IpcMessageId>, Option<GenericRequestId>, IpcRequest),
+    Response(Option<IpcMessageId>, Option<GenericRequestId>, IpcResponse),
+    Notification(Option<GenericRequestId>, IpcNotification),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -27,6 +31,7 @@ impl IpcFile {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum IpcRequest {
     Initialize { fingerprint: String },
+    Shutdown,
     DidChange(IpcFile, Vec<TextEdit>),
     DidSave(IpcFile),
     Completion(TextPosition),
@@ -36,6 +41,7 @@ pub enum IpcRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum IpcResponse {
     Initialized,
+    ShuttingDown,
     Changed,
     Saved,
     Completion(Vec<String>),
@@ -45,4 +51,36 @@ pub enum IpcResponse {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum IpcNotification {
     Exit,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(transparent)]
+pub struct GenericRequestId(GenericRequestIdRepr);
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(untagged)]
+enum GenericRequestIdRepr {
+    Int(i32),
+    String(Arc<str>),
+}
+
+impl From<i32> for GenericRequestId {
+    fn from(id: i32) -> GenericRequestId {
+        GenericRequestId(GenericRequestIdRepr::Int(id))
+    }
+}
+
+impl From<String> for GenericRequestId {
+    fn from(id: String) -> GenericRequestId {
+        GenericRequestId(GenericRequestIdRepr::String(Arc::from(id)))
+    }
+}
+
+impl Display for GenericRequestId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            GenericRequestIdRepr::Int(it) => write!(f, "{}", it),
+            GenericRequestIdRepr::String(it) => write!(f, "{:?}", it),
+        }
+    }
 }
