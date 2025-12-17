@@ -44,7 +44,7 @@ impl IdleTracker {
             .duration_since(self.shared.started)
             .as_millis() as u64;
 
-        self.shared.last_active_ms.store(ms, Ordering::Relaxed);
+        self.shared.last_active_ms.store(ms, Ordering::SeqCst);
     }
 
     pub fn set_max_idle_time(&self, new_max_idle_time: Option<Duration>) {
@@ -54,12 +54,12 @@ impl IdleTracker {
 
                 self.shared
                     .max_idle_time_ms
-                    .store(max_idle_time_ms, Ordering::Relaxed)
+                    .store(max_idle_time_ms, Ordering::SeqCst)
             }
             None => self
                 .shared
                 .max_idle_time_ms
-                .store(self.shared.original_max_idle_time_ms, Ordering::Relaxed),
+                .store(self.shared.original_max_idle_time_ms, Ordering::SeqCst),
         }
     }
 
@@ -68,40 +68,35 @@ impl IdleTracker {
             return Err(());
         }
 
-        self.shared.num_connections.fetch_add(1, Ordering::Relaxed);
+        self.shared.num_connections.fetch_add(1, Ordering::SeqCst);
         self.still_active();
         Ok(())
     }
 
     pub fn remove_connection(&self) {
-        self.shared.num_connections.fetch_sub(1, Ordering::Relaxed);
+        self.shared.num_connections.fetch_sub(1, Ordering::SeqCst);
     }
 
     pub fn shutting_down(&self) -> bool {
-        self.shared.num_connections.load(Ordering::Relaxed) == 0
-            && self.shared.should_shutdown.load(Ordering::Relaxed)
+        self.shared.num_connections.load(Ordering::SeqCst) == 0
+            && self.shared.should_shutdown.load(Ordering::SeqCst)
     }
 
     pub fn shutdown_if_idle(&self) -> bool {
-        let no_connections = self.shared.num_connections.load(Ordering::Relaxed) == 0;
+        let no_connections = self.shared.num_connections.load(Ordering::SeqCst) == 0;
 
         let now = Instant::now()
             .duration_since(self.shared.started)
             .as_millis() as u64;
 
-        let expire_at = self.shared.last_active_ms.load(Ordering::Relaxed)
-            + self.shared.max_idle_time_ms.load(Ordering::Relaxed);
-
-        dbg!(self.shared.num_connections.load(Ordering::Relaxed));
-        dbg!(self.shared.last_active_ms.load(Ordering::Relaxed));
-        dbg!(self.shared.max_idle_time_ms.load(Ordering::Relaxed));
+        let expire_at = self.shared.last_active_ms.load(Ordering::SeqCst)
+            + self.shared.max_idle_time_ms.load(Ordering::SeqCst);
 
         if no_connections && now > expire_at {
-            dbg!("should shutdown");
-            self.shared.should_shutdown.store(true, Ordering::Relaxed);
+            self.shared.should_shutdown.store(true, Ordering::SeqCst);
             true
         } else {
-            self.shared.should_shutdown.load(Ordering::Relaxed)
+            self.shared.should_shutdown.load(Ordering::SeqCst)
         }
     }
 }

@@ -1,4 +1,5 @@
 use std::{sync::Arc, time::SystemTime};
+use text_edit::TextEdit;
 
 pub struct VfsFile {
     pub is_buffer: bool,
@@ -26,4 +27,11 @@ impl VfsFileContent {
             Err(())
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct IncrementalVfsFileContent {
+    pub rest_content: Arc<[u8]>,
+    pub edits: Option<Arc<[TextEdit]>>,
+    pub is_text: bool,
 }

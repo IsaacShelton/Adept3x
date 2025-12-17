@@ -8,3 +8,4 @@ derive_more.workspace = true
 serde.workspace = true
 serde_derive.workspace = true
 idle = { version = "0.1.0", path = "../idle" }
+text_edit = { version = "0.1.0", path = "../../representations/text_edit" }

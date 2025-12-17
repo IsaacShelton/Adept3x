@@ -8,4 +8,4 @@ serde.workspace = true
 serde_json.workspace = true
 text_edit = { version = "0.1.0", path = "../../representations/text_edit" }
 vfs = { version = "0.1.0", path = "../../components/vfs" }
-
+fluent-uri.workspace = true

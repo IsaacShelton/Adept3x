@@ -9,7 +9,9 @@ pub(crate) use document::*;
 use fingerprint::COMPILER_BUILT_AT;
 use ipc_message::{IpcMessage, IpcMessageId, IpcRequest, IpcResponse};
 pub(crate) use log::*;
-use lsp_types::{CompletionItem, CompletionList, CompletionResponse, Uri};
+use lsp_types::{
+    CompletionItem, CompletionList, CompletionResponse, DidChangeTextDocumentParams, Uri,
+};
 use pin_project_lite::pin_project;
 use smol::{
     io::{AsyncWriteExt, WriteHalf},
@@ -268,10 +270,23 @@ pub async fn start() -> ExitCode {
                 };
             }
             Message::Response(_) => (),
-            Message::Notification(notification) => match notification.method.as_str() {
+            Message::Notification(notif) => match notif.method.as_str() {
                 "initialized" => (),
                 "textDocument/didChange" => {
-                    methods::text_document::did_change(&mut server, notification);
+                    let params =
+                        serde_json::from_value::<DidChangeTextDocumentParams>(notif.params)
+                            .unwrap();
+
+                    dbg!(params);
+
+                    /*
+                    notification.params
+
+                        write_message_raw_async(server.as_mut().project().daemon, &data)
+                            .await
+                            .unwrap();
+                        server.as_mut().project().daemon.flush().await.unwrap();
+                    */
                 }
                 "exit" => {
                     return if server.did_shutdown {

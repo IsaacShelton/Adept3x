@@ -16,3 +16,4 @@ ipc_message = { version = "0.1.0", path = "../../representations/ipc_message" }
 transport = { version = "0.1.0", path = "../../components/transport" }
 serde_json.workspace = true
 fingerprint = { version = "0.1.0", path = "../../representations/fingerprint" }
+fluent-uri.workspace = true

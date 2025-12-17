@@ -18,7 +18,9 @@ pub fn initialize() -> <Initialize as LspRequest>::Result {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
                 completion_item: None,
             }),
-            text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+            text_document_sync: Some(TextDocumentSyncCapability::Kind(
+                TextDocumentSyncKind::INCREMENTAL,
+            )),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: None,
                 inter_file_dependencies: true,

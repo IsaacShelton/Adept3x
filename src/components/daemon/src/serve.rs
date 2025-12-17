@@ -1,21 +1,34 @@
 use crate::server::Server;
 use fingerprint::COMPILER_BUILT_AT;
+use fluent_uri::Uri;
 use ipc_message::{
     GenericRequestId, IpcMessage, IpcMessageId, IpcNotification, IpcRequest, IpcResponse,
 };
 use request::{Cache, PfIn, Req, Rt, RtStIn, TimeoutAfterSteps, UnwrapAft, WithErrors};
 use smol::{
     io::{self, AsyncWriteExt, BufReader, BufWriter},
+    lock::Mutex,
     net::TcpStream,
     stream::StreamExt,
 };
-use std::{num::NonZero, pin::pin};
+use std::{collections::HashMap, num::NonZero, pin::pin, sync::Arc};
 use transport::{read_message_raw_async, write_message_raw_async};
+
+#[derive(Default)]
+pub struct LanguageClient {
+    pub documents: Mutex<HashMap<Uri<String>, Document>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Document {
+    pub content: String,
+}
 
 impl Server {
     pub async fn serve(&self, mut stream: TcpStream) -> io::Result<()> {
         let idle_tracker = self.idle_tracker.clone();
         let stream_writer = stream.clone();
+        let client = Arc::new(LanguageClient::default());
 
         // Channel for sending requests off to be processed
         let (tx_req, rx_req) =
@@ -52,8 +65,6 @@ impl Server {
                         });
                         break;
                     }
-                    IpcRequest::DidChange(ipc_file, text_edits) => todo!(),
-                    IpcRequest::DidSave(ipc_file) => todo!(),
                     IpcRequest::Completion(text_position) => request::ListSymbols.into(),
                     IpcRequest::Diagnostics(ipc_file) => todo!(),
                 };
@@ -75,8 +86,6 @@ impl Server {
                 match ipc_request {
                     IpcRequest::Initialize { .. } => unreachable!(),
                     IpcRequest::Shutdown => unreachable!(),
-                    IpcRequest::DidChange(ipc_file, text_edits) => todo!(),
-                    IpcRequest::DidSave(ipc_file) => todo!(),
                     IpcRequest::Completion(_text_position) => {
                         let WithErrors { value: names, .. } = request::ListSymbols::unwrap_aft(aft);
 
@@ -139,6 +148,15 @@ impl Server {
                     let writer = pin!(BufWriter::new(&mut stream));
                     write_message_raw_async(writer, &content).await?;
                 }
+                IpcMessage::Notification(_, IpcNotification::DidChange(ipc_file, edits)) => {
+                    todo!("daemon: notif {:?} {:?}", ipc_file, edits)
+                }
+                IpcMessage::Notification(_, IpcNotification::DidOpen(..)) => {
+                    todo!("daemon: did open")
+                }
+                IpcMessage::Notification(_, IpcNotification::DidSave(..)) => {
+                    todo!("daemon: did save")
+                }
                 IpcMessage::Notification(_, IpcNotification::Exit) => {
                     eprintln!("daemon: Exit requested...");
                     break;
@@ -155,6 +173,7 @@ impl Server {
         eprintln!("daemon: Closing language server connection...");
         tx_req.close();
         thread.join().unwrap();
+        eprintln!("daemon: Closed language server connection...");
         Ok(())
     }
 }

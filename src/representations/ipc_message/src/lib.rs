@@ -32,8 +32,6 @@ impl IpcFile {
 pub enum IpcRequest {
     Initialize { fingerprint: String },
     Shutdown,
-    DidChange(IpcFile, Vec<TextEdit>),
-    DidSave(IpcFile),
     Completion(TextPosition),
     Diagnostics(IpcFile),
 }
@@ -51,6 +49,9 @@ pub enum IpcResponse {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum IpcNotification {
     Exit,
+    DidOpen(IpcFile),
+    DidChange(IpcFile, Vec<TextEdit>),
+    DidSave(IpcFile),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -40,7 +40,7 @@ macro_rules! log {
         $crate::log!("\n")
     };
     ($($arg:tt)*) => {{
-        if true {
+        if false {
             eprintln!($($arg)*);
         } else {
             let _ = format_args!($($arg)*);

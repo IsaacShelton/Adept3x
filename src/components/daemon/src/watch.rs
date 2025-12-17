@@ -63,8 +63,6 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
         )
         .await;
 
-        dbg!(&new_project);
-
         // Determine if the watch config was changed as part of the project config.
         let new_watch_config = match new_project {
             Ok(BlockOn::Complete(Ok(project))) => {
@@ -122,7 +120,8 @@ pub async fn watch<'e, P: Pf, REQ: Into<P::Req<'e>> + Clone + Send + UnwrapAft<'
             Err(())
         };
 
-        log!("Watch Result is {:?}", run.or(timeout).await);
+        let result = run.or(timeout).await;
+        log!("Watch Result is {:?}", result);
         Timer::after(Duration::from_millis(watch_config.interval_ms)).await;
 
         if server.idle_tracker.shutdown_if_idle() {

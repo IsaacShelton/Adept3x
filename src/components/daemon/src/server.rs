@@ -45,7 +45,7 @@ pub fn server_main(max_idle_time: Duration) -> io::Result<()> {
                 smol::spawn(talk_to_client(server.clone(), stream)).detach();
             }
 
-            if server.idle_tracker.shutting_down() {
+            if server.idle_tracker.shutdown_if_idle() {
                 break;
             }
         }

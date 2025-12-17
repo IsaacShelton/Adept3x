@@ -38,3 +38,5 @@ bincode = { version = "2.0.1", features = ["serde"] }
 by_address = "1.2.1"
 thiserror = "2.0.17"
 pin-project-lite = "0.2"
+fluent-uri = "0.4.1"
+
