@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use text_edit::{TextEdit, TextPosition};
+use text_edit::{DocumentChange, TextEdit, TextPosition};
 use vfs::Canonical;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,7 +40,6 @@ pub enum IpcRequest {
 pub enum IpcResponse {
     Initialized,
     ShuttingDown,
-    Changed,
     Saved,
     Completion(Vec<String>),
     Diagnostics(Vec<(String, TextPosition)>),
@@ -50,7 +49,7 @@ pub enum IpcResponse {
 pub enum IpcNotification {
     Exit,
     DidOpen(IpcFile),
-    DidChange(IpcFile, Vec<TextEdit>),
+    DidChange(IpcFile, Vec<DocumentChange>),
     DidSave(IpcFile),
 }
 

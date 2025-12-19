@@ -1,18 +1,24 @@
 mod document;
+mod file_uri;
 mod log;
 mod message;
 mod methods;
 
-use crate::message::{Message, Response};
+use crate::{
+    file_uri::FileUri,
+    message::{Message, Response},
+};
 use daemon::connect_to_daemon;
 pub(crate) use document::*;
 use fingerprint::COMPILER_BUILT_AT;
 use ipc_message::{IpcMessage, IpcMessageId, IpcRequest, IpcResponse};
 pub(crate) use log::*;
 use lsp_types::{
-    CompletionItem, CompletionList, CompletionResponse, DidChangeTextDocumentParams, Uri,
+    CompletionItem, CompletionList, CompletionResponse, DidChangeTextDocumentParams,
+    InitializeParams, Uri,
 };
 use pin_project_lite::pin_project;
+use serde::Deserialize;
 use smol::{
     io::{AsyncWriteExt, WriteHalf},
     net::TcpStream,
@@ -22,8 +28,12 @@ use std::{
     io::{BufReader, BufWriter, Stdin, Stdout, Write},
     pin::pin,
     process::ExitCode,
+    sync::Arc,
 };
-use text_edit::TextPosition;
+use text_edit::{
+    DocumentChange, TextEditLineColumnUtf16, TextPosition, TextPositionLineColumnUtf16,
+    TextRangeLineColumnUtf16,
+};
 use transport::{read_message_raw_async, write_message_raw_async};
 
 pin_project! {
@@ -137,7 +147,6 @@ pub async fn start() -> ExitCode {
                         )
                         .await;
                     }
-                    IpcResponse::Changed => todo!(),
                     IpcResponse::Saved => todo!(),
                     IpcResponse::Completion(items) => {
                         Server::send_to_editor(
@@ -234,6 +243,8 @@ pub async fn start() -> ExitCode {
                         ))
                         .unwrap();
 
+                        let init_params = InitializeParams::deserialize(request.params);
+
                         write_message_raw_async(server.as_mut().project().daemon, &data)
                             .await
                             .unwrap();
@@ -270,33 +281,68 @@ pub async fn start() -> ExitCode {
                 };
             }
             Message::Response(_) => (),
-            Message::Notification(notif) => match notif.method.as_str() {
-                "initialized" => (),
-                "textDocument/didChange" => {
-                    let params =
-                        serde_json::from_value::<DidChangeTextDocumentParams>(notif.params)
-                            .unwrap();
+            Message::Notification(notif) => {
+                match notif.method.as_str() {
+                    "initialized" => (),
+                    "textDocument/didChange" => {
+                        let params =
+                            serde_json::from_value::<DidChangeTextDocumentParams>(notif.params)
+                                .unwrap();
 
-                    dbg!(params);
+                        if let Some("file") = params
+                            .text_document
+                            .uri
+                            .scheme()
+                            .map(|scheme| scheme.as_str())
+                        {
+                            let document_changes =
+                                params.content_changes.into_iter().map(|change| {
+                                    if let Some(range) = change.range {
+                                        assert!(range.start <= range.end, "Invalid range");
 
-                    /*
-                    notification.params
+                                        DocumentChange::IncrementalUtf16(TextEditLineColumnUtf16 {
+                                            range: TextRangeLineColumnUtf16 {
+                                                start: TextPositionLineColumnUtf16 {
+                                                    line_utf16: range.start.line,
+                                                    column_utf16: range.start.character,
+                                                },
+                                                end: TextPositionLineColumnUtf16 {
+                                                    line_utf16: range.end.line,
+                                                    column_utf16: range.end.character,
+                                                },
+                                            },
+                                            replace_with: Arc::from(change.text),
+                                        })
+                                    } else {
+                                        DocumentChange::Full(Arc::from(change.text))
+                                    }
+                                });
 
-                        write_message_raw_async(server.as_mut().project().daemon, &data)
-                            .await
-                            .unwrap();
-                        server.as_mut().project().daemon.flush().await.unwrap();
-                    */
+                            eprintln!(
+                                "{:?} {:?}",
+                                &params.text_document.uri.to_file_path(),
+                                &document_changes
+                            );
+                        }
+
+                        /*
+                        notification.params
+                            write_message_raw_async(server.as_mut().project().daemon, &data)
+                                .await
+                                .unwrap();
+                            server.as_mut().project().daemon.flush().await.unwrap();
+                        */
+                    }
+                    "exit" => {
+                        return if server.did_shutdown {
+                            ExitCode::SUCCESS
+                        } else {
+                            ExitCode::FAILURE
+                        };
+                    }
+                    _ => (),
                 }
-                "exit" => {
-                    return if server.did_shutdown {
-                        ExitCode::SUCCESS
-                    } else {
-                        ExitCode::FAILURE
-                    };
-                }
-                _ => (),
-            },
+            }
         }
     }
 

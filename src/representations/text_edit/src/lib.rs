@@ -124,7 +124,31 @@ impl std::ops::AddAssign<TextLength> for TextPosition {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DocumentChange {
+    IncrementalUtf16(TextEditLineColumnUtf16),
+    Full(Arc<str>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TextEdit {
     pub range: TextRange,
     pub replace_with: Arc<str>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextEditLineColumnUtf16 {
+    pub range: TextRangeLineColumnUtf16,
+    pub replace_with: Arc<str>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextRangeLineColumnUtf16 {
+    pub start: TextPositionLineColumnUtf16,
+    pub end: TextPositionLineColumnUtf16,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextPositionLineColumnUtf16 {
+    pub line_utf16: u32,
+    pub column_utf16: u32,
 }
