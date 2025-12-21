@@ -1,7 +1,0 @@
-[package]
-name = "top_n"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-itertools = { workspace = true }

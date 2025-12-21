@@ -1,8 +1,0 @@
-[package]
-name = "text_edit"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-derive_more.workspace = true
-serde.workspace = true

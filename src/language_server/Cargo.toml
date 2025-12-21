@@ -1,0 +1,14 @@
+[package]
+name = "language_server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fern.workspace = true
+humantime.workspace = true
+log.workspace = true
+lsp_connection = { version = "0.1.0", path = "../lsp_connection" }
+lsp-types.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+derive_more.workspace = true

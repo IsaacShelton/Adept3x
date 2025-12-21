@@ -1,0 +1,13 @@
+[package]
+name = "lsp_connection"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lsp-types.workspace = true
+serde_derive.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+content_length = { version = "0.1.0", path = "../content_length" }
+derive_more.workspace = true
+log.workspace = true

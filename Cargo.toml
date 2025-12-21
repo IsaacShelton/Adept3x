@@ -2,24 +2,12 @@
 resolver = "3"
 members = [
     "src/adept",
-    "src/components/request",
-    "src/components/language_server",
-    "src/components/vfs",
-    "src/components/idle",
-    "src/components/daemon",
-    "src/components/build_aon",
-    "src/components/build_token",
-    "src/components/transport",
-    "src/representations/token",
-    "src/representations/text_edit",
-    "src/representations/ipc_message",
-    "src/representations/fingerprint",
-    "src/support/define_requests",
-    "src/support/iter_ext",
-    "src/support/top_n",
-    "src/support/infinite_iterator",
-    "src/support/line_column",
-    "src/support/text",
+    "src/daemon",
+    "src/daemon_scheduler",
+    "src/language_server",
+    "src/lock_file",
+    "src/idle_tracker",
+    "src/lsp_connection",
 ]
 
 [workspace.dependencies]
@@ -39,4 +27,8 @@ by_address = "1.2.1"
 thiserror = "2.0.17"
 pin-project-lite = "0.2"
 fluent-uri = "0.4.1"
+fern = "0.7.1"
+humantime = "2.3.0"
+log = "0.4.29"
+lsp-types = "0.97.0"
 
