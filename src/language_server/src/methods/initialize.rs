@@ -1,4 +1,4 @@
-use crate::{LspRequestEndpoint, MaybeReady, Static};
+use crate::{LspEndpoint, MaybeReady, Static};
 use lsp_connection::LspConnection;
 use lsp_types::{
     CompletionOptions, DiagnosticOptions, DiagnosticServerCapabilities, InitializeResult,
@@ -6,7 +6,7 @@ use lsp_types::{
     TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WorkDoneProgressOptions,
 };
 
-impl LspRequestEndpoint for Static<lsp_types::request::Initialize> {
+impl LspEndpoint for Static<lsp_types::request::Initialize> {
     fn run(_client: &mut LspConnection, params: Self::Params) -> MaybeReady<Self::Result> {
         let save = params
             .capabilities

@@ -9,37 +9,38 @@ pub trait LspMethod {
     type Result: IntoLspResult;
 }
 
-impl LspMethod for lsp_types::request::Initialize {
-    const REQUIRED_STATE: Option<LspConnectionState> = Some(LspConnectionState::Started);
-    const METHOD: &'static str = <Self as lsp_types::request::Request>::METHOD;
-    type Params = <Self as lsp_types::request::Request>::Params;
-    type Result = <Self as lsp_types::request::Request>::Result;
+macro_rules! request {
+    ($request_ty: ident) => {
+        request!($request_ty, LspConnectionState::Initialized);
+    };
+    ($notif_ty: ident, $state:expr) => {
+        impl LspMethod for lsp_types::request::$notif_ty {
+            const REQUIRED_STATE: Option<LspConnectionState> = Some($state);
+            const METHOD: &'static str = <Self as lsp_types::request::Request>::METHOD;
+            type Params = <Self as lsp_types::request::Request>::Params;
+            type Result = <Self as lsp_types::request::Request>::Result;
+        }
+    };
 }
 
-impl LspMethod for lsp_types::request::Shutdown {
-    const REQUIRED_STATE: Option<LspConnectionState> = Some(LspConnectionState::Initialized);
-    const METHOD: &'static str = <Self as lsp_types::request::Request>::METHOD;
-    type Params = <Self as lsp_types::request::Request>::Params;
-    type Result = <Self as lsp_types::request::Request>::Result;
+macro_rules! notification {
+    ($notif_ty: ident) => {
+        notification!($notif_ty, LspConnectionState::Initialized);
+    };
+    ($notif_ty: ident, $state:expr) => {
+        impl LspMethod for lsp_types::notification::$notif_ty {
+            const REQUIRED_STATE: Option<LspConnectionState> = Some($state);
+            const METHOD: &'static str = <Self as lsp_types::notification::Notification>::METHOD;
+            type Params = <Self as lsp_types::notification::Notification>::Params;
+            type Result = NeverRespond;
+        }
+    };
 }
 
-impl LspMethod for lsp_types::request::Completion {
-    const REQUIRED_STATE: Option<LspConnectionState> = Some(LspConnectionState::Initialized);
-    const METHOD: &'static str = <Self as lsp_types::request::Request>::METHOD;
-    type Params = <Self as lsp_types::request::Request>::Params;
-    type Result = <Self as lsp_types::request::Request>::Result;
-}
+request!(Initialize, LspConnectionState::Started);
+request!(Shutdown);
+request!(Completion);
 
-impl LspMethod for lsp_types::notification::Initialized {
-    const REQUIRED_STATE: Option<LspConnectionState> = Some(LspConnectionState::Initialized);
-    const METHOD: &'static str = <Self as lsp_types::notification::Notification>::METHOD;
-    type Params = <Self as lsp_types::notification::Notification>::Params;
-    type Result = NeverRespond;
-}
-
-impl LspMethod for lsp_types::notification::DidOpenTextDocument {
-    const REQUIRED_STATE: Option<LspConnectionState> = Some(LspConnectionState::Initialized);
-    const METHOD: &'static str = <Self as lsp_types::notification::Notification>::METHOD;
-    type Params = <Self as lsp_types::notification::Notification>::Params;
-    type Result = NeverRespond;
-}
+notification!(Initialized, LspConnectionState::Started);
+notification!(DidOpenTextDocument);
+notification!(SetTrace);
