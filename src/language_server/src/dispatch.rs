@@ -20,13 +20,12 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                 return DispatchResult::NotHandled(request.into());
             }
 
-            if Endpoint::REQUIRED_STATE.map_or(false, |state| state != client.connection_state) {
+            if client.connection_state != Endpoint::REQUIRED_CONNECTION_STATE {
                 log::error!(
                     "Invalid request '{}' message in LSP connection state {:?}",
                     request.method,
                     client.connection_state
                 );
-
                 return Handled::ready(invalid_request_state(request.id, client.connection_state))
                     .into();
             }
@@ -40,7 +39,7 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                     id: request.id,
                     result: Some(
                         serde_json::to_value(ready.into_lsp_result().expect("has response"))
-                            .expect("Can serialize response"),
+                            .expect("can serialize response"),
                     ),
                     error: None,
                 })
@@ -53,12 +52,11 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                 return DispatchResult::NotHandled(notification.into());
             }
 
-            if Endpoint::REQUIRED_STATE.map_or(false, |state| state != client.connection_state) {
+            if client.connection_state != Endpoint::REQUIRED_CONNECTION_STATE {
                 log::error!(
                     "Ignoring '{}' notification, we are not in the right state to accept it",
                     &notification.method
                 );
-
                 return Handled::WontRespond.into();
             }
 

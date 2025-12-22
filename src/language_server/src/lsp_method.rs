@@ -3,7 +3,7 @@ use lsp_connection::LspConnectionState;
 use serde::{Serialize, de::DeserializeOwned};
 
 pub trait LspMethod {
-    const REQUIRED_STATE: Option<LspConnectionState>;
+    const REQUIRED_CONNECTION_STATE: LspConnectionState;
     const METHOD: &'static str;
     type Params: DeserializeOwned + Serialize + Send + Sync + 'static;
     type Result: IntoLspResult;
@@ -15,7 +15,7 @@ macro_rules! request {
     };
     ($notif_ty: ident, $state:expr) => {
         impl LspMethod for lsp_types::request::$notif_ty {
-            const REQUIRED_STATE: Option<LspConnectionState> = Some($state);
+            const REQUIRED_CONNECTION_STATE: LspConnectionState = $state;
             const METHOD: &'static str = <Self as lsp_types::request::Request>::METHOD;
             type Params = <Self as lsp_types::request::Request>::Params;
             type Result = <Self as lsp_types::request::Request>::Result;
@@ -29,7 +29,7 @@ macro_rules! notification {
     };
     ($notif_ty: ident, $state:expr) => {
         impl LspMethod for lsp_types::notification::$notif_ty {
-            const REQUIRED_STATE: Option<LspConnectionState> = Some($state);
+            const REQUIRED_CONNECTION_STATE: LspConnectionState = $state;
             const METHOD: &'static str = <Self as lsp_types::notification::Notification>::METHOD;
             type Params = <Self as lsp_types::notification::Notification>::Params;
             type Result = NeverRespond;
