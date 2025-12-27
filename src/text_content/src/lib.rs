@@ -12,7 +12,9 @@ impl IncrementalTextContent {
         }
     }
 
-    pub fn chars() {}
+    pub fn chars(&self) -> impl Iterator<Item = char> {
+        self.content.chars()
+    }
 
     pub fn with_edit(
         &self,

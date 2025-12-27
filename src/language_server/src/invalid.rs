@@ -1,4 +1,5 @@
-use lsp_connection::{LspConnectionState, LspRequestId, LspResponse, LspResponseError};
+use lsp_connection::LspConnectionState;
+use lsp_message::{LspRequestId, LspResponse, LspResponseError};
 
 pub fn invalid_request_state(id: LspRequestId, state: LspConnectionState) -> LspResponse {
     let error = match state {

@@ -6,7 +6,7 @@ version = 4
 name = "adept"
 version = "0.1.0"
 dependencies = [
- "daemon",
+ "daemon_init",
  "language_server",
  "smol",
 ]
@@ -211,17 +211,26 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 name = "daemon"
 version = "0.1.0"
 dependencies = [
- "daemon_scheduler",
+ "derive_more",
+ "fern",
+ "humantime",
  "lock_file",
- "smol",
+ "log",
+ "lsp_message",
  "thiserror",
 ]
 
 [[package]]
-name = "daemon_scheduler"
+name = "daemon_init"
 version = "0.1.0"
 dependencies = [
- "smol",
+ "daemon",
+ "derive_more",
+ "fern",
+ "humantime",
+ "lock_file",
+ "log",
+ "lsp_message",
  "thiserror",
 ]
 
@@ -357,12 +366,15 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 name = "language_server"
 version = "0.1.0"
 dependencies = [
+ "daemon",
+ "daemon_init",
  "derive_more",
  "fern",
  "humantime",
  "log",
  "lsp-types",
  "lsp_connection",
+ "lsp_message",
  "serde",
  "serde_json",
 ]
@@ -408,6 +420,22 @@ dependencies = [
 
 [[package]]
 name = "lsp_connection"
+version = "0.1.0"
+dependencies = [
+ "content_length",
+ "daemon",
+ "daemon_init",
+ "derive_more",
+ "log",
+ "lsp-types",
+ "lsp_message",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "lsp_message"
 version = "0.1.0"
 dependencies = [
  "content_length",

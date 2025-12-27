@@ -3,11 +3,12 @@ resolver = "3"
 members = [
     "src/adept",
     "src/daemon",
-    "src/daemon_scheduler",
+    "src/daemon_init",
     "src/language_server",
     "src/lock_file",
     "src/idle_tracker",
     "src/lsp_connection",
+    "src/lsp_message",
 ]
 
 [workspace.dependencies]

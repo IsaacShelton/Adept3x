@@ -10,16 +10,17 @@ mod methods;
 mod never_respond;
 mod static_wrapper;
 
-pub use dispatch::*;
-pub use handled::*;
-pub use into_lsp_response::*;
-pub use invalid::*;
-use lsp_connection::{LspConnection, LspMessage};
-pub use lsp_endpoint::*;
-pub use lsp_method::*;
-pub use maybe_ready::*;
-pub use never_respond::*;
-pub use static_wrapper::*;
+pub(crate) use dispatch::*;
+pub(crate) use handled::*;
+pub(crate) use into_lsp_response::*;
+pub(crate) use invalid::*;
+pub(crate) use lsp_connection::LspConnection;
+pub(crate) use lsp_endpoint::*;
+use lsp_message::LspMessage;
+pub(crate) use lsp_method::*;
+pub(crate) use maybe_ready::*;
+pub(crate) use never_respond::*;
+pub(crate) use static_wrapper::*;
 use std::process::ExitCode;
 
 pub fn start() -> ExitCode {
@@ -34,6 +35,16 @@ pub fn start() -> ExitCode {
     let mut client = LspConnection::stdio();
     log::info!("Established stdio connection");
 
+    match daemon_init::connect() {
+        Ok(connection) => client.daemon = Some(connection),
+        Err(error) => {
+            log::error!("Failed to connect to daemon - {:?}", error);
+            return ExitCode::FAILURE;
+        }
+    }
+
+    log::info!("Connected to daemon!");
+
     while let Some(message) = client.wait_for_message() {
         log::info!("Received message from client: {:?}", message);
 
@@ -42,6 +53,8 @@ pub fn start() -> ExitCode {
             .or_else(|message| handle::<Initialized>(&mut client, message))
             .or_else(|message| handle::<SetTrace>(&mut client, message))
             .or_else(|message| handle::<Shutdown>(&mut client, message))
+            .or_else(|message| handle::<DidOpenTextDocument>(&mut client, message))
+            .or_else(|message| handle::<DidChangeTextDocument>(&mut client, message))
             .err();
 
         if let Some(unhandled) = unhandled {

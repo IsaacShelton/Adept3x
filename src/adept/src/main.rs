@@ -5,7 +5,7 @@ fn main() -> ExitCode {
 
     match args.peek().map(String::as_str) {
         Some("-h" | "--help") | None => show_help(),
-        Some("--daemon") => daemon::start(),
+        Some("--daemon") => daemon_init::start(),
         Some("--language-server") => language_server::start(),
         _ => show_help(),
     }

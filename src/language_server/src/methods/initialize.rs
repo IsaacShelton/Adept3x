@@ -1,5 +1,6 @@
 use crate::{LspEndpoint, MaybeReady, Static};
 use lsp_connection::LspConnection;
+use lsp_message::LspRequestId;
 use lsp_types::{
     CompletionOptions, DiagnosticOptions, DiagnosticServerCapabilities, InitializeResult,
     ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
@@ -7,7 +8,11 @@ use lsp_types::{
 };
 
 impl LspEndpoint for Static<lsp_types::request::Initialize> {
-    fn run(_client: &mut LspConnection, params: Self::Params) -> MaybeReady<Self::Result> {
+    fn run(
+        _client: &mut LspConnection,
+        _id: Option<&LspRequestId>,
+        params: Self::Params,
+    ) -> MaybeReady<Self::Result> {
         let save = params
             .capabilities
             .text_document

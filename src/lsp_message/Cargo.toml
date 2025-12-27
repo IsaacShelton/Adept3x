@@ -1,5 +1,5 @@
 [package]
-name = "lsp_connection"
+name = "lsp_message"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,8 +9,6 @@ serde_derive.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 content_length = { version = "0.1.0", path = "../content_length" }
-lsp_message = { version = "0.1.0", path = "../lsp_message" }
-daemon = { version = "0.1.0", path = "../daemon" }
-daemon_init = { version = "0.1.0", path = "../daemon_init" }
 derive_more.workspace = true
 log.workspace = true
+

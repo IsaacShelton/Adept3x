@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-daemon = { version = "0.1.0", path = "../daemon" }
+daemon_init = { version = "0.1.0", path = "../daemon_init" }
 language_server = { version = "0.1.0", path = "../language_server" }
 smol.workspace = true
 

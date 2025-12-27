@@ -8,6 +8,9 @@ fern.workspace = true
 humantime.workspace = true
 log.workspace = true
 lsp_connection = { version = "0.1.0", path = "../lsp_connection" }
+lsp_message = { version = "0.1.0", path = "../lsp_message" }
+daemon = { version = "0.1.0", path = "../daemon" }
+daemon_init = { version = "0.1.0", path = "../daemon_init" }
 lsp-types.workspace = true
 serde_json.workspace = true
 serde.workspace = true

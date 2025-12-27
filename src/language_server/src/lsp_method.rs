@@ -43,4 +43,5 @@ request!(Completion);
 
 notification!(Initialized, LspConnectionState::Started);
 notification!(DidOpenTextDocument);
+notification!(DidChangeTextDocument);
 notification!(SetTrace);

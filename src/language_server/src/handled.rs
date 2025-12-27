@@ -1,6 +1,6 @@
 use crate::MaybeReady;
 use derive_more::From;
-use lsp_connection::LspResponse;
+use lsp_message::LspResponse;
 
 #[derive(Clone, Debug, From)]
 pub enum Handled {

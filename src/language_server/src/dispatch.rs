@@ -2,7 +2,8 @@ use crate::{
     Handled, IntoLspResult, LspEndpoint, MaybeReady, invalid_params, invalid_request_state,
 };
 use derive_more::From;
-use lsp_connection::{LspConnection, LspMessage, LspResponse};
+use lsp_connection::LspConnection;
+use lsp_message::{LspMessage, LspResponse};
 
 #[derive(Clone, Debug, From)]
 pub enum DispatchResult {
@@ -34,7 +35,7 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                 return Handled::ready(invalid_params(request.id)).into();
             };
 
-            match Endpoint::run(client, params) {
+            match Endpoint::run(client, Some(&request.id), params) {
                 MaybeReady::Ready(ready) => Handled::ready(LspResponse {
                     id: request.id,
                     result: Some(
@@ -68,7 +69,7 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                 return Handled::WontRespond.into();
             };
 
-            Endpoint::run(client, params);
+            Endpoint::run(client, None, params);
             Handled::WontRespond.into()
         }
         _ => return DispatchResult::NotHandled(message),
