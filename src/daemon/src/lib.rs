@@ -6,9 +6,10 @@ mod queue;
 pub use crate::{connection::Connection, daemon::Daemon};
 use lsp_message::LspMessage;
 pub use queue::*;
+#[cfg(target_family = "unix")]
+use std::os::unix::net::{SocketAddr, UnixStream};
 use std::{
     io::{self, BufReader, ErrorKind},
-    os::unix::net::{SocketAddr, UnixStream},
     sync::Arc,
     time::Duration,
 };
@@ -51,8 +52,12 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
 
         std::thread::sleep(Duration::from_millis(50));
     }
+
+    #[cfg(target_family = "windows")]
+    panic!("Windows is not supported")
 }
 
+#[cfg(target_family = "unix")]
 fn handle_client(_daemon: Arc<Daemon>, stream: UnixStream, address: SocketAddr) {
     log::info!("Accepted client {:?} {:?}", stream, address);
     std::thread::sleep(Duration::from_millis(50));
