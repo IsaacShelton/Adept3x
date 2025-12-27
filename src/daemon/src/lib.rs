@@ -55,7 +55,10 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
     }
 
     #[cfg(target_family = "windows")]
-    panic!("Windows is not supported")
+    {
+        let _ = daemon;
+        panic!("Windows is not supported")
+    }
 }
 
 #[cfg(target_family = "unix")]

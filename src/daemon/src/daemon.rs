@@ -27,10 +27,12 @@ impl Daemon {
         }
     }
 
+    #[cfg(target_family = "unix")]
     pub fn wait_for_message(&self, client_stream: &UnixStream) -> io::Result<Option<LspMessage>> {
         LspMessage::read(&mut BufReader::new(client_stream))
     }
 
+    #[cfg(target_family = "unix")]
     pub fn send(message: LspMessage, mut client_stream: &UnixStream) -> io::Result<()> {
         message.write(&mut client_stream)
     }
