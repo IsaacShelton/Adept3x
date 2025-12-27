@@ -1,9 +1,11 @@
 use lsp_message::LspMessage;
+use std::io;
+#[cfg(target_family = "unix")]
+use std::io::BufReader;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixStream;
 #[cfg(target_family = "unix")]
 use std::sync::Mutex;
-use std::{io, io::BufReader};
 
 pub struct Connection {
     #[cfg(target_family = "unix")]
@@ -30,6 +32,9 @@ impl Connection {
         }
 
         #[cfg(target_family = "windows")]
-        panic!("Windows is not supported")
+        {
+            let _ = message;
+            panic!("Windows is not supported")
+        }
     }
 }

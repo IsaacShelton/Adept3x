@@ -2,9 +2,10 @@ use crate::Queue;
 use lsp_message::LspMessage;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixListener;
+#[cfg(target_family = "unix")]
+use std::os::unix::net::UnixStream;
 use std::{
     io::{self, BufReader},
-    os::unix::net::UnixStream,
     sync::atomic::{AtomicBool, Ordering},
 };
 
