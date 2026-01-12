@@ -41,7 +41,7 @@ fn strict_canonicalize<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
 #[inline]
 #[cfg(windows)]
 fn strict_canonicalize<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
-    let path = std::fs::canonicalize(path)?;
+    let path = std::fs::canonicalize(path).ok()?;
     let head = path.components().next()?;
 
     let head = if let std::path::Component::Prefix(prefix) = head {
@@ -56,7 +56,9 @@ fn strict_canonicalize<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
         head
     };
 
-    Ok(std::iter::once(head)
-        .chain(path.components().skip(1))
-        .collect())
+    Some(
+        std::iter::once(head)
+            .chain(path.components().skip(1))
+            .collect(),
+    )
 }

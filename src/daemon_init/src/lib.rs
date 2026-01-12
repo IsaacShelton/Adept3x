@@ -28,6 +28,11 @@ pub fn try_become() -> io::Result<()> {
     try_become_impl(&cwd.join("adeptd.lock"))
 }
 
+#[cfg(target_family = "windows")]
+pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
+    todo!("daemon not supported on windows yet")
+}
+
 #[cfg(target_family = "unix")]
 pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
     let listener = loop {
@@ -76,6 +81,13 @@ pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
     let result = daemon::main_loop(Daemon::new(listener));
     let _ = remove_file(&filepath);
     result
+}
+
+/// Tries to connect to the daemon process. If the daemon process
+/// is not running yet, then this function attempts to launch it.
+#[cfg(target_family = "windows")]
+pub fn connect() -> Result<Connection, StartError> {
+    todo!("connecting to daemon on windows is not supported yet")
 }
 
 /// Tries to connect to the daemon process. If the daemon process
