@@ -1,4 +1,6 @@
 use lsp_types::Uri;
+#[cfg(target_family = "windows")]
+use std::path::Component;
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
@@ -38,27 +40,24 @@ fn strict_canonicalize<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
 }
 
 /// On Windows, we should remove the wide path prefix `\\?` from `\\?\C:`
-#[inline]
 #[cfg(windows)]
 fn strict_canonicalize<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
     let path = std::fs::canonicalize(path).ok()?;
     let head = path.components().next()?;
 
-    let head = if let std::path::Component::Prefix(prefix) = head {
-        if let std::path::Prefix::VerbatimDisk(disk) = prefix.kind() {
-            Path::new(&format!("{}:", disk as char))
-                .components()
-                .next()?
-        } else {
-            head
-        }
-    } else {
-        head
-    };
-
-    Some(
+    fn change_disk(head: Component, path: &Path) -> PathBuf {
         std::iter::once(head)
             .chain(path.components().skip(1))
-            .collect(),
-    )
+            .collect()
+    }
+
+    if let std::path::Component::Prefix(prefix) = head {
+        if let std::path::Prefix::VerbatimDisk(disk) = prefix.kind() {
+            let disk = format!("{}:", disk as char);
+            let head = Path::new(&disk).components().next()?;
+            return Some(change_disk(head, &path));
+        }
+    }
+
+    Some(change_disk(head, &path))
 }
