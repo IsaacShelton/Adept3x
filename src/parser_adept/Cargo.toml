@@ -1,0 +1,9 @@
+[package]
+name = "parser_adept"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
+parser_abstract = { version = "0.1.0", path = "../parser_abstract" }
+util_infinite_iterator = { version = "0.1.0", path = "../util_infinite_iterator" }

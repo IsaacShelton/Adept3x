@@ -1,3 +1,6 @@
+use derive_more::IsVariant;
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
 pub enum BareSyntaxKind {
     Error,

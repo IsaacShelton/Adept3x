@@ -1,29 +1,31 @@
-use super::bare::BareSyntaxNode;
-use std::{path::PathBuf, sync::Arc};
-use text_edit::{TextEdit, TextPosition, TextRange};
+/*
+use super::BareSyntaxNode;
+use std::{fmt::Debug, sync::Arc};
+use util_data_unit::ByteUnits;
+
 use vfs::Canonical;
 
 #[derive(Clone, Debug)]
-pub struct SyntaxNode<RootData: Clone + Debug> {
+pub struct SyntaxNode<Root: Clone + Debug> {
     pub(crate) bare: Arc<BareSyntaxNode>,
-    pub(crate) parent: Result<Arc<SyntaxNode>, RootData>,
-    pub(crate) absolute_position: TextPosition,
+    pub(crate) parent: Result<Arc<SyntaxNode<Root>>, Root>,
+    pub(crate) start_in_utf16: TextPointUtf16,
 }
 
-impl<RootData: Clone + Debug> SyntaxNode<RootData> {
+impl<Root: Clone + Debug> SyntaxNode<Root> {
     pub fn new(
-        parent: Result<Arc<SyntaxNode>, RootData>>,
+        parent: Result<Arc<Self>, Root>,
         bare: Arc<BareSyntaxNode>,
-        absolute_position: TextPosition,
+        start_in_byptes: ByteUnits,
     ) -> Arc<Self> {
         Arc::new(Self {
             bare,
             parent,
-            absolute_position,
+            start_in_bytes: absolute_position,
         })
     }
 
-    pub fn parent(&self) -> Result<&Arc<Self>, &RootData> {
+    pub fn parent(&self) -> Result<&Arc<Self>, &Root> {
         self.parent.as_ref()
     }
 
@@ -31,19 +33,19 @@ impl<RootData: Clone + Debug> SyntaxNode<RootData> {
         self.bare
             .children
             .iter()
-            .scan(self.absolute_position, |next_start, child| {
+            .scan(self.start_in_bytes, |next_start, child| {
                 let start = *next_start;
                 *next_start += child.content_bytes;
                 Some((start, child))
             })
-            .map(|(start, child)| Self::new_arc(Ok(self.clone()), child.clone(), start))
+            .map(|(start, child)| Self::new(Ok(self.clone()), child.clone(), start))
     }
 
     pub fn text_range(&self) -> TextRange {
-        TextRange::new(self.absolute_position, self.bare.content_bytes)
+        TextRange::new(self.start_in_bytes, self.bare.content_len_utf16)
     }
 
-    pub fn dump(self: &Arc<Self>, w: &mut impl std::io::Writer, depth: usize) {
+    pub fn dump(self: &Arc<Self>, w: &mut impl std::io::Write, depth: usize) {
         if let Err(Some(path)) = &self.parent {
             writeln!(w, "{}", path.to_string_lossy());
         }
@@ -69,3 +71,4 @@ impl<RootData: Clone + Debug> SyntaxNode<RootData> {
         }
     }
 }
+*/

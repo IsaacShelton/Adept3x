@@ -1,0 +1,10 @@
+[package]
+name = "syntax_tree"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde.workspace = true
+derive_more.workspace = true
+text_edit = { version = "0.1.0", path = "../text_edit" }
+util_data_unit = { version = "0.1.0", path = "../util_data_unit" }

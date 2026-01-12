@@ -61,6 +61,8 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
     }
 }
 
+pub struct Client {}
+
 #[cfg(target_family = "unix")]
 fn handle_client(_daemon: Arc<Daemon>, stream: UnixStream, address: SocketAddr) {
     log::info!("Accepted client {:?} {:?}", stream, address);

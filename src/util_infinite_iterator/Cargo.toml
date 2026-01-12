@@ -1,0 +1,6 @@
+[package]
+name = "util_infinite_iterator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]

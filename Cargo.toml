@@ -4,11 +4,17 @@ members = [
     "src/adept",
     "src/daemon",
     "src/daemon_init",
+    "src/document",
+    "src/file_uri",
     "src/language_server",
     "src/lock_file",
     "src/idle_tracker",
     "src/lsp_connection",
     "src/lsp_message",
+    "src/parser_abstract",
+    "src/parser_adept",
+    "src/vfs",
+    "src/util_infinite_iterator",
 ]
 
 [workspace.dependencies]

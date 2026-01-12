@@ -1,10 +1,22 @@
-struct TextPointUtf16 {
-    line: LineIndex,
-    col: TextLengthUtf16,
+use crate::{LineIndex, TextLengthUtf16};
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextPointUtf16 {
+    pub line: LineIndex,
+    pub col: TextLengthUtf16,
 }
 
 impl TextPointUtf16 {
-    pub fn endOf(content: &str) -> Self {
+    pub const fn start() -> Self {
+        Self {
+            line: LineIndex(0),
+            col: TextLengthUtf16(0),
+        }
+    }
+
+    pub fn end(content: &str) -> Self {
         let mut line = 0;
         let mut col = 0;
 
@@ -25,7 +37,15 @@ impl TextPointUtf16 {
 }
 
 impl Ord for TextPointUtf16 {
-    fn ord(&self, other: &Self) -> Ordering {
-        self.line.cmp(&other.line).then(|| self.col.cmp(&other.col))
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.line
+            .cmp(&other.line)
+            .then_with(|| self.col.cmp(&other.col))
+    }
+}
+
+impl PartialOrd for TextPointUtf16 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }

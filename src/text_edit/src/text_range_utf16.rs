@@ -1,18 +1,22 @@
+use crate::TextPointUtf16;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TextRangeUtf16 {
+pub struct TextPointRangeUtf16 {
     start: TextPointUtf16,
     end: TextPointUtf16,
 }
 
-impl TextRange {
+impl TextPointRangeUtf16 {
     #[inline]
-    pub fn new(start: TextPointUtf16, end: TextLengthUtf16) -> Self {
+    pub fn new(start: TextPointUtf16, end: TextPointUtf16) -> Self {
         Self { start, end }
     }
 
     #[inline]
     pub fn full(content: &str) -> Self {
-        Self::new(TextPointUtf16(0), TextPointUtf16::endOf(content))
+        Self::new(TextPointUtf16::start(), TextPointUtf16::end(content))
     }
 
     #[inline]
@@ -22,12 +26,7 @@ impl TextRange {
 
     #[inline]
     pub fn end(&self) -> TextPointUtf16 {
-        self.start + self.length
-    }
-
-    #[inline]
-    pub fn of<'a>(&self, content: &'a str) -> &'a str {
-        &content[self.start().0..self.end().0]
+        self.end
     }
 
     #[inline]
@@ -36,8 +35,8 @@ impl TextRange {
     }
 }
 
-impl Display for TextRangeUtf16 {
+impl Display for TextPointRangeUtf16 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}..{}", self.start().0, self.end().0)
+        write!(f, "{:?}..{:?}", self.start(), self.end())
     }
 }
