@@ -4,10 +4,12 @@ use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FileId(usize);
 
+#[derive(Default)]
 pub struct PathInterner {
     inner: Mutex<PathInternerInner>,
 }
 
+#[derive(Default)]
 pub struct PathInternerInner {
     paths: HashMap<FileId, Canonical<PathBuf>>,
     file_ids: HashMap<Canonical<PathBuf>, FileId>,

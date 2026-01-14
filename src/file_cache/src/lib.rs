@@ -2,17 +2,16 @@ mod canonical;
 mod file_content;
 mod path_interner;
 
-use crate::{
-    file_content::FileContent,
-    path_interner::{FileId, PathInterner},
-};
+use crate::path_interner::{FileId, PathInterner};
 pub use canonical::Canonical;
+pub use file_content::FileContent;
 use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
+#[derive(Default)]
 pub struct FileCache {
     path_interner: PathInterner,
     files: Mutex<HashMap<FileId, Arc<FileContent>>>,

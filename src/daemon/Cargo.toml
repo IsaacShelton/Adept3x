@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 lock_file = { version = "0.1.0", path = "../lock_file" }
 lsp_message = { version = "0.1.0", path = "../lsp_message" }
+file_cache = { version = "0.1.0", path = "../file_cache" }
+file_uri = { version = "0.1.0", path = "../file_uri" }
 thiserror.workspace = true
 derive_more.workspace = true
 fern.workspace = true

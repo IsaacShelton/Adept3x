@@ -213,6 +213,8 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "fern",
+ "file_cache",
+ "file_uri",
  "humantime",
  "lock_file",
  "log",
