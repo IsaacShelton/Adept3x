@@ -1,7 +1,0 @@
-[package]
-name = "vfs"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-document = { version = "0.1.0", path = "../document" }

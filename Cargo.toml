@@ -5,6 +5,7 @@ members = [
     "src/daemon",
     "src/daemon_init",
     "src/document",
+    "src/file_cache",
     "src/file_uri",
     "src/language_server",
     "src/lock_file",
@@ -13,7 +14,7 @@ members = [
     "src/lsp_message",
     "src/parser_abstract",
     "src/parser_adept",
-    "src/vfs",
+    "src/util_iter_coproduct",
     "src/util_infinite_iterator",
 ]
 

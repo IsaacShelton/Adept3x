@@ -321,6 +321,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "file_cache"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "document",
+ "serde",
+ "serde_derive",
+ "util_iter_coproduct",
+]
+
+[[package]]
 name = "file_uri"
 version = "0.1.0"
 dependencies = [
@@ -764,11 +775,8 @@ name = "util_infinite_iterator"
 version = "0.1.0"
 
 [[package]]
-name = "vfs"
+name = "util_iter_coproduct"
 version = "0.1.0"
-dependencies = [
- "document",
-]
 
 [[package]]
 name = "windows-link"
