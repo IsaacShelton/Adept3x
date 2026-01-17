@@ -8,8 +8,13 @@ lock_file = { version = "0.1.0", path = "../lock_file" }
 lsp_message = { version = "0.1.0", path = "../lsp_message" }
 file_cache = { version = "0.1.0", path = "../file_cache" }
 file_uri = { version = "0.1.0", path = "../file_uri" }
+document = { version = "0.1.0", path = "../document" }
+text_edit = { version = "0.1.0", path = "../text_edit" }
 thiserror.workspace = true
 derive_more.workspace = true
 fern.workspace = true
 humantime.workspace = true
 log.workspace = true
+lsp-types.workspace = true
+serde_json.workspace = true
+serde.workspace = true

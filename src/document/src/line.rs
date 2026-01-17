@@ -1,6 +1,7 @@
 use text_edit::TextLengthUtf16;
 use util_data_unit::ByteUnits;
 
+#[derive(Clone, Debug)]
 pub struct DocumentLine {
     pub(crate) content: String,
 }

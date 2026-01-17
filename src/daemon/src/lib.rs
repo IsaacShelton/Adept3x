@@ -4,15 +4,19 @@ mod logger;
 mod queue;
 
 pub use crate::{connection::Connection, daemon::Daemon};
-use file_cache::{FileCache, FileContent};
+use file_cache::{Canonical, FileCache, FileContent};
+use file_uri::DecodeFileUri;
 #[cfg(target_family = "unix")]
 use lsp_message::LspMessage;
+use lsp_message::LspNotification;
+use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams};
 pub use queue::*;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::{SocketAddr, UnixStream};
-use std::{io, sync::Arc};
+use std::{ffi::OsStr, io, sync::Arc};
 #[cfg(target_family = "unix")]
 use std::{io::BufReader, io::ErrorKind, time::Duration};
+use text_edit::TextEditOrFullUtf16;
 
 pub fn main_loop(daemon: Daemon) -> io::Result<()> {
     let daemon = Arc::new(daemon);
@@ -76,8 +80,6 @@ impl Client {
 
 #[cfg(target_family = "unix")]
 fn handle_client(_daemon: Arc<Daemon>, stream: UnixStream, address: SocketAddr) {
-    use file_cache::Canonical;
-
     log::info!("Accepted client {:?} {:?}", stream, address);
     std::thread::sleep(Duration::from_millis(50));
 
@@ -120,7 +122,20 @@ fn handle_client(_daemon: Arc<Daemon>, stream: UnixStream, address: SocketAddr) 
                 break;
             }
             Ok(Some(LspMessage::Notification(notification))) => {
-                log::info!("Got notification {:?}", notification);
+                let _ = on_notif::<lsp_types::notification::DidOpenTextDocument>(
+                    notification,
+                    |params| did_open(&mut client, params),
+                )
+                .or_else(|notification| {
+                    on_notif::<lsp_types::notification::DidChangeTextDocument>(
+                        notification,
+                        |params| did_change(&mut client, params),
+                    )
+                })
+                .or_else(|notification| {
+                    log::warn!("Unhandled notification {:?}", notification);
+                    Result::<(), ()>::Ok(())
+                });
             }
             Ok(Some(LspMessage::Request(request))) => {
                 log::info!("Got request {:?}", request);
@@ -137,4 +152,59 @@ fn handle_client(_daemon: Arc<Daemon>, stream: UnixStream, address: SocketAddr) 
             }
         }
     }
+}
+
+fn on_notif<T: lsp_types::notification::Notification>(
+    notification: LspNotification,
+    then: impl FnOnce(T::Params),
+) -> Result<(), LspNotification> {
+    if notification.method.as_str() != T::METHOD {
+        return Err(notification);
+    }
+
+    then(serde_json::from_value(notification.params).expect("invalid notification"));
+    Ok(())
+}
+
+fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
+    if let Some(filepath) = params.text_document.uri.decode_file_uri() {
+        if let Ok(filepath) = Canonical::new(filepath) {
+            let _is_adept = filepath.extension() == Some(OsStr::new("adept"));
+            let file_content = FileContent::Text(params.text_document.text.into());
+            let file_id = client.file_cache.preregister_file(filepath);
+            log::info!("on_notif did open {:?} {:?}", file_id, &file_content);
+            client.file_cache.set_content(file_id, file_content);
+        }
+    }
+}
+
+fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
+    let Some(filepath) = params.text_document.uri.decode_file_uri() else {
+        return;
+    };
+
+    let Ok(filepath) = Canonical::new(filepath) else {
+        return;
+    };
+
+    log::info!("Change for {:?}", filepath);
+    let file_id = client.file_cache.preregister_file(filepath);
+    let Some(file_content) = client.file_cache.get_content(file_id) else {
+        return;
+    };
+
+    let edits = params
+        .content_changes
+        .into_iter()
+        .map(TextEditOrFullUtf16::from);
+
+    client
+        .file_cache
+        .set_content(file_id, file_content.after_edits(edits));
+    log::info!("Existing is {:?} {:?}", file_id, file_content);
+    log::info!(
+        "New content is {:?} {:?}",
+        file_id,
+        client.file_cache.get_content(file_id)
+    );
 }

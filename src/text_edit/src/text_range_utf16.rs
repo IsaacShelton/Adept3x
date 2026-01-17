@@ -4,8 +4,8 @@ use std::fmt::Display;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TextPointRangeUtf16 {
-    start: TextPointUtf16,
-    end: TextPointUtf16,
+    pub start: TextPointUtf16,
+    pub end: TextPointUtf16,
 }
 
 impl TextPointRangeUtf16 {
@@ -38,5 +38,14 @@ impl TextPointRangeUtf16 {
 impl Display for TextPointRangeUtf16 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}..{:?}", self.start(), self.end())
+    }
+}
+
+impl From<lsp_types::Range> for TextPointRangeUtf16 {
+    fn from(range: lsp_types::Range) -> Self {
+        Self {
+            start: range.start.into(),
+            end: range.end.into(),
+        }
     }
 }

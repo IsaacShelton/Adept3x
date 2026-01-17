@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 document = { version = "0.1.0", path = "../document" }
 util_iter_coproduct = { version = "0.1.0", path = "../util_iter_coproduct" }
+text_edit = { version = "0.1.0", path = "../text_edit" }
 serde.workspace = true
 serde_derive.workspace = true
 derive_more.workspace = true

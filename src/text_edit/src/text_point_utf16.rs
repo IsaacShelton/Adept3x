@@ -49,3 +49,12 @@ impl PartialOrd for TextPointUtf16 {
         Some(self.cmp(other))
     }
 }
+
+impl From<lsp_types::Position> for TextPointUtf16 {
+    fn from(position: lsp_types::Position) -> Self {
+        Self {
+            line: LineIndex(position.line as usize),
+            col: TextLengthUtf16(position.character as usize),
+        }
+    }
+}

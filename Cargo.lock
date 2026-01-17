@@ -212,13 +212,18 @@ name = "daemon"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "document",
  "fern",
  "file_cache",
  "file_uri",
  "humantime",
  "lock_file",
  "log",
+ "lsp-types",
  "lsp_message",
+ "serde",
+ "serde_json",
+ "text_edit",
  "thiserror",
 ]
 
@@ -330,6 +335,7 @@ dependencies = [
  "document",
  "serde",
  "serde_derive",
+ "text_edit",
  "util_iter_coproduct",
 ]
 
@@ -723,6 +729,7 @@ name = "text_edit"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "lsp-types",
  "serde",
 ]
 

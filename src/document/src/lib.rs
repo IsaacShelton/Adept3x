@@ -7,8 +7,9 @@ use crate::line::DocumentLine;
 use itertools::Itertools;
 pub use position::DocumentPosition;
 pub use range::DocumentRange;
-use text_edit::{TextEditUtf16, TextPointRangeUtf16, TextPointUtf16};
+use text_edit::{TextEditOrFullUtf16, TextEditUtf16, TextPointRangeUtf16, TextPointUtf16};
 
+#[derive(Clone, Debug)]
 pub struct Document {
     lines: Vec<DocumentLine>,
 }
@@ -45,6 +46,13 @@ impl Document {
         let range = self.translate_utf16_point_range(text_edit.range);
         self.delete(range);
         self.insert(range.start, &text_edit.replace_with);
+    }
+
+    pub fn apply_utf16_text_edit_or_full(&mut self, text_edit_or_full: TextEditOrFullUtf16) {
+        match text_edit_or_full.as_text_edit() {
+            Ok(text_edit) => self.apply_utf16_text_edit(text_edit),
+            Err(full_content) => *self = Self::new(full_content),
+        }
     }
 
     pub fn delete(&mut self, range: DocumentRange) {
