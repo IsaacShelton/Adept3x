@@ -217,6 +217,7 @@ dependencies = [
  "file_cache",
  "file_uri",
  "humantime",
+ "idle_tracker",
  "lock_file",
  "log",
  "lsp-types",
@@ -393,11 +394,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
-name = "idle"
+name = "idle_tracker"
 version = "0.1.0"
-dependencies = [
- "smol",
-]
 
 [[package]]
 name = "itertools"

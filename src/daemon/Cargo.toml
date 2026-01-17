@@ -10,6 +10,7 @@ file_cache = { version = "0.1.0", path = "../file_cache" }
 file_uri = { version = "0.1.0", path = "../file_uri" }
 document = { version = "0.1.0", path = "../document" }
 text_edit = { version = "0.1.0", path = "../text_edit" }
+idle_tracker = { version = "0.1.0", path = "../idle_tracker" }
 thiserror.workspace = true
 derive_more.workspace = true
 fern.workspace = true

@@ -57,25 +57,25 @@ impl IdleTracker {
     }
 
     pub fn add_connection(&self) -> Result<(), ()> {
-        if self.shutting_down() {
-            return Err(());
-        }
-
         self.shared.num_connections.fetch_add(1, Ordering::SeqCst);
         self.still_active();
-        Ok(())
+
+        if self.is_shutting_down() {
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 
     pub fn remove_connection(&self) {
         self.shared.num_connections.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn shutting_down(&self) -> bool {
-        self.shared.num_connections.load(Ordering::SeqCst) == 0
-            && self.shared.should_shutdown.load(Ordering::SeqCst)
+    pub fn is_shutting_down(&self) -> bool {
+        self.shared.should_shutdown.load(Ordering::SeqCst)
     }
 
-    pub fn shutdown_if_idle(&self) -> bool {
+    pub fn should_shutdown(&self) -> bool {
         let no_connections = self.shared.num_connections.load(Ordering::SeqCst) == 0;
 
         let now = Instant::now()

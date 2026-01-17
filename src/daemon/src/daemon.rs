@@ -1,29 +1,28 @@
 use crate::Queue;
+use idle_tracker::IdleTracker;
 use lsp_message::LspMessage;
+use std::io::{self, BufReader};
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixListener;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixStream;
-use std::{
-    io::{self, BufReader},
-    sync::atomic::{AtomicBool, Ordering},
-};
 
 pub struct Daemon {
     #[cfg(target_family = "unix")]
     pub listener: UnixListener,
-
-    pub should_exit: AtomicBool,
+    pub idle_tracker: IdleTracker,
     pub queue: Queue,
 }
 
 impl Daemon {
     #[cfg(target_family = "unix")]
     pub fn new(listener: UnixListener) -> Self {
+        use std::time::Duration;
+
         Self {
             listener,
-            should_exit: false.into(),
             queue: Queue::default(),
+            idle_tracker: IdleTracker::new(Duration::from_secs(5)),
         }
     }
 
@@ -37,11 +36,7 @@ impl Daemon {
         message.write(&mut client_stream)
     }
 
-    pub fn intend_exit(&self) {
-        self.should_exit.store(true, Ordering::SeqCst);
-    }
-
     pub fn should_exit(&self) -> bool {
-        self.should_exit.load(Ordering::SeqCst)
+        self.idle_tracker.should_shutdown()
     }
 }
