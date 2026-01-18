@@ -4,6 +4,7 @@ mod daemon;
 mod logger;
 mod queue;
 
+#[cfg(target_family = "unix")]
 use crate::client::handle_client;
 pub use crate::{connection::Connection, daemon::Daemon};
 pub use queue::*;

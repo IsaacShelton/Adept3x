@@ -1,6 +1,6 @@
 #[cfg(target_family = "unix")]
 use crate::Daemon;
-use file_cache::{Canonical, FileCache, FileContent};
+use file_cache::{Canonical, FileBytes, FileCache, FileKind};
 use file_uri::DecodeFileUri;
 #[cfg(target_family = "unix")]
 use lsp_message::LspMessage;
@@ -27,6 +27,8 @@ impl Client {
 
 #[cfg(target_family = "unix")]
 pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
+    use file_cache::{FileContent, FileKind};
+
     log::info!("Accepted client {:?} {:?}", stream, address);
 
     stream.set_nonblocking(false).unwrap();
@@ -51,15 +53,24 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
         }
     };
 
-    let config_text =
-        std::fs::read_to_string(config_filepath.as_path()).expect("Failed to read config file");
+    {
+        let config_text =
+            std::fs::read_to_string(config_filepath.as_path()).expect("Failed to read config file");
 
-    let config_file_id = client.file_cache.preregister_file(config_filepath);
-    log::info!("Config file id is {:?}", config_file_id);
-    log::info!("Config text is {}", config_text);
-    client
-        .file_cache
-        .set_content(config_file_id, FileContent::Text(config_text));
+        let config_file_id = client.file_cache.preregister_file(config_filepath);
+        log::info!("Config file id is {:?}", config_file_id);
+        log::info!("Config text is {}", config_text);
+
+        let file_bytes = FileBytes::Text(config_text);
+        client.file_cache.set_content(
+            config_file_id,
+            FileContent {
+                kind: FileKind::ProjectConfig,
+                file_bytes,
+                syntax_tree: None,
+            },
+        );
+    }
 
     loop {
         match LspMessage::read(reader) {
@@ -120,11 +131,24 @@ fn on_notif<T: lsp_types::notification::Notification>(
 fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
     if let Some(filepath) = params.text_document.uri.decode_file_uri() {
         if let Ok(filepath) = Canonical::new(filepath) {
-            let _is_adept = filepath.extension() == Some(OsStr::new("adept"));
-            let file_content = FileContent::Text(params.text_document.text.into());
+            let is_adept = filepath.extension() == Some(OsStr::new("adept"));
+            let kind = if is_adept {
+                FileKind::Adept
+            } else {
+                FileKind::Unknown
+            };
+            let file_bytes = FileBytes::Text(params.text_document.text.into());
             let file_id = client.file_cache.preregister_file(filepath);
-            log::info!("on_notif did open {:?} {:?}", file_id, &file_content);
-            client.file_cache.set_content(file_id, file_content);
+            log::info!("on_notif did open {:?} {:?}", file_id, &file_bytes);
+
+            client.file_cache.set_content(
+                file_id,
+                file_cache::FileContent {
+                    kind,
+                    file_bytes,
+                    syntax_tree: None,
+                },
+            );
         }
     }
 }
