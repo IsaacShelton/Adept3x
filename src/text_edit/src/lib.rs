@@ -1,6 +1,7 @@
 mod line_index;
 mod text_edit_utf16;
 mod text_length_utf16;
+mod text_point_diff_utf16;
 mod text_point_utf16;
 mod text_range_utf16;
 
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 pub use text_edit_utf16::*;
 pub use text_length_utf16::*;
+pub use text_point_diff_utf16::TextPointDiffUtf16;
 pub use text_point_utf16::*;
 pub use text_range_utf16::*;
 
