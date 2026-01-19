@@ -3,11 +3,14 @@ mod connection;
 mod daemon;
 mod logger;
 mod queue;
+mod show;
 
 #[cfg(target_family = "unix")]
 use crate::client::handle_client;
 pub use crate::{connection::Connection, daemon::Daemon};
 pub use queue::*;
+#[cfg(target_family = "unix")]
+use std::io::ErrorKind;
 #[cfg(target_family = "unix")]
 use std::time::Duration;
 use std::{io, sync::Arc};
@@ -42,9 +45,7 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
                     });
                 }
                 Err(error) => {
-                    if let io::ErrorKind::WouldBlock = error.kind() {
-                        // No clients ready to connect to us yet
-                    } else {
+                    if !matches!(error.kind(), ErrorKind::WouldBlock) {
                         log::error!("Failed to accept client: {:?}", error);
                     }
                 }

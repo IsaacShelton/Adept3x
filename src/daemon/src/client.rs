@@ -1,10 +1,10 @@
 #[cfg(target_family = "unix")]
 use crate::Daemon;
-use file_cache::{Canonical, FileBytes, FileCache, FileKind};
+use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
 #[cfg(target_family = "unix")]
 use lsp_message::LspMessage;
-use lsp_message::LspNotification;
+use lsp_message::{LspNotification, LspRequestId};
 use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams};
 use std::ffi::OsStr;
 #[cfg(target_family = "unix")]
@@ -15,20 +15,34 @@ use text_edit::TextEditOrFullUtf16;
 
 pub struct Client {
     file_cache: FileCache,
+    next_request_id: LspRequestId,
+    config_file: ConfigFile,
+}
+
+pub enum ConfigFile {
+    Missing,
+    Prompted(LspRequestId),
+    Present(FileId),
 }
 
 impl Client {
     pub fn new() -> Self {
         Self {
             file_cache: FileCache::default(),
+            next_request_id: LspRequestId::Int(0),
+            config_file: ConfigFile::Missing,
         }
+    }
+
+    pub fn next_request_id(&mut self) -> LspRequestId {
+        let id = self.next_request_id.clone();
+        self.next_request_id = self.next_request_id.succ();
+        id
     }
 }
 
 #[cfg(target_family = "unix")]
 pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
-    use file_cache::{FileContent, FileKind};
-
     log::info!("Accepted client {:?} {:?}", stream, address);
 
     stream.set_nonblocking(false).unwrap();
@@ -38,39 +52,7 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
 
     let reader = &mut BufReader::new(&stream);
     let mut client = Client::new();
-
-    let config_filepath = match std::env::current_dir()
-        .map_err(|_| ())
-        .and_then(|path| Canonical::new(path.join("adept.build")))
-    {
-        Ok(config_filepath) => {
-            log::info!("Found config file {:?}", config_filepath);
-            config_filepath
-        }
-        Err(error) => {
-            log::error!("Failed to find config file - {:?}", error);
-            return;
-        }
-    };
-
-    {
-        let config_text =
-            std::fs::read_to_string(config_filepath.as_path()).expect("Failed to read config file");
-
-        let config_file_id = client.file_cache.preregister_file(config_filepath);
-        log::info!("Config file id is {:?}", config_file_id);
-        log::info!("Config text is {}", config_text);
-
-        let file_bytes = FileBytes::Text(config_text);
-        client.file_cache.set_content(
-            config_file_id,
-            FileContent {
-                kind: FileKind::ProjectConfig,
-                file_bytes,
-                syntax_tree: None,
-            },
-        );
-    }
+    client.config_file = get_config_file_id(&mut client, &stream);
 
     loop {
         match LspMessage::read(reader) {
@@ -97,12 +79,29 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
                 });
             }
             Ok(Some(LspMessage::Request(request))) => {
-                daemon.idle_tracker.still_active();
-                log::info!("Got request {:?}", request);
+                if let ConfigFile::Present(_) = &client.config_file {
+                    daemon.idle_tracker.still_active();
+                    log::info!("Got request {:?}", request);
+                }
             }
             Ok(Some(LspMessage::Response(response))) => {
-                daemon.idle_tracker.still_active();
-                log::info!("Got response {:?}", response);
+                if let ConfigFile::Present(_) = &client.config_file {
+                    daemon.idle_tracker.still_active();
+                    log::info!("Got response {:?}", response);
+                }
+
+                if let ConfigFile::Prompted(config_file_lsp_request_id) = &client.config_file {
+                    if response.id == *config_file_lsp_request_id {
+                        if let Some(choice) = response.result.and_then(|value| {
+                            serde_json::from_value::<lsp_types::MessageActionItem>(value).ok()
+                        }) {
+                            log::error!("They chose {:?}", choice.title);
+                            client.config_file = ConfigFile::Missing;
+                        } else {
+                            client.config_file = ConfigFile::Missing;
+                        }
+                    }
+                }
             }
             Err(error) => {
                 if let ErrorKind::WouldBlock = error.kind() {
@@ -112,6 +111,51 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
                     log::error!("Error receiving message from client - {:?}", error);
                 }
             }
+        }
+    }
+}
+
+#[cfg(target_family = "unix")]
+fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
+    match std::env::current_dir()
+        .map_err(|_| ())
+        .and_then(|path| Canonical::new(path.join("adept.build")))
+    {
+        Ok(config_filepath) => {
+            log::info!("Found config file {:?}", config_filepath);
+            let config_text = std::fs::read_to_string(config_filepath.as_path())
+                .expect("Failed to read config file");
+
+            let config_file_id = client.file_cache.preregister_file(config_filepath);
+            log::info!("Config file id is {:?}", config_file_id);
+            log::info!("Config text is {}", config_text);
+
+            let file_bytes = FileBytes::Text(config_text);
+            client.file_cache.set_content(
+                config_file_id,
+                FileContent {
+                    kind: FileKind::ProjectConfig,
+                    file_bytes,
+                    syntax_tree: None,
+                },
+            );
+
+            ConfigFile::Present(config_file_id)
+        }
+        Err(error) => {
+            log::error!("Failed to find config file - {:?}", error);
+
+            let create_project_file_prompt_request_id = client.next_request_id();
+
+            crate::show::show_message_request(
+                &stream,
+                create_project_file_prompt_request_id.clone(),
+                lsp_types::MessageType::INFO,
+                "Missing `adept.build` project config file!".into(),
+                ["Create".into(), "Ignore".into(), "Another".into()].into_iter(),
+            );
+
+            ConfigFile::Prompted(create_project_file_prompt_request_id)
         }
     }
 }

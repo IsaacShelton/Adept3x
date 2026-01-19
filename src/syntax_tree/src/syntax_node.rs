@@ -2,6 +2,7 @@ use crate::BareSyntaxNode;
 use std::{fmt::Debug, sync::Arc};
 use text_edit::{TextPointRangeUtf16, TextPointUtf16};
 
+#[derive(Debug)]
 pub struct SyntaxNode<Root: Clone + Debug> {
     pub(crate) bare: Arc<BareSyntaxNode>,
     pub(crate) parent: Result<Arc<SyntaxNode<Root>>, Root>,

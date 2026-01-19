@@ -12,6 +12,27 @@ pub enum LspRequestId {
     String(Arc<str>),
 }
 
+impl LspRequestId {
+    pub fn succ(&self) -> Self {
+        match self {
+            LspRequestId::Int(id) => {
+                if let Some(new_id) = id.checked_add(1) {
+                    Self::Int(new_id)
+                } else {
+                    Self::String(format!("{}", i32::MAX as u32 + 1).into())
+                }
+            }
+            LspRequestId::String(id) => match usize::from_str_radix(id, 10) {
+                Ok(id) => {
+                    let new_id = id.checked_add(1).expect("exhausted possible request ids");
+                    Self::String(format!("{}", new_id).into())
+                }
+                Err(_) => unreachable!(),
+            },
+        }
+    }
+}
+
 impl From<String> for LspRequestId {
     fn from(id: String) -> LspRequestId {
         Self::String(Arc::from(id))

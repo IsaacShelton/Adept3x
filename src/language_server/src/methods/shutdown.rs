@@ -8,7 +8,7 @@ impl LspEndpoint for Static<lsp_types::request::Shutdown> {
         _id: Option<&LspRequestId>,
         _params: Self::Params,
     ) -> MaybeReady<Self::Result> {
-        client.connection_state = LspConnectionState::Shutdown;
+        client.state = LspConnectionState::Shutdown;
         MaybeReady::Ready(())
     }
 }

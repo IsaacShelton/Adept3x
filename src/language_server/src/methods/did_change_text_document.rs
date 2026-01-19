@@ -10,8 +10,6 @@ impl LspEndpoint for Static<lsp_types::notification::DidChangeTextDocument> {
     ) -> MaybeReady<Self::Result> {
         client
             .daemon
-            .as_ref()
-            .expect("has daemon")
             .send(
                 LspNotification {
                     method: Self::METHOD.into(),

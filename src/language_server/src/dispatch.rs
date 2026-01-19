@@ -21,14 +21,13 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                 return DispatchResult::NotHandled(request.into());
             }
 
-            if client.connection_state != Endpoint::REQUIRED_CONNECTION_STATE {
+            if client.state != Endpoint::REQUIRED_CONNECTION_STATE {
                 log::error!(
                     "Invalid request '{}' message in LSP connection state {:?}",
                     request.method,
-                    client.connection_state
+                    client.state
                 );
-                return Handled::ready(invalid_request_state(request.id, client.connection_state))
-                    .into();
+                return Handled::ready(invalid_request_state(request.id, client.state)).into();
             }
 
             let Ok(params) = serde_json::from_value(request.params) else {
@@ -53,7 +52,7 @@ pub fn dispatch<Endpoint: LspEndpoint>(
                 return DispatchResult::NotHandled(notification.into());
             }
 
-            if client.connection_state != Endpoint::REQUIRED_CONNECTION_STATE {
+            if client.state != Endpoint::REQUIRED_CONNECTION_STATE {
                 log::error!(
                     "Ignoring '{}' notification, we are not in the right state to accept it",
                     &notification.method

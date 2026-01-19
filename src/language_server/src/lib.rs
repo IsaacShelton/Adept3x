@@ -14,6 +14,7 @@ pub(crate) use dispatch::*;
 pub(crate) use handled::*;
 pub(crate) use into_lsp_response::*;
 pub(crate) use invalid::*;
+use lsp_connection::IdeConnection;
 pub(crate) use lsp_connection::LspConnection;
 pub(crate) use lsp_endpoint::*;
 use lsp_message::LspMessage;
@@ -21,7 +22,15 @@ pub(crate) use lsp_method::*;
 pub(crate) use maybe_ready::*;
 pub(crate) use never_respond::*;
 pub(crate) use static_wrapper::*;
-use std::process::ExitCode;
+use std::{
+    io::{BufReader, ErrorKind},
+    process::ExitCode,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 pub fn start() -> ExitCode {
     match logger::setup() {
@@ -32,20 +41,51 @@ pub fn start() -> ExitCode {
         }
     }
 
-    let mut client = LspConnection::stdio();
+    let (ide, ide_sender) = IdeConnection::stdio();
     log::info!("Established stdio connection");
 
-    match daemon_init::connect() {
-        Ok(connection) => client.daemon = Some(connection),
+    let mut client = match daemon_init::connect() {
+        Ok(daemon) => LspConnection::new(ide, ide_sender.clone(), daemon),
         Err(error) => {
             log::error!("Failed to connect to daemon - {:?}", error);
             return ExitCode::FAILURE;
         }
-    }
+    };
 
     log::info!("Connected to daemon!");
 
-    while let Some(message) = client.wait_for_message() {
+    let daemon = client.daemon.clone();
+    let should_exit = Arc::new(AtomicBool::new(false));
+    let read_daemon_should_exit = should_exit.clone();
+
+    let outgoing_thread = std::thread::spawn(move || {
+        let should_exit = read_daemon_should_exit;
+        daemon.stream.set_nonblocking(false).unwrap();
+        daemon
+            .stream
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
+
+        while !should_exit.load(Ordering::SeqCst) {
+            match LspMessage::read(&mut BufReader::new(&daemon.stream)) {
+                Ok(None) => {
+                    // Connection closed
+                    break;
+                }
+                Ok(Some(message)) => {
+                    // Forward the message from the daemon this language server's attached IDE
+                    ide_sender.send(message);
+                }
+                Err(error) => {
+                    if !matches!(error.kind(), ErrorKind::WouldBlock) {
+                        log::error!("Error receiving message from daemon - {:?}", error);
+                    }
+                }
+            }
+        }
+    });
+
+    while let Some(message) = client.ide.wait_for_message() {
         log::info!("Received message from client: {:?}", message);
 
         use lsp_types::{notification::*, request::*};
@@ -63,7 +103,10 @@ pub fn start() -> ExitCode {
                     log::warn!("Unhandled request '{}'", request.method)
                 }
                 LspMessage::Response(response) => {
-                    log::warn!("Unhandled response from client for id {}", response.id)
+                    client
+                        .daemon
+                        .send(response.into())
+                        .expect("Failed to foward LSP response to daemon");
                 }
                 LspMessage::Notification(notification) => {
                     log::warn!("Unhandled notification '{}'", notification.method)
@@ -72,8 +115,9 @@ pub fn start() -> ExitCode {
         }
     }
 
-    log::info!("Joining threads");
-    client.join();
+    should_exit.store(true, Ordering::SeqCst);
+    outgoing_thread.join().unwrap();
+    client.ide.join();
     log::info!("Exited");
     ExitCode::SUCCESS
 }
@@ -86,7 +130,7 @@ where
         DispatchResult::Handled(handled) => match handled {
             Handled::WillRespond(MaybeReady::Pending) | Handled::WontRespond => Ok(()),
             Handled::WillRespond(MaybeReady::Ready(response)) => {
-                client.send(response.into());
+                client.ide_sender.send(response.into());
                 Ok(())
             }
         },

@@ -2,7 +2,8 @@ mod canonical;
 mod file_bytes;
 mod path_interner;
 
-use crate::path_interner::{FileId, PathInterner};
+pub use crate::path_interner::FileId;
+use crate::path_interner::PathInterner;
 pub use canonical::Canonical;
 pub use file_bytes::FileBytes;
 use std::{
@@ -10,6 +11,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+use syntax_tree::SyntaxNode;
 use text_edit::TextEditOrFullUtf16;
 
 #[derive(Default)]
@@ -29,7 +31,7 @@ pub enum FileKind {
 pub struct FileContent {
     pub kind: FileKind,
     pub file_bytes: FileBytes,
-    pub syntax_tree: Option<()>,
+    pub syntax_tree: Option<SyntaxNode<()>>,
 }
 
 impl FileContent {

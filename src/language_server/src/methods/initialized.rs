@@ -9,7 +9,7 @@ impl LspEndpoint for Static<lsp_types::notification::Initialized> {
         _params: Self::Params,
     ) -> MaybeReady<Self::Result> {
         log::info!("Server and client are now initialized");
-        client.connection_state = LspConnectionState::Initialized;
+        client.state = LspConnectionState::Initialized;
         MaybeReady::Ready(NeverRespond)
     }
 }

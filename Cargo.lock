@@ -336,6 +336,7 @@ dependencies = [
  "document",
  "serde",
  "serde_derive",
+ "syntax_tree",
  "text_edit",
  "util_iter_coproduct",
 ]
