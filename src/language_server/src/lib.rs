@@ -32,6 +32,21 @@ use std::{
     time::Duration,
 };
 
+#[cfg(target_family = "windows")]
+pub fn start() -> ExitCode {
+    match logger::setup() {
+        Ok(()) => (),
+        Err(error) => {
+            eprintln!("Failed to setup logger: {}", error);
+            return ExitCode::FAILURE;
+        }
+    }
+
+    log::error!("Language server is not supported on Windows yet");
+    ExitCode::FAILURE
+}
+
+#[cfg(target_family = "unix")]
 pub fn start() -> ExitCode {
     match logger::setup() {
         Ok(()) => (),
