@@ -42,4 +42,5 @@ fern = "0.7.1"
 humantime = "2.3.0"
 log = "0.4.29"
 lsp-types = "0.97.0"
+lazy_static = "1.5.0"
 

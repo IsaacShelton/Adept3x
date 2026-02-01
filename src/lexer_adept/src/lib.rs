@@ -2,7 +2,7 @@ mod feed_result;
 mod infinite_iterator;
 
 use crate::feed_result::FeedResult;
-use token::{ALL_DIRECTIVES, ALL_PUNCT_GROUPS, Directive, Punct, StringLiteral, Token, TokenKind};
+use token::{ALL_DIRECTIVES, ALL_PUNCT_SORTED, Directive, Punct, StringLiteral, Token, TokenKind};
 use util_text::{Character, Lexable};
 
 pub struct Lexer<L, S>
@@ -136,7 +136,7 @@ where
             return FeedResult::Waiting;
         }
 
-        for punct_str in ALL_PUNCT_GROUPS.iter().copied().flatten().copied() {
+        for punct_str in ALL_PUNCT_SORTED.iter().copied() {
             if let Ok(source) = self.lexable.eat_remember(punct_str) {
                 return FeedResult::Has(TokenKind::Punct(Punct::new(punct_str)).at(source));
             }

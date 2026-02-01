@@ -1,7 +1,15 @@
+mod directive;
+mod punct;
+mod string;
+
 use derivative::Derivative;
 use derive_more::{Deref, IsVariant, PartialEq, Unwrap};
+pub use directive::Directive;
+use lazy_static::lazy_static;
 use num_bigint::BigInt;
+pub use punct::Punct;
 use std::fmt::{Debug, Display};
+pub use string::{StringLiteral, StringModifier};
 use util_infinite_iterator::IsEnd;
 use util_text::ColumnSpacingAtom;
 
@@ -32,137 +40,6 @@ impl<S> Token<S> {
 impl<S> IsEnd for Token<S> {
     fn is_end(&self) -> bool {
         self.kind.is_end_of_file()
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum StringModifier {
-    Normal,
-    Character,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct StringLiteral {
-    pub literal: String,
-}
-
-impl StringLiteral {
-    pub fn modifier(&self) -> StringModifier {
-        if self.literal.starts_with('"') {
-            return StringModifier::Normal;
-        }
-
-        if self.literal.starts_with('\'') {
-            return StringModifier::Character;
-        }
-
-        panic!("Invalid string literal")
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Directive {
-    Standard(&'static str),
-    Unknown(Box<str>),
-}
-
-impl Directive {
-    pub fn new(directive: &'static str) -> Self {
-        Self::Standard(directive)
-    }
-
-    pub fn unknown(unknown: Box<str>) -> Self {
-        Self::Unknown(unknown)
-    }
-
-    pub fn len_with_prefix(&self) -> usize {
-        1 + match self {
-            Directive::Standard(s) => s.len(),
-            Directive::Unknown(s) => s.len(),
-        }
-    }
-}
-
-impl AsRef<str> for Directive {
-    fn as_ref(&self) -> &str {
-        match self {
-            Directive::Standard(s) => s,
-            Directive::Unknown(s) => s,
-        }
-    }
-}
-
-impl Display for Directive {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}", self.as_ref())
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct Punct([u8; 4]);
-
-impl Punct {
-    pub const fn new(s: &'static str) -> Self {
-        let str_bytes = s.as_bytes();
-        let mut chars: [u8; 4] = *b"\0\0\0\0";
-        let mut i = 0;
-
-        while i < str_bytes.len() && i < 4 {
-            let c = str_bytes[i];
-
-            if c >= 128 {
-                break;
-            }
-
-            chars[i] = c;
-            i += 1;
-        }
-
-        Self(chars)
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.iter().position(|c| *c == b'\0').unwrap_or(4)
-    }
-
-    #[inline]
-    pub const fn is(&self, possible: &'static str) -> bool {
-        self.const_eq(Punct::new(possible))
-    }
-
-    #[inline]
-    pub const fn const_eq(&self, other: Punct) -> bool {
-        u32::from_ne_bytes(self.0) == u32::from_ne_bytes(other.0)
-    }
-
-    #[inline]
-    pub const fn is_any(&self, possible: &[&'static str]) -> bool {
-        let mut i = 0;
-
-        while i < possible.len() {
-            if self.const_eq(Punct::new(possible[i])) {
-                return true;
-            }
-            i += 1;
-        }
-
-        false
-    }
-
-    pub fn as_str(&self) -> &str {
-        str::from_utf8(&self.0[..self.len()]).unwrap()
-    }
-}
-
-impl Display for Punct {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl Debug for Punct {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Punct").field(&self.as_str()).finish()
     }
 }
 
@@ -209,6 +86,7 @@ const ASSIGNMENT_OPERATORS: &[&'static str] = &[
     "=", ":=", "+=", "-=", "*=", "/=", "%=", "&=", "^=", "|=", "<<=", "<<<=", ">>=", ">>>=",
 ];
 
+#[allow(unused)]
 const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
     ",", ".", ":", "::", "++", "--", "!", "~", "*", "/", "%", "+", "-", "<<", "<<<", ">>", ">>>",
     "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&", "||",
@@ -216,8 +94,17 @@ const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
 
 pub const ALL_DIRECTIVES: &[&'static str] = &["fn", "type", "struct", "enum", "record"];
 
-pub const ALL_PUNCT_GROUPS: &[&'static [&'static str]] =
-    &[ASSIGNMENT_OPERATORS, NON_ASSIGNMENT_OPERATORS];
+// Since Rust's const evaluation sucks
+lazy_static! {
+    pub static ref ALL_PUNCT_SORTED: &'static [&'static str] = {
+        let mut puncts = Vec::<&'static str>::new();
+        puncts.extend(ASSIGNMENT_OPERATORS);
+        puncts.extend(NON_ASSIGNMENT_OPERATORS);
+        puncts.sort_by_key(|s| s.len());
+        puncts.reverse();
+        Vec::leak(puncts)
+    };
+}
 
 impl TokenKind {
     pub fn precedence(&self) -> usize {
