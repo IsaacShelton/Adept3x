@@ -31,7 +31,7 @@ pub enum FileKind {
 pub struct FileContent {
     pub kind: FileKind,
     pub file_bytes: FileBytes,
-    pub syntax_tree: Option<SyntaxNode<()>>,
+    pub syntax_tree: Option<Arc<SyntaxNode>>,
 }
 
 impl FileContent {

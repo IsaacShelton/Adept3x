@@ -13,4 +13,5 @@ pub enum BareSyntaxKind {
     String,
     Array,
     Value,
+    Identifier(Box<str>),
 }

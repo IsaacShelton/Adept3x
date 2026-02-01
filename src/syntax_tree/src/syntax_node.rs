@@ -3,15 +3,15 @@ use std::{fmt::Debug, sync::Arc};
 use text_edit::{TextPointRangeUtf16, TextPointUtf16};
 
 #[derive(Debug)]
-pub struct SyntaxNode<Root: Clone + Debug> {
+pub struct SyntaxNode {
     pub(crate) bare: Arc<BareSyntaxNode>,
-    pub(crate) parent: Result<Arc<SyntaxNode<Root>>, Root>,
+    pub(crate) parent: Option<Arc<SyntaxNode>>,
     pub(crate) start: TextPointUtf16,
 }
 
-impl<Root: Clone + Debug> SyntaxNode<Root> {
+impl SyntaxNode {
     pub fn new(
-        parent: Result<Arc<Self>, Root>,
+        parent: Option<Arc<Self>>,
         bare: Arc<BareSyntaxNode>,
         start: TextPointUtf16,
     ) -> Arc<Self> {
@@ -22,7 +22,7 @@ impl<Root: Clone + Debug> SyntaxNode<Root> {
         })
     }
 
-    pub fn parent(&self) -> Result<&Arc<Self>, &Root> {
+    pub fn parent(&self) -> Option<&Arc<Self>> {
         self.parent.as_ref()
     }
 
@@ -39,7 +39,7 @@ impl<Root: Clone + Debug> SyntaxNode<Root> {
                 *next_start += child.text_point_diff_utf16;
                 Some((start, child))
             })
-            .map(|(start, child)| Self::new(Ok(self.clone()), child.clone(), start))
+            .map(|(start, child)| Self::new(Some(self.clone()), child.clone(), start))
     }
 
     pub fn dump(
@@ -47,7 +47,7 @@ impl<Root: Clone + Debug> SyntaxNode<Root> {
         w: &mut impl std::io::Write,
         depth: usize,
     ) -> std::io::Result<()> {
-        if let Err(_) = &self.parent {
+        if self.parent.is_none() {
             writeln!(w, "<root>")?;
         }
 

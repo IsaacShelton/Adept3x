@@ -1,0 +1,11 @@
+[package]
+name = "token"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+derivative.workspace = true
+derive_more.workspace = true
+util_infinite_iterator = { version = "0.1.0", path = "../util_infinite_iterator" }
+num-bigint.workspace = true
+util_text = { version = "0.1.0", path = "../util_text" }

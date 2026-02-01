@@ -7,3 +7,7 @@ edition = "2024"
 syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
 parser_abstract = { version = "0.1.0", path = "../parser_abstract" }
 util_infinite_iterator = { version = "0.1.0", path = "../util_infinite_iterator" }
+text_edit = { version = "0.1.0", path = "../text_edit" }
+document = { version = "0.1.0", path = "../document" }
+util_text = { version = "0.1.0", path = "../util_text" }
+lexer_adept = { version = "0.1.0", path = "../lexer_adept" }

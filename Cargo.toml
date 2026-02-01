@@ -7,15 +7,18 @@ members = [
     "src/document",
     "src/file_cache",
     "src/file_uri",
-    "src/language_server",
-    "src/lock_file",
     "src/idle_tracker",
+    "src/language_server",
+    "src/lexer_adept",
+    "src/lock_file",
     "src/lsp_connection",
     "src/lsp_message",
     "src/parser_abstract",
     "src/parser_adept",
+    "src/token",
     "src/util_iter_coproduct",
     "src/util_infinite_iterator",
+    "src/util_text",
 ]
 
 [workspace.dependencies]

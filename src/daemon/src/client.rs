@@ -1,5 +1,6 @@
 #[cfg(target_family = "unix")]
 use crate::Daemon;
+use document::Document;
 use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
 #[cfg(target_family = "unix")]
@@ -122,6 +123,8 @@ fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
         .and_then(|path| Canonical::new(path.join("adept.build")))
     {
         Ok(config_filepath) => {
+            use document::Document;
+
             log::info!("Found config file {:?}", config_filepath);
             let config_text = std::fs::read_to_string(config_filepath.as_path())
                 .expect("Failed to read config file");
@@ -130,13 +133,20 @@ fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
             log::info!("Config file id is {:?}", config_file_id);
             log::info!("Config text is {}", config_text);
 
-            let file_bytes = FileBytes::Text(config_text);
+            let document = Document::new(config_text.into());
+
+            let syntax_tree = parser_adept::reparse(&document, None, document.full_range());
+
+            log::error!("Got syntax tree {:?}", syntax_tree);
+
+            let file_bytes = FileBytes::Document(document);
+
             client.file_cache.set_content(
                 config_file_id,
                 FileContent {
                     kind: FileKind::ProjectConfig,
                     file_bytes,
-                    syntax_tree: None,
+                    syntax_tree: Some(syntax_tree),
                 },
             );
 
@@ -181,7 +191,7 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
             } else {
                 FileKind::Unknown
             };
-            let file_bytes = FileBytes::Text(params.text_document.text.into());
+            let file_bytes = FileBytes::Document(Document::new(params.text_document.text.into()));
             let file_id = client.file_cache.preregister_file(filepath);
             log::info!("on_notif did open {:?} {:?}", file_id, &file_bytes);
 
@@ -212,15 +222,29 @@ fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
         return;
     };
 
-    let edits = params
-        .content_changes
-        .into_iter()
-        .map(TextEditOrFullUtf16::from);
+    if let Some(document) = file_content.file_bytes.as_document() {
+        let edits = params
+            .content_changes
+            .into_iter()
+            .map(TextEditOrFullUtf16::from);
 
-    client
-        .file_cache
-        .set_content(file_id, file_content.after_edits(edits));
+        for edit in edits {
+            let old_syntax_tree = file_content.syntax_tree.clone();
+
+            let new_syntax_tree =
+                parser_adept::reparse(document, old_syntax_tree, document.full_range());
+
+            log::error!("New syntax tree {:#?}", &new_syntax_tree);
+
+            let mut new_file_contents = file_content.after_edits(std::iter::once(edit));
+            new_file_contents.syntax_tree = Some(new_syntax_tree);
+
+            client.file_cache.set_content(file_id, new_file_contents);
+        }
+    }
+
     log::info!("Existing is {:?} {:?}", file_id, file_content);
+
     log::info!(
         "New content is {:?} {:?}",
         file_id,

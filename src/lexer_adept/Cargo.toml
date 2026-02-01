@@ -1,0 +1,9 @@
+[package]
+name = "lexer_adept"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+util_text = { version = "0.1.0", path = "../util_text" }
+util_infinite_iterator = { version = "0.1.0", path = "../util_infinite_iterator" }
+token = { version = "0.1.0", path = "../token" }

@@ -7,7 +7,10 @@ use crate::line::DocumentLine;
 use itertools::Itertools;
 pub use position::DocumentPosition;
 pub use range::DocumentRange;
-use text_edit::{TextEditOrFullUtf16, TextEditUtf16, TextPointRangeUtf16, TextPointUtf16};
+use text_edit::{
+    LineIndex, TextEditOrFullUtf16, TextEditUtf16, TextPointRangeUtf16, TextPointUtf16,
+};
+use util_data_unit::ByteUnits;
 
 #[derive(Clone, Debug)]
 pub struct Document {
@@ -52,6 +55,20 @@ impl Document {
         match text_edit_or_full.as_text_edit() {
             Ok(text_edit) => self.apply_utf16_text_edit(text_edit),
             Err(full_content) => *self = Self::new(full_content),
+        }
+    }
+
+    pub fn full_range(&self) -> DocumentRange {
+        let last_line = self.lines.last().unwrap();
+        DocumentRange {
+            start: DocumentPosition {
+                line: LineIndex(0),
+                index: ByteUnits::of(0),
+            },
+            end: DocumentPosition {
+                line: LineIndex(self.lines.len().checked_sub(1).unwrap()),
+                index: ByteUnits::of(last_line.content.len().try_into().unwrap()),
+            },
         }
     }
 
