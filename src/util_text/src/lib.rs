@@ -1,26 +1,15 @@
 mod character;
+mod column_spacing_atom;
 mod eatable;
+mod line_spacing_atom;
 mod peeker;
 
 pub use character::Character;
+pub use column_spacing_atom::ColumnSpacingAtom;
 pub use eatable::Eatable;
+pub use line_spacing_atom::LineSpacingAtom;
 pub use peeker::Peeker as CharacterPeeker;
 use util_infinite_iterator::InfiniteIterator;
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ColumnSpacingAtom {
-    Spaces(u32),
-    Tabs(u32),
-}
-
-impl ColumnSpacingAtom {
-    pub fn len(&self) -> u32 {
-        match self {
-            ColumnSpacingAtom::Spaces(count) => *count,
-            ColumnSpacingAtom::Tabs(count) => *count,
-        }
-    }
-}
 
 pub trait Lexable<S: Copy>: InfiniteIterator<Item = Character<S>> {
     fn peek_nth(&mut self, n: usize) -> Self::Item;
@@ -40,6 +29,24 @@ pub trait Lexable<S: Copy>: InfiniteIterator<Item = Character<S>> {
             }
         }
         true
+    }
+
+    fn eat_line_spacing_atom(&mut self) -> Option<(LineSpacingAtom, S)> {
+        if let Character::At(c @ '\n', source) = self.peek() {
+            let mut count = 0;
+
+            loop {
+                if !self.eat(c) {
+                    break;
+                }
+
+                count += 1;
+            }
+
+            return Some((LineSpacingAtom { count }, source));
+        }
+
+        None
     }
 
     fn eat_column_spacing_atom(&mut self) -> Option<(ColumnSpacingAtom, S)> {

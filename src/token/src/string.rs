@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteral {
     pub literal: String,
@@ -21,4 +23,10 @@ impl StringLiteral {
 pub enum StringModifier {
     Normal,
     Character,
+}
+
+impl Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal)
+    }
 }

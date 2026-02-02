@@ -127,8 +127,8 @@ where
             _ => (),
         }
 
-        if let Ok(source) = self.lexable.eat_remember('\n') {
-            return FeedResult::Has(TokenKind::Newline.at(source));
+        if let Some((atom, source)) = self.lexable.eat_line_spacing_atom() {
+            return FeedResult::Has(TokenKind::LineSpacing(atom).at(source));
         }
 
         if self.lexable.peek().is_identifier_start() {

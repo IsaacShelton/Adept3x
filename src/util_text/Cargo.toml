@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 util_infinite_iterator = { version = "0.1.0", path = "../util_infinite_iterator" }
+serde_derive.workspace = true
+serde.workspace = true

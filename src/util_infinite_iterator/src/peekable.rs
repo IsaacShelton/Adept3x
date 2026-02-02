@@ -17,6 +17,16 @@ pub trait Peekable<T>: InfiniteIterator<Item = T> {
     fn peek_mut(&mut self) -> &mut T {
         self.peek_nth_mut(0)
     }
+
+    fn eat<TSub>(&mut self, predicate: impl FnOnce(T) -> Result<TSub, T>) -> Option<TSub> {
+        match predicate(self.next()) {
+            Ok(sub) => Some(sub),
+            Err(keep) => {
+                self.un_next(keep);
+                None
+            }
+        }
+    }
 }
 
 impl<T: IsEnd, II: Peekable<T>> Peekable<T> for &mut II {

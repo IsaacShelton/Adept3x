@@ -11,3 +11,4 @@ text_edit = { version = "0.1.0", path = "../text_edit" }
 document = { version = "0.1.0", path = "../document" }
 util_text = { version = "0.1.0", path = "../util_text" }
 lexer_adept = { version = "0.1.0", path = "../lexer_adept" }
+token = { version = "0.1.0", path = "../token" }

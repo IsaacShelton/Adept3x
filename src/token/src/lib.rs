@@ -11,7 +11,7 @@ pub use punct::Punct;
 use std::fmt::{Debug, Display};
 pub use string::{StringLiteral, StringModifier};
 use util_infinite_iterator::IsEnd;
-use util_text::ColumnSpacingAtom;
+use util_text::{ColumnSpacingAtom, LineSpacingAtom};
 
 #[derive(Clone, Debug, Deref, Derivative)]
 #[derivative(PartialEq)]
@@ -48,7 +48,7 @@ pub enum TokenKind {
     EndOfFile,
     Error(char),
     ColumnSpacing(ColumnSpacingAtom),
-    Newline,
+    LineSpacing(LineSpacingAtom),
     Identifier(String),
     Polymorph(String),
     Grouping(char),
@@ -65,19 +65,19 @@ impl Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EndOfFile => f.write_str("end-of-file"),
-            Self::Error(message) => write!(f, "'lex error - {}'", message),
-            Self::ColumnSpacing(atom) => write!(f, "column spacing {:?}", atom),
-            Self::Newline => f.write_str("'newline'"),
-            Self::Identifier(name) => write!(f, "(identifier) '{}'", name),
-            Self::Polymorph(name) => write!(f, "'${}'", name),
-            Self::Grouping(c) => write!(f, "'{}'", c),
-            Self::String { .. } => f.write_str("'string'"),
-            Self::MissingStringTermination => f.write_str("'missing string termination'"),
-            Self::Integer { .. } => f.write_str("'integer'"),
-            Self::Float { .. } => f.write_str("'float'"),
-            Self::Directive(directive) => write!(f, "'{}'", directive),
-            Self::Punct(punct) => write!(f, "'{}'", punct),
-            Self::Label(name) => write!(f, "goto label '@{}@'", name),
+            Self::Error(error_c) => write!(f, "{}", *error_c),
+            Self::ColumnSpacing(atom) => write!(f, "{}", atom),
+            Self::LineSpacing(atom) => write!(f, "{}", atom),
+            Self::Identifier(name) => write!(f, "{}", name),
+            Self::Polymorph(name) => write!(f, "${}", name),
+            Self::Grouping(c) => write!(f, "{}", c),
+            Self::String(string_literal) => write!(f, "{}", string_literal),
+            Self::MissingStringTermination => Ok(()),
+            Self::Integer(value, _) => write!(f, "{}", value),
+            Self::Float(value, _) => write!(f, "{}", value),
+            Self::Directive(directive) => write!(f, "{}", directive),
+            Self::Punct(punct) => write!(f, "{}", punct),
+            Self::Label(name) => write!(f, "@{}@", name),
         }
     }
 }
@@ -127,7 +127,7 @@ impl TokenKind {
             Self::Punct(c) if c.is("::") => 0,
             Self::EndOfFile
             | Self::Error(_)
-            | Self::Newline
+            | Self::LineSpacing(_)
             | Self::ColumnSpacing(_)
             | Self::Identifier(_)
             | Self::Polymorph(_)
@@ -147,7 +147,7 @@ impl TokenKind {
             TokenKind::EndOfFile => 0,
             TokenKind::Error(_c) => 1,
             TokenKind::ColumnSpacing(atom) => atom.len() as usize,
-            TokenKind::Newline => 1,
+            TokenKind::LineSpacing(atom) => atom.count,
             TokenKind::Identifier(name) => name.len(),
             TokenKind::Polymorph(name) => 1 + name.len(),
             TokenKind::Grouping(_) => 1,

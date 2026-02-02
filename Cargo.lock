@@ -593,6 +593,7 @@ dependencies = [
  "parser_abstract",
  "syntax_tree",
  "text_edit",
+ "token",
  "util_infinite_iterator",
  "util_text",
 ]
@@ -790,7 +791,9 @@ dependencies = [
  "derive_more",
  "serde",
  "text_edit",
+ "token",
  "util_data_unit",
+ "util_text",
 ]
 
 [[package]]
@@ -872,6 +875,8 @@ version = "0.1.0"
 name = "util_text"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_derive",
  "util_infinite_iterator",
 ]
 
