@@ -61,6 +61,15 @@ pub enum TokenKind {
     Label(String),
 }
 
+impl TokenKind {
+    pub fn is_punct_of(&self, punct: Punct) -> bool {
+        match self {
+            TokenKind::Punct(other) => punct == *other,
+            _ => false,
+        }
+    }
+}
+
 impl Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -833,6 +833,8 @@ dependencies = [
  "derive_more",
  "lazy_static",
  "num-bigint",
+ "serde",
+ "serde_derive",
  "util_infinite_iterator",
  "util_text",
 ]

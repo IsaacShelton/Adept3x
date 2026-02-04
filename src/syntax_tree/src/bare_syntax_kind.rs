@@ -1,5 +1,6 @@
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
+use token::Punct;
 use util_text::{ColumnSpacingAtom, LineSpacingAtom};
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
@@ -8,7 +9,7 @@ pub enum BareSyntaxKind {
     Error,
     ColumnSpacing(ColumnSpacingAtom),
     LineSpacing(LineSpacingAtom),
-    Punct(char),
+    Punct(Punct),
     Null,
     True,
     False,
@@ -17,4 +18,5 @@ pub enum BareSyntaxKind {
     Array,
     Value,
     Identifier(Box<str>),
+    Binding,
 }

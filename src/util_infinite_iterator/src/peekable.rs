@@ -27,6 +27,33 @@ pub trait Peekable<T>: InfiniteIterator<Item = T> {
             }
         }
     }
+
+    fn peek_skipping<'a>(
+        &'a mut self,
+        start_index: usize,
+        should_skip: impl Fn(&T) -> bool,
+    ) -> (&'a T, usize) {
+        let new_index = self.peek_skipping_via_index(start_index, should_skip);
+        (self.peek_nth(new_index), new_index + 1)
+    }
+
+    fn peek_skipping_via_index<'a>(
+        &'a mut self,
+        start_index: usize,
+        should_skip: impl Fn(&T) -> bool,
+    ) -> usize {
+        let mut index = start_index;
+
+        loop {
+            let value = self.peek_nth(index);
+
+            if !(should_skip)(value) {
+                return index;
+            }
+
+            index += 1;
+        }
+    }
 }
 
 impl<T: IsEnd, II: Peekable<T>> Peekable<T> for &mut II {

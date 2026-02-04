@@ -10,3 +10,5 @@ util_infinite_iterator = { version = "0.1.0", path = "../util_infinite_iterator"
 num-bigint.workspace = true
 util_text = { version = "0.1.0", path = "../util_text" }
 lazy_static.workspace = true
+serde.workspace = true
+serde_derive.workspace = true

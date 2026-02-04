@@ -2,6 +2,7 @@ use crate::BareSyntaxKind;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use text_edit::TextPointDiffUtf16;
+use token::Punct;
 use util_data_unit::ByteUnits;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -40,13 +41,13 @@ impl BareSyntaxNode {
         })
     }
 
-    pub fn new_punct(c: char) -> Arc<BareSyntaxNode> {
+    pub fn new_punct(punct: Punct) -> Arc<BareSyntaxNode> {
         Arc::new(BareSyntaxNode {
-            kind: BareSyntaxKind::Punct(c),
-            content_bytes: ByteUnits::of(1),
-            text_point_diff_utf16: TextPointDiffUtf16::of_char(c),
+            kind: BareSyntaxKind::Punct(punct),
+            content_bytes: ByteUnits::of(punct.len() as u64),
+            text_point_diff_utf16: TextPointDiffUtf16::of_str(punct.as_str()),
             children: vec![],
-            text: Some(c.into()),
+            text: Some(punct.to_string()),
         })
     }
 
