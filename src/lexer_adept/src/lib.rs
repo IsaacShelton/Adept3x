@@ -114,17 +114,11 @@ where
             return FeedResult::Has(TokenKind::ColumnSpacing(spacing_atom).at(source));
         }
 
-        match self.lexable.peek() {
-            Character::At(c @ ('(' | '[' | '{'), source) => {
-                self.lexable.next();
-                return FeedResult::Has(TokenKind::Grouping(c).at(source));
-            }
-            Character::At(c @ (')' | ']' | '}'), source) => {
+        for punct_str in [")", "]", "}"] {
+            if let Ok(source) = self.lexable.eat_remember(punct_str) {
                 self.state = State::UnaryCall;
-                self.lexable.next();
-                return FeedResult::Has(TokenKind::Grouping(c).at(source));
+                return FeedResult::Has(TokenKind::Punct(Punct::new(punct_str)).at(source));
             }
-            _ => (),
         }
 
         if let Some((atom, source)) = self.lexable.eat_line_spacing_atom() {

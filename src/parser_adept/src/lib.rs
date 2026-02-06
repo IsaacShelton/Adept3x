@@ -2,7 +2,7 @@ use document::{Document, DocumentRange};
 use std::sync::Arc;
 use syntax_tree::{BareSyntaxKind, BareSyntaxNode, SyntaxNode};
 use text_edit::{LineIndex, TextLengthUtf16, TextPointUtf16};
-use token::{Punct, Token, TokenKind};
+use token::{Directive, Punct, Token, TokenKind};
 use util_infinite_iterator::Peekable;
 use util_text::{Character, CharacterPeeker};
 
@@ -31,16 +31,21 @@ where
     }
 
     fn parse_top_level(&mut self) -> Arc<BareSyntaxNode> {
-        if let Some(binding) = self.parse_binding() {
-            return binding;
+        if self.should_parse_binding() {
+            return self.parse_binding();
         }
 
-        BareSyntaxNode::new_leaf(BareSyntaxKind::Error, self.lexer.next().kind.to_string())
+        BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Error {
+                description: "Expected top-level binding or attribute".into(),
+            },
+            self.lexer.next().kind.to_string(),
+        )
     }
 
-    fn parse_binding(&mut self) -> Option<Arc<BareSyntaxNode>> {
+    fn should_parse_binding(&mut self) -> bool {
         if !self.lexer.peek().is_identifier() {
-            return None;
+            return false;
         }
 
         let (after, _) = self
@@ -48,7 +53,28 @@ where
             .peek_skipping(1, |token| token.kind.is_column_spacing());
 
         if !after.kind.is_punct_of(Punct::new("::")) {
-            return None;
+            return false;
+        }
+
+        true
+    }
+
+    fn error_for_next_token(&mut self, description: impl Into<String>) -> Arc<BareSyntaxNode> {
+        let token = self.lexer.next();
+        BareSyntaxNode::new_error(token.kind.to_string(), description.into())
+    }
+
+    fn parse_binding(&mut self) -> Arc<BareSyntaxNode> {
+        if !self.lexer.peek().is_identifier() {
+            return self.error_for_next_token("Expected identifier for binding");
+        }
+
+        let (after, _) = self
+            .lexer
+            .peek_skipping(1, |token| token.kind.is_column_spacing());
+
+        if !after.kind.is_punct_of(Punct::new("::")) {
+            return self.error_for_next_token("Expected `::` after identifier for binding");
         }
 
         let mut children = Vec::new();
@@ -81,11 +107,49 @@ where
         );
 
         self.parse_column_whitespace(&mut children);
+        children.push(self.parse_expr());
 
-        Some(BareSyntaxNode::new_parent(
-            BareSyntaxKind::Binding,
-            children,
-        ))
+        BareSyntaxNode::new_parent(BareSyntaxKind::Binding, children)
+    }
+
+    fn parse_expr(&mut self) -> Arc<BareSyntaxNode> {
+        if let Some(directive) = self.lexer.eat(|token| match token.kind {
+            TokenKind::Directive(directive) => Ok(directive),
+            _ => Err(token),
+        }) {
+            return self.parse_directive(directive);
+        }
+
+        self.error_for_next_token("Expected expression")
+    }
+
+    fn parse_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        match &directive {
+            Directive::Standard("fn") => self.parse_fn_directive(),
+            Directive::Standard(name) => BareSyntaxNode::new_error(
+                directive.to_string(),
+                format!("Directive `{}` is not supported yet", name),
+            ),
+            Directive::Unknown(name) => BareSyntaxNode::new_error(
+                directive.to_string(),
+                format!("Unknown directive `{}`", name),
+            ),
+        }
+    }
+
+    fn parse_fn_directive(&mut self) -> Arc<BareSyntaxNode> {
+        if self
+            .lexer
+            .eat(|token| match token.kind {
+                TokenKind::Punct(punct) if punct == Punct::new("(") => Ok(()),
+                _ => Err(token),
+            })
+            .is_none()
+        {
+            return self.error_for_next_token("Expected `(` after `@fn` directive");
+        }
+
+        self.error_for_next_token("NOT SUPPORTED YET")
     }
 
     fn parse_column_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {

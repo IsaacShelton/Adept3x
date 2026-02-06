@@ -6,7 +6,7 @@ use util_text::{ColumnSpacingAtom, LineSpacingAtom};
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
 pub enum BareSyntaxKind {
     Root,
-    Error,
+    Error { description: String },
     ColumnSpacing(ColumnSpacingAtom),
     LineSpacing(LineSpacingAtom),
     Punct(Punct),

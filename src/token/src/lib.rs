@@ -51,7 +51,6 @@ pub enum TokenKind {
     LineSpacing(LineSpacingAtom),
     Identifier(String),
     Polymorph(String),
-    Grouping(char),
     String(StringLiteral),
     MissingStringTermination,
     Integer(BigInt, usize),
@@ -79,7 +78,6 @@ impl Display for TokenKind {
             Self::LineSpacing(atom) => write!(f, "{}", atom),
             Self::Identifier(name) => write!(f, "{}", name),
             Self::Polymorph(name) => write!(f, "${}", name),
-            Self::Grouping(c) => write!(f, "{}", c),
             Self::String(string_literal) => write!(f, "{}", string_literal),
             Self::MissingStringTermination => Ok(()),
             Self::Integer(value, _) => write!(f, "{}", value),
@@ -97,8 +95,8 @@ const ASSIGNMENT_OPERATORS: &[&'static str] = &[
 
 #[allow(unused)]
 const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
-    ",", ".", ":", "::", "++", "--", "!", "~", "*", "/", "%", "+", "-", "<<", "<<<", ">>", ">>>",
-    "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&", "||",
+    ",", ".", ":", "::", "(", ")", "[", "]", "{", "}", "++", "--", "!", "~", "*", "/", "%", "+",
+    "-", "<<", "<<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&", "||",
 ];
 
 pub const ALL_DIRECTIVES: &[&'static str] = &["fn", "type", "struct", "enum", "record"];
@@ -118,7 +116,7 @@ lazy_static! {
 impl TokenKind {
     pub fn precedence(&self) -> usize {
         match self {
-            Self::Grouping('{' | '[') => 16,
+            Self::Punct(c) if c.is_any(&["{", "["]) => 16,
             Self::Punct(c) if c.is(".") => 16,
             Self::Punct(c) if c.is_any(&["++", "--"]) => 15,
             Self::Punct(c) if c.is_any(&["!", "~"]) => 14,
@@ -140,7 +138,6 @@ impl TokenKind {
             | Self::ColumnSpacing(_)
             | Self::Identifier(_)
             | Self::Polymorph(_)
-            | Self::Grouping(_)
             | Self::String { .. }
             | Self::MissingStringTermination
             | Self::Integer { .. }
@@ -159,7 +156,6 @@ impl TokenKind {
             TokenKind::LineSpacing(atom) => atom.count,
             TokenKind::Identifier(name) => name.len(),
             TokenKind::Polymorph(name) => 1 + name.len(),
-            TokenKind::Grouping(_) => 1,
             TokenKind::String(string) => string.literal.len(),
             TokenKind::MissingStringTermination => 0,
             TokenKind::Integer(_, len) => *len,
