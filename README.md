@@ -55,9 +55,9 @@ It will have a comprehensive set of features that no other language fully offers
 | 2025-12-01 | Incremental Parser POC                | ☑
 | 2025-12-07 | Background Compilation Daemon POC     | ☑
 | 2025-12-14 | Language Server Integration POC       | ☑
-| 2025-01-21 | Better Import System Design           | ☑
-| 2025-01-28 | Syntax Redesign for Dependent Types   | ☑
-| 2025-01-31 | Language Server Incremental Parser    | 60 days
+| 2026-01-21 | Better Import System Design           | ☑
+| 2026-01-28 | Syntax Redesign for Dependent Types   | ☑
+| 2026-01-31 | Language Server Incremental Parser    | 60 days
 | 2026-03-31 | SSA-based Dependent Type System POC   | 60 days
 | 2026-05-31 | Integrate Compilation into Daemon     | 60 days
 | 2026-07-31 | - Milestone 2 -                       | ☐
