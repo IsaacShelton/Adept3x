@@ -10,13 +10,30 @@ pub enum BareSyntaxKind {
     ColumnSpacing(ColumnSpacingAtom),
     LineSpacing(LineSpacingAtom),
     Punct(Punct),
-    Null,
-    True,
-    False,
+    BuiltinValue(BuiltinValue),
+    BuiltinType(BuiltinType),
     Number,
     String,
     Array,
-    Value,
+    Term,
     Identifier(Box<str>),
+    Fn,
+    ParamList,
+    Param,
+    Name,
     Binding,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
+pub enum BuiltinType {
+    Bool,
+    Void,
+    Type,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
+pub enum BuiltinValue {
+    True,
+    False,
+    Void,
 }

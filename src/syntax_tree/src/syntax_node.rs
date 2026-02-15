@@ -55,17 +55,10 @@ impl SyntaxNode {
 
         match &self.bare.text {
             Some(leaf) => {
-                writeln!(
-                    w,
-                    "{}@{} {:?}: {}",
-                    padding,
-                    self.text_range(),
-                    self.bare.kind,
-                    leaf,
-                )?;
+                writeln!(w, "{} {:?}: `{}`", padding, self.bare.kind, leaf,)?;
             }
             None => {
-                writeln!(w, "{}@{} {:?}", padding, self.text_range(), self.bare.kind)?;
+                writeln!(w, "{} {:?}", padding, self.bare.kind)?;
                 for child in self.children() {
                     child.dump(w, depth + 1)?;
                 }

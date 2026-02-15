@@ -443,6 +443,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_format"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e479e99b287d578ed5f6cd4c92cdf48db219088adb9c5b14f7c155b71dfba792"
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -589,6 +595,7 @@ name = "parser_adept"
 version = "0.1.0"
 dependencies = [
  "document",
+ "lazy_format",
  "lexer_adept",
  "parser_abstract",
  "syntax_tree",

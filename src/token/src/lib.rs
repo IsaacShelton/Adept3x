@@ -67,12 +67,20 @@ impl TokenKind {
             _ => false,
         }
     }
+
+    pub fn is_punct_of_or_eof(&self, punct: Punct) -> bool {
+        match self {
+            TokenKind::Punct(other) => punct == *other,
+            TokenKind::EndOfFile => true,
+            _ => false,
+        }
+    }
 }
 
 impl Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::EndOfFile => f.write_str("end-of-file"),
+            Self::EndOfFile => Ok(()),
             Self::Error(error_c) => write!(f, "{}", *error_c),
             Self::ColumnSpacing(atom) => write!(f, "{}", atom),
             Self::LineSpacing(atom) => write!(f, "{}", atom),

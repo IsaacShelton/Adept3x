@@ -1,6 +1,7 @@
 use document::{Document, DocumentRange};
-use std::sync::Arc;
-use syntax_tree::{BareSyntaxKind, BareSyntaxNode, SyntaxNode};
+use lazy_format::lazy_format;
+use std::{fmt::Display, sync::Arc};
+use syntax_tree::{BareSyntaxKind, BareSyntaxNode, BuiltinType, BuiltinValue, SyntaxNode};
 use text_edit::{LineIndex, TextLengthUtf16, TextPointUtf16};
 use token::{Directive, Punct, Token, TokenKind};
 use util_infinite_iterator::Peekable;
@@ -23,8 +24,8 @@ where
         self.parse_all_whitespace(&mut children);
 
         while !self.lexer.peek().is_end_of_file() {
-            self.parse_all_whitespace(&mut children);
             children.push(self.parse_top_level());
+            self.parse_all_whitespace(&mut children);
         }
 
         BareSyntaxNode::new_parent(BareSyntaxKind::Root, children)
@@ -59,9 +60,28 @@ where
         true
     }
 
-    fn error_for_next_token(&mut self, description: impl Into<String>) -> Arc<BareSyntaxNode> {
+    fn error_for_next_token(&mut self, description: impl Display) -> Arc<BareSyntaxNode> {
         let token = self.lexer.next();
-        BareSyntaxNode::new_error(token.kind.to_string(), description.into())
+        BareSyntaxNode::new_error(token.kind.to_string(), description.to_string())
+    }
+
+    fn parse_name(&mut self) -> Arc<BareSyntaxNode> {
+        if let Some(ok) = self.lexer.eat(|token| match token.kind {
+            TokenKind::Identifier(name) => {
+                let identifier =
+                    BareSyntaxNode::new_leaf(BareSyntaxKind::Identifier(name.clone().into()), name);
+
+                Ok(BareSyntaxNode::new_parent(
+                    BareSyntaxKind::Name,
+                    vec![identifier],
+                ))
+            }
+            _ => Err(token),
+        }) {
+            ok
+        } else {
+            self.error_for_next_token("Expected name")
+        }
     }
 
     fn parse_binding(&mut self) -> Arc<BareSyntaxNode> {
@@ -78,20 +98,7 @@ where
         }
 
         let mut children = Vec::new();
-
-        let name = self
-            .lexer
-            .eat(|token| match token.kind {
-                TokenKind::Identifier(name) => Ok(name),
-                _ => Err(token),
-            })
-            .unwrap();
-
-        children.push(BareSyntaxNode::new_leaf(
-            BareSyntaxKind::Identifier(name.clone().into()),
-            name,
-        ));
-
+        children.push(self.parse_name());
         self.parse_column_whitespace(&mut children);
 
         children.push(
@@ -107,17 +114,57 @@ where
         );
 
         self.parse_column_whitespace(&mut children);
-        children.push(self.parse_expr());
+        children.push(self.parse_term());
 
         BareSyntaxNode::new_parent(BareSyntaxKind::Binding, children)
     }
 
-    fn parse_expr(&mut self) -> Arc<BareSyntaxNode> {
+    fn parse_term(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        self.parse_column_whitespace(&mut children);
+        children.push(self.parse_term_inner());
+        BareSyntaxNode::new_parent(BareSyntaxKind::Term, children)
+    }
+
+    fn parse_term_inner(&mut self) -> Arc<BareSyntaxNode> {
         if let Some(directive) = self.lexer.eat(|token| match token.kind {
             TokenKind::Directive(directive) => Ok(directive),
             _ => Err(token),
         }) {
             return self.parse_directive(directive);
+        }
+
+        if let Some(node) = self.lexer.eat(|token| match &token.kind {
+            TokenKind::Identifier(name) => match name.as_str() {
+                "Bool" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::Bool),
+                    name.into(),
+                )),
+                "Void" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::Void),
+                    name.into(),
+                )),
+                "Type" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::Type),
+                    name.into(),
+                )),
+                "true" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinValue(BuiltinValue::True),
+                    name.into(),
+                )),
+                "false" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinValue(BuiltinValue::False),
+                    name.into(),
+                )),
+                "void" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinValue(BuiltinValue::Void),
+                    name.into(),
+                )),
+                _ => Err(token),
+            },
+            _ => Err(token),
+        }) {
+            return node;
         }
 
         self.error_for_next_token("Expected expression")
@@ -137,19 +184,77 @@ where
         }
     }
 
+    fn parse_punct(&mut self, expected: Punct, children: &mut Vec<Arc<BareSyntaxNode>>) {
+        let result = if let Some(result) = self.lexer.eat(|token| match token.kind {
+            TokenKind::Punct(punct) if punct == expected => Ok(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::Punct(punct),
+                punct.to_string(),
+            )),
+            _ => Err(token),
+        }) {
+            result
+        } else {
+            self.error_for_next_token(lazy_format!("Expected `{}`", expected))
+        };
+
+        children.push(result);
+    }
+
     fn parse_fn_directive(&mut self) -> Arc<BareSyntaxNode> {
-        if self
-            .lexer
-            .eat(|token| match token.kind {
-                TokenKind::Punct(punct) if punct == Punct::new("(") => Ok(()),
-                _ => Err(token),
-            })
-            .is_none()
-        {
-            return self.error_for_next_token("Expected `(` after `@fn` directive");
+        let mut children = Vec::new();
+        self.parse_column_whitespace(&mut children);
+        children.push(self.parse_param_list());
+        self.parse_column_whitespace(&mut children);
+        self.parse_punct(Punct::new(":"), &mut children);
+        children.push(self.parse_term());
+        self.parse_column_whitespace(&mut children);
+        self.parse_punct(Punct::new("{"), &mut children);
+        self.parse_column_whitespace(&mut children);
+        self.parse_punct(Punct::new("}"), &mut children);
+        BareSyntaxNode::new_parent(BareSyntaxKind::Fn, children)
+    }
+
+    fn parse_param_list(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        self.parse_punct(Punct::new("("), &mut children);
+        self.parse_all_whitespace(&mut children);
+
+        let mut has_param = false;
+
+        while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
+            if has_param {
+                self.parse_punct(Punct::new(","), &mut children);
+                self.parse_all_whitespace(&mut children);
+            } else {
+                has_param = true;
+            }
+
+            children.push(self.parse_param_sublist());
+            self.parse_all_whitespace(&mut children);
         }
 
-        self.error_for_next_token("NOT SUPPORTED YET")
+        self.parse_punct(Punct::new(")"), &mut children);
+        BareSyntaxNode::new_parent(BareSyntaxKind::ParamList, children)
+    }
+
+    fn parse_param_sublist(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        self.parse_param_names(&mut children);
+        self.parse_punct(Punct::new(":"), &mut children);
+        children.push(self.parse_term());
+        BareSyntaxNode::new_parent(BareSyntaxKind::Param, children)
+    }
+
+    fn parse_param_names(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
+        children.push(self.parse_name());
+        self.parse_all_whitespace(children);
+
+        while self.lexer.peek().is_punct_of(Punct::new(",")) {
+            self.parse_punct(Punct::new(","), children);
+            self.parse_all_whitespace(children);
+            children.push(self.parse_name());
+            self.parse_all_whitespace(children);
+        }
     }
 
     fn parse_column_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
@@ -211,7 +316,22 @@ pub fn reparse(
 fn test1() {
     use util_infinite_iterator::AsIter;
 
-    let document = Document::new(r#"main :: @fn() {}"#.into());
+    let document = Document::new(
+        r#"
+        test1 :: @fn(): Bool {}
+
+        test2 :: @fn(): Void {}
+
+        test3 :: @fn(a: Bool): Void {}
+
+        test4 :: @fn(a: Bool, b: Bool): Bool {}
+        
+        test5 :: @fn(a: Bool, b: Bool, c: Bool): Bool {}
+
+        sum :: @fn(a, b, c, d: Bool): Bool {}
+        "#
+        .into(),
+    );
 
     let adapter = util_infinite_iterator::Adapter::new(
         document.chars().map(|c| Character::At(c, ())),
@@ -225,5 +345,5 @@ fn test1() {
     }
 
     let syntax_tree = reparse(&document, None, document.full_range());
-    println!("{:#?}", syntax_tree);
+    let _ = syntax_tree.dump(&mut std::io::stdout(), 0);
 }
