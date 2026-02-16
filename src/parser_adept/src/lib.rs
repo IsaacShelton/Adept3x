@@ -1,11 +1,11 @@
 use document::{Document, DocumentRange};
 use lazy_format::lazy_format;
 use std::{fmt::Display, sync::Arc};
-use syntax_tree::{BareSyntaxKind, BareSyntaxNode, BuiltinType, BuiltinValue, SyntaxNode};
+use syntax_tree::{BareSyntaxKind, BareSyntaxNode, BuiltinType, SyntaxNode};
 use text_edit::{LineIndex, TextLengthUtf16, TextPointUtf16};
 use token::{Directive, Punct, Token, TokenKind};
 use util_infinite_iterator::Peekable;
-use util_text::{Character, CharacterPeeker};
+use util_text::{Character, CharacterPeeker, LineSpacingAtom};
 
 pub struct Parser<II: Peekable<Token<()>>> {
     lexer: II,
@@ -73,7 +73,7 @@ where
         if let Some(ok) = self.lexer.eat(|token| match token.kind {
             TokenKind::Identifier(name) => {
                 let identifier =
-                    BareSyntaxNode::new_leaf(BareSyntaxKind::Identifier(name.clone().into()), name);
+                    BareSyntaxNode::new_leaf(BareSyntaxKind::Word(name.clone().into()), name);
 
                 Ok(BareSyntaxNode::new_parent(
                     BareSyntaxKind::Name,
@@ -153,15 +153,15 @@ where
                     name.into(),
                 )),
                 "true" => Ok(BareSyntaxNode::new_leaf(
-                    BareSyntaxKind::BuiltinValue(BuiltinValue::True),
+                    BareSyntaxKind::TrueValue,
                     name.into(),
                 )),
                 "false" => Ok(BareSyntaxNode::new_leaf(
-                    BareSyntaxKind::BuiltinValue(BuiltinValue::False),
+                    BareSyntaxKind::FalseValue,
                     name.into(),
                 )),
                 "void" => Ok(BareSyntaxNode::new_leaf(
-                    BareSyntaxKind::BuiltinValue(BuiltinValue::Void),
+                    BareSyntaxKind::VoidValue,
                     name.into(),
                 )),
                 variable_name => Ok(BareSyntaxNode::new_leaf(
@@ -186,6 +186,8 @@ where
             Directive::Standard(name) => match name.as_ref() {
                 "fn" => self.parse_fn_directive(directive),
                 "if" => self.parse_if_directive(directive),
+                "Fn" => self.parse_fn_type_directive(directive),
+                "Record" => self.parse_record_type_directive(directive),
                 _ => BareSyntaxNode::new_error(
                     directive.to_string(),
                     format!("Directive `{}` is not supported yet", name),
@@ -214,6 +216,31 @@ where
         children.push(result);
     }
 
+    fn parse_fn_type_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+        self.parse_column_whitespace(&mut children);
+        children.push(self.parse_param_list());
+        self.parse_column_whitespace(&mut children);
+        self.parse_punct(Punct::new(":"), &mut children);
+        children.push(self.parse_term());
+        BareSyntaxNode::new_parent(BareSyntaxKind::BuiltinType(BuiltinType::Fn), children)
+    }
+
+    fn parse_record_type_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+        self.parse_all_whitespace(&mut children);
+        children.push(self.parse_field_def_list());
+        BareSyntaxNode::new_parent(BareSyntaxKind::BuiltinType(BuiltinType::Record), children)
+    }
+
     fn parse_fn_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
         children.push(BareSyntaxNode::new_leaf(
@@ -227,7 +254,7 @@ where
         children.push(self.parse_term());
         self.parse_column_whitespace(&mut children);
         children.push(self.parse_block());
-        BareSyntaxNode::new_parent(BareSyntaxKind::Fn, children)
+        BareSyntaxNode::new_parent(BareSyntaxKind::FnValue, children)
     }
 
     fn parse_block(&mut self) -> Arc<BareSyntaxNode> {
@@ -285,12 +312,9 @@ where
 
             children.push(
                 if let Some(else_keyword) = self.lexer.eat(|token| match token.kind {
-                    TokenKind::Identifier(ident) if ident == "else" => {
-                        Ok(BareSyntaxNode::new_leaf(
-                            BareSyntaxKind::Identifier(ident.clone().into()),
-                            ident,
-                        ))
-                    }
+                    TokenKind::Identifier(ident) if ident == "else" => Ok(
+                        BareSyntaxNode::new_leaf(BareSyntaxKind::Word(ident.clone().into()), ident),
+                    ),
                     _ => Err(token),
                 }) {
                     else_keyword
@@ -298,12 +322,12 @@ where
                     self.error_for_empty("Expected `else` after first block of if")
                 },
             );
-            self.parse_all_whitespace(&mut children);
 
+            self.parse_all_whitespace(&mut children);
             children.push(self.parse_block());
         }
 
-        BareSyntaxNode::new_parent(BareSyntaxKind::If, children)
+        BareSyntaxNode::new_parent(BareSyntaxKind::IfValue, children)
     }
 
     fn parse_if_arg_list(&mut self) -> Arc<BareSyntaxNode> {
@@ -327,6 +351,40 @@ where
 
         self.parse_punct(Punct::new(")"), &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::IfArgList, children)
+    }
+
+    fn parse_field_def_list(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        self.parse_punct(Punct::new("{"), &mut children);
+        self.parse_all_whitespace(&mut children);
+
+        while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
+            children.push(self.parse_field_def_sublist());
+
+            let needs_separator = self.parse_all_whitespace(&mut children).is_none();
+
+            if self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
+                break;
+            } else if self.lexer.peek().is_punct_of(Punct::new(",")) {
+                self.parse_punct(Punct::new(","), &mut children);
+                self.parse_all_whitespace(&mut children);
+            } else if needs_separator {
+                children.push(
+                    self.error_for_next_token("Expected ',' or newline after field definition"),
+                );
+            }
+        }
+
+        self.parse_punct(Punct::new("}"), &mut children);
+        BareSyntaxNode::new_parent(BareSyntaxKind::FieldDefList, children)
+    }
+
+    fn parse_field_def_sublist(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        self.parse_names(&mut children);
+        self.parse_punct(Punct::new(":"), &mut children);
+        children.push(self.parse_term());
+        BareSyntaxNode::new_parent(BareSyntaxKind::FieldDef, children)
     }
 
     fn parse_param_list(&mut self) -> Arc<BareSyntaxNode> {
@@ -354,13 +412,13 @@ where
 
     fn parse_param_sublist(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
-        self.parse_param_names(&mut children);
+        self.parse_names(&mut children);
         self.parse_punct(Punct::new(":"), &mut children);
         children.push(self.parse_term());
         BareSyntaxNode::new_parent(BareSyntaxKind::Param, children)
     }
 
-    fn parse_param_names(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
+    fn parse_names(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
         children.push(self.parse_name());
         self.parse_all_whitespace(children);
 
@@ -372,16 +430,25 @@ where
         }
     }
 
-    fn parse_whitespace(&mut self, allow_newlines: bool, children: &mut Vec<Arc<BareSyntaxNode>>) {
+    fn parse_whitespace(
+        &mut self,
+        allow_newlines: bool,
+        children: &mut Vec<Arc<BareSyntaxNode>>,
+    ) -> Option<LineSpacingAtom> {
+        let mut has_newline = None;
+
         while let Some(child) = self.lexer.eat(|token| match token.kind {
             TokenKind::ColumnSpacing(atom) => Ok(BareSyntaxNode::new_leaf(
                 BareSyntaxKind::ColumnSpacing(atom),
                 atom.to_string(),
             )),
-            TokenKind::LineSpacing(atom) if allow_newlines => Ok(BareSyntaxNode::new_leaf(
-                BareSyntaxKind::LineSpacing(atom),
-                atom.to_string(),
-            )),
+            TokenKind::LineSpacing(atom) if allow_newlines => {
+                has_newline = Some(atom);
+                Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::LineSpacing(atom),
+                    atom.to_string(),
+                ))
+            }
             TokenKind::SinglelineComment(comment) => Ok(BareSyntaxNode::new_leaf(
                 BareSyntaxKind::SinglelineComment(comment.clone().into()),
                 comment,
@@ -394,14 +461,19 @@ where
         }) {
             children.push(child);
         }
+
+        has_newline
     }
 
     fn parse_column_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
         self.parse_whitespace(false, children);
     }
 
-    fn parse_all_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
-        self.parse_whitespace(true, children);
+    fn parse_all_whitespace(
+        &mut self,
+        children: &mut Vec<Arc<BareSyntaxNode>>,
+    ) -> Option<LineSpacingAtom> {
+        self.parse_whitespace(true, children)
     }
 }
 
@@ -461,7 +533,6 @@ fn test1() {
 
         test12 :: @fn(a, b: Bool): @if (a) { Bool } else { Void } {}
 
-        /*
         Test13 :: @Record {
             a: Bool,
             b: Bool,
@@ -469,8 +540,20 @@ fn test1() {
             d: Type,
         }
 
-        test_if_else :: @fn(a, b: Bool): if a { Bool } else { Void } {}
+        Test14 :: @Record {
+            a: Bool
+            b: Bool
+            c: Void
+            d: Type
+        }
 
+        Test15 :: @Record { a, b, c: Bool, d: Type }
+
+        Test16 :: @Fn(a: Void, b: Type, c: Bool): Type
+
+        Test17 :: @Fn(a, b, c: Bool): Type
+
+        /*
         //my_pair :: @record { a: true, b: false }
 
         make_pair :: @fn(T: Type, a, b: T): Pair(T) {

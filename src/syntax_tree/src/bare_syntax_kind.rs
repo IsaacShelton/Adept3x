@@ -10,25 +10,26 @@ pub enum BareSyntaxKind {
     ColumnSpacing(ColumnSpacingAtom),
     LineSpacing(LineSpacingAtom),
     Punct(Punct),
-    BuiltinValue(BuiltinValue),
-    BuiltinType(BuiltinType),
-    Number,
-    String,
-    Array,
     Term,
-    Identifier(Box<str>),
+    Word(Box<str>),
     Directive(Directive),
-    Fn,
     ParamList,
     Param,
-    Block,
     Name,
     Binding,
-    Variable(Box<str>),
-    If,
     IfArgList,
+    FieldDef,
+    FieldDefList,
     SinglelineComment(Box<str>),
     MultilineComment(Box<str>, IsTerminated),
+    BuiltinType(BuiltinType),
+    TrueValue,
+    FalseValue,
+    VoidValue,
+    FnValue,
+    IfValue,
+    Block,
+    Variable(Box<str>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
@@ -36,11 +37,6 @@ pub enum BuiltinType {
     Bool,
     Void,
     Type,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
-pub enum BuiltinValue {
-    True,
-    False,
-    Void,
+    Fn,
+    Record,
 }
