@@ -60,6 +60,10 @@ where
         true
     }
 
+    fn error_for_empty(&mut self, description: impl Display) -> Arc<BareSyntaxNode> {
+        BareSyntaxNode::new_error("".into(), description.to_string())
+    }
+
     fn error_for_next_token(&mut self, description: impl Display) -> Arc<BareSyntaxNode> {
         let token = self.lexer.next();
         BareSyntaxNode::new_error(token.kind.to_string(), description.to_string())
@@ -160,23 +164,33 @@ where
                     BareSyntaxKind::BuiltinValue(BuiltinValue::Void),
                     name.into(),
                 )),
-                _ => Err(token),
+                variable_name => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::Variable(variable_name.into()),
+                    name.into(),
+                )),
             },
             _ => Err(token),
         }) {
             return node;
         }
 
-        self.error_for_next_token("Expected expression")
+        if self.lexer.peek().is_punct_of_or_eof(Punct::new("}")) {
+            self.error_for_empty("Expected expression")
+        } else {
+            self.error_for_next_token("Expected expression")
+        }
     }
 
     fn parse_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
         match &directive {
-            Directive::Standard("fn") => self.parse_fn_directive(),
-            Directive::Standard(name) => BareSyntaxNode::new_error(
-                directive.to_string(),
-                format!("Directive `{}` is not supported yet", name),
-            ),
+            Directive::Standard(name) => match name.as_ref() {
+                "fn" => self.parse_fn_directive(directive),
+                "if" => self.parse_if_directive(directive),
+                _ => BareSyntaxNode::new_error(
+                    directive.to_string(),
+                    format!("Directive `{}` is not supported yet", name),
+                ),
+            },
             Directive::Unknown(name) => BareSyntaxNode::new_error(
                 directive.to_string(),
                 format!("Unknown directive `{}`", name),
@@ -200,18 +214,119 @@ where
         children.push(result);
     }
 
-    fn parse_fn_directive(&mut self) -> Arc<BareSyntaxNode> {
+    fn parse_fn_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
         self.parse_column_whitespace(&mut children);
         children.push(self.parse_param_list());
         self.parse_column_whitespace(&mut children);
         self.parse_punct(Punct::new(":"), &mut children);
         children.push(self.parse_term());
         self.parse_column_whitespace(&mut children);
-        self.parse_punct(Punct::new("{"), &mut children);
-        self.parse_column_whitespace(&mut children);
-        self.parse_punct(Punct::new("}"), &mut children);
+        children.push(self.parse_block());
         BareSyntaxNode::new_parent(BareSyntaxKind::Fn, children)
+    }
+
+    fn parse_block(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        self.parse_punct(Punct::new("{"), &mut children);
+        self.parse_all_whitespace(&mut children);
+        children.push(self.parse_term());
+        self.parse_all_whitespace(&mut children);
+        self.parse_punct(Punct::new("}"), &mut children);
+        BareSyntaxNode::new_parent(BareSyntaxKind::Block, children)
+    }
+
+    fn parse_if_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        // Ternary (for short single-line)
+        // @if(a >= b, a + b, a - b)
+
+        // Traditional (for multi-line)
+        // @if a >= b { a + b } else { a - b }
+        // @if (a >= b) { a + b } else { a - b }
+        // @if(a >= b){ a + b }else{ a - b }
+
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+
+        self.parse_column_whitespace(&mut children);
+
+        let has_block_args = if self.lexer.peek().is_punct_of(Punct::new("(")) {
+            let arg_list = self.parse_if_arg_list();
+
+            let has_arg_comma = arg_list.children().any(|child| {
+                matches!(
+                    child.as_ref().kind(),
+                    BareSyntaxKind::Punct(punct) if *punct == Punct::new(","),
+                )
+            });
+
+            let has_an_arg = arg_list
+                .children()
+                .any(|child| matches!(child.as_ref().kind(), BareSyntaxKind::Term));
+
+            children.push(arg_list);
+            !has_arg_comma && has_an_arg
+        } else {
+            children.push(self.parse_term());
+            true
+        };
+
+        if has_block_args {
+            self.parse_all_whitespace(&mut children);
+            children.push(self.parse_block());
+            self.parse_all_whitespace(&mut children);
+
+            children.push(
+                if let Some(else_keyword) = self.lexer.eat(|token| match token.kind {
+                    TokenKind::Identifier(ident) if ident == "else" => {
+                        Ok(BareSyntaxNode::new_leaf(
+                            BareSyntaxKind::Identifier(ident.clone().into()),
+                            ident,
+                        ))
+                    }
+                    _ => Err(token),
+                }) {
+                    else_keyword
+                } else {
+                    self.error_for_empty("Expected `else` after first block of if")
+                },
+            );
+            self.parse_all_whitespace(&mut children);
+
+            children.push(self.parse_block());
+        }
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::If, children)
+    }
+
+    fn parse_if_arg_list(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        self.parse_punct(Punct::new("("), &mut children);
+        self.parse_all_whitespace(&mut children);
+
+        let mut has_param = false;
+
+        while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
+            if has_param {
+                self.parse_punct(Punct::new(","), &mut children);
+                self.parse_all_whitespace(&mut children);
+            } else {
+                has_param = true;
+            }
+
+            children.push(self.parse_term());
+            self.parse_all_whitespace(&mut children);
+        }
+
+        self.parse_punct(Punct::new(")"), &mut children);
+        BareSyntaxNode::new_parent(BareSyntaxKind::IfArgList, children)
     }
 
     fn parse_param_list(&mut self) -> Arc<BareSyntaxNode> {
@@ -257,11 +372,23 @@ where
         }
     }
 
-    fn parse_column_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
+    fn parse_whitespace(&mut self, allow_newlines: bool, children: &mut Vec<Arc<BareSyntaxNode>>) {
         while let Some(child) = self.lexer.eat(|token| match token.kind {
             TokenKind::ColumnSpacing(atom) => Ok(BareSyntaxNode::new_leaf(
                 BareSyntaxKind::ColumnSpacing(atom),
                 atom.to_string(),
+            )),
+            TokenKind::LineSpacing(atom) if allow_newlines => Ok(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::LineSpacing(atom),
+                atom.to_string(),
+            )),
+            TokenKind::SinglelineComment(comment) => Ok(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::SinglelineComment(comment.clone().into()),
+                comment,
+            )),
+            TokenKind::MultilineComment(comment, terminated) => Ok(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::MultilineComment(comment.clone().into(), terminated),
+                comment,
             )),
             _ => Err(token),
         }) {
@@ -269,20 +396,12 @@ where
         }
     }
 
+    fn parse_column_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
+        self.parse_whitespace(false, children);
+    }
+
     fn parse_all_whitespace(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
-        while let Some(child) = self.lexer.eat(|token| match token.kind {
-            TokenKind::ColumnSpacing(atom) => Ok(BareSyntaxNode::new_leaf(
-                BareSyntaxKind::ColumnSpacing(atom),
-                atom.to_string(),
-            )),
-            TokenKind::LineSpacing(atom) => Ok(BareSyntaxNode::new_leaf(
-                BareSyntaxKind::LineSpacing(atom),
-                atom.to_string(),
-            )),
-            _ => Err(token),
-        }) {
-            children.push(child);
-        }
+        self.parse_whitespace(true, children);
     }
 }
 
@@ -314,8 +433,6 @@ pub fn reparse(
 
 #[test]
 fn test1() {
-    use util_infinite_iterator::AsIter;
-
     let document = Document::new(
         r#"
         test1 :: @fn(): Bool {}
@@ -328,11 +445,50 @@ fn test1() {
         
         test5 :: @fn(a: Bool, b: Bool, c: Bool): Bool {}
 
-        sum :: @fn(a, b, c, d: Bool): Bool {}
+        test6 :: @fn(a, b, c, d: Bool): Bool {}
+
+        test8 :: @fn(): Bool { true }
+
+        test9 :: @fn(x: Bool): Type {
+            @if(x, Bool, Void)
+        }
+
+        test_if_else :: @fn(a, b: Bool): @if(a, Bool, Void) {}
+
+        test10 :: @fn(a, b: Bool): @if a { Bool } else { Void } {}
+
+        test11 :: @fn(a, b: Bool): @if(a){ Bool } else { Void } {}
+
+        test12 :: @fn(a, b: Bool): @if (a) { Bool } else { Void } {}
+
+        /*
+        Test13 :: @Record {
+            a: Bool,
+            b: Bool,
+            c: Void,
+            d: Type,
+        }
+
+        test_if_else :: @fn(a, b: Bool): if a { Bool } else { Void } {}
+
+        //my_pair :: @record { a: true, b: false }
+
+        make_pair :: @fn(T: Type, a, b: T): Pair(T) {
+            @record { a, b }
+        }
+
+        Pair :: @fn(T: Type): Type {
+            @Record {
+                a: T,
+                b: T,
+            }
+        }
+        */
         "#
         .into(),
     );
 
+    /*
     let adapter = util_infinite_iterator::Adapter::new(
         document.chars().map(|c| Character::At(c, ())),
         Character::End(()),
@@ -343,6 +499,7 @@ fn test1() {
     for item in lexer.as_iter(true) {
         println!("has {:?}", item);
     }
+    */
 
     let syntax_tree = reparse(&document, None, document.full_range());
     let _ = syntax_tree.dump(&mut std::io::stdout(), 0);

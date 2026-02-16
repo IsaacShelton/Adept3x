@@ -1,6 +1,6 @@
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
-use token::Punct;
+use token::{Directive, IsTerminated, Punct};
 use util_text::{ColumnSpacingAtom, LineSpacingAtom};
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
@@ -17,11 +17,18 @@ pub enum BareSyntaxKind {
     Array,
     Term,
     Identifier(Box<str>),
+    Directive(Directive),
     Fn,
     ParamList,
     Param,
+    Block,
     Name,
     Binding,
+    Variable(Box<str>),
+    If,
+    IfArgList,
+    SinglelineComment(Box<str>),
+    MultilineComment(Box<str>, IsTerminated),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]

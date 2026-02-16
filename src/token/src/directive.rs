@@ -1,13 +1,14 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Directive {
-    Standard(&'static str),
+    Standard(Box<str>),
     Unknown(Box<str>),
 }
 
 impl Directive {
-    pub fn new(directive: &'static str) -> Self {
+    pub fn new(directive: Box<str>) -> Self {
         Self::Standard(directive)
     }
 

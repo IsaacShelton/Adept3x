@@ -8,6 +8,7 @@ pub use directive::Directive;
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
 pub use punct::Punct;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 pub use string::{StringLiteral, StringModifier};
 use util_infinite_iterator::IsEnd;
@@ -58,6 +59,14 @@ pub enum TokenKind {
     Directive(Directive),
     Punct(Punct),
     Label(String),
+    SinglelineComment(String),
+    MultilineComment(String, IsTerminated),
+}
+
+#[derive(Clone, Debug, PartialEq, IsVariant, Unwrap, Serialize, Deserialize)]
+pub enum IsTerminated {
+    Terminated,
+    Unterminated,
 }
 
 impl TokenKind {
@@ -91,6 +100,8 @@ impl Display for TokenKind {
             Self::Integer(value, _) => write!(f, "{}", value),
             Self::Float(value, _) => write!(f, "{}", value),
             Self::Directive(directive) => write!(f, "{}", directive),
+            Self::SinglelineComment(content) => write!(f, "{}", content),
+            Self::MultilineComment(content, _) => write!(f, "{}", content),
             Self::Punct(punct) => write!(f, "{}", punct),
             Self::Label(name) => write!(f, "@{}@", name),
         }
@@ -107,7 +118,8 @@ const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
     "-", "<<", "<<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&", "||",
 ];
 
-pub const ALL_DIRECTIVES: &[&'static str] = &["fn", "type", "struct", "enum", "record"];
+pub const ALL_DIRECTIVES: &[&'static str] =
+    &["fn", "Fn", "if", "record", "Record", "Variant", "variant"];
 
 // Since Rust's const evaluation sucks
 lazy_static! {
@@ -152,7 +164,9 @@ impl TokenKind {
             | Self::Float { .. }
             | Self::Directive(_)
             | Self::Punct(_)
-            | Self::Label(_) => 0,
+            | Self::Label(_)
+            | Self::SinglelineComment(..)
+            | Self::MultilineComment(..) => 0,
         }
     }
 
@@ -170,6 +184,8 @@ impl TokenKind {
             TokenKind::Float(_, len) => *len,
             TokenKind::Directive(directive) => directive.len_with_prefix(),
             TokenKind::Punct(punct) => punct.len(),
+            TokenKind::SinglelineComment(content) => content.len(),
+            TokenKind::MultilineComment(content, _) => content.len(),
             TokenKind::Label(_) => todo!(),
         }
     }

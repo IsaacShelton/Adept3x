@@ -47,18 +47,14 @@ impl SyntaxNode {
         w: &mut impl std::io::Write,
         depth: usize,
     ) -> std::io::Result<()> {
-        if self.parent.is_none() {
-            writeln!(w, "<root>")?;
-        }
-
         let padding = " ".repeat(depth * 2);
 
         match &self.bare.text {
             Some(leaf) => {
-                writeln!(w, "{} {:?}: `{}`", padding, self.bare.kind, leaf,)?;
+                writeln!(w, "{}{:?}: `{}`", padding, self.bare.kind, leaf,)?;
             }
             None => {
-                writeln!(w, "{} {:?}", padding, self.bare.kind)?;
+                writeln!(w, "{}{:?}", padding, self.bare.kind)?;
                 for child in self.children() {
                     child.dump(w, depth + 1)?;
                 }

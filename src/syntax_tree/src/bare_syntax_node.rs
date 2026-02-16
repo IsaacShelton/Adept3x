@@ -78,6 +78,14 @@ impl BareSyntaxNode {
         }
     }
 
+    pub fn kind(&self) -> &BareSyntaxKind {
+        &self.kind
+    }
+
+    pub fn children(&self) -> impl Iterator<Item = &Arc<BareSyntaxNode>> {
+        self.children.iter()
+    }
+
     pub fn flatten(&self) -> String {
         let mut builder = String::with_capacity(128);
         self.flatten_into(&mut builder);

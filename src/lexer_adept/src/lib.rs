@@ -2,7 +2,10 @@ mod feed_result;
 mod infinite_iterator;
 
 use crate::feed_result::FeedResult;
-use token::{ALL_DIRECTIVES, ALL_PUNCT_SORTED, Directive, Punct, StringLiteral, Token, TokenKind};
+use token::{
+    ALL_DIRECTIVES, ALL_PUNCT_SORTED, Directive, IsTerminated, Punct, StringLiteral, Token,
+    TokenKind,
+};
 use util_text::{Character, Lexable};
 
 pub struct Lexer<L, S>
@@ -20,6 +23,8 @@ pub enum State<S: Copy> {
     Identifier(String, S),
     UnknownDirective(String, S),
     String(StringState<S>),
+    SinglelineComment(SinglelineCommentState<S>),
+    MultilineComment(MultilineCommentState<S>),
     UnterminatedString(S),
     EndOfFile(S),
 }
@@ -28,6 +33,16 @@ pub struct StringState<S: Copy> {
     literal: String,
     close_char: char,
     escaped: bool,
+    source: S,
+}
+
+pub struct SinglelineCommentState<S: Copy> {
+    content: String,
+    source: S,
+}
+
+pub struct MultilineCommentState<S: Copy> {
+    content: String,
     source: S,
 }
 
@@ -105,6 +120,45 @@ where
                     )
                 }
             }
+            State::SinglelineComment(state) => {
+                if self.lexable.peek().is('\n') || self.lexable.peek().is_end() {
+                    let content = std::mem::take(&mut state.content);
+                    let source = state.source;
+                    self.state = State::Idle;
+                    FeedResult::Has(TokenKind::SinglelineComment(content).at(source))
+                } else {
+                    state.content.push(self.lexable.next().unwrap().0);
+                    FeedResult::Waiting
+                }
+            }
+            State::MultilineComment(state) => {
+                const MULTILINE_COMMENT_END: &str = "*/";
+
+                if let Ok(source) = self.lexable.eat_remember(MULTILINE_COMMENT_END) {
+                    let mut content = std::mem::take(&mut state.content);
+                    self.state = State::Idle;
+                    content.push_str(MULTILINE_COMMENT_END);
+                    FeedResult::Has(
+                        TokenKind::MultilineComment(content, IsTerminated::Terminated).at(source),
+                    )
+                } else {
+                    match self.lexable.next() {
+                        Character::At(c, _) => {
+                            state.content.push(c);
+                            FeedResult::Waiting
+                        }
+                        Character::End(_) => {
+                            let content = std::mem::take(&mut state.content);
+                            let source = state.source;
+                            self.state = State::Idle;
+                            FeedResult::Has(
+                                TokenKind::MultilineComment(content, IsTerminated::Unterminated)
+                                    .at(source),
+                            )
+                        }
+                    }
+                }
+            }
             State::EndOfFile(source) => FeedResult::Has(TokenKind::EndOfFile.at(*source)),
         }
     }
@@ -112,6 +166,24 @@ where
     fn feed_idle(&mut self) -> FeedResult<Token<S>> {
         if let Some((spacing_atom, source)) = self.lexable.eat_column_spacing_atom() {
             return FeedResult::Has(TokenKind::ColumnSpacing(spacing_atom).at(source));
+        }
+
+        const SINGLELINE_COMMENT_START: &str = "//";
+        if let Ok(source) = self.lexable.eat_remember(SINGLELINE_COMMENT_START) {
+            self.state = State::SinglelineComment(SinglelineCommentState {
+                content: SINGLELINE_COMMENT_START.into(),
+                source: source,
+            });
+            return FeedResult::Waiting;
+        }
+
+        const MULTILINE_COMMENT_START: &str = "/*";
+        if let Ok(source) = self.lexable.eat_remember(MULTILINE_COMMENT_START) {
+            self.state = State::MultilineComment(MultilineCommentState {
+                content: MULTILINE_COMMENT_START.into(),
+                source: source,
+            });
+            return FeedResult::Waiting;
         }
 
         for punct_str in [")", "]", "}"] {
@@ -140,7 +212,7 @@ where
             for possible in ALL_DIRECTIVES.iter().copied() {
                 if self.lexable.eat(possible) {
                     return FeedResult::Has(
-                        TokenKind::Directive(Directive::Standard(possible)).at(source),
+                        TokenKind::Directive(Directive::Standard(possible.into())).at(source),
                     );
                 }
             }
