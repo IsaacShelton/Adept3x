@@ -5,13 +5,18 @@ use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind}
 use file_uri::DecodeFileUri;
 #[cfg(target_family = "unix")]
 use lsp_message::LspMessage;
-use lsp_message::{LspNotification, LspRequestId};
-use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams};
+use lsp_message::{LspNotification, LspRequest, LspRequestId, LspResponse};
+use lsp_types::{
+    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
+    FullDocumentDiagnosticReport, Position, Range, RelatedFullDocumentDiagnosticReport,
+};
 use std::ffi::OsStr;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::{SocketAddr, UnixStream};
 #[cfg(target_family = "unix")]
 use std::{io::BufReader, io::ErrorKind, time::Duration};
+use syntax_tree::BareSyntaxKind;
 use text_edit::TextEditOrFullUtf16;
 
 pub struct Client {
@@ -83,6 +88,22 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
                 if let ConfigFile::Present(_) = &client.config_file {
                     daemon.idle_tracker.still_active();
                     log::info!("Got request {:?}", request);
+                }
+
+                let response_or_original_request = on_request::<
+                    lsp_types::request::DocumentDiagnosticRequest,
+                >(request, |id, params| {
+                    document_diagnostics_request(&mut client, id, params)
+                })
+                .or_else(|request| {
+                    log::warn!("Unhandled request {:?}", request);
+                    Err(request)
+                });
+
+                if let Ok(response) = response_or_original_request {
+                    response
+                        .write(&mut &stream)
+                        .expect("Failed to send message to client");
                 }
             }
             Ok(Some(LspMessage::Response(response))) => {
@@ -170,6 +191,99 @@ fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
     }
 }
 
+fn on_request<T: lsp_types::request::Request>(
+    request: LspRequest,
+    then: impl FnOnce(&LspRequestId, T::Params) -> Result<T::Result, LspResponse>,
+) -> Result<LspMessage, LspRequest> {
+    if request.method.as_str() != T::METHOD {
+        return Err(request);
+    }
+
+    let response = then(
+        &request.id,
+        serde_json::from_value(request.params).expect("invalid request"),
+    );
+
+    let response = match response {
+        Ok(result) => LspResponse {
+            id: request.id,
+            result: Some(serde_json::to_value(result).expect("response is serializable")),
+            error: None,
+        },
+        Err(response) => response,
+    };
+
+    Ok(LspMessage::Response(response))
+}
+
+fn document_diagnostics_request(
+    client: &mut Client,
+    _id: &LspRequestId,
+    params: DocumentDiagnosticParams,
+) -> Result<DocumentDiagnosticReportResult, LspResponse> {
+    let mut diagnostics = vec![];
+
+    if let Some(filepath) = params.text_document.uri.decode_file_uri() {
+        if let Ok(filepath) = Canonical::new(filepath) {
+            let file_id = client.file_cache.preregister_file(filepath);
+            if let Some(file_content) = client.file_cache.get_content(file_id) {
+                if let Some(syntax_tree) = &file_content.syntax_tree {
+                    let bindings = syntax_tree
+                        .bare()
+                        .children()
+                        .filter(|x| matches!(x.kind(), BareSyntaxKind::Binding));
+
+                    let mut binding_names = bindings
+                        .flat_map(|binding| {
+                            binding
+                                .children()
+                                .find(|child| matches!(child.kind(), BareSyntaxKind::Name))
+                                .map(|name| {
+                                    name.children().find_map(|id| match id.kind() {
+                                        BareSyntaxKind::Identifier(name) => Some(name),
+                                        _ => None,
+                                    })
+                                })
+                        })
+                        .flatten();
+
+                    let names = itertools::Itertools::join(&mut binding_names, ", ");
+
+                    diagnostics.push(Diagnostic {
+                        range: Range {
+                            start: Position {
+                                line: 1,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: 1,
+                                character: 4,
+                            },
+                        },
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        source: Some("Adept".into()),
+                        message: format!("Defined bindings are: {}", names),
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(DocumentDiagnosticReportResult::Report(
+        DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+            related_documents: None,
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: None,
+                items: diagnostics,
+            },
+        }),
+    ))
+}
+
 fn on_notif<T: lsp_types::notification::Notification>(
     notification: LspNotification,
     then: impl FnOnce(T::Params),
@@ -233,8 +347,6 @@ fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
 
             let new_syntax_tree =
                 parser_adept::reparse(document, old_syntax_tree, document.full_range());
-
-            log::error!("New syntax tree {:#?}", &new_syntax_tree);
 
             let mut new_file_contents = file_content.after_edits(std::iter::once(edit));
             new_file_contents.syntax_tree = Some(new_syntax_tree);

@@ -218,6 +218,7 @@ dependencies = [
  "file_uri",
  "humantime",
  "idle_tracker",
+ "itertools",
  "lock_file",
  "log",
  "lsp-types",
@@ -225,6 +226,7 @@ dependencies = [
  "parser_adept",
  "serde",
  "serde_json",
+ "syntax_tree",
  "text_edit",
  "thiserror",
 ]

@@ -73,7 +73,7 @@ where
         if let Some(ok) = self.lexer.eat(|token| match token.kind {
             TokenKind::Identifier(name) => {
                 let identifier =
-                    BareSyntaxNode::new_leaf(BareSyntaxKind::Word(name.clone().into()), name);
+                    BareSyntaxNode::new_leaf(BareSyntaxKind::Identifier(name.clone().into()), name);
 
                 Ok(BareSyntaxNode::new_parent(
                     BareSyntaxKind::Name,
@@ -89,33 +89,10 @@ where
     }
 
     fn parse_binding(&mut self) -> Arc<BareSyntaxNode> {
-        if !self.lexer.peek().is_identifier() {
-            return self.error_for_next_token("Expected identifier for binding");
-        }
-
-        let (after, _) = self
-            .lexer
-            .peek_skipping(1, |token| token.kind.is_column_spacing());
-
-        if !after.kind.is_punct_of(Punct::new("::")) {
-            return self.error_for_next_token("Expected `::` after identifier for binding");
-        }
-
         let mut children = Vec::new();
         children.push(self.parse_name());
         self.parse_column_whitespace(&mut children);
-
-        children.push(
-            self.lexer
-                .eat(|token| match token.kind {
-                    TokenKind::Punct(punct) => {
-                        assert!(punct == Punct::new("::"));
-                        Ok(BareSyntaxNode::new_punct(punct))
-                    }
-                    _ => Err(token),
-                })
-                .unwrap(),
-        );
+        self.parse_punct(Punct::new("::"), &mut children);
 
         self.parse_column_whitespace(&mut children);
         children.push(self.parse_term());
@@ -250,8 +227,7 @@ where
         self.parse_column_whitespace(&mut children);
         children.push(self.parse_param_list());
         self.parse_column_whitespace(&mut children);
-        self.parse_punct(Punct::new(":"), &mut children);
-        children.push(self.parse_term());
+        self.parse_type_annotation(false, &mut children);
         self.parse_column_whitespace(&mut children);
         children.push(self.parse_block());
         BareSyntaxNode::new_parent(BareSyntaxKind::FnValue, children)
@@ -275,6 +251,10 @@ where
         // @if a >= b { a + b } else { a - b }
         // @if (a >= b) { a + b } else { a - b }
         // @if(a >= b){ a + b }else{ a - b }
+
+        // With Motive (for dependent if)
+        // @if(a >= b, a + b, a - b): Nat
+        // @if a >= b { a + b } else { a - b }: Nat
 
         let mut children = Vec::new();
         children.push(BareSyntaxNode::new_leaf(
@@ -312,9 +292,12 @@ where
 
             children.push(
                 if let Some(else_keyword) = self.lexer.eat(|token| match token.kind {
-                    TokenKind::Identifier(ident) if ident == "else" => Ok(
-                        BareSyntaxNode::new_leaf(BareSyntaxKind::Word(ident.clone().into()), ident),
-                    ),
+                    TokenKind::Identifier(ident) if ident == "else" => {
+                        Ok(BareSyntaxNode::new_leaf(
+                            BareSyntaxKind::Identifier(ident.clone().into()),
+                            ident,
+                        ))
+                    }
                     _ => Err(token),
                 }) {
                     else_keyword
@@ -326,6 +309,9 @@ where
             self.parse_all_whitespace(&mut children);
             children.push(self.parse_block());
         }
+
+        self.parse_column_whitespace(&mut children);
+        self.parse_type_annotation(false, &mut children);
 
         BareSyntaxNode::new_parent(BareSyntaxKind::IfValue, children)
     }
@@ -382,8 +368,7 @@ where
     fn parse_field_def_sublist(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
         self.parse_names(&mut children);
-        self.parse_punct(Punct::new(":"), &mut children);
-        children.push(self.parse_term());
+        self.parse_type_annotation(true, &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::FieldDef, children)
     }
 
@@ -410,11 +395,25 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::ParamList, children)
     }
 
+    fn parse_type_annotation(&mut self, required: bool, out: &mut Vec<Arc<BareSyntaxNode>>) {
+        if self.lexer.peek().is_punct_of(Punct::new(":")) {
+            let mut children = vec![];
+            self.parse_punct(Punct::new(":"), &mut children);
+            children.push(self.parse_term());
+
+            out.push(BareSyntaxNode::new_parent(
+                BareSyntaxKind::TypeAnnotation,
+                children,
+            ));
+        } else if required {
+            out.push(self.error_for_empty("Expected type annotation"));
+        }
+    }
+
     fn parse_param_sublist(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
         self.parse_names(&mut children);
-        self.parse_punct(Punct::new(":"), &mut children);
-        children.push(self.parse_term());
+        self.parse_type_annotation(true, &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::Param, children)
     }
 
@@ -490,7 +489,6 @@ pub fn reparse(
     let lexer =
         util_infinite_iterator::Peeker::new(lexer_adept::Lexer::new(CharacterPeeker::new(adapter)));
 
-    assert!(existing.is_none());
     let mut parser = Parser::new(lexer);
 
     SyntaxNode::new(
@@ -507,57 +505,93 @@ pub fn reparse(
 fn test1() {
     let document = Document::new(
         r#"
-        test1 :: @fn(): Bool {}
+        fn_test1 :: @fn(): Bool {}
 
-        test2 :: @fn(): Void {}
+        fn_test2 :: @fn(): Void {}
 
-        test3 :: @fn(a: Bool): Void {}
+        fn_test3 :: @fn(a: Bool): Void {}
 
-        test4 :: @fn(a: Bool, b: Bool): Bool {}
+        fn_test4 :: @fn(a: Bool, b: Bool): Bool {}
         
-        test5 :: @fn(a: Bool, b: Bool, c: Bool): Bool {}
+        fn_test5 :: @fn(a: Bool, b: Bool, c: Bool): Bool {}
 
-        test6 :: @fn(a, b, c, d: Bool): Bool {}
+        fn_test6 :: @fn(a, b, c, d: Bool): Bool {}
 
-        test8 :: @fn(): Bool { true }
+        fn_test7 :: @fn(): Bool { true }
 
-        test9 :: @fn(x: Bool): Type {
+        if_test1 :: @fn(x: Bool): Type {
             @if(x, Bool, Void)
         }
 
-        test_if_else :: @fn(a, b: Bool): @if(a, Bool, Void) {}
+        if_test2 :: @fn(x: Bool): Type {
+            @if(x, Bool, Void): Type
+        }
 
-        test10 :: @fn(a, b: Bool): @if a { Bool } else { Void } {}
+        if_test3 :: @fn(a, b: Bool): @if(a, Bool, Void) {}
 
-        test11 :: @fn(a, b: Bool): @if(a){ Bool } else { Void } {}
+        if_test4 :: @fn(a, b: Bool): @if a { Bool } else { Void } {}
 
-        test12 :: @fn(a, b: Bool): @if (a) { Bool } else { Void } {}
+        if_test5 :: @fn(a, b: Bool): @if(a){ Bool } else { Void } {}
 
-        Test13 :: @Record {
+        if_test6 :: @fn(a, b: Bool): @if (a) { Bool } else { Void } {}
+
+        RecordTest1 :: @Record {
             a: Bool,
             b: Bool,
             c: Void,
             d: Type,
         }
 
-        Test14 :: @Record {
+        RecordTest2 :: @Record {
             a: Bool
             b: Bool
             c: Void
             d: Type
         }
 
-        Test15 :: @Record { a, b, c: Bool, d: Type }
+        RecordTest3 :: @Record { a, b, c: Bool, d: Type }
 
-        Test16 :: @Fn(a: Void, b: Type, c: Bool): Type
+        PiTest1 :: @Fn(a: Void, b: Type, c: Bool): Type
 
-        Test17 :: @Fn(a, b, c: Bool): Type
+        PiTest2 :: @Fn(a, b, c: Bool): Type
+
+        if_motive_test1 :: @fn(x: Bool): Bool {
+            @if(x, false, true): Bool
+        }
+
+        if_motive_test2 :: @fn(x: Bool): Bool {
+            @if x {
+                false
+            } else {
+                true
+            }: Bool
+        }
 
         /*
+        record_test1 :: @fn(): @Record { a: Bool, b: Void } {
+            @record { a: true, b: void }
+        }
+
         //my_pair :: @record { a: true, b: false }
 
         make_pair :: @fn(T: Type, a, b: T): Pair(T) {
             @record { a, b }
+        }
+
+        access_test1 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
+            @first(pair)
+        }
+
+        access_test2 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
+            @second(pair)
+        }
+
+        access_test3 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
+            pair.a
+        }
+
+        access_test4 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
+            pair.b
         }
 
         Pair :: @fn(T: Type): Type {

@@ -40,6 +40,7 @@ macro_rules! notification {
 request!(Initialize, LspConnectionState::Started);
 request!(Shutdown);
 request!(Completion);
+request!(DocumentDiagnosticRequest);
 
 notification!(Initialized, LspConnectionState::Started);
 notification!(DidOpenTextDocument);

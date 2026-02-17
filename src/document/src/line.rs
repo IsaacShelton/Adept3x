@@ -31,19 +31,11 @@ impl DocumentLine {
         self.content.push_str(text)
     }
 
-    pub fn prepend(&mut self, text: &str) {
-        self.content.insert_str(0, text);
-    }
-
     pub fn insert(&mut self, index: usize, text: &str) {
         self.content.insert_str(index, text);
     }
 
     pub fn delete_after(&mut self, index: usize) {
         self.content.truncate(index);
-    }
-
-    pub fn delete_before(&mut self, index: usize) {
-        self.content.replace_range(0..index, "");
     }
 }

@@ -110,6 +110,7 @@ pub fn start() -> ExitCode {
             .or_else(|message| handle::<Shutdown>(&mut client, message))
             .or_else(|message| handle::<DidOpenTextDocument>(&mut client, message))
             .or_else(|message| handle::<DidChangeTextDocument>(&mut client, message))
+            .or_else(|message| handle::<DocumentDiagnosticRequest>(&mut client, message))
             .err();
 
         if let Some(unhandled) = unhandled {

@@ -12,6 +12,7 @@ document = { version = "0.1.0", path = "../document" }
 text_edit = { version = "0.1.0", path = "../text_edit" }
 idle_tracker = { version = "0.1.0", path = "../idle_tracker" }
 parser_adept = { version = "0.1.0", path = "../parser_adept" }
+syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
 thiserror.workspace = true
 derive_more.workspace = true
 fern.workspace = true
@@ -20,3 +21,4 @@ log.workspace = true
 lsp-types.workspace = true
 serde_json.workspace = true
 serde.workspace = true
+itertools.workspace = true

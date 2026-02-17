@@ -22,6 +22,10 @@ impl SyntaxNode {
         })
     }
 
+    pub fn bare(&self) -> &Arc<BareSyntaxNode> {
+        &self.bare
+    }
+
     pub fn parent(&self) -> Option<&Arc<Self>> {
         self.parent.as_ref()
     }
