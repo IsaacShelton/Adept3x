@@ -7,13 +7,15 @@ use file_uri::DecodeFileUri;
 use lsp_message::LspMessage;
 use lsp_message::{LspNotification, LspRequest, LspRequestId, LspResponse};
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
+    CompletionItem, CompletionList, CompletionParams, CompletionResponse, Diagnostic,
+    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, Position, Range, RelatedFullDocumentDiagnosticReport,
+    ExecuteCommandParams, FullDocumentDiagnosticReport, Position, Range,
+    RelatedFullDocumentDiagnosticReport, Uri,
 };
-use std::ffi::OsStr;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::{SocketAddr, UnixStream};
+use std::{borrow::Cow, ffi::OsStr, path::PathBuf, str::FromStr, sync::Arc};
 #[cfg(target_family = "unix")]
 use std::{io::BufReader, io::ErrorKind, time::Duration};
 use syntax_tree::BareSyntaxKind;
@@ -96,6 +98,16 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
                     document_diagnostics_request(&mut client, id, params)
                 })
                 .or_else(|request| {
+                    on_request::<lsp_types::request::Completion>(request, |id, params| {
+                        completion(&mut client, id, params)
+                    })
+                })
+                .or_else(|request| {
+                    on_request::<lsp_types::request::ExecuteCommand>(request, |id, params| {
+                        execute_command(&mut client, id, params)
+                    })
+                })
+                .or_else(|request| {
                     log::warn!("Unhandled request {:?}", request);
                     Err(request)
                 });
@@ -145,12 +157,16 @@ fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
     {
         Ok(config_filepath) => {
             use document::Document;
+            use std::borrow::Cow;
 
             log::info!("Found config file {:?}", config_filepath);
             let config_text = std::fs::read_to_string(config_filepath.as_path())
                 .expect("Failed to read config file");
 
-            let config_file_id = client.file_cache.preregister_file(config_filepath);
+            let config_file_id = client
+                .file_cache
+                .preregister_file(Cow::Owned(config_filepath));
+
             log::info!("Config file id is {:?}", config_file_id);
             log::info!("Config text is {}", config_text);
 
@@ -225,7 +241,8 @@ fn document_diagnostics_request(
 
     if let Some(filepath) = params.text_document.uri.decode_file_uri() {
         if let Ok(filepath) = Canonical::new(filepath) {
-            let file_id = client.file_cache.preregister_file(filepath);
+            let file_id = client.file_cache.preregister_file(Cow::Owned(filepath));
+
             if let Some(file_content) = client.file_cache.get_content(file_id) {
                 if let Some(syntax_tree) = &file_content.syntax_tree {
                     let bindings = syntax_tree
@@ -284,6 +301,73 @@ fn document_diagnostics_request(
     ))
 }
 
+fn completion(
+    _client: &mut Client,
+    _id: &LspRequestId,
+    params: CompletionParams,
+) -> Result<Option<CompletionResponse>, LspResponse> {
+    Ok(Some(CompletionResponse::List(CompletionList {
+        is_incomplete: true,
+        items: vec![CompletionItem {
+            label: "testing_word".into(),
+            ..Default::default()
+        }],
+    })))
+}
+
+fn get_file_content<'c, 'u>(
+    client: &'c mut Client,
+    uri: &'c Uri,
+) -> Option<(Arc<FileContent>, FileId, Canonical<PathBuf>)> {
+    uri.decode_file_uri()
+        .and_then(|filepath| Canonical::new(filepath).ok())
+        .and_then(|filepath| {
+            let file_id = client.file_cache.preregister_file(Cow::Borrowed(&filepath));
+            client
+                .file_cache
+                .get_content(file_id)
+                .map(|file_content| (file_content, file_id, filepath))
+        })
+}
+
+fn execute_command(
+    client: &mut Client,
+    _id: &LspRequestId,
+    params: ExecuteCommandParams,
+) -> Result<Option<serde_json::Value>, LspResponse> {
+    match params.command.as_str() {
+        "adept.showSyntaxTree" => {
+            let result = params
+                .arguments
+                .first()
+                .and_then(|arg| arg.as_str())
+                .and_then(|arg| Some(lsp_types::Uri::from_str(arg)))
+                .into_iter()
+                .flatten()
+                .next()
+                .as_ref()
+                .and_then(|uri| get_file_content(client, uri))
+                .and_then(|file_content| {
+                    file_content
+                        .0
+                        .as_ref()
+                        .syntax_tree
+                        .as_ref()
+                        .map(|syntax_tree| {
+                            let mut value = Vec::new();
+                            let _ = syntax_tree.dump(&mut value, 0);
+                            String::from_utf8(value).ok()
+                        })
+                })
+                .map(|string| serde_json::Value::from(string))
+                .unwrap_or_else(|| serde_json::Value::from(""));
+
+            Ok(Some(result))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn on_notif<T: lsp_types::notification::Notification>(
     notification: LspNotification,
     then: impl FnOnce(T::Params),
@@ -305,8 +389,9 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
             } else {
                 FileKind::Unknown
             };
+
             let file_bytes = FileBytes::Document(Document::new(params.text_document.text.into()));
-            let file_id = client.file_cache.preregister_file(filepath);
+            let file_id = client.file_cache.preregister_file(Cow::Owned(filepath));
             log::info!("on_notif did open {:?} {:?}", file_id, &file_bytes);
 
             client.file_cache.set_content(
@@ -322,44 +407,33 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
 }
 
 fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
-    let Some(filepath) = params.text_document.uri.decode_file_uri() else {
-        return;
-    };
-
-    let Ok(filepath) = Canonical::new(filepath) else {
+    let Some((file_content, file_id, filepath)) =
+        get_file_content(client, &params.text_document.uri)
+    else {
         return;
     };
 
     log::info!("Change for {:?}", filepath);
-    let file_id = client.file_cache.preregister_file(filepath);
-    let Some(file_content) = client.file_cache.get_content(file_id) else {
-        return;
-    };
 
-    if let Some(document) = file_content.file_bytes.as_document() {
+    if let Some(_) = file_content.file_bytes.as_document() {
         let edits = params
             .content_changes
             .into_iter()
             .map(TextEditOrFullUtf16::from);
 
+        let mut file_content = file_content.after_edits(std::iter::empty());
+
         for edit in edits {
-            let old_syntax_tree = file_content.syntax_tree.clone();
+            file_content = file_content.after_edits(std::iter::once(edit));
 
-            let new_syntax_tree =
-                parser_adept::reparse(document, old_syntax_tree, document.full_range());
-
-            let mut new_file_contents = file_content.after_edits(std::iter::once(edit));
-            new_file_contents.syntax_tree = Some(new_syntax_tree);
-
-            client.file_cache.set_content(file_id, new_file_contents);
+            if let Some(document) = file_content.file_bytes.as_document() {
+                let old_syntax_tree = file_content.syntax_tree.clone();
+                let new_syntax_tree =
+                    parser_adept::reparse(document, old_syntax_tree, document.full_range());
+                file_content.syntax_tree = Some(new_syntax_tree);
+            }
         }
+
+        client.file_cache.set_content(file_id, file_content);
     }
-
-    log::info!("Existing is {:?} {:?}", file_id, file_content);
-
-    log::info!(
-        "New content is {:?} {:?}",
-        file_id,
-        client.file_cache.get_content(file_id)
-    );
 }

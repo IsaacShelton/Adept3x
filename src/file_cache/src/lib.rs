@@ -7,6 +7,7 @@ use crate::path_interner::PathInterner;
 pub use canonical::Canonical;
 pub use file_bytes::FileBytes;
 use std::{
+    borrow::Cow,
     collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -49,7 +50,7 @@ impl FileCache {
         todo!("FileCache::register_file")
     }
 
-    pub fn preregister_file(&mut self, filepath: Canonical<PathBuf>) -> FileId {
+    pub fn preregister_file(&mut self, filepath: Cow<Canonical<PathBuf>>) -> FileId {
         self.path_interner.intern_mut(filepath)
     }
 

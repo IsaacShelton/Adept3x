@@ -2,9 +2,10 @@ use crate::{LspEndpoint, MaybeReady, Static};
 use lsp_connection::LspConnection;
 use lsp_message::LspRequestId;
 use lsp_types::{
-    CompletionOptions, DiagnosticOptions, DiagnosticServerCapabilities, InitializeResult,
-    ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WorkDoneProgressOptions,
+    CompletionOptions, DiagnosticOptions, DiagnosticServerCapabilities, ExecuteCommandOptions,
+    InitializeResult, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    WorkDoneProgressOptions,
 };
 
 impl LspEndpoint for Static<lsp_types::request::Initialize> {
@@ -58,6 +59,10 @@ impl LspEndpoint for Static<lsp_types::request::Initialize> {
                         work_done_progress_options: WorkDoneProgressOptions::default(),
                     },
                 )),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec!["Show Syntax Tree".into()],
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                }),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {

@@ -285,6 +285,7 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "itertools",
+ "log",
  "serde",
  "text_edit",
  "util_data_unit",

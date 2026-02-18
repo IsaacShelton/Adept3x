@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "child_process";
-import type { ExtensionContext } from "vscode";
-import { commands, window, workspace } from "vscode";
+import { ExtensionContext, TextDocumentContentProvider, Uri, ViewColumn } from "vscode";
+import { commands, EventEmitter, window, workspace } from "vscode";
 import type {
     LanguageClientOptions,
     ServerOptions,
@@ -11,7 +11,25 @@ import { LanguageClient } from "vscode-languageclient/node";
 let client: LanguageClient;
 let server: ChildProcess | undefined;
 
-function startServer() {
+const liveScheme = 'adept-live';
+
+class LiveProvider implements TextDocumentContentProvider {
+    private _onDidChange = new EventEmitter<Uri>();
+    onDidChange = this._onDidChange.event;
+
+    private content = new Map<string, string>();
+
+    provideTextDocumentContent(uri: Uri): string {
+        return this.content.get(uri.toString()) ?? '';
+    }
+
+    update(uri: Uri, text: string) {
+        this.content.set(uri.toString(), text);
+        this._onDidChange.fire(uri);
+    }
+}
+
+async function startServer(context: ExtensionContext) {
     const config = workspace.getConfiguration("adept");
     const serverCommand: string = config.get("serverCommand") ?? "";
 
@@ -69,9 +87,46 @@ function startServer() {
             clientOptions,
         );
 
-        client.start().then(() =>
-            outputChannel.appendLine("started adept.")
+        await client.start();
+        outputChannel.appendLine("started adept.");
+
+        const provider = new LiveProvider();
+
+        context.subscriptions.push(
+            workspace.registerTextDocumentContentProvider(liveScheme, provider)
         );
+
+        context.subscriptions.push(
+            commands.registerCommand('adept.showSyntaxTree', async () => {
+                const fileUri = window.activeTextEditor?.document.uri.toString();
+                if (fileUri == null) {
+                    return;
+                }
+
+                const result = String(await client.sendRequest('workspace/executeCommand', {
+                    command: 'adept.showSyntaxTree',
+                    arguments: [fileUri]
+                }));
+                
+                const uri = Uri.parse(liveScheme + ':Live Output');
+                const doc = await workspace.openTextDocument(uri);
+
+                await window.showTextDocument(doc, {
+                    viewColumn: ViewColumn.Beside,
+                    preview: false,
+                    preserveFocus: true,
+                });
+
+                provider.update(uri, result);
+            })
+        );
+        context.subscriptions.push(
+            commands.registerCommand("adept.restartServer", async () => {
+                await killServer();
+                startServer(context);
+            }),
+        );
+
     }
 }
 
@@ -81,13 +136,8 @@ async function killServer(): Promise<void> {
 }
 
 export function activate(context: ExtensionContext) {
-    startServer();
-    context.subscriptions.push(
-        commands.registerCommand("adept.restartServer", async () => {
-            await killServer();
-            startServer();
-        }),
-    );
+    startServer(context);
+
 }
 export function deactivate(): Thenable<void> | undefined {
     return killServer();

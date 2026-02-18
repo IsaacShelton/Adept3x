@@ -103,17 +103,22 @@ impl Document {
     }
 
     pub fn insert(&mut self, position: DocumentPosition, text: &str) {
-        let mut added_lines = text.split('\n');
+        // Get the portions of edited line before & after the edit position
         let start_line = self.lines.get_mut(position.line.0).unwrap();
+        let prefix = &start_line.content[..position.index.bytes() as usize];
+        let suffix = &start_line.content[position.index.bytes() as usize..];
 
-        if let Some(text) = added_lines.next() {
-            start_line.insert(position.index.bytes() as usize, text);
-        }
+        // Split replacement text into lines, and add the prefix and suffix back in
+        let mut new_lines = text.split('\n').map(String::from).collect_vec();
+        new_lines.first_mut().unwrap().insert_str(0, prefix);
+        new_lines.last_mut().unwrap().push_str(suffix);
 
-        let next_line = position.line.0 + 1;
+        // Replace the affected line with the new lines
         self.lines.splice(
-            next_line..next_line,
-            added_lines.map(|text| DocumentLine::new(text.into())),
+            position.line.0..(position.line.0 + 1),
+            new_lines
+                .into_iter()
+                .map(|text| DocumentLine::new(text.into())),
         );
     }
 

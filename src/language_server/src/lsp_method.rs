@@ -41,6 +41,7 @@ request!(Initialize, LspConnectionState::Started);
 request!(Shutdown);
 request!(Completion);
 request!(DocumentDiagnosticRequest);
+request!(ExecuteCommand);
 
 notification!(Initialized, LspConnectionState::Started);
 notification!(DidOpenTextDocument);

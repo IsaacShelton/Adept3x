@@ -1,5 +1,5 @@
 use crate::Canonical;
-use std::{collections::HashMap, path::PathBuf, sync::Mutex};
+use std::{borrow::Cow, collections::HashMap, path::PathBuf, sync::Mutex};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FileId(usize);
@@ -17,17 +17,17 @@ pub struct PathInternerInner {
 }
 
 impl PathInterner {
-    pub fn intern(&self, filepath: Canonical<PathBuf>) -> FileId {
+    pub fn intern(&self, filepath: Cow<Canonical<PathBuf>>) -> FileId {
         self.inner.lock().unwrap().intern(filepath)
     }
 
-    pub fn intern_mut(&mut self, filepath: Canonical<PathBuf>) -> FileId {
+    pub fn intern_mut(&mut self, filepath: Cow<Canonical<PathBuf>>) -> FileId {
         self.inner.get_mut().unwrap().intern(filepath)
     }
 }
 
 impl PathInternerInner {
-    pub fn intern(&mut self, filepath: Canonical<PathBuf>) -> FileId {
+    pub fn intern(&mut self, filepath: Cow<Canonical<PathBuf>>) -> FileId {
         if let Some(found) = self.file_ids.get(&filepath) {
             return *found;
         }
@@ -35,8 +35,8 @@ impl PathInternerInner {
         let file_id = FileId(self.next_file_id);
         self.next_file_id += 1;
 
-        self.paths.insert(file_id, filepath.clone());
-        self.file_ids.insert(filepath, file_id);
+        self.paths.insert(file_id, filepath.as_ref().clone());
+        self.file_ids.insert(filepath.into_owned(), file_id);
         file_id
     }
 }

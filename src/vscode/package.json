@@ -57,14 +57,18 @@
                     "default": {},
                     "description": "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initializeParams"
                 }
+            }
+        },
+        "commands": [
+            {
+                "command": "adept.restartServer",
+                "title": "Adept: Restart Language Server"
             },
-            "commands": [
-                {
-                    "command": "adept.restartServer",
-                    "title": "Adept: Restart Language Server"
-                }
-            ]
-        }
+            {
+                "command": "adept.showSyntaxTree",
+                "title": "Adept: Show Syntax Tree"
+            }
+        ]
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
