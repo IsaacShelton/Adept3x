@@ -3,9 +3,7 @@ use crate::Daemon;
 use document::Document;
 use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
-#[cfg(target_family = "unix")]
-use lsp_message::LspMessage;
-use lsp_message::{LspNotification, LspRequest, LspRequestId, LspResponse};
+use lsp_message::{LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse};
 use lsp_types::{
     CompletionItem, CompletionList, CompletionParams, CompletionResponse, Diagnostic,
     DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
