@@ -25,6 +25,22 @@ pub struct Client {
     config_file: ConfigFile,
 }
 
+impl Client {
+    pub fn get_file_content(
+        &mut self,
+        uri: &Uri,
+    ) -> Option<(Arc<FileContent>, FileId, Canonical<PathBuf>)> {
+        uri.decode_file_uri()
+            .and_then(|filepath| Canonical::new(filepath).ok())
+            .and_then(|filepath| {
+                let file_id = self.file_cache.preregister_file(Cow::Borrowed(&filepath));
+                self.file_cache
+                    .get_content(file_id)
+                    .map(|file_content| (file_content, file_id, filepath))
+            })
+    }
+}
+
 pub enum ConfigFile {
     Missing,
     Prompted(LspRequestId),
@@ -313,21 +329,6 @@ fn completion(
     })))
 }
 
-fn get_file_content<'c, 'u>(
-    client: &'c mut Client,
-    uri: &'c Uri,
-) -> Option<(Arc<FileContent>, FileId, Canonical<PathBuf>)> {
-    uri.decode_file_uri()
-        .and_then(|filepath| Canonical::new(filepath).ok())
-        .and_then(|filepath| {
-            let file_id = client.file_cache.preregister_file(Cow::Borrowed(&filepath));
-            client
-                .file_cache
-                .get_content(file_id)
-                .map(|file_content| (file_content, file_id, filepath))
-        })
-}
-
 fn execute_command(
     client: &mut Client,
     _id: &LspRequestId,
@@ -344,7 +345,7 @@ fn execute_command(
                 .flatten()
                 .next()
                 .as_ref()
-                .and_then(|uri| get_file_content(client, uri))
+                .and_then(|uri| client.get_file_content(uri))
                 .and_then(|file_content| {
                     file_content
                         .0
@@ -406,7 +407,7 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
 
 fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
     let Some((file_content, file_id, filepath)) =
-        get_file_content(client, &params.text_document.uri)
+        client.get_file_content(&params.text_document.uri)
     else {
         return;
     };
