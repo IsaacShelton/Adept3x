@@ -107,7 +107,7 @@ async function startServer(context: ExtensionContext) {
                     command: 'adept.showSyntaxTree',
                     arguments: [fileUri]
                 }));
-                
+
                 const uri = Uri.parse(liveScheme + ':Live Output');
                 const doc = await workspace.openTextDocument(uri);
 
@@ -120,13 +120,13 @@ async function startServer(context: ExtensionContext) {
                 provider.update(uri, result);
             })
         );
+
         context.subscriptions.push(
             commands.registerCommand("adept.restartServer", async () => {
                 await killServer();
                 startServer(context);
             }),
         );
-
     }
 }
 
@@ -137,8 +137,8 @@ async function killServer(): Promise<void> {
 
 export function activate(context: ExtensionContext) {
     startServer(context);
-
 }
+
 export function deactivate(): Thenable<void> | undefined {
     return killServer();
 }

@@ -340,7 +340,7 @@ fn execute_command(
                 .arguments
                 .first()
                 .and_then(|arg| arg.as_str())
-                .and_then(|arg| Some(lsp_types::Uri::from_str(arg)))
+                .map(|arg| lsp_types::Uri::from_str(arg))
                 .into_iter()
                 .flatten()
                 .next()

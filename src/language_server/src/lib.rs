@@ -124,7 +124,7 @@ pub fn start() -> ExitCode {
                     client
                         .daemon
                         .send(response.into())
-                        .expect("Failed to foward LSP response to daemon");
+                        .expect("Failed to forward LSP response to daemon");
                 }
                 LspMessage::Notification(notification) => {
                     log::warn!("Unhandled notification '{}'", notification.method)

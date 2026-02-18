@@ -1,4 +1,4 @@
-use crate::BareSyntaxNode;
+use crate::{BareSyntaxKind, BareSyntaxNode};
 use std::{fmt::Debug, sync::Arc};
 use text_edit::{TextPointRangeUtf16, TextPointUtf16};
 
@@ -54,9 +54,14 @@ impl SyntaxNode {
         let padding = " ".repeat(depth * 2);
 
         match &self.bare.text {
-            Some(leaf) => {
-                writeln!(w, "{}{:?}: `{}`", padding, self.bare.kind, leaf,)?;
-            }
+            Some(leaf) => match &self.bare.kind {
+                BareSyntaxKind::ColumnSpacing(_) | BareSyntaxKind::LineSpacing(_) => {
+                    writeln!(w, "{}{:?}", padding, self.bare.kind)?;
+                }
+                _ => {
+                    writeln!(w, "{}{:?}: `{}`", padding, self.bare.kind, leaf)?;
+                }
+            },
             None => {
                 writeln!(w, "{}{:?}", padding, self.bare.kind)?;
                 for child in self.children() {
