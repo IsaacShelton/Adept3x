@@ -51,15 +51,15 @@ impl BareSyntaxNode {
         })
     }
 
-    pub fn new_error(rest: String, description: impl Into<String>) -> Arc<BareSyntaxNode> {
+    pub fn new_error(raw_content: String, description: impl Into<String>) -> Arc<BareSyntaxNode> {
         Arc::new(BareSyntaxNode {
             kind: BareSyntaxKind::Error {
                 description: description.into(),
             },
-            content_bytes: ByteUnits::of(rest.len().try_into().unwrap()),
-            text_point_diff_utf16: TextPointDiffUtf16::of_str(&rest),
+            content_bytes: ByteUnits::of(raw_content.len().try_into().unwrap()),
+            text_point_diff_utf16: TextPointDiffUtf16::of_str(&raw_content),
             children: vec![],
-            text: Some(rest),
+            text: Some(raw_content),
         })
     }
 

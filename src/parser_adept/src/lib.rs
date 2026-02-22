@@ -11,6 +11,12 @@ pub struct Parser<II: Peekable<Token<()>>> {
     lexer: II,
 }
 
+pub enum ErrorRecovery {
+    Empty,
+    EatOne,
+    EatUntilNestedClosing(TokenKind),
+}
+
 impl<II> Parser<II>
 where
     II: Peekable<Token<()>>,
@@ -38,7 +44,7 @@ where
 
         BareSyntaxNode::new_leaf(
             BareSyntaxKind::Error {
-                description: "Expected top-level binding or attribute".into(),
+                description: "Expected top-level binding".into(),
             },
             self.lexer.next().kind.to_string(),
         )
@@ -60,13 +66,37 @@ where
         true
     }
 
-    fn error_for_empty(&mut self, description: impl Display) -> Arc<BareSyntaxNode> {
+    fn error_for_empty(description: impl Display) -> Arc<BareSyntaxNode> {
         BareSyntaxNode::new_error("".into(), description.to_string())
     }
 
     fn error_for_next_token(&mut self, description: impl Display) -> Arc<BareSyntaxNode> {
         let token = self.lexer.next();
         BareSyntaxNode::new_error(token.kind.to_string(), description.to_string())
+    }
+
+    fn error_until(
+        &mut self,
+        closing_token: TokenKind,
+        description: impl Display,
+    ) -> Arc<BareSyntaxNode> {
+        let mut raw_content = String::new();
+
+        while self
+            .lexer
+            .eat(|token| {
+                if token.kind == closing_token || token.is_end_of_file() {
+                    Err(token)
+                } else {
+                    raw_content.push_str(&token.to_string());
+
+                    Ok(())
+                }
+            })
+            .is_some()
+        {}
+
+        BareSyntaxNode::new_error(raw_content, description.to_string())
     }
 
     fn parse_name(&mut self) -> Arc<BareSyntaxNode> {
@@ -92,10 +122,20 @@ where
         let mut children = Vec::new();
         children.push(self.parse_name());
         self.parse_column_whitespace(&mut children);
-        self.parse_punct(Punct::new("::"), &mut children);
 
-        self.parse_column_whitespace(&mut children);
-        children.push(self.parse_term());
+        if self
+            .parse_punct(Punct::new("::"), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_column_whitespace(&mut children);
+            children.push(self.parse_term());
+
+            if self.parse_all_whitespace(&mut children).is_none()
+                && !self.lexer.peek().is_end_of_file()
+            {
+                children.push(Self::error_for_empty("Expected newline after binding"))
+            }
+        }
 
         BareSyntaxNode::new_parent(BareSyntaxKind::Binding, children)
     }
@@ -151,8 +191,12 @@ where
             return node;
         }
 
-        if self.lexer.peek().is_punct_of_or_eof(Punct::new("}")) {
-            self.error_for_empty("Expected expression")
+        if self.lexer.peek().is_punct_of(Punct::new("}")) {
+            Self::error_for_empty("Expected expression before `}`")
+        } else if self.lexer.peek().is_line_spacing() {
+            Self::error_for_empty("Expected expression")
+        } else if self.lexer.peek().is_end_of_file() {
+            Self::error_for_empty("Expected expression before end-of-file")
         } else {
             self.error_for_next_token("Expected expression")
         }
@@ -177,20 +221,41 @@ where
         }
     }
 
-    fn parse_punct(&mut self, expected: Punct, children: &mut Vec<Arc<BareSyntaxNode>>) {
-        let result = if let Some(result) = self.lexer.eat(|token| match token.kind {
+    fn parse_punct(
+        &mut self,
+        expected: Punct,
+        children: &mut Vec<Arc<BareSyntaxNode>>,
+        error_recovery: ErrorRecovery,
+    ) -> Result<(), ()> {
+        if let Some(result) = self.lexer.eat(|token| match token.kind {
             TokenKind::Punct(punct) if punct == expected => Ok(BareSyntaxNode::new_leaf(
                 BareSyntaxKind::Punct(punct),
                 punct.to_string(),
             )),
             _ => Err(token),
         }) {
-            result
+            children.push(result);
+            Ok(())
         } else {
-            self.error_for_next_token(lazy_format!("Expected `{}`", expected))
-        };
-
-        children.push(result);
+            match error_recovery {
+                ErrorRecovery::Empty => {
+                    children.push(Self::error_for_empty(lazy_format!(
+                        "Expected `{}`",
+                        expected
+                    )));
+                }
+                ErrorRecovery::EatOne => {
+                    children
+                        .push(self.error_for_next_token(lazy_format!("Expected `{}`", expected)));
+                }
+                ErrorRecovery::EatUntilNestedClosing(token_kind) => {
+                    children.push(
+                        self.error_until(token_kind, lazy_format!("Expected `{}`", expected)),
+                    );
+                }
+            }
+            Err(())
+        }
     }
 
     fn parse_fn_type_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
@@ -200,10 +265,17 @@ where
             directive.to_string(),
         ));
         self.parse_column_whitespace(&mut children);
-        children.push(self.parse_param_list());
-        self.parse_column_whitespace(&mut children);
-        self.parse_punct(Punct::new(":"), &mut children);
-        children.push(self.parse_term());
+        match self.parse_param_list() {
+            Ok(node) => {
+                children.push(node);
+                self.parse_column_whitespace(&mut children);
+                self.parse_type_annotation(false, &mut children);
+            }
+            Err(node) => {
+                children.push(node);
+                self.parse_column_whitespace(&mut children);
+            }
+        }
         BareSyntaxNode::new_parent(BareSyntaxKind::BuiltinType(BuiltinType::Fn), children)
     }
 
@@ -213,7 +285,7 @@ where
             BareSyntaxKind::Directive(directive.clone()),
             directive.to_string(),
         ));
-        self.parse_all_whitespace(&mut children);
+        self.parse_column_whitespace(&mut children);
         children.push(self.parse_field_def_list());
         BareSyntaxNode::new_parent(BareSyntaxKind::BuiltinType(BuiltinType::Record), children)
     }
@@ -225,21 +297,42 @@ where
             directive.to_string(),
         ));
         self.parse_column_whitespace(&mut children);
-        children.push(self.parse_param_list());
-        self.parse_column_whitespace(&mut children);
-        self.parse_type_annotation(false, &mut children);
-        self.parse_column_whitespace(&mut children);
-        children.push(self.parse_block());
+
+        match self.parse_param_list() {
+            Ok(node) => {
+                children.push(node);
+                self.parse_column_whitespace(&mut children);
+                self.parse_type_annotation(false, &mut children);
+                self.parse_column_whitespace(&mut children);
+                children.push(self.parse_block());
+            }
+            Err(node) => {
+                children.push(node);
+                self.parse_column_whitespace(&mut children);
+            }
+        }
+
         BareSyntaxNode::new_parent(BareSyntaxKind::FnValue, children)
     }
 
     fn parse_block(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
-        self.parse_punct(Punct::new("{"), &mut children);
-        self.parse_all_whitespace(&mut children);
-        children.push(self.parse_term());
-        self.parse_all_whitespace(&mut children);
-        self.parse_punct(Punct::new("}"), &mut children);
+        if self
+            .parse_punct(Punct::new("{"), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_all_whitespace(&mut children);
+            children.push(self.parse_term());
+            self.parse_all_whitespace(&mut children);
+
+            let _ = self.parse_punct(
+                Punct::new("}"),
+                &mut children,
+                // TODO: This should take ideally nesting into account
+                ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new("}"))),
+            );
+        }
+
         BareSyntaxNode::new_parent(BareSyntaxKind::Block, children)
     }
 
@@ -302,7 +395,7 @@ where
                 }) {
                     else_keyword
                 } else {
-                    self.error_for_empty("Expected `else` after first block of if")
+                    Self::error_for_empty("Expected `else` after first block of if")
                 },
             );
 
@@ -318,50 +411,67 @@ where
 
     fn parse_if_arg_list(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
-        self.parse_punct(Punct::new("("), &mut children);
-        self.parse_all_whitespace(&mut children);
+        if self
+            .parse_punct(Punct::new("("), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_all_whitespace(&mut children);
 
-        let mut has_param = false;
+            let mut has_param = false;
 
-        while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
-            if has_param {
-                self.parse_punct(Punct::new(","), &mut children);
+            while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
+                if has_param {
+                    let _ = self.parse_punct(
+                        Punct::new(","),
+                        &mut children,
+                        ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new(")"))),
+                    );
+                    self.parse_all_whitespace(&mut children);
+                } else {
+                    has_param = true;
+                }
+
+                children.push(self.parse_term());
                 self.parse_all_whitespace(&mut children);
-            } else {
-                has_param = true;
             }
 
-            children.push(self.parse_term());
-            self.parse_all_whitespace(&mut children);
+            let _ = self.parse_punct(Punct::new(")"), &mut children, ErrorRecovery::Empty);
         }
-
-        self.parse_punct(Punct::new(")"), &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::IfArgList, children)
     }
 
     fn parse_field_def_list(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
-        self.parse_punct(Punct::new("{"), &mut children);
-        self.parse_all_whitespace(&mut children);
 
-        while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
-            children.push(self.parse_field_def_sublist());
+        if self
+            .parse_punct(Punct::new("{"), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_all_whitespace(&mut children);
 
-            let needs_separator = self.parse_all_whitespace(&mut children).is_none();
+            while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
+                children.push(self.parse_field_def_sublist());
 
-            if self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
-                break;
-            } else if self.lexer.peek().is_punct_of(Punct::new(",")) {
-                self.parse_punct(Punct::new(","), &mut children);
-                self.parse_all_whitespace(&mut children);
-            } else if needs_separator {
-                children.push(
-                    self.error_for_next_token("Expected ',' or newline after field definition"),
-                );
+                let needs_separator = self.parse_all_whitespace(&mut children).is_none();
+
+                if self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
+                    break;
+                } else if self.lexer.peek().is_punct_of(Punct::new(",")) {
+                    let _ = self.parse_punct(
+                        Punct::new(","),
+                        &mut children,
+                        ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new(")"))),
+                    );
+                    self.parse_all_whitespace(&mut children);
+                } else if needs_separator {
+                    children.push(
+                        self.error_for_next_token("Expected ',' or newline after field definition"),
+                    );
+                }
             }
-        }
 
-        self.parse_punct(Punct::new("}"), &mut children);
+            let _ = self.parse_punct(Punct::new("}"), &mut children, ErrorRecovery::Empty);
+        }
         BareSyntaxNode::new_parent(BareSyntaxKind::FieldDefList, children)
     }
 
@@ -372,33 +482,50 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::FieldDef, children)
     }
 
-    fn parse_param_list(&mut self) -> Arc<BareSyntaxNode> {
+    fn parse_param_list(&mut self) -> Result<Arc<BareSyntaxNode>, Arc<BareSyntaxNode>> {
         let mut children = vec![];
-        self.parse_punct(Punct::new("("), &mut children);
-        self.parse_all_whitespace(&mut children);
 
-        let mut has_param = false;
+        if self
+            .parse_punct(Punct::new("("), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_all_whitespace(&mut children);
 
-        while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
-            if has_param {
-                self.parse_punct(Punct::new(","), &mut children);
+            let mut has_param = false;
+
+            while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
+                if has_param {
+                    let _ = self.parse_punct(
+                        Punct::new(","),
+                        &mut children,
+                        ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new(")"))),
+                    );
+                    self.parse_all_whitespace(&mut children);
+                } else {
+                    has_param = true;
+                }
+
+                children.push(self.parse_param_sublist());
                 self.parse_all_whitespace(&mut children);
-            } else {
-                has_param = true;
             }
 
-            children.push(self.parse_param_sublist());
-            self.parse_all_whitespace(&mut children);
+            let _ = self.parse_punct(Punct::new(")"), &mut children, ErrorRecovery::Empty);
+            Ok(BareSyntaxNode::new_parent(
+                BareSyntaxKind::ParamList,
+                children,
+            ))
+        } else {
+            Err(BareSyntaxNode::new_parent(
+                BareSyntaxKind::ParamList,
+                children,
+            ))
         }
-
-        self.parse_punct(Punct::new(")"), &mut children);
-        BareSyntaxNode::new_parent(BareSyntaxKind::ParamList, children)
     }
 
     fn parse_type_annotation(&mut self, required: bool, out: &mut Vec<Arc<BareSyntaxNode>>) {
         if self.lexer.peek().is_punct_of(Punct::new(":")) {
             let mut children = vec![];
-            self.parse_punct(Punct::new(":"), &mut children);
+            let _ = self.parse_punct(Punct::new(":"), &mut children, ErrorRecovery::Empty);
             children.push(self.parse_term());
 
             out.push(BareSyntaxNode::new_parent(
@@ -406,7 +533,7 @@ where
                 children,
             ));
         } else if required {
-            out.push(self.error_for_empty("Expected type annotation"));
+            out.push(Self::error_for_empty("Expected type annotation"));
         }
     }
 
@@ -422,7 +549,7 @@ where
         self.parse_all_whitespace(children);
 
         while self.lexer.peek().is_punct_of(Punct::new(",")) {
-            self.parse_punct(Punct::new(","), children);
+            let _ = self.parse_punct(Punct::new(","), children, ErrorRecovery::Empty);
             self.parse_all_whitespace(children);
             children.push(self.parse_name());
             self.parse_all_whitespace(children);
@@ -436,30 +563,49 @@ where
     ) -> Option<LineSpacingAtom> {
         let mut has_newline = None;
 
-        while let Some(child) = self.lexer.eat(|token| match token.kind {
-            TokenKind::ColumnSpacing(atom) => Ok(BareSyntaxNode::new_leaf(
-                BareSyntaxKind::ColumnSpacing(atom),
-                atom.to_string(),
-            )),
-            TokenKind::LineSpacing(atom) if allow_newlines => {
-                has_newline = Some(atom);
-                Ok(BareSyntaxNode::new_leaf(
-                    BareSyntaxKind::LineSpacing(atom),
-                    atom.to_string(),
-                ))
-            }
-            TokenKind::SinglelineComment(comment) => Ok(BareSyntaxNode::new_leaf(
-                BareSyntaxKind::SinglelineComment(comment.clone().into()),
-                comment,
-            )),
-            TokenKind::MultilineComment(comment, terminated) => Ok(BareSyntaxNode::new_leaf(
-                BareSyntaxKind::MultilineComment(comment.clone().into(), terminated),
-                comment,
-            )),
-            _ => Err(token),
-        }) {
-            children.push(child);
-        }
+        while self
+            .lexer
+            .eat(|token| match token.kind {
+                TokenKind::ColumnSpacing(atom) => {
+                    children.push(BareSyntaxNode::new_leaf(
+                        BareSyntaxKind::ColumnSpacing(atom),
+                        atom.to_string(),
+                    ));
+                    Ok(())
+                }
+                TokenKind::LineSpacing(atom) if allow_newlines => {
+                    has_newline = Some(atom);
+                    children.push(BareSyntaxNode::new_leaf(
+                        BareSyntaxKind::LineSpacing(atom),
+                        atom.to_string(),
+                    ));
+                    Ok(())
+                }
+                TokenKind::SinglelineComment(comment) => {
+                    children.push(BareSyntaxNode::new_leaf(
+                        BareSyntaxKind::SinglelineComment(comment.clone().into()),
+                        comment,
+                    ));
+                    Ok(())
+                }
+                TokenKind::MultilineComment(comment, terminated) => {
+                    children.push(BareSyntaxNode::new_leaf(
+                        BareSyntaxKind::MultilineComment(comment.clone().into()),
+                        comment,
+                    ));
+
+                    if terminated.is_unterminated() {
+                        children.push(Self::error_for_empty(
+                            "Expected `*/` to close multi-line comment",
+                        ));
+                    }
+
+                    Ok(())
+                }
+                _ => Err(token),
+            })
+            .is_some()
+        {}
 
         has_newline
     }
@@ -503,107 +649,7 @@ pub fn reparse(
 
 #[test]
 fn test1() {
-    let document = Document::new(
-        r#"
-        fn_test1 :: @fn(): Bool {}
-
-        fn_test2 :: @fn(): Void {}
-
-        fn_test3 :: @fn(a: Bool): Void {}
-
-        fn_test4 :: @fn(a: Bool, b: Bool): Bool {}
-        
-        fn_test5 :: @fn(a: Bool, b: Bool, c: Bool): Bool {}
-
-        fn_test6 :: @fn(a, b, c, d: Bool): Bool {}
-
-        fn_test7 :: @fn(): Bool { true }
-
-        if_test1 :: @fn(x: Bool): Type {
-            @if(x, Bool, Void)
-        }
-
-        if_test2 :: @fn(x: Bool): Type {
-            @if(x, Bool, Void): Type
-        }
-
-        if_test3 :: @fn(a, b: Bool): @if(a, Bool, Void) {}
-
-        if_test4 :: @fn(a, b: Bool): @if a { Bool } else { Void } {}
-
-        if_test5 :: @fn(a, b: Bool): @if(a){ Bool } else { Void } {}
-
-        if_test6 :: @fn(a, b: Bool): @if (a) { Bool } else { Void } {}
-
-        RecordTest1 :: @Record {
-            a: Bool,
-            b: Bool,
-            c: Void,
-            d: Type,
-        }
-
-        RecordTest2 :: @Record {
-            a: Bool
-            b: Bool
-            c: Void
-            d: Type
-        }
-
-        RecordTest3 :: @Record { a, b, c: Bool, d: Type }
-
-        PiTest1 :: @Fn(a: Void, b: Type, c: Bool): Type
-
-        PiTest2 :: @Fn(a, b, c: Bool): Type
-
-        if_motive_test1 :: @fn(x: Bool): Bool {
-            @if(x, false, true): Bool
-        }
-
-        if_motive_test2 :: @fn(x: Bool): Bool {
-            @if x {
-                false
-            } else {
-                true
-            }: Bool
-        }
-
-        /*
-        record_test1 :: @fn(): @Record { a: Bool, b: Void } {
-            @record { a: true, b: void }
-        }
-
-        //my_pair :: @record { a: true, b: false }
-
-        make_pair :: @fn(T: Type, a, b: T): Pair(T) {
-            @record { a, b }
-        }
-
-        access_test1 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
-            @first(pair)
-        }
-
-        access_test2 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
-            @second(pair)
-        }
-
-        access_test3 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
-            pair.a
-        }
-
-        access_test4 :: @fn(pair: @Record { a: Bool, b: Bool }): Bool {
-            pair.b
-        }
-
-        Pair :: @fn(T: Type): Type {
-            @Record {
-                a: T,
-                b: T,
-            }
-        }
-        */
-        "#
-        .into(),
-    );
+    let document = Document::new(r#""#.into());
 
     /*
     let adapter = util_infinite_iterator::Adapter::new(

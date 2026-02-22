@@ -259,46 +259,35 @@ fn document_diagnostics_request(
 
             if let Some(file_content) = client.file_cache.get_content(file_id) {
                 if let Some(syntax_tree) = &file_content.syntax_tree {
-                    let bindings = syntax_tree
-                        .bare()
-                        .children()
-                        .filter(|x| matches!(x.kind(), BareSyntaxKind::Binding));
+                    let mut stack = Vec::from_iter(syntax_tree.children());
 
-                    let mut binding_names = bindings
-                        .flat_map(|binding| {
-                            binding
-                                .children()
-                                .find(|child| matches!(child.kind(), BareSyntaxKind::Name))
-                                .map(|name| {
-                                    name.children().find_map(|id| match id.kind() {
-                                        BareSyntaxKind::Identifier(name) => Some(name),
-                                        _ => None,
-                                    })
-                                })
-                        })
-                        .flatten();
+                    while let Some(node) = stack.pop() {
+                        stack.extend(node.children());
 
-                    let names = itertools::Itertools::join(&mut binding_names, ", ");
+                        if let BareSyntaxKind::Error { description } = node.bare().kind() {
+                            let range = node.text_range();
 
-                    diagnostics.push(Diagnostic {
-                        range: Range {
-                            start: Position {
-                                line: 1,
-                                character: 0,
-                            },
-                            end: Position {
-                                line: 1,
-                                character: 4,
-                            },
-                        },
-                        severity: Some(DiagnosticSeverity::ERROR),
-                        source: Some("Adept".into()),
-                        message: format!("Defined bindings are: {}", names),
-                        related_information: None,
-                        tags: None,
-                        data: None,
-                        ..Default::default()
-                    });
+                            diagnostics.push(Diagnostic {
+                                range: Range {
+                                    start: Position {
+                                        line: range.start.line.0 as u32,
+                                        character: range.start.col.0 as u32,
+                                    },
+                                    end: Position {
+                                        line: range.end.line.0 as u32,
+                                        character: range.end.col.0 as u32,
+                                    },
+                                },
+                                severity: Some(DiagnosticSeverity::ERROR),
+                                source: Some("Adept".into()),
+                                message: description.into(),
+                                related_information: None,
+                                tags: None,
+                                data: None,
+                                ..Default::default()
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -316,16 +305,50 @@ fn document_diagnostics_request(
 }
 
 fn completion(
-    _client: &mut Client,
+    client: &mut Client,
     _id: &LspRequestId,
     params: CompletionParams,
 ) -> Result<Option<CompletionResponse>, LspResponse> {
+    let text_document = &params.text_document_position.text_document;
+    let mut items = vec![];
+
+    if let Some(filepath) = text_document.uri.decode_file_uri() {
+        if let Ok(filepath) = Canonical::new(filepath) {
+            let file_id = client.file_cache.preregister_file(Cow::Owned(filepath));
+
+            if let Some(file_content) = client.file_cache.get_content(file_id) {
+                if let Some(syntax_tree) = &file_content.syntax_tree {
+                    let bindings = syntax_tree
+                        .bare()
+                        .children()
+                        .filter(|x| matches!(x.kind(), BareSyntaxKind::Binding));
+
+                    let binding_names = bindings
+                        .flat_map(|binding| {
+                            binding
+                                .children()
+                                .find(|child| matches!(child.kind(), BareSyntaxKind::Name))
+                                .map(|name| {
+                                    name.children().find_map(|id| match id.kind() {
+                                        BareSyntaxKind::Identifier(name) => Some(name),
+                                        _ => None,
+                                    })
+                                })
+                        })
+                        .flatten();
+
+                    items.extend(binding_names.map(|name| CompletionItem {
+                        label: name.to_string(),
+                        ..Default::default()
+                    }));
+                }
+            }
+        }
+    }
+
     Ok(Some(CompletionResponse::List(CompletionList {
         is_incomplete: true,
-        items: vec![CompletionItem {
-            label: "testing_word".into(),
-            ..Default::default()
-        }],
+        items,
     })))
 }
 

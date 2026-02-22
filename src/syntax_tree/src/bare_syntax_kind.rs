@@ -1,6 +1,6 @@
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
-use token::{Directive, IsTerminated, Punct};
+use token::{Directive, Punct};
 use util_text::{ColumnSpacingAtom, LineSpacingAtom};
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
@@ -22,7 +22,7 @@ pub enum BareSyntaxKind {
     FieldDefList,
     TypeAnnotation,
     SinglelineComment(Box<str>),
-    MultilineComment(Box<str>, IsTerminated),
+    MultilineComment(Box<str>),
     BuiltinType(BuiltinType),
     TrueValue,
     FalseValue,
