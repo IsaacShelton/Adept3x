@@ -80,3 +80,12 @@ impl AddAssign<TextPointDiffUtf16> for TextPointUtf16 {
         *self = *self + rhs;
     }
 }
+
+impl Into<lsp_types::Position> for TextPointUtf16 {
+    fn into(self) -> lsp_types::Position {
+        lsp_types::Position {
+            line: self.line.0 as u32,
+            character: self.col.0 as u32,
+        }
+    }
+}

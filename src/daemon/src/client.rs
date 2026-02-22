@@ -5,8 +5,8 @@ use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind}
 use file_uri::DecodeFileUri;
 use lsp_message::{LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse};
 use lsp_types::{
-    CompletionItem, CompletionList, CompletionParams, CompletionResponse, Diagnostic,
-    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
+    CompletionItem, CompletionItemKind, CompletionList, CompletionParams, CompletionResponse,
+    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
     ExecuteCommandParams, FullDocumentDiagnosticReport, Position, Range,
     RelatedFullDocumentDiagnosticReport, Uri,
@@ -16,7 +16,7 @@ use std::os::unix::net::{SocketAddr, UnixStream};
 use std::{borrow::Cow, ffi::OsStr, path::PathBuf, str::FromStr, sync::Arc};
 #[cfg(target_family = "unix")]
 use std::{io::BufReader, io::ErrorKind, time::Duration};
-use syntax_tree::BareSyntaxKind;
+use syntax_tree::{BareSyntaxKind, BuiltinType};
 use text_edit::TextEditOrFullUtf16;
 
 pub struct Client {
@@ -253,42 +253,37 @@ fn document_diagnostics_request(
 ) -> Result<DocumentDiagnosticReportResult, LspResponse> {
     let mut diagnostics = vec![];
 
-    if let Some(filepath) = params.text_document.uri.decode_file_uri() {
-        if let Ok(filepath) = Canonical::new(filepath) {
-            let file_id = client.file_cache.preregister_file(Cow::Owned(filepath));
+    let Some((file_content, _, _)) = client.get_file_content(&params.text_document.uri) else {
+        return Ok(DocumentDiagnosticReportResult::Report(
+            DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: diagnostics,
+                },
+            }),
+        ));
+    };
 
-            if let Some(file_content) = client.file_cache.get_content(file_id) {
-                if let Some(syntax_tree) = &file_content.syntax_tree {
-                    let mut stack = Vec::from_iter(syntax_tree.children());
+    if let Some(syntax_tree) = &file_content.syntax_tree {
+        let mut stack = Vec::from_iter(syntax_tree.children());
 
-                    while let Some(node) = stack.pop() {
-                        stack.extend(node.children());
+        while let Some(node) = stack.pop() {
+            stack.extend(node.children());
 
-                        if let BareSyntaxKind::Error { description } = node.bare().kind() {
-                            let range = node.text_range();
+            if let BareSyntaxKind::Error { description } = node.bare().kind() {
+                let range = node.text_range();
 
-                            diagnostics.push(Diagnostic {
-                                range: Range {
-                                    start: Position {
-                                        line: range.start.line.0 as u32,
-                                        character: range.start.col.0 as u32,
-                                    },
-                                    end: Position {
-                                        line: range.end.line.0 as u32,
-                                        character: range.end.col.0 as u32,
-                                    },
-                                },
-                                severity: Some(DiagnosticSeverity::ERROR),
-                                source: Some("Adept".into()),
-                                message: description.into(),
-                                related_information: None,
-                                tags: None,
-                                data: None,
-                                ..Default::default()
-                            });
-                        }
-                    }
-                }
+                diagnostics.push(Diagnostic {
+                    range: range.into(),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    source: Some("Adept".into()),
+                    message: description.into(),
+                    related_information: None,
+                    tags: None,
+                    data: None,
+                    ..Default::default()
+                });
             }
         }
     }
@@ -312,39 +307,104 @@ fn completion(
     let text_document = &params.text_document_position.text_document;
     let mut items = vec![];
 
-    if let Some(filepath) = text_document.uri.decode_file_uri() {
-        if let Ok(filepath) = Canonical::new(filepath) {
-            let file_id = client.file_cache.preregister_file(Cow::Owned(filepath));
+    let Some((file_content, _, _)) = client.get_file_content(&text_document.uri) else {
+        return Ok(Some(CompletionResponse::List(CompletionList {
+            is_incomplete: true,
+            items,
+        })));
+    };
 
-            if let Some(file_content) = client.file_cache.get_content(file_id) {
-                if let Some(syntax_tree) = &file_content.syntax_tree {
-                    let bindings = syntax_tree
-                        .bare()
-                        .children()
-                        .filter(|x| matches!(x.kind(), BareSyntaxKind::Binding));
-
-                    let binding_names = bindings
-                        .flat_map(|binding| {
-                            binding
-                                .children()
-                                .find(|child| matches!(child.kind(), BareSyntaxKind::Name))
-                                .map(|name| {
-                                    name.children().find_map(|id| match id.kind() {
-                                        BareSyntaxKind::Identifier(name) => Some(name),
-                                        _ => None,
-                                    })
-                                })
-                        })
-                        .flatten();
-
-                    items.extend(binding_names.map(|name| CompletionItem {
-                        label: name.to_string(),
-                        ..Default::default()
-                    }));
-                }
-            }
-        }
+    struct BindingInfo<'a> {
+        name: &'a str,
+        kind: Option<CompletionItemKind>,
     }
+
+    if let Some(syntax_tree) = &file_content.syntax_tree {
+        let binding_names = syntax_tree
+            .bare()
+            .children()
+            .filter(|x| matches!(x.kind(), BareSyntaxKind::Binding))
+            .flat_map(|binding| {
+                let name = binding
+                    .children()
+                    .find(|child| matches!(child.kind(), BareSyntaxKind::Name))
+                    .and_then(|name| {
+                        name.children().find_map(|id| match id.kind() {
+                            BareSyntaxKind::Identifier(name) => Some(name),
+                            _ => None,
+                        })
+                    });
+
+                let kind = binding
+                    .children()
+                    .find_map(|child| match child.kind() {
+                        BareSyntaxKind::Term => Some(child),
+                        _ => None,
+                    })
+                    .and_then(|term| {
+                        term.children().find_map(|child| match child.kind() {
+                            BareSyntaxKind::BuiltinType(BuiltinType::Fn) => {
+                                Some(CompletionItemKind::INTERFACE)
+                            }
+                            BareSyntaxKind::BuiltinType(BuiltinType::Record) => {
+                                Some(CompletionItemKind::STRUCT)
+                            }
+                            BareSyntaxKind::BuiltinType(
+                                BuiltinType::Bool | BuiltinType::Void | BuiltinType::Type,
+                            ) => Some(CompletionItemKind::ENUM),
+                            BareSyntaxKind::FnValue => Some(CompletionItemKind::FUNCTION),
+                            BareSyntaxKind::TrueValue
+                            | BareSyntaxKind::FalseValue
+                            | BareSyntaxKind::VoidValue
+                            | BareSyntaxKind::IfValue
+                            | BareSyntaxKind::Block
+                            | BareSyntaxKind::Variable(_) => Some(CompletionItemKind::VALUE),
+                            _ => None,
+                        })
+                    });
+
+                name.map(|name| BindingInfo { name, kind })
+            });
+
+        items.extend(binding_names.map(|info| CompletionItem {
+            label: info.name.to_string(),
+            kind: info.kind,
+            ..Default::default()
+        }));
+    }
+
+    items.extend([
+        CompletionItem {
+            label: "Void".into(),
+            kind: Some(CompletionItemKind::ENUM),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "Bool".into(),
+            kind: Some(CompletionItemKind::ENUM),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "Type".into(),
+            kind: Some(CompletionItemKind::ENUM),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "void".into(),
+            kind: Some(CompletionItemKind::VALUE),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "true".into(),
+            kind: Some(CompletionItemKind::VALUE),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "false".into(),
+            kind: Some(CompletionItemKind::VALUE),
+            ..Default::default()
+        },
+    ]);
 
     Ok(Some(CompletionResponse::List(CompletionList {
         is_incomplete: true,

@@ -49,3 +49,12 @@ impl From<lsp_types::Range> for TextPointRangeUtf16 {
         }
     }
 }
+
+impl Into<lsp_types::Range> for TextPointRangeUtf16 {
+    fn into(self) -> lsp_types::Range {
+        lsp_types::Range {
+            start: self.start.into(),
+            end: self.end.into(),
+        }
+    }
+}
