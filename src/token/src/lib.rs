@@ -114,12 +114,14 @@ const ASSIGNMENT_OPERATORS: &[&'static str] = &[
 
 #[allow(unused)]
 const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
-    ",", ".", ":", "::", "(", ")", "[", "]", "{", "}", "++", "--", "!", "~", "*", "/", "%", "+",
-    "-", "<<", "<<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&", "||",
+    ",", ".", ":", "::", "(", ")", "[", "]", "{", "}", "$", "++", "--", "!", "~", "*", "/", "%",
+    "+", "-", "<<", "<<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&",
+    "||",
 ];
 
-pub const ALL_DIRECTIVES: &[&'static str] =
-    &["fn", "Fn", "if", "record", "Record", "Variant", "variant"];
+pub const ALL_DIRECTIVES: &[&'static str] = &[
+    "fn", "Fn", "if", "record", "Record", "Variant", "variant", "eval",
+];
 
 // Since Rust's const evaluation sucks
 lazy_static! {

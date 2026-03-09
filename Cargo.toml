@@ -8,6 +8,7 @@ members = [
     "src/file_cache",
     "src/file_uri",
     "src/idle_tracker",
+    "src/kernel",
     "src/language_server",
     "src/lexer_adept",
     "src/lock_file",

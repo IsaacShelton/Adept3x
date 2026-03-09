@@ -1,7 +1,7 @@
 use document::{Document, DocumentRange};
 use lazy_format::lazy_format;
 use std::{fmt::Display, sync::Arc};
-use syntax_tree::{BareSyntaxKind, BareSyntaxNode, BuiltinType, SyntaxNode};
+use syntax_tree::{BareSyntaxKind, BareSyntaxNode, BuiltinType, Reparsable, SyntaxNode};
 use text_edit::{LineIndex, TextLengthUtf16, TextPointUtf16};
 use token::{Directive, Punct, Token, TokenKind};
 use util_infinite_iterator::Peekable;
@@ -80,16 +80,23 @@ where
         closing_token: TokenKind,
         description: impl Display,
     ) -> Arc<BareSyntaxNode> {
+        self.error_until_any(&[closing_token], description)
+    }
+
+    fn error_until_any(
+        &mut self,
+        closing_tokens: &[TokenKind],
+        description: impl Display,
+    ) -> Arc<BareSyntaxNode> {
         let mut raw_content = String::new();
 
         while self
             .lexer
             .eat(|token| {
-                if token.kind == closing_token || token.is_end_of_file() {
+                if closing_tokens.contains(&token.kind) || token.is_end_of_file() {
                     Err(token)
                 } else {
                     raw_content.push_str(&token.to_string());
-
                     Ok(())
                 }
             })
@@ -99,8 +106,13 @@ where
         BareSyntaxNode::new_error(raw_content, description.to_string())
     }
 
-    fn parse_name(&mut self) -> Arc<BareSyntaxNode> {
-        if let Some(ok) = self.lexer.eat(|token| match token.kind {
+    fn parse_name_required(&mut self) -> Arc<BareSyntaxNode> {
+        self.parse_name()
+            .unwrap_or_else(|| self.error_for_next_token("Expected name"))
+    }
+
+    fn parse_name(&mut self) -> Option<Arc<BareSyntaxNode>> {
+        self.lexer.eat(|token| match token.kind {
             TokenKind::Identifier(name) => {
                 let identifier =
                     BareSyntaxNode::new_leaf(BareSyntaxKind::Identifier(name.clone().into()), name);
@@ -111,16 +123,12 @@ where
                 ))
             }
             _ => Err(token),
-        }) {
-            ok
-        } else {
-            self.error_for_next_token("Expected name")
-        }
+        })
     }
 
     fn parse_binding(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
-        children.push(self.parse_name());
+        children.push(self.parse_name_required());
         self.parse_column_whitespace(&mut children);
 
         if self
@@ -141,10 +149,49 @@ where
     }
 
     fn parse_term(&mut self) -> Arc<BareSyntaxNode> {
-        let mut children = vec![];
-        self.parse_column_whitespace(&mut children);
-        children.push(self.parse_term_inner());
-        BareSyntaxNode::new_parent(BareSyntaxKind::Term, children)
+        let mut top_children = vec![];
+        self.parse_column_whitespace(&mut top_children);
+
+        let mut term_inner = vec![self.parse_term_inner()];
+
+        let term_children = loop {
+            self.parse_column_whitespace(&mut term_inner);
+
+            match self.parse_term_post(term_inner) {
+                Ok(new_result) => term_inner = vec![new_result],
+                Err(done) => break done,
+            }
+        };
+
+        top_children.extend(term_children);
+        BareSyntaxNode::new_parent(BareSyntaxKind::Term, top_children)
+    }
+
+    fn parse_term_post(
+        &mut self,
+        mut children: Vec<Arc<BareSyntaxNode>>,
+    ) -> Result<Arc<BareSyntaxNode>, Vec<Arc<BareSyntaxNode>>> {
+        if self.lexer.peek().is_punct_of(Punct::new("(")) {
+            children = vec![BareSyntaxNode::new_parent(BareSyntaxKind::Term, children)];
+            children.push(self.parse_arg_list(Reparsable::Reparse));
+            return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Call, children));
+        }
+
+        if self.lexer.peek().is_punct_of(Punct::new(":=")) {
+            children = vec![BareSyntaxNode::new_parent(BareSyntaxKind::Term, children)];
+            children.push(BareSyntaxNode::new_punct(
+                self.lexer.next().kind.unwrap_punct(),
+            ));
+            children.push(self.parse_term());
+
+            if self.parse_all_whitespace(&mut children).is_some() {
+                children.push(self.parse_term());
+            }
+
+            return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Let, children));
+        }
+
+        Err(children)
     }
 
     fn parse_term_inner(&mut self) -> Arc<BareSyntaxNode> {
@@ -153,6 +200,20 @@ where
             _ => Err(token),
         }) {
             return self.parse_directive(directive);
+        }
+
+        {
+            let mut children = vec![];
+            if self
+                .parse_punct(Punct::new("("), &mut children, ErrorRecovery::Empty)
+                .is_ok()
+            {
+                self.parse_all_whitespace(&mut children);
+                children.push(self.parse_term());
+                self.parse_all_whitespace(&mut children);
+                let _ = self.parse_punct(Punct::new(")"), &mut children, ErrorRecovery::Empty);
+                return BareSyntaxNode::new_parent(BareSyntaxKind::ParenthesizedTerm, children);
+            }
         }
 
         if let Some(node) = self.lexer.eat(|token| match &token.kind {
@@ -191,7 +252,11 @@ where
             return node;
         }
 
-        if self.lexer.peek().is_punct_of(Punct::new("}")) {
+        if self.lexer.peek().is_punct_of(Punct::new(",")) {
+            Self::error_for_empty("Expected expression before `,`")
+        } else if self.lexer.peek().is_punct_of(Punct::new(")")) {
+            Self::error_for_empty("Expected expression before `)`")
+        } else if self.lexer.peek().is_punct_of(Punct::new("}")) {
             Self::error_for_empty("Expected expression before `}`")
         } else if self.lexer.peek().is_line_spacing() {
             Self::error_for_empty("Expected expression")
@@ -209,6 +274,7 @@ where
                 "if" => self.parse_if_directive(directive),
                 "Fn" => self.parse_fn_type_directive(directive),
                 "Record" => self.parse_record_type_directive(directive),
+                "eval" => self.parse_eval(directive),
                 _ => BareSyntaxNode::new_error(
                     directive.to_string(),
                     format!("Directive `{}` is not supported yet", name),
@@ -290,6 +356,16 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::BuiltinType(BuiltinType::Record), children)
     }
 
+    fn parse_eval(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+        children.push(self.parse_term());
+        BareSyntaxNode::new_parent(BareSyntaxKind::Eval, children)
+    }
+
     fn parse_fn_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
         children.push(BareSyntaxNode::new_leaf(
@@ -358,7 +434,7 @@ where
         self.parse_column_whitespace(&mut children);
 
         let has_block_args = if self.lexer.peek().is_punct_of(Punct::new("(")) {
-            let arg_list = self.parse_if_arg_list();
+            let arg_list = self.parse_arg_list(Reparsable::Ignore);
 
             let has_arg_comma = arg_list.children().any(|child| {
                 matches!(
@@ -409,7 +485,7 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::IfValue, children)
     }
 
-    fn parse_if_arg_list(&mut self) -> Arc<BareSyntaxNode> {
+    fn parse_arg_list(&mut self, reparsable: Reparsable) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
         if self
             .parse_punct(Punct::new("("), &mut children, ErrorRecovery::Empty)
@@ -437,7 +513,7 @@ where
 
             let _ = self.parse_punct(Punct::new(")"), &mut children, ErrorRecovery::Empty);
         }
-        BareSyntaxNode::new_parent(BareSyntaxKind::IfArgList, children)
+        BareSyntaxNode::new_parent(BareSyntaxKind::ArgList(reparsable), children)
     }
 
     fn parse_field_def_list(&mut self) -> Arc<BareSyntaxNode> {
@@ -539,19 +615,79 @@ where
 
     fn parse_param_sublist(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
-        self.parse_names(&mut children);
+        self.parse_param_heads(&mut children);
         self.parse_type_annotation(true, &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::Param, children)
     }
 
-    fn parse_names(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
-        children.push(self.parse_name());
+    fn parse_param_heads(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
+        children.push(self.parse_param_head());
         self.parse_all_whitespace(children);
 
         while self.lexer.peek().is_punct_of(Punct::new(",")) {
             let _ = self.parse_punct(Punct::new(","), children, ErrorRecovery::Empty);
             self.parse_all_whitespace(children);
-            children.push(self.parse_name());
+            children.push(self.parse_param_head());
+            self.parse_all_whitespace(children);
+        }
+    }
+
+    fn parse_param_head(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+
+        if let Some(implicit_name) = self.parse_implicit_name() {
+            children.push(implicit_name);
+            self.parse_column_whitespace(&mut children);
+            children.extend(self.parse_name().into_iter());
+        } else {
+            children.push(self.parse_name_required());
+        }
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::ParamHead, children)
+    }
+
+    fn parse_implicit_name(&mut self) -> Option<Arc<BareSyntaxNode>> {
+        let mut children = vec![];
+        if self
+            .parse_punct(Punct::new("$"), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_column_whitespace(&mut children);
+
+            if self.lexer.peek().is_identifier() {
+                let identifier = self.lexer.next().kind.unwrap_identifier();
+                children.push(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::Identifier(identifier.clone().into()),
+                    identifier,
+                ));
+            } else {
+                children.push(self.error_until_any(
+                    &[
+                        TokenKind::Punct(Punct::new(",")),
+                        TokenKind::Punct(Punct::new(":")),
+                        TokenKind::Punct(Punct::new(")")),
+                    ],
+                    "Expected name for implicit argument after `$`",
+                ))
+            };
+
+            Some(BareSyntaxNode::new_parent(
+                BareSyntaxKind::ImplicitName,
+                children,
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn parse_names(&mut self, children: &mut Vec<Arc<BareSyntaxNode>>) {
+        children.push(self.parse_name_required());
+        self.parse_all_whitespace(children);
+
+        while self.lexer.peek().is_punct_of(Punct::new(",")) {
+            let _ = self.parse_punct(Punct::new(","), children, ErrorRecovery::Empty);
+            self.parse_all_whitespace(children);
+            children.push(self.parse_name_required());
             self.parse_all_whitespace(children);
         }
     }

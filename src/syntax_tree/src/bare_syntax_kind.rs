@@ -1,9 +1,10 @@
-use derive_more::IsVariant;
+use derive_more::{IsVariant, PartialEq};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use token::{Directive, Punct};
 use util_text::{ColumnSpacingAtom, LineSpacingAtom};
 
-#[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
+#[derive(Clone, Debug, Serialize, Deserialize, IsVariant, PartialEq, Eq)]
 pub enum BareSyntaxKind {
     Root,
     Error { description: String },
@@ -11,13 +12,15 @@ pub enum BareSyntaxKind {
     LineSpacing(LineSpacingAtom),
     Punct(Punct),
     Term,
-    Identifier(Box<str>),
+    Identifier(Arc<str>),
     Directive(Directive),
     ParamList,
     Param,
+    ParamHead,
     Name,
+    ImplicitName,
     Binding,
-    IfArgList,
+    ArgList(Reparsable),
     FieldDef,
     FieldDefList,
     TypeAnnotation,
@@ -30,10 +33,20 @@ pub enum BareSyntaxKind {
     FnValue,
     IfValue,
     Block,
-    Variable(Box<str>),
+    Variable(Arc<str>),
+    Eval,
+    ParenthesizedTerm,
+    Call,
+    Let,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, IsVariant)]
+#[derive(Clone, Debug, Serialize, Deserialize, IsVariant, PartialEq, Eq)]
+pub enum Reparsable {
+    Reparse,
+    Ignore,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, IsVariant, PartialEq, Eq)]
 pub enum BuiltinType {
     Bool,
     Void,

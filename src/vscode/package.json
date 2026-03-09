@@ -67,6 +67,11 @@
             {
                 "command": "adept.showSyntaxTree",
                 "title": "Adept: Show Syntax Tree"
+            },
+            {
+                "command": "adept.debugEval",
+                "title": "Adept: Debug Eval"
+
             }
         ]
     },

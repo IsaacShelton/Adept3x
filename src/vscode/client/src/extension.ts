@@ -122,6 +122,31 @@ async function startServer(context: ExtensionContext) {
         );
 
         context.subscriptions.push(
+            commands.registerCommand('adept.debugEval', async () => {
+                const fileUri = window.activeTextEditor?.document.uri.toString();
+                if (fileUri == null) {
+                    return;
+                }
+
+                const result = String(await client.sendRequest('workspace/executeCommand', {
+                    command: 'adept.debugEval',
+                    arguments: [fileUri]
+                }));
+
+                const uri = Uri.parse(liveScheme + ':Live Output');
+                const doc = await workspace.openTextDocument(uri);
+
+                await window.showTextDocument(doc, {
+                    viewColumn: ViewColumn.Beside,
+                    preview: false,
+                    preserveFocus: true,
+                });
+
+                provider.update(uri, result);
+            })
+        );
+
+        context.subscriptions.push(
             commands.registerCommand("adept.restartServer", async () => {
                 await killServer();
                 startServer(context);

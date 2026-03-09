@@ -8,8 +8,7 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionParams, CompletionResponse,
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    ExecuteCommandParams, FullDocumentDiagnosticReport, Position, Range,
-    RelatedFullDocumentDiagnosticReport, Uri,
+    ExecuteCommandParams, FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Uri,
 };
 #[cfg(target_family = "unix")]
 use std::os::unix::net::{SocketAddr, UnixStream};
@@ -446,6 +445,29 @@ fn execute_command(
 
             Ok(Some(result))
         }
+        "adept.debugEval" => {
+            let result_string = params
+                .arguments
+                .first()
+                .and_then(|arg| arg.as_str())
+                .map(|arg| lsp_types::Uri::from_str(arg))
+                .into_iter()
+                .flatten()
+                .next()
+                .as_ref()
+                .and_then(|uri| client.get_file_content(uri))
+                .and_then(|file_content| {
+                    file_content
+                        .0
+                        .as_ref()
+                        .syntax_tree
+                        .as_ref()
+                        .map(|syntax_tree| kernel::debug_eval(syntax_tree))
+                })
+                .unwrap_or_else(|| "".into());
+
+            Ok(Some(serde_json::Value::from(result_string)))
+        }
         _ => Ok(None),
     }
 }
@@ -472,7 +494,10 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
                 FileKind::Unknown
             };
 
-            let file_bytes = FileBytes::Document(Document::new(params.text_document.text.into()));
+            let document = Document::new(params.text_document.text.into());
+            let syntax_tree = parser_adept::reparse(&document, None, document.full_range());
+
+            let file_bytes = FileBytes::Document(document);
             let file_id = client.file_cache.preregister_file(Cow::Owned(filepath));
             log::info!("on_notif did open {:?} {:?}", file_id, &file_bytes);
 
@@ -481,7 +506,7 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
                 file_cache::FileContent {
                     kind,
                     file_bytes,
-                    syntax_tree: None,
+                    syntax_tree: Some(syntax_tree),
                 },
             );
         }
@@ -494,8 +519,6 @@ fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
     else {
         return;
     };
-
-    log::info!("Change for {:?}", filepath);
 
     if let Some(_) = file_content.file_bytes.as_document() {
         let edits = params

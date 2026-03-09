@@ -219,6 +219,7 @@ dependencies = [
  "humantime",
  "idle_tracker",
  "itertools",
+ "kernel",
  "lock_file",
  "log",
  "lsp-types",
@@ -427,6 +428,20 @@ name = "itoa"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "document",
+ "log",
+ "parser_adept",
+ "syntax_tree",
+ "thiserror",
+ "token",
+ "util_infinite_iterator",
+]
 
 [[package]]
 name = "language_server"
