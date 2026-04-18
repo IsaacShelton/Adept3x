@@ -1,11 +1,9 @@
 use crate::Queue;
 use idle_tracker::IdleTracker;
 use lsp_message::LspMessage;
-use std::io::{self, BufReader};
+use std::io::{self, BufReader, Read, Write};
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixListener;
-#[cfg(target_family = "unix")]
-use std::os::unix::net::UnixStream;
 
 pub struct Daemon {
     #[cfg(target_family = "unix")]
@@ -26,13 +24,11 @@ impl Daemon {
         }
     }
 
-    #[cfg(target_family = "unix")]
-    pub fn wait_for_message(&self, client_stream: &UnixStream) -> io::Result<Option<LspMessage>> {
+    pub fn wait_for_message(&self, client_stream: impl Read) -> io::Result<Option<LspMessage>> {
         LspMessage::read(&mut BufReader::new(client_stream))
     }
 
-    #[cfg(target_family = "unix")]
-    pub fn send(message: LspMessage, mut client_stream: &UnixStream) -> io::Result<()> {
+    pub fn send(message: LspMessage, mut client_stream: impl Write) -> io::Result<()> {
         message.write(&mut client_stream)
     }
 

@@ -1,4 +1,3 @@
-#[cfg(target_family = "unix")]
 use crate::Daemon;
 use document::Document;
 use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
