@@ -2,7 +2,7 @@
 use std::process::ExitCode;
 
 #[cfg(target_family = "windows")]
-pub fn compile() -> ExitCode {
+pub fn compile(_filename: &str) -> ExitCode {
     env_logger::init();
 
     log::error!("Driver is not supported on Windows yet");
