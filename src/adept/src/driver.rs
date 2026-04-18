@@ -1,15 +1,5 @@
-#[cfg(target_family = "unix")]
 use std::process::ExitCode;
 
-#[cfg(target_family = "windows")]
-pub fn compile(_filename: &str) -> ExitCode {
-    env_logger::init();
-
-    log::error!("Driver is not supported on Windows yet");
-    ExitCode::FAILURE
-}
-
-#[cfg(target_family = "unix")]
 pub fn compile(filename: &str) -> ExitCode {
     use lsp_message::{LspCompile, LspMessage};
     use std::{thread, time::Duration};

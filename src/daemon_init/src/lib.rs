@@ -2,15 +2,12 @@ mod error;
 
 use daemon::{Connection, Daemon};
 pub use error::*;
-#[cfg(target_family = "unix")]
-use std::os::unix::net::{UnixListener, UnixStream};
-#[cfg(target_family = "unix")]
-use std::time::Duration;
 use std::{
     fs::remove_file,
     io,
     path::Path,
     process::{Command, ExitCode},
+    time::Duration,
 };
 
 pub fn start() -> ExitCode {
@@ -35,6 +32,8 @@ pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
 
 #[cfg(target_family = "unix")]
 pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
+    use std::os::unix::net::{UnixListener, UnixStream};
+
     let listener = loop {
         // Attempt to become the server for Unix Domain Socket
         // at the specified filepath.
@@ -85,25 +84,15 @@ pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
 
 /// Tries to connect to the daemon process. If the daemon process
 /// is not running yet, then this function attempts to launch it.
-#[cfg(target_family = "windows")]
-pub fn connect() -> Result<Connection, StartError> {
-    todo!("connecting to daemon on windows is not supported yet")
-}
-
-/// Tries to connect to the daemon process. If the daemon process
-/// is not running yet, then this function attempts to launch it.
-#[cfg(target_family = "unix")]
 pub fn connect() -> Result<Connection, StartError> {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let filepath = cwd.join("adeptd.lock");
 
     // 1) Check if we can connect to Unix Domain Socket
-    if let Ok(stream) = UnixStream::connect(&filepath) {
+    if let Ok(connection) = Connection::connect(&filepath) {
         // 2) If okay, then this client has established a connection.
         log::info!("Connected to existing daemon instance");
-        return Ok(Connection {
-            stream: stream.into(),
-        });
+        return Ok(connection);
     }
 
     // 3) If failed, spawn daemon.
@@ -111,11 +100,9 @@ pub fn connect() -> Result<Connection, StartError> {
 
     // 4) Try to connect again a few times.
     for _ in 0..10 {
-        if let Ok(stream) = UnixStream::connect(&filepath) {
+        if let Ok(connection) = Connection::connect(&filepath) {
             log::info!("Connected to new daemon instance");
-            return Ok(Connection {
-                stream: stream.into(),
-            });
+            return Ok(connection);
         }
 
         std::thread::sleep(Duration::from_millis(20));

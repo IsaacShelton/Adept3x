@@ -1,7 +1,7 @@
 use lsp_message::LspMessage;
-use std::io;
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixStream;
+use std::{io, path::Path};
 
 pub struct Connection {
     #[cfg(target_family = "unix")]
@@ -18,7 +18,22 @@ impl Connection {
         #[cfg(target_family = "windows")]
         {
             let _ = message;
-            panic!("Windows is not supported")
+            panic!("Connection::send - Windows is not supported")
+        }
+    }
+
+    pub fn connect(filepath: &Path) -> Result<Self, ()> {
+        #[cfg(target_family = "unix")]
+        {
+            UnixStream::connect(filepath)
+                .map(|stream| Self { stream })
+                .map_err(|_| ())
+        }
+
+        #[cfg(target_family = "windows")]
+        {
+            let _ = filepath;
+            panic!("Connection::connect - Windows is not supported")
         }
     }
 }

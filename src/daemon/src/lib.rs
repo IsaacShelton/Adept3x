@@ -5,14 +5,8 @@ mod logger;
 mod queue;
 mod show;
 
-#[cfg(target_family = "unix")]
-use crate::handle_client::handle_client;
 pub use crate::{connection::Connection, daemon::Daemon};
 pub use queue::*;
-#[cfg(target_family = "unix")]
-use std::io::ErrorKind;
-#[cfg(target_family = "unix")]
-use std::time::Duration;
 use std::{io, sync::Arc};
 
 pub fn main_loop(daemon: Daemon) -> io::Result<()> {
@@ -24,6 +18,9 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
 
     #[cfg(target_family = "unix")]
     {
+        use crate::handle_client::handle_client;
+        use std::{io::ErrorKind, time::Duration};
+
         daemon
             .listener
             .set_nonblocking(true)
@@ -35,11 +32,23 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
         // Accept clients
         loop {
             match daemon.listener.accept() {
-                Ok((stream, address)) => {
+                Ok((stream, _address)) => {
                     let daemon = Arc::clone(&daemon);
                     std::thread::spawn(move || {
                         if daemon.idle_tracker.add_connection().is_ok() {
-                            handle_client(daemon.as_ref(), stream, address);
+                            stream.set_nonblocking(false).unwrap();
+                            if let Err(err) =
+                                stream.set_read_timeout(Some(Duration::from_millis(50)))
+                            {
+                                log::error!(
+                                    "Client connection closed before able to set timeout - {}",
+                                    err
+                                );
+                                return;
+                            }
+
+                            let desc = format!("{:?}", stream.local_addr());
+                            handle_client(daemon.as_ref(), &stream, desc);
                             daemon.idle_tracker.remove_connection();
                         }
                     });

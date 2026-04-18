@@ -10,16 +10,21 @@ use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
     ExecuteCommandParams, FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Uri,
 };
-#[cfg(target_family = "unix")]
-use std::os::unix::net::{SocketAddr, UnixStream};
-use std::{borrow::Cow, ffi::OsStr, panic::catch_unwind, path::PathBuf, str::FromStr, sync::Arc};
-#[cfg(target_family = "unix")]
-use std::{io::BufReader, io::ErrorKind, time::Duration};
+use std::{
+    borrow::Cow,
+    ffi::OsStr,
+    io::{BufReader, ErrorKind, Read, Write},
+    panic::catch_unwind,
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
+};
 use syntax_tree::{BareSyntaxKind, BuiltinType};
 use text_edit::TextEditOrFullUtf16;
 
 pub struct Client {
     file_cache: FileCache,
+    #[allow(unused)]
     next_request_id: LspRequestId,
     config_file: ConfigFile,
 }
@@ -42,6 +47,7 @@ impl Client {
 
 pub enum ConfigFile {
     Missing,
+    #[allow(unused)]
     Prompted(LspRequestId),
     #[allow(unused)]
     Present(FileId),
@@ -56,6 +62,7 @@ impl Client {
         }
     }
 
+    #[allow(unused)]
     pub fn next_request_id(&mut self) -> LspRequestId {
         let id = self.next_request_id.clone();
         self.next_request_id = self.next_request_id.succ();
@@ -63,20 +70,10 @@ impl Client {
     }
 }
 
-#[cfg(target_family = "unix")]
-pub fn handle_client(daemon: &Daemon, stream: UnixStream, _address: SocketAddr) {
-    log::info!("Accepted client {:?}", stream.local_addr());
+pub fn handle_client(daemon: &Daemon, mut stream: impl Read + Write + Copy, desc: String) {
+    log::info!("Accepted client {:?}", desc);
 
-    stream.set_nonblocking(false).unwrap();
-    if let Err(err) = stream.set_read_timeout(Some(Duration::from_millis(50))) {
-        log::error!(
-            "Client connection closed before able to set timeout - {}",
-            err
-        );
-        return;
-    }
-
-    let reader = &mut BufReader::new(&stream);
+    let reader = &mut BufReader::new(stream);
     let mut client = Client::new();
     client.config_file = ConfigFile::Missing; // get_config_file_id(&mut client, &stream);
 
@@ -132,7 +129,7 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, _address: SocketAddr) 
 
                 if let Ok(response) = response_or_original_request {
                     response
-                        .write(&mut &stream)
+                        .write(&mut stream)
                         .expect("Failed to send message to client");
                 }
             }
@@ -166,64 +163,6 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, _address: SocketAddr) 
                     log::error!("Error receiving message from client - {:?}", error);
                 }
             }
-        }
-    }
-}
-
-#[allow(unused)]
-#[cfg(target_family = "unix")]
-fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
-    match std::env::current_dir()
-        .map_err(|_| ())
-        .and_then(|path| Canonical::new(path.join("adept.build")))
-    {
-        Ok(config_filepath) => {
-            use document::Document;
-            use std::borrow::Cow;
-
-            log::info!("Found config file {:?}", config_filepath);
-            let config_text = std::fs::read_to_string(config_filepath.as_path())
-                .expect("Failed to read config file");
-
-            let config_file_id = client
-                .file_cache
-                .preregister_file(Cow::Owned(config_filepath));
-
-            log::info!("Config file id is {:?}", config_file_id);
-            log::info!("Config text is {}", config_text);
-
-            let document = Document::new(config_text.into());
-            let syntax_tree = parser_adept::reparse(&document, None, document.full_range());
-
-            log::error!("Got syntax tree {:?}", syntax_tree);
-
-            let file_bytes = FileBytes::Document(document);
-
-            client.file_cache.set_content(
-                config_file_id,
-                FileContent {
-                    kind: FileKind::ProjectConfig,
-                    file_bytes,
-                    syntax_tree: Some(syntax_tree),
-                },
-            );
-
-            ConfigFile::Present(config_file_id)
-        }
-        Err(error) => {
-            log::error!("Failed to find config file - {:?}", error);
-
-            let create_project_file_prompt_request_id = client.next_request_id();
-
-            crate::show::show_message_request(
-                &stream,
-                create_project_file_prompt_request_id.clone(),
-                lsp_types::MessageType::INFO,
-                "Missing `adept.build` project config file!".into(),
-                ["Create".into(), "Ignore".into(), "Another".into()].into_iter(),
-            );
-
-            ConfigFile::Prompted(create_project_file_prompt_request_id)
         }
     }
 }
