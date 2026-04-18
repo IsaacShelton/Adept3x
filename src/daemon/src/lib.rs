@@ -1,12 +1,12 @@
-mod client;
 mod connection;
 mod daemon;
+mod handle_client;
 mod logger;
 mod queue;
 mod show;
 
 #[cfg(target_family = "unix")]
-use crate::client::handle_client;
+use crate::handle_client::handle_client;
 pub use crate::{connection::Connection, daemon::Daemon};
 pub use queue::*;
 #[cfg(target_family = "unix")]

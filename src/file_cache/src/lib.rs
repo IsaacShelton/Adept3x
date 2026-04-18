@@ -46,7 +46,7 @@ impl FileContent {
 }
 
 impl FileCache {
-    pub fn register_file(&self, relative_to: FileId, relative_path: &str) -> Option<FileId> {
+    pub fn register_file(&self, _relative_to: FileId, _relative_path: &str) -> Option<FileId> {
         todo!("FileCache::register_file")
     }
 

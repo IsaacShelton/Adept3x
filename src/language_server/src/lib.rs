@@ -129,6 +129,9 @@ pub fn start() -> ExitCode {
                 LspMessage::Notification(notification) => {
                     log::warn!("Unhandled notification '{}'", notification.method)
                 }
+                LspMessage::Compile(_) => {
+                    log::error!("Language server does not support compile message");
+                }
             }
         }
     }

@@ -9,6 +9,12 @@ pub enum LspMessage {
     Request(LspRequest),
     Response(LspResponse),
     Notification(LspNotification),
+    Compile(LspCompile),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LspCompile {
+    pub filename: String,
 }
 
 #[derive(Serialize)]

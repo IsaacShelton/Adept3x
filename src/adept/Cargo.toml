@@ -5,6 +5,10 @@ edition = "2024"
 
 [dependencies]
 daemon_init = { version = "0.1.0", path = "../daemon_init" }
+env_logger = "0.11.10"
 language_server = { version = "0.1.0", path = "../language_server" }
 smol.workspace = true
+log.workspace = true
+lsp_message = { version = "0.1.0", path = "../lsp_message" }
+
 

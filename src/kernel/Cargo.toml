@@ -12,6 +12,10 @@ token = { version = "0.1.0", path = "../token" }
 thiserror.workspace = true
 derive_more.workspace = true
 log.workspace = true
+arrayvec = { version= "0.7.6" }
+num-bigint.workspace = true
+num-traits.workspace = true
+bit-vec.workspace = true
 
 [features]
 default = []

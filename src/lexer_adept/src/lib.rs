@@ -2,6 +2,8 @@ mod feed_result;
 mod infinite_iterator;
 
 use crate::feed_result::FeedResult;
+use num_bigint::BigInt;
+use std::{str::FromStr, sync::Arc};
 use token::{
     ALL_DIRECTIVES, ALL_PUNCT_SORTED, Directive, IsTerminated, Punct, StringLiteral, Token,
     TokenKind,
@@ -23,6 +25,7 @@ pub enum State<S: Copy> {
     Identifier(String, S),
     UnknownDirective(String, S),
     String(StringState<S>),
+    Number(NumberState<S>),
     SinglelineComment(SinglelineCommentState<S>),
     MultilineComment(MultilineCommentState<S>),
     UnterminatedString(S),
@@ -33,6 +36,11 @@ pub struct StringState<S: Copy> {
     literal: String,
     close_char: char,
     escaped: bool,
+    source: S,
+}
+
+pub struct NumberState<S: Copy> {
+    literal: String,
     source: S,
 }
 
@@ -102,6 +110,19 @@ where
                     FeedResult::Has(TokenKind::String(StringLiteral { literal }).at(source))
                 }
             },
+            State::Number(number_state) => {
+                if self.lexable.peek().is_digit() {
+                    let c = self.lexable.next().unwrap().0;
+                    number_state.literal.push(c);
+                    FeedResult::Waiting
+                } else {
+                    let big_int = BigInt::from_str(&number_state.literal).unwrap();
+                    let literal = std::mem::take(&mut number_state.literal);
+                    let source = number_state.source;
+                    self.state = State::Idle;
+                    FeedResult::Has(TokenKind::Integer(Arc::new(big_int), literal).at(source))
+                }
+            }
             State::UnterminatedString(source) => {
                 let source = *source;
                 self.state = State::Idle;
@@ -218,6 +239,15 @@ where
             }
 
             self.state = State::UnknownDirective("".into(), source);
+            return FeedResult::Waiting;
+        }
+
+        if self.lexable.peek().is_digit() {
+            let source = self.lexable.peek().source();
+            self.state = State::Number(NumberState {
+                literal: String::new(),
+                source,
+            });
             return FeedResult::Waiting;
         }
 

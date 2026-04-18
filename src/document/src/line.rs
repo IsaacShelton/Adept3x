@@ -31,6 +31,7 @@ impl DocumentLine {
         self.content.push_str(text)
     }
 
+    #[allow(unused)]
     pub fn insert(&mut self, index: usize, text: &str) {
         self.content.insert_str(index, text);
     }

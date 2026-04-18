@@ -1,3 +1,5 @@
+mod driver;
+
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -7,7 +9,7 @@ fn main() -> ExitCode {
         Some("-h" | "--help") | None => show_help(),
         Some("--daemon") => daemon_init::start(),
         Some("--language-server") => language_server::start(),
-        _ => show_help(),
+        Some(filename) => driver::compile(filename),
     }
 }
 

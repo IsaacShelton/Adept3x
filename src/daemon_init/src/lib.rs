@@ -17,7 +17,7 @@ pub fn start() -> ExitCode {
     match try_become() {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("{}", error);
+            log::error!("Failed to become daemon: {}", error);
             ExitCode::FAILURE
         }
     }
@@ -65,7 +65,7 @@ pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
                     // Otherwise, an instance of the daemon is
                     // very likely already running here, so we
                     // shouldn't try to take its place.
-                    eprintln!("Daemon already running.");
+                    log::info!("Daemon already running.");
                     return Ok(());
                 }
 
@@ -76,7 +76,7 @@ pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
         }
     };
 
-    eprintln!("Got listener {:?}", listener);
+    log::info!("Got listener {:?}", listener);
 
     let result = daemon::main_loop(Daemon::new(listener));
     let _ = remove_file(&filepath);
@@ -100,7 +100,7 @@ pub fn connect() -> Result<Connection, StartError> {
     // 1) Check if we can connect to Unix Domain Socket
     if let Ok(stream) = UnixStream::connect(&filepath) {
         // 2) If okay, then this client has established a connection.
-        eprintln!("Connected to existing daemon.");
+        log::info!("Connected to existing daemon instance");
         return Ok(Connection {
             stream: stream.into(),
         });
@@ -112,7 +112,7 @@ pub fn connect() -> Result<Connection, StartError> {
     // 4) Try to connect again a few times.
     for _ in 0..10 {
         if let Ok(stream) = UnixStream::connect(&filepath) {
-            eprintln!("Connected to spawned daemon.");
+            log::info!("Connected to new daemon instance");
             return Ok(Connection {
                 stream: stream.into(),
             });

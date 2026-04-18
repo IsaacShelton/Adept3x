@@ -9,7 +9,10 @@ use lazy_static::lazy_static;
 use num_bigint::BigInt;
 pub use punct::Punct;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 pub use string::{StringLiteral, StringModifier};
 use util_infinite_iterator::IsEnd;
 use util_text::{ColumnSpacingAtom, LineSpacingAtom};
@@ -54,7 +57,7 @@ pub enum TokenKind {
     Polymorph(String),
     String(StringLiteral),
     MissingStringTermination,
-    Integer(BigInt, usize),
+    Integer(Arc<BigInt>, String),
     Float(f64, usize),
     Directive(Directive),
     Punct(Punct),
@@ -120,7 +123,18 @@ const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
 ];
 
 pub const ALL_DIRECTIVES: &[&'static str] = &[
-    "fn", "Fn", "if", "record", "Record", "Variant", "variant", "eval",
+    "fn",
+    "Fn",
+    "if",
+    "record",
+    "Record",
+    "Variant",
+    "variant",
+    "eval",
+    "match",
+    "bool_elim",
+    "nat_elim",
+    "nat_succ",
 ];
 
 // Since Rust's const evaluation sucks
@@ -182,7 +196,7 @@ impl TokenKind {
             TokenKind::Polymorph(name) => 1 + name.len(),
             TokenKind::String(string) => string.literal.len(),
             TokenKind::MissingStringTermination => 0,
-            TokenKind::Integer(_, len) => *len,
+            TokenKind::Integer(_, text) => text.len(),
             TokenKind::Float(_, len) => *len,
             TokenKind::Directive(directive) => directive.len_with_prefix(),
             TokenKind::Punct(punct) => punct.len(),

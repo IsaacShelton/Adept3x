@@ -17,6 +17,7 @@ pub struct PathInternerInner {
 }
 
 impl PathInterner {
+    #[allow(unused)]
     pub fn intern(&self, filepath: Cow<Canonical<PathBuf>>) -> FileId {
         self.inner.lock().unwrap().intern(filepath)
     }

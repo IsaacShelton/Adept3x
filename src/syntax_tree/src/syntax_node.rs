@@ -1,5 +1,6 @@
 use crate::{BareSyntaxKind, BareSyntaxNode};
 use derive_more::From;
+use num_bigint::BigInt;
 use std::{fmt::Debug, sync::Arc};
 use text_edit::{TextPointRangeUtf16, TextPointUtf16};
 
@@ -104,6 +105,16 @@ impl SyntaxNode {
                     None
                 }
             })
+        })
+    }
+
+    pub fn find_integer(self: &Arc<Self>) -> Option<Arc<BigInt>> {
+        self.children().find_map(|child| {
+            if let BareSyntaxKind::Integer(value) = child.bare.kind() {
+                Some(Arc::clone(value))
+            } else {
+                None
+            }
         })
     }
 
@@ -272,6 +283,13 @@ impl NamedImplicitness {
             NamedImplicitness::Implicitness(lambda_implicitness) => {
                 param_implicitness == *lambda_implicitness
             }
+        }
+    }
+
+    pub fn to_implicitness(&self) -> Implicitness {
+        match self {
+            NamedImplicitness::ImplicitWithName(_) => Implicitness::Implicit,
+            NamedImplicitness::Implicitness(implicitness) => *implicitness,
         }
     }
 }

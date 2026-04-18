@@ -1,4 +1,5 @@
 use derive_more::{IsVariant, PartialEq};
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use token::{Directive, Punct};
@@ -30,14 +31,24 @@ pub enum BareSyntaxKind {
     TrueValue,
     FalseValue,
     VoidValue,
+    Integer(Arc<BigInt>),
     FnValue,
     IfValue,
+    RecordValue,
     Block,
     Variable(Arc<str>),
     Eval,
     ParenthesizedTerm,
     Call,
     Let,
+    Nth,
+    Match,
+    MatchBlock,
+    MatchArm,
+    Pattern,
+    BoolElim,
+    NatElim,
+    NatSucc,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant, PartialEq, Eq)]
@@ -53,4 +64,5 @@ pub enum BuiltinType {
     Type,
     Fn,
     Record,
+    Nat,
 }

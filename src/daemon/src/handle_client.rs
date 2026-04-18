@@ -12,7 +12,7 @@ use lsp_types::{
 };
 #[cfg(target_family = "unix")]
 use std::os::unix::net::{SocketAddr, UnixStream};
-use std::{borrow::Cow, ffi::OsStr, path::PathBuf, str::FromStr, sync::Arc};
+use std::{borrow::Cow, ffi::OsStr, panic::catch_unwind, path::PathBuf, str::FromStr, sync::Arc};
 #[cfg(target_family = "unix")]
 use std::{io::BufReader, io::ErrorKind, time::Duration};
 use syntax_tree::{BareSyntaxKind, BuiltinType};
@@ -43,6 +43,7 @@ impl Client {
 pub enum ConfigFile {
     Missing,
     Prompted(LspRequestId),
+    #[allow(unused)]
     Present(FileId),
 }
 
@@ -63,22 +64,26 @@ impl Client {
 }
 
 #[cfg(target_family = "unix")]
-pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
-    log::info!("Accepted client {:?} {:?}", stream, address);
+pub fn handle_client(daemon: &Daemon, stream: UnixStream, _address: SocketAddr) {
+    log::info!("Accepted client {:?}", stream.local_addr());
 
     stream.set_nonblocking(false).unwrap();
-    stream
-        .set_read_timeout(Some(Duration::from_millis(50)))
-        .unwrap();
+    if let Err(err) = stream.set_read_timeout(Some(Duration::from_millis(50))) {
+        log::error!(
+            "Client connection closed before able to set timeout - {}",
+            err
+        );
+        return;
+    }
 
     let reader = &mut BufReader::new(&stream);
     let mut client = Client::new();
-    client.config_file = get_config_file_id(&mut client, &stream);
+    client.config_file = ConfigFile::Missing; // get_config_file_id(&mut client, &stream);
 
     loop {
         match LspMessage::read(reader) {
             Ok(None) => {
-                log::info!("Shutting down connection to client");
+                log::info!("Done handling client");
                 break;
             }
             Ok(Some(LspMessage::Notification(notification))) => {
@@ -150,6 +155,9 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
                     }
                 }
             }
+            Ok(Some(LspMessage::Compile(compile))) => {
+                log::info!("Compiling {}", compile.filename)
+            }
             Err(error) => {
                 if let ErrorKind::WouldBlock = error.kind() {
                     // No message is ready to receive from the client yet
@@ -162,6 +170,7 @@ pub fn handle_client(daemon: &Daemon, stream: UnixStream, address: SocketAddr) {
     }
 }
 
+#[allow(unused)]
 #[cfg(target_family = "unix")]
 fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
     match std::env::current_dir()
@@ -184,7 +193,6 @@ fn get_config_file_id(client: &mut Client, stream: &UnixStream) -> ConfigFile {
             log::info!("Config text is {}", config_text);
 
             let document = Document::new(config_text.into());
-
             let syntax_tree = parser_adept::reparse(&document, None, document.full_range());
 
             log::error!("Got syntax tree {:?}", syntax_tree);
@@ -349,7 +357,10 @@ fn completion(
                                 Some(CompletionItemKind::STRUCT)
                             }
                             BareSyntaxKind::BuiltinType(
-                                BuiltinType::Bool | BuiltinType::Void | BuiltinType::Type,
+                                BuiltinType::Bool
+                                | BuiltinType::Void
+                                | BuiltinType::Nat
+                                | BuiltinType::Type,
                             ) => Some(CompletionItemKind::ENUM),
                             BareSyntaxKind::FnValue => Some(CompletionItemKind::FUNCTION),
                             BareSyntaxKind::TrueValue
@@ -462,7 +473,10 @@ fn execute_command(
                         .as_ref()
                         .syntax_tree
                         .as_ref()
-                        .map(|syntax_tree| kernel::debug_eval(syntax_tree))
+                        .map(|syntax_tree| {
+                            catch_unwind(|| kernel::debug_eval(syntax_tree))
+                                .unwrap_or_else(|e| format!("<paniced>: {e:?}"))
+                        })
                 })
                 .unwrap_or_else(|| "".into());
 
@@ -514,7 +528,7 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
 }
 
 fn did_change(client: &mut Client, params: DidChangeTextDocumentParams) {
-    let Some((file_content, file_id, filepath)) =
+    let Some((file_content, file_id, _filepath)) =
         client.get_file_content(&params.text_document.uri)
     else {
         return;

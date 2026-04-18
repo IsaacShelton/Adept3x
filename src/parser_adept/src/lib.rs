@@ -172,23 +172,70 @@ where
         mut children: Vec<Arc<BareSyntaxNode>>,
     ) -> Result<Arc<BareSyntaxNode>, Vec<Arc<BareSyntaxNode>>> {
         if self.lexer.peek().is_punct_of(Punct::new("(")) {
-            children = vec![BareSyntaxNode::new_parent(BareSyntaxKind::Term, children)];
-            children.push(self.parse_arg_list(Reparsable::Reparse));
+            children = vec![
+                BareSyntaxNode::new_parent(BareSyntaxKind::Term, children),
+                self.parse_arg_list(Reparsable::Reparse),
+            ];
             return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Call, children));
         }
 
         if self.lexer.peek().is_punct_of(Punct::new(":=")) {
-            children = vec![BareSyntaxNode::new_parent(BareSyntaxKind::Term, children)];
-            children.push(BareSyntaxNode::new_punct(
-                self.lexer.next().kind.unwrap_punct(),
-            ));
-            children.push(self.parse_term());
+            children = vec![
+                BareSyntaxNode::new_parent(BareSyntaxKind::Term, children),
+                BareSyntaxNode::new_punct(self.lexer.next().kind.unwrap_punct()),
+                self.parse_term(),
+            ];
 
             if self.parse_all_whitespace(&mut children).is_some() {
                 children.push(self.parse_term());
             }
 
             return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Let, children));
+        }
+
+        if self.lexer.peek().is_punct_of(Punct::new(":")) {
+            children = vec![
+                BareSyntaxNode::new_parent(BareSyntaxKind::Term, children),
+                BareSyntaxNode::new_punct(self.lexer.next().kind.unwrap_punct()),
+            ];
+
+            self.parse_column_whitespace(&mut children);
+
+            if self.lexer.peek().is_punct_of(Punct::new("=")) {
+                children.push(BareSyntaxNode::new_punct(
+                    self.lexer.next().kind.unwrap_punct(),
+                ));
+                children.push(self.parse_term());
+            } else {
+                children.push(self.parse_term());
+
+                if self
+                    .parse_punct(Punct::new("="), &mut children, ErrorRecovery::Empty)
+                    .is_ok()
+                {
+                    children.push(self.parse_term());
+                }
+            }
+
+            if self.parse_all_whitespace(&mut children).is_some() {
+                children.push(self.parse_term());
+            }
+
+            return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Let, children));
+        }
+
+        if self.lexer.peek().is_punct_of(Punct::new(".")) && self.lexer.peek_nth(1).is_integer() {
+            children = vec![
+                BareSyntaxNode::new_parent(BareSyntaxKind::Term, children),
+                BareSyntaxNode::new_punct(self.lexer.next().kind.unwrap_punct()),
+            ];
+            let (integer, text) = self.lexer.next().kind.unwrap_integer();
+            children.push(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::Integer(integer),
+                text,
+            ));
+
+            return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Nth, children));
         }
 
         Err(children)
@@ -217,17 +264,25 @@ where
         }
 
         if let Some(node) = self.lexer.eat(|token| match &token.kind {
+            TokenKind::Integer(value, text) => Ok(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::Integer(Arc::clone(value)),
+                text.into(),
+            )),
             TokenKind::Identifier(name) => match name.as_str() {
-                "Bool" => Ok(BareSyntaxNode::new_leaf(
-                    BareSyntaxKind::BuiltinType(BuiltinType::Bool),
+                "Type" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::Type),
                     name.into(),
                 )),
                 "Void" => Ok(BareSyntaxNode::new_leaf(
                     BareSyntaxKind::BuiltinType(BuiltinType::Void),
                     name.into(),
                 )),
-                "Type" => Ok(BareSyntaxNode::new_leaf(
-                    BareSyntaxKind::BuiltinType(BuiltinType::Type),
+                "Bool" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::Bool),
+                    name.into(),
+                )),
+                "Nat" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::Nat),
                     name.into(),
                 )),
                 "true" => Ok(BareSyntaxNode::new_leaf(
@@ -272,8 +327,13 @@ where
             Directive::Standard(name) => match name.as_ref() {
                 "fn" => self.parse_fn_directive(directive),
                 "if" => self.parse_if_directive(directive),
+                "bool_elim" => self.parse_elim_directive(directive, BareSyntaxKind::BoolElim),
+                "nat_elim" => self.parse_elim_directive(directive, BareSyntaxKind::NatElim),
+                "nat_succ" => self.parse_intro_directive(directive, BareSyntaxKind::NatSucc),
+                "match" => self.parse_match_directive(directive),
                 "Fn" => self.parse_fn_type_directive(directive),
                 "Record" => self.parse_record_type_directive(directive),
+                "record" => self.parse_record_directive(directive),
                 "eval" => self.parse_eval(directive),
                 _ => BareSyntaxNode::new_error(
                     directive.to_string(),
@@ -412,7 +472,136 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::Block, children)
     }
 
+    fn parse_match_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        /*
+        @match x @so(x) P(x) {
+            true => 0,
+            false => 1,
+        }
+        */
+
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+
+        self.parse_column_whitespace(&mut children);
+        children.push(self.parse_term());
+        children.push(self.parse_match_block());
+        BareSyntaxNode::new_parent(BareSyntaxKind::Match, children)
+    }
+
+    fn parse_match_block(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        if self
+            .parse_punct(Punct::new("{"), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_all_whitespace(&mut children);
+            children.push(self.parse_match_arm());
+            self.parse_all_whitespace(&mut children);
+
+            let _ = self.parse_punct(
+                Punct::new("}"),
+                &mut children,
+                // TODO: This should take ideally nesting into account
+                ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new("}"))),
+            );
+        }
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::MatchBlock, children)
+    }
+
+    fn parse_match_arm(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        children.push(self.parse_pattern());
+        let _ = self.parse_punct(Punct::new("=>"), &mut children, ErrorRecovery::Empty);
+        children.push(self.parse_term());
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::MatchArm, children)
+    }
+
+    fn parse_pattern(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+
+        if let Some(node) = self.lexer.eat(|token| match &token.kind {
+            TokenKind::Integer(value, text) => Ok(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::Integer(Arc::clone(value)),
+                text.into(),
+            )),
+            TokenKind::Identifier(name) => match name.as_str() {
+                "true" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::TrueValue,
+                    name.into(),
+                )),
+                "false" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::FalseValue,
+                    name.into(),
+                )),
+                "void" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::VoidValue,
+                    name.into(),
+                )),
+                _ => Err(token),
+            },
+            _ => Err(token),
+        }) {
+            children.push(node);
+        }
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::Pattern, children)
+    }
+
+    fn parse_intro_directive(
+        &mut self,
+        directive: Directive,
+        kind: BareSyntaxKind,
+    ) -> Arc<BareSyntaxNode> {
+        // (same as elim directive)
+        self.parse_elim_directive(directive, kind)
+    }
+
+    fn parse_elim_directive(
+        &mut self,
+        directive: Directive,
+        kind: BareSyntaxKind,
+    ) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+
+        self.parse_column_whitespace(&mut children);
+        let arg_list = self.parse_arg_list(Reparsable::Reparse);
+        children.push(arg_list);
+        self.parse_column_whitespace(&mut children);
+
+        BareSyntaxNode::new_parent(kind, children)
+    }
+
     fn parse_if_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        // Ternary (for short single-line)
+        // @if(a >= b, a + b, a - b)
+
+        // Ternary with Motive (for dependent if)
+        // @if(a >= b, @fn(_) { Nat }, a + b, a - b)
+
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+
+        self.parse_column_whitespace(&mut children);
+        let arg_list = self.parse_arg_list(Reparsable::Ignore);
+        children.push(arg_list);
+        self.parse_column_whitespace(&mut children);
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::IfValue, children)
+
+        /*
         // Ternary (for short single-line)
         // @if(a >= b, a + b, a - b)
 
@@ -481,8 +670,23 @@ where
 
         self.parse_column_whitespace(&mut children);
         self.parse_type_annotation(false, &mut children);
-
         BareSyntaxNode::new_parent(BareSyntaxKind::IfValue, children)
+        */
+    }
+
+    fn parse_record_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
+        // @record(12, true, Type, void)
+
+        let mut children = Vec::new();
+        children.push(BareSyntaxNode::new_leaf(
+            BareSyntaxKind::Directive(directive.clone()),
+            directive.to_string(),
+        ));
+
+        self.parse_column_whitespace(&mut children);
+        children.push(self.parse_arg_list(Reparsable::Reparse));
+
+        BareSyntaxNode::new_parent(BareSyntaxKind::RecordValue, children)
     }
 
     fn parse_arg_list(&mut self, reparsable: Reparsable) -> Arc<BareSyntaxNode> {
@@ -760,8 +964,8 @@ where
 
 pub fn reparse(
     document: &Document,
-    existing: Option<Arc<SyntaxNode>>,
-    range: DocumentRange,
+    _existing: Option<Arc<SyntaxNode>>,
+    _range: DocumentRange,
 ) -> Arc<SyntaxNode> {
     let adapter = util_infinite_iterator::Adapter::new(
         document.chars().map(|c| Character::At(c, ())),

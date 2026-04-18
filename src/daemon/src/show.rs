@@ -6,6 +6,7 @@ use lsp_types::{MessageType, ShowMessageParams, notification::Notification};
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixStream;
 
+#[allow(unused)]
 #[cfg(target_family = "unix")]
 pub fn show_message(mut stream: &UnixStream, typ: MessageType, message: String) {
     let message = LspMessage::Notification(LspNotification {
