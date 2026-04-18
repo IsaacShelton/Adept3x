@@ -2,10 +2,10 @@
 use std::process::ExitCode;
 
 #[cfg(target_family = "windows")]
-pub fn start() -> ExitCode {
+pub fn compile() -> ExitCode {
     env_logger::init();
 
-    log::error!("Language server is not supported on Windows yet");
+    log::error!("Driver is not supported on Windows yet");
     ExitCode::FAILURE
 }
 
