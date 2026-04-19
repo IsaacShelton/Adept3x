@@ -1,4 +1,5 @@
-use crate::Pf;
+use crate::{Pf, QueryThen};
+use connection::Connection;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 pub struct RtStInQuery<'e, P: Pf> {
@@ -7,6 +8,8 @@ pub struct RtStInQuery<'e, P: Pf> {
     pub(crate) rev: P::Rev,
     pub(crate) req: P::Req<'e>,
     pub(crate) files: QueryFiles,
+    pub then: QueryThen<'e, P>,
+    pub connection: Connection,
 }
 
 pub type QueryFiles = HashMap<PathBuf, Arc<str>>;

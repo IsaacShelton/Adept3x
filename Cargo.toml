@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "src/adept",
+    "src/connection",
     "src/daemon",
     "src/daemon_init",
     "src/define_requests",
@@ -18,6 +19,8 @@ members = [
     "src/parser_abstract",
     "src/parser_adept",
     "src/request",
+    "src/rt_st_in",
+    "src/syntax_tree",
     "src/token",
     "src/top_n",
     "src/util_iter_coproduct",

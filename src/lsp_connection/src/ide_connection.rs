@@ -38,7 +38,7 @@ impl IdeConnection {
             let mut stdin = BufReader::new(std::io::stdin().lock());
 
             loop {
-                let Some(message) = LspMessage::read(&mut stdin)? else {
+                let Some(message) = LspMessage::read_raw(&mut stdin)? else {
                     continue;
                 };
 
@@ -68,7 +68,7 @@ impl IdeConnection {
                     break;
                 };
 
-                message.write(&mut stdout)?;
+                message.write_raw(&mut stdout)?;
                 stdout.flush()?;
             }
 

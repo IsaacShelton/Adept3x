@@ -1,4 +1,4 @@
-use crate::{Major, Pf, RtStIn, TaskStatusKind, rt_st_in::query::RtStInQuery, rt_trace};
+use crate::{Major, Pf, RtStIn, RtStInQuery, TaskStatusKind, rt_trace};
 
 pub fn wake_dependants<'e, P: Pf>(
     rt: &mut RtStIn<'e, P>,

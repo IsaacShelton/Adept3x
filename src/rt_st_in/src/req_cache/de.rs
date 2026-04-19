@@ -1,5 +1,6 @@
-use crate::{Completed, Kv, Pf, ReqCache, Task, TaskStatus, TaskStatusKind};
+use crate::{Kv, ReqCache};
 use fingerprint::COMPILER_BUILT_AT;
+use request::{Completed, Pf, Task, TaskStatus, TaskStatusKind};
 use std::marker::PhantomData;
 
 impl<'de, P: Pf> serde::Deserialize<'de> for ReqCache<'de, P> {

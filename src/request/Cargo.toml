@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bincode.workspace = true
 by_address.workspace = true
 define_requests = { version = "0.1.0", path = "../define_requests" }
 idle_tracker = { version = "0.1.0", path = "../idle_tracker" }
@@ -15,6 +14,7 @@ kernel = { version = "0.1.0", path = "../kernel" }
 syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
 document = { version = "0.1.0", path = "../document" }
 parser_adept = { version = "0.1.0", path = "../parser_adept" }
+connection = { version = "0.1.0", path = "../connection" }
 derive_more.workspace = true
 serde.workspace = true
 serde_json.workspace = true

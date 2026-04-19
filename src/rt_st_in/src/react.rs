@@ -1,8 +1,7 @@
-use crate::{
-    Completed, IsImpure, Like, Major, Pf, Req, Restarting, RtStIn, RunDispatch, Running, Suspend,
-    Task, TaskStatus, TaskStatusKind, Th, UnLike, UnwrapAft,
-    rt_st_in::query::{QueryFiles, RtStInQuery},
-    rt_trace, wake_dependants,
+use crate::{RtStIn, RtStInQuery, query::QueryFiles, wake_dependants};
+use request::{
+    Completed, IsImpure, Like, Major, Pf, Req, Restarting, RunDispatch, Running, Suspend, Task,
+    TaskStatus, TaskStatusKind, Th, UnLike, UnwrapAft, rt_trace,
 };
 use std::{collections::HashSet, sync::Arc};
 

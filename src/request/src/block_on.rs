@@ -1,7 +1,9 @@
-#[derive(Copy, Clone, Debug)]
-pub enum BlockOn<T, Q> {
+use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum BlockOn<T> {
     Complete(T),
     Cyclic,
     Diverges,
-    TimedOut(Q),
+    TimedOut,
 }

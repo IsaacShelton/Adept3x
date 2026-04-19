@@ -1,10 +1,9 @@
-mod connection;
 mod daemon;
 mod handle_client;
 mod logger;
 mod show;
 
-pub use crate::{connection::Connection, daemon::Daemon};
+pub use crate::daemon::Daemon;
 use std::{io, sync::Arc};
 
 pub fn main_loop(daemon: Daemon) -> io::Result<()> {
@@ -30,53 +29,32 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
             let daemon = exe_daemon;
 
             loop {
-                use request::{BlockOn, Rt};
+                use request::Rt;
                 use std::time::{Duration, Instant};
 
                 if daemon.should_exit() {
                     return;
                 }
 
-                {
-                    use file_cache::Canonical;
-                    use request::QueryMode;
+                let mut query = { daemon.queries.lock().unwrap().pop_front() };
 
-                    let mut rt = daemon.rt.lock().unwrap();
-                    let soon = Instant::now() + Duration::from_millis(50);
+                let Some(query) = query.as_mut() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
 
-                    let q = rt.query(
-                        request::ListSymbols {
-                            filename: Arc::new(Canonical::new("other.adept").expect("canonical")),
-                        }
-                        .into(),
-                        QueryMode::New,
-                    );
-
-                    match rt.block_on(q, request::TimeoutAt(soon)) {
-                        Ok(BlockOn::TimedOut(_)) => {
-                            println!("Timed out");
-                        }
-                        Ok(BlockOn::Complete(result)) => {
-                            println!("Got result: {:?}", result);
-                        }
-                        Ok(BlockOn::Cyclic) => {
-                            println!("Cyclic");
-                        }
-                        Ok(BlockOn::Diverges) => {
-                            println!("Diverges");
-                        }
-                        Err(top_errors) => {
-                            for error in top_errors.iter_unordered() {
-                                println!("Got error: {:?}", error);
-                            }
+                daemon.idle_tracker.still_active();
+                let soon = Instant::now() + Duration::from_millis(50);
+                let mut rt = daemon.rt.lock().unwrap();
+                match rt.block_on(query, request::TimeoutAt(soon)) {
+                    Ok(value) => {
+                        (&query.then)(&query.connection, value);
+                    }
+                    Err(top_errors) => {
+                        for error in top_errors.iter_unordered() {
+                            println!("Got error: {:?}", error);
                         }
                     }
-                }
-
-                let did_timeout = false;
-
-                if !did_timeout {
-                    std::thread::sleep(Duration::from_millis(500));
                 }
             }
         });
@@ -89,6 +67,8 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
 
                     std::thread::spawn(move || {
                         if daemon.idle_tracker.add_connection().is_ok() {
+                            use connection::Connection;
+
                             if let Err(err) = stream.set_nonblocking(false).and_then(|_| {
                                 stream.set_read_timeout(Some(Duration::from_millis(50)))
                             }) {
@@ -101,7 +81,8 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
                             }
 
                             let desc = format!("{:?}", stream.local_addr());
-                            handle_client(daemon.as_ref(), &stream, desc);
+                            let connection = Connection::new_unix(stream);
+                            handle_client(daemon.as_ref(), connection, desc);
                             daemon.idle_tracker.remove_connection();
                         }
                     });

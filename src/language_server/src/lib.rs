@@ -23,7 +23,7 @@ pub(crate) use maybe_ready::*;
 pub(crate) use never_respond::*;
 pub(crate) use static_wrapper::*;
 use std::{
-    io::{BufReader, ErrorKind},
+    io::ErrorKind,
     process::ExitCode,
     sync::{
         Arc,
@@ -75,14 +75,10 @@ pub fn start() -> ExitCode {
 
     let outgoing_thread = std::thread::spawn(move || {
         let should_exit = read_daemon_should_exit;
-        daemon.stream.set_nonblocking(false).unwrap();
-        daemon
-            .stream
-            .set_read_timeout(Some(Duration::from_millis(50)))
-            .unwrap();
+        daemon.set_non_blocking(false, Some(Duration::from_millis(50)));
 
         while !should_exit.load(Ordering::SeqCst) {
-            match LspMessage::read(&mut BufReader::new(&daemon.stream)) {
+            match LspMessage::recv(&daemon) {
                 Ok(None) => {
                     // Connection closed
                     break;
@@ -121,9 +117,7 @@ pub fn start() -> ExitCode {
                     log::warn!("Unhandled request '{}'", request.method)
                 }
                 LspMessage::Response(response) => {
-                    client
-                        .daemon
-                        .send(response.into())
+                    LspMessage::send(&client.daemon, response.into())
                         .expect("Failed to forward LSP response to daemon");
                 }
                 LspMessage::Notification(notification) => {
@@ -131,6 +125,9 @@ pub fn start() -> ExitCode {
                 }
                 LspMessage::Compile(_) => {
                     log::error!("Language server does not support compile message");
+                }
+                LspMessage::Aft(_) => {
+                    log::error!("Language server does not support aft message");
                 }
             }
         }

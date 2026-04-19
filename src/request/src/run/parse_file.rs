@@ -22,7 +22,7 @@ impl<'e, P: Pf> Run<'e, P> for ParseFile {
 
         let document = Document::new(content);
         let syntax_tree = parser_adept::reparse(&document, None, document.full_range());
-        let _ = syntax_tree.dump(&mut std::io::stdout(), 0);
+        // let _ = syntax_tree.dump(&mut std::io::stdout(), 0);
         Ok(WithErrors::no_errors(Some(ByAddress(syntax_tree))))
     }
 }

@@ -312,6 +312,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "connection"
+version = "0.1.0"
+
+[[package]]
 name = "content_length"
 version = "0.1.0"
 
@@ -334,6 +338,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 name = "daemon"
 version = "0.1.0"
 dependencies = [
+ "connection",
  "derive_more",
  "document",
  "fern",
@@ -349,6 +354,7 @@ dependencies = [
  "lsp_message",
  "parser_adept",
  "request",
+ "rt_st_in",
  "serde",
  "serde_json",
  "syntax_tree",
@@ -360,6 +366,7 @@ dependencies = [
 name = "daemon_init"
 version = "0.1.0"
 dependencies = [
+ "connection",
  "daemon",
  "derive_more",
  "fern",
@@ -732,6 +739,7 @@ dependencies = [
 name = "lsp_connection"
 version = "0.1.0"
 dependencies = [
+ "connection",
  "content_length",
  "daemon",
  "daemon_init",
@@ -748,10 +756,12 @@ dependencies = [
 name = "lsp_message"
 version = "0.1.0"
 dependencies = [
+ "connection",
  "content_length",
  "derive_more",
  "log",
  "lsp-types",
+ "request",
  "serde",
  "serde_derive",
  "serde_json",
@@ -953,8 +963,8 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 name = "request"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "by_address",
+ "connection",
  "define_requests",
  "derive_more",
  "document",
@@ -970,6 +980,19 @@ dependencies = [
  "thiserror",
  "top_n",
  "vfs",
+]
+
+[[package]]
+name = "rt_st_in"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "connection",
+ "fingerprint",
+ "log",
+ "request",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

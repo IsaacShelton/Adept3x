@@ -10,7 +10,7 @@ mod shutdown;
 
 use crate::{LspEndpoint, MaybeReady};
 use lsp_connection::LspConnection;
-use lsp_message::{LspNotification, LspRequest, LspRequestId};
+use lsp_message::{LspMessage, LspNotification, LspRequest, LspRequestId};
 
 trait Forward: LspEndpoint {
     const IS_REQUEST: bool;
@@ -40,10 +40,7 @@ where
             .into()
         };
 
-        client
-            .daemon
-            .send(message)
-            .expect("Failed to forward LSP message to daemon");
+        LspMessage::send(&client.daemon, message).expect("Failed to forward LSP message to daemon");
         MaybeReady::Pending
     }
 }

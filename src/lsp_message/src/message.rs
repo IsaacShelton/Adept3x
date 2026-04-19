@@ -1,5 +1,7 @@
 use crate::{LspNotification, LspRequest, LspResponse};
+use connection::Connection;
 use derive_more::From;
+use request::{BlockOn, CachedAft, PfIn};
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, Write};
 
@@ -10,6 +12,12 @@ pub enum LspMessage {
     Response(LspResponse),
     Notification(LspNotification),
     Compile(LspCompile),
+    Aft(AftResult),
+}
+
+#[derive(Clone, Debug, From, Serialize, Deserialize)]
+pub struct AftResult {
+    aft_result: BlockOn<Option<CachedAft<PfIn>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -25,7 +33,20 @@ struct JsonRpc<'a> {
 }
 
 impl LspMessage {
-    pub fn read(reader: &mut impl BufRead) -> io::Result<Option<LspMessage>> {
+    pub fn send(connection: &Connection, message: LspMessage) -> io::Result<()> {
+        connection
+            .with_writer(|w| message.write_raw(w))
+            .unwrap_or(Ok(()))
+    }
+
+    pub fn recv(connection: &Connection) -> io::Result<Option<LspMessage>> {
+        connection
+            .with_reader(|r| LspMessage::read_raw(r))
+            .transpose()
+            .map(|x| x.flatten())
+    }
+
+    pub fn read_raw(reader: &mut dyn BufRead) -> io::Result<Option<LspMessage>> {
         let Some(text) = content_length::read(reader)? else {
             return Ok(None);
         };
@@ -39,7 +60,7 @@ impl LspMessage {
         }
     }
 
-    pub fn write(&self, writer: &mut impl Write) -> io::Result<()> {
+    pub fn write_raw(&self, writer: impl Write) -> io::Result<()> {
         content_length::write(
             writer,
             &serde_json::to_string(&JsonRpc {

@@ -7,6 +7,7 @@ edition = "2024"
 lock_file = { version = "0.1.0", path = "../lock_file" }
 lsp_message = { version = "0.1.0", path = "../lsp_message" }
 daemon = { version = "0.1.0", path = "../daemon" }
+connection = { version = "0.1.0", path = "../connection" }
 thiserror.workspace = true
 derive_more.workspace = true
 fern.workspace = true

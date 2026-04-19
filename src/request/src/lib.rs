@@ -4,7 +4,6 @@ mod is_div;
 mod like;
 mod pf;
 mod rt;
-mod rt_st_in;
 mod run;
 mod succ;
 mod syms;
@@ -21,7 +20,6 @@ pub use like::*;
 pub use pf::*;
 pub use requests::*;
 pub use rt::*;
-pub use rt_st_in::*;
 use serde::{Deserialize, Serialize};
 use std::{
     marker::PhantomData,
@@ -58,16 +56,13 @@ pub struct Project {
     pub cache_to_disk: Option<bool>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Ast;
-
 #[define_requests::group]
 mod requests {
     use super::*;
     use vfs::Canonical;
 
     #[define_requests::never_persist]
-    #[define_requests::returns(String)]
+    #[define_requests::returns(Arc<str>)]
     pub struct Compile();
     #[derive(Default)]
     pub struct CompileState;
@@ -80,7 +75,7 @@ mod requests {
     #[derive(Default)]
     pub struct ParseFileState;
 
-    #[define_requests::returns(WithErrors<Vec<String>>)]
+    #[define_requests::returns(WithErrors<Arc<[String]>>)]
     pub struct ListSymbols {
         pub filename: Arc<Canonical<PathBuf>>,
     }

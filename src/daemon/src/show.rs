@@ -12,7 +12,7 @@ pub fn show_message(stream: &mut impl Write, typ: MessageType, message: String) 
         params: serde_json::to_value(ShowMessageParams { typ, message }).unwrap(),
     });
 
-    let _ = message.write(stream);
+    let _ = message.write_raw(stream);
 }
 
 #[allow(unused)]
@@ -41,5 +41,5 @@ pub fn show_message_request(
         .unwrap(),
     });
 
-    let _ = message.write(stream);
+    let _ = message.write_raw(stream);
 }

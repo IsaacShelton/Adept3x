@@ -3,7 +3,7 @@ use std::{
     str::FromStr,
 };
 
-pub fn write(writer: &mut impl Write, content: &str) -> io::Result<()> {
+pub fn write(mut writer: impl Write, content: &str) -> io::Result<()> {
     writer.write(b"Content-Length: ")?;
     writer.write(format!("{}", content.len()).as_bytes())?;
     writer.write(b"\r\n\r\n")?;
@@ -12,7 +12,7 @@ pub fn write(writer: &mut impl Write, content: &str) -> io::Result<()> {
     Ok(())
 }
 
-pub fn read(reader: &mut impl BufRead) -> io::Result<Option<String>> {
+pub fn read(reader: &mut dyn BufRead) -> io::Result<Option<String>> {
     let mut size = None;
     let mut buffer = String::with_capacity(1024);
 

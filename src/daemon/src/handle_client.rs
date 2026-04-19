@@ -1,4 +1,5 @@
 use crate::Daemon;
+use connection::Connection;
 use document::Document;
 use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
@@ -9,13 +10,9 @@ use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
     ExecuteCommandParams, FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Uri,
 };
+use request::{BlockOn, Cache, QueryMode, Rt};
 use std::{
-    borrow::Cow,
-    ffi::OsStr,
-    io::{BufReader, ErrorKind, Read, Write},
-    panic::catch_unwind,
-    path::PathBuf,
-    str::FromStr,
+    borrow::Cow, ffi::OsStr, io::ErrorKind, panic::catch_unwind, path::PathBuf, str::FromStr,
     sync::Arc,
 };
 use syntax_tree::{BareSyntaxKind, BuiltinType};
@@ -69,15 +66,14 @@ impl Client {
     }
 }
 
-pub fn handle_client(daemon: &Daemon, mut stream: impl Read + Write + Copy, desc: String) {
+pub fn handle_client(daemon: &Daemon, connection: Connection, desc: String) {
     log::info!("Accepted client {:?}", desc);
 
-    let reader = &mut BufReader::new(stream);
     let mut client = Client::new();
-    client.config_file = ConfigFile::Missing; // get_config_file_id(&mut client, &stream);
+    client.config_file = ConfigFile::Missing;
 
     loop {
-        match LspMessage::read(reader) {
+        match LspMessage::recv(&connection) {
             Ok(None) => {
                 log::info!("Done handling client");
                 break;
@@ -127,9 +123,7 @@ pub fn handle_client(daemon: &Daemon, mut stream: impl Read + Write + Copy, desc
                 });
 
                 if let Ok(response) = response_or_original_request {
-                    response
-                        .write(&mut stream)
-                        .expect("Failed to send message to client");
+                    let _ = LspMessage::send(&connection, response);
                 }
             }
             Ok(Some(LspMessage::Response(response))) => {
@@ -153,6 +147,36 @@ pub fn handle_client(daemon: &Daemon, mut stream: impl Read + Write + Copy, desc
             }
             Ok(Some(LspMessage::Compile(compile))) => {
                 log::info!("Compiling {}", compile.filename);
+
+                let query = {
+                    let mut rt = daemon.rt.lock().unwrap();
+                    rt.query(
+                        request::ListSymbols {
+                            filename: Arc::new(Canonical::new("other.adept").expect("canonical")),
+                        }
+                        .into(),
+                        QueryMode::New,
+                        connection.dupe(),
+                        Box::new(|connection, result| match result {
+                            BlockOn::Complete(value) => {
+                                log::info!("Callback got complete {:?}", value);
+
+                                let response = LspMessage::Aft(
+                                    BlockOn::Complete(value.cache().cloned()).into(),
+                                );
+                                let _ = LspMessage::send(connection, response);
+                            }
+                            BlockOn::Cyclic => log::info!("Callback got cyclic"),
+                            BlockOn::Diverges => log::info!("Callback got diverges"),
+                            BlockOn::TimedOut => log::info!("Callback got timed out"),
+                        }),
+                    )
+                };
+
+                daemon.queries.lock().unwrap().push_back(query);
+            }
+            Ok(Some(LspMessage::Aft(_))) => {
+                log::error!("Client sent aft message");
             }
             Err(error) => {
                 if let ErrorKind::WouldBlock = error.kind() {

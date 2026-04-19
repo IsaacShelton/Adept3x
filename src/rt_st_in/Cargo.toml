@@ -1,0 +1,13 @@
+[package]
+name = "rt_st_in"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bincode.workspace = true
+request = { version = "0.1.0", path = "../request" }
+fingerprint = { version = "0.1.0", path = "../fingerprint" }
+connection = { version = "0.1.0", path = "../connection" }
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true

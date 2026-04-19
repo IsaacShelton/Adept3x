@@ -1,4 +1,5 @@
 use crate::{BlockOn, Pf, Req, ShouldUnblock, Suspend, Task, TopErrorsNode, UnLike, UnwrapAft};
+use connection::Connection;
 use std::{path::Path, sync::Arc};
 
 pub enum QueryMode {
@@ -8,12 +9,18 @@ pub enum QueryMode {
 
 pub trait Rt<'e, P: Pf>: Send {
     type Query: Send;
-    fn query(&mut self, req: P::Req<'e>, mode: QueryMode) -> Self::Query;
+    fn query(
+        &mut self,
+        req: P::Req<'e>,
+        mode: QueryMode,
+        stream: Connection,
+        then: QueryThen<'e, P>,
+    ) -> Self::Query;
     fn block_on(
         &mut self,
-        query: Self::Query,
+        query: &mut Self::Query,
         timeout: impl ShouldUnblock,
-    ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, TopErrorsNode>;
+    ) -> Result<BlockOn<&P::Aft<'e>>, TopErrorsNode>;
     fn current(&self) -> P::Rev;
 }
 
@@ -34,3 +41,5 @@ pub trait Ch<'e, P: Pf> {
     fn rel(&self, req: &P::Req<'e>, st: P::St<'e>);
     fn get(&self, req: &P::Req<'e>) -> Option<&P::Aft<'e>>;
 }
+
+pub type QueryThen<'e, P> = Box<dyn Send + Fn(&Connection, BlockOn<&<P as Pf>::Aft<'e>>)>;

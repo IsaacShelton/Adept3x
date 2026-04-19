@@ -1,9 +1,7 @@
+use lsp_message::{LspCompile, LspMessage};
 use std::process::ExitCode;
 
 pub fn compile(filename: &str) -> ExitCode {
-    use lsp_message::{LspCompile, LspMessage};
-    use std::{thread, time::Duration};
-
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
 
     let daemon = match daemon_init::connect() {
@@ -14,14 +12,19 @@ pub fn compile(filename: &str) -> ExitCode {
         }
     };
 
-    if let Err(err) = daemon.send(LspMessage::Compile(LspCompile {
-        filename: filename.into(),
-    })) {
+    if let Err(err) = LspMessage::send(
+        &daemon,
+        LspMessage::Compile(LspCompile {
+            filename: filename.into(),
+        }),
+    ) {
         log::error!("Failed to send compile request - {}", err);
         return ExitCode::FAILURE;
     }
 
-    thread::sleep(Duration::from_secs(5));
+    let message = LspMessage::recv(&daemon);
+
+    log::info!("Got response {:?}", message);
 
     log::info!("Exited");
     ExitCode::SUCCESS

@@ -9,6 +9,8 @@ serde_derive.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 content_length = { version = "0.1.0", path = "../content_length" }
+request = { version = "0.1.0", path = "../request" }
+connection = { version = "0.1.0", path = "../connection" }
 derive_more.workspace = true
 log.workspace = true
 

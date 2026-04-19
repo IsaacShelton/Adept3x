@@ -1,5 +1,6 @@
-use crate::{Cache, Kv, Pf, ReqCache, ShouldPersist, TaskStatusKind};
+use crate::{Kv, Pf, ReqCache, TaskStatusKind};
 use fingerprint::COMPILER_BUILT_AT;
+use request::{Cache, ShouldPersist};
 use serde::ser::{SerializeMap, SerializeSeq};
 
 impl<'e, P: Pf> serde::Serialize for ReqCache<'e, P> {

@@ -3,13 +3,15 @@ mod react;
 mod req_cache;
 mod wake_dependants;
 
-use crate::{
-    BlockOn, Major, Pf, QueryMode, Rt, ShouldUnblock, TaskStatus, TaskStatusKind, TopErrorsNode,
-    rt_st_in::query::{QueryFiles, RtStInQuery},
-    rt_trace,
-};
+use crate::query::QueryFiles;
+use connection::Connection;
+pub use query::RtStInQuery;
 use react::*;
 pub use req_cache::*;
+use request::{
+    BlockOn, Major, Pf, QueryMode, QueryThen, Rt, ShouldUnblock, TaskStatus, TaskStatusKind,
+    TopErrorsNode, rt_trace,
+};
 use std::collections::HashMap;
 pub use wake_dependants::*;
 
@@ -45,7 +47,13 @@ where
 {
     type Query = RtStInQuery<'e, P>;
 
-    fn query(&mut self, req: P::Req<'e>, mode: QueryMode) -> RtStInQuery<'e, P> {
+    fn query(
+        &mut self,
+        req: P::Req<'e>,
+        mode: QueryMode,
+        connection: Connection,
+        then: QueryThen<'e, P>,
+    ) -> RtStInQuery<'e, P> {
         if let QueryMode::New = mode {
             self.current = self.current.major();
             rt_trace!("Currently at: {:?}", self.current);
@@ -57,6 +65,8 @@ where
             rev: self.current,
             req,
             files: QueryFiles::default(),
+            then,
+            connection,
         }
     }
 
@@ -66,14 +76,14 @@ where
 
     fn block_on(
         &mut self,
-        mut query: Self::Query,
+        query: &mut Self::Query,
         mut timeout: impl ShouldUnblock,
-    ) -> Result<BlockOn<P::Aft<'e>, Self::Query>, TopErrorsNode> {
+    ) -> Result<BlockOn<&P::Aft<'e>>, TopErrorsNode> {
         while let Some(req) = query.queue.pop() {
-            react(self, &mut query, req);
+            react(self, query, req);
 
             if timeout.should_unblock() {
-                return Ok(BlockOn::TimedOut(query));
+                return Ok(BlockOn::TimedOut);
             }
         }
 
@@ -83,7 +93,7 @@ where
             Some(Some(TaskStatus {
                 kind: TaskStatusKind::Completed(completed),
                 ..
-            })) => Ok(BlockOn::Complete(completed.aft.clone())),
+            })) => Ok(BlockOn::Complete(&completed.aft)),
             _ => {
                 unreachable!("block_on should have completed task since nothing left in queue");
             }
