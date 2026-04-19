@@ -1,0 +1,24 @@
+[package]
+name = "request"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bincode.workspace = true
+by_address.workspace = true
+define_requests = { version = "0.1.0", path = "../define_requests" }
+idle_tracker = { version = "0.1.0", path = "../idle_tracker" }
+vfs = { version = "0.1.0", path = "../vfs" }
+fingerprint = { version = "0.1.0", path = "../fingerprint" }
+top_n = { version = "0.1.0", path = "../top_n" }
+kernel = { version = "0.1.0", path = "../kernel" }
+syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
+document = { version = "0.1.0", path = "../document" }
+parser_adept = { version = "0.1.0", path = "../parser_adept" }
+derive_more.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+log.workspace = true
+

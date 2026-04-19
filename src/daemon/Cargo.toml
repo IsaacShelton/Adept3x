@@ -14,6 +14,7 @@ idle_tracker = { version = "0.1.0", path = "../idle_tracker" }
 parser_adept = { version = "0.1.0", path = "../parser_adept" }
 syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
 kernel = { version = "0.1.0", path = "../kernel" }
+request = { version = "0.1.0", path = "../request" }
 thiserror.workspace = true
 derive_more.workspace = true
 fern.workspace = true

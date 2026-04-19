@@ -21,7 +21,7 @@ pub fn compile(filename: &str) -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    thread::sleep(Duration::from_secs(2));
+    thread::sleep(Duration::from_secs(5));
 
     log::info!("Exited");
     ExitCode::SUCCESS

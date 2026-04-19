@@ -1,26 +1,30 @@
-use crate::Queue;
 use idle_tracker::IdleTracker;
 use lsp_message::LspMessage;
-use std::io::{self, BufReader, Read, Write};
+use request::{PfIn, RtStIn};
 #[cfg(target_family = "unix")]
 use std::os::unix::net::UnixListener;
+use std::{
+    io::{self, BufReader, Read, Write},
+    sync::Mutex,
+};
 
 pub struct Daemon {
     #[cfg(target_family = "unix")]
     pub listener: UnixListener,
     pub idle_tracker: IdleTracker,
-    pub queue: Queue,
+    pub rt: Mutex<RtStIn<'static, PfIn>>,
 }
 
 impl Daemon {
     #[cfg(target_family = "unix")]
     pub fn new(listener: UnixListener) -> Self {
+        use request::ReqCache;
         use std::time::Duration;
 
         Self {
             listener,
-            queue: Queue::default(),
             idle_tracker: IdleTracker::new(Duration::from_secs(5)),
+            rt: Mutex::new(RtStIn::new(ReqCache::default())),
         }
     }
 

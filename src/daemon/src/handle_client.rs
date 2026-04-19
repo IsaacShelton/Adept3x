@@ -152,7 +152,7 @@ pub fn handle_client(daemon: &Daemon, mut stream: impl Read + Write + Copy, desc
                 }
             }
             Ok(Some(LspMessage::Compile(compile))) => {
-                log::info!("Compiling {}", compile.filename)
+                log::info!("Compiling {}", compile.filename);
             }
             Err(error) => {
                 if let ErrorKind::WouldBlock = error.kind() {
@@ -446,7 +446,7 @@ fn did_open(client: &mut Client, params: DidOpenTextDocumentParams) {
                 FileKind::Unknown
             };
 
-            let document = Document::new(params.text_document.text.into());
+            let document = Document::new(&params.text_document.text);
             let syntax_tree = parser_adept::reparse(&document, None, document.full_range());
 
             let file_bytes = FileBytes::Document(document);

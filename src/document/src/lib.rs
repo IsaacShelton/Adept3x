@@ -18,7 +18,7 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new(content: Box<str>) -> Self {
+    pub fn new(content: &str) -> Self {
         let lines = content
             .split('\n')
             .map(|s| DocumentLine::new(s.into()))
@@ -54,7 +54,7 @@ impl Document {
     pub fn apply_utf16_text_edit_or_full(&mut self, text_edit_or_full: TextEditOrFullUtf16) {
         match text_edit_or_full.as_text_edit() {
             Ok(text_edit) => self.apply_utf16_text_edit(text_edit),
-            Err(full_content) => *self = Self::new(full_content),
+            Err(full_content) => *self = Self::new(&full_content),
         }
     }
 
