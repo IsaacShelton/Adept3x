@@ -3,7 +3,7 @@ use connection::Connection;
 use document::Document;
 use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
-use lsp_message::{LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse};
+use lsp_message::{ExtError, LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse};
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionParams, CompletionResponse,
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
@@ -145,14 +145,22 @@ pub fn handle_client(daemon: &Daemon, connection: Connection, desc: String) {
                     }
                 }
             }
-            Ok(Some(LspMessage::Compile(compile))) => {
-                log::info!("Compiling {}", compile.filename);
+            Ok(Some(LspMessage::ExtCompile(compile))) => {
+                log::info!("Compiling {}", compile.ext_compile);
 
                 let query = {
+                    let Ok(filename) = Canonical::new(&compile.ext_compile) else {
+                        let response = LspMessage::ExtError(ExtError {
+                            ext_error: format!("`{}` does not exist", compile.ext_compile),
+                        });
+                        let _ = LspMessage::send(&connection, response);
+                        continue;
+                    };
+
                     let mut rt = daemon.rt.lock().unwrap();
                     rt.query(
                         request::ListSymbols {
-                            filename: Arc::new(Canonical::new("other.adept").expect("canonical")),
+                            filename: Arc::new(filename),
                         }
                         .into(),
                         QueryMode::New,
@@ -161,7 +169,7 @@ pub fn handle_client(daemon: &Daemon, connection: Connection, desc: String) {
                             BlockOn::Complete(value) => {
                                 log::info!("Callback got complete {:?}", value);
 
-                                let response = LspMessage::Aft(
+                                let response = LspMessage::ExtAft(
                                     BlockOn::Complete(value.cache().cloned()).into(),
                                 );
                                 let _ = LspMessage::send(connection, response);
@@ -175,8 +183,11 @@ pub fn handle_client(daemon: &Daemon, connection: Connection, desc: String) {
 
                 daemon.queries.lock().unwrap().push_back(query);
             }
-            Ok(Some(LspMessage::Aft(_))) => {
-                log::error!("Client sent aft message");
+            Ok(Some(LspMessage::ExtAft(_))) => {
+                log::error!("Client sent ext aft message");
+            }
+            Ok(Some(LspMessage::ExtError(_))) => {
+                log::error!("Client sent ext error message");
             }
             Err(error) => {
                 if let ErrorKind::WouldBlock = error.kind() {

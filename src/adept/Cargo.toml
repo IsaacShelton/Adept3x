@@ -10,5 +10,6 @@ language_server = { version = "0.1.0", path = "../language_server" }
 smol.workspace = true
 log.workspace = true
 lsp_message = { version = "0.1.0", path = "../lsp_message" }
+request = { version = "0.1.0", path = "../request" }
 
 

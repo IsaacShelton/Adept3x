@@ -70,7 +70,7 @@ pub fn main_loop(daemon: Daemon) -> io::Result<()> {
                             use connection::Connection;
 
                             if let Err(err) = stream.set_nonblocking(false).and_then(|_| {
-                                stream.set_read_timeout(Some(Duration::from_millis(50)))
+                                stream.set_read_timeout(Some(Duration::from_millis(5)))
                             }) {
                                 log::error!(
                                     "Client connection closed before able to setup - {}",

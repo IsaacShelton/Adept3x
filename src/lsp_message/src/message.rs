@@ -11,18 +11,24 @@ pub enum LspMessage {
     Request(LspRequest),
     Response(LspResponse),
     Notification(LspNotification),
-    Compile(LspCompile),
-    Aft(AftResult),
+    ExtCompile(ExtCompile),
+    ExtAft(ExtAft),
+    ExtError(ExtError),
 }
 
 #[derive(Clone, Debug, From, Serialize, Deserialize)]
-pub struct AftResult {
-    aft_result: BlockOn<Option<CachedAft<PfIn>>>,
+pub struct ExtAft {
+    pub ext_aft: BlockOn<Option<CachedAft<PfIn>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LspCompile {
-    pub filename: String,
+pub struct ExtCompile {
+    pub ext_compile: String,
+}
+
+#[derive(Clone, Debug, From, Serialize, Deserialize)]
+pub struct ExtError {
+    pub ext_error: String,
 }
 
 #[derive(Serialize)]

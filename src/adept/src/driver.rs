@@ -1,4 +1,5 @@
-use lsp_message::{LspCompile, LspMessage};
+use lsp_message::{ExtCompile, LspMessage};
+use request::{Aft, BlockOn, UnwrapAft};
 use std::process::ExitCode;
 
 pub fn compile(filename: &str) -> ExitCode {
@@ -14,8 +15,8 @@ pub fn compile(filename: &str) -> ExitCode {
 
     if let Err(err) = LspMessage::send(
         &daemon,
-        LspMessage::Compile(LspCompile {
-            filename: filename.into(),
+        LspMessage::ExtCompile(ExtCompile {
+            ext_compile: filename.into(),
         }),
     ) {
         log::error!("Failed to send compile request - {}", err);
@@ -24,7 +25,39 @@ pub fn compile(filename: &str) -> ExitCode {
 
     let message = LspMessage::recv(&daemon);
 
-    log::info!("Got response {:?}", message);
+    match message {
+        Ok(Some(LspMessage::ExtAft(aft_result))) => match aft_result.ext_aft {
+            BlockOn::Complete(Some(complete)) => {
+                let aft = Aft::from(complete);
+                let ret = request::ListSymbols::unwrap_aft(aft);
+
+                for name in ret.value.iter() {
+                    println!(" - {name}");
+                }
+            }
+            BlockOn::Complete(None) => {
+                unreachable!("result not serializable");
+            }
+            BlockOn::Cyclic => {
+                log::info!("Cyclic");
+            }
+            BlockOn::Diverges => {
+                log::info!("Diverges");
+            }
+            BlockOn::TimedOut => {
+                log::info!("Timed out");
+            }
+        },
+        Ok(Some(LspMessage::ExtError(ext_error))) => {
+            eprintln!("ERROR: {}", ext_error.ext_error);
+        }
+        Ok(_) => {
+            log::error!("Driver received invalid response");
+        }
+        Err(error) => {
+            log::error!("Failed to receive response {}", error)
+        }
+    }
 
     log::info!("Exited");
     ExitCode::SUCCESS

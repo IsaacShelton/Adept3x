@@ -123,11 +123,14 @@ pub fn start() -> ExitCode {
                 LspMessage::Notification(notification) => {
                     log::warn!("Unhandled notification '{}'", notification.method)
                 }
-                LspMessage::Compile(_) => {
-                    log::error!("Language server does not support compile message");
+                LspMessage::ExtCompile(_) => {
+                    log::error!("Language server does not support ext compile message");
                 }
-                LspMessage::Aft(_) => {
-                    log::error!("Language server does not support aft message");
+                LspMessage::ExtAft(_) => {
+                    log::error!("Language server does not support ext aft message");
+                }
+                LspMessage::ExtError(_) => {
+                    log::error!("Language server does not support ext error message");
                 }
             }
         }

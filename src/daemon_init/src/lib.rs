@@ -79,7 +79,7 @@ pub fn try_become_impl(filepath: &Path) -> io::Result<()> {
     log::info!("Got listener {:?}", listener);
 
     let result = daemon::main_loop(Daemon::new(listener));
-    log::info!("Exiting daemon");
+    log::trace!("Exiting daemon");
     let _ = remove_file(&filepath);
     result
 }
