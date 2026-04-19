@@ -31,10 +31,18 @@ impl Connection {
     }
 
     pub fn dupe(&self) -> Self {
-        Self {
-            stream: self.stream.dupe(),
-            reader: Arc::clone(&self.reader),
-            writer: Arc::clone(&self.writer),
+        #[cfg(target_family = "unix")]
+        {
+            Self {
+                stream: self.stream.dupe(),
+                reader: Arc::clone(&self.reader),
+                writer: Arc::clone(&self.writer),
+            }
+        }
+
+        #[cfg(target_family = "windows")]
+        {
+            panic!("Connection::dupe - Windows is not supported")
         }
     }
 
@@ -65,8 +73,7 @@ impl Connection {
 
         #[cfg(target_family = "windows")]
         {
-            let _ = message;
-            panic!("Connection::send - Windows is not supported")
+            panic!("Connection::with_writer - Windows is not supported")
         }
     }
 
@@ -84,8 +91,7 @@ impl Connection {
 
         #[cfg(target_family = "windows")]
         {
-            let _ = message;
-            panic!("Connection::send - Windows is not supported")
+            panic!("Connection::with_reader - Windows is not supported")
         }
     }
 
@@ -98,7 +104,6 @@ impl Connection {
 
         #[cfg(target_family = "windows")]
         {
-            let _ = message;
             panic!("Connection::set_non_blocking - Windows is not supported")
         }
     }
