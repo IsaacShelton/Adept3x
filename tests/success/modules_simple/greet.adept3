@@ -1,5 +1,0 @@
-
-func greet(name ptr<char>) {
-    printf(c"Welcome, %s!\n", name)
-}
-

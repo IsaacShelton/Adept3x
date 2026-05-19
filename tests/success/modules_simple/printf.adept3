@@ -1,4 +1,0 @@
-
-#[foreign]
-func printf(format ptr<char>, ...) int
-

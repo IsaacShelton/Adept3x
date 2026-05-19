@@ -1,4 +1,5 @@
-use crate::{Like, ListSymbols, Pf, Run, Suspend, Th, UnwrapSt, WithErrors};
+use crate::{Like, ListSymbols, Pf, Run, Suspend, Th, UnwrapSt};
+use with_errors::WithErrors;
 
 impl<'e, P: Pf> Run<'e, P> for ListSymbols {
     fn run(
@@ -13,12 +14,14 @@ impl<'e, P: Pf> Run<'e, P> for ListSymbols {
             filename: self.filename.clone(),
         })?;
 
-        let names = parsed.value.as_ref().into_iter().flat_map(|parsed| {
+        let _names = parsed.value.as_ref().into_iter().flat_map(|parsed| {
             parsed
                 .bindings()
                 .flat_map(|binding| binding.name.as_ref().map(|s| s.to_string()))
         });
 
-        Ok(WithErrors::no_errors(names.collect()))
+        let symbols = vec![];
+
+        Ok(WithErrors::new(symbols.into(), parsed.errors.clone()))
     }
 }

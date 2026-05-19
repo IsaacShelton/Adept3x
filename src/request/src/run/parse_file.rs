@@ -1,6 +1,7 @@
-use crate::{Error, Like, ParseFile, Pf, Run, Suspend, Th, UnwrapSt, WithErrors};
+use crate::{Like, ParseFile, Pf, Run, Suspend, Th, UnwrapSt, WithErrors};
 use by_address::ByAddress;
 use document::Document;
+use with_errors::Error;
 
 impl<'e, P: Pf> Run<'e, P> for ParseFile {
     fn run(

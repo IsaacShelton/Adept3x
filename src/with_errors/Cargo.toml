@@ -1,0 +1,13 @@
+[package]
+name = "with_errors"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+by_address.workspace = true
+top_n = { version = "0.1.0", path = "../top_n" }
+vfs = { version = "0.1.0", path = "../vfs" }
+serde.workspace = true
+smallvec.workspace = true
+derive_more.workspace = true
+thiserror.workspace = true

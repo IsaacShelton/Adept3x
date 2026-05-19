@@ -3,14 +3,16 @@ use connection::Connection;
 use document::Document;
 use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
-use lsp_message::{ExtError, LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse};
+use lsp_message::{
+    ExtAft, ExtError, LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse,
+};
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionParams, CompletionResponse,
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
     ExecuteCommandParams, FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Uri,
 };
-use request::{BlockOn, Cache, QueryMode, Rt};
+use request::{BlockOn, Cache, CachedAft, PfIn, QueryMode, Rt};
 use std::{
     borrow::Cow, ffi::OsStr, io::ErrorKind, panic::catch_unwind, path::PathBuf, str::FromStr,
     sync::Arc,
@@ -159,24 +161,22 @@ pub fn handle_client(daemon: &Daemon, connection: Connection, desc: String) {
 
                     let mut rt = daemon.rt.lock().unwrap();
                     rt.query(
-                        request::ListSymbols {
+                        request::Compile {
                             filename: Arc::new(filename),
                         }
                         .into(),
                         QueryMode::New,
                         connection.dupe(),
-                        Box::new(|connection, result| match result {
-                            BlockOn::Complete(value) => {
-                                log::info!("Callback got complete {:?}", value);
+                        Box::new(|connection, result| {
+                            let ext_aft: BlockOn<Option<CachedAft<PfIn>>> = match result {
+                                BlockOn::Complete(aft) => BlockOn::Complete(aft.cache().cloned()),
+                                BlockOn::Cyclic => BlockOn::Cyclic,
+                                BlockOn::Diverges => BlockOn::Diverges,
+                                BlockOn::TimedOut => BlockOn::TimedOut,
+                            };
 
-                                let response = LspMessage::ExtAft(
-                                    BlockOn::Complete(value.cache().cloned()).into(),
-                                );
-                                let _ = LspMessage::send(connection, response);
-                            }
-                            BlockOn::Cyclic => log::info!("Callback got cyclic"),
-                            BlockOn::Diverges => log::info!("Callback got diverges"),
-                            BlockOn::TimedOut => log::info!("Callback got timed out"),
+                            let response = LspMessage::ExtAft(ExtAft { ext_aft });
+                            let _ = LspMessage::send(connection, response);
                         }),
                     )
                 };

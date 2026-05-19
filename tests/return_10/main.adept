@@ -1,0 +1,9 @@
+
+other :: @fn(): Bool {
+    134
+}
+
+main :: @fn(): Nat {
+    true
+}
+

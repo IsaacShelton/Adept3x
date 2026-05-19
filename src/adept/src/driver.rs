@@ -29,7 +29,14 @@ pub fn compile(filename: &str) -> ExitCode {
         Ok(Some(LspMessage::ExtAft(aft_result))) => match aft_result.ext_aft {
             BlockOn::Complete(Some(complete)) => {
                 let aft = Aft::from(complete);
-                let ret = request::ListSymbols::unwrap_aft(aft);
+                let ret = request::Compile::unwrap_aft(aft);
+
+                let mut errors = Vec::from_iter(ret.errors.iter_unordered());
+                errors.sort();
+
+                for error in errors {
+                    println!("error: {}", error);
+                }
 
                 for name in ret.value.iter() {
                     println!(" - {name}");

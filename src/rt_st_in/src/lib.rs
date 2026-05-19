@@ -10,10 +10,11 @@ use react::*;
 pub use req_cache::*;
 use request::{
     BlockOn, Major, Pf, QueryMode, QueryThen, Rt, ShouldUnblock, TaskStatus, TaskStatusKind,
-    TopErrorsNode, rt_trace,
+    rt_trace,
 };
 use std::collections::HashMap;
 pub use wake_dependants::*;
+use with_errors::TopErrorsNode;
 
 pub struct RtStIn<'e, P: Pf>
 where

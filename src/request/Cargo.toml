@@ -15,6 +15,7 @@ syntax_tree = { version = "0.1.0", path = "../syntax_tree" }
 document = { version = "0.1.0", path = "../document" }
 parser_adept = { version = "0.1.0", path = "../parser_adept" }
 connection = { version = "0.1.0", path = "../connection" }
+with_errors = { version = "0.1.0", path = "../with_errors" }
 derive_more.workspace = true
 serde.workspace = true
 serde_json.workspace = true

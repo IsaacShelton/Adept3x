@@ -28,6 +28,7 @@ members = [
     "src/util_infinite_iterator",
     "src/util_text",
     "src/vfs",
+    "src/with_errors",
 ]
 
 [workspace.dependencies]

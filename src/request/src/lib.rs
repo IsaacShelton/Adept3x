@@ -6,15 +6,12 @@ mod pf;
 mod rt;
 mod run;
 mod succ;
-mod syms;
 mod task;
-mod top_errors;
 mod un_like;
 mod unblock;
 
 pub use block_on::*;
 use by_address::ByAddress;
-pub use errors::*;
 pub use is_div::*;
 pub use like::*;
 pub use pf::*;
@@ -27,12 +24,11 @@ use std::{
     sync::Arc,
 };
 pub use succ::*;
-pub use syms::*;
 use syntax_tree::SyntaxNode;
 pub use task::*;
-pub use top_errors::*;
 pub use un_like::*;
 pub use unblock::*;
+use with_errors::WithErrors;
 
 #[macro_export]
 macro_rules! rt_trace {
@@ -61,9 +57,10 @@ mod requests {
     use super::*;
     use vfs::Canonical;
 
-    #[define_requests::never_persist]
-    #[define_requests::returns(Arc<str>)]
-    pub struct Compile();
+    #[define_requests::returns(WithErrors<Arc<[String]>>)]
+    pub struct Compile {
+        pub filename: Arc<Canonical<PathBuf>>,
+    }
     #[derive(Default)]
     pub struct CompileState;
 
@@ -75,12 +72,19 @@ mod requests {
     #[derive(Default)]
     pub struct ParseFileState;
 
-    #[define_requests::returns(WithErrors<Arc<[String]>>)]
+    #[define_requests::returns(WithErrors<Arc<[()]>>)]
     pub struct ListSymbols {
         pub filename: Arc<Canonical<PathBuf>>,
     }
     #[derive(Default)]
     pub struct ListSymbolsState;
+
+    #[define_requests::returns(WithErrors<Arc<[String]>>)]
+    pub struct ListBindings {
+        pub filename: Arc<Canonical<PathBuf>>,
+    }
+    #[derive(Default)]
+    pub struct ListBindingsState;
 
     #[define_requests::returns(PhantomData<P>)]
     pub struct UnusedRequest;
