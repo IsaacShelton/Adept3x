@@ -19,5 +19,5 @@ num-traits.workspace = true
 bit-vec.workspace = true
 
 [features]
-default = ["kernel"]
+default = []
 kernel = []
