@@ -26,7 +26,7 @@ impl<'e, P: Pf> Run<'e, P> for Compile {
         if let Some(parsed) = &parsed.value {
             let bindings = parsed.0.bindings();
             let symbols = kernel::elaborate_symbols(bindings);
-            log::info!("symbols is {:#?}", symbols);
+            //log::info!("symbols is {:#?}", symbols);
 
             if !symbols.errors.is_empty() {
                 return Ok(WithErrors::new(Arc::new([]), symbols.errors));
