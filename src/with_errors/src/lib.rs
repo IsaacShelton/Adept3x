@@ -1,8 +1,7 @@
 mod errors;
 mod top_errors;
 
-pub use crate::errors::Error;
-pub use crate::top_errors::TopErrors;
+pub use crate::{errors::Error, top_errors::TopErrors};
 use serde::{Deserialize, Serialize};
 pub use top_errors::TopErrorsNode;
 
@@ -28,6 +27,13 @@ impl<T> WithErrors<T> {
         Self {
             value,
             errors: TopErrors::default(),
+        }
+    }
+
+    pub fn map<S>(self, f: impl FnOnce(T) -> S) -> WithErrors<S> {
+        WithErrors {
+            value: f(self.value),
+            errors: self.errors,
         }
     }
 }

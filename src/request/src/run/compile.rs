@@ -1,6 +1,6 @@
 use crate::{Compile, Like, Pf, Run, Suspend, Th, UnwrapSt};
 use std::sync::Arc;
-use with_errors::{Error, WithErrors};
+use with_errors::WithErrors;
 
 impl<'e, P: Pf> Run<'e, P> for Compile {
     fn run(
@@ -32,32 +32,7 @@ impl<'e, P: Pf> Run<'e, P> for Compile {
                 return Ok(WithErrors::new(Arc::new([]), symbols.errors));
             }
 
-            let symbols = symbols.value;
-
-            let main = symbols.lookup("main");
-
-            let Some(main) = main else {
-                return Ok(WithErrors::new_one(
-                    Arc::new([]),
-                    Error::MissingMainFunction,
-                ));
-            };
-
-            match main.ty.is_main_function_ty() {
-                Ok(true) => (),
-                Ok(false) => {
-                    return Ok(WithErrors::new_one(
-                        Arc::new([]),
-                        Error::IncorrectSignatureForMainFunction,
-                    ));
-                }
-                Err(message) => {
-                    return Ok(WithErrors::new_one(
-                        Arc::new([]),
-                        Error::TypingError(message),
-                    ));
-                }
-            }
+            return Ok(kernel::compile_executable(&symbols.value).map(|_| Arc::from([])));
         }
 
         Ok(result)
