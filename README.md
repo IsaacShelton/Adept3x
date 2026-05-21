@@ -32,7 +32,7 @@ It will have a comprehensive set of features that no other language fully offers
 
 ## Roadmap
 
-| Start Date | Feature                             n  |  Time Budget |
+| Start Date | Feature                               |  Time Budget |
 | ---------- | ------------------------------------- | ------------ |
 | ...        | Proof of Concept                      | ☑
 | 2024-08-14 | Type Aliases                          | ☑
@@ -57,22 +57,26 @@ It will have a comprehensive set of features that no other language fully offers
 | 2025-12-14 | Language Server Integration POC       | ☑
 | 2026-01-21 | Better Import System Design           | ☑
 | 2026-01-28 | Syntax Redesign for Dependent Types   | ☑
-| 2026-01-31 | Language Server Incremental Parser    | 60 days
-| 2026-03-31 | SSA-based Dependent Type System POC   | 60 days
-| 2026-05-31 | Integrate Compilation into Daemon     | 60 days
+| 2026-01-31 | Language Server Incremental Parser    | ☑
+| 2026-03-31 | Integrate Compilation into Daemon     | ☑
+| 2026-05-01 | Dependent-Types Codegen Design        | ☑
+| 2026-05-10 | Algebraic Effects Codegen Design      | ☑
+| 2026-05-17 | Dependent-Types Codegen POC           | 30 days
+| 2026-06-17 | Algebraic Effect Codegen POC          | 15 days
 | 2026-07-31 | - Milestone 2 -                       | ☐
-| 2026-07-31 | Dependent Function Types              | 90 days  
-| 2026-10-31 | Dependent Record Types                | 90 days 
-| 2027-01-31 | - Milestone 3 -                       | ☐
-| 2027-01-31 | Implement Abstract Modules/Interfaces | 60 days
-| 2027-03-31 | - Milestone 4 -                       | ☐ 
-| 2027-03-31 | Mini Standard Library                 | 14 days 
-| 2027-04-14 | Pattern Matching                      | 60 days  
-| 2027-06-14 | - Milestone 5 -                       | ☐ 
-| 2027-06-14 | C Expressions Support (Group 2)       | 60 days
-| 2027-08-14 | C Constructs Support (Group 2)        | 30 days
-| 2027-09-14 | - Milestone 6 -                       | ☐ 
-| 2027-09-14 | Async I/O / Effects                   | 90 days
-| 2027-12-14 | - Milestone 7 -                       | ☐ 
-| 2027-12-14 | Borrow Checking, RAII, Origins        | 90 days  
-| 2028-03-14 | ...                                   |
+| 2026-07-31 | LLVM for Dependent Function Types     | 30 days  
+| 2026-08-31 | LLVM for Dependent Record Types       | 30 days 
+| 2026-09-31 | LLVM for Algebraic Effects            | 30 days 
+| 2026-10-31 | - Milestone 3 -                       | ☐
+| 2026-10-31 | Implement Abstract Modules/Interfaces | 60 days
+| 2026-12-31 | - Milestone 4 -                       | ☐ 
+| 2026-12-31 | Mini Standard Library                 | 14 days 
+| 2026-12-14 | Pattern Matching                      | 60 days  
+| 2027-02-14 | - Milestone 5 -                       | ☐ 
+| 2027-02-14 | C Expressions Support (Group 2)       | 60 days
+| 2027-06-14 | C Constructs Support (Group 2)        | 30 days
+| 2027-07-14 | - Milestone 6 -                       | ☐ 
+| 2027-07-14 | Async I/O w/ Algebraic Effects Demo   | 30 days
+| 2027-09-14 | - Milestone 7 -                       | ☐ 
+| 2027-09-14 | Borrow Checking, RAII, Origins        | 90 days  
+| 2027-12-14 | - Milestone 8 -                       | ☐ 
