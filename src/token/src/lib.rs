@@ -122,7 +122,9 @@ const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
     "||",
 ];
 
-pub const ALL_DIRECTIVES: &[&'static str] = &[
+pub const ALL_KEYWORD_DIRECTIVES: &[&'static str] = &["fn", "if"];
+
+pub const ALL_SIGIL_DIRECTIVES: &[&'static str] = &[
     "fn",
     "Fn",
     "if",

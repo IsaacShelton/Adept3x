@@ -272,6 +272,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64fa3c856b712db6612c019f14756e64e4bcea13337a6b33b696333a9eaa2d06"
 
 [[package]]
+name = "canonical"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "serde",
+ "serde_derive",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -339,6 +348,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 name = "daemon"
 version = "0.1.0"
 dependencies = [
+ "canonical",
  "connection",
  "derive_more",
  "document",
@@ -473,6 +483,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "equivalent"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+
+[[package]]
 name = "errno"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -522,6 +538,7 @@ dependencies = [
 name = "file_cache"
 version = "0.1.0"
 dependencies = [
+ "canonical",
  "derive_more",
  "document",
  "serde",
@@ -580,6 +597,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+
+[[package]]
 name = "hermit-abi"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -594,6 +617,16 @@ checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 [[package]]
 name = "idle_tracker"
 version = "0.1.0"
+
+[[package]]
+name = "indexmap"
+version = "2.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
+dependencies = [
+ "equivalent",
+ "hashbrown",
+]
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -648,6 +681,7 @@ dependencies = [
  "bit-vec",
  "derive_more",
  "document",
+ "indexmap",
  "log",
  "num-bigint",
  "num-traits",
@@ -966,6 +1000,7 @@ name = "request"
 version = "0.1.0"
 dependencies = [
  "by_address",
+ "canonical",
  "connection",
  "define_requests",
  "derive_more",
@@ -1156,6 +1191,7 @@ dependencies = [
  "token",
  "util_data_unit",
  "util_text",
+ "with_errors",
 ]
 
 [[package]]
@@ -1302,6 +1338,7 @@ dependencies = [
 name = "vfs"
 version = "0.1.0"
 dependencies = [
+ "canonical",
  "derive_more",
  "file_cache",
  "idle_tracker",
@@ -1336,12 +1373,12 @@ name = "with_errors"
 version = "0.1.0"
 dependencies = [
  "by_address",
+ "canonical",
  "derive_more",
  "serde",
  "smallvec",
  "thiserror",
  "top_n",
- "vfs",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 use crate::{Compile, Like, Pf, Run, Suspend, Th, UnwrapSt};
-use std::sync::Arc;
-use with_errors::WithErrors;
+use std::{ffi::OsStr, sync::Arc};
+use with_errors::{TopErrors, WithErrors};
 
 impl<'e, P: Pf> Run<'e, P> for Compile {
     fn run(
@@ -24,6 +24,20 @@ impl<'e, P: Pf> Run<'e, P> for Compile {
             .clone();
 
         if let Some(parsed) = &parsed.value {
+            let syntax_errors = TopErrors::new(parsed.errors().take(1).map(|error| {
+                let filename = self
+                    .filename
+                    .file_name()
+                    .unwrap_or(OsStr::new(""))
+                    .to_string_lossy()
+                    .into();
+                error.with_filename(filename)
+            }));
+
+            if !syntax_errors.is_empty() {
+                return Ok(WithErrors::new(Arc::new([]), syntax_errors));
+            }
+
             let bindings = parsed.0.bindings();
             let symbols = kernel::elaborate_symbols(bindings);
             //log::info!("symbols is {:#?}", symbols);

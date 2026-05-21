@@ -35,7 +35,7 @@ pub fn compile(filename: &str) -> ExitCode {
                 errors.sort();
 
                 for error in errors {
-                    println!("error: {}", error);
+                    println!("{}", error.display(Some("error")));
                 }
 
                 for name in ret.value.iter() {

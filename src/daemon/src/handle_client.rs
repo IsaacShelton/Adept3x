@@ -1,7 +1,8 @@
 use crate::Daemon;
+use canonical::Canonical;
 use connection::Connection;
 use document::Document;
-use file_cache::{Canonical, FileBytes, FileCache, FileContent, FileId, FileKind};
+use file_cache::{FileBytes, FileCache, FileContent, FileId, FileKind};
 use file_uri::DecodeFileUri;
 use lsp_message::{
     ExtAft, ExtError, LspMessage, LspNotification, LspRequest, LspRequestId, LspResponse,
@@ -159,7 +160,10 @@ pub fn handle_client(daemon: &Daemon, connection: Connection, desc: String) {
                         continue;
                     };
 
-                    let mut rt = daemon.rt.lock().unwrap();
+                    let Ok(mut rt) = daemon.rt.lock() else {
+                        return;
+                    };
+
                     rt.query(
                         request::Compile {
                             filename: Arc::new(filename),

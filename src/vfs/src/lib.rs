@@ -2,9 +2,9 @@ mod file;
 mod fs;
 mod view;
 
+use canonical::Canonical;
 use derive_more::Deref;
 pub use file::*;
-pub use file_cache::Canonical;
 pub use fs::*;
 use idle_tracker::IdleTracker;
 use std::{

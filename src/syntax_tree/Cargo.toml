@@ -11,3 +11,4 @@ util_data_unit = { version = "0.1.0", path = "../util_data_unit" }
 token = { version = "0.1.0", path = "../token" }
 util_text = { version = "0.1.0", path = "../util_text" }
 num-bigint = { workspace = true, features = ["serde"] }
+with_errors = { version = "0.1.0", path = "../with_errors" }

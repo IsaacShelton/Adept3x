@@ -1,7 +1,10 @@
 mod errors;
 mod top_errors;
 
-pub use crate::{errors::Error, top_errors::TopErrors};
+pub use crate::{
+    errors::{Error, ErrorAt},
+    top_errors::TopErrors,
+};
 use serde::{Deserialize, Serialize};
 pub use top_errors::TopErrorsNode;
 
@@ -17,6 +20,13 @@ impl<T> WithErrors<T> {
     }
 
     pub fn new_one(value: T, error: Error) -> Self {
+        Self {
+            value,
+            errors: TopErrors::new_one(ErrorAt::new(error)),
+        }
+    }
+
+    pub fn new_one_at(value: T, error: ErrorAt) -> Self {
         Self {
             value,
             errors: TopErrors::new_one(error),

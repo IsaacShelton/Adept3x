@@ -1,10 +1,9 @@
-mod canonical;
 mod file_bytes;
 mod path_interner;
 
 pub use crate::path_interner::FileId;
 use crate::path_interner::PathInterner;
-pub use canonical::Canonical;
+use canonical::Canonical;
 pub use file_bytes::FileBytes;
 use std::{
     borrow::Cow,

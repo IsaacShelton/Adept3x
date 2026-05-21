@@ -5,8 +5,8 @@ use crate::feed_result::FeedResult;
 use num_bigint::BigInt;
 use std::{str::FromStr, sync::Arc};
 use token::{
-    ALL_DIRECTIVES, ALL_PUNCT_SORTED, Directive, IsTerminated, Punct, StringLiteral, Token,
-    TokenKind,
+    ALL_KEYWORD_DIRECTIVES, ALL_PUNCT_SORTED, ALL_SIGIL_DIRECTIVES, Directive, IsTerminated, Punct,
+    StringLiteral, Token, TokenKind,
 };
 use util_text::{Character, Lexable};
 
@@ -79,6 +79,17 @@ where
                 }
             }
             State::Identifier(name, source) => {
+                for keyword in ALL_KEYWORD_DIRECTIVES {
+                    if name == keyword {
+                        let name = std::mem::take(name);
+                        let source = *source;
+                        self.state = State::Idle;
+                        return FeedResult::Has(
+                            TokenKind::Directive(Directive::Keyword(name.into())).at(source),
+                        );
+                    }
+                }
+
                 if self.lexable.peek().is_identifier_continue() {
                     name.push(self.lexable.next().unwrap().0);
                     FeedResult::Waiting
@@ -230,7 +241,7 @@ where
         }
 
         if let Ok(source) = self.lexable.eat_remember("@") {
-            for possible in ALL_DIRECTIVES.iter().copied() {
+            for possible in ALL_SIGIL_DIRECTIVES.iter().copied() {
                 if self.lexable.eat(possible) {
                     return FeedResult::Has(
                         TokenKind::Directive(Directive::Standard(possible.into())).at(source),

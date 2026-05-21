@@ -55,7 +55,7 @@ pub struct Project {
 #[define_requests::group]
 mod requests {
     use super::*;
-    use vfs::Canonical;
+    use canonical::Canonical;
 
     #[define_requests::returns(WithErrors<Arc<[String]>>)]
     pub struct Compile {

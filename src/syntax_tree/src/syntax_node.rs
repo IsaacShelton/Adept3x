@@ -3,6 +3,7 @@ use derive_more::From;
 use num_bigint::BigInt;
 use std::{fmt::Debug, sync::Arc};
 use text_edit::{TextPointRangeUtf16, TextPointUtf16};
+use with_errors::{Error, ErrorAt};
 
 #[derive(Debug)]
 pub struct SyntaxNode {
@@ -46,6 +47,24 @@ impl SyntaxNode {
                 Some((start, child))
             })
             .map(|(start, child)| Self::new(Some(self.clone()), child.clone(), start))
+    }
+
+    pub fn errors(self: &Arc<Self>) -> impl Iterator<Item = ErrorAt> {
+        if let BareSyntaxKind::Error { description } = &self.bare.kind {
+            // NOTE: This is not 100% accurate since it doesn't account for
+            // multi-byte utf-16 characters in the column, but it's good enough for now.
+            vec![ErrorAt::new_at(
+                Error::SyntaxError(description.into()),
+                self.start.line.0.try_into().unwrap_or(u32::MAX),
+                self.start.col.0.try_into().unwrap_or(u32::MAX),
+            )]
+        } else {
+            Vec::from_iter(
+                self.children()
+                    .flat_map(|child| Vec::from_iter(child.errors())),
+            )
+        }
+        .into_iter()
     }
 
     pub fn dump(

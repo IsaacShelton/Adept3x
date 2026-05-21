@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "src/adept",
+    "src/canonical",
     "src/connection",
     "src/daemon",
     "src/daemon_init",
@@ -55,4 +56,5 @@ log = "0.4.29"
 lsp-types = "0.97.0"
 lazy_static = "1.5.0"
 lazy_format = "2.0.3"
+indexmap = "2.14.0"
 

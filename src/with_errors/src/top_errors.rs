@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::errors::ErrorAt;
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
 use std::sync::Arc;
@@ -10,13 +10,13 @@ pub struct TopErrors {
 }
 
 impl TopErrors {
-    pub fn new(errors: impl Iterator<Item = Error>) -> Self {
+    pub fn new(errors: impl Iterator<Item = ErrorAt>) -> Self {
         Self {
             inner: TopErrorsNode::new(errors).map(Arc::new),
         }
     }
 
-    pub fn new_one(error: Error) -> Self {
+    pub fn new_one(error: ErrorAt) -> Self {
         Self {
             inner: TopErrorsNode::new(std::iter::once(error)).map(Arc::new),
         }
@@ -52,15 +52,15 @@ impl From<Arc<TopErrorsNode>> for TopErrors {
 pub struct TopErrorsNode {
     // Invariant: there must always be at least one error
     // in the errors node.
-    errors: SmallVec<[Error; 1]>,
+    errors: SmallVec<[ErrorAt; 1]>,
 
     // We guarantee that this will always be acyclic by construction
     parent: Option<Arc<TopErrorsNode>>,
 }
 
 impl TopErrorsNode {
-    pub fn new(errors: impl IntoIterator<Item = Error>) -> Option<Self> {
-        let list: SmallVec<[Error; 1]> = errors.into_iter().collect();
+    pub fn new(errors: impl IntoIterator<Item = ErrorAt>) -> Option<Self> {
+        let list: SmallVec<[ErrorAt; 1]> = errors.into_iter().collect();
 
         if list.is_empty() {
             None
@@ -73,10 +73,10 @@ impl TopErrorsNode {
     }
 
     pub fn new_with_parent(
-        errors: impl IntoIterator<Item = Error>,
+        errors: impl IntoIterator<Item = ErrorAt>,
         parent: Arc<TopErrorsNode>,
     ) -> Option<Self> {
-        let list: SmallVec<[Error; 1]> = errors.into_iter().collect();
+        let list: SmallVec<[ErrorAt; 1]> = errors.into_iter().collect();
 
         if list.is_empty() {
             None
@@ -88,12 +88,12 @@ impl TopErrorsNode {
         }
     }
 
-    pub fn with(mut self: Arc<Self>, new_errors: impl Iterator<Item = Error>) -> Arc<Self> {
+    pub fn with(mut self: Arc<Self>, new_errors: impl Iterator<Item = ErrorAt>) -> Arc<Self> {
         Arc::make_mut(&mut self).errors.extend(new_errors);
         self
     }
 
-    pub fn top(&self, n: usize) -> TopN<&Error> {
+    pub fn top(&self, n: usize) -> TopN<&ErrorAt> {
         TopN::from_iter(n, self.iter_unordered(), |a, b| a.cmp(b))
     }
 
@@ -109,7 +109,7 @@ impl TopErrorsNode {
 #[derive(Default)]
 pub struct TopErrorsUnorderedIter<'a> {
     stack: SmallVec<[&'a TopErrorsNode; 10]>,
-    slice: &'a [Error],
+    slice: &'a [ErrorAt],
 }
 
 impl<'a> TopErrorsUnorderedIter<'a> {
@@ -122,7 +122,7 @@ impl<'a> TopErrorsUnorderedIter<'a> {
 }
 
 impl<'a> Iterator for TopErrorsUnorderedIter<'a> {
-    type Item = &'a Error;
+    type Item = &'a ErrorAt;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

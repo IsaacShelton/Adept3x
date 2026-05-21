@@ -10,4 +10,5 @@ serde_derive.workspace = true
 idle_tracker = { version = "0.1.0", path = "../idle_tracker/" }
 text_edit = { version = "0.1.0", path = "../text_edit/" }
 file_cache = { version = "0.1.0", path = "../file_cache/" }
+canonical = { version = "0.1.0", path = "../canonical/" }
 

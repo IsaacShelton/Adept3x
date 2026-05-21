@@ -3,6 +3,7 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Directive {
+    Keyword(Box<str>),
     Standard(Box<str>),
     Unknown(Box<str>),
 }
@@ -17,24 +18,20 @@ impl Directive {
     }
 
     pub fn len_with_prefix(&self) -> usize {
-        1 + match self {
-            Directive::Standard(s) => s.len(),
-            Directive::Unknown(s) => s.len(),
-        }
-    }
-}
-
-impl AsRef<str> for Directive {
-    fn as_ref(&self) -> &str {
         match self {
-            Directive::Standard(s) => s,
-            Directive::Unknown(s) => s,
+            Directive::Keyword(s) => s.len(),
+            Directive::Standard(s) => 1 + s.len(),
+            Directive::Unknown(s) => 1 + s.len(),
         }
     }
 }
 
 impl Display for Directive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}", self.as_ref())
+        match self {
+            Directive::Keyword(s) => write!(f, "{s}"),
+            Directive::Standard(s) => write!(f, "@{s}"),
+            Directive::Unknown(s) => write!(f, "@{s}"),
+        }
     }
 }

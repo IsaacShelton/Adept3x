@@ -1,9 +1,11 @@
 
-main :: @fn(): Nat {
-    234
+main :: fn(): Nat {
+    1234
 }
 
-other :: @fn(x, y, z: Bool): Bool {
-    @fn(a: Bool) { y }
+Char :: Nat
+
+other :: fn(z: Char): if(z, Nat, Bool) {
+    if(z, fn(a) if(a, Nat, Void), 1234, false)
 }
 

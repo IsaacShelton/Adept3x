@@ -33,7 +33,6 @@ pub enum BareSyntaxKind {
     VoidValue,
     Integer(Arc<BigInt>),
     FnValue,
-    IfValue,
     RecordValue,
     Block,
     Variable(Arc<str>),
@@ -46,7 +45,7 @@ pub enum BareSyntaxKind {
     MatchBlock,
     MatchArm,
     Pattern,
-    BoolElim,
+    IfValue,
     NatElim,
     NatSucc,
 }

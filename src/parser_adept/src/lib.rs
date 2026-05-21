@@ -324,10 +324,17 @@ where
 
     fn parse_directive(&mut self, directive: Directive) -> Arc<BareSyntaxNode> {
         match &directive {
+            Directive::Keyword(name) => match name.as_ref() {
+                "fn" => self.parse_fn_directive(directive),
+                "if" => self.parse_if_directive(directive),
+                _ => BareSyntaxNode::new_error(
+                    directive.to_string(),
+                    format!("Directive `{}` is not supported yet", name),
+                ),
+            },
             Directive::Standard(name) => match name.as_ref() {
                 "fn" => self.parse_fn_directive(directive),
                 "if" => self.parse_if_directive(directive),
-                "bool_elim" => self.parse_elim_directive(directive, BareSyntaxKind::BoolElim),
                 "nat_elim" => self.parse_elim_directive(directive, BareSyntaxKind::NatElim),
                 "nat_succ" => self.parse_intro_directive(directive, BareSyntaxKind::NatSucc),
                 "match" => self.parse_match_directive(directive),
@@ -440,7 +447,7 @@ where
                 self.parse_column_whitespace(&mut children);
                 self.parse_type_annotation(false, &mut children);
                 self.parse_column_whitespace(&mut children);
-                children.push(self.parse_block());
+                children.push(self.parse_block(true));
             }
             Err(node) => {
                 children.push(node);
@@ -451,7 +458,7 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::FnValue, children)
     }
 
-    fn parse_block(&mut self) -> Arc<BareSyntaxNode> {
+    fn parse_block(&mut self, allow_inline: bool) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
         if self
             .parse_punct(Punct::new("{"), &mut children, ErrorRecovery::Empty)
@@ -467,6 +474,9 @@ where
                 // TODO: This should take ideally nesting into account
                 ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new("}"))),
             );
+        } else if allow_inline {
+            children.clear();
+            children.push(self.parse_term());
         }
 
         BareSyntaxNode::new_parent(BareSyntaxKind::Block, children)
@@ -588,18 +598,7 @@ where
         // Ternary with Motive (for dependent if)
         // @if(a >= b, @fn(_) { Nat }, a + b, a - b)
 
-        let mut children = Vec::new();
-        children.push(BareSyntaxNode::new_leaf(
-            BareSyntaxKind::Directive(directive.clone()),
-            directive.to_string(),
-        ));
-
-        self.parse_column_whitespace(&mut children);
-        let arg_list = self.parse_arg_list(Reparsable::Ignore);
-        children.push(arg_list);
-        self.parse_column_whitespace(&mut children);
-
-        BareSyntaxNode::new_parent(BareSyntaxKind::IfValue, children)
+        self.parse_elim_directive(directive, BareSyntaxKind::IfValue)
 
         /*
         // Ternary (for short single-line)
@@ -820,7 +819,7 @@ where
     fn parse_param_sublist(&mut self) -> Arc<BareSyntaxNode> {
         let mut children = vec![];
         self.parse_param_heads(&mut children);
-        self.parse_type_annotation(true, &mut children);
+        self.parse_type_annotation(false, &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::Param, children)
     }
 
