@@ -77,6 +77,6 @@ It will have a comprehensive set of features that no other language fully offers
 | 2027-06-14 | C Constructs Support (Group 2)        | 30 days
 | 2027-07-14 | - Milestone 6 -                       | ☐ 
 | 2027-07-14 | Async I/O w/ Algebraic Effects Demo   | 30 days
-| 2027-09-14 | - Milestone 7 -                       | ☐ 
-| 2027-09-14 | Borrow Checking, RAII, Origins        | 90 days  
-| 2027-12-14 | - Milestone 8 -                       | ☐ 
+| 2027-08-14 | - Milestone 7 -                       | ☐ 
+| 2027-08-14 | Borrow Checking, RAII, Origins        | 90 days  
+| 2027-11-14 | - Milestone 8 -                       | ☐ 
