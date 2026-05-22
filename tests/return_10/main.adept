@@ -1,12 +1,7 @@
 
 main :: fn() 0
 
-testing :: fn(
-    Ts: struct { A: Type, x, y: Nat, B: Type, z: Nat },
-    a: Ts.A,
-    b: Ts.B,
-    f: Fn(_: Ts.A): Ts.B,
-): Ts.B {
-    f(a)
+testing :: fn(): Nat {
+    data: struct { p: Nat, q: Bool } = .{ p: 10, q: false }
+    data.q
 }
-

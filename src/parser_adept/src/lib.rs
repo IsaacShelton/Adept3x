@@ -353,6 +353,17 @@ where
             return node;
         }
 
+        if self.lexer.peek().is_punct_of(Punct::new("."))
+            && self.lexer.peek_nth(1).is_punct_of(Punct::new("{"))
+        {
+            let children = vec![
+                BareSyntaxNode::new_punct(self.lexer.next().kind.unwrap_punct()),
+                self.parse_field_init_list(),
+            ];
+
+            return BareSyntaxNode::new_parent(BareSyntaxKind::RecordValue, children);
+        }
+
         if self.lexer.peek().is_punct_of(Punct::new(",")) {
             Self::error_for_empty("Expected expression before `,`")
         } else if self.lexer.peek().is_punct_of(Punct::new(")")) {
@@ -733,7 +744,7 @@ where
         self.parse_column_whitespace(&mut children);
         children.push(self.parse_arg_list(Reparsable::Reparse));
 
-        BareSyntaxNode::new_parent(BareSyntaxKind::RecordValue, children)
+        BareSyntaxNode::new_parent(BareSyntaxKind::PairValue, children)
     }
 
     fn parse_arg_list(&mut self, reparsable: Reparsable) -> Arc<BareSyntaxNode> {
@@ -807,6 +818,49 @@ where
         self.parse_names(&mut children);
         self.parse_type_annotation(true, &mut children);
         BareSyntaxNode::new_parent(BareSyntaxKind::FieldDef, children)
+    }
+
+    fn parse_field_init_list(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+
+        if self
+            .parse_punct(Punct::new("{"), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_all_whitespace(&mut children);
+
+            while !self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
+                children.push(self.parse_field_init());
+
+                let needs_separator = self.parse_all_whitespace(&mut children).is_none();
+
+                if self.lexer.peek().kind.is_punct_of_or_eof(Punct::new("}")) {
+                    break;
+                } else if self.lexer.peek().is_punct_of(Punct::new(",")) {
+                    let _ = self.parse_punct(
+                        Punct::new(","),
+                        &mut children,
+                        ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new(")"))),
+                    );
+                    self.parse_all_whitespace(&mut children);
+                } else if needs_separator {
+                    children.push(
+                        self.error_for_next_token("Expected ',' or newline after field definition"),
+                    );
+                }
+            }
+
+            let _ = self.parse_punct(Punct::new("}"), &mut children, ErrorRecovery::Empty);
+        }
+        BareSyntaxNode::new_parent(BareSyntaxKind::FieldInitList, children)
+    }
+
+    fn parse_field_init(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = vec![];
+        children.push(self.parse_name_required());
+        let _ = self.parse_punct(Punct::new(":"), &mut children, ErrorRecovery::Empty);
+        children.push(self.parse_term());
+        BareSyntaxNode::new_parent(BareSyntaxKind::FieldInit, children)
     }
 
     fn parse_param_list(&mut self) -> Result<Arc<BareSyntaxNode>, Arc<BareSyntaxNode>> {

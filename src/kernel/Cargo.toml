@@ -20,5 +20,5 @@ bit-vec.workspace = true
 indexmap.workspace = true
 
 [features]
-default = []
+default = ["kernel"]
 kernel = []
