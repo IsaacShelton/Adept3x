@@ -845,7 +845,9 @@ where
                     self.parse_all_whitespace(&mut children);
                 } else if needs_separator {
                     children.push(
-                        self.error_for_next_token("Expected ',' or newline after field definition"),
+                        self.error_for_next_token(
+                            "Expected ',' or newline after field initializer",
+                        ),
                     );
                 }
             }
