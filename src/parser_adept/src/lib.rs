@@ -37,9 +37,36 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::Root, children)
     }
 
+    fn parse_attributes(&mut self) -> Option<Arc<BareSyntaxNode>> {
+        let mut children = vec![];
+        if self
+            .parse_punct(Punct::new("#"), &mut children, ErrorRecovery::Empty)
+            .is_err()
+        {
+            return None;
+        }
+
+        if self
+            .parse_punct(Punct::new("["), &mut children, ErrorRecovery::Empty)
+            .is_ok()
+        {
+            self.parse_names(&mut children);
+            let _ = self.parse_punct(Punct::new("]"), &mut children, ErrorRecovery::Empty);
+        }
+
+        self.parse_all_whitespace(&mut children);
+
+        Some(BareSyntaxNode::new_parent(
+            BareSyntaxKind::Attributes,
+            children,
+        ))
+    }
+
     fn parse_top_level(&mut self) -> Arc<BareSyntaxNode> {
-        if self.should_parse_binding() {
-            return self.parse_binding();
+        let attributes = self.parse_attributes();
+
+        if self.should_parse_binding() || attributes.is_some() {
+            return self.parse_binding(attributes);
         }
 
         BareSyntaxNode::new_leaf(
@@ -126,8 +153,9 @@ where
         })
     }
 
-    fn parse_binding(&mut self) -> Arc<BareSyntaxNode> {
+    fn parse_binding(&mut self, attributes: Option<Arc<BareSyntaxNode>>) -> Arc<BareSyntaxNode> {
         let mut children = Vec::new();
+        children.extend(attributes);
         children.push(self.parse_name_required());
         self.parse_column_whitespace(&mut children);
 
@@ -238,6 +266,24 @@ where
             return Ok(BareSyntaxNode::new_parent(BareSyntaxKind::Nth, children));
         }
 
+        if self.lexer.peek().is_punct_of(Punct::new(".")) && self.lexer.peek_nth(1).is_identifier()
+        {
+            children = vec![
+                BareSyntaxNode::new_parent(BareSyntaxKind::Term, children),
+                BareSyntaxNode::new_punct(self.lexer.next().kind.unwrap_punct()),
+            ];
+            let name = self.lexer.next().kind.unwrap_identifier();
+            children.push(BareSyntaxNode::new_leaf(
+                BareSyntaxKind::Identifier(Arc::from(name.clone())),
+                name,
+            ));
+
+            return Ok(BareSyntaxNode::new_parent(
+                BareSyntaxKind::FieldProjection,
+                children,
+            ));
+        }
+
         Err(children)
     }
 
@@ -326,7 +372,9 @@ where
         match &directive {
             Directive::Keyword(name) => match name.as_ref() {
                 "fn" => self.parse_fn_directive(directive),
+                "Fn" => self.parse_fn_type_directive(directive),
                 "if" => self.parse_if_directive(directive),
+                "struct" => self.parse_record_type_directive(directive),
                 _ => BareSyntaxNode::new_error(
                     directive.to_string(),
                     format!("Directive `{}` is not supported yet", name),
@@ -780,6 +828,11 @@ where
                         ErrorRecovery::EatUntilNestedClosing(TokenKind::Punct(Punct::new(")"))),
                     );
                     self.parse_all_whitespace(&mut children);
+
+                    // Allow trailing comma
+                    if self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
+                        break;
+                    }
                 } else {
                     has_param = true;
                 }

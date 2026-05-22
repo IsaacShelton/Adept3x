@@ -1,11 +1,12 @@
 
-main :: fn(): Nat {
-    1234
-}
+main :: fn() 0
 
-Char :: Nat
-
-other :: fn(z: Char): if(z, Nat, Bool) {
-    if(z, fn(a) if(a, Nat, Void), 1234, false)
+testing :: fn(
+    Ts: struct { A: Type, x, y: Nat, B: Type, z: Nat },
+    a: Ts.A,
+    b: Ts.B,
+    f: Fn(_: Ts.A): Ts.B,
+): Ts.B {
+    f(a)
 }
 

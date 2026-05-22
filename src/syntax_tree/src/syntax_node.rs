@@ -1,4 +1,4 @@
-use crate::{BareSyntaxKind, BareSyntaxNode};
+use crate::{BareSyntaxKind, BareSyntaxNode, BuiltinType};
 use derive_more::From;
 use num_bigint::BigInt;
 use std::{fmt::Debug, sync::Arc};
@@ -115,6 +115,16 @@ impl SyntaxNode {
         })
     }
 
+    pub fn find_identifier(self: &Arc<Self>) -> Option<Arc<str>> {
+        self.children().find_map(|child| {
+            if let BareSyntaxKind::Identifier(name) = child.bare.kind() {
+                Some(name.clone())
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn find_implicit_name(self: &Arc<Self>) -> Option<Arc<str>> {
         self.find(BareSyntaxKind::ImplicitName).and_then(|name| {
             name.children().find_map(|child| {
@@ -211,6 +221,20 @@ impl SyntaxNode {
                 block,
             }
         })
+    }
+
+    pub fn find_pi(self: &Arc<Self>) -> Option<Func> {
+        self.find(BareSyntaxKind::BuiltinType(BuiltinType::Fn))
+            .map(|func| {
+                let param_list = func.find(BareSyntaxKind::ParamList);
+                let return_type_annotation = func.find(BareSyntaxKind::TypeAnnotation);
+
+                Func {
+                    param_list,
+                    return_type_annotation,
+                    block: None,
+                }
+            })
     }
 
     pub fn param_list_params(self: &Arc<Self>) -> impl Iterator<Item = Param> {
