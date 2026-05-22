@@ -1,7 +1,15 @@
 
-main :: fn() 0
-
 testing :: fn(): Nat {
     data: struct { p: Nat, q: Bool } = .{ p: 10, q: false }
-    data.q
+    data.p
 }
+
+main :: (
+    // We can store types in records
+    Types := .{ N: Nat, B: Bool, f: fn(T) T }
+    // We can nest records, use fields, etc.
+    MoreTypes := .{ n: 1234, nested_field: .{ NT: Types.f(Types.N) } }
+    // And reference values in types
+    fn(): MoreTypes.nested_field.NT { MoreTypes.n }
+)
+
