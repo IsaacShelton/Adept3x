@@ -20,6 +20,7 @@ bit-vec.workspace = true
 indexmap.workspace = true
 slotmap.workspace = true
 ouroboros.workspace = true
+indoc.workspace = true
 
 [features]
 default = ["kernel"]

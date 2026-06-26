@@ -344,6 +344,14 @@ where
                 BareSyntaxKind::Integer(Arc::clone(value)),
                 text.into(),
             )),
+            TokenKind::String(full_text) => {
+                let unescaped = full_text.to_value();
+
+                Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::String(unescaped),
+                    full_text.full_text.clone(),
+                ))
+            }
             TokenKind::Identifier(name) => match name.as_str() {
                 "Type" => Ok(BareSyntaxNode::new_leaf(
                     BareSyntaxKind::BuiltinType(BuiltinType::Type),
@@ -359,6 +367,10 @@ where
                 )),
                 "Nat" => Ok(BareSyntaxNode::new_leaf(
                     BareSyntaxKind::BuiltinType(BuiltinType::Nat),
+                    name.into(),
+                )),
+                "String" => Ok(BareSyntaxNode::new_leaf(
+                    BareSyntaxKind::BuiltinType(BuiltinType::String),
                     name.into(),
                 )),
                 "true" => Ok(BareSyntaxNode::new_leaf(
@@ -431,6 +443,7 @@ where
                 "Record" => self.parse_record_type_directive(directive),
                 "record" => self.parse_record_directive(directive),
                 "eval" => self.parse_eval(directive),
+                "println" => self.parse_elim_directive(directive, BareSyntaxKind::Println),
                 _ => BareSyntaxNode::new_error(
                     directive.to_string(),
                     format!("Directive `{}` is not supported yet", name),

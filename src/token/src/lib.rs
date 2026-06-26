@@ -98,7 +98,7 @@ impl Display for TokenKind {
             Self::LineSpacing(atom) => write!(f, "{}", atom),
             Self::Identifier(name) => write!(f, "{}", name),
             Self::Polymorph(name) => write!(f, "${}", name),
-            Self::String(string_literal) => write!(f, "{}", string_literal),
+            Self::String(full_text) => write!(f, "{}", full_text),
             Self::MissingStringTermination => Ok(()),
             Self::Integer(value, _) => write!(f, "{}", value),
             Self::Float(value, _) => write!(f, "{}", value),
@@ -137,6 +137,7 @@ pub const ALL_SIGIL_DIRECTIVES: &[&'static str] = &[
     "bool_elim",
     "nat_elim",
     "nat_succ",
+    "println",
 ];
 
 // Since Rust's const evaluation sucks
@@ -196,7 +197,7 @@ impl TokenKind {
             TokenKind::LineSpacing(atom) => atom.count,
             TokenKind::Identifier(name) => name.len(),
             TokenKind::Polymorph(name) => 1 + name.len(),
-            TokenKind::String(string) => string.literal.len(),
+            TokenKind::String(string) => string.full_text.len(),
             TokenKind::MissingStringTermination => 0,
             TokenKind::Integer(_, text) => text.len(),
             TokenKind::Float(_, len) => *len,

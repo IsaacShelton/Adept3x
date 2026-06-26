@@ -35,6 +35,7 @@ pub enum BareSyntaxKind {
     FalseValue,
     VoidValue,
     Integer(Arc<BigInt>),
+    String(Result<Arc<str>, ()>),
     FnValue,
     PairValue,
     RecordValue,
@@ -55,6 +56,7 @@ pub enum BareSyntaxKind {
     NatSucc,
     Associate,
     Namespace,
+    Println,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant, PartialEq, Eq)]
@@ -71,4 +73,5 @@ pub enum BuiltinType {
     Fn,
     Record,
     Nat,
+    String,
 }

@@ -37,6 +37,7 @@ pub struct StringState<S: Copy> {
     close_char: char,
     escaped: bool,
     source: S,
+    full_text: String,
 }
 
 pub struct NumberState<S: Copy> {
@@ -102,13 +103,16 @@ where
             }
             State::String(string_state) => match self.lexable.next() {
                 Character::At(c, _) => {
+                    string_state.full_text.push(c);
                     string_state.literal.push(c);
 
                     if c == string_state.close_char && !string_state.escaped {
                         let literal = std::mem::take(&mut string_state.literal);
                         let source = string_state.source;
                         self.state = State::Idle;
-                        FeedResult::Has(TokenKind::String(StringLiteral { literal }).at(source))
+                        FeedResult::Has(
+                            TokenKind::String(StringLiteral { full_text: literal }).at(source),
+                        )
                     } else {
                         string_state.escaped = !string_state.escaped && c == '\\';
                         FeedResult::Waiting
@@ -118,7 +122,9 @@ where
                     let literal = std::mem::take(&mut string_state.literal);
                     let source = string_state.source;
                     self.state = State::UnterminatedString(eof_source);
-                    FeedResult::Has(TokenKind::String(StringLiteral { literal }).at(source))
+                    FeedResult::Has(
+                        TokenKind::String(StringLiteral { full_text: literal }).at(source),
+                    )
                 }
             },
             State::Number(number_state) => {
@@ -269,6 +275,7 @@ where
                     close_char: c,
                     escaped: false,
                     source,
+                    full_text: c.into(),
                 });
                 FeedResult::Waiting
             }

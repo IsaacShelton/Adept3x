@@ -337,7 +337,8 @@ fn completion(
                                 BuiltinType::Bool
                                 | BuiltinType::Void
                                 | BuiltinType::Nat
-                                | BuiltinType::Type,
+                                | BuiltinType::Type
+                                | BuiltinType::String,
                             ) => Some(CompletionItemKind::ENUM),
                             BareSyntaxKind::FnValue => Some(CompletionItemKind::FUNCTION),
                             BareSyntaxKind::TrueValue

@@ -165,6 +165,16 @@ impl SyntaxNode {
         })
     }
 
+    pub fn find_string(self: &Arc<Self>) -> Option<Arc<str>> {
+        self.children().find_map(|child| {
+            if let BareSyntaxKind::String(value) = child.bare.kind() {
+                value.as_ref().map(|value| Arc::clone(value)).ok()
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn find_names(self: &Arc<Self>) -> impl Iterator<Item = Arc<str>> {
         self.children()
             .filter(|child| matches!(child.bare.kind(), BareSyntaxKind::Name))
