@@ -47,16 +47,31 @@ pub enum Error {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ErrorAt {
-    error: Error,
-    filename: Option<Box<str>>,
-    line: Option<NonZeroU32>,
-    column: Option<NonZeroU32>,
+    pub error: Error,
+    pub filename: Option<Box<str>>,
+    pub line: Option<NonZeroU32>,
+    pub column: Option<NonZeroU32>,
+}
+
+impl From<Error> for ErrorAt {
+    fn from(error: Error) -> Self {
+        Self::new(error)
+    }
 }
 
 impl ErrorAt {
     pub fn new(error: Error) -> Self {
         Self {
             error,
+            filename: None,
+            line: None,
+            column: None,
+        }
+    }
+
+    pub fn new_typing(message: String) -> Self {
+        Self {
+            error: Error::TypingError(message),
             filename: None,
             line: None,
             column: None,

@@ -94,12 +94,30 @@ impl SyntaxNode {
         Ok(())
     }
 
+    pub fn attributes(self: &Arc<Self>) -> impl Iterator<Item = Arc<str>> {
+        let attributes = self.find(BareSyntaxKind::Attributes);
+        attributes
+            .into_iter()
+            .flat_map(|node| Vec::from_iter(node.find_names()))
+    }
+
     pub fn bindings(self: &Arc<Self>) -> impl Iterator<Item = Binding> {
         self.children()
             .filter(|child| matches!(child.bare.kind, BareSyntaxKind::Binding))
-            .map(|binding| Binding {
-                name: binding.find_name(),
-                value: binding.find_term(),
+            .map(move |binding| {
+                let mut is_alias = false;
+                for attribute in binding.attributes() {
+                    if attribute.as_ref() == "alias" {
+                        is_alias = true;
+                    }
+                }
+
+                Binding {
+                    name: binding.find_name(),
+                    type_annotation: binding.find(BareSyntaxKind::TypeAnnotation),
+                    value: binding.find_term(),
+                    is_alias,
+                }
             })
     }
 
@@ -254,7 +272,9 @@ impl SyntaxNode {
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub name: Option<Arc<str>>,
+    pub type_annotation: Option<Arc<SyntaxNode>>,
     pub value: Option<Arc<SyntaxNode>>,
+    pub is_alias: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -305,10 +325,19 @@ pub struct ParamHead {
     pub implicitness: NamedImplicitness,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Implicitness {
     Explicit,
     Implicit,
+}
+
+impl Debug for Implicitness {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Explicit => write!(f, "Explicit"),
+            Self::Implicit => write!(f, "Implicit"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, From)]

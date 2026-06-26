@@ -37,6 +37,22 @@ where
         BareSyntaxNode::new_parent(BareSyntaxKind::Root, children)
     }
 
+    pub fn parse_namespace(&mut self) -> Arc<BareSyntaxNode> {
+        let mut children = Vec::new();
+        self.parse_all_whitespace(&mut children);
+
+        let _ = self.parse_punct(Punct::new("{"), &mut children, ErrorRecovery::Empty);
+        self.parse_all_whitespace(&mut children);
+
+        while !self.lexer.peek().is_punct_of_or_eof(Punct::new("}")) {
+            children.push(self.parse_top_level());
+            self.parse_all_whitespace(&mut children);
+        }
+
+        let _ = self.parse_punct(Punct::new("}"), &mut children, ErrorRecovery::Empty);
+        BareSyntaxNode::new_parent(BareSyntaxKind::Namespace, children)
+    }
+
     fn parse_attributes(&mut self) -> Option<Arc<BareSyntaxNode>> {
         let mut children = vec![];
         if self
@@ -86,7 +102,7 @@ where
             .lexer
             .peek_skipping(1, |token| token.kind.is_column_spacing());
 
-        if !after.kind.is_punct_of(Punct::new("::")) {
+        if !after.kind.is_punct_of(Punct::new("::")) && !after.kind.is_punct_of(Punct::new(":")) {
             return false;
         }
 
@@ -158,6 +174,7 @@ where
         children.extend(attributes);
         children.push(self.parse_name_required());
         self.parse_column_whitespace(&mut children);
+        self.parse_type_annotation(false, &mut children);
 
         if self
             .parse_punct(Punct::new("::"), &mut children, ErrorRecovery::Empty)
@@ -280,6 +297,19 @@ where
 
             return Ok(BareSyntaxNode::new_parent(
                 BareSyntaxKind::FieldProjection,
+                children,
+            ));
+        }
+
+        if self.lexer.peek().is_punct_of(Punct::new("~>")) {
+            children = vec![
+                BareSyntaxNode::new_parent(BareSyntaxKind::Term, children),
+                BareSyntaxNode::new_punct(self.lexer.next().kind.unwrap_punct()),
+            ];
+            children.push(self.parse_namespace());
+
+            return Ok(BareSyntaxNode::new_parent(
+                BareSyntaxKind::Associate,
                 children,
             ));
         }
@@ -939,6 +969,12 @@ where
         while self.lexer.peek().is_punct_of(Punct::new(",")) {
             let _ = self.parse_punct(Punct::new(","), children, ErrorRecovery::Empty);
             self.parse_all_whitespace(children);
+
+            // Allow trailing comma
+            if self.lexer.peek().kind.is_punct_of_or_eof(Punct::new(")")) {
+                break;
+            }
+
             children.push(self.parse_param_head());
             self.parse_all_whitespace(children);
         }

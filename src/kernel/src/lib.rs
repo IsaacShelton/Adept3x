@@ -25,14 +25,14 @@ mod non_implementation {
     #[derive(Debug)]
     pub struct Symbols {
         #[allow(unused)]
-        symbols: HashMap<String, Symbol>,
+        symbols: HashMap<String, SymbolStage>,
     }
 
-    pub fn elaborate_symbols<'a>(_: impl Iterator<Item = Binding>) -> WithErrors<Symbols> {
+    pub fn elaborate_symbols<'a>(_: impl Iterator<Item = Binding>) -> WithErrors<SymbolTable> {
         unpublished()
     }
 
-    pub fn compile_executable(_symbols: &Symbols) -> WithErrors<()> {
+    pub fn compile_executable(_symbols: &SymbolTable) -> WithErrors<()> {
         unpublished()
     }
 

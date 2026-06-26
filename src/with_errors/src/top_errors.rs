@@ -29,6 +29,12 @@ impl TopErrors {
             .unwrap_or_default()
     }
 
+    pub fn iter_ordered<'a>(&'a self) -> impl Iterator<Item = &'a ErrorAt> {
+        let mut errors = Vec::from_iter(self.iter_unordered());
+        errors.sort();
+        errors.into_iter()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.inner.is_none()
     }

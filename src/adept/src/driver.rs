@@ -31,10 +31,7 @@ pub fn compile(filename: &str) -> ExitCode {
                 let aft = Aft::from(complete);
                 let ret = request::Compile::unwrap_aft(aft);
 
-                let mut errors = Vec::from_iter(ret.errors.iter_unordered());
-                errors.sort();
-
-                for error in errors {
+                for error in ret.errors.iter_ordered() {
                     println!("{}", error.display(Some("error")));
                 }
 

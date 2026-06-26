@@ -119,7 +119,7 @@ const ASSIGNMENT_OPERATORS: &[&'static str] = &[
 const NON_ASSIGNMENT_OPERATORS: &[&'static str] = &[
     ",", ".", ":", "::", "(", ")", "[", "]", "{", "}", "$", "++", "--", "!", "~", "*", "/", "%",
     "#", "+", "-", "<<", "<<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!=", "&", "^", "|", "&&",
-    "||",
+    "||", "~>",
 ];
 
 pub const ALL_KEYWORD_DIRECTIVES: &[&'static str] = &["fn", "Fn", "if", "struct"];

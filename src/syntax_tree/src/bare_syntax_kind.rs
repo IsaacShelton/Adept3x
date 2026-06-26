@@ -53,6 +53,8 @@ pub enum BareSyntaxKind {
     IfValue,
     NatElim,
     NatSucc,
+    Associate,
+    Namespace,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, IsVariant, PartialEq, Eq)]
