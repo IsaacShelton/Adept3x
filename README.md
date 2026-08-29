@@ -1,16 +1,16 @@
-# Adept3x
+
+# Coming Soon!
+
+Adept 3.x is in heavy development, but is not open-source (yet).
+
+Please do not expect it to be released soon. This is an ongoing process and with take years before having a public build of the language. The language will be released when it's ready for the public.
+
+### Adept3x
 
 <img src="https://raw.github.com/IsaacShelton/Adept3x/master/.github/README_logo.png" width="240" height="240">
 
 Work-in-progress compiler that will become Adept 3.x
 
-### Coming Soon!
-
-Adept 3.x is in heavy development, but is not open-source (yet).
-
-Please do not expect it to be released soon.
-
-This is an ongoing process and with take years before having a public build of the language.
 
 ### Why Adept 3.x?
 
@@ -20,12 +20,12 @@ It will have a comprehensive set of features that no other language fully offers
 
 - Easily run code at compile-time (no function annotations or separate file requirements)
 - Easily generate arbitrary functions, structures, etc. at compile-time (even within same file - no ordering/annotation requirements)
-- Easily reference values safely with borrow checking & move memantics
+- Easily reference values safely with borrow checking & move semantics
 - Manage data variants with pattern matching & sum types
 - Consider goto *un*harmful, since they are safe and structured in Adept
 - Import c headers and source files with first-class support
 - Easily cross-compile to other platforms
-- Compile your code blazingly fast (with or without incrementatal compilation)
+- Compile your code blazingly fast (with or without incremental compilation)
 - Receive intelligent language server completions/etc. even for generated symbols
 - Use extremely powerful features, which haven't even been announced publicly yet
 
