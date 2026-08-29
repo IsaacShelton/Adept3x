@@ -4,11 +4,13 @@
 
 Work-in-progress compiler that will become Adept 3.x
 
-```
-func main {
-    println("Hello World")
-}
-```
+### Coming Soon!
+
+Adept 3.x is in heavy development, but is not open-source (yet).
+
+Please do not expect it to be released soon.
+
+This is an ongoing process and with take years before having a public build of the language.
 
 ### Why Adept 3.x?
 
@@ -16,21 +18,24 @@ Adept 3.x is an attempt at creating a Next-Gen Programming Language.
 
 It will have a comprehensive set of features that no other language fully offers:
 
-- Easily Run Code at Compile-Time (no function annotations or separate file requirements)
-- Easily Generate Arbitrary Functions, Structures, etc. at Compile-Time (even within same file - no ordering/annotation requirements)
-- Easily Reference Values Safely with Borrow Checking & Move Semantics
-- Easily Manage Data Variants with Pattern Matching & Sum Types
-- Consider Goto Unharmful, Since They Are Safe and Structured in Adept
-- Import C Headers and Source Files with First-Class Support
-- Easily Cross-Compile to Other Platforms
-- Compile Your Code Blazingly Fast (with or without Incrementatal Compilation)
-- Receive Intelligent Language Server Completions/etc. even for Generated Symbols
+- Easily run code at compile-time (no function annotations or separate file requirements)
+- Easily generate arbitrary functions, structures, etc. at compile-time (even within same file - no ordering/annotation requirements)
+- Easily reference values safely with borrow checking & move memantics
+- Manage data variants with pattern matching & sum types
+- Consider goto *un*harmful, since they are safe and structured in Adept
+- Import c headers and source files with first-class support
+- Easily cross-compile to other platforms
+- Compile your code blazingly fast (with or without incrementatal compilation)
+- Receive intelligent language server completions/etc. even for generated symbols
+- Use extremely powerful features, which haven't even been announced publicly yet
 
 ## Thank you for sponsoring Adept ❤️
 
 - Spoiledpay
 
 ## Roadmap
+
+Note: This timeline is subject to change at any time.
 
 | Start Date | Feature                               |  Time Budget |
 | ---------- | ------------------------------------- | ------------ |

@@ -4,7 +4,4 @@ a.o
 a.out
 bin/
 obj/
-__pycache__
-docs/OLD
 adeptd.lock
-src/kernel/src/v1

@@ -1,1 +1,0 @@
-# Adept VS Code Extension
